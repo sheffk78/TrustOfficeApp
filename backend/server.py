@@ -2280,6 +2280,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Start background task runner on app startup"""
+    try:
+        await background_runner.start()
+        logger.info("Background task runner started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start background runner: {e}")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    await background_runner.stop()
     client.close()
