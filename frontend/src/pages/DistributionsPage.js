@@ -137,6 +137,16 @@ export default function DistributionsPage() {
   };
 
   const handleUpdateStatus = async (distributionId, newStatus) => {
+    if (newStatus === 'approved') {
+      // Open approval modal for formal approval
+      const dist = distributions.find(d => d.distribution_id === distributionId);
+      setApprovalModal(dist);
+      setSolvencyConfirmed(false);
+      setRecusalAcknowledged(false);
+      return;
+    }
+    
+    // For decline, just update directly
     try {
       const response = await fetchWithAuth(`/distributions/${distributionId}?status=${newStatus}`, {
         method: 'PUT'
@@ -146,10 +156,42 @@ export default function DistributionsPage() {
         throw new Error('Failed to update status');
       }
 
-      toast.success(`Status updated to ${newStatus}`);
+      toast.success(`Distribution declined`);
       loadDistributions();
     } catch (error) {
       toast.error(error.message);
+    }
+  };
+
+  const handleApproveWithChecks = async () => {
+    if (!approvalModal) return;
+    
+    if (!solvencyConfirmed || !recusalAcknowledged) {
+      toast.error('Please confirm both solvency and recusal acknowledgments');
+      return;
+    }
+    
+    setApprovalLoading(true);
+    try {
+      const response = await fetchWithAuth(`/distributions/${approvalModal.distribution_id}/approve`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          solvency_confirmed: solvencyConfirmed,
+          recusal_acknowledged: recusalAcknowledged
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to approve distribution');
+      }
+
+      toast.success('Distribution approved');
+      setApprovalModal(null);
+      loadDistributions();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setApprovalLoading(false);
     }
   };
 
