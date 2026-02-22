@@ -51,10 +51,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const loadTrusts = useCallback(async () => {
+  // Internal function that doesn't depend on state
+  const loadTrustsInternal = async () => {
     try {
       const response = await fetch(`${API}/trusts`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders()
       });
       
       if (response.ok) {
@@ -62,14 +64,20 @@ export const AuthProvider = ({ children }) => {
         setTrusts(data);
         
         // Select first trust if none selected
-        if (data.length > 0 && !selectedTrust) {
-          setSelectedTrust(data[0]);
+        if (data.length > 0) {
+          const storedTrustId = localStorage.getItem('selected_trust_id');
+          const storedTrust = data.find(t => t.trust_id === storedTrustId);
+          setSelectedTrust(storedTrust || data[0]);
         }
       }
     } catch (error) {
       console.error('Failed to load trusts:', error);
     }
-  }, [selectedTrust]);
+  };
+
+  const loadTrusts = useCallback(async () => {
+    await loadTrustsInternal();
+  }, []);
 
   const login = useCallback(async (email, password) => {
     const response = await fetch(`${API}/auth/login`, {
