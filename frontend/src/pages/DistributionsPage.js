@@ -519,6 +519,106 @@ export default function DistributionsPage() {
           )}
         </div>
       </main>
+
+      {/* Approval Modal with Solvency & Recusal Checks */}
+      {approvalModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="approval-modal">
+          <div className="bg-white p-6 w-full max-w-md corner-mark">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-serif text-xl text-navy">Approve Distribution</h2>
+              <button 
+                onClick={() => setApprovalModal(null)} 
+                className="text-navy hover:text-gold"
+                data-testid="close-approval-modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Distribution Summary */}
+            <div className="p-4 bg-navy/5 border border-navy/10 mb-6">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Beneficiary</p>
+                  <p className="font-medium text-navy">{approvalModal.beneficiary_name || approvalModal.beneficiary}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Amount</p>
+                  <p className="font-mono text-navy">{formatCurrency(approvalModal.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Category</p>
+                  <p className="text-navy">{approvalModal.purpose_classification || approvalModal.category}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Date</p>
+                  <p className="font-mono text-navy">{formatDate(approvalModal.date)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Solvency Confirmation */}
+            <div className="space-y-4 mb-6">
+              <label className="flex items-start gap-3 p-4 border border-navy/20 cursor-pointer hover:border-navy/40 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={solvencyConfirmed}
+                  onChange={(e) => setSolvencyConfirmed(e.target.checked)}
+                  className="mt-1 w-5 h-5"
+                  data-testid="solvency-checkbox"
+                />
+                <div>
+                  <p className="font-medium text-navy">Solvency Confirmation</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    I confirm that the Trust has sufficient assets to make this distribution while meeting all other known obligations and maintaining appropriate reserves.
+                  </p>
+                </div>
+              </label>
+
+              {/* Recusal Acknowledgment */}
+              <label className="flex items-start gap-3 p-4 border border-navy/20 cursor-pointer hover:border-navy/40 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={recusalAcknowledged}
+                  onChange={(e) => setRecusalAcknowledged(e.target.checked)}
+                  className="mt-1 w-5 h-5"
+                  data-testid="recusal-checkbox"
+                />
+                <div>
+                  <p className="font-medium text-navy">Recusal Acknowledgment</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    I acknowledge that any trustee who is a beneficiary of this distribution has properly recused themselves from the approval decision.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setApprovalModal(null)} 
+                variant="outline" 
+                className="flex-1 btn-secondary"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleApproveWithChecks}
+                disabled={!solvencyConfirmed || !recusalAcknowledged || approvalLoading}
+                className="flex-1 btn-primary"
+                data-testid="confirm-approval-btn"
+              >
+                {approvalLoading ? 'Approving...' : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Approve Distribution
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
