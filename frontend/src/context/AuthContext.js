@@ -5,6 +5,15 @@ const API = `${BACKEND_URL}/api`;
 
 const AuthContext = createContext(null);
 
+// Helper to get auth headers including localStorage token as fallback
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    return { 'Authorization': `Bearer ${token}` };
+  }
+  return {};
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +30,8 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const response = await fetch(`${API}/auth/me`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders()
       });
       
       if (!response.ok) {
@@ -32,9 +42,10 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       
       // Load trusts after authentication
-      await loadTrusts();
+      await loadTrustsInternal();
     } catch (error) {
       setUser(null);
+      localStorage.removeItem('auth_token');
     } finally {
       setLoading(false);
     }
