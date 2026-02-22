@@ -70,9 +70,7 @@ export default function DistributionsPage() {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API}/distributions?trust_id=${selectedTrust.trust_id}`, {
-        credentials: 'include'
-      });
+      const response = await fetchWithAuth(`/distributions?trust_id=${selectedTrust.trust_id}`);
       if (response.ok) {
         setDistributions(await response.json());
       }
@@ -96,10 +94,8 @@ export default function DistributionsPage() {
 
     setFormLoading(true);
     try {
-      const response = await fetch(`${API}/distributions`, {
+      const response = await fetchWithAuth('/distributions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
           date: formData.date.toISOString(),
@@ -137,9 +133,8 @@ export default function DistributionsPage() {
 
   const handleUpdateStatus = async (distributionId, newStatus) => {
     try {
-      const response = await fetch(`${API}/distributions/${distributionId}?status=${newStatus}`, {
-        method: 'PUT',
-        credentials: 'include'
+      const response = await fetchWithAuth(`/distributions/${distributionId}?status=${newStatus}`, {
+        method: 'PUT'
       });
 
       if (!response.ok) {
