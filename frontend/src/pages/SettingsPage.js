@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const { user, selectedTrust, setSelectedTrust, loadTrusts } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
   const [trustData, setTrustData] = useState({
@@ -37,6 +38,40 @@ export default function SettingsPage() {
     review_cadence: selectedTrust?.review_cadence || 'quarterly',
     description: selectedTrust?.description || ''
   });
+
+  const handleExport = async (type) => {
+    setExportLoading(type);
+    try {
+      const token = localStorage.getItem('token') || document.cookie.split('; ').find(row => row.startsWith('session_token='))?.split('=')[1];
+      const trustParam = selectedTrust ? `?trust_id=${selectedTrust.trust_id}` : '';
+      
+      const response = await fetch(`${API_BASE}/api/export/${type}${trustParam}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${type}_export_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} exported successfully`);
+      } else {
+        toast.error('Export failed');
+      }
+    } catch (error) {
+      toast.error('Export failed');
+    } finally {
+      setExportLoading(null);
+    }
+  };
 
   const handleUpdateTrust = async () => {
     if (!selectedTrust) {
