@@ -422,7 +422,7 @@ def get_task_status(due_date: str, completed_at: Optional[str]) -> str:
             due = due.replace(tzinfo=timezone.utc)
         if due < datetime.now(timezone.utc):
             return "overdue"
-    except:
+    except (ValueError, AttributeError):
         pass
     
     return "upcoming"
