@@ -172,6 +172,14 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [checkAuth]);
 
+  // Wrapper to persist trust selection
+  const selectTrust = useCallback((trust) => {
+    setSelectedTrust(trust);
+    if (trust) {
+      localStorage.setItem('selected_trust_id', trust.trust_id);
+    }
+  }, []);
+
   const value = {
     user,
     setUser,
@@ -180,7 +188,7 @@ export const AuthProvider = ({ children }) => {
     trusts,
     setTrusts,
     selectedTrust,
-    setSelectedTrust,
+    setSelectedTrust: selectTrust,
     checkAuth,
     loadTrusts,
     login,
