@@ -98,13 +98,11 @@ export default function DistributionsPage() {
         method: 'POST',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
-          date: formData.date.toISOString(),
+          beneficiary_name: formData.beneficiary,
           amount: parseFloat(formData.amount),
-          distribution_type: formData.distribution_type,
-          beneficiary: formData.beneficiary,
-          category: formData.category,
-          notes: formData.notes || null,
-          status: formData.status
+          date: formData.date.toISOString().split('T')[0],
+          purpose_classification: formData.category,
+          notes: formData.notes || ''
         })
       });
 
