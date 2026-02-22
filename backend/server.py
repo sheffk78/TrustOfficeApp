@@ -1940,6 +1940,98 @@ async def stripe_webhook(request: Request):
     
     return {"status": "ok"}
 
+# ==================== EMAIL ENDPOINTS ====================
+
+@api_router.get("/email/status")
+async def get_email_status(user: dict = Depends(get_current_user)):
+    """Get email service status and configuration"""
+    return {
+        "configured": email_service.is_configured,
+        "from_email": email_service.from_email,
+        "from_name": email_service.from_name,
+        "available_templates": email_service.get_available_templates()
+    }
+
+@api_router.post("/email/test")
+async def send_test_email(user: dict = Depends(get_current_user)):
+    """Send a test welcome email to the current user"""
+    if not email_service.is_configured:
+        raise HTTPException(status_code=503, detail="Email service not configured")
+    
+    result = await email_service.send_welcome_email(
+        to_email=user["email"],
+        user_name=user.get("name", "")
+    )
+    
+    return {
+        "message": "Test email sent",
+        "recipient": user["email"],
+        "result": result
+    }
+
+@api_router.post("/email/send-task-reminders")
+async def send_task_reminders(background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
+    """
+    Manually trigger task reminder emails for upcoming/overdue tasks.
+    In production, this would be called by a cron job.
+    """
+    if not email_service.is_configured:
+        raise HTTPException(status_code=503, detail="Email service not configured")
+    
+    # Get all user's trusts
+    trusts = await db.trusts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
+    
+    emails_queued = 0
+    now = datetime.now(timezone.utc).date()
+    
+    for trust in trusts:
+        # Get upcoming tasks (due in next 7 days)
+        upcoming_date = (now + timedelta(days=7)).isoformat()
+        tasks = await db.governance_tasks.find({
+            "trust_id": trust["trust_id"],
+            "user_id": user["user_id"],
+            "status": {"$in": ["upcoming", "overdue"]}
+        }, {"_id": 0}).to_list(100)
+        
+        for task in tasks:
+            task_due = task.get("due_date", "")[:10]
+            
+            if task["status"] == "overdue":
+                # Calculate days overdue
+                try:
+                    due_date = datetime.fromisoformat(task_due).date()
+                    days_overdue = (now - due_date).days
+                except:
+                    days_overdue = 1
+                
+                background_tasks.add_task(
+                    email_service.send_task_overdue,
+                    to_email=user["email"],
+                    user_name=user.get("name", ""),
+                    trust_name=trust.get("name", ""),
+                    task_type=task.get("task_type", ""),
+                    due_date=task_due,
+                    days_overdue=days_overdue
+                )
+                emails_queued += 1
+            
+            elif task_due <= upcoming_date:
+                background_tasks.add_task(
+                    email_service.send_task_reminder,
+                    to_email=user["email"],
+                    user_name=user.get("name", ""),
+                    trust_name=trust.get("name", ""),
+                    task_type=task.get("task_type", ""),
+                    due_date=task_due,
+                    description=task.get("description", "")
+                )
+                emails_queued += 1
+    
+    return {
+        "message": f"Queued {emails_queued} reminder emails",
+        "emails_queued": emails_queued
+    }
+
 # ==================== DEMO DATA ====================
 
 @api_router.post("/demo/seed")
