@@ -152,7 +152,14 @@ export default function MinutesPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredMinutes.map((entry) => (
+              {filteredMinutes.map((entry) => {
+                const summary = entry.summary || `${(entry.minutes_type || 'Meeting').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Minutes`;
+                const details = entry.details || entry.decisions_text || '';
+                const entryDate = entry.date || entry.meeting_date;
+                const entryType = entry.entry_type || entry.minutes_type || 'meeting';
+                const participantCount = entry.participants?.length || (entry.participants_text ? entry.participants_text.split(',').length : 0);
+                
+                return (
                 <div 
                   key={entry.minutes_id} 
                   className="card-trust hover-lift cursor-pointer"
@@ -166,28 +173,28 @@ export default function MinutesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <h3 className="font-serif text-lg text-navy mb-1">{entry.summary}</h3>
-                          <p className="text-sm text-muted-foreground line-clamp-2">{entry.details}</p>
+                          <h3 className="font-serif text-lg text-navy mb-1">{summary}</h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{details}</p>
                         </div>
                         <ChevronRight className="w-5 h-5 text-navy/40 flex-shrink-0" />
                       </div>
                       <div className="flex flex-wrap items-center gap-4 mt-3">
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Calendar className="w-4 h-4" />
-                          <span className="font-mono text-xs">{formatDate(entry.date)}</span>
+                          <span className="font-mono text-xs">{formatDate(entryDate)}</span>
                         </div>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Users className="w-4 h-4" />
-                          <span className="font-mono text-xs">{entry.participants.length} participants</span>
+                          <span className="font-mono text-xs">{participantCount} participants</span>
                         </div>
                         <span className="badge-trust">
-                          {getEntryTypeLabel(entry.entry_type)}
+                          {getEntryTypeLabel(entryType)}
                         </span>
                       </div>
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </div>
