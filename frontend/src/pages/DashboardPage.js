@@ -297,6 +297,114 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
+              {/* Onboarding Checklist */}
+              {onboarding && !onboarding.checklist_dismissed && onboardingProgress.completed < onboardingProgress.total && (
+                <div className="mb-8 card-trust border-l-4 border-l-gold bg-gold/5" data-testid="onboarding-checklist">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gold/20 flex items-center justify-center text-gold">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-lg text-navy">Getting Started</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {onboardingProgress.completed}/{onboardingProgress.total} steps completed
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={dismissOnboarding}
+                      className="text-muted-foreground hover:text-navy"
+                      data-testid="dismiss-onboarding"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {onboardingProgress.steps.map(step => {
+                      const Icon = step.icon;
+                      return (
+                        <button
+                          key={step.id}
+                          onClick={() => !step.done && navigate(step.action)}
+                          disabled={step.done}
+                          className={`p-3 border text-left transition-colors ${
+                            step.done 
+                              ? 'border-success/30 bg-success/5 cursor-default' 
+                              : 'border-navy/20 hover:border-navy/40 cursor-pointer'
+                          }`}
+                          data-testid={`onboarding-step-${step.id}`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            {step.done ? (
+                              <CheckCircle2 className="w-4 h-4 text-success" />
+                            ) : (
+                              <Circle className="w-4 h-4 text-muted-foreground" />
+                            )}
+                            <Icon className={`w-4 h-4 ${step.done ? 'text-success' : 'text-navy'}`} />
+                          </div>
+                          <span className={`font-mono text-xs ${step.done ? 'text-success line-through' : 'text-navy'}`}>
+                            {step.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Governance Insights - Only show if there are issues */}
+              {insights.length > 0 && (
+                <div className="mb-8 card-trust corner-mark border-l-4 border-l-warning" data-testid="governance-insights">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-warning/20 flex items-center justify-center text-warning">
+                      <Lightbulb className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-lg text-navy">Governance Insights</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Actions to improve your health score (+{insights.reduce((sum, i) => sum + i.points, 0)} potential points)
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {insights.slice(0, 3).map((insight, index) => (
+                      <div 
+                        key={index}
+                        className={`p-4 border ${
+                          insight.type === 'error' ? 'border-error/30 bg-error/5' :
+                          insight.type === 'warning' ? 'border-warning/30 bg-warning/5' :
+                          'border-navy/20 bg-navy/5'
+                        }`}
+                        data-testid={`insight-${index}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className={`w-8 h-8 flex items-center justify-center ${
+                            insight.type === 'error' ? 'bg-error/20 text-error' :
+                            insight.type === 'warning' ? 'bg-warning/20 text-warning' :
+                            'bg-navy/10 text-navy'
+                          }`}>
+                            {insight.icon}
+                          </div>
+                          <span className="badge-trust bg-navy/10 text-navy">+{insight.points} pts</span>
+                        </div>
+                        <h4 className="font-medium text-navy text-sm mb-1">{insight.title}</h4>
+                        <p className="text-xs text-muted-foreground mb-3">{insight.description}</p>
+                        <Button 
+                          onClick={() => navigate(insight.action)}
+                          size="sm"
+                          className="w-full btn-secondary text-xs"
+                        >
+                          {insight.actionLabel}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Top Row - Governance Score & Quick Actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 {/* Governance Health Score */}
