@@ -420,19 +420,21 @@ export default function DistributionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredDistributions.map((dist) => (
+                  {filteredDistributions.map((dist) => {
+                    const status = dist.approved_at ? 'approved' : 'review';
+                    return (
                     <tr key={dist.distribution_id} data-testid={`dist-row-${dist.distribution_id}`}>
                       <td>{formatDate(dist.date)}</td>
-                      <td>{dist.beneficiary}</td>
-                      <td>{dist.category}</td>
+                      <td>{dist.beneficiary_name || dist.beneficiary || '-'}</td>
+                      <td>{dist.purpose_classification || dist.category || '-'}</td>
                       <td className="text-right font-mono">{formatCurrency(dist.amount)}</td>
                       <td className="text-center">
-                        <span className={`badge-trust ${getStatusBadgeClass(dist.status)}`}>
-                          {dist.status}
+                        <span className={`badge-trust ${getStatusBadgeClass(status)}`}>
+                          {status}
                         </span>
                       </td>
                       <td className="text-center">
-                        {dist.status === 'review' && (
+                        {status === 'review' && (
                           <div className="flex justify-center gap-2">
                             <button
                               onClick={() => handleUpdateStatus(dist.distribution_id, 'approved')}
@@ -452,7 +454,7 @@ export default function DistributionsPage() {
                             </button>
                           </div>
                         )}
-                        {dist.status !== 'review' && (
+                        {status !== 'review' && (
                           <button
                             onClick={() => handleUpdateStatus(dist.distribution_id, 'review')}
                             className="p-1 hover:bg-warning/10 text-warning"
@@ -463,7 +465,7 @@ export default function DistributionsPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
