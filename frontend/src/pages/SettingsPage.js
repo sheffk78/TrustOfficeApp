@@ -166,6 +166,99 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Billing Section */}
+          <div className="card-trust mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <CreditCard className="w-5 h-5 text-navy" />
+              <h2 className="font-serif text-xl text-navy">Billing & Subscription</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Manage your subscription, view billing history, and update payment methods.
+            </p>
+            <Button
+              onClick={() => navigate('/settings/billing')}
+              className="btn-secondary"
+              data-testid="go-to-billing-btn"
+            >
+              Manage Subscription
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+
+          {/* Export Data Section */}
+          <div className="card-trust mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Download className="w-5 h-5 text-navy" />
+              <h2 className="font-serif text-xl text-navy">Export Data</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Download your data as CSV files for backup or reporting purposes.
+              {selectedTrust && <span className="text-navy font-medium"> Exporting for: {selectedTrust.name}</span>}
+            </p>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Button
+                onClick={() => handleExport('minutes')}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+                disabled={exportLoading === 'minutes'}
+                data-testid="export-minutes-btn"
+              >
+                {exportLoading === 'minutes' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                Minutes
+              </Button>
+              
+              <Button
+                onClick={() => handleExport('distributions')}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+                disabled={exportLoading === 'distributions'}
+                data-testid="export-distributions-btn"
+              >
+                {exportLoading === 'distributions' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                Distributions
+              </Button>
+              
+              <Button
+                onClick={() => handleExport('compensation')}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+                disabled={exportLoading === 'compensation'}
+                data-testid="export-compensation-btn"
+              >
+                {exportLoading === 'compensation' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                Compensation
+              </Button>
+              
+              <Button
+                onClick={() => handleExport('tasks')}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+                disabled={exportLoading === 'tasks'}
+                data-testid="export-tasks-btn"
+              >
+                {exportLoading === 'tasks' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                Tasks
+              </Button>
+            </div>
+          </div>
+
           {/* Trust Settings */}
           {selectedTrust && (
             <div className="card-trust mb-8">
