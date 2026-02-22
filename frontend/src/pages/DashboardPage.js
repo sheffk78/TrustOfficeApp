@@ -123,9 +123,125 @@ export default function DashboardPage() {
       case 'minutes': return <FileText className="w-4 h-4" />;
       case 'distribution': return <DollarSign className="w-4 h-4" />;
       case 'expense': return <Receipt className="w-4 h-4" />;
+      case 'compensation': return <Wallet className="w-4 h-4" />;
+      case 'task': return <CheckCircle2 className="w-4 h-4" />;
       default: return <FileText className="w-4 h-4" />;
     }
   };
+
+  // Generate actionable insights from health criteria
+  const getInsights = () => {
+    if (!healthDetails?.criteria) return [];
+    
+    const insights = [];
+    const criteria = healthDetails.criteria;
+    
+    criteria.forEach(c => {
+      if (!c.achieved) {
+        switch (c.name) {
+          case 'Quarterly Minutes':
+            insights.push({
+              type: 'warning',
+              icon: <FileText className="w-4 h-4" />,
+              title: 'Missing Q Minutes',
+              description: 'Generate minutes this quarter to earn +20 points',
+              action: '/minutes/new',
+              actionLabel: 'Record Now',
+              points: 20
+            });
+            break;
+          case 'Task Compliance':
+            insights.push({
+              type: 'error',
+              icon: <Calendar className="w-4 h-4" />,
+              title: 'Overdue Tasks',
+              description: 'Complete overdue tasks to earn +20 points',
+              action: '/calendar',
+              actionLabel: 'View Tasks',
+              points: 20
+            });
+            break;
+          case 'Compensation Alignment':
+            insights.push({
+              type: 'error',
+              icon: <Wallet className="w-4 h-4" />,
+              title: 'Compensation Over Plan',
+              description: 'YTD compensation exceeds approved amount',
+              action: '/compensation',
+              actionLabel: 'Review',
+              points: 20
+            });
+            break;
+          case 'Distribution Documentation':
+            insights.push({
+              type: 'info',
+              icon: <DollarSign className="w-4 h-4" />,
+              title: 'No Distributions Logged',
+              description: 'Log your first distribution to earn +20 points',
+              action: '/distributions',
+              actionLabel: 'Add Distribution',
+              points: 20
+            });
+            break;
+          case 'Annual Review':
+            insights.push({
+              type: 'warning',
+              icon: <TrendingUp className="w-4 h-4" />,
+              title: 'Annual Review Due',
+              description: 'Complete annual review for +20 points',
+              action: '/calendar',
+              actionLabel: 'Schedule Review',
+              points: 20
+            });
+            break;
+        }
+      }
+    });
+    
+    return insights;
+  };
+
+  // Calculate onboarding progress
+  const getOnboardingProgress = () => {
+    if (!onboarding) return { completed: 0, total: 4, steps: [] };
+    
+    const steps = [
+      { 
+        id: 'entities', 
+        label: 'Confirm Entities', 
+        done: onboarding.entities_confirmed,
+        icon: Building2,
+        action: '/entities'
+      },
+      { 
+        id: 'calendar', 
+        label: 'Set Up Calendar', 
+        done: onboarding.calendar_set,
+        icon: Calendar,
+        action: '/calendar'
+      },
+      { 
+        id: 'minutes', 
+        label: 'Generate Minutes', 
+        done: onboarding.minutes_generated,
+        icon: FileText,
+        action: '/minutes/new'
+      },
+      { 
+        id: 'distribution', 
+        label: 'Log Distribution', 
+        done: onboarding.distribution_logged,
+        icon: DollarSign,
+        action: '/distributions'
+      }
+    ];
+    
+    const completed = steps.filter(s => s.done).length;
+    return { completed, total: steps.length, steps };
+  };
+
+  const insights = getInsights();
+  const onboardingProgress = getOnboardingProgress();
 
   // Empty state - no trusts
   if (!loading && trusts.length === 0) {
