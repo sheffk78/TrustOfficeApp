@@ -13,6 +13,12 @@ import ExpensesPage from "@/pages/ExpensesPage";
 import GovernancePage from "@/pages/GovernancePage";
 import SettingsPage from "@/pages/SettingsPage";
 import OnboardingPage from "@/pages/OnboardingPage";
+import CalendarPage from "@/pages/CalendarPage";
+import EntitiesPage from "@/pages/EntitiesPage";
+import EntityDetailPage from "@/pages/EntityDetailPage";
+import StructurePage from "@/pages/StructurePage";
+import CompensationPage from "@/pages/CompensationPage";
+import BillingPage from "@/pages/BillingPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 // Protected Route component
