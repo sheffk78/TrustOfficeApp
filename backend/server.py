@@ -1925,6 +1925,126 @@ async def verify_payment(session_id: str, user: dict = Depends(get_current_user)
         logger.error(f"Stripe verification error: {e}")
         raise HTTPException(status_code=500, detail="Payment verification failed")
 
+@api_router.post("/subscription/create-portal")
+async def create_customer_portal(portal: PortalRequest, user: dict = Depends(get_current_user)):
+    """Create a Stripe customer portal session for managing subscription"""
+    sub = await get_or_create_subscription(user["user_id"])
+    
+    if not sub.get("stripe_customer_id"):
+        raise HTTPException(status_code=400, detail="No billing account found. Please subscribe first.")
+    
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=sub["stripe_customer_id"],
+            return_url=portal.return_url
+        )
+        return {"portal_url": session.url}
+    except stripe.StripeError as e:
+        logger.error(f"Stripe portal error: {e}")
+        raise HTTPException(status_code=500, detail="Could not create billing portal")
+
+@api_router.post("/subscription/cancel")
+async def cancel_subscription(user: dict = Depends(get_current_user)):
+    """Cancel subscription at end of current billing period"""
+    sub = await get_or_create_subscription(user["user_id"])
+    
+    if not sub.get("stripe_subscription_id"):
+        raise HTTPException(status_code=400, detail="No active subscription found")
+    
+    try:
+        # Cancel at period end (user keeps access until subscription ends)
+        stripe_sub = stripe.Subscription.modify(
+            sub["stripe_subscription_id"],
+            cancel_at_period_end=True
+        )
+        
+        await db.subscriptions.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        cancel_date = datetime.fromtimestamp(
+            stripe_sub.current_period_end, tz=timezone.utc
+        ).strftime('%B %d, %Y')
+        
+        return {
+            "status": "canceled",
+            "message": f"Your subscription will be canceled on {cancel_date}. You'll have access until then.",
+            "cancel_at": stripe_sub.current_period_end
+        }
+    except stripe.StripeError as e:
+        logger.error(f"Stripe cancel error: {e}")
+        raise HTTPException(status_code=500, detail="Could not cancel subscription")
+
+@api_router.post("/subscription/reactivate")
+async def reactivate_subscription(user: dict = Depends(get_current_user)):
+    """Reactivate a subscription that was set to cancel at period end"""
+    sub = await get_or_create_subscription(user["user_id"])
+    
+    if not sub.get("stripe_subscription_id"):
+        raise HTTPException(status_code=400, detail="No subscription found")
+    
+    try:
+        stripe_sub = stripe.Subscription.modify(
+            sub["stripe_subscription_id"],
+            cancel_at_period_end=False
+        )
+        
+        await db.subscriptions.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        return {
+            "status": "active",
+            "message": "Your subscription has been reactivated."
+        }
+    except stripe.StripeError as e:
+        logger.error(f"Stripe reactivate error: {e}")
+        raise HTTPException(status_code=500, detail="Could not reactivate subscription")
+
+@api_router.post("/subscription/upgrade")
+async def upgrade_subscription(user: dict = Depends(get_current_user)):
+    """Upgrade from monthly to annual plan"""
+    sub = await get_or_create_subscription(user["user_id"])
+    
+    if not sub.get("stripe_subscription_id"):
+        raise HTTPException(status_code=400, detail="No active subscription found")
+    
+    if sub.get("plan_type") == "annual":
+        raise HTTPException(status_code=400, detail="Already on annual plan")
+    
+    try:
+        # Get current subscription
+        stripe_sub = stripe.Subscription.retrieve(sub["stripe_subscription_id"])
+        
+        # Update to annual price
+        stripe.Subscription.modify(
+            sub["stripe_subscription_id"],
+            items=[{
+                "id": stripe_sub["items"]["data"][0]["id"],
+                "price": STRIPE_ANNUAL_PRICE_ID
+            }],
+            proration_behavior="create_prorations"
+        )
+        
+        await db.subscriptions.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {
+                "plan_type": "annual",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "status": "upgraded",
+            "message": "Successfully upgraded to annual plan. You'll be charged the prorated difference.",
+            "new_plan": "annual"
+        }
+    except stripe.StripeError as e:
+        logger.error(f"Stripe upgrade error: {e}")
+        raise HTTPException(status_code=500, detail="Could not upgrade subscription")
+
 @api_router.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
     """Handle Stripe webhook events"""
