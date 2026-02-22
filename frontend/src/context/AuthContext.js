@@ -155,17 +155,18 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await fetch(`${API}/demo/seed`, {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders()
       });
       
       if (response.ok) {
-        await loadTrusts();
+        await loadTrustsInternal();
         return await response.json();
       }
     } catch (error) {
       console.error('Failed to seed demo data:', error);
     }
-  }, [loadTrusts]);
+  }, []);
 
   useEffect(() => {
     checkAuth();
