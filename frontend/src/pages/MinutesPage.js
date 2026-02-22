@@ -34,9 +34,7 @@ export default function MinutesPage() {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API}/minutes?trust_id=${selectedTrust.trust_id}`, {
-        credentials: 'include'
-      });
+      const response = await fetchWithAuth(`/minutes?trust_id=${selectedTrust.trust_id}`);
       if (response.ok) {
         setMinutes(await response.json());
       }
