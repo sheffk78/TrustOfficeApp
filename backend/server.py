@@ -29,6 +29,13 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'trustoffice_secret_key_change_in_prod
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
+# Stripe Config
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET')
+STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID')
+STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
+TRIAL_DAYS = 14
+
 # Create the main app
 app = FastAPI(title="TrustOffice API")
 
