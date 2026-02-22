@@ -2127,7 +2127,7 @@ async def reactivate_subscription(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="No subscription found")
     
     try:
-        stripe_sub = stripe.Subscription.modify(
+        stripe.Subscription.modify(
             sub["stripe_subscription_id"],
             cancel_at_period_end=False
         )
