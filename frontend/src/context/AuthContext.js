@@ -93,6 +93,10 @@ export const AuthProvider = ({ children }) => {
     }
     
     const data = await response.json();
+    // Store token in localStorage as backup for cookie issues
+    if (data.token) {
+      localStorage.setItem('auth_token', data.token);
+    }
     setUser(data.user);
     return data;
   }, []);
