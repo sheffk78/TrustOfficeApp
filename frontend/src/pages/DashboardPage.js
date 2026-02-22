@@ -36,17 +36,13 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       // Load governance score
-      const govResponse = await fetch(`${API}/governance/${selectedTrust.trust_id}`, {
-        credentials: 'include'
-      });
+      const govResponse = await fetchWithAuth(`/governance/${selectedTrust.trust_id}`);
       if (govResponse.ok) {
         setGovernance(await govResponse.json());
       }
 
       // Load recent activity
-      const actResponse = await fetch(`${API}/activity?trust_id=${selectedTrust.trust_id}&limit=10`, {
-        credentials: 'include'
-      });
+      const actResponse = await fetchWithAuth(`/activity?trust_id=${selectedTrust.trust_id}&limit=10`);
       if (actResponse.ok) {
         setActivities(await actResponse.json());
       }
