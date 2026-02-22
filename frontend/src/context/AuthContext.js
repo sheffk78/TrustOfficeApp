@@ -120,12 +120,15 @@ export const AuthProvider = ({ children }) => {
     try {
       await fetch(`${API}/auth/logout`, {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders()
       });
     } catch (error) {
       console.error('Logout error:', error);
     }
     
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('selected_trust_id');
     setUser(null);
     setTrusts([]);
     setSelectedTrust(null);
