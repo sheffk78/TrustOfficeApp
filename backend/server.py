@@ -2019,7 +2019,7 @@ async def send_task_reminders(background_tasks: BackgroundTasks, user: dict = De
                 )
                 emails_queued += 1
             
-            elif task_due <= upcoming_date:
+            elif task_status == "upcoming" and task_due <= upcoming_date:
                 background_tasks.add_task(
                     email_service.send_task_reminder,
                     to_email=user["email"],
