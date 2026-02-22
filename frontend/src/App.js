@@ -73,6 +73,11 @@ const AppRouter = () => {
           <DashboardPage />
         </ProtectedRoute>
       } />
+      <Route path="/calendar" element={
+        <ProtectedRoute>
+          <CalendarPage />
+        </ProtectedRoute>
+      } />
       <Route path="/minutes" element={
         <ProtectedRoute>
           <MinutesPage />
@@ -88,9 +93,29 @@ const AppRouter = () => {
           <DistributionsPage />
         </ProtectedRoute>
       } />
+      <Route path="/compensation" element={
+        <ProtectedRoute>
+          <CompensationPage />
+        </ProtectedRoute>
+      } />
       <Route path="/expenses" element={
         <ProtectedRoute>
           <ExpensesPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/entities" element={
+        <ProtectedRoute>
+          <EntitiesPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/entities/:entityId" element={
+        <ProtectedRoute>
+          <EntityDetailPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/structure" element={
+        <ProtectedRoute>
+          <StructurePage />
         </ProtectedRoute>
       } />
       <Route path="/governance" element={
@@ -101,6 +126,11 @@ const AppRouter = () => {
       <Route path="/settings" element={
         <ProtectedRoute>
           <SettingsPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/billing" element={
+        <ProtectedRoute>
+          <BillingPage />
         </ProtectedRoute>
       } />
     </Routes>
