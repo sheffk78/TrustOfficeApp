@@ -597,6 +597,8 @@ export default function DashboardPage() {
                           <div className={`w-8 h-8 flex items-center justify-center ${
                             activity.type === 'minutes' ? 'bg-navy/10 text-navy' :
                             activity.type === 'distribution' ? 'bg-gold/20 text-gold' :
+                            activity.type === 'compensation' ? 'bg-navy/10 text-navy' :
+                            activity.type === 'task' ? 'bg-success/20 text-success' :
                             'bg-muted text-muted-foreground'
                           }`}>
                             {getActivityIcon(activity.type)}
