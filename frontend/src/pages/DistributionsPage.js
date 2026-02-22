@@ -58,7 +58,8 @@ export default function DistributionsPage() {
       const response = await fetch(`${API}/categories`);
       if (response.ok) {
         const data = await response.json();
-        setCategories(data.distribution_categories || []);
+        // Use purpose_classifications from backend
+        setCategories(data.purpose_classifications || data.distribution_categories || []);
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
