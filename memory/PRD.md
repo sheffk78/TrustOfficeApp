@@ -12,6 +12,7 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - **Auth**: JWT + Emergent-managed Google OAuth
 - **Payments**: Stripe (test mode)
 - **PDF Generation**: ReportLab
+- **Email**: Postmark (transactional emails)
 
 ### Design System (AnchorPoint)
 - Primary: Navy #010079
@@ -25,53 +26,52 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - Fixed race condition - users stay logged in on page refresh
 
 ### Dashboard Enhancements ✅
-- **Governance Insights Panel**: Actionable recommendations with +pts badges
-- **5-Criteria Health Score Display**: Visual checkmarks for achieved criteria
-- **Onboarding Checklist**: Auto-updating, dismissible getting started guide
+- Governance Insights Panel with actionable recommendations
+- 5-Criteria Health Score Display with checkmarks
+- Onboarding Checklist (auto-updating, dismissible)
 
 ### Distribution Approval Workflow ✅
-- **Approval Modal** with solvency confirmation + recusal acknowledgment
+- Approval Modal with solvency + recusal confirmations
 
-### PDF Generation for Minutes ✅ NEW (P1)
-- **ReportLab PDF generation** with professional formatting
-- **Preview Modal** with embedded iframe viewer
-- **Download Button** for saving PDFs locally
-- API: `/api/minutes/{id}/pdf` returns base64-encoded PDF
+### PDF Generation for Minutes ✅
+- ReportLab PDF with professional formatting
+- Preview modal with Download button
 
-### Historical Health Score Chart ✅ NEW (P1)
-- **30-Day Trend Chart** with SVG rendering
-- **Daily Score Snapshots** stored in database
-- **Trend Indicator** showing +/- points over 30 days
-- API: `/api/governance/{id}/history?days=30`
+### Historical Health Score Chart ✅
+- 30-day trend chart with SVG rendering
+- Daily score snapshots
 
-### Updated Governance Page ✅ NEW (P1)
-- **5-Criteria Assessment** with checkmarks and descriptions
-- **Score Breakdown** showing points per criterion
-- **How Scoring Works** guide with 5 criteria cards
-- **Score Ranges Legend** (Excellent/Needs Attention/Critical)
+### Postmark Email Integration ✅ NEW
+**Configuration:**
+- From: no-reply@contact.trustoffice.app
+- Server Token: Configured in .env
 
-### Backend APIs (36 endpoints, 100% tested)
-- Auth: register, login, google, callback, session, me, logout
-- Trusts: CRUD + demo seeding
-- Entities: CRUD with EGP fields
-- Entity Relationships: CRUD for hierarchy
-- Governance Tasks: CRUD + complete/uncomplete
-- Minutes: CRUD + PDF generation
-- Distributions: CRUD + approval workflow
-- Compensation: Plans + payments + YTD
-- Governance Health: 5-criteria + history
-- Onboarding: Auto-updating checklist
-- Subscription: Stripe integration
+**6 Email Templates (centralized in `email_templates.py`):**
+1. `welcome` - Sent on new user registration
+2. `task_reminder` - Upcoming governance task reminders
+3. `task_overdue` - Overdue task alerts (red styling)
+4. `minutes_created` - When new minutes are logged
+5. `distribution_created` - When new distribution is logged
+6. `distribution_approved` - When distribution is approved
+
+**Automatic Email Triggers:**
+- User registration → Welcome email
+- Create minutes → Minutes notification
+- Create distribution → Distribution notification
+- Approve distribution → Approval confirmation
+
+**API Endpoints:**
+- `GET /api/email/status` - Check configuration
+- `POST /api/email/test` - Send test email
+- `POST /api/email/send-task-reminders` - Trigger task reminders
+
+**Note:** Postmark sandbox mode restricts sending to domains matching from address until account approval.
+
+### Backend APIs (48 endpoints, 100% tested)
+- Auth, Trusts, Entities, Relationships, Tasks, Minutes, Distributions, Compensation, Health, Onboarding, Subscription, Email
 
 ### Frontend Pages (All implemented)
-- Login/Signup, Onboarding, Dashboard
-- Calendar, Minutes (with PDF), Distributions (with approval)
-- Compensation, Entities, Entity Detail, Structure
-- Governance Health (with chart), Settings, Billing
-
-### Stripe Integration ✅
-- 14-day free trial
-- Monthly: $79/month | Annual: $790/year (2 months free)
+- Login/Signup, Onboarding, Dashboard, Calendar, Minutes (PDF), Distributions (approval), Compensation, Entities, Entity Detail, Structure, Governance Health (chart), Settings, Billing
 
 ## Test Credentials
 - Email: test@trustoffice.com
@@ -79,17 +79,12 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Prioritized Backlog
 
-### P0 (Critical) - ✅ COMPLETE
-- Session persistence, all pages, health score, Stripe
-
-### P1 (High Priority) - ✅ COMPLETE
-- PDF generation for minutes
-- Historical health score chart
-- Updated governance page with 5-criteria
+### P0-P1 - ✅ COMPLETE
+- Session persistence, all pages, health score, Stripe, PDF generation, historical chart, email integration
 
 ### P2 (Medium Priority)
-- [ ] Email notifications for task reminders
-- [ ] Background cron for task status updates
+- [ ] Automated cron job for daily task reminders
+- [ ] Background task status updates
 - [ ] Audit log with detailed history
 - [ ] Export data to CSV
 
@@ -100,6 +95,6 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - [ ] AI-assisted minutes drafting
 
 ## Next Tasks
-1. Email notifications for overdue tasks
+1. Set up cron job for automated daily task reminders
 2. Background job for auto-updating task statuses
 3. Audit log for tracking all changes
