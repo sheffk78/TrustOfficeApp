@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { fetchWithAuth } from '@/utils/api';
 import { 
   Shield,
   Calendar,
@@ -11,9 +12,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 export default function GovernancePage() {
   const { selectedTrust } = useAuth();
