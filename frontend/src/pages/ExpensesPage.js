@@ -68,9 +68,7 @@ export default function ExpensesPage() {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API}/expenses?trust_id=${selectedTrust.trust_id}`, {
-        credentials: 'include'
-      });
+      const response = await fetchWithAuth(`/expenses?trust_id=${selectedTrust.trust_id}`);
       if (response.ok) {
         setExpenses(await response.json());
       }
@@ -94,10 +92,8 @@ export default function ExpensesPage() {
 
     setFormLoading(true);
     try {
-      const response = await fetch(`${API}/expenses`, {
+      const response = await fetchWithAuth('/expenses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
           date: formData.date.toISOString(),
@@ -133,9 +129,8 @@ export default function ExpensesPage() {
 
   const handleUpdateStatus = async (expenseId, newStatus) => {
     try {
-      const response = await fetch(`${API}/expenses/${expenseId}?status=${newStatus}`, {
-        method: 'PUT',
-        credentials: 'include'
+      const response = await fetchWithAuth(`/expenses/${expenseId}?status=${newStatus}`, {
+        method: 'PUT'
       });
 
       if (!response.ok) {
