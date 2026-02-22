@@ -1,0 +1,134 @@
+{
+  "project_name": "TrustOffice",
+  "design_philosophy": {
+    "name": "The Royal Ledger",
+    "description": "A high-end, brutalist-fintech workspace that feels like a digitized legal document. Precise, authoritative, and permanent. No softness, no ambiguity.",
+    "core_principles": [
+      "Sharpness over Softness: 0px border-radius everywhere.",
+      "Ink on Paper: High contrast Navy text on White backgrounds.",
+      "Value in Gold: Use Gold (#D5AD36) only for high-value actions or accents.",
+      "Data is Truth: Monospace fonts for all numbers, dates, and financial data.",
+      "Structure is Beauty: Visible borders, grids, and lines."
+    ]
+  },
+  "theme": {
+    "mode": "light",
+    "colors": {
+      "primary": "#010079",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#D5AD36",
+      "secondary_foreground": "#010079",
+      "background": "#FFFFFF",
+      "foreground": "#010079",
+      "muted": "#F1F5F9",
+      "muted_foreground": "#64748B",
+      "border": "#010079",
+      "input": "#E2E8F0",
+      "ring": "#D5AD36",
+      "chart_1": "#010079",
+      "chart_2": "#D5AD36",
+      "chart_3": "#1E293B",
+      "chart_4": "#64748B",
+      "chart_5": "#94A3B8"
+    },
+    "typography": {
+      "font_family": {
+        "sans": ["DM Sans", "sans-serif"],
+        "serif": ["Cormorant Garamond", "serif"],
+        "mono": ["JetBrains Mono", "monospace"]
+      },
+      "usage": {
+        "headings": "font-serif text-primary tracking-tight font-semibold",
+        "body": "font-sans text-foreground/80 leading-relaxed",
+        "data": "font-mono text-sm tracking-wide text-primary",
+        "labels": "font-mono text-xs uppercase tracking-widest text-muted-foreground"
+      }
+    },
+    "spacing": {
+      "container_padding": "p-8 md:p-12",
+      "card_padding": "p-6",
+      "section_gap": "gap-8"
+    },
+    "borders": {
+      "radius": "0px",
+      "width": "1px",
+      "style": "solid",
+      "color": "border-primary/20"
+    },
+    "shadows": {
+      "default": "none",
+      "hover": "none",
+      "active": "none",
+      "floating": "4px 4px 0px 0px #010079"
+    }
+  },
+  "assets": {
+    "logo_horizontal": "https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/5h7i559r_Trust%20Office%20Logo%20%281%29.svg",
+    "logo_vertical": "https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/eqrftij2_Trust%20Office%20-%20Vertical.svg",
+    "backgrounds": {
+      "login_texture": "https://images.pexels.com/photos/4709486/pexels-photo-4709486.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+    }
+  },
+  "components": {
+    "Button": {
+      "default": "bg-primary text-white hover:bg-primary/90 rounded-none border border-primary font-sans uppercase tracking-wider text-xs h-10 px-6",
+      "secondary": "bg-transparent text-primary border border-primary hover:bg-primary hover:text-white rounded-none font-sans uppercase tracking-wider text-xs h-10 px-6",
+      "ghost": "bg-transparent text-primary hover:bg-muted rounded-none",
+      "gold": "bg-secondary text-primary hover:bg-secondary/90 border border-secondary font-bold"
+    },
+    "Card": {
+      "wrapper": "bg-white border border-primary/20 rounded-none p-6 relative overflow-hidden",
+      "header": "font-serif text-2xl text-primary mb-4 border-b border-primary/10 pb-2",
+      "corner_mark": "absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-secondary"
+    },
+    "Input": {
+      "base": "rounded-none border-primary/30 focus:border-secondary focus:ring-1 focus:ring-secondary bg-white font-mono text-sm h-10"
+    },
+    "Badge": {
+      "base": "rounded-none border border-primary text-primary bg-transparent font-mono text-[10px] uppercase px-2 py-0.5"
+    },
+    "Sidebar": {
+      "container": "w-64 fixed left-0 top-0 h-full bg-primary text-white border-r border-primary z-50",
+      "item": "flex items-center gap-3 px-6 py-3 text-sm font-sans hover:bg-white/10 text-white/80 hover:text-white transition-colors border-l-2 border-transparent hover:border-secondary",
+      "active_item": "bg-white/10 text-white border-l-2 border-secondary font-medium"
+    },
+    "Table": {
+      "header": "bg-muted/50 text-primary font-mono text-xs uppercase tracking-wider border-b-2 border-primary",
+      "row": "border-b border-primary/10 hover:bg-muted/20 transition-colors",
+      "cell": "py-4 px-4 font-mono text-sm"
+    }
+  },
+  "layout_rules": {
+    "sidebar_width": "256px",
+    "main_content_margin": "ml-64",
+    "max_width": "max-w-7xl",
+    "grid_columns": "grid-cols-1 md:grid-cols-12",
+    "gap": "gap-6"
+  },
+  "instructions_to_main_agent": [
+    "1. UPDATE TAILWIND CONFIG: Add the custom colors (primary: #010079, secondary: #D5AD36) and fonts (Cormorant Garamond, DM Sans, JetBrains Mono) immediately.",
+    "2. INSTALL FONTS: Add the Google Fonts import to index.css: @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');",
+    "3. SHARP CORNERS: Ensure 'rounded-none' is applied globally or via the radius variable in tailwind config (set --radius: 0rem).",
+    "4. BORDERS: Use visible 1px borders for separation instead of shadows. Use 'border-primary/20' for subtle dividers.",
+    "5. MONOSPACE DATA: Any number, date, currency, or ID MUST be in JetBrains Mono.",
+    "6. SIDEBAR: Implement the fixed sidebar with the specific Navy background (#010079).",
+    "7. TRUST SCORE: Display the Governance Health Score prominently using a large Serif font or a radial chart with Navy/Gold colors.",
+    "8. CORNER MARKS: Add decorative 'L' shapes (Gold color) to the corners of key dashboard cards using pseudo-elements to reinforce the 'technical/blueprint' aesthetic.",
+    "9. LOGIN PAGE: Use the provided marble texture as a subtle background with a Navy overlay (opacity 90%) or as a side panel."
+  ],
+  "universal_guidelines": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) ONLY for overlays, not main cards.",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; }.",
+    "Always use modern button styles (Sharp rectangles in this case) with interaction animations.",
+    "Every interaction needs micro-animations - hover states, transitions.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations.",
+    "Components MUST use named exports.",
+    "Pages MUST use default exports.",
+    "Use 'sonner' for toasts."
+  ]
+}
