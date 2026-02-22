@@ -2037,6 +2037,59 @@ async def send_task_reminders(background_tasks: BackgroundTasks, user: dict = De
         "emails_queued": emails_queued
     }
 
+# ==================== BACKGROUND JOBS ENDPOINTS ====================
+
+@api_router.get("/background-jobs/status")
+async def get_background_jobs_status(user: dict = Depends(get_current_user)):
+    """Get status of scheduled background jobs"""
+    return {
+        "running": background_runner.running,
+        "jobs": background_runner.get_jobs_info(),
+        "scheduler_active": background_runner.scheduler is not None and background_runner.scheduler.running if background_runner.scheduler else False
+    }
+
+@api_router.post("/background-jobs/run/task-status-update")
+async def trigger_task_status_update(user: dict = Depends(get_current_user)):
+    """Manually trigger task status update job"""
+    try:
+        updates = await run_task_status_update()
+        return {
+            "success": True,
+            "message": f"Task status update complete",
+            "tasks_updated": updates
+        }
+    except Exception as e:
+        logger.error(f"Error running task status update: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/background-jobs/run/daily-reminders")
+async def trigger_daily_reminders(user: dict = Depends(get_current_user)):
+    """Manually trigger daily reminder emails job"""
+    try:
+        emails_sent = await run_daily_reminders()
+        return {
+            "success": True,
+            "message": f"Daily reminders sent",
+            "emails_sent": emails_sent
+        }
+    except Exception as e:
+        logger.error(f"Error running daily reminders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/background-jobs/run/health-snapshots")
+async def trigger_health_snapshots(user: dict = Depends(get_current_user)):
+    """Manually trigger health score snapshots job"""
+    try:
+        snapshots = await run_health_snapshots()
+        return {
+            "success": True,
+            "message": f"Health snapshots created",
+            "snapshots_created": snapshots
+        }
+    except Exception as e:
+        logger.error(f"Error running health snapshots: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== DEMO DATA ====================
 
 @api_router.post("/demo/seed")
