@@ -1769,12 +1769,41 @@ async def get_or_create_subscription(user_id: str) -> dict:
     return sub
 
 def calculate_subscription_status(sub: dict) -> dict:
-    """Calculate current status and days remaining"""
+    """Calculate current status and days remaining, fetch Stripe data if available"""
     now = datetime.now(timezone.utc)
+    
+    result = {
+        **sub,
+        "current_period_end": None,
+        "cancel_at_period_end": None
+    }
+    
+    # If there's an active Stripe subscription, fetch details
+    if sub.get("stripe_subscription_id") and sub["status"] == "active":
+        try:
+            stripe_sub = stripe.Subscription.retrieve(sub["stripe_subscription_id"])
+            result["current_period_end"] = datetime.fromtimestamp(
+                stripe_sub.current_period_end, tz=timezone.utc
+            ).isoformat()
+            result["cancel_at_period_end"] = stripe_sub.cancel_at_period_end
+            result["is_active"] = True
+            result["days_remaining"] = None
+            
+            # Update plan type from Stripe if needed
+            if stripe_sub.items.data:
+                price_id = stripe_sub.items.data[0].price.id
+                if price_id == STRIPE_ANNUAL_PRICE_ID:
+                    result["plan_type"] = "annual"
+                elif price_id == STRIPE_MONTHLY_PRICE_ID:
+                    result["plan_type"] = "monthly"
+            
+            return result
+        except stripe.StripeError as e:
+            logger.warning(f"Could not fetch Stripe subscription: {e}")
     
     if sub["status"] == "active":
         return {
-            **sub,
+            **result,
             "is_active": True,
             "days_remaining": None
         }
@@ -1788,14 +1817,14 @@ def calculate_subscription_status(sub: dict) -> dict:
         is_expired = days_remaining < 0
         
         return {
-            **sub,
+            **result,
             "is_active": not is_expired,
             "days_remaining": max(0, days_remaining),
             "status": "expired" if is_expired else "trialing"
         }
     
     return {
-        **sub,
+        **result,
         "is_active": sub["status"] == "active",
         "days_remaining": None
     }
