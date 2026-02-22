@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -14,17 +14,37 @@ const getAuthHeaders = () => {
   return {};
 };
 
+// Check if we have a token to validate (synchronous check)
+const hasStoredToken = () => {
+  return localStorage.getItem('auth_token') !== null;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Start loading as true ONLY if we have a token to validate
+  // If no token, we know immediately user is not authenticated
+  const [loading, setLoading] = useState(hasStoredToken());
   const [trusts, setTrusts] = useState([]);
   const [selectedTrust, setSelectedTrust] = useState(null);
+  const authCheckComplete = useRef(false);
 
   const checkAuth = useCallback(async () => {
+    // Prevent duplicate auth checks
+    if (authCheckComplete.current) {
+      return;
+    }
+    
     // CRITICAL: If returning from OAuth callback, skip the /me check.
     // AuthCallback will exchange the session_id and establish the session first.
     if (window.location.hash?.includes('session_id=')) {
       setLoading(false);
+      return;
+    }
+
+    // If no token exists, no need to call the API
+    if (!hasStoredToken()) {
+      setLoading(false);
+      authCheckComplete.current = true;
       return;
     }
 
@@ -48,6 +68,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('auth_token');
     } finally {
       setLoading(false);
+      authCheckComplete.current = true;
     }
   }, []);
 
