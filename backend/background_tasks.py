@@ -211,7 +211,7 @@ class BackgroundTaskRunner:
                             try:
                                 due_date_obj = datetime.fromisoformat(task_due).date()
                                 days_overdue = (today - due_date_obj).days
-                            except:
+                            except ValueError:
                                 days_overdue = 1
                             
                             try:
@@ -267,7 +267,7 @@ class BackgroundTaskRunner:
                 
                 try:
                     # Calculate health score (this also saves a snapshot)
-                    health = await self._calculate_health_score_internal(trust_id, user_id)
+                    await self._calculate_health_score_internal(trust_id, user_id)
                     snapshots_created += 1
                 except Exception as e:
                     logger.error(f"Error creating snapshot for trust {trust_id}: {e}")
