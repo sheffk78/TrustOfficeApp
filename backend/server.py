@@ -2055,7 +2055,7 @@ async def trigger_task_status_update(user: dict = Depends(get_current_user)):
         updates = await run_task_status_update()
         return {
             "success": True,
-            "message": f"Task status update complete",
+            "message": "Task status update complete",
             "tasks_updated": updates
         }
     except Exception as e:
@@ -2069,7 +2069,7 @@ async def trigger_daily_reminders(user: dict = Depends(get_current_user)):
         emails_sent = await run_daily_reminders()
         return {
             "success": True,
-            "message": f"Daily reminders sent",
+            "message": "Daily reminders sent",
             "emails_sent": emails_sent
         }
     except Exception as e:
@@ -2083,7 +2083,7 @@ async def trigger_health_snapshots(user: dict = Depends(get_current_user)):
         snapshots = await run_health_snapshots()
         return {
             "success": True,
-            "message": f"Health snapshots created",
+            "message": "Health snapshots created",
             "snapshots_created": snapshots
         }
     except Exception as e:
