@@ -15,8 +15,15 @@ import {
   Building2,
   Bell,
   Trash2,
-  Save
+  Save,
+  CreditCard,
+  Download,
+  FileText,
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
+
+const API_BASE = process.env.REACT_APP_BACKEND_URL;
 
 export default function SettingsPage() {
   const navigate = useNavigate();
