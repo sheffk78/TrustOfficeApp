@@ -11,9 +11,14 @@ import {
   Search,
   Calendar,
   Users,
-  ChevronRight
+  ChevronRight,
+  Download,
+  Eye,
+  X,
+  Loader2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function MinutesPage() {
   const navigate = useNavigate();
@@ -22,6 +27,8 @@ export default function MinutesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [pdfPreview, setPdfPreview] = useState(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   useEffect(() => {
     if (selectedTrust) {
@@ -43,6 +50,39 @@ export default function MinutesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewPdf = async (minutesId) => {
+    setPdfLoading(true);
+    try {
+      const response = await fetchWithAuth(`/minutes/${minutesId}/pdf`);
+      if (response.ok) {
+        const data = await response.json();
+        setPdfPreview({
+          base64: data.pdf_base64,
+          filename: data.filename,
+          minutesId
+        });
+      } else {
+        toast.error('Failed to generate PDF');
+      }
+    } catch (error) {
+      toast.error('Failed to generate PDF');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!pdfPreview) return;
+    
+    const link = document.createElement('a');
+    link.href = `data:application/pdf;base64,${pdfPreview.base64}`;
+    link.download = pdfPreview.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('PDF downloaded');
   };
 
   const formatDate = (dateString) => {
