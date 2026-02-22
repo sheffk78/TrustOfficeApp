@@ -10,6 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { fetchWithAuth, API } from '@/utils/api';
 import { 
   Plus, 
   Search,
@@ -20,9 +21,6 @@ import {
   Clock
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 export default function ExpensesPage() {
   const { selectedTrust } = useAuth();
