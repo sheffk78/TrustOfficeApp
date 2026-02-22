@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
+import { fetchWithAuth } from '@/utils/api';
 import { 
   Plus, 
   FileText, 
@@ -13,9 +14,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 export default function DashboardPage() {
   const navigate = useNavigate();
