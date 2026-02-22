@@ -647,5 +647,169 @@ class TestOnboarding:
         print(f"Onboarding state: entities={data['entities_confirmed']}, calendar={data['calendar_set']}")
 
 
+class TestGovernanceHealthScore:
+    """Test 5-criteria governance health score"""
+    
+    @pytest.fixture(scope="class")
+    def auth_session(self):
+        session = requests.Session()
+        response = session.post(f"{BASE_URL}/api/auth/login", json={
+            "email": TEST_EMAIL,
+            "password": TEST_PASSWORD
+        })
+        if response.status_code == 200:
+            token = response.json().get("token")
+            session.headers.update({"Authorization": f"Bearer {token}"})
+        return session
+    
+    @pytest.fixture(scope="class")
+    def trust_id(self, auth_session):
+        trusts = auth_session.get(f"{BASE_URL}/api/trusts").json()
+        if len(trusts) > 0:
+            return trusts[0]["trust_id"]
+        pytest.skip("No trusts available for testing")
+    
+    def test_get_governance_health_returns_5_criteria(self, auth_session, trust_id):
+        """Governance health endpoint returns 5 criteria with scores"""
+        response = auth_session.get(f"{BASE_URL}/api/governance/{trust_id}")
+        assert response.status_code == 200, f"Get governance failed: {response.text}"
+        
+        data = response.json()
+        
+        # Verify 5-criteria response structure
+        assert "trust_id" in data
+        assert "total_score" in data
+        assert "max_score" in data
+        assert data["max_score"] == 100, "Max score should be 100"
+        assert "color" in data
+        assert data["color"] in ["red", "yellow", "green"]
+        assert "criteria" in data
+        
+        # Verify we have 5 criteria
+        criteria = data["criteria"]
+        assert len(criteria) == 5, f"Expected 5 criteria, got {len(criteria)}"
+        
+        # Verify each criterion has correct structure
+        expected_criteria_names = [
+            "Quarterly Minutes",
+            "Task Compliance",
+            "Compensation Alignment",
+            "Distribution Documentation",
+            "Annual Review"
+        ]
+        
+        for criterion in criteria:
+            assert "name" in criterion
+            assert "description" in criterion
+            assert "points" in criterion
+            assert "max_points" in criterion
+            assert "achieved" in criterion
+            assert criterion["max_points"] == 20, f"Each criterion should have max 20 points"
+            assert criterion["name"] in expected_criteria_names, f"Unexpected criterion: {criterion['name']}"
+        
+        print(f"Governance health score: {data['total_score']}/{data['max_score']} ({data['color']})")
+        print(f"Criteria: {[c['name'] + '=' + str(c['points']) for c in criteria]}")
+
+
+class TestDistributionApproval:
+    """Test distribution approval workflow with solvency/recusal confirmations"""
+    
+    @pytest.fixture(scope="class")
+    def auth_session(self):
+        session = requests.Session()
+        response = session.post(f"{BASE_URL}/api/auth/login", json={
+            "email": TEST_EMAIL,
+            "password": TEST_PASSWORD
+        })
+        if response.status_code == 200:
+            token = response.json().get("token")
+            session.headers.update({"Authorization": f"Bearer {token}"})
+        return session
+    
+    @pytest.fixture(scope="class")
+    def trust_id(self, auth_session):
+        trusts = auth_session.get(f"{BASE_URL}/api/trusts").json()
+        if len(trusts) > 0:
+            return trusts[0]["trust_id"]
+        pytest.skip("No trusts available for testing")
+    
+    @pytest.fixture
+    def test_distribution(self, auth_session, trust_id):
+        """Create a test distribution for approval testing"""
+        response = auth_session.post(f"{BASE_URL}/api/distributions", json={
+            "trust_id": trust_id,
+            "beneficiary_name": "TEST_Approval_Beneficiary",
+            "amount": 1000.0,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "purpose_classification": "distribution",
+            "notes": "Test distribution for approval workflow"
+        })
+        assert response.status_code == 200, f"Failed to create test distribution: {response.text}"
+        dist = response.json()
+        yield dist
+        # Cleanup
+        auth_session.delete(f"{BASE_URL}/api/distributions/{dist['distribution_id']}")
+    
+    def test_approve_without_solvency_fails(self, auth_session, test_distribution):
+        """Approval without solvency confirmation should fail"""
+        dist_id = test_distribution["distribution_id"]
+        
+        response = auth_session.patch(f"{BASE_URL}/api/distributions/{dist_id}/approve", json={
+            "solvency_confirmed": False,
+            "recusal_acknowledged": True
+        })
+        
+        assert response.status_code == 400, "Should fail without solvency"
+        assert "solvency" in response.text.lower()
+        print("✅ Correctly rejected approval without solvency confirmation")
+    
+    def test_approve_without_recusal_fails(self, auth_session, test_distribution):
+        """Approval without recusal acknowledgment should fail"""
+        dist_id = test_distribution["distribution_id"]
+        
+        response = auth_session.patch(f"{BASE_URL}/api/distributions/{dist_id}/approve", json={
+            "solvency_confirmed": True,
+            "recusal_acknowledged": False
+        })
+        
+        assert response.status_code == 400, "Should fail without recusal"
+        assert "recusal" in response.text.lower()
+        print("✅ Correctly rejected approval without recusal acknowledgment")
+    
+    def test_approve_with_both_confirmations_succeeds(self, auth_session, trust_id):
+        """Approval with both solvency and recusal should succeed"""
+        # Create a fresh distribution for this test
+        create_resp = auth_session.post(f"{BASE_URL}/api/distributions", json={
+            "trust_id": trust_id,
+            "beneficiary_name": "TEST_Full_Approval",
+            "amount": 2000.0,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "purpose_classification": "distribution",
+            "notes": "Test for full approval"
+        })
+        dist = create_resp.json()
+        dist_id = dist["distribution_id"]
+        
+        try:
+            response = auth_session.patch(f"{BASE_URL}/api/distributions/{dist_id}/approve", json={
+                "solvency_confirmed": True,
+                "recusal_acknowledged": True
+            })
+            
+            assert response.status_code == 200, f"Approval failed: {response.text}"
+            data = response.json()
+            
+            # Verify approval fields
+            assert data["solvency_confirmed"] == True
+            assert data["recusal_acknowledged"] == True
+            assert data["approved_by"] is not None
+            assert data["approved_at"] is not None
+            
+            print(f"✅ Distribution approved successfully. Approved by: {data['approved_by']} at {data['approved_at']}")
+        finally:
+            # Cleanup
+            auth_session.delete(f"{BASE_URL}/api/distributions/{dist_id}")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
