@@ -28,6 +28,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 # Import email service after dotenv is loaded
 from email_service import email_service
+from background_tasks import background_runner, run_task_status_update, run_daily_reminders, run_health_snapshots
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
