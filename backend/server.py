@@ -1502,7 +1502,59 @@ async def get_governance_health(trust_id: str, user: dict = Depends(get_current_
         raise HTTPException(status_code=404, detail="Trust not found")
     
     health = await calculate_health_score(trust_id, user["user_id"])
+    
+    # Store snapshot for history tracking
+    snapshot_id = f"snap_{uuid.uuid4().hex[:12]}"
+    await db.health_score_snapshots.insert_one({
+        "snapshot_id": snapshot_id,
+        "trust_id": trust_id,
+        "user_id": user["user_id"],
+        "score_value": health["total_score"],
+        "color": health["color"],
+        "criteria_summary": {c["name"]: c["achieved"] for c in health["criteria"]},
+        "calculated_at": datetime.now(timezone.utc).isoformat()
+    })
+    
     return HealthScoreResponse(**health)
+
+@api_router.get("/governance/{trust_id}/history")
+async def get_governance_history(trust_id: str, days: int = 30, user: dict = Depends(get_current_user)):
+    """Get historical health score snapshots for charting"""
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    
+    # Get snapshots grouped by day (take latest per day)
+    snapshots = await db.health_score_snapshots.find(
+        {"trust_id": trust_id, "user_id": user["user_id"], "calculated_at": {"$gte": cutoff}},
+        {"_id": 0}
+    ).sort("calculated_at", -1).to_list(1000)
+    
+    # Deduplicate by day, keeping latest
+    daily_scores = {}
+    for snap in snapshots:
+        date_key = snap["calculated_at"][:10]  # YYYY-MM-DD
+        if date_key not in daily_scores:
+            daily_scores[date_key] = {
+                "date": date_key,
+                "score": snap["score_value"],
+                "color": snap["color"]
+            }
+    
+    # Sort by date ascending for chart
+    history = sorted(daily_scores.values(), key=lambda x: x["date"])
+    
+    return {
+        "trust_id": trust_id,
+        "days": days,
+        "history": history,
+        "current_score": history[-1]["score"] if history else 0
+    }
 
 # ==================== ONBOARDING ENDPOINTS ====================
 
