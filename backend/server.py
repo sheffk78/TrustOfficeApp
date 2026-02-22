@@ -349,11 +349,16 @@ class SubscriptionResponse(BaseModel):
     stripe_subscription_id: Optional[str] = None
     days_remaining: Optional[int] = None
     is_active: bool
+    current_period_end: Optional[str] = None
+    cancel_at_period_end: Optional[bool] = None
 
 class CheckoutRequest(BaseModel):
     plan_type: str  # "monthly" or "annual"
     success_url: str
     cancel_url: str
+
+class PortalRequest(BaseModel):
+    return_url: str
 
 # ==================== HELPER FUNCTIONS ====================
 
