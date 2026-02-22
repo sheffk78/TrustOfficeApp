@@ -108,7 +108,7 @@ class EmailService:
             response = self.client.emails.send(**payload)
             
             logger.info(
-                f"Email sent successfully",
+                "Email sent successfully",
                 extra={
                     "message_id": response.get("MessageID"),
                     "to": to_email,

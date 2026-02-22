@@ -296,7 +296,7 @@ TrustOffice
               </table>
             </div>
             
-            {f'<div class="alert"><strong>Action Required:</strong> This distribution requires approval.</div>' if data.get('status') == 'review' else ''}
+            {'<div class="alert"><strong>Action Required:</strong> This distribution requires approval.</div>' if data.get('status') == 'review' else ''}
             
             <p style="text-align: center;">
               <a href="{data.get('app_url', '#')}/distributions" class="button">View Distributions</a>
