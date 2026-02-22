@@ -21,20 +21,25 @@ const ProtectedRoute = ({ children }) => {
   const location = useLocation();
   const hasChecked = useRef(false);
 
+  // Check localStorage for existing token on mount
+  const hasToken = localStorage.getItem('auth_token') !== null;
+
   useEffect(() => {
     // Skip if user data passed from AuthCallback via location state
     if (location.state?.user) {
       return;
     }
     
-    // Only check once
+    // Only check once per route
     if (!hasChecked.current && !user) {
       hasChecked.current = true;
       checkAuth();
     }
   }, [checkAuth, user, location.state]);
 
-  if (loading) {
+  // Show loading state while checking auth
+  // Also show loading if there's a token but no user yet
+  if (loading || (hasToken && !user)) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
@@ -45,7 +50,8 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!user && !location.state?.user) {
+  // Only redirect if no user AND no token
+  if (!user && !hasToken && !location.state?.user) {
     return <Navigate to="/" replace />;
   }
 
