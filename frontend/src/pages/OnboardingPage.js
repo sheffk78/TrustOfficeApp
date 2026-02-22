@@ -32,10 +32,8 @@ export default function OnboardingPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API}/trusts`, {
+      const response = await fetchWithAuth('/trusts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(trustData)
       });
 
