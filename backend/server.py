@@ -1480,6 +1480,210 @@ async def get_categories():
         "relationship_types": [r.value for r in RelationshipType]
     }
 
+# ==================== SUBSCRIPTION ENDPOINTS ====================
+
+async def get_or_create_subscription(user_id: str) -> dict:
+    """Get or create subscription for a user"""
+    sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+    
+    if not sub:
+        now = datetime.now(timezone.utc)
+        sub = {
+            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+            "user_id": user_id,
+            "plan_type": "trial",
+            "status": "trialing",
+            "trial_start_date": now.isoformat(),
+            "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
+            "stripe_customer_id": None,
+            "stripe_subscription_id": None,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        }
+        await db.subscriptions.insert_one(sub)
+    
+    return sub
+
+def calculate_subscription_status(sub: dict) -> dict:
+    """Calculate current status and days remaining"""
+    now = datetime.now(timezone.utc)
+    
+    if sub["status"] == "active":
+        return {
+            **sub,
+            "is_active": True,
+            "days_remaining": None
+        }
+    
+    if sub["status"] == "trialing" and sub.get("trial_end_date"):
+        trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        
+        days_remaining = (trial_end - now).days
+        is_expired = days_remaining < 0
+        
+        return {
+            **sub,
+            "is_active": not is_expired,
+            "days_remaining": max(0, days_remaining),
+            "status": "expired" if is_expired else "trialing"
+        }
+    
+    return {
+        **sub,
+        "is_active": sub["status"] == "active",
+        "days_remaining": None
+    }
+
+@api_router.get("/subscription", response_model=SubscriptionResponse)
+async def get_subscription(user: dict = Depends(get_current_user)):
+    sub = await get_or_create_subscription(user["user_id"])
+    enriched = calculate_subscription_status(sub)
+    return SubscriptionResponse(**enriched)
+
+@api_router.post("/subscription/create-checkout")
+async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depends(get_current_user)):
+    """Create a Stripe checkout session for subscription"""
+    if checkout.plan_type not in ["monthly", "annual"]:
+        raise HTTPException(status_code=400, detail="Invalid plan type")
+    
+    price_id = STRIPE_MONTHLY_PRICE_ID if checkout.plan_type == "monthly" else STRIPE_ANNUAL_PRICE_ID
+    
+    # Get or create subscription to get/create stripe customer
+    sub = await get_or_create_subscription(user["user_id"])
+    
+    try:
+        # Get or create Stripe customer
+        if sub.get("stripe_customer_id"):
+            customer_id = sub["stripe_customer_id"]
+        else:
+            customer = stripe.Customer.create(
+                email=user["email"],
+                name=user.get("name", ""),
+                metadata={"user_id": user["user_id"]}
+            )
+            customer_id = customer.id
+            await db.subscriptions.update_one(
+                {"user_id": user["user_id"]},
+                {"$set": {"stripe_customer_id": customer_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+        
+        # Create checkout session
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=checkout.success_url,
+            cancel_url=checkout.cancel_url,
+            metadata={"user_id": user["user_id"], "plan_type": checkout.plan_type}
+        )
+        
+        # Record transaction
+        await db.payment_transactions.insert_one({
+            "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
+            "user_id": user["user_id"],
+            "session_id": session.id,
+            "amount": 79.00 if checkout.plan_type == "monthly" else 790.00,
+            "currency": "usd",
+            "plan_type": checkout.plan_type,
+            "payment_status": "initiated",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        return {"checkout_url": session.url, "session_id": session.id}
+        
+    except stripe.StripeError as e:
+        logger.error(f"Stripe error: {e}")
+        raise HTTPException(status_code=500, detail="Payment service unavailable")
+
+@api_router.get("/subscription/verify-payment")
+async def verify_payment(session_id: str, user: dict = Depends(get_current_user)):
+    """Verify a checkout session and update subscription"""
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        
+        if session.payment_status == "paid":
+            plan_type = session.metadata.get("plan_type", "monthly")
+            
+            # Update subscription
+            await db.subscriptions.update_one(
+                {"user_id": user["user_id"]},
+                {"$set": {
+                    "plan_type": plan_type,
+                    "status": "active",
+                    "stripe_subscription_id": session.subscription,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            # Update transaction
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            
+            return {"status": "success", "plan_type": plan_type}
+        
+        return {"status": "pending"}
+        
+    except stripe.StripeError as e:
+        logger.error(f"Stripe verification error: {e}")
+        raise HTTPException(status_code=500, detail="Payment verification failed")
+
+@api_router.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        user_id = session.get("metadata", {}).get("user_id")
+        plan_type = session.get("metadata", {}).get("plan_type", "monthly")
+        
+        if user_id:
+            await db.subscriptions.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "plan_type": plan_type,
+                    "status": "active",
+                    "stripe_subscription_id": session.get("subscription"),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            await db.payment_transactions.update_one(
+                {"session_id": session["id"]},
+                {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+    
+    elif event["type"] == "customer.subscription.deleted":
+        subscription = event["data"]["object"]
+        await db.subscriptions.update_one(
+            {"stripe_subscription_id": subscription["id"]},
+            {"$set": {"status": "canceled", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+    
+    elif event["type"] == "invoice.payment_failed":
+        invoice = event["data"]["object"]
+        customer_id = invoice.get("customer")
+        if customer_id:
+            await db.subscriptions.update_one(
+                {"stripe_customer_id": customer_id},
+                {"$set": {"status": "past_due", "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+    
+    return {"status": "ok"}
+
 # ==================== DEMO DATA ====================
 
 @api_router.post("/demo/seed")
