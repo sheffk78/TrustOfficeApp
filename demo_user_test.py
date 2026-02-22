@@ -3,7 +3,7 @@
 import requests
 import json
 
-BACKEND_URL = "https://trustee-hub.preview.emergentagent.com"
+BACKEND_URL = "https://trust-governance-3.preview.emergentagent.com"
 API_URL = f"{BACKEND_URL}/api"
 
 def test_demo_user_login():
