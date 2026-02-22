@@ -39,10 +39,8 @@ export default function SettingsPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API}/trusts/${selectedTrust.trust_id}`, {
+      const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(trustData)
       });
 
@@ -66,9 +64,8 @@ export default function SettingsPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API}/trusts/${selectedTrust.trust_id}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}`, {
+        method: 'DELETE'
       });
 
       if (!response.ok) {
