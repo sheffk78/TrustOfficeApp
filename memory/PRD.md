@@ -23,94 +23,114 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## What's Been Implemented
 
-### Session Persistence
-- Fixed race condition - users stay logged in on page refresh
+### Core Features
+- **Authentication**: JWT + Google OAuth with session persistence
+- **Dashboard**: Governance Insights panel, 5-criteria health score, onboarding checklist
+- **Minutes**: Record meeting minutes with PDF generation and download
+- **Distributions**: Log and track with approval workflow (solvency/recusal checks)
+- **Compensation**: Track payments with plan alignment monitoring
+- **Entities**: Manage trusts, LLCs, and entity relationships
+- **Governance Calendar**: Task tracking with due dates and status
+- **Health Score History**: 30-day trend chart with daily snapshots
 
-### Dashboard Enhancements
-- Governance Insights Panel with actionable recommendations
-- 5-Criteria Health Score Display with checkmarks
-- Onboarding Checklist (auto-updating, dismissible)
+### Email Integration (Postmark)
+- Welcome emails on registration
+- Task reminder and overdue notifications
+- Minutes/Distribution creation alerts
+- Distribution approval confirmations
 
-### Distribution Approval Workflow
-- Approval Modal with solvency + recusal confirmations
+### Background Jobs (APScheduler) 
+- Hourly task status updates
+- Daily reminders at 9 AM UTC
+- Daily health score snapshots at midnight UTC
+- Manual trigger endpoints for testing
 
-### PDF Generation for Minutes
-- ReportLab PDF with professional formatting
-- Preview modal with Download button
+### Billing & Subscription (Feb 22, 2026) - NEW
+**Stripe Integration:**
+- Checkout session creation for Monthly ($79) and Annual ($790) plans
+- Customer portal for payment method management
+- Subscription cancellation (at period end with reactivation option)
+- Plan upgrade (monthly to annual with proration)
 
-### Historical Health Score Chart
-- 30-day trend chart with SVG rendering
-- Daily score snapshots
+**Billing Page Features:**
+- Current plan status with clear badges (Trial, Active, Canceling, Expired)
+- Trial end date prominently displayed
+- Days remaining countdown
+- Next billing date for active subscriptions
+- Cancel/Reactivate subscription controls
+- Upgrade to Annual button (saves $158)
+- Manage Payment Method (Stripe portal)
+- FAQ section
 
-### Postmark Email Integration
-**Configuration:**
-- From: no-reply@contact.trustoffice.app
-- Server Token: Configured in .env
+### CSV Data Export (Feb 22, 2026) - NEW
+**Export Endpoints:**
+- `GET /api/export/minutes` - Export all minutes records
+- `GET /api/export/distributions` - Export all distribution records
+- `GET /api/export/compensation` - Export all compensation payments
+- `GET /api/export/tasks` - Export all governance tasks
 
-**6 Email Templates (centralized in `email_templates.py`):**
-1. `welcome` - Sent on new user registration
-2. `task_reminder` - Upcoming governance task reminders
-3. `task_overdue` - Overdue task alerts (red styling)
-4. `minutes_created` - When new minutes are logged
-5. `distribution_created` - When new distribution is logged
-6. `distribution_approved` - When distribution is approved
-
-**Automatic Email Triggers:**
-- User registration -> Welcome email
-- Create minutes -> Minutes notification
-- Create distribution -> Distribution notification
-- Approve distribution -> Approval confirmation
-
-**Note:** Postmark sandbox mode restricts sending to domains matching from address until account approval.
-
-### Background Jobs (APScheduler) - NEW (Feb 22, 2026)
-**Scheduled Jobs:**
-1. `task_status_update` - Runs hourly, updates task statuses (upcoming/overdue)
-2. `daily_reminders` - Runs at 9 AM UTC, sends email reminders for upcoming/overdue tasks
-3. `daily_health_snapshots` - Runs at 00:05 UTC, creates health score snapshots for all trusts
-
-**API Endpoints:**
-- `GET /api/background-jobs/status` - View scheduled jobs and their next run times
-- `POST /api/background-jobs/run/task-status-update` - Manually trigger task status update
-- `POST /api/background-jobs/run/daily-reminders` - Manually trigger daily reminders
-- `POST /api/background-jobs/run/health-snapshots` - Manually trigger health snapshots
-
-**Implementation:**
-- APScheduler integrated with FastAPI lifecycle (startup/shutdown events)
-- Background runner starts automatically with the server
-- All manual trigger endpoints require authentication
-- Audit logging for task status changes
-
-### Backend APIs (50+ endpoints, 100% tested)
-- Auth, Trusts, Entities, Relationships, Tasks, Minutes, Distributions, Compensation, Health, Onboarding, Subscription, Email, Background Jobs
-
-### Frontend Pages (All implemented)
-- Login/Signup, Onboarding, Dashboard, Calendar, Minutes (PDF), Distributions (approval), Compensation, Entities, Entity Detail, Structure, Governance Health (chart), Settings, Billing
+**Features:**
+- Filter by trust_id for specific trust exports
+- Properly formatted CSV with headers
+- Download with timestamped filename
+- Available from Settings page
 
 ## Test Credentials
 - Email: test@example.com
 - Password: testpassword123
 
+## API Endpoints Summary
+
+### Export
+- `GET /api/export/minutes` - CSV export
+- `GET /api/export/distributions` - CSV export
+- `GET /api/export/compensation` - CSV export
+- `GET /api/export/tasks` - CSV export
+
+### Subscription
+- `GET /api/subscription` - Get subscription status
+- `POST /api/subscription/create-checkout` - Start Stripe checkout
+- `GET /api/subscription/verify-payment` - Verify checkout session
+- `POST /api/subscription/create-portal` - Open Stripe portal
+- `POST /api/subscription/cancel` - Cancel at period end
+- `POST /api/subscription/reactivate` - Undo cancellation
+- `POST /api/subscription/upgrade` - Monthly to annual
+
+### Background Jobs
+- `GET /api/background-jobs/status` - View scheduled jobs
+- `POST /api/background-jobs/run/task-status-update` - Manual trigger
+- `POST /api/background-jobs/run/daily-reminders` - Manual trigger
+- `POST /api/background-jobs/run/health-snapshots` - Manual trigger
+
 ## Prioritized Backlog
 
-### P0-P1 - COMPLETE
-- Session persistence, all pages, health score, Stripe, PDF generation, historical chart, email integration
+### Completed
+- [x] Core authentication (JWT + Google OAuth)
+- [x] Dashboard with governance insights
+- [x] Minutes management with PDF generation
+- [x] Distribution approval workflow
+- [x] Compensation tracking
+- [x] Entity management
+- [x] Governance calendar and tasks
+- [x] Health score with historical chart
+- [x] Email integration (Postmark)
+- [x] Background jobs (APScheduler)
+- [x] Stripe subscription management
+- [x] CSV data export
 
-### P2 - COMPLETE (Feb 22, 2026)
-- [x] Automated cron job for daily task reminders (APScheduler)
-- [x] Background task status updates (hourly)
-- [x] Daily health score snapshots
-- [ ] Audit log UI for viewing change history
-- [ ] Export data to CSV
+### P2 (Medium Priority)
+- [ ] Audit Log UI - view history of changes
+- [ ] Gate app features based on subscription status
+- [ ] Email notifications for subscription events
 
 ### P3 (Nice to Have)
 - [ ] Dark mode toggle
 - [ ] Multi-trustee collaboration
 - [ ] Mobile-optimized views
 - [ ] AI-assisted minutes drafting
+- [ ] Additional entity types (more LLCs)
 
-## Next Tasks
-1. Implement Audit Log UI - display history of changes from audit_logs collection
-2. Export data to CSV functionality
-3. Lift Postmark sandbox limitation (user action required)
-4. Gate app features based on Stripe subscription status
+## Notes
+- Postmark is in sandbox mode (can only send to verified sender domain)
+- Stripe is in test mode (use test card 4242424242424242)
+- Background jobs run automatically on server startup
