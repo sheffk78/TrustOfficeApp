@@ -6,8 +6,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional, Literal
+from enum import Enum
 import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
@@ -36,14 +37,55 @@ api_router = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ==================== ENUMS ====================
+
+class TrustType(str, Enum):
+    family = "family"
+    institutional = "institutional"
+
+class EntityType(str, Enum):
+    trust = "Trust"
+    holding_llc = "Holding LLC"
+    operating_llc = "Operating LLC"
+
+class RelationshipType(str, Enum):
+    owns = "owns"
+    controls = "controls"
+    receives_distributions_from = "receives_distributions_from"
+    pays_compensation_to = "pays_compensation_to"
+
+class TaskType(str, Enum):
+    annual_review = "annual_review"
+    quarterly_review = "quarterly_review"
+    compensation_review = "compensation_review"
+    distribution_review = "distribution_review"
+    insurance_compliance = "insurance_compliance"
+    custom = "custom"
+
+class MinutesType(str, Enum):
+    annual = "annual"
+    quarterly = "quarterly"
+    compensation = "compensation"
+    distribution = "distribution"
+    solvency = "solvency"
+
+class PurposeClassification(str, Enum):
+    distribution = "distribution"
+    compensation = "compensation"
+    expense = "expense"
+    other = "other"
+
+class HealthColor(str, Enum):
+    red = "red"
+    yellow = "yellow"
+    green = "green"
 
 # ==================== MODELS ====================
 
+# User Models
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -60,103 +102,209 @@ class UserResponse(BaseModel):
     picture: Optional[str] = None
     created_at: str
 
+# Trust Models
 class TrustCreate(BaseModel):
     name: str
-    role: str = "Trustee"
-    review_cadence: str = "quarterly"  # monthly, quarterly, annual
-    description: Optional[str] = None
+    trust_type: TrustType = TrustType.family
+    jurisdiction: str = ""
 
 class TrustUpdate(BaseModel):
     name: Optional[str] = None
-    role: Optional[str] = None
-    review_cadence: Optional[str] = None
-    description: Optional[str] = None
+    trust_type: Optional[TrustType] = None
+    jurisdiction: Optional[str] = None
 
 class TrustResponse(BaseModel):
     trust_id: str
     user_id: str
     name: str
-    role: str
-    review_cadence: str
-    description: Optional[str] = None
+    trust_type: str
+    jurisdiction: str
     created_at: str
     governance_score: int = 0
 
+# Entity Models
+class EntityCreate(BaseModel):
+    trust_id: str
+    name: str
+    entity_type: EntityType
+    legal_name: str = ""
+    formation_date: Optional[str] = None
+    governing_law: str = ""
+    ein: Optional[str] = None
+    # Trust-specific
+    trustee_names: str = ""
+    beneficiary_standard: str = ""
+    article_ref_distribution: str = ""
+    article_ref_compensation: str = ""
+    article_ref_amendment: str = ""
+    oversight_required: bool = False
+    # LLC-specific
+    member_names: str = ""
+    manager_names: str = ""
+    article_ref_authority: str = ""
+    article_ref_profit_distribution: str = ""
+
+class EntityResponse(BaseModel):
+    entity_id: str
+    trust_id: str
+    name: str
+    entity_type: str
+    legal_name: str
+    formation_date: Optional[str] = None
+    governing_law: str
+    ein: Optional[str] = None
+    trustee_names: str
+    beneficiary_standard: str
+    article_ref_distribution: str
+    article_ref_compensation: str
+    article_ref_amendment: str
+    oversight_required: bool
+    member_names: str
+    manager_names: str
+    article_ref_authority: str
+    article_ref_profit_distribution: str
+    created_at: str
+
+# Entity Relationship Models
+class EntityRelationshipCreate(BaseModel):
+    trust_id: str
+    parent_entity_id: str
+    child_entity_id: str
+    relationship_type: RelationshipType
+    ownership_percentage: Optional[float] = None
+    notes: str = ""
+
+class EntityRelationshipResponse(BaseModel):
+    relationship_id: str
+    trust_id: str
+    parent_entity_id: str
+    child_entity_id: str
+    relationship_type: str
+    ownership_percentage: Optional[float] = None
+    notes: str
+    created_at: str
+
+# Governance Task Models
+class GovernanceTaskCreate(BaseModel):
+    trust_id: str
+    task_type: TaskType
+    due_date: str
+    description: str = ""
+
+class GovernanceTaskResponse(BaseModel):
+    task_id: str
+    trust_id: str
+    task_type: str
+    due_date: str
+    completed_at: Optional[str] = None
+    status: str  # upcoming, completed, overdue
+    description: str
+    created_at: str
+
+# Minutes Models
 class MinutesCreate(BaseModel):
     trust_id: str
-    entry_type: str  # meeting, decision, distribution_approval
-    date: str
-    participants: List[str]
-    summary: str
-    details: str
-    best_interest_rationale: Optional[str] = None
+    minutes_type: MinutesType
+    meeting_date: str
+    participants_text: str
+    decisions_text: str
+    distribution_id: Optional[str] = None
+    compensation_payment_id: Optional[str] = None
 
 class MinutesResponse(BaseModel):
     minutes_id: str
     trust_id: str
-    user_id: str
-    entry_type: str
-    date: str
-    participants: List[str]
-    summary: str
-    details: str
-    best_interest_rationale: Optional[str] = None
+    minutes_type: str
+    meeting_date: str
+    participants_text: str
+    decisions_text: str
     created_at: str
 
+# Distribution Models
 class DistributionCreate(BaseModel):
     trust_id: str
-    date: str
+    beneficiary_name: str
     amount: float
-    distribution_type: str  # trust_distribution, loan, gift
-    beneficiary: str
-    category: str
-    notes: Optional[str] = None
-    status: str = "review"  # approved, review, declined
+    date: str
+    purpose_classification: PurposeClassification
+    authority_clause_ref: str = ""
+    notes: str = ""
+
+class DistributionApprove(BaseModel):
+    solvency_confirmed: bool
+    recusal_acknowledged: bool
 
 class DistributionResponse(BaseModel):
     distribution_id: str
     trust_id: str
-    user_id: str
-    date: str
+    beneficiary_name: str
     amount: float
-    distribution_type: str
-    beneficiary: str
-    category: str
-    notes: Optional[str] = None
-    status: str
+    date: str
+    purpose_classification: str
+    authority_clause_ref: str
+    notes: str
+    solvency_confirmed: bool
+    recusal_acknowledged: bool
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
+    minutes_record_id: Optional[str] = None
     created_at: str
 
-class ExpenseCreate(BaseModel):
+# Compensation Models
+class CompensationPlanCreate(BaseModel):
     trust_id: str
-    date: str
-    amount: float
-    payee: str
-    category: str
-    notes: Optional[str] = None
-    status: str = "review"
+    annual_approved_amount: float
+    effective_date: str
+    notes: str = ""
 
-class ExpenseResponse(BaseModel):
-    expense_id: str
+class CompensationPlanResponse(BaseModel):
+    plan_id: str
     trust_id: str
-    user_id: str
-    date: str
-    amount: float
-    payee: str
-    category: str
-    notes: Optional[str] = None
-    status: str
+    annual_approved_amount: float
+    effective_date: str
+    notes: str
     created_at: str
 
-class GovernanceHealthResponse(BaseModel):
+class CompensationPaymentCreate(BaseModel):
     trust_id: str
-    overall_score: int
-    meeting_recency_score: int
-    decisions_count_score: int
-    pending_reviews_score: int
-    last_meeting_date: Optional[str] = None
-    total_decisions: int
-    pending_reviews: int
-    status: str  # good, warning, critical
+    amount: float
+    date: str
+    classification_text: str = ""
+
+class CompensationPaymentResponse(BaseModel):
+    payment_id: str
+    trust_id: str
+    amount: float
+    date: str
+    classification_text: str
+    exceeds_plan_flag: bool
+    minutes_record_id: Optional[str] = None
+    created_at: str
+
+# Onboarding Models
+class OnboardingState(BaseModel):
+    user_id: str
+    entities_confirmed: bool = False
+    calendar_set: bool = False
+    minutes_generated: bool = False
+    distribution_logged: bool = False
+    checklist_dismissed: bool = False
+
+# Health Score Models
+class HealthScoreCriterion(BaseModel):
+    name: str
+    description: str
+    points: int
+    max_points: int = 20
+    achieved: bool
+
+class HealthScoreResponse(BaseModel):
+    trust_id: str
+    total_score: int
+    max_score: int = 100
+    color: str
+    criteria: List[HealthScoreCriterion]
+    calculated_at: str
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -176,11 +324,9 @@ def create_jwt_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def get_current_user(request: Request) -> dict:
-    # Check cookie first
     session_token = request.cookies.get("session_token")
-    
-    # Then check Authorization header
     auth_header = request.headers.get("Authorization")
+    
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
     elif session_token:
@@ -199,7 +345,7 @@ async def get_current_user(request: Request) -> dict:
     except jwt.InvalidTokenError:
         pass
     
-    # Try session token (Google OAuth)
+    # Try session token
     session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
     if session:
         expires_at = session.get("expires_at")
@@ -216,105 +362,248 @@ async def get_current_user(request: Request) -> dict:
     
     raise HTTPException(status_code=401, detail="Invalid token")
 
-async def calculate_governance_score(trust_id: str, user_id: str) -> dict:
-    """Calculate governance health score based on activity"""
-    now = datetime.now(timezone.utc)
+def get_task_status(due_date: str, completed_at: Optional[str]) -> str:
+    """Calculate task status based on due_date and completed_at"""
+    if completed_at:
+        return "completed"
     
-    # Get latest minutes/meeting
-    latest_minutes = await db.minutes.find_one(
+    try:
+        due = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=timezone.utc)
+        if due < datetime.now(timezone.utc):
+            return "overdue"
+    except:
+        pass
+    
+    return "upcoming"
+
+def get_quarter_start(dt: datetime) -> datetime:
+    """Get the start of the current quarter"""
+    quarter = (dt.month - 1) // 3
+    month = quarter * 3 + 1
+    return datetime(dt.year, month, 1, tzinfo=timezone.utc)
+
+def get_year_start(dt: datetime) -> datetime:
+    """Get the start of the current year"""
+    return datetime(dt.year, 1, 1, tzinfo=timezone.utc)
+
+async def calculate_health_score(trust_id: str, user_id: str) -> dict:
+    """
+    Calculate governance health score using 5 criteria (20 points each):
+    1. Quarterly Minutes - minutes generated this quarter
+    2. Task Compliance - no overdue tasks
+    3. Compensation Alignment - YTD ≤ approved annual
+    4. Distribution Documentation - at least 1 distribution logged
+    5. Annual Review - annual_review task completed in last 12 months
+    """
+    now = datetime.now(timezone.utc)
+    criteria = []
+    total_score = 0
+    
+    # 1. Quarterly Minutes (+20)
+    quarter_start = get_quarter_start(now)
+    quarterly_minutes = await db.minutes_records.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "created_at": {"$gte": quarter_start.isoformat()}
+    })
+    quarterly_achieved = quarterly_minutes > 0
+    criteria.append(HealthScoreCriterion(
+        name="Quarterly Minutes",
+        description="Minutes generated this quarter",
+        points=20 if quarterly_achieved else 0,
+        achieved=quarterly_achieved
+    ))
+    if quarterly_achieved:
+        total_score += 20
+    
+    # 2. Task Compliance (+20)
+    overdue_tasks = await db.governance_tasks.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "completed_at": None,
+        "due_date": {"$lt": now.isoformat()}
+    })
+    task_compliance = overdue_tasks == 0
+    criteria.append(HealthScoreCriterion(
+        name="Task Compliance",
+        description="No overdue governance tasks",
+        points=20 if task_compliance else 0,
+        achieved=task_compliance
+    ))
+    if task_compliance:
+        total_score += 20
+    
+    # 3. Compensation Alignment (+20)
+    year_start = get_year_start(now)
+    comp_plan = await db.compensation_plans.find_one(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0},
-        sort=[("date", -1)]
+        sort=[("effective_date", -1)]
     )
     
-    # Count decisions in last 90 days
-    ninety_days_ago = (now - timedelta(days=90)).isoformat()
-    decisions_count = await db.minutes.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "date": {"$gte": ninety_days_ago}
-    })
-    
-    # Count pending reviews
-    pending_distributions = await db.distributions.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "status": "review"
-    })
-    pending_expenses = await db.expenses.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "status": "review"
-    })
-    pending_reviews = pending_distributions + pending_expenses
-    
-    # Calculate scores (0-100 each)
-    # Meeting recency score
-    meeting_recency_score = 0
-    last_meeting_date = None
-    if latest_minutes:
-        last_meeting_date = latest_minutes.get("date")
-        try:
-            last_date = datetime.fromisoformat(last_meeting_date.replace('Z', '+00:00'))
-            days_since = (now - last_date).days
-            if days_since <= 30:
-                meeting_recency_score = 100
-            elif days_since <= 60:
-                meeting_recency_score = 75
-            elif days_since <= 90:
-                meeting_recency_score = 50
-            elif days_since <= 180:
-                meeting_recency_score = 25
-            else:
-                meeting_recency_score = 0
-        except:
-            meeting_recency_score = 0
-    
-    # Decisions count score (more = better, up to 10)
-    decisions_count_score = min(decisions_count * 10, 100)
-    
-    # Pending reviews score (fewer = better)
-    if pending_reviews == 0:
-        pending_reviews_score = 100
-    elif pending_reviews <= 2:
-        pending_reviews_score = 75
-    elif pending_reviews <= 5:
-        pending_reviews_score = 50
+    if comp_plan:
+        # Calculate YTD payments
+        ytd_payments = await db.compensation_payments.find(
+            {"trust_id": trust_id, "user_id": user_id, "date": {"$gte": year_start.isoformat()}},
+            {"_id": 0}
+        ).to_list(1000)
+        ytd_total = sum(p.get("amount", 0) for p in ytd_payments)
+        comp_aligned = ytd_total <= comp_plan.get("annual_approved_amount", 0)
     else:
-        pending_reviews_score = 25
+        comp_aligned = True  # No plan means no overage
     
-    # Overall score (weighted average)
-    overall_score = int(
-        meeting_recency_score * 0.4 +
-        decisions_count_score * 0.35 +
-        pending_reviews_score * 0.25
-    )
+    criteria.append(HealthScoreCriterion(
+        name="Compensation Alignment",
+        description="YTD compensation within approved plan",
+        points=20 if comp_aligned else 0,
+        achieved=comp_aligned
+    ))
+    if comp_aligned:
+        total_score += 20
     
-    # Determine status
-    if overall_score >= 70:
-        status = "good"
-    elif overall_score >= 40:
-        status = "warning"
+    # 4. Distribution Documentation (+20)
+    dist_count = await db.distribution_records.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    dist_documented = dist_count > 0
+    criteria.append(HealthScoreCriterion(
+        name="Distribution Documentation",
+        description="At least one distribution logged",
+        points=20 if dist_documented else 0,
+        achieved=dist_documented
+    ))
+    if dist_documented:
+        total_score += 20
+    
+    # 5. Annual Review (+20)
+    one_year_ago = (now - timedelta(days=365)).isoformat()
+    annual_review = await db.governance_tasks.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "task_type": "annual_review",
+        "completed_at": {"$gte": one_year_ago}
+    }, {"_id": 0})
+    annual_done = annual_review is not None
+    criteria.append(HealthScoreCriterion(
+        name="Annual Review",
+        description="Annual review completed in last 12 months",
+        points=20 if annual_done else 0,
+        achieved=annual_done
+    ))
+    if annual_done:
+        total_score += 20
+    
+    # Determine color
+    if total_score >= 80:
+        color = HealthColor.green
+    elif total_score >= 60:
+        color = HealthColor.yellow
     else:
-        status = "critical"
+        color = HealthColor.red
+    
+    # Save snapshot
+    snapshot = {
+        "snapshot_id": f"health_{uuid.uuid4().hex[:12]}",
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "score_value": total_score,
+        "color": color.value,
+        "calculated_at": now.isoformat()
+    }
+    await db.health_score_snapshots.insert_one(snapshot)
     
     return {
         "trust_id": trust_id,
-        "overall_score": overall_score,
-        "meeting_recency_score": meeting_recency_score,
-        "decisions_count_score": decisions_count_score,
-        "pending_reviews_score": pending_reviews_score,
-        "last_meeting_date": last_meeting_date,
-        "total_decisions": decisions_count,
-        "pending_reviews": pending_reviews,
-        "status": status
+        "total_score": total_score,
+        "max_score": 100,
+        "color": color.value,
+        "criteria": [c.model_dump() for c in criteria],
+        "calculated_at": now.isoformat()
     }
+
+async def auto_update_onboarding(user_id: str, trust_id: str):
+    """Auto-update onboarding state based on user actions"""
+    updates = {}
+    
+    # Check entities
+    entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
+    if entity_count > 0:
+        updates["entities_confirmed"] = True
+    
+    # Check calendar (non-custom tasks)
+    task_count = await db.governance_tasks.count_documents({
+        "trust_id": trust_id, 
+        "user_id": user_id,
+        "task_type": {"$ne": "custom"}
+    })
+    if task_count > 0:
+        updates["calendar_set"] = True
+    
+    # Check minutes
+    minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
+    if minutes_count > 0:
+        updates["minutes_generated"] = True
+    
+    # Check distributions or compensation
+    dist_count = await db.distribution_records.count_documents({"trust_id": trust_id, "user_id": user_id})
+    comp_count = await db.compensation_payments.count_documents({"trust_id": trust_id, "user_id": user_id})
+    if dist_count > 0 or comp_count > 0:
+        updates["distribution_logged"] = True
+    
+    if updates:
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.user_onboarding.update_one(
+            {"user_id": user_id},
+            {"$set": updates},
+            upsert=True
+        )
+
+async def create_initial_governance_tasks(trust_id: str, user_id: str):
+    """Seed a new trust with default governance tasks"""
+    now = datetime.now(timezone.utc)
+    
+    default_tasks = [
+        {
+            "task_id": f"task_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "task_type": "annual_review",
+            "due_date": (now + timedelta(days=365)).isoformat(),
+            "completed_at": None,
+            "description": "Annual trust review and documentation",
+            "created_at": now.isoformat()
+        },
+        {
+            "task_id": f"task_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "task_type": "quarterly_review",
+            "due_date": (now + timedelta(days=90)).isoformat(),
+            "completed_at": None,
+            "description": "Quarterly trust performance review",
+            "created_at": now.isoformat()
+        },
+        {
+            "task_id": f"task_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "task_type": "compensation_review",
+            "due_date": (now + timedelta(days=180)).isoformat(),
+            "completed_at": None,
+            "description": "Review trustee compensation arrangements",
+            "created_at": now.isoformat()
+        }
+    ]
+    
+    await db.governance_tasks.insert_many(default_tasks)
 
 # ==================== AUTH ENDPOINTS ====================
 
 @api_router.post("/auth/register", response_model=UserResponse)
 async def register(user: UserCreate):
-    # Check if user exists
     existing = await db.users.find_one({"email": user.email}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -331,6 +620,18 @@ async def register(user: UserCreate):
     
     await db.users.insert_one(user_doc)
     
+    # Initialize onboarding state
+    await db.user_onboarding.insert_one({
+        "user_id": user_id,
+        "entities_confirmed": False,
+        "calendar_set": False,
+        "minutes_generated": False,
+        "distribution_logged": False,
+        "checklist_dismissed": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    })
+    
     return UserResponse(
         user_id=user_id,
         email=user.email,
@@ -346,7 +647,7 @@ async def login(user: UserLogin, response: Response):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if not user_doc.get("password_hash"):
-        raise HTTPException(status_code=401, detail="Please use Google login for this account")
+        raise HTTPException(status_code=401, detail="Please use Google login")
     
     if not verify_password(user.password, user_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -375,14 +676,12 @@ async def login(user: UserLogin, response: Response):
 
 @api_router.post("/auth/session")
 async def exchange_session(request: Request, response: Response):
-    """Exchange Google OAuth session_id for session data"""
     body = await request.json()
     session_id = body.get("session_id")
     
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
     
-    # Call Emergent Auth to get session data
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(
@@ -397,13 +696,11 @@ async def exchange_session(request: Request, response: Response):
             logger.error(f"Error fetching session data: {e}")
             raise HTTPException(status_code=500, detail="Auth service unavailable")
     
-    # Check if user exists, create if not
     email = session_data.get("email")
     existing_user = await db.users.find_one({"email": email}, {"_id": 0})
     
     if existing_user:
         user_id = existing_user["user_id"]
-        # Update user info if needed
         await db.users.update_one(
             {"user_id": user_id},
             {"$set": {
@@ -421,8 +718,19 @@ async def exchange_session(request: Request, response: Response):
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.users.insert_one(user_doc)
+        
+        # Initialize onboarding
+        await db.user_onboarding.insert_one({
+            "user_id": user_id,
+            "entities_confirmed": False,
+            "calendar_set": False,
+            "minutes_generated": False,
+            "distribution_logged": False,
+            "checklist_dismissed": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        })
     
-    # Store session
     session_token = session_data.get("session_token")
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
     
@@ -486,13 +794,15 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
         "trust_id": trust_id,
         "user_id": user["user_id"],
         "name": trust.name,
-        "role": trust.role,
-        "review_cadence": trust.review_cadence,
-        "description": trust.description,
+        "trust_type": trust.trust_type.value,
+        "jurisdiction": trust.jurisdiction,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.trusts.insert_one(trust_doc)
+    
+    # Create initial governance tasks
+    await create_initial_governance_tasks(trust_id, user["user_id"])
     
     return TrustResponse(**trust_doc, governance_score=0)
 
@@ -502,8 +812,8 @@ async def get_trusts(user: dict = Depends(get_current_user)):
     
     result = []
     for trust in trusts:
-        health = await calculate_governance_score(trust["trust_id"], user["user_id"])
-        result.append(TrustResponse(**trust, governance_score=health["overall_score"]))
+        health = await calculate_health_score(trust["trust_id"], user["user_id"])
+        result.append(TrustResponse(**trust, governance_score=health["total_score"]))
     
     return result
 
@@ -516,8 +826,8 @@ async def get_trust(trust_id: str, user: dict = Depends(get_current_user)):
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
-    health = await calculate_governance_score(trust_id, user["user_id"])
-    return TrustResponse(**trust, governance_score=health["overall_score"])
+    health = await calculate_health_score(trust_id, user["user_id"])
+    return TrustResponse(**trust, governance_score=health["total_score"])
 
 @api_router.put("/trusts/{trust_id}", response_model=TrustResponse)
 async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(get_current_user)):
@@ -528,16 +838,13 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
-    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    update_data = {k: v.value if isinstance(v, Enum) else v for k, v in update.model_dump().items() if v is not None}
     if update_data:
-        await db.trusts.update_one(
-            {"trust_id": trust_id},
-            {"$set": update_data}
-        )
+        await db.trusts.update_one({"trust_id": trust_id}, {"$set": update_data})
     
     updated = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
-    health = await calculate_governance_score(trust_id, user["user_id"])
-    return TrustResponse(**updated, governance_score=health["overall_score"])
+    health = await calculate_health_score(trust_id, user["user_id"])
+    return TrustResponse(**updated, governance_score=health["total_score"])
 
 @api_router.delete("/trusts/{trust_id}")
 async def delete_trust(trust_id: str, user: dict = Depends(get_current_user)):
@@ -546,39 +853,224 @@ async def delete_trust(trust_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Trust not found")
     
     # Delete related data
-    await db.minutes.delete_many({"trust_id": trust_id})
-    await db.distributions.delete_many({"trust_id": trust_id})
-    await db.expenses.delete_many({"trust_id": trust_id})
+    await db.entities.delete_many({"trust_id": trust_id})
+    await db.entity_relationships.delete_many({"trust_id": trust_id})
+    await db.governance_tasks.delete_many({"trust_id": trust_id})
+    await db.minutes_records.delete_many({"trust_id": trust_id})
+    await db.distribution_records.delete_many({"trust_id": trust_id})
+    await db.compensation_plans.delete_many({"trust_id": trust_id})
+    await db.compensation_payments.delete_many({"trust_id": trust_id})
+    await db.health_score_snapshots.delete_many({"trust_id": trust_id})
     
     return {"message": "Trust deleted"}
+
+# ==================== ENTITY ENDPOINTS ====================
+
+@api_router.post("/entities", response_model=EntityResponse)
+async def create_entity(entity: EntityCreate, user: dict = Depends(get_current_user)):
+    trust = await db.trusts.find_one({"trust_id": entity.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    entity_id = f"entity_{uuid.uuid4().hex[:12]}"
+    entity_doc = {
+        "entity_id": entity_id,
+        "user_id": user["user_id"],
+        **entity.model_dump(),
+        "entity_type": entity.entity_type.value,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.entities.insert_one(entity_doc)
+    await auto_update_onboarding(user["user_id"], entity.trust_id)
+    
+    return EntityResponse(**entity_doc)
+
+@api_router.get("/entities", response_model=List[EntityResponse])
+async def get_entities(trust_id: str, user: dict = Depends(get_current_user)):
+    entities = await db.entities.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).to_list(100)
+    
+    return [EntityResponse(**e) for e in entities]
+
+@api_router.get("/entities/{entity_id}", response_model=EntityResponse)
+async def get_entity(entity_id: str, user: dict = Depends(get_current_user)):
+    entity = await db.entities.find_one(
+        {"entity_id": entity_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    
+    return EntityResponse(**entity)
+
+@api_router.delete("/entities/{entity_id}")
+async def delete_entity(entity_id: str, user: dict = Depends(get_current_user)):
+    result = await db.entities.delete_one({"entity_id": entity_id, "user_id": user["user_id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    
+    # Delete related relationships
+    await db.entity_relationships.delete_many({"$or": [
+        {"parent_entity_id": entity_id},
+        {"child_entity_id": entity_id}
+    ]})
+    
+    return {"message": "Entity deleted"}
+
+# ==================== ENTITY RELATIONSHIP ENDPOINTS ====================
+
+@api_router.post("/entity-relationships", response_model=EntityRelationshipResponse)
+async def create_relationship(rel: EntityRelationshipCreate, user: dict = Depends(get_current_user)):
+    rel_id = f"rel_{uuid.uuid4().hex[:12]}"
+    rel_doc = {
+        "relationship_id": rel_id,
+        "user_id": user["user_id"],
+        **rel.model_dump(),
+        "relationship_type": rel.relationship_type.value,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.entity_relationships.insert_one(rel_doc)
+    
+    return EntityRelationshipResponse(**rel_doc)
+
+@api_router.get("/entity-relationships", response_model=List[EntityRelationshipResponse])
+async def get_relationships(trust_id: str, user: dict = Depends(get_current_user)):
+    rels = await db.entity_relationships.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).to_list(100)
+    
+    return [EntityRelationshipResponse(**r) for r in rels]
+
+@api_router.delete("/entity-relationships/{relationship_id}")
+async def delete_relationship(relationship_id: str, user: dict = Depends(get_current_user)):
+    result = await db.entity_relationships.delete_one({
+        "relationship_id": relationship_id,
+        "user_id": user["user_id"]
+    })
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    
+    return {"message": "Relationship deleted"}
+
+# ==================== GOVERNANCE TASK ENDPOINTS ====================
+
+@api_router.post("/tasks", response_model=GovernanceTaskResponse)
+async def create_task(task: GovernanceTaskCreate, user: dict = Depends(get_current_user)):
+    trust = await db.trusts.find_one({"trust_id": task.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    task_id = f"task_{uuid.uuid4().hex[:12]}"
+    task_doc = {
+        "task_id": task_id,
+        "trust_id": task.trust_id,
+        "user_id": user["user_id"],
+        "task_type": task.task_type.value,
+        "due_date": task.due_date,
+        "completed_at": None,
+        "description": task.description,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.governance_tasks.insert_one(task_doc)
+    await auto_update_onboarding(user["user_id"], task.trust_id)
+    
+    status = get_task_status(task.due_date, None)
+    return GovernanceTaskResponse(**task_doc, status=status)
+
+@api_router.get("/tasks", response_model=List[GovernanceTaskResponse])
+async def get_tasks(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    query = {"user_id": user["user_id"]}
+    if trust_id:
+        query["trust_id"] = trust_id
+    
+    tasks = await db.governance_tasks.find(query, {"_id": 0}).sort("due_date", 1).to_list(1000)
+    
+    result = []
+    for t in tasks:
+        status = get_task_status(t["due_date"], t.get("completed_at"))
+        result.append(GovernanceTaskResponse(**t, status=status))
+    
+    return result
+
+@api_router.patch("/tasks/{task_id}/complete")
+async def complete_task(task_id: str, user: dict = Depends(get_current_user)):
+    task = await db.governance_tasks.find_one(
+        {"task_id": task_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    completed_at = datetime.now(timezone.utc).isoformat()
+    await db.governance_tasks.update_one(
+        {"task_id": task_id},
+        {"$set": {"completed_at": completed_at}}
+    )
+    
+    return {"message": "Task completed", "completed_at": completed_at}
+
+@api_router.patch("/tasks/{task_id}/uncomplete")
+async def uncomplete_task(task_id: str, user: dict = Depends(get_current_user)):
+    result = await db.governance_tasks.update_one(
+        {"task_id": task_id, "user_id": user["user_id"]},
+        {"$set": {"completed_at": None}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    return {"message": "Task marked incomplete"}
+
+@api_router.delete("/tasks/{task_id}")
+async def delete_task(task_id: str, user: dict = Depends(get_current_user)):
+    result = await db.governance_tasks.delete_one({"task_id": task_id, "user_id": user["user_id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    return {"message": "Task deleted"}
 
 # ==================== MINUTES ENDPOINTS ====================
 
 @api_router.post("/minutes", response_model=MinutesResponse)
 async def create_minutes(minutes: MinutesCreate, user: dict = Depends(get_current_user)):
-    # Verify trust belongs to user
-    trust = await db.trusts.find_one(
-        {"trust_id": minutes.trust_id, "user_id": user["user_id"]},
-        {"_id": 0}
-    )
+    trust = await db.trusts.find_one({"trust_id": minutes.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
-    minutes_id = f"min_{uuid.uuid4().hex[:12]}"
+    minutes_id = f"minutes_{uuid.uuid4().hex[:12]}"
     minutes_doc = {
         "minutes_id": minutes_id,
         "trust_id": minutes.trust_id,
         "user_id": user["user_id"],
-        "entry_type": minutes.entry_type,
-        "date": minutes.date,
-        "participants": minutes.participants,
-        "summary": minutes.summary,
-        "details": minutes.details,
-        "best_interest_rationale": minutes.best_interest_rationale,
+        "minutes_type": minutes.minutes_type.value,
+        "meeting_date": minutes.meeting_date,
+        "participants_text": minutes.participants_text,
+        "decisions_text": minutes.decisions_text,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.minutes.insert_one(minutes_doc)
+    await db.minutes_records.insert_one(minutes_doc)
+    
+    # Link to distribution if provided
+    if minutes.distribution_id:
+        await db.distribution_records.update_one(
+            {"distribution_id": minutes.distribution_id},
+            {"$set": {"minutes_record_id": minutes_id}}
+        )
+    
+    # Link to compensation payment if provided
+    if minutes.compensation_payment_id:
+        await db.compensation_payments.update_one(
+            {"payment_id": minutes.compensation_payment_id},
+            {"$set": {"minutes_record_id": minutes_id}}
+        )
+    
+    await auto_update_onboarding(user["user_id"], minutes.trust_id)
     
     return MinutesResponse(**minutes_doc)
 
@@ -588,12 +1080,12 @@ async def get_minutes(trust_id: Optional[str] = None, user: dict = Depends(get_c
     if trust_id:
         query["trust_id"] = trust_id
     
-    minutes = await db.minutes.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    minutes = await db.minutes_records.find(query, {"_id": 0}).sort("meeting_date", -1).to_list(1000)
     return [MinutesResponse(**m) for m in minutes]
 
 @api_router.get("/minutes/{minutes_id}", response_model=MinutesResponse)
 async def get_minutes_by_id(minutes_id: str, user: dict = Depends(get_current_user)):
-    minutes = await db.minutes.find_one(
+    minutes = await db.minutes_records.find_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
@@ -603,7 +1095,7 @@ async def get_minutes_by_id(minutes_id: str, user: dict = Depends(get_current_us
 
 @api_router.delete("/minutes/{minutes_id}")
 async def delete_minutes(minutes_id: str, user: dict = Depends(get_current_user)):
-    result = await db.minutes.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
+    result = await db.minutes_records.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Minutes not found")
     return {"message": "Minutes deleted"}
@@ -612,10 +1104,7 @@ async def delete_minutes(minutes_id: str, user: dict = Depends(get_current_user)
 
 @api_router.post("/distributions", response_model=DistributionResponse)
 async def create_distribution(dist: DistributionCreate, user: dict = Depends(get_current_user)):
-    trust = await db.trusts.find_one(
-        {"trust_id": dist.trust_id, "user_id": user["user_id"]},
-        {"_id": 0}
-    )
+    trust = await db.trusts.find_one({"trust_id": dist.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
@@ -624,112 +1113,195 @@ async def create_distribution(dist: DistributionCreate, user: dict = Depends(get
         "distribution_id": dist_id,
         "trust_id": dist.trust_id,
         "user_id": user["user_id"],
-        "date": dist.date,
+        "beneficiary_name": dist.beneficiary_name,
         "amount": dist.amount,
-        "distribution_type": dist.distribution_type,
-        "beneficiary": dist.beneficiary,
-        "category": dist.category,
+        "date": dist.date,
+        "purpose_classification": dist.purpose_classification.value,
+        "authority_clause_ref": dist.authority_clause_ref,
         "notes": dist.notes,
-        "status": dist.status,
+        "solvency_confirmed": False,
+        "recusal_acknowledged": False,
+        "approved_by": None,
+        "approved_at": None,
+        "minutes_record_id": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.distributions.insert_one(dist_doc)
+    await db.distribution_records.insert_one(dist_doc)
+    await auto_update_onboarding(user["user_id"], dist.trust_id)
     
     return DistributionResponse(**dist_doc)
 
 @api_router.get("/distributions", response_model=List[DistributionResponse])
-async def get_distributions(trust_id: Optional[str] = None, status: Optional[str] = None, user: dict = Depends(get_current_user)):
+async def get_distributions(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
-    if status:
-        query["status"] = status
     
-    dists = await db.distributions.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    dists = await db.distribution_records.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
     return [DistributionResponse(**d) for d in dists]
 
-@api_router.put("/distributions/{distribution_id}", response_model=DistributionResponse)
-async def update_distribution(distribution_id: str, status: str, user: dict = Depends(get_current_user)):
-    result = await db.distributions.update_one(
+@api_router.patch("/distributions/{distribution_id}/approve", response_model=DistributionResponse)
+async def approve_distribution(distribution_id: str, approval: DistributionApprove, user: dict = Depends(get_current_user)):
+    dist = await db.distribution_records.find_one(
         {"distribution_id": distribution_id, "user_id": user["user_id"]},
-        {"$set": {"status": status}}
+        {"_id": 0}
     )
-    if result.matched_count == 0:
+    if not dist:
         raise HTTPException(status_code=404, detail="Distribution not found")
     
-    dist = await db.distributions.find_one({"distribution_id": distribution_id}, {"_id": 0})
-    return DistributionResponse(**dist)
+    if not approval.solvency_confirmed:
+        raise HTTPException(status_code=400, detail="Solvency must be confirmed to approve distribution")
+    
+    if not approval.recusal_acknowledged:
+        raise HTTPException(status_code=400, detail="Recusal must be acknowledged")
+    
+    await db.distribution_records.update_one(
+        {"distribution_id": distribution_id},
+        {"$set": {
+            "solvency_confirmed": True,
+            "recusal_acknowledged": True,
+            "approved_by": user["user_id"],
+            "approved_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.distribution_records.find_one({"distribution_id": distribution_id}, {"_id": 0})
+    return DistributionResponse(**updated)
 
 @api_router.delete("/distributions/{distribution_id}")
 async def delete_distribution(distribution_id: str, user: dict = Depends(get_current_user)):
-    result = await db.distributions.delete_one({"distribution_id": distribution_id, "user_id": user["user_id"]})
+    result = await db.distribution_records.delete_one({
+        "distribution_id": distribution_id,
+        "user_id": user["user_id"]
+    })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Distribution not found")
     return {"message": "Distribution deleted"}
 
-# ==================== EXPENSE ENDPOINTS ====================
+# ==================== COMPENSATION PLAN ENDPOINTS ====================
 
-@api_router.post("/expenses", response_model=ExpenseResponse)
-async def create_expense(expense: ExpenseCreate, user: dict = Depends(get_current_user)):
-    trust = await db.trusts.find_one(
-        {"trust_id": expense.trust_id, "user_id": user["user_id"]},
-        {"_id": 0}
-    )
+@api_router.post("/compensation-plans", response_model=CompensationPlanResponse)
+async def create_comp_plan(plan: CompensationPlanCreate, user: dict = Depends(get_current_user)):
+    trust = await db.trusts.find_one({"trust_id": plan.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
-    expense_id = f"exp_{uuid.uuid4().hex[:12]}"
-    expense_doc = {
-        "expense_id": expense_id,
-        "trust_id": expense.trust_id,
+    plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+    plan_doc = {
+        "plan_id": plan_id,
+        "trust_id": plan.trust_id,
         "user_id": user["user_id"],
-        "date": expense.date,
-        "amount": expense.amount,
-        "payee": expense.payee,
-        "category": expense.category,
-        "notes": expense.notes,
-        "status": expense.status,
+        "annual_approved_amount": plan.annual_approved_amount,
+        "effective_date": plan.effective_date,
+        "notes": plan.notes,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.expenses.insert_one(expense_doc)
+    await db.compensation_plans.insert_one(plan_doc)
     
-    return ExpenseResponse(**expense_doc)
+    return CompensationPlanResponse(**plan_doc)
 
-@api_router.get("/expenses", response_model=List[ExpenseResponse])
-async def get_expenses(trust_id: Optional[str] = None, status: Optional[str] = None, user: dict = Depends(get_current_user)):
-    query = {"user_id": user["user_id"]}
-    if trust_id:
-        query["trust_id"] = trust_id
-    if status:
-        query["status"] = status
+@api_router.get("/compensation-plans", response_model=List[CompensationPlanResponse])
+async def get_comp_plans(trust_id: str, user: dict = Depends(get_current_user)):
+    plans = await db.compensation_plans.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).sort("effective_date", -1).to_list(100)
     
-    expenses = await db.expenses.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
-    return [ExpenseResponse(**e) for e in expenses]
+    return [CompensationPlanResponse(**p) for p in plans]
 
-@api_router.put("/expenses/{expense_id}", response_model=ExpenseResponse)
-async def update_expense(expense_id: str, status: str, user: dict = Depends(get_current_user)):
-    result = await db.expenses.update_one(
-        {"expense_id": expense_id, "user_id": user["user_id"]},
-        {"$set": {"status": status}}
+# ==================== COMPENSATION PAYMENT ENDPOINTS ====================
+
+@api_router.post("/compensation-payments", response_model=CompensationPaymentResponse)
+async def create_comp_payment(payment: CompensationPaymentCreate, user: dict = Depends(get_current_user)):
+    trust = await db.trusts.find_one({"trust_id": payment.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    payment_id = f"payment_{uuid.uuid4().hex[:12]}"
+    
+    # Check if exceeds plan
+    exceeds_plan = False
+    plan = await db.compensation_plans.find_one(
+        {"trust_id": payment.trust_id, "user_id": user["user_id"]},
+        {"_id": 0},
+        sort=[("effective_date", -1)]
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Expense not found")
     
-    expense = await db.expenses.find_one({"expense_id": expense_id}, {"_id": 0})
-    return ExpenseResponse(**expense)
+    if plan:
+        year_start = get_year_start(datetime.now(timezone.utc))
+        existing = await db.compensation_payments.find(
+            {"trust_id": payment.trust_id, "user_id": user["user_id"], "date": {"$gte": year_start.isoformat()}},
+            {"_id": 0}
+        ).to_list(1000)
+        ytd_total = sum(p.get("amount", 0) for p in existing) + payment.amount
+        exceeds_plan = ytd_total > plan.get("annual_approved_amount", 0)
+    
+    payment_doc = {
+        "payment_id": payment_id,
+        "trust_id": payment.trust_id,
+        "user_id": user["user_id"],
+        "amount": payment.amount,
+        "date": payment.date,
+        "classification_text": payment.classification_text,
+        "exceeds_plan_flag": exceeds_plan,
+        "minutes_record_id": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.compensation_payments.insert_one(payment_doc)
+    await auto_update_onboarding(user["user_id"], payment.trust_id)
+    
+    return CompensationPaymentResponse(**payment_doc)
 
-@api_router.delete("/expenses/{expense_id}")
-async def delete_expense(expense_id: str, user: dict = Depends(get_current_user)):
-    result = await db.expenses.delete_one({"expense_id": expense_id, "user_id": user["user_id"]})
+@api_router.get("/compensation-payments", response_model=List[CompensationPaymentResponse])
+async def get_comp_payments(trust_id: str, user: dict = Depends(get_current_user)):
+    payments = await db.compensation_payments.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).sort("date", -1).to_list(1000)
+    
+    return [CompensationPaymentResponse(**p) for p in payments]
+
+@api_router.get("/compensation-ytd")
+async def get_comp_ytd(trust_id: str, user: dict = Depends(get_current_user)):
+    """Get YTD compensation total and plan info"""
+    year_start = get_year_start(datetime.now(timezone.utc))
+    
+    payments = await db.compensation_payments.find(
+        {"trust_id": trust_id, "user_id": user["user_id"], "date": {"$gte": year_start.isoformat()}},
+        {"_id": 0}
+    ).to_list(1000)
+    ytd_total = sum(p.get("amount", 0) for p in payments)
+    
+    plan = await db.compensation_plans.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0},
+        sort=[("effective_date", -1)]
+    )
+    annual_approved = plan.get("annual_approved_amount", 0) if plan else 0
+    
+    return {
+        "ytd_total": ytd_total,
+        "annual_approved": annual_approved,
+        "exceeds_plan": ytd_total > annual_approved if plan else False,
+        "remaining": max(0, annual_approved - ytd_total)
+    }
+
+@api_router.delete("/compensation-payments/{payment_id}")
+async def delete_comp_payment(payment_id: str, user: dict = Depends(get_current_user)):
+    result = await db.compensation_payments.delete_one({
+        "payment_id": payment_id,
+        "user_id": user["user_id"]
+    })
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Expense not found")
-    return {"message": "Expense deleted"}
+        raise HTTPException(status_code=404, detail="Payment not found")
+    return {"message": "Payment deleted"}
 
-# ==================== GOVERNANCE HEALTH ENDPOINT ====================
+# ==================== GOVERNANCE HEALTH ENDPOINTS ====================
 
-@api_router.get("/governance/{trust_id}", response_model=GovernanceHealthResponse)
+@api_router.get("/governance/{trust_id}", response_model=HealthScoreResponse)
 async def get_governance_health(trust_id: str, user: dict = Depends(get_current_user)):
     trust = await db.trusts.find_one(
         {"trust_id": trust_id, "user_id": user["user_id"]},
@@ -738,60 +1310,123 @@ async def get_governance_health(trust_id: str, user: dict = Depends(get_current_
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
-    health = await calculate_governance_score(trust_id, user["user_id"])
-    return GovernanceHealthResponse(**health)
+    health = await calculate_health_score(trust_id, user["user_id"])
+    return HealthScoreResponse(**health)
+
+# ==================== ONBOARDING ENDPOINTS ====================
+
+@api_router.get("/onboarding", response_model=OnboardingState)
+async def get_onboarding(user: dict = Depends(get_current_user)):
+    # Get user's trust to auto-update
+    trust = await db.trusts.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    if trust:
+        await auto_update_onboarding(user["user_id"], trust["trust_id"])
+    
+    state = await db.user_onboarding.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    if not state:
+        state = {
+            "user_id": user["user_id"],
+            "entities_confirmed": False,
+            "calendar_set": False,
+            "minutes_generated": False,
+            "distribution_logged": False,
+            "checklist_dismissed": False
+        }
+    
+    return OnboardingState(**state)
+
+@api_router.patch("/onboarding")
+async def update_onboarding(updates: dict, user: dict = Depends(get_current_user)):
+    allowed_fields = ["entities_confirmed", "calendar_set", "minutes_generated", "distribution_logged", "checklist_dismissed"]
+    update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.user_onboarding.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": update_data},
+        upsert=True
+    )
+    
+    return {"message": "Onboarding updated"}
+
+@api_router.post("/onboarding/dismiss")
+async def dismiss_onboarding(user: dict = Depends(get_current_user)):
+    await db.user_onboarding.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "checklist_dismissed": True,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    return {"message": "Onboarding dismissed"}
 
 # ==================== ACTIVITY TIMELINE ====================
 
 @api_router.get("/activity")
 async def get_activity(trust_id: Optional[str] = None, limit: int = 20, user: dict = Depends(get_current_user)):
-    """Get recent activity across all trusts or a specific trust"""
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
     
     activities = []
     
-    # Get recent minutes
-    minutes = await db.minutes.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    # Minutes
+    minutes = await db.minutes_records.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
     for m in minutes:
         activities.append({
             "type": "minutes",
             "id": m["minutes_id"],
             "trust_id": m["trust_id"],
-            "title": m["summary"],
-            "entry_type": m["entry_type"],
-            "date": m["date"],
+            "title": f"{m['minutes_type'].title()} Minutes",
+            "subtitle": m.get("decisions_text", "")[:100],
+            "date": m["meeting_date"],
             "created_at": m["created_at"]
         })
     
-    # Get recent distributions
-    dists = await db.distributions.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    # Distributions
+    dists = await db.distribution_records.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
     for d in dists:
         activities.append({
             "type": "distribution",
             "id": d["distribution_id"],
             "trust_id": d["trust_id"],
-            "title": f"${d['amount']:,.2f} to {d['beneficiary']}",
-            "status": d["status"],
+            "title": f"${d['amount']:,.2f} to {d['beneficiary_name']}",
+            "subtitle": d.get("purpose_classification", ""),
+            "status": "approved" if d.get("approved_at") else "pending",
             "date": d["date"],
             "created_at": d["created_at"]
         })
     
-    # Get recent expenses
-    expenses = await db.expenses.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
-    for e in expenses:
+    # Compensation Payments
+    payments = await db.compensation_payments.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    for p in payments:
         activities.append({
-            "type": "expense",
-            "id": e["expense_id"],
-            "trust_id": e["trust_id"],
-            "title": f"${e['amount']:,.2f} to {e['payee']}",
-            "status": e["status"],
-            "date": e["date"],
-            "created_at": e["created_at"]
+            "type": "compensation",
+            "id": p["payment_id"],
+            "trust_id": p["trust_id"],
+            "title": f"${p['amount']:,.2f} Compensation",
+            "subtitle": p.get("classification_text", ""),
+            "status": "exceeds" if p.get("exceeds_plan_flag") else "within_plan",
+            "date": p["date"],
+            "created_at": p["created_at"]
         })
     
-    # Sort by created_at and limit
+    # Tasks completed
+    tasks = await db.governance_tasks.find({**query, "completed_at": {"$ne": None}}, {"_id": 0}).sort("completed_at", -1).to_list(limit)
+    for t in tasks:
+        activities.append({
+            "type": "task",
+            "id": t["task_id"],
+            "trust_id": t["trust_id"],
+            "title": f"{t['task_type'].replace('_', ' ').title()} Completed",
+            "subtitle": t.get("description", ""),
+            "status": "completed",
+            "date": t["completed_at"],
+            "created_at": t["completed_at"]
+        })
+    
     activities.sort(key=lambda x: x["created_at"], reverse=True)
     return activities[:limit]
 
@@ -799,154 +1434,247 @@ async def get_activity(trust_id: Optional[str] = None, limit: int = 20, user: di
 
 @api_router.get("/categories")
 async def get_categories():
-    """Get default categories for distributions and expenses"""
     return {
-        "distribution_categories": [
-            "Trust Distribution",
-            "Living Expenses",
-            "Education",
-            "Medical",
-            "Housing",
-            "Emergency",
-            "Gift",
-            "Loan",
-            "Other"
-        ],
-        "expense_categories": [
-            "Administrative",
-            "Legal",
-            "Accounting",
-            "Investment Management",
-            "Property Maintenance",
-            "Insurance",
-            "Taxes",
-            "Professional Fees",
-            "Other"
-        ],
-        "distribution_types": [
-            "trust_distribution",
-            "loan",
-            "gift"
-        ]
+        "purpose_classifications": [c.value for c in PurposeClassification],
+        "task_types": [t.value for t in TaskType],
+        "minutes_types": [m.value for m in MinutesType],
+        "entity_types": [e.value for e in EntityType],
+        "relationship_types": [r.value for r in RelationshipType]
     }
 
 # ==================== DEMO DATA ====================
 
 @api_router.post("/demo/seed")
 async def seed_demo_data(user: dict = Depends(get_current_user)):
-    """Create demo trust with sample data"""
-    # Check if user already has trusts
     existing = await db.trusts.count_documents({"user_id": user["user_id"]})
     if existing > 0:
         return {"message": "User already has trusts", "seeded": False}
     
-    # Create demo trust
-    trust_id = f"trust_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc)
+    trust_id = f"trust_{uuid.uuid4().hex[:12]}"
     
-    trust_doc = {
+    # Create trust
+    await db.trusts.insert_one({
         "trust_id": trust_id,
         "user_id": user["user_id"],
         "name": "Smith Family Trust",
-        "role": "Trustee",
-        "review_cadence": "quarterly",
-        "description": "Family trust established for education and living expenses",
+        "trust_type": "family",
+        "jurisdiction": "Delaware",
         "created_at": now.isoformat()
-    }
-    await db.trusts.insert_one(trust_doc)
+    })
     
-    # Create sample minutes
-    minutes_data = [
+    # Create trust entity
+    trust_entity_id = f"entity_{uuid.uuid4().hex[:12]}"
+    await db.entities.insert_one({
+        "entity_id": trust_entity_id,
+        "trust_id": trust_id,
+        "user_id": user["user_id"],
+        "name": "Smith Family Trust",
+        "entity_type": "Trust",
+        "legal_name": "The Smith Family Irrevocable Trust",
+        "formation_date": "2020-01-15",
+        "governing_law": "Delaware",
+        "ein": "12-3456789",
+        "trustee_names": "John Smith, Jane Smith",
+        "beneficiary_standard": "Health, Education, Maintenance, and Support",
+        "article_ref_distribution": "Article IV, Section 4.1",
+        "article_ref_compensation": "Article V, Section 5.2",
+        "article_ref_amendment": "Article VIII",
+        "oversight_required": False,
+        "member_names": "",
+        "manager_names": "",
+        "article_ref_authority": "",
+        "article_ref_profit_distribution": "",
+        "created_at": now.isoformat()
+    })
+    
+    # Create holding LLC
+    holding_llc_id = f"entity_{uuid.uuid4().hex[:12]}"
+    await db.entities.insert_one({
+        "entity_id": holding_llc_id,
+        "trust_id": trust_id,
+        "user_id": user["user_id"],
+        "name": "Smith Holdings LLC",
+        "entity_type": "Holding LLC",
+        "legal_name": "Smith Holdings, LLC",
+        "formation_date": "2020-03-01",
+        "governing_law": "Delaware",
+        "ein": "98-7654321",
+        "trustee_names": "",
+        "beneficiary_standard": "",
+        "article_ref_distribution": "",
+        "article_ref_compensation": "",
+        "article_ref_amendment": "",
+        "oversight_required": False,
+        "member_names": "Smith Family Trust (100%)",
+        "manager_names": "John Smith",
+        "article_ref_authority": "Section 3.2",
+        "article_ref_profit_distribution": "Section 5.1",
+        "created_at": now.isoformat()
+    })
+    
+    # Create relationship
+    await db.entity_relationships.insert_one({
+        "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
+        "trust_id": trust_id,
+        "user_id": user["user_id"],
+        "parent_entity_id": trust_entity_id,
+        "child_entity_id": holding_llc_id,
+        "relationship_type": "owns",
+        "ownership_percentage": 100,
+        "notes": "Trust is sole member of holding LLC",
+        "created_at": now.isoformat()
+    })
+    
+    # Create governance tasks
+    await db.governance_tasks.insert_many([
         {
-            "minutes_id": f"min_{uuid.uuid4().hex[:12]}",
+            "task_id": f"task_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
-            "entry_type": "meeting",
-            "date": (now - timedelta(days=15)).isoformat(),
-            "participants": ["John Smith", "Jane Smith", "Robert Attorney"],
-            "summary": "Q4 2025 Quarterly Review Meeting",
-            "details": "Reviewed trust performance, discussed upcoming distributions for education expenses, and approved budget for next quarter.",
-            "best_interest_rationale": "Regular quarterly review ensures proper oversight and alignment with beneficiary needs.",
+            "task_type": "annual_review",
+            "due_date": (now + timedelta(days=60)).isoformat(),
+            "completed_at": None,
+            "description": "Annual trust administration review",
+            "created_at": now.isoformat()
+        },
+        {
+            "task_id": f"task_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "task_type": "quarterly_review",
+            "due_date": (now + timedelta(days=30)).isoformat(),
+            "completed_at": None,
+            "description": "Q1 2026 quarterly review",
+            "created_at": now.isoformat()
+        },
+        {
+            "task_id": f"task_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "task_type": "compensation_review",
+            "due_date": (now - timedelta(days=5)).isoformat(),  # Overdue
+            "completed_at": None,
+            "description": "Review trustee compensation for 2026",
+            "created_at": (now - timedelta(days=30)).isoformat()
+        }
+    ])
+    
+    # Create minutes
+    await db.minutes_records.insert_many([
+        {
+            "minutes_id": f"minutes_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "minutes_type": "quarterly",
+            "meeting_date": (now - timedelta(days=15)).isoformat(),
+            "participants_text": "John Smith, Jane Smith, Robert Attorney",
+            "decisions_text": "Reviewed Q4 2025 performance. Approved education distribution for Emily. Confirmed investment strategy.",
             "created_at": (now - timedelta(days=15)).isoformat()
         },
         {
-            "minutes_id": f"min_{uuid.uuid4().hex[:12]}",
+            "minutes_id": f"minutes_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
-            "entry_type": "decision",
-            "date": (now - timedelta(days=30)).isoformat(),
-            "participants": ["John Smith", "Jane Smith"],
-            "summary": "Approved Education Distribution",
-            "details": "Approved distribution of $15,000 for spring semester tuition at State University.",
-            "best_interest_rationale": "Education expenses are a primary purpose of the trust and support beneficiary's long-term success.",
+            "minutes_type": "distribution",
+            "meeting_date": (now - timedelta(days=30)).isoformat(),
+            "participants_text": "John Smith, Jane Smith",
+            "decisions_text": "Approved $15,000 distribution for spring semester tuition at State University. Solvency confirmed.",
             "created_at": (now - timedelta(days=30)).isoformat()
         }
-    ]
-    await db.minutes.insert_many(minutes_data)
+    ])
     
-    # Create sample distributions
-    distributions_data = [
+    # Create compensation plan
+    await db.compensation_plans.insert_one({
+        "plan_id": f"plan_{uuid.uuid4().hex[:12]}",
+        "trust_id": trust_id,
+        "user_id": user["user_id"],
+        "annual_approved_amount": 25000,
+        "effective_date": f"{now.year}-01-01",
+        "notes": "Annual trustee compensation approved by trust protector",
+        "created_at": now.isoformat()
+    })
+    
+    # Create compensation payments
+    await db.compensation_payments.insert_many([
+        {
+            "payment_id": f"payment_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "amount": 6250,
+            "date": (now - timedelta(days=60)).isoformat(),
+            "classification_text": "Q4 2025 trustee services",
+            "exceeds_plan_flag": False,
+            "minutes_record_id": None,
+            "created_at": (now - timedelta(days=60)).isoformat()
+        },
+        {
+            "payment_id": f"payment_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "amount": 6250,
+            "date": (now - timedelta(days=5)).isoformat(),
+            "classification_text": "Q1 2026 trustee services",
+            "exceeds_plan_flag": False,
+            "minutes_record_id": None,
+            "created_at": (now - timedelta(days=5)).isoformat()
+        }
+    ])
+    
+    # Create distributions
+    await db.distribution_records.insert_many([
         {
             "distribution_id": f"dist_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
+            "beneficiary_name": "Emily Smith",
+            "amount": 15000,
             "date": (now - timedelta(days=10)).isoformat(),
-            "amount": 15000.00,
-            "distribution_type": "trust_distribution",
-            "beneficiary": "Emily Smith",
-            "category": "Education",
+            "purpose_classification": "distribution",
+            "authority_clause_ref": "Article IV, Section 4.1(a)",
             "notes": "Spring 2026 semester tuition",
-            "status": "approved",
+            "solvency_confirmed": True,
+            "recusal_acknowledged": True,
+            "approved_by": user["user_id"],
+            "approved_at": (now - timedelta(days=10)).isoformat(),
+            "minutes_record_id": None,
             "created_at": (now - timedelta(days=10)).isoformat()
         },
         {
             "distribution_id": f"dist_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
-            "date": (now - timedelta(days=5)).isoformat(),
-            "amount": 2500.00,
-            "distribution_type": "trust_distribution",
-            "beneficiary": "Emily Smith",
-            "category": "Living Expenses",
-            "notes": "Monthly living allowance",
-            "status": "review",
-            "created_at": (now - timedelta(days=5)).isoformat()
-        }
-    ]
-    await db.distributions.insert_many(distributions_data)
-    
-    # Create sample expenses
-    expenses_data = [
-        {
-            "expense_id": f"exp_{uuid.uuid4().hex[:12]}",
-            "trust_id": trust_id,
-            "user_id": user["user_id"],
-            "date": (now - timedelta(days=20)).isoformat(),
-            "amount": 750.00,
-            "payee": "Anderson & Associates",
-            "category": "Legal",
-            "notes": "Annual trust review and documentation",
-            "status": "approved",
-            "created_at": (now - timedelta(days=20)).isoformat()
-        },
-        {
-            "expense_id": f"exp_{uuid.uuid4().hex[:12]}",
-            "trust_id": trust_id,
-            "user_id": user["user_id"],
+            "beneficiary_name": "Emily Smith",
+            "amount": 2500,
             "date": (now - timedelta(days=3)).isoformat(),
-            "amount": 350.00,
-            "payee": "Smith CPA",
-            "category": "Accounting",
-            "notes": "Quarterly tax preparation",
-            "status": "review",
+            "purpose_classification": "distribution",
+            "authority_clause_ref": "Article IV, Section 4.1(b)",
+            "notes": "Monthly living allowance",
+            "solvency_confirmed": False,
+            "recusal_acknowledged": False,
+            "approved_by": None,
+            "approved_at": None,
+            "minutes_record_id": None,
             "created_at": (now - timedelta(days=3)).isoformat()
         }
-    ]
-    await db.expenses.insert_many(expenses_data)
+    ])
+    
+    # Update onboarding
+    await db.user_onboarding.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "entities_confirmed": True,
+            "calendar_set": True,
+            "minutes_generated": True,
+            "distribution_logged": True,
+            "updated_at": now.isoformat()
+        }},
+        upsert=True
+    )
     
     return {"message": "Demo data created", "seeded": True, "trust_id": trust_id}
 
-# Include the router in the main app
+# Include router and middleware
 app.include_router(api_router)
 
 app.add_middleware(
