@@ -944,6 +944,30 @@ async def get_entity(entity_id: str, user: dict = Depends(get_current_user)):
     
     return EntityResponse(**entity)
 
+@api_router.patch("/entities/{entity_id}", response_model=EntityResponse)
+async def update_entity(entity_id: str, updates: dict, user: dict = Depends(get_current_user)):
+    entity = await db.entities.find_one(
+        {"entity_id": entity_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    
+    # Filter only allowed fields
+    allowed_fields = [
+        "name", "legal_name", "formation_date", "governing_law", "ein",
+        "trustee_names", "beneficiary_standard", "article_ref_distribution",
+        "article_ref_compensation", "article_ref_amendment", "oversight_required",
+        "member_names", "manager_names", "article_ref_authority", "article_ref_profit_distribution"
+    ]
+    update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+    
+    if update_data:
+        await db.entities.update_one({"entity_id": entity_id}, {"$set": update_data})
+    
+    updated = await db.entities.find_one({"entity_id": entity_id}, {"_id": 0})
+    return EntityResponse(**updated)
+
 @api_router.delete("/entities/{entity_id}")
 async def delete_entity(entity_id: str, user: dict = Depends(get_current_user)):
     result = await db.entities.delete_one({"entity_id": entity_id, "user_id": user["user_id"]})
