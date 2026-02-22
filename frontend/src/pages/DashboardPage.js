@@ -27,6 +27,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, selectedTrust, trusts, loadTrusts, seedDemoData } = useAuth();
   const [governance, setGovernance] = useState(null);
+  const [healthDetails, setHealthDetails] = useState(null);
+  const [onboarding, setOnboarding] = useState(null);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,7 +48,18 @@ export default function DashboardPage() {
       // Load governance score
       const govResponse = await fetchWithAuth(`/governance/${selectedTrust.trust_id}`);
       if (govResponse.ok) {
-        setGovernance(await govResponse.json());
+        const govData = await govResponse.json();
+        setGovernance(govData);
+        // Check if response has criteria (5-criteria health score)
+        if (govData.criteria) {
+          setHealthDetails(govData);
+        }
+      }
+
+      // Load onboarding state
+      const onboardingResponse = await fetchWithAuth('/onboarding');
+      if (onboardingResponse.ok) {
+        setOnboarding(await onboardingResponse.json());
       }
 
       // Load recent activity
@@ -58,6 +71,15 @@ export default function DashboardPage() {
       console.error('Failed to load dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const dismissOnboarding = async () => {
+    try {
+      await fetchWithAuth('/onboarding/dismiss', { method: 'POST' });
+      setOnboarding(prev => ({ ...prev, checklist_dismissed: true }));
+    } catch (error) {
+      console.error('Failed to dismiss onboarding:', error);
     }
   };
 
