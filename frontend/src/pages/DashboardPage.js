@@ -425,55 +425,84 @@ export default function DashboardPage() {
 
                   <div className="flex items-center gap-8">
                     <div className="score-circle">
-                      <span className={`score-indicator ${getScoreColor(governance?.overall_score || 0)}`}>
-                        {governance?.overall_score || 0}
+                      <span className={`score-indicator ${getScoreColor(healthDetails?.total_score || governance?.overall_score || 0)}`}>
+                        {healthDetails?.total_score || governance?.overall_score || 0}
                       </span>
                       <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
                         Score
                       </span>
                     </div>
 
-                    <div className="flex-1 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Meeting Recency</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-navy/10">
-                            <div 
-                              className="h-full bg-navy" 
-                              style={{ width: `${governance?.meeting_recency_score || 0}%` }}
-                            ></div>
+                    {/* 5-Criteria Display */}
+                    {healthDetails?.criteria ? (
+                      <div className="flex-1 space-y-3">
+                        {healthDetails.criteria.map((criterion, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground flex items-center gap-2">
+                              {criterion.achieved ? (
+                                <CheckCircle2 className="w-4 h-4 text-success" />
+                              ) : (
+                                <Circle className="w-4 h-4 text-navy/30" />
+                              )}
+                              {criterion.name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 h-2 bg-navy/10">
+                                <div 
+                                  className={`h-full ${criterion.achieved ? 'bg-success' : 'bg-navy/20'}`} 
+                                  style={{ width: `${(criterion.points / 20) * 100}%` }}
+                                ></div>
+                              </div>
+                              <span className={`font-mono text-xs w-8 ${criterion.achieved ? 'text-success' : 'text-muted-foreground'}`}>
+                                {criterion.points}/20
+                              </span>
+                            </div>
                           </div>
-                          <span className="font-mono text-xs w-8">{governance?.meeting_recency_score || 0}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex-1 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Meeting Recency</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 h-2 bg-navy/10">
+                              <div 
+                                className="h-full bg-navy" 
+                                style={{ width: `${governance?.meeting_recency_score || 0}%` }}
+                              ></div>
+                            </div>
+                            <span className="font-mono text-xs w-8">{governance?.meeting_recency_score || 0}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Decisions (90 days)</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 h-2 bg-navy/10">
+                              <div 
+                                className="h-full bg-gold" 
+                                style={{ width: `${governance?.decisions_count_score || 0}%` }}
+                              ></div>
+                            </div>
+                            <span className="font-mono text-xs w-8">{governance?.decisions_count_score || 0}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Pending Reviews</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 h-2 bg-navy/10">
+                              <div 
+                                className="h-full bg-success" 
+                                style={{ width: `${governance?.pending_reviews_score || 0}%` }}
+                              ></div>
+                            </div>
+                            <span className="font-mono text-xs w-8">{governance?.pending_reviews_score || 0}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Decisions (90 days)</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-navy/10">
-                            <div 
-                              className="h-full bg-gold" 
-                              style={{ width: `${governance?.decisions_count_score || 0}%` }}
-                            ></div>
-                          </div>
-                          <span className="font-mono text-xs w-8">{governance?.decisions_count_score || 0}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Pending Reviews</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-navy/10">
-                            <div 
-                              className="h-full bg-success" 
-                              style={{ width: `${governance?.pending_reviews_score || 0}%` }}
-                            ></div>
-                          </div>
-                          <span className="font-mono text-xs w-8">{governance?.pending_reviews_score || 0}</span>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
-                  {governance?.status === 'warning' && (
+                  {(governance?.status === 'warning' || (healthDetails?.total_score < 60 && healthDetails?.total_score >= 40)) && (
                     <div className="mt-6 p-4 bg-warning/10 border border-warning/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
                       <p className="text-sm text-warning">
@@ -482,11 +511,11 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {governance?.status === 'critical' && (
+                  {(governance?.status === 'critical' || (healthDetails?.total_score < 40)) && (
                     <div className="mt-6 p-4 bg-error/10 border border-error/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
                       <p className="text-sm text-error">
-                        Urgent: Your trust requires immediate attention. Schedule a review meeting now.
+                        Urgent: Your trust requires immediate attention. Complete pending tasks to improve your score.
                       </p>
                     </div>
                   )}
