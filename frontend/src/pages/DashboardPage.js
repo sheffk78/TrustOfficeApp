@@ -11,7 +11,15 @@ import {
   Receipt,
   Calendar,
   ArrowRight,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2,
+  Circle,
+  X,
+  Lightbulb,
+  Zap,
+  TrendingUp,
+  Building2,
+  Wallet
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
