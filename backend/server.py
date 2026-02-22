@@ -1987,18 +1987,20 @@ async def send_task_reminders(background_tasks: BackgroundTasks, user: dict = De
     now = datetime.now(timezone.utc).date()
     
     for trust in trusts:
-        # Get upcoming tasks (due in next 7 days)
+        # Get incomplete tasks (status is calculated dynamically, not stored)
         upcoming_date = (now + timedelta(days=7)).isoformat()
         tasks = await db.governance_tasks.find({
             "trust_id": trust["trust_id"],
             "user_id": user["user_id"],
-            "status": {"$in": ["upcoming", "overdue"]}
+            "completed_at": None  # Only incomplete tasks
         }, {"_id": 0}).to_list(100)
         
         for task in tasks:
             task_due = task.get("due_date", "")[:10]
+            # Calculate status dynamically
+            task_status = get_task_status(task.get("due_date", ""), task.get("completed_at"))
             
-            if task["status"] == "overdue":
+            if task_status == "overdue":
                 # Calculate days overdue
                 try:
                     due_date = datetime.fromisoformat(task_due).date()
