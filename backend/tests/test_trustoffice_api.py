@@ -811,5 +811,158 @@ class TestDistributionApproval:
             auth_session.delete(f"{BASE_URL}/api/distributions/{dist_id}")
 
 
+class TestMinutesPDF:
+    """Test PDF generation for minutes - P1 Feature"""
+    
+    @pytest.fixture(scope="class")
+    def auth_session(self):
+        session = requests.Session()
+        response = session.post(f"{BASE_URL}/api/auth/login", json={
+            "email": TEST_EMAIL,
+            "password": TEST_PASSWORD
+        })
+        if response.status_code == 200:
+            token = response.json().get("token")
+            session.headers.update({"Authorization": f"Bearer {token}"})
+        return session
+    
+    @pytest.fixture(scope="class")
+    def trust_id(self, auth_session):
+        trusts = auth_session.get(f"{BASE_URL}/api/trusts").json()
+        if len(trusts) > 0:
+            return trusts[0]["trust_id"]
+        pytest.skip("No trusts available for testing")
+    
+    def test_get_minutes_pdf_returns_base64(self, auth_session, trust_id):
+        """Get PDF for existing minutes returns base64 encoded PDF"""
+        # First get minutes list
+        minutes_resp = auth_session.get(f"{BASE_URL}/api/minutes?trust_id={trust_id}")
+        assert minutes_resp.status_code == 200
+        minutes_list = minutes_resp.json()
+        
+        if len(minutes_list) == 0:
+            pytest.skip("No minutes available for PDF testing")
+        
+        minutes_id = minutes_list[0]["minutes_id"]
+        
+        # Get PDF
+        response = auth_session.get(f"{BASE_URL}/api/minutes/{minutes_id}/pdf")
+        assert response.status_code == 200, f"Get PDF failed: {response.text}"
+        
+        data = response.json()
+        assert "pdf_base64" in data, "Response should contain pdf_base64"
+        assert "filename" in data, "Response should contain filename"
+        
+        # Verify base64 is valid
+        import base64
+        try:
+            decoded = base64.b64decode(data["pdf_base64"])
+            assert len(decoded) > 0, "PDF should not be empty"
+            assert decoded[:4] == b'%PDF', "Decoded data should be valid PDF"
+        except Exception as e:
+            pytest.fail(f"Invalid base64 PDF: {e}")
+        
+        print(f"✅ PDF generated: {data['filename']}, size: {len(decoded)} bytes")
+    
+    def test_get_minutes_pdf_for_nonexistent_returns_404(self, auth_session):
+        """PDF request for nonexistent minutes returns 404"""
+        response = auth_session.get(f"{BASE_URL}/api/minutes/nonexistent_minutes_id/pdf")
+        assert response.status_code == 404, f"Should return 404 for nonexistent minutes: {response.status_code}"
+        print("✅ Correctly returned 404 for nonexistent minutes")
+    
+    def test_create_minutes_and_get_pdf(self, auth_session, trust_id):
+        """Create new minutes and generate PDF"""
+        # Create minutes
+        create_resp = auth_session.post(f"{BASE_URL}/api/minutes", json={
+            "trust_id": trust_id,
+            "minutes_type": "quarterly",
+            "meeting_date": datetime.now().isoformat()[:10],
+            "participants_text": "TEST_PDF_Participant1, TEST_PDF_Participant2",
+            "decisions_text": "TEST_PDF - This is a test minutes record for PDF generation testing."
+        })
+        assert create_resp.status_code == 200
+        minutes = create_resp.json()
+        minutes_id = minutes["minutes_id"]
+        
+        try:
+            # Get PDF
+            pdf_resp = auth_session.get(f"{BASE_URL}/api/minutes/{minutes_id}/pdf")
+            assert pdf_resp.status_code == 200, f"PDF generation failed: {pdf_resp.text}"
+            
+            data = pdf_resp.json()
+            assert "pdf_base64" in data
+            assert minutes_id in data["filename"]
+            
+            print(f"✅ PDF successfully generated for new minutes: {data['filename']}")
+        finally:
+            # Cleanup
+            auth_session.delete(f"{BASE_URL}/api/minutes/{minutes_id}")
+
+
+class TestGovernanceHistory:
+    """Test governance history/30-day trend - P1 Feature"""
+    
+    @pytest.fixture(scope="class")
+    def auth_session(self):
+        session = requests.Session()
+        response = session.post(f"{BASE_URL}/api/auth/login", json={
+            "email": TEST_EMAIL,
+            "password": TEST_PASSWORD
+        })
+        if response.status_code == 200:
+            token = response.json().get("token")
+            session.headers.update({"Authorization": f"Bearer {token}"})
+        return session
+    
+    @pytest.fixture(scope="class")
+    def trust_id(self, auth_session):
+        trusts = auth_session.get(f"{BASE_URL}/api/trusts").json()
+        if len(trusts) > 0:
+            return trusts[0]["trust_id"]
+        pytest.skip("No trusts available for testing")
+    
+    def test_get_governance_history_returns_daily_scores(self, auth_session, trust_id):
+        """Get 30-day governance history returns daily score snapshots"""
+        response = auth_session.get(f"{BASE_URL}/api/governance/{trust_id}/history?days=30")
+        assert response.status_code == 200, f"Get history failed: {response.text}"
+        
+        data = response.json()
+        assert "trust_id" in data
+        assert data["trust_id"] == trust_id
+        assert "days" in data
+        assert data["days"] == 30
+        assert "history" in data
+        assert "current_score" in data
+        
+        # Verify history structure
+        history = data["history"]
+        assert isinstance(history, list)
+        
+        if len(history) > 0:
+            for item in history:
+                assert "date" in item, "Each history item should have date"
+                assert "score" in item, "Each history item should have score"
+                assert "color" in item, "Each history item should have color"
+                assert 0 <= item["score"] <= 100, "Score should be 0-100"
+                assert item["color"] in ["red", "yellow", "green"]
+        
+        print(f"✅ Governance history: {len(history)} days of data, current score: {data['current_score']}")
+    
+    def test_get_governance_history_custom_days(self, auth_session, trust_id):
+        """Get governance history with custom days parameter"""
+        response = auth_session.get(f"{BASE_URL}/api/governance/{trust_id}/history?days=7")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["days"] == 7
+        print(f"✅ Governance history with 7 days: {len(data['history'])} data points")
+    
+    def test_get_governance_history_for_nonexistent_trust_returns_404(self, auth_session):
+        """History request for nonexistent trust returns 404"""
+        response = auth_session.get(f"{BASE_URL}/api/governance/nonexistent_trust/history")
+        assert response.status_code == 404, f"Should return 404: {response.status_code}"
+        print("✅ Correctly returned 404 for nonexistent trust")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
