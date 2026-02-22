@@ -1314,7 +1314,7 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
 # ==================== DISTRIBUTION ENDPOINTS ====================
 
 @api_router.post("/distributions", response_model=DistributionResponse)
-async def create_distribution(dist: DistributionCreate, user: dict = Depends(get_current_user)):
+async def create_distribution(dist: DistributionCreate, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     trust = await db.trusts.find_one({"trust_id": dist.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
@@ -1340,6 +1340,19 @@ async def create_distribution(dist: DistributionCreate, user: dict = Depends(get
     
     await db.distribution_records.insert_one(dist_doc)
     await auto_update_onboarding(user["user_id"], dist.trust_id)
+    
+    # Send notification email
+    background_tasks.add_task(
+        email_service.send_distribution_notification,
+        to_email=user["email"],
+        user_name=user.get("name", ""),
+        trust_name=trust.get("name", ""),
+        amount=dist.amount,
+        beneficiary=dist.beneficiary_name,
+        category=dist.purpose_classification.value,
+        date=dist.date,
+        status="review"
+    )
     
     return DistributionResponse(**dist_doc)
 
