@@ -173,16 +173,19 @@ export default function DistributionsPage() {
   };
 
   const filteredDistributions = distributions.filter(d => {
+    const beneficiary = d.beneficiary_name || d.beneficiary || '';
+    const category = d.purpose_classification || d.category || '';
+    const status = d.approved_at ? 'approved' : 'review';
     const matchesSearch = 
-      d.beneficiary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      beneficiary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (d.notes && d.notes.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = filterStatus === 'all' || d.status === filterStatus;
+    const matchesStatus = filterStatus === 'all' || status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const totalAmount = filteredDistributions.reduce((sum, d) => sum + d.amount, 0);
-  const pendingCount = distributions.filter(d => d.status === 'review').length;
+  const pendingCount = distributions.filter(d => !d.approved_at).length;
 
   return (
     <div className="main-layout" data-testid="distributions-page">
