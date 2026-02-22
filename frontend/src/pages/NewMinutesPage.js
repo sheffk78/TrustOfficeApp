@@ -82,10 +82,8 @@ export default function NewMinutesPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API}/minutes`, {
+      const response = await fetchWithAuth('/minutes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
           entry_type: formData.entry_type,
