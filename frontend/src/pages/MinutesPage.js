@@ -202,8 +202,7 @@ export default function MinutesPage() {
                 return (
                 <div 
                   key={entry.minutes_id} 
-                  className="card-trust hover-lift cursor-pointer"
-                  onClick={() => navigate(`/minutes/${entry.minutes_id}`)}
+                  className="card-trust hover-lift"
                   data-testid={`minutes-entry-${entry.minutes_id}`}
                 >
                   <div className="flex items-start gap-4">
@@ -212,11 +211,32 @@ export default function MinutesPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h3 className="font-serif text-lg text-navy mb-1">{summary}</h3>
+                        <div className="cursor-pointer" onClick={() => navigate(`/minutes/${entry.minutes_id}`)}>
+                          <h3 className="font-serif text-lg text-navy mb-1 hover:text-gold transition-colors">{summary}</h3>
                           <p className="text-sm text-muted-foreground line-clamp-2">{details}</p>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-navy/40 flex-shrink-0" />
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewPdf(entry.minutes_id);
+                            }}
+                            disabled={pdfLoading}
+                            className="btn-secondary text-xs"
+                            data-testid={`view-pdf-${entry.minutes_id}`}
+                          >
+                            {pdfLoading ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Eye className="w-4 h-4 mr-1" />
+                                PDF
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-4 mt-3">
                         <div className="flex items-center gap-1 text-muted-foreground">
@@ -239,6 +259,41 @@ export default function MinutesPage() {
           )}
         </div>
       </main>
+
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="pdf-preview-modal">
+          <div className="bg-white w-full max-w-4xl h-[80vh] flex flex-col corner-mark">
+            <div className="flex items-center justify-between p-4 border-b border-navy/10">
+              <h2 className="font-serif text-xl text-navy">Minutes PDF Preview</h2>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleDownloadPdf}
+                  className="btn-primary"
+                  data-testid="download-pdf-btn"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+                <button 
+                  onClick={() => setPdfPreview(null)}
+                  className="text-navy hover:text-gold"
+                  data-testid="close-pdf-modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 p-4 bg-subtle-bg overflow-auto">
+              <iframe
+                src={`data:application/pdf;base64,${pdfPreview.base64}`}
+                className="w-full h-full border border-navy/10"
+                title="Minutes PDF Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
