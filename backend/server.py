@@ -1114,7 +1114,7 @@ async def delete_task(task_id: str, user: dict = Depends(get_current_user)):
 # ==================== MINUTES ENDPOINTS ====================
 
 @api_router.post("/minutes", response_model=MinutesResponse)
-async def create_minutes(minutes: MinutesCreate, user: dict = Depends(get_current_user)):
+async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     trust = await db.trusts.find_one({"trust_id": minutes.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
@@ -1148,6 +1148,18 @@ async def create_minutes(minutes: MinutesCreate, user: dict = Depends(get_curren
         )
     
     await auto_update_onboarding(user["user_id"], minutes.trust_id)
+    
+    # Send notification email
+    background_tasks.add_task(
+        email_service.send_minutes_notification,
+        to_email=user["email"],
+        user_name=user.get("name", ""),
+        trust_name=trust.get("name", ""),
+        minutes_type=minutes.minutes_type.value,
+        meeting_date=minutes.meeting_date,
+        participants=minutes.participants_text,
+        decisions=minutes.decisions_text
+    )
     
     return MinutesResponse(**minutes_doc)
 
