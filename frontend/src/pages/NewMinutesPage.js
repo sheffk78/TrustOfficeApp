@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/utils/api';
 import { 
   ArrowLeft, 
   ArrowRight,
@@ -20,9 +21,6 @@ import {
   X
 } from 'lucide-react';
 import { format } from 'date-fns';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 export default function NewMinutesPage() {
   const navigate = useNavigate();
