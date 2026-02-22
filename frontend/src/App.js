@@ -17,29 +17,14 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
-  const { user, loading, checkAuth } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
-  const hasChecked = useRef(false);
 
-  // Check localStorage for existing token on mount
-  const hasToken = localStorage.getItem('auth_token') !== null;
+  // If user was passed via navigation state (e.g., from AuthCallback), use it
+  const hasUserFromState = location.state?.user;
 
-  useEffect(() => {
-    // Skip if user data passed from AuthCallback via location state
-    if (location.state?.user) {
-      return;
-    }
-    
-    // Only check once per route
-    if (!hasChecked.current && !user) {
-      hasChecked.current = true;
-      checkAuth();
-    }
-  }, [checkAuth, user, location.state]);
-
-  // Show loading state while checking auth
-  // Also show loading if there's a token but no user yet
-  if (loading || (hasToken && !user)) {
+  // Show loading spinner while auth is being verified
+  if (loading) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
@@ -50,8 +35,8 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  // Only redirect if no user AND no token
-  if (!user && !hasToken && !location.state?.user) {
+  // After loading is complete, check if user is authenticated
+  if (!user && !hasUserFromState) {
     return <Navigate to="/" replace />;
   }
 
