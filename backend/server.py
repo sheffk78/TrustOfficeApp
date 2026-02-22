@@ -326,6 +326,24 @@ class HealthScoreResponse(BaseModel):
     criteria: List[HealthScoreCriterion]
     calculated_at: str
 
+# Subscription Models
+class SubscriptionResponse(BaseModel):
+    subscription_id: str
+    user_id: str
+    plan_type: str
+    status: str
+    trial_start_date: Optional[str] = None
+    trial_end_date: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    days_remaining: Optional[int] = None
+    is_active: bool
+
+class CheckoutRequest(BaseModel):
+    plan_type: str  # "monthly" or "annual"
+    success_url: str
+    cancel_url: str
+
 # ==================== HELPER FUNCTIONS ====================
 
 def hash_password(password: str) -> str:
