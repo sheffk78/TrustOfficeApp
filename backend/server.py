@@ -649,7 +649,7 @@ async def create_initial_governance_tasks(trust_id: str, user_id: str):
 # ==================== AUTH ENDPOINTS ====================
 
 @api_router.post("/auth/register", response_model=UserResponse)
-async def register(user: UserCreate):
+async def register(user: UserCreate, background_tasks: BackgroundTasks):
     existing = await db.users.find_one({"email": user.email}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -677,6 +677,13 @@ async def register(user: UserCreate):
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     })
+    
+    # Send welcome email in background
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        to_email=user.email,
+        user_name=user.name
+    )
     
     return UserResponse(
         user_id=user_id,
