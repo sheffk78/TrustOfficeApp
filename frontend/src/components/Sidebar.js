@@ -11,7 +11,11 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronDown
+  ChevronDown,
+  Calendar,
+  Building2,
+  GitBranch,
+  Wallet
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -22,9 +26,12 @@ import {
 
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/minutes', icon: FileText, label: 'Minutes' },
-  { path: '/distributions', icon: DollarSign, label: 'Distributions' },
-  { path: '/expenses', icon: Receipt, label: 'Expenses' },
+  { path: '/calendar', icon: Calendar, label: 'Calendar', group: 'Governance' },
+  { path: '/minutes', icon: FileText, label: 'Minutes', group: 'Governance' },
+  { path: '/distributions', icon: DollarSign, label: 'Distributions', group: 'Money' },
+  { path: '/compensation', icon: Wallet, label: 'Compensation', group: 'Money' },
+  { path: '/entities', icon: Building2, label: 'Entities', group: 'Structures' },
+  { path: '/structure', icon: GitBranch, label: 'Hierarchy', group: 'Structures' },
   { path: '/governance', icon: Shield, label: 'Governance Health' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
