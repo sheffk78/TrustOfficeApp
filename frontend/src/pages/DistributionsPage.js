@@ -33,6 +33,12 @@ export default function DistributionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   
+  // Approval modal state
+  const [approvalModal, setApprovalModal] = useState(null);
+  const [solvencyConfirmed, setSolvencyConfirmed] = useState(false);
+  const [recusalAcknowledged, setRecusalAcknowledged] = useState(false);
+  const [approvalLoading, setApprovalLoading] = useState(false);
+  
   const [formData, setFormData] = useState({
     date: new Date(),
     amount: '',
