@@ -91,6 +91,18 @@ class HealthColor(str, Enum):
     yellow = "yellow"
     green = "green"
 
+class PlanType(str, Enum):
+    trial = "trial"
+    monthly = "monthly"
+    annual = "annual"
+
+class SubscriptionStatus(str, Enum):
+    trialing = "trialing"
+    active = "active"
+    past_due = "past_due"
+    canceled = "canceled"
+    expired = "expired"
+
 # ==================== MODELS ====================
 
 # User Models
