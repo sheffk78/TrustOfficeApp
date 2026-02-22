@@ -1366,7 +1366,7 @@ async def get_distributions(trust_id: Optional[str] = None, user: dict = Depends
     return [DistributionResponse(**d) for d in dists]
 
 @api_router.patch("/distributions/{distribution_id}/approve", response_model=DistributionResponse)
-async def approve_distribution(distribution_id: str, approval: DistributionApprove, user: dict = Depends(get_current_user)):
+async def approve_distribution(distribution_id: str, approval: DistributionApprove, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     dist = await db.distribution_records.find_one(
         {"distribution_id": distribution_id, "user_id": user["user_id"]},
         {"_id": 0}
@@ -1380,17 +1380,35 @@ async def approve_distribution(distribution_id: str, approval: DistributionAppro
     if not approval.recusal_acknowledged:
         raise HTTPException(status_code=400, detail="Recusal must be acknowledged")
     
+    approval_time = datetime.now(timezone.utc).isoformat()
+    
     await db.distribution_records.update_one(
         {"distribution_id": distribution_id},
         {"$set": {
             "solvency_confirmed": True,
             "recusal_acknowledged": True,
             "approved_by": user["user_id"],
-            "approved_at": datetime.now(timezone.utc).isoformat()
+            "approved_at": approval_time
         }}
     )
     
     updated = await db.distribution_records.find_one({"distribution_id": distribution_id}, {"_id": 0})
+    
+    # Get trust name for email
+    trust = await db.trusts.find_one({"trust_id": dist["trust_id"]}, {"_id": 0})
+    
+    # Send approval notification
+    background_tasks.add_task(
+        email_service.send_distribution_approved_notification,
+        to_email=user["email"],
+        user_name=user.get("name", ""),
+        trust_name=trust.get("name", "") if trust else "",
+        amount=dist["amount"],
+        beneficiary=dist["beneficiary_name"],
+        approved_by=user.get("name", user["email"]),
+        approval_date=approval_time.split("T")[0]
+    )
+    
     return DistributionResponse(**updated)
 
 @api_router.delete("/distributions/{distribution_id}")
