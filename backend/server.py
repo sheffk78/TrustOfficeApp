@@ -2006,7 +2006,7 @@ async def send_task_reminders(background_tasks: BackgroundTasks, user: dict = De
                 try:
                     due_date = datetime.fromisoformat(task_due).date()
                     days_overdue = (now - due_date).days
-                except:
+                except ValueError:
                     days_overdue = 1
                 
                 background_tasks.add_task(
