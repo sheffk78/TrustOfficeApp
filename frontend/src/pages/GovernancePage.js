@@ -29,9 +29,7 @@ export default function GovernancePage() {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API}/governance/${selectedTrust.trust_id}`, {
-        credentials: 'include'
-      });
+      const response = await fetchWithAuth(`/governance/${selectedTrust.trust_id}`);
       if (response.ok) {
         setGovernance(await response.json());
       }
