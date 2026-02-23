@@ -313,6 +313,115 @@ class EmailService:
             metadata={"email_type": "distribution_approved"}
         )
     
+    # ==================== SUBSCRIPTION EMAIL METHODS ====================
+    
+    async def send_subscription_activated(
+        self,
+        to_email: str,
+        user_name: str,
+        plan_type: str,
+        amount: str,
+        next_billing_date: str
+    ) -> Dict[str, Any]:
+        """Send notification when subscription is activated"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="subscription_activated",
+            template_data={
+                "user_name": user_name,
+                "plan_type": plan_type,
+                "amount": amount,
+                "next_billing_date": next_billing_date
+            },
+            to_name=user_name,
+            tag="subscription",
+            metadata={"email_type": "subscription_activated", "plan": plan_type}
+        )
+    
+    async def send_subscription_canceled(
+        self,
+        to_email: str,
+        user_name: str,
+        access_until: str
+    ) -> Dict[str, Any]:
+        """Send notification when subscription is canceled"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="subscription_canceled",
+            template_data={
+                "user_name": user_name,
+                "access_until": access_until
+            },
+            to_name=user_name,
+            tag="subscription",
+            metadata={"email_type": "subscription_canceled"}
+        )
+    
+    async def send_subscription_renewed(
+        self,
+        to_email: str,
+        user_name: str,
+        plan_type: str,
+        amount: str,
+        next_billing_date: str
+    ) -> Dict[str, Any]:
+        """Send notification when subscription is renewed"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="subscription_renewed",
+            template_data={
+                "user_name": user_name,
+                "plan_type": plan_type,
+                "amount": amount,
+                "next_billing_date": next_billing_date
+            },
+            to_name=user_name,
+            tag="subscription",
+            metadata={"email_type": "subscription_renewed", "plan": plan_type}
+        )
+    
+    async def send_payment_failed(
+        self,
+        to_email: str,
+        user_name: str,
+        amount: str,
+        retry_date: str = None
+    ) -> Dict[str, Any]:
+        """Send notification when payment fails"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="payment_failed",
+            template_data={
+                "user_name": user_name,
+                "amount": amount,
+                "retry_date": retry_date or "within the next few days"
+            },
+            to_name=user_name,
+            tag="subscription",
+            metadata={"email_type": "payment_failed"}
+        )
+    
+    async def send_subscription_upgraded(
+        self,
+        to_email: str,
+        user_name: str,
+        old_plan: str,
+        new_plan: str
+    ) -> Dict[str, Any]:
+        """Send notification when subscription is upgraded"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="subscription_upgraded",
+            template_data={
+                "user_name": user_name,
+                "old_plan": old_plan,
+                "new_plan": new_plan
+            },
+            to_name=user_name,
+            tag="subscription",
+            metadata={"email_type": "subscription_upgraded", "new_plan": new_plan}
+        )
+    
     def get_available_templates(self) -> List[str]:
         """Get list of available template names"""
         return list(TEMPLATES.keys())
