@@ -812,6 +812,101 @@ async def login(user: UserLogin, response: Response):
         }
     }
 
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks):
+    """Request a password reset email"""
+    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"message": "If an account exists with this email, you will receive a password reset link."}
+    
+    # Check if user has a password (not OAuth-only)
+    if not user.get("password_hash"):
+        return {"message": "If an account exists with this email, you will receive a password reset link."}
+    
+    # Generate reset token (expires in 1 hour)
+    reset_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Store reset token
+    await db.password_resets.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "token": reset_token,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Send reset email
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://trust-governance-4.preview.emergentagent.com')
+    reset_url = f"{frontend_url}/reset-password?token={reset_token}"
+    
+    background_tasks.add_task(
+        email_service.send_password_reset_email,
+        to_email=user["email"],
+        user_name=user.get("name", ""),
+        reset_url=reset_url
+    )
+    
+    return {"message": "If an account exists with this email, you will receive a password reset link."}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: PasswordResetConfirm):
+    """Reset password using token"""
+    # Find valid reset token
+    reset_record = await db.password_resets.find_one({"token": request.token}, {"_id": 0})
+    
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    # Check expiration
+    expires_at = datetime.fromisoformat(reset_record["expires_at"].replace('Z', '+00:00'))
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < datetime.now(timezone.utc):
+        await db.password_resets.delete_one({"token": request.token})
+        raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
+    
+    # Validate password
+    if len(request.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    
+    # Update password
+    new_hash = hash_password(request.new_password)
+    await db.users.update_one(
+        {"user_id": reset_record["user_id"]},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    # Delete used token
+    await db.password_resets.delete_one({"token": request.token})
+    
+    # Invalidate all sessions for this user
+    await db.user_sessions.delete_many({"user_id": reset_record["user_id"]})
+    
+    return {"message": "Password has been reset successfully. Please log in with your new password."}
+
+@api_router.get("/auth/verify-reset-token")
+async def verify_reset_token(token: str):
+    """Verify if a reset token is valid"""
+    reset_record = await db.password_resets.find_one({"token": token}, {"_id": 0})
+    
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Invalid reset token")
+    
+    expires_at = datetime.fromisoformat(reset_record["expires_at"].replace('Z', '+00:00'))
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+    
+    return {"valid": True}
+
 @api_router.post("/auth/session")
 async def exchange_session(request: Request, response: Response):
     body = await request.json()
