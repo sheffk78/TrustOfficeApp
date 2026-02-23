@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
+import { toast } from 'sonner';
 import { 
   Plus, 
   FileText, 
