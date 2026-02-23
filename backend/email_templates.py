@@ -389,6 +389,315 @@ View Distributions: {data.get('app_url', '#')}/distributions
 Best regards,
 TrustOffice
         """
+    },
+
+    # Subscription Activated
+    "subscription_activated": {
+        "subject": "Welcome to TrustOffice Pro!",
+        "html": lambda data: _base_template(f"""
+            <h2>Your Subscription is Active!</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>Thank you for subscribing to TrustOffice! Your <strong>{data.get('plan_type', 'subscription').title()}</strong> plan is now active.</p>
+            
+            <div class="success">
+              <h3 style="margin: 0; color: #155724;">✓ Subscription Confirmed</h3>
+            </div>
+            
+            <div class="task-card">
+              <table style="width: 100%;">
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Plan</span></td>
+                  <td style="padding: 5px 0;"><span class="value">{data.get('plan_type', 'Monthly').title()} Plan</span></td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Next Billing Date</span></td>
+                  <td style="padding: 5px 0;">{data.get('next_billing_date', 'N/A')}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Amount</span></td>
+                  <td style="padding: 5px 0;">${data.get('amount', '79')}/{'year' if data.get('plan_type') == 'annual' else 'month'}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <h3>You now have full access to:</h3>
+            <ul>
+              <li>Unlimited trusts & entities</li>
+              <li>Governance health tracking</li>
+              <li>Minutes & distribution management</li>
+              <li>PDF generation & CSV export</li>
+              <li>Priority support</li>
+            </ul>
+            
+            <p style="text-align: center;">
+              <a href="{data.get('app_url', '#')}/dashboard" class="button">Go to Dashboard</a>
+            </p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Your Subscription is Active!
+
+Hi {data.get('user_name', 'there')},
+
+Thank you for subscribing to TrustOffice! Your {data.get('plan_type', 'subscription').title()} plan is now active.
+
+Subscription Details:
+- Plan: {data.get('plan_type', 'Monthly').title()} Plan
+- Next Billing Date: {data.get('next_billing_date', 'N/A')}
+- Amount: ${data.get('amount', '79')}/{'year' if data.get('plan_type') == 'annual' else 'month'}
+
+You now have full access to:
+- Unlimited trusts & entities
+- Governance health tracking
+- Minutes & distribution management
+- PDF generation & CSV export
+- Priority support
+
+Go to Dashboard: {data.get('app_url', '#')}/dashboard
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
+    # Subscription Canceled
+    "subscription_canceled": {
+        "subject": "Your TrustOffice Subscription Has Been Canceled",
+        "html": lambda data: _base_template(f"""
+            <h2>Subscription Canceled</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>We're sorry to see you go. Your TrustOffice subscription has been set to cancel.</p>
+            
+            <div class="alert">
+              <strong>Access Until:</strong> {data.get('access_until', 'N/A')}<br>
+              You'll retain full access to TrustOffice until this date.
+            </div>
+            
+            <h3>What happens next:</h3>
+            <ul>
+              <li>Your data will be safely retained for 90 days after cancellation</li>
+              <li>You can resubscribe at any time to regain access</li>
+              <li>Download your data before your access expires</li>
+            </ul>
+            
+            <p><strong>Changed your mind?</strong> You can reactivate your subscription at any time before {data.get('access_until', 'your access expires')}.</p>
+            
+            <p style="text-align: center;">
+              <a href="{data.get('app_url', '#')}/settings/billing" class="button">Manage Subscription</a>
+            </p>
+            
+            <p>We'd love to hear your feedback. Reply to this email to let us know how we can improve.</p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Subscription Canceled
+
+Hi {data.get('user_name', 'there')},
+
+We're sorry to see you go. Your TrustOffice subscription has been set to cancel.
+
+Access Until: {data.get('access_until', 'N/A')}
+You'll retain full access to TrustOffice until this date.
+
+What happens next:
+- Your data will be safely retained for 90 days after cancellation
+- You can resubscribe at any time to regain access
+- Download your data before your access expires
+
+Changed your mind? You can reactivate your subscription at any time before {data.get('access_until', 'your access expires')}.
+
+Manage Subscription: {data.get('app_url', '#')}/settings/billing
+
+We'd love to hear your feedback. Reply to this email to let us know how we can improve.
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
+    # Subscription Renewed
+    "subscription_renewed": {
+        "subject": "Your TrustOffice Subscription Has Been Renewed",
+        "html": lambda data: _base_template(f"""
+            <h2>Subscription Renewed</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>Great news! Your TrustOffice subscription has been successfully renewed.</p>
+            
+            <div class="success">
+              <h3 style="margin: 0; color: #155724;">✓ Payment Successful</h3>
+            </div>
+            
+            <div class="task-card">
+              <table style="width: 100%;">
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Plan</span></td>
+                  <td style="padding: 5px 0;"><span class="value">{data.get('plan_type', 'Monthly').title()} Plan</span></td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Amount Charged</span></td>
+                  <td style="padding: 5px 0;"><span class="value">${data.get('amount', '0')}</span></td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Next Billing Date</span></td>
+                  <td style="padding: 5px 0;">{data.get('next_billing_date', 'N/A')}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <p>Thank you for your continued trust in TrustOffice!</p>
+            
+            <p style="text-align: center;">
+              <a href="{data.get('app_url', '#')}/settings/billing" class="button">View Billing Details</a>
+            </p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Subscription Renewed
+
+Hi {data.get('user_name', 'there')},
+
+Great news! Your TrustOffice subscription has been successfully renewed.
+
+Renewal Details:
+- Plan: {data.get('plan_type', 'Monthly').title()} Plan
+- Amount Charged: ${data.get('amount', '0')}
+- Next Billing Date: {data.get('next_billing_date', 'N/A')}
+
+Thank you for your continued trust in TrustOffice!
+
+View Billing Details: {data.get('app_url', '#')}/settings/billing
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
+    # Payment Failed
+    "payment_failed": {
+        "subject": "Action Required: Payment Failed for TrustOffice",
+        "html": lambda data: _base_template(f"""
+            <h2 style="color: #dc3545;">Payment Failed</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>We were unable to process your payment for TrustOffice.</p>
+            
+            <div class="alert" style="background-color: #f8d7da; border-color: #dc3545;">
+              <strong>Action Required:</strong> Please update your payment method to continue using TrustOffice.
+            </div>
+            
+            <div class="task-card" style="border-left-color: #dc3545;">
+              <table style="width: 100%;">
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Amount Due</span></td>
+                  <td style="padding: 5px 0;"><span class="value" style="color: #dc3545;">${data.get('amount', '0')}</span></td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Retry Date</span></td>
+                  <td style="padding: 5px 0;">{data.get('retry_date', 'Soon')}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <h3>Common reasons for payment failure:</h3>
+            <ul>
+              <li>Expired card</li>
+              <li>Insufficient funds</li>
+              <li>Bank declined transaction</li>
+            </ul>
+            
+            <p style="text-align: center;">
+              <a href="{data.get('app_url', '#')}/settings/billing" class="button" style="background-color: #dc3545;">Update Payment Method</a>
+            </p>
+            
+            <p>If you continue to have issues, please contact your bank or our support team.</p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+PAYMENT FAILED
+
+Hi {data.get('user_name', 'there')},
+
+We were unable to process your payment for TrustOffice.
+
+Action Required: Please update your payment method to continue using TrustOffice.
+
+Payment Details:
+- Amount Due: ${data.get('amount', '0')}
+- Retry Date: {data.get('retry_date', 'Soon')}
+
+Common reasons for payment failure:
+- Expired card
+- Insufficient funds
+- Bank declined transaction
+
+Update Payment Method: {data.get('app_url', '#')}/settings/billing
+
+If you continue to have issues, please contact your bank or our support team.
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
+    # Subscription Upgraded
+    "subscription_upgraded": {
+        "subject": "Your TrustOffice Plan Has Been Upgraded!",
+        "html": lambda data: _base_template(f"""
+            <h2>Plan Upgraded!</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>Your TrustOffice plan has been successfully upgraded to <strong>{data.get('new_plan', 'Annual').title()}</strong>!</p>
+            
+            <div class="success">
+              <h3 style="margin: 0; color: #155724;">✓ Upgrade Complete</h3>
+            </div>
+            
+            <div class="task-card">
+              <table style="width: 100%;">
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Previous Plan</span></td>
+                  <td style="padding: 5px 0;">{data.get('old_plan', 'Monthly').title()}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">New Plan</span></td>
+                  <td style="padding: 5px 0;"><span class="value">{data.get('new_plan', 'Annual').title()}</span></td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;"><span class="label">Annual Savings</span></td>
+                  <td style="padding: 5px 0;"><span class="value" style="color: #28a745;">$158/year</span></td>
+                </tr>
+              </table>
+            </div>
+            
+            <p>Thank you for your continued commitment to good governance!</p>
+            
+            <p style="text-align: center;">
+              <a href="{data.get('app_url', '#')}/settings/billing" class="button">View Subscription</a>
+            </p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Plan Upgraded!
+
+Hi {data.get('user_name', 'there')},
+
+Your TrustOffice plan has been successfully upgraded to {data.get('new_plan', 'Annual').title()}!
+
+Upgrade Details:
+- Previous Plan: {data.get('old_plan', 'Monthly').title()}
+- New Plan: {data.get('new_plan', 'Annual').title()}
+- Annual Savings: $158/year
+
+Thank you for your continued commitment to good governance!
+
+View Subscription: {data.get('app_url', '#')}/settings/billing
+
+Best regards,
+The TrustOffice Team
+        """
     }
 }
 
