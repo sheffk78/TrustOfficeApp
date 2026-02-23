@@ -45,7 +45,7 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - Daily health score snapshots at midnight UTC
 - Manual trigger endpoints for testing
 
-### Billing & Subscription (Feb 22, 2026) - NEW
+### Billing & Subscription
 **Stripe Integration:**
 - Checkout session creation for Monthly ($79) and Annual ($790) plans
 - Customer portal for payment method management
@@ -62,24 +62,39 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - Manage Payment Method (Stripe portal)
 - FAQ section
 
-### CSV Data Export (Feb 22, 2026) - NEW
+### CSV Data Export
 **Export Endpoints:**
 - `GET /api/export/minutes` - Export all minutes records
 - `GET /api/export/distributions` - Export all distribution records
 - `GET /api/export/compensation` - Export all compensation payments
 - `GET /api/export/tasks` - Export all governance tasks
 
-**Features:**
-- Filter by trust_id for specific trust exports
-- Properly formatted CSV with headers
-- Download with timestamped filename
-- Available from Settings page
+### Subscription Gating (Feb 23, 2026) - NEW
+**Backend Middleware:**
+- SubscriptionMiddleware checks trial status on all protected routes
+- Returns 402 Payment Required for expired trials
+- Exempt paths: `/api/auth/*`, `/api/subscription/*`, `/api/categories`
+
+**Frontend Paywall:**
+- `SubscriptionGate` component wraps protected routes
+- Shows "Your Trial Has Ended" message with feature list
+- "Subscribe Now" CTA button navigates to billing page
+- Settings and Billing pages remain accessible for expired users
+
+**User Experience:**
+- Active users see normal app content
+- Expired users see paywall on all pages except Settings/Billing
+- Clear messaging about data safety ("Your data is safe")
 
 ## Test Credentials
-- Email: test@example.com
-- Password: testpassword123
+- Active User: test@example.com / testpassword123
+- Expired User: expired@test.com / testpass123
 
 ## API Endpoints Summary
+
+### Subscription Gating
+- Protected routes return 402 for expired trials
+- Exempt paths: auth, subscription, categories
 
 ### Export
 - `GET /api/export/minutes` - CSV export
@@ -117,11 +132,12 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - [x] Background jobs (APScheduler)
 - [x] Stripe subscription management
 - [x] CSV data export
+- [x] **Subscription gating (trial expiration enforcement)**
 
 ### P2 (Medium Priority)
 - [ ] Audit Log UI - view history of changes
-- [ ] Gate app features based on subscription status
-- [ ] Email notifications for subscription events
+- [ ] Email notifications for subscription events (canceled, renewed)
+- [ ] Stripe webhook for subscription lifecycle events
 
 ### P3 (Nice to Have)
 - [ ] Dark mode toggle
@@ -134,3 +150,4 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - Postmark is in sandbox mode (can only send to verified sender domain)
 - Stripe is in test mode (use test card 4242424242424242)
 - Background jobs run automatically on server startup
+- Expired trials are blocked from app features but can access settings/billing
