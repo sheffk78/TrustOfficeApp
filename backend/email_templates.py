@@ -62,6 +62,45 @@ def _base_template(content: str, year: int = None) -> str:
 # ================== TEMPLATE DEFINITIONS ==================
 
 TEMPLATES = {
+    # Password Reset Email
+    "password_reset": {
+        "subject": "Reset Your TrustOffice Password",
+        "html": lambda data: _base_template(f"""
+            <h2>Password Reset Request</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>We received a request to reset your TrustOffice password. Click the button below to create a new password:</p>
+            
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="{data.get('reset_url', '#')}" class="button">Reset Password</a>
+            </p>
+            
+            <div class="alert">
+              <strong>This link expires in 1 hour.</strong> If you didn't request a password reset, you can safely ignore this email.
+            </div>
+            
+            <p style="font-size: 12px; color: #666;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <span style="word-break: break-all;">{data.get('reset_url', '#')}</span>
+            </p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Password Reset Request
+
+Hi {data.get('user_name', 'there')},
+
+We received a request to reset your TrustOffice password. 
+
+Reset your password here: {data.get('reset_url', '#')}
+
+This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
     # Welcome / Onboarding Email
     "welcome": {
         "subject": "Welcome to TrustOffice - Let's Get Started",
