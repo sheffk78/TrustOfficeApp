@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
   }, [loadSubscription]);
 
   // Internal function that doesn't depend on state
-  const loadTrustsInternal = async () => {
+  const loadTrustsInternal = async (forceSelectNew = false) => {
     try {
       const response = await fetch(`${API}/trusts`, {
         credentials: 'include',
@@ -104,11 +104,13 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         setTrusts(data);
         
-        // Select first trust if none selected
-        if (data.length > 0) {
+        // Select first trust if none selected, or if forced
+        if (data.length > 0 && (!selectedTrust || forceSelectNew)) {
           const storedTrustId = localStorage.getItem('selected_trust_id');
           const storedTrust = data.find(t => t.trust_id === storedTrustId);
-          setSelectedTrust(storedTrust || data[0]);
+          if (!selectedTrust) {
+            setSelectedTrust(storedTrust || data[0]);
+          }
         }
       }
     } catch (error) {
