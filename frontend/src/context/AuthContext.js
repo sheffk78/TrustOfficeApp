@@ -128,12 +128,12 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email, password })
     });
     
+    const data = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Login failed');
+      throw new Error(data.detail || 'Login failed');
     }
     
-    const data = await response.json();
     // Store token in localStorage as backup for cookie issues
     if (data.token) {
       localStorage.setItem('auth_token', data.token);
