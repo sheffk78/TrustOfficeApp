@@ -2698,6 +2698,93 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
+
+class SubscriptionMiddleware(BaseHTTPMiddleware):
+    """Middleware to check subscription status for protected routes"""
+    
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        
+        # Skip subscription check for exempt paths
+        if path in SUBSCRIPTION_EXEMPT_PATHS or not path.startswith("/api/"):
+            return await call_next(request)
+        
+        # Skip for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
+        # Get auth token
+        session_token = request.cookies.get("session_token")
+        auth_header = request.headers.get("Authorization")
+        
+        token = None
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+        elif session_token:
+            token = session_token
+        
+        if not token:
+            # No token - let the endpoint handle 401
+            return await call_next(request)
+        
+        # Try to get user_id from token
+        user_id = None
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("user_id")
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            pass
+        
+        if not user_id:
+            # Try session token
+            session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+            if session:
+                user_id = session.get("user_id")
+        
+        if not user_id:
+            # Can't determine user - let endpoint handle it
+            return await call_next(request)
+        
+        # Check subscription status
+        sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+        
+        if sub:
+            if sub["status"] == "active":
+                return await call_next(request)
+            
+            if sub["status"] == "trialing" and sub.get("trial_end_date"):
+                trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
+                if trial_end.tzinfo is None:
+                    trial_end = trial_end.replace(tzinfo=timezone.utc)
+                
+                if trial_end >= datetime.now(timezone.utc):
+                    return await call_next(request)
+                
+                # Trial expired
+                return JSONResponse(
+                    status_code=402,
+                    content={
+                        "detail": "Trial expired. Please subscribe to continue using TrustOffice.",
+                        "subscription_status": "expired"
+                    }
+                )
+            
+            if sub["status"] in ["canceled", "expired"]:
+                return JSONResponse(
+                    status_code=402,
+                    content={
+                        "detail": "Subscription inactive. Please subscribe to continue.",
+                        "subscription_status": sub["status"]
+                    }
+                )
+        
+        # No subscription or valid trial
+        return await call_next(request)
+
+app.add_middleware(SubscriptionMiddleware)
+
 @app.on_event("startup")
 async def startup_event():
     """Start background task runner on app startup"""
