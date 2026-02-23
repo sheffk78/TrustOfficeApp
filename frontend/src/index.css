@@ -245,6 +245,10 @@
     background-color: var(--navy);
 }
 
+.dark .sidebar-trust {
+    @apply bg-slate-900 border-slate-700;
+}
+
 .sidebar-item {
     @apply flex items-center gap-3 px-6 py-3 text-sm font-sans text-white/80 hover:text-white border-l-2 border-transparent;
     transition: background-color 0.15s ease, border-color 0.15s ease;
