@@ -43,12 +43,9 @@ export default function OnboardingPage() {
 
       const newTrust = await response.json();
       
-      // Load trusts first, then select the newly created one
+      // Select the new trust first, then reload list
+      setSelectedTrust(newTrust);
       await loadTrusts();
-      // Use a small delay to ensure state is updated
-      setTimeout(() => {
-        setSelectedTrust(newTrust);
-      }, 100);
 
       toast.success('Trust created successfully');
       setStep(3);
