@@ -372,3 +372,58 @@
         display: contents !important;
     }
 }
+
+/* Dark mode utility overrides */
+@layer utilities {
+    .dark .text-navy {
+        color: #D5AD36 !important;
+    }
+    
+    .dark .bg-navy {
+        background-color: #1e293b !important;
+    }
+    
+    .dark .border-navy {
+        border-color: #D5AD36 !important;
+    }
+    
+    .dark .bg-subtle-bg {
+        background-color: #0f172a !important;
+    }
+    
+    .dark .bg-white {
+        background-color: #1e293b !important;
+    }
+    
+    .dark .text-primary {
+        color: #D5AD36 !important;
+    }
+    
+    .dark .border-primary {
+        border-color: rgba(213, 173, 54, 0.3) !important;
+    }
+    
+    /* Label styles in dark mode */
+    .dark .label-trust {
+        color: #94a3b8 !important;
+    }
+}
+
+/* Dark mode specific card styles */
+.dark .corner-mark::before {
+    border-color: transparent transparent transparent rgba(213, 173, 54, 0.3);
+}
+
+.dark .corner-mark::after {
+    border-color: transparent #D5AD36 transparent transparent;
+}
+
+/* Dark mode alert/notification boxes */
+.dark .bg-gold\/5 {
+    background-color: rgba(213, 173, 54, 0.1) !important;
+}
+
+.dark .bg-navy\/5 {
+    background-color: rgba(30, 41, 59, 0.5) !important;
+}
+
