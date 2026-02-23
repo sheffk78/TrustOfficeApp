@@ -2178,6 +2178,17 @@ async def cancel_subscription(user: dict = Depends(get_current_user)):
             stripe_sub.current_period_end, tz=timezone.utc
         ).strftime('%B %d, %Y')
         
+        # Send cancellation email
+        if email_service.is_configured:
+            try:
+                await email_service.send_subscription_canceled(
+                    to_email=user["email"],
+                    user_name=user.get("name", ""),
+                    access_until=cancel_date
+                )
+            except Exception as e:
+                logger.error(f"Failed to send cancellation email: {e}")
+        
         return {
             "status": "canceled",
             "message": f"Your subscription will be canceled on {cancel_date}. You'll have access until then.",
