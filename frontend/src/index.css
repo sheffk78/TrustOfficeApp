@@ -330,6 +330,18 @@
     background: rgba(1, 0, 121, 0.3);
 }
 
+.dark ::-webkit-scrollbar-track {
+    background: #1e293b;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: rgba(213, 173, 54, 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(213, 173, 54, 0.5);
+}
+
 /* Debug wrapper styles */
 @layer base {
     [data-debug-wrapper="true"] {
