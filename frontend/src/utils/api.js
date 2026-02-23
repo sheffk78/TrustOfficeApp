@@ -29,5 +29,11 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
     }
   });
   
+  // Handle 402 Payment Required (subscription expired)
+  if (response.status === 402) {
+    // Emit a custom event for subscription expiration
+    window.dispatchEvent(new CustomEvent('subscription-expired'));
+  }
+  
   return response;
 };
