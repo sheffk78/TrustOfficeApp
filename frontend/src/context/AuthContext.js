@@ -80,8 +80,9 @@ export const AuthProvider = ({ children }) => {
       const userData = await response.json();
       setUser(userData);
       
-      // Load trusts after authentication
+      // Load trusts and subscription after authentication
       await loadTrustsInternal();
+      await loadSubscription();
     } catch (error) {
       setUser(null);
       localStorage.removeItem('auth_token');
@@ -89,7 +90,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       authCheckComplete.current = true;
     }
-  }, []);
+  }, [loadSubscription]);
 
   // Internal function that doesn't depend on state
   const loadTrustsInternal = async () => {
