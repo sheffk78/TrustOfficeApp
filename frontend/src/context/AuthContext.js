@@ -213,6 +213,19 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [checkAuth]);
 
+  // Listen for subscription expired events from API calls
+  useEffect(() => {
+    const handleSubscriptionExpired = () => {
+      setSubscriptionExpired(true);
+      loadSubscription();
+    };
+    
+    window.addEventListener('subscription-expired', handleSubscriptionExpired);
+    return () => {
+      window.removeEventListener('subscription-expired', handleSubscriptionExpired);
+    };
+  }, [loadSubscription]);
+
   // Wrapper to persist trust selection
   const selectTrust = useCallback((trust) => {
     setSelectedTrust(trust);
