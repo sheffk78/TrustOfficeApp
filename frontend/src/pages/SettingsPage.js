@@ -27,10 +27,12 @@ const API_BASE = process.env.REACT_APP_BACKEND_URL;
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { user, selectedTrust, setSelectedTrust, loadTrusts } = useAuth();
+  const { user, setUser, selectedTrust, setSelectedTrust, loadTrusts } = useAuth();
   const [loading, setLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState(user?.name || '');
   
   const [trustData, setTrustData] = useState({
     name: selectedTrust?.name || '',
@@ -38,6 +40,35 @@ export default function SettingsPage() {
     review_cadence: selectedTrust?.review_cadence || 'quarterly',
     description: selectedTrust?.description || ''
   });
+
+  const handleUpdateProfile = async () => {
+    if (!profileName.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await fetchWithAuth('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ name: profileName.trim() })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUser(prev => ({ ...prev, name: data.user.name }));
+        setEditingProfile(false);
+        toast.success('Profile updated');
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to update profile');
+      }
+    } catch (error) {
+      toast.error('Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleExport = async (type) => {
     setExportLoading(type);
