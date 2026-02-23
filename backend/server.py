@@ -171,6 +171,14 @@ class TrustResponse(BaseModel):
     created_at: str
     governance_score: int = 0
 
+# Password Reset Models
+class PasswordResetRequest(BaseModel):
+    email: str
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
 # Entity Models
 class EntityCreate(BaseModel):
     trust_id: str
