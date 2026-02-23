@@ -209,6 +209,10 @@
     border-radius: 0 !important;
 }
 
+.dark .card-trust {
+    @apply bg-slate-800 border-slate-600/30;
+}
+
 /* Badge styles */
 .badge-trust {
     @apply border border-primary text-primary bg-transparent font-mono text-[10px] uppercase px-2 py-0.5;
