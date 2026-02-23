@@ -266,7 +266,7 @@ class TestEmailTemplates:
         # May return 200 or 402 depending on subscription
         if response.status_code == 200:
             data = response.json()
-            templates = data.get("templates", [])
+            templates = data.get("available_templates", [])
             assert "password_reset" in templates, f"password_reset template should exist. Found: {templates}"
         else:
             # Can't verify templates without subscription access
