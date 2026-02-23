@@ -59,10 +59,14 @@ export default function OnboardingPage() {
   const handleSeedDemo = async () => {
     setLoading(true);
     try {
-      await seedDemoData();
-      await loadTrusts();
-      toast.success('Demo data created');
-      navigate('/dashboard');
+      const result = await seedDemoData();
+      if (result?.seeded) {
+        await loadTrusts();
+        toast.success('Demo data created');
+        navigate('/dashboard');
+      } else {
+        toast.info('You already have trusts. Demo data is only for new accounts.');
+      }
     } catch (error) {
       toast.error('Failed to create demo data');
     } finally {
@@ -73,9 +77,13 @@ export default function OnboardingPage() {
   const handleSkipToDemo = async () => {
     setLoading(true);
     try {
-      await seedDemoData();
-      await loadTrusts();
-      toast.success('Welcome to TrustOffice');
+      const result = await seedDemoData();
+      if (result?.seeded) {
+        await loadTrusts();
+        toast.success('Welcome to TrustOffice');
+      } else {
+        toast.info('You already have trusts');
+      }
       navigate('/dashboard');
     } catch (error) {
       toast.error('Failed to setup');
