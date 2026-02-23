@@ -20,6 +20,7 @@ import StructurePage from "@/pages/StructurePage";
 import CompensationPage from "@/pages/CompensationPage";
 import BillingPage from "@/pages/BillingPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { SubscriptionGate } from "@/components/SubscriptionGate";
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -47,6 +48,17 @@ const ProtectedRoute = ({ children }) => {
   }
 
   return children;
+};
+
+// Protected Route with Subscription Gate (for routes that require active subscription)
+const SubscriptionProtectedRoute = ({ children }) => {
+  return (
+    <ProtectedRoute>
+      <SubscriptionGate>
+        {children}
+      </SubscriptionGate>
+    </ProtectedRoute>
+  );
 };
 
 // App Router with session_id detection
