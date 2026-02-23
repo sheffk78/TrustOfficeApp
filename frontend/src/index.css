@@ -165,6 +165,18 @@
     background-color: rgba(213, 173, 54, 0.05);
 }
 
+.dark .trust-table th {
+    @apply bg-slate-800 text-gold border-gold/30;
+}
+
+.dark .trust-table td {
+    @apply border-slate-700;
+}
+
+.dark .trust-table tr:hover {
+    background-color: rgba(213, 173, 54, 0.1);
+}
+
 /* Button styles */
 .btn-primary {
     @apply bg-primary text-white hover:bg-primary/90 border border-primary font-sans uppercase tracking-wider text-xs h-10 px-6;
