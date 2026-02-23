@@ -81,60 +81,61 @@ const AppRouter = () => {
         </ProtectedRoute>
       } />
       <Route path="/dashboard" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <DashboardPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/calendar" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <CalendarPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/minutes" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <MinutesPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/minutes/new" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <NewMinutesPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/distributions" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <DistributionsPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/compensation" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <CompensationPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/expenses" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <ExpensesPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/entities" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <EntitiesPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/entities/:entityId" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <EntityDetailPage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/structure" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <StructurePage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
       <Route path="/governance" element={
-        <ProtectedRoute>
+        <SubscriptionProtectedRoute>
           <GovernancePage />
-        </ProtectedRoute>
+        </SubscriptionProtectedRoute>
       } />
+      {/* Settings and Billing are accessible without active subscription */}
       <Route path="/settings" element={
         <ProtectedRoute>
           <SettingsPage />
