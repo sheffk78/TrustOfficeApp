@@ -39,6 +39,40 @@
         --paper: #F5F5F7;
         --subtle-bg: #F9FAFB;
     }
+
+    .dark {
+        --background: 222 47% 11%;
+        --foreground: 210 40% 98%;
+        --card: 222 47% 14%;
+        --card-foreground: 210 40% 98%;
+        --popover: 222 47% 14%;
+        --popover-foreground: 210 40% 98%;
+        --primary: 43 66% 52%;
+        --primary-foreground: 222 47% 11%;
+        --secondary: 236 100% 24%;
+        --secondary-foreground: 210 40% 98%;
+        --muted: 217 33% 17%;
+        --muted-foreground: 215 20% 65%;
+        --accent: 43 66% 52%;
+        --accent-foreground: 222 47% 11%;
+        --destructive: 0 62% 50%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 217 33% 25%;
+        --input: 217 33% 17%;
+        --ring: 43 66% 52%;
+        
+        /* Status colors for dark mode */
+        --success: 158 64% 52%;
+        --warning: 38 92% 50%;
+        --error: 0 84% 60%;
+        --info: 217 91% 60%;
+        
+        /* Custom TrustOffice colors - dark mode */
+        --navy: #D5AD36;
+        --gold: #D5AD36;
+        --paper: #1e293b;
+        --subtle-bg: #0f172a;
+    }
 }
 
 @layer base {
