@@ -83,6 +83,7 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Test Credentials
 - test@example.com / testpassword123
+- testuser@test.com / testpassword123 (created for P1 testing)
 
 ## Prioritized Backlog
 
