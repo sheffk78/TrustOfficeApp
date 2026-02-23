@@ -1382,10 +1382,26 @@ async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTas
     return MinutesResponse(**minutes_doc)
 
 @api_router.get("/minutes", response_model=List[MinutesResponse])
-async def get_minutes(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+async def get_minutes(
+    trust_id: Optional[str] = None, 
+    search: Optional[str] = None,
+    minutes_type: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get minutes with optional search and filters"""
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
+    if minutes_type:
+        query["minutes_type"] = minutes_type
+    
+    # Add text search across participants and decisions
+    if search:
+        search_term = search.strip()
+        query["$or"] = [
+            {"participants_text": {"$regex": search_term, "$options": "i"}},
+            {"decisions_text": {"$regex": search_term, "$options": "i"}}
+        ]
     
     minutes = await db.minutes_records.find(query, {"_id": 0}).sort("meeting_date", -1).to_list(1000)
     return [MinutesResponse(**m) for m in minutes]
