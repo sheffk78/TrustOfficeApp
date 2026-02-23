@@ -87,10 +87,16 @@ export default function DashboardPage() {
   const handleCreateDemo = async () => {
     setLoading(true);
     try {
-      await seedDemoData();
-      await loadTrusts();
+      const result = await seedDemoData();
+      if (result?.seeded) {
+        toast.success('Demo data created successfully');
+        await loadTrusts();
+      } else {
+        toast.info('You already have trusts. Demo data can only be created for new accounts.');
+      }
     } catch (error) {
       console.error('Failed to create demo:', error);
+      toast.error('Failed to create demo data');
     } finally {
       setLoading(false);
     }
