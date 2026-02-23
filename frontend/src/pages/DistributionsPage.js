@@ -241,15 +241,9 @@ export default function DistributionsPage() {
   };
 
   const filteredDistributions = distributions.filter(d => {
-    const beneficiary = d.beneficiary_name || d.beneficiary || '';
-    const category = d.purpose_classification || d.category || '';
     const status = d.approved_at ? 'approved' : 'review';
-    const matchesSearch = 
-      beneficiary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (d.notes && d.notes.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || status === filterStatus;
-    return matchesSearch && matchesStatus;
+    return matchesStatus;
   });
 
   const totalAmount = filteredDistributions.reduce((sum, d) => sum + d.amount, 0);

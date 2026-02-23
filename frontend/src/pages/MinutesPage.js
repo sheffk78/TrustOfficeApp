@@ -124,13 +124,9 @@ export default function MinutesPage() {
   };
 
   const filteredMinutes = minutes.filter(m => {
-    const summary = m.summary || m.minutes_type || '';
-    const details = m.details || m.decisions_text || '';
     const entryType = m.entry_type || m.minutes_type || '';
-    const matchesSearch = summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      details.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || entryType === filterType;
-    return matchesSearch && matchesType;
+    return matchesType;
   });
 
   return (
