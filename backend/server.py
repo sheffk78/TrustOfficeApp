@@ -155,6 +155,9 @@ class UserResponse(BaseModel):
     picture: Optional[str] = None
     created_at: str
 
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+
 # Trust Models
 class TrustCreate(BaseModel):
     name: str
