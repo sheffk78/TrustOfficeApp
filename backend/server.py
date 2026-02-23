@@ -59,6 +59,24 @@ security = HTTPBearer(auto_error=False)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Paths that don't require active subscription
+SUBSCRIPTION_EXEMPT_PATHS = {
+    "/api/auth/register",
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/session",
+    "/api/auth/me",
+    "/api/subscription",
+    "/api/subscription/create-checkout",
+    "/api/subscription/verify-payment",
+    "/api/subscription/create-portal",
+    "/api/subscription/cancel",
+    "/api/subscription/reactivate",
+    "/api/subscription/upgrade",
+    "/api/stripe/webhook",
+    "/api/categories",
+}
+
 # ==================== ENUMS ====================
 
 class TrustType(str, Enum):
