@@ -203,6 +203,10 @@
     border-radius: 0 !important;
 }
 
+.dark .input-trust {
+    @apply bg-slate-800 border-slate-600 text-white;
+}
+
 /* Card styles */
 .card-trust {
     @apply bg-white border border-primary/20 p-6 relative overflow-hidden;
