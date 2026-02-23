@@ -416,6 +416,57 @@ async def get_current_user(request: Request) -> dict:
     
     raise HTTPException(status_code=401, detail="Invalid token")
 
+async def check_subscription_active(user: dict = Depends(get_current_user)) -> dict:
+    """
+    Dependency that checks if user has active subscription.
+    Returns user if subscription is active, raises 402 if expired.
+    """
+    sub = await db.subscriptions.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    
+    if not sub:
+        # No subscription record - create trial and allow access
+        now = datetime.now(timezone.utc)
+        sub = {
+            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+            "user_id": user["user_id"],
+            "plan_type": "trial",
+            "status": "trialing",
+            "trial_start_date": now.isoformat(),
+            "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
+            "stripe_customer_id": None,
+            "stripe_subscription_id": None,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        }
+        await db.subscriptions.insert_one(sub)
+        return user
+    
+    # Check if subscription is active
+    if sub["status"] == "active":
+        return user
+    
+    if sub["status"] == "trialing" and sub.get("trial_end_date"):
+        trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        
+        if trial_end >= datetime.now(timezone.utc):
+            return user
+        
+        # Trial expired
+        raise HTTPException(
+            status_code=402,
+            detail="Trial expired. Please subscribe to continue using TrustOffice."
+        )
+    
+    if sub["status"] in ["canceled", "expired", "past_due"]:
+        raise HTTPException(
+            status_code=402,
+            detail="Subscription inactive. Please subscribe to continue using TrustOffice."
+        )
+    
+    return user
+
 def get_task_status(due_date: str, completed_at: Optional[str]) -> str:
     """Calculate task status based on due_date and completed_at"""
     if completed_at:
