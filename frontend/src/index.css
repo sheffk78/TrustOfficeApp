@@ -148,6 +148,10 @@
     background-size: 20px 20px;
 }
 
+.dark .dot-grid {
+    background-image: radial-gradient(circle, rgba(213, 173, 54, 0.05) 1px, transparent 1px);
+}
+
 /* Table styles */
 .trust-table th {
     @apply bg-muted/50 text-primary font-mono text-xs uppercase tracking-wider border-b-2 border-primary py-4 px-4;
