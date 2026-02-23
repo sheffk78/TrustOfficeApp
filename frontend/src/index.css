@@ -189,10 +189,22 @@
     border-color: var(--gold);
 }
 
+.dark .btn-primary {
+    @apply bg-gold text-slate-900 border-gold;
+}
+
+.dark .btn-primary:hover {
+    @apply bg-gold/80;
+}
+
 .btn-secondary {
     @apply bg-transparent text-primary border border-primary hover:bg-primary hover:text-white font-sans uppercase tracking-wider text-xs h-10 px-6;
     border-radius: 0 !important;
     transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dark .btn-secondary {
+    @apply text-gold border-gold hover:bg-gold hover:text-slate-900;
 }
 
 .btn-gold {
