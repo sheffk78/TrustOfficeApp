@@ -33,11 +33,21 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - **Governance Calendar**: Task tracking with due dates and status
 - **Health Score History**: 30-day trend chart with daily snapshots
 
-### Email Integration (Postmark)
-- Welcome emails on registration
-- Task reminder and overdue notifications
-- Minutes/Distribution creation alerts
-- Distribution approval confirmations
+### Email Integration (Postmark) - 11 Templates
+**Governance Emails:**
+- `welcome` - Onboarding for new users
+- `task_reminder` - Upcoming task reminders
+- `task_overdue` - Overdue task alerts
+- `minutes_created` - New minutes notification
+- `distribution_created` - New distribution logged
+- `distribution_approved` - Distribution approval confirmation
+
+**Subscription Emails (NEW):**
+- `subscription_activated` - Welcome to Pro!
+- `subscription_canceled` - Cancellation confirmation with access date
+- `subscription_renewed` - Payment successful/renewal
+- `payment_failed` - Payment failure alert with retry info
+- `subscription_upgraded` - Plan upgrade confirmation
 
 ### Background Jobs (APScheduler) 
 - Hourly task status updates
@@ -49,8 +59,8 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 **Stripe Integration:**
 - Checkout session creation for Monthly ($79) and Annual ($790) plans
 - Customer portal for payment method management
-- Subscription cancellation (at period end with reactivation option)
-- Plan upgrade (monthly to annual with proration)
+- Subscription cancellation (with email notification)
+- Plan upgrade monthly to annual (with email notification)
 
 **Billing Page Features:**
 - Current plan status with clear badges (Trial, Active, Canceling, Expired)
@@ -59,32 +69,31 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - Next billing date for active subscriptions
 - Cancel/Reactivate subscription controls
 - Upgrade to Annual button (saves $158)
-- Manage Payment Method (Stripe portal)
 - FAQ section
 
 ### CSV Data Export
-**Export Endpoints:**
-- `GET /api/export/minutes` - Export all minutes records
-- `GET /api/export/distributions` - Export all distribution records
-- `GET /api/export/compensation` - Export all compensation payments
-- `GET /api/export/tasks` - Export all governance tasks
+- Minutes, Distributions, Compensation, Tasks exports
+- Filter by trust_id
 
-### Subscription Gating (Feb 23, 2026) - NEW
-**Backend Middleware:**
-- SubscriptionMiddleware checks trial status on all protected routes
-- Returns 402 Payment Required for expired trials
-- Exempt paths: `/api/auth/*`, `/api/subscription/*`, `/api/categories`
+### Subscription Gating
+- Backend middleware blocks expired trials (402 response)
+- Frontend paywall for expired users
+- Settings/Billing remain accessible
 
-**Frontend Paywall:**
-- `SubscriptionGate` component wraps protected routes
-- Shows "Your Trial Has Ended" message with feature list
-- "Subscribe Now" CTA button navigates to billing page
-- Settings and Billing pages remain accessible for expired users
+### Stripe Webhook Integration (Feb 23, 2026) - ENHANCED
+**Events Handled:**
+- `checkout.session.completed` - Activates subscription, sends welcome email
+- `customer.subscription.updated` - Detects plan changes and cancellation scheduling
+- `customer.subscription.deleted` - Marks subscription as canceled
+- `invoice.paid` - Handles renewals, sends renewal confirmation
+- `invoice.payment_failed` - Updates status to past_due, sends payment alert
 
-**User Experience:**
-- Active users see normal app content
-- Expired users see paywall on all pages except Settings/Billing
-- Clear messaging about data safety ("Your data is safe")
+**Email Triggers:**
+- New subscription -> `subscription_activated`
+- Cancellation scheduled -> `subscription_canceled`
+- Plan upgrade -> `subscription_upgraded`
+- Renewal success -> `subscription_renewed`
+- Payment failure -> `payment_failed`
 
 ## Test Credentials
 - Active User: test@example.com / testpassword123
@@ -92,30 +101,20 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## API Endpoints Summary
 
-### Subscription Gating
-- Protected routes return 402 for expired trials
-- Exempt paths: auth, subscription, categories
-
-### Export
-- `GET /api/export/minutes` - CSV export
-- `GET /api/export/distributions` - CSV export
-- `GET /api/export/compensation` - CSV export
-- `GET /api/export/tasks` - CSV export
+### Stripe Webhook
+- `POST /api/stripe/webhook` - Handles subscription lifecycle events
 
 ### Subscription
 - `GET /api/subscription` - Get subscription status
 - `POST /api/subscription/create-checkout` - Start Stripe checkout
-- `GET /api/subscription/verify-payment` - Verify checkout session
 - `POST /api/subscription/create-portal` - Open Stripe portal
-- `POST /api/subscription/cancel` - Cancel at period end
+- `POST /api/subscription/cancel` - Cancel at period end (triggers email)
 - `POST /api/subscription/reactivate` - Undo cancellation
-- `POST /api/subscription/upgrade` - Monthly to annual
+- `POST /api/subscription/upgrade` - Monthly to annual (triggers email)
 
-### Background Jobs
-- `GET /api/background-jobs/status` - View scheduled jobs
-- `POST /api/background-jobs/run/task-status-update` - Manual trigger
-- `POST /api/background-jobs/run/daily-reminders` - Manual trigger
-- `POST /api/background-jobs/run/health-snapshots` - Manual trigger
+### Email
+- `GET /api/email/status` - View email config and 11 templates
+- `POST /api/email/test` - Send test email
 
 ## Prioritized Backlog
 
@@ -128,26 +127,25 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - [x] Entity management
 - [x] Governance calendar and tasks
 - [x] Health score with historical chart
-- [x] Email integration (Postmark)
+- [x] Email integration (Postmark) - 11 templates
 - [x] Background jobs (APScheduler)
 - [x] Stripe subscription management
 - [x] CSV data export
-- [x] **Subscription gating (trial expiration enforcement)**
+- [x] Subscription gating (trial expiration enforcement)
+- [x] **Stripe webhook improvements with email notifications**
 
 ### P2 (Medium Priority)
 - [ ] Audit Log UI - view history of changes
-- [ ] Email notifications for subscription events (canceled, renewed)
-- [ ] Stripe webhook for subscription lifecycle events
+- [ ] Receipt/invoice download from billing page
 
 ### P3 (Nice to Have)
 - [ ] Dark mode toggle
 - [ ] Multi-trustee collaboration
 - [ ] Mobile-optimized views
 - [ ] AI-assisted minutes drafting
-- [ ] Additional entity types (more LLCs)
 
 ## Notes
 - Postmark is in sandbox mode (can only send to verified sender domain)
 - Stripe is in test mode (use test card 4242424242424242)
 - Background jobs run automatically on server startup
-- Expired trials are blocked from app features but can access settings/billing
+- Webhook requires valid Stripe signature for event processing
