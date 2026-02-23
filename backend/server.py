@@ -2258,7 +2258,7 @@ async def upgrade_subscription(user: dict = Depends(get_current_user)):
 
 @api_router.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
-    """Handle Stripe webhook events"""
+    """Handle Stripe webhook events for subscription lifecycle"""
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     
@@ -2269,12 +2269,33 @@ async def stripe_webhook(request: Request):
     except stripe.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
     
-    if event["type"] == "checkout.session.completed":
+    event_type = event["type"]
+    logger.info(f"Stripe webhook received: {event_type}")
+    
+    # Helper to get user info from stripe customer ID
+    async def get_user_by_customer_id(customer_id: str):
+        sub = await db.subscriptions.find_one({"stripe_customer_id": customer_id}, {"_id": 0})
+        if sub:
+            user = await db.users.find_one({"user_id": sub["user_id"]}, {"_id": 0})
+            return user, sub
+        return None, None
+    
+    # Helper to format date from timestamp
+    def format_date(timestamp: int) -> str:
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime('%B %d, %Y')
+    
+    # Helper to format amount
+    def format_amount(amount_cents: int) -> str:
+        return f"{amount_cents / 100:.2f}"
+    
+    # ========== CHECKOUT COMPLETED (New subscription) ==========
+    if event_type == "checkout.session.completed":
         session = event["data"]["object"]
         user_id = session.get("metadata", {}).get("user_id")
         plan_type = session.get("metadata", {}).get("plan_type", "monthly")
         
         if user_id:
+            # Update subscription status
             await db.subscriptions.update_one(
                 {"user_id": user_id},
                 {"$set": {
@@ -2285,28 +2306,174 @@ async def stripe_webhook(request: Request):
                 }}
             )
             
+            # Update payment transaction
             await db.payment_transactions.update_one(
                 {"session_id": session["id"]},
                 {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
             )
+            
+            # Send activation email
+            user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if user and email_service.is_configured:
+                try:
+                    # Get subscription details from Stripe
+                    stripe_sub = stripe.Subscription.retrieve(session.get("subscription"))
+                    next_billing = format_date(stripe_sub.current_period_end)
+                    amount = "790" if plan_type == "annual" else "79"
+                    
+                    await email_service.send_subscription_activated(
+                        to_email=user["email"],
+                        user_name=user.get("name", ""),
+                        plan_type=plan_type,
+                        amount=amount,
+                        next_billing_date=next_billing
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send activation email: {e}")
     
-    elif event["type"] == "customer.subscription.deleted":
+    # ========== SUBSCRIPTION UPDATED ==========
+    elif event_type == "customer.subscription.updated":
+        subscription = event["data"]["object"]
+        previous_attributes = event["data"].get("previous_attributes", {})
+        customer_id = subscription.get("customer")
+        
+        user, sub = await get_user_by_customer_id(customer_id)
+        if not user:
+            return {"status": "ok", "message": "User not found"}
+        
+        # Check if plan changed (upgrade)
+        if "items" in previous_attributes:
+            old_price = previous_attributes.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
+            new_price = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
+            
+            if old_price and new_price and old_price != new_price:
+                # Determine plan types
+                old_plan = "annual" if old_price == STRIPE_ANNUAL_PRICE_ID else "monthly"
+                new_plan = "annual" if new_price == STRIPE_ANNUAL_PRICE_ID else "monthly"
+                
+                # Update database
+                await db.subscriptions.update_one(
+                    {"user_id": user["user_id"]},
+                    {"$set": {
+                        "plan_type": new_plan,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                
+                # Send upgrade email
+                if email_service.is_configured:
+                    try:
+                        await email_service.send_subscription_upgraded(
+                            to_email=user["email"],
+                            user_name=user.get("name", ""),
+                            old_plan=old_plan,
+                            new_plan=new_plan
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send upgrade email: {e}")
+        
+        # Check if cancel_at_period_end changed (cancellation scheduled)
+        if "cancel_at_period_end" in previous_attributes:
+            if subscription.get("cancel_at_period_end") and not previous_attributes.get("cancel_at_period_end"):
+                # Subscription scheduled for cancellation
+                access_until = format_date(subscription.get("current_period_end"))
+                
+                if email_service.is_configured:
+                    try:
+                        await email_service.send_subscription_canceled(
+                            to_email=user["email"],
+                            user_name=user.get("name", ""),
+                            access_until=access_until
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send cancellation email: {e}")
+    
+    # ========== SUBSCRIPTION DELETED (fully canceled) ==========
+    elif event_type == "customer.subscription.deleted":
         subscription = event["data"]["object"]
         await db.subscriptions.update_one(
             {"stripe_subscription_id": subscription["id"]},
-            {"$set": {"status": "canceled", "updated_at": datetime.now(timezone.utc).isoformat()}}
+            {"$set": {
+                "status": "canceled",
+                "stripe_subscription_id": None,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
         )
     
-    elif event["type"] == "invoice.payment_failed":
+    # ========== INVOICE PAID (renewal) ==========
+    elif event_type == "invoice.paid":
         invoice = event["data"]["object"]
         customer_id = invoice.get("customer")
-        if customer_id:
+        
+        # Skip if this is the first invoice (handled by checkout.session.completed)
+        if invoice.get("billing_reason") == "subscription_create":
+            return {"status": "ok", "message": "Initial invoice, skipping"}
+        
+        user, sub = await get_user_by_customer_id(customer_id)
+        if not user:
+            return {"status": "ok", "message": "User not found"}
+        
+        # Ensure subscription is active
+        await db.subscriptions.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {
+                "status": "active",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Send renewal email
+        if email_service.is_configured and invoice.get("billing_reason") == "subscription_cycle":
+            try:
+                # Get next billing date from subscription
+                stripe_sub = stripe.Subscription.retrieve(invoice.get("subscription"))
+                next_billing = format_date(stripe_sub.current_period_end)
+                amount = format_amount(invoice.get("amount_paid", 0))
+                plan_type = sub.get("plan_type", "monthly")
+                
+                await email_service.send_subscription_renewed(
+                    to_email=user["email"],
+                    user_name=user.get("name", ""),
+                    plan_type=plan_type,
+                    amount=amount,
+                    next_billing_date=next_billing
+                )
+            except Exception as e:
+                logger.error(f"Failed to send renewal email: {e}")
+    
+    # ========== INVOICE PAYMENT FAILED ==========
+    elif event_type == "invoice.payment_failed":
+        invoice = event["data"]["object"]
+        customer_id = invoice.get("customer")
+        
+        user, sub = await get_user_by_customer_id(customer_id)
+        if user:
+            # Update subscription status
             await db.subscriptions.update_one(
                 {"stripe_customer_id": customer_id},
-                {"$set": {"status": "past_due", "updated_at": datetime.now(timezone.utc).isoformat()}}
+                {"$set": {
+                    "status": "past_due",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
             )
+            
+            # Send payment failed email
+            if email_service.is_configured:
+                try:
+                    amount = format_amount(invoice.get("amount_due", 0))
+                    next_attempt = invoice.get("next_payment_attempt")
+                    retry_date = format_date(next_attempt) if next_attempt else None
+                    
+                    await email_service.send_payment_failed(
+                        to_email=user["email"],
+                        user_name=user.get("name", ""),
+                        amount=amount,
+                        retry_date=retry_date
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send payment failed email: {e}")
     
-    return {"status": "ok"}
+    return {"status": "ok", "event_type": event_type}
 
 # ==================== EMAIL ENDPOINTS ====================
 
