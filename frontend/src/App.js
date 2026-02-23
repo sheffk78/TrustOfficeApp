@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-route
 import { Toaster } from "@/components/ui/sonner";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import AuthCallback from "@/pages/AuthCallback";
 import DashboardPage from "@/pages/DashboardPage";
 import MinutesPage from "@/pages/MinutesPage";
