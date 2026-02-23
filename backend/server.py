@@ -3084,12 +3084,65 @@ app.add_middleware(SubscriptionMiddleware)
 
 @app.on_event("startup")
 async def startup_event():
-    """Start background task runner on app startup"""
+    """Start background task runner and create indexes on app startup"""
     try:
         await background_runner.start()
         logger.info("Background task runner started successfully")
     except Exception as e:
         logger.error(f"Failed to start background runner: {e}")
+    
+    # Create database indexes for performance
+    try:
+        # User-related indexes
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("user_id", unique=True)
+        
+        # Subscription indexes
+        await db.subscriptions.create_index("user_id", unique=True)
+        await db.subscriptions.create_index("stripe_customer_id", sparse=True)
+        
+        # Trust indexes
+        await db.trusts.create_index("user_id")
+        await db.trusts.create_index("trust_id", unique=True)
+        
+        # Entity indexes
+        await db.entities.create_index([("trust_id", 1), ("user_id", 1)])
+        await db.entities.create_index("entity_id", unique=True)
+        
+        # Governance tasks indexes
+        await db.governance_tasks.create_index([("trust_id", 1), ("user_id", 1)])
+        await db.governance_tasks.create_index([("user_id", 1), ("due_date", 1)])
+        await db.governance_tasks.create_index("task_id", unique=True)
+        
+        # Minutes indexes
+        await db.minutes_records.create_index([("trust_id", 1), ("user_id", 1)])
+        await db.minutes_records.create_index([("user_id", 1), ("meeting_date", -1)])
+        await db.minutes_records.create_index("minutes_id", unique=True)
+        
+        # Distribution indexes
+        await db.distribution_records.create_index([("trust_id", 1), ("user_id", 1)])
+        await db.distribution_records.create_index([("user_id", 1), ("date", -1)])
+        await db.distribution_records.create_index("distribution_id", unique=True)
+        
+        # Health score snapshots indexes
+        await db.health_score_snapshots.create_index([("trust_id", 1), ("calculated_at", -1)])
+        await db.health_score_snapshots.create_index("snapshot_id", unique=True)
+        
+        # Session indexes with TTL
+        await db.user_sessions.create_index("session_token", unique=True)
+        await db.user_sessions.create_index("user_id")
+        
+        # Password reset with TTL (auto-expire after 2 hours)
+        await db.password_resets.create_index("token", unique=True)
+        await db.password_resets.create_index("user_id", unique=True)
+        
+        # Audit logs
+        await db.audit_logs.create_index([("user_id", 1), ("timestamp", -1)])
+        await db.audit_logs.create_index("audit_id", unique=True)
+        
+        logger.info("Database indexes created/verified successfully")
+    except Exception as e:
+        logger.error(f"Failed to create indexes: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
