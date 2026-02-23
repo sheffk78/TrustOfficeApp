@@ -1,110 +1,107 @@
 # TrustOffice - Trust Governance Workspace
 
 ## Original Problem Statement
-Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status. Web-first (desktop optimized) with responsive mobile support. React + FastAPI + MongoDB stack.
+Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
 ## Architecture
 
 ### Tech Stack
-- **Frontend**: React 18, Tailwind CSS, Shadcn/UI components
+- **Frontend**: React 18, Tailwind CSS, Shadcn/UI
 - **Backend**: FastAPI, Python 3.10+
-- **Database**: MongoDB
-- **Auth**: JWT + Emergent-managed Google OAuth
+- **Database**: MongoDB (with indexes)
+- **Auth**: JWT + Google OAuth, Password Reset
 - **Payments**: Stripe (test mode)
-- **PDF Generation**: ReportLab
-- **Email**: Postmark (transactional emails)
-- **Background Jobs**: APScheduler (cron-like scheduling)
-- **Theme**: Light/Dark mode with localStorage persistence
+- **Email**: Postmark (12 templates)
+- **Background Jobs**: APScheduler
 
 ### Design System (AnchorPoint)
-- **Light Mode**: Primary Navy #010079, Gold accent #D5AD36
-- **Dark Mode**: Gold accent on slate backgrounds (#0f172a, #1e293b)
-- Fonts: Cormorant Garamond (headings), DM Sans (body), JetBrains Mono (data/labels)
-- 0px border-radius everywhere
+- Light: Navy #010079, Gold #D5AD36
+- Dark: Gold on slate backgrounds
+- 0px border-radius, Cormorant Garamond/DM Sans/JetBrains Mono fonts
 
-## What's Been Implemented
+## Completed Features
 
-### Core Features
-- **Authentication**: JWT + Google OAuth with session persistence
-- **Dashboard**: Governance Insights panel, 5-criteria health score, onboarding checklist
-- **Minutes**: Record meeting minutes with PDF generation and download
-- **Distributions**: Log and track with approval workflow (solvency/recusal checks)
-- **Compensation**: Track payments with plan alignment monitoring
-- **Entities**: Manage trusts, LLCs, and entity relationships
-- **Governance Calendar**: Task tracking with due dates and status
-- **Health Score History**: 30-day trend chart with daily snapshots
+### P0 - Critical (Feb 23, 2026) - COMPLETE
+1. **Password Reset Flow**
+   - `POST /api/auth/forgot-password` - Creates token, sends email
+   - `GET /api/auth/verify-reset-token` - Validates token
+   - `POST /api/auth/reset-password` - Changes password, invalidates sessions
+   - Frontend pages: ForgotPasswordPage, ResetPasswordPage
+   - Login page "Forgot password?" link
 
-### Dark Mode (Feb 23, 2026) - NEW
-**Implementation:**
-- `ThemeProvider` context manages theme state
-- `ThemeToggle` component in sidebar
-- Tailwind class-based dark mode (`dark:` utilities)
-- CSS variables for color tokens
-- localStorage persistence (`trustoffice-theme`)
+2. **Database Indexes** - Created on server startup
+   - users: email (unique), user_id (unique)
+   - subscriptions: user_id (unique), stripe_customer_id
+   - trusts: user_id, trust_id (unique)
+   - entities: (trust_id, user_id), entity_id (unique)
+   - governance_tasks: (trust_id, user_id), (user_id, due_date), task_id (unique)
+   - minutes_records: (trust_id, user_id), (user_id, meeting_date), minutes_id (unique)
+   - distribution_records: (trust_id, user_id), (user_id, date), distribution_id (unique)
+   - health_score_snapshots: (trust_id, calculated_at), snapshot_id (unique)
+   - password_resets: token (unique), user_id (unique)
+   - user_sessions: session_token (unique), user_id
+   - audit_logs: (user_id, timestamp), audit_id (unique)
 
-**Features:**
-- Toggle between light and dark themes
-- System preference detection (if no manual preference)
-- Persists across sessions
-- Full styling coverage: sidebar, cards, buttons, tables, inputs
+3. **Legacy Collection Cleanup**
+   - Removed: `minutes`, `distributions` (old schema)
+   - Active: `minutes_records`, `distribution_records` (proper schema)
 
-### Email Integration (Postmark) - 11 Templates
-- Governance: welcome, task_reminder, task_overdue, minutes_created, distribution_created, distribution_approved
-- Subscription: subscription_activated, subscription_canceled, subscription_renewed, payment_failed, subscription_upgraded
+### Core Features - COMPLETE
+- Authentication (JWT + Google OAuth + Password Reset)
+- Trust & Entity Management
+- Minutes with PDF generation
+- Distributions with approval workflow
+- Compensation tracking
+- Governance Health (5-criteria scoring)
+- Historical health chart
+- Calendar & tasks
+- Dark mode toggle
 
-### Background Jobs (APScheduler) 
-- Hourly task status updates
-- Daily reminders at 9 AM UTC
-- Daily health score snapshots at midnight UTC
+### Integrations - COMPLETE
+- **Stripe**: Checkout, portal, cancel/reactivate/upgrade, webhooks
+- **Postmark**: 12 email templates (including password_reset)
+- **APScheduler**: Daily reminders, task updates, health snapshots
 
-### Billing & Subscription (Stripe)
-- Checkout sessions for Monthly ($79) and Annual ($790) plans
-- Customer portal for payment management
-- Cancel/reactivate/upgrade with email notifications
-- Webhook handling for lifecycle events
+### Subscription - COMPLETE
+- 14-day trial with gating
+- Monthly ($79) and Annual ($790) plans
+- Paywall for expired trials
 
-### CSV Data Export
-- Minutes, Distributions, Compensation, Tasks exports
-
-### Subscription Gating
-- Backend middleware blocks expired trials (402 response)
-- Frontend paywall for expired users
-- Settings/Billing remain accessible
+## Email Templates (12)
+1. welcome
+2. password_reset (NEW)
+3. task_reminder
+4. task_overdue
+5. minutes_created
+6. distribution_created
+7. distribution_approved
+8. subscription_activated
+9. subscription_canceled
+10. subscription_renewed
+11. payment_failed
+12. subscription_upgraded
 
 ## Test Credentials
-- Active User: test@example.com / testpassword123
-- Expired User: expired@test.com / testpass123
+- test@example.com / testpassword123
 
 ## Prioritized Backlog
 
-### Completed
-- [x] Core authentication (JWT + Google OAuth)
-- [x] Dashboard with governance insights
-- [x] Minutes management with PDF generation
-- [x] Distribution approval workflow
-- [x] Compensation tracking
-- [x] Entity management
-- [x] Governance calendar and tasks
-- [x] Health score with historical chart
-- [x] Email integration (Postmark) - 11 templates
-- [x] Background jobs (APScheduler)
-- [x] Stripe subscription management
-- [x] CSV data export
-- [x] Subscription gating
-- [x] Stripe webhook with email notifications
-- [x] **Dark mode toggle**
+### P1 (Short-term)
+- [ ] Profile editing (name change)
+- [ ] Search in minutes/distributions
+- [ ] Table horizontal scroll for mobile
+- [ ] Notification preferences
 
-### P2 (Medium Priority)
-- [ ] Audit Log UI - view history of changes
-- [ ] Receipt/invoice download from billing page
+### P2 (Medium-term)
+- [ ] Audit Log UI
+- [ ] Receipt/invoice download
 
-### P3 (Nice to Have)
+### P3 (Future)
 - [ ] Multi-trustee collaboration
-- [ ] Mobile-optimized views
 - [ ] AI-assisted minutes drafting
+- [ ] Mobile app
 
 ## Notes
-- Postmark is in sandbox mode (can only send to verified sender domain)
-- Stripe is in test mode (use test card 4242424242424242)
-- Background jobs run automatically on server startup
-- Dark mode toggle is in the sidebar below user profile
+- Postmark: Sandbox mode (verified domain only)
+- Stripe: Test mode (card 4242424242424242)
+- Password reset tokens expire in 1 hour
