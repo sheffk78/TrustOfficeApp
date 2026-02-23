@@ -168,6 +168,25 @@ class EmailService:
     
     # ==================== CONVENIENCE METHODS ====================
     
+    async def send_password_reset_email(
+        self,
+        to_email: str,
+        user_name: str,
+        reset_url: str
+    ) -> Dict[str, Any]:
+        """Send password reset email"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="password_reset",
+            template_data={
+                "user_name": user_name,
+                "reset_url": reset_url
+            },
+            to_name=user_name,
+            tag="password_reset",
+            metadata={"email_type": "password_reset"}
+        )
+    
     async def send_welcome_email(
         self,
         to_email: str,
