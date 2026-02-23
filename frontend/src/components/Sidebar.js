@@ -159,6 +159,10 @@ export const Sidebar = () => {
               <p className="font-mono text-[10px] text-white/40 truncate">{user?.email}</p>
             </div>
           </div>
+          
+          {/* Theme Toggle */}
+          <ThemeToggle className="text-white/60 hover:text-white w-full mb-3" />
+          
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 text-white/60 hover:text-white w-full"
