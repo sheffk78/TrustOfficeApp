@@ -72,12 +72,16 @@ export default function DistributionsPage() {
     }
   };
 
-  const loadDistributions = async () => {
+  const loadDistributions = async (search = '') => {
     if (!selectedTrust) return;
     
     setLoading(true);
     try {
-      const response = await fetchWithAuth(`/distributions?trust_id=${selectedTrust.trust_id}`);
+      let url = `/distributions?trust_id=${selectedTrust.trust_id}`;
+      if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
+      }
+      const response = await fetchWithAuth(url);
       if (response.ok) {
         setDistributions(await response.json());
       }

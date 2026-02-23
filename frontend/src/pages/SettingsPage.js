@@ -187,12 +187,62 @@ export default function SettingsPage() {
                   </span>
                 </div>
               )}
-              <div>
-                <p className="font-medium text-lg text-navy">{user?.name}</p>
-                <p className="font-mono text-sm text-muted-foreground">{user?.email}</p>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mt-2">
-                  User ID: {user?.user_id}
-                </p>
+              <div className="flex-1">
+                {editingProfile ? (
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="label-trust">Display Name</Label>
+                      <Input
+                        value={profileName}
+                        onChange={(e) => setProfileName(e.target.value)}
+                        className="mt-1 input-trust max-w-xs"
+                        placeholder="Your name"
+                        data-testid="profile-name-input"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleUpdateProfile}
+                        disabled={loading}
+                        className="btn-primary text-sm"
+                        data-testid="save-profile-btn"
+                      >
+                        <Save className="w-4 h-4 mr-1" />
+                        {loading ? 'Saving...' : 'Save'}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setEditingProfile(false);
+                          setProfileName(user?.name || '');
+                        }}
+                        variant="outline"
+                        className="btn-secondary text-sm"
+                        data-testid="cancel-profile-edit-btn"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-lg text-navy">{user?.name}</p>
+                      <Button
+                        onClick={() => setEditingProfile(true)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-navy"
+                        data-testid="edit-profile-btn"
+                      >
+                        Edit
+                      </Button>
+                    </div>
+                    <p className="font-mono text-sm text-muted-foreground">{user?.email}</p>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mt-2">
+                      User ID: {user?.user_id}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>

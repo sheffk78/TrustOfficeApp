@@ -36,12 +36,16 @@ export default function MinutesPage() {
     }
   }, [selectedTrust]);
 
-  const loadMinutes = async () => {
+  const loadMinutes = async (search = '') => {
     if (!selectedTrust) return;
     
     setLoading(true);
     try {
-      const response = await fetchWithAuth(`/minutes?trust_id=${selectedTrust.trust_id}`);
+      let url = `/minutes?trust_id=${selectedTrust.trust_id}`;
+      if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
+      }
+      const response = await fetchWithAuth(url);
       if (response.ok) {
         setMinutes(await response.json());
       }
