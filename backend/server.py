@@ -1591,10 +1591,36 @@ async def create_distribution(dist: DistributionCreate, background_tasks: Backgr
     return DistributionResponse(**dist_doc)
 
 @api_router.get("/distributions", response_model=List[DistributionResponse])
-async def get_distributions(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+async def get_distributions(
+    trust_id: Optional[str] = None,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    purpose: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get distributions with optional search and filters"""
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
+    
+    # Filter by approval status
+    if status == "approved":
+        query["approved_at"] = {"$ne": None}
+    elif status == "pending":
+        query["approved_at"] = None
+    
+    # Filter by purpose classification
+    if purpose:
+        query["purpose_classification"] = purpose
+    
+    # Add text search across beneficiary name and notes
+    if search:
+        search_term = search.strip()
+        query["$or"] = [
+            {"beneficiary_name": {"$regex": search_term, "$options": "i"}},
+            {"notes": {"$regex": search_term, "$options": "i"}},
+            {"authority_clause_ref": {"$regex": search_term, "$options": "i"}}
+        ]
     
     dists = await db.distribution_records.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
     return [DistributionResponse(**d) for d in dists]
