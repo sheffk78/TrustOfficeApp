@@ -848,7 +848,7 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
     )
     
     # Send reset email
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://trust-governance-4.preview.emergentagent.com')
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://health-dashboard-124.preview.emergentagent.com')
     reset_url = f"{frontend_url}/reset-password?token={reset_token}"
     
     background_tasks.add_task(
