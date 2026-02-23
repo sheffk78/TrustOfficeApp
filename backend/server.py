@@ -1016,6 +1016,37 @@ async def get_me(user: dict = Depends(get_current_user)):
         created_at=user.get("created_at", "")
     )
 
+@api_router.put("/auth/profile")
+async def update_profile(profile: ProfileUpdate, user: dict = Depends(get_current_user)):
+    """Update user profile (name)"""
+    update_fields = {}
+    
+    if profile.name is not None:
+        if len(profile.name.strip()) < 1:
+            raise HTTPException(status_code=400, detail="Name cannot be empty")
+        update_fields["name"] = profile.name.strip()
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": update_fields}
+    )
+    
+    # Get updated user
+    updated_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "user_id": updated_user["user_id"],
+            "email": updated_user["email"],
+            "name": updated_user["name"],
+            "picture": updated_user.get("picture")
+        }
+    }
+
 @api_router.post("/auth/logout")
 async def logout(request: Request, response: Response):
     session_token = request.cookies.get("session_token")
