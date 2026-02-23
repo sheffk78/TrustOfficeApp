@@ -64,15 +64,17 @@ export default function DistributionsPage() {
     status: 'review'
   });
 
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
   useEffect(() => {
     loadCategories();
   }, []);
 
   useEffect(() => {
     if (selectedTrust) {
-      loadDistributions();
+      loadDistributions(debouncedSearch);
     }
-  }, [selectedTrust]);
+  }, [selectedTrust, debouncedSearch]);
 
   const loadCategories = async () => {
     try {

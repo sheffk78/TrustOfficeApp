@@ -45,11 +45,13 @@ export default function MinutesPage() {
   const [pdfPreview, setPdfPreview] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
   useEffect(() => {
     if (selectedTrust) {
-      loadMinutes();
+      loadMinutes(debouncedSearch);
     }
-  }, [selectedTrust]);
+  }, [selectedTrust, debouncedSearch]);
 
   const loadMinutes = async (search = '') => {
     if (!selectedTrust) return;
