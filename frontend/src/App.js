@@ -20,6 +20,7 @@ import StructurePage from "@/pages/StructurePage";
 import CompensationPage from "@/pages/CompensationPage";
 import BillingPage from "@/pages/BillingPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
 
 // Protected Route component
