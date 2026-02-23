@@ -2258,6 +2258,18 @@ async def upgrade_subscription(user: dict = Depends(get_current_user)):
             }}
         )
         
+        # Send upgrade email
+        if email_service.is_configured:
+            try:
+                await email_service.send_subscription_upgraded(
+                    to_email=user["email"],
+                    user_name=user.get("name", ""),
+                    old_plan="monthly",
+                    new_plan="annual"
+                )
+            except Exception as e:
+                logger.error(f"Failed to send upgrade email: {e}")
+        
         return {
             "status": "upgraded",
             "message": "Successfully upgraded to annual plan. You'll be charged the prorated difference.",
