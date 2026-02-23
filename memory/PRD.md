@@ -14,10 +14,11 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - **PDF Generation**: ReportLab
 - **Email**: Postmark (transactional emails)
 - **Background Jobs**: APScheduler (cron-like scheduling)
+- **Theme**: Light/Dark mode with localStorage persistence
 
 ### Design System (AnchorPoint)
-- Primary: Navy #010079
-- Accent: Gold #D5AD36
+- **Light Mode**: Primary Navy #010079, Gold accent #D5AD36
+- **Dark Mode**: Gold accent on slate backgrounds (#0f172a, #1e293b)
 - Fonts: Cormorant Garamond (headings), DM Sans (body), JetBrains Mono (data/labels)
 - 0px border-radius everywhere
 
@@ -33,88 +34,46 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - **Governance Calendar**: Task tracking with due dates and status
 - **Health Score History**: 30-day trend chart with daily snapshots
 
-### Email Integration (Postmark) - 11 Templates
-**Governance Emails:**
-- `welcome` - Onboarding for new users
-- `task_reminder` - Upcoming task reminders
-- `task_overdue` - Overdue task alerts
-- `minutes_created` - New minutes notification
-- `distribution_created` - New distribution logged
-- `distribution_approved` - Distribution approval confirmation
+### Dark Mode (Feb 23, 2026) - NEW
+**Implementation:**
+- `ThemeProvider` context manages theme state
+- `ThemeToggle` component in sidebar
+- Tailwind class-based dark mode (`dark:` utilities)
+- CSS variables for color tokens
+- localStorage persistence (`trustoffice-theme`)
 
-**Subscription Emails (NEW):**
-- `subscription_activated` - Welcome to Pro!
-- `subscription_canceled` - Cancellation confirmation with access date
-- `subscription_renewed` - Payment successful/renewal
-- `payment_failed` - Payment failure alert with retry info
-- `subscription_upgraded` - Plan upgrade confirmation
+**Features:**
+- Toggle between light and dark themes
+- System preference detection (if no manual preference)
+- Persists across sessions
+- Full styling coverage: sidebar, cards, buttons, tables, inputs
+
+### Email Integration (Postmark) - 11 Templates
+- Governance: welcome, task_reminder, task_overdue, minutes_created, distribution_created, distribution_approved
+- Subscription: subscription_activated, subscription_canceled, subscription_renewed, payment_failed, subscription_upgraded
 
 ### Background Jobs (APScheduler) 
 - Hourly task status updates
 - Daily reminders at 9 AM UTC
 - Daily health score snapshots at midnight UTC
-- Manual trigger endpoints for testing
 
-### Billing & Subscription
-**Stripe Integration:**
-- Checkout session creation for Monthly ($79) and Annual ($790) plans
-- Customer portal for payment method management
-- Subscription cancellation (with email notification)
-- Plan upgrade monthly to annual (with email notification)
-
-**Billing Page Features:**
-- Current plan status with clear badges (Trial, Active, Canceling, Expired)
-- Trial end date prominently displayed
-- Days remaining countdown
-- Next billing date for active subscriptions
-- Cancel/Reactivate subscription controls
-- Upgrade to Annual button (saves $158)
-- FAQ section
+### Billing & Subscription (Stripe)
+- Checkout sessions for Monthly ($79) and Annual ($790) plans
+- Customer portal for payment management
+- Cancel/reactivate/upgrade with email notifications
+- Webhook handling for lifecycle events
 
 ### CSV Data Export
 - Minutes, Distributions, Compensation, Tasks exports
-- Filter by trust_id
 
 ### Subscription Gating
 - Backend middleware blocks expired trials (402 response)
 - Frontend paywall for expired users
 - Settings/Billing remain accessible
 
-### Stripe Webhook Integration (Feb 23, 2026) - ENHANCED
-**Events Handled:**
-- `checkout.session.completed` - Activates subscription, sends welcome email
-- `customer.subscription.updated` - Detects plan changes and cancellation scheduling
-- `customer.subscription.deleted` - Marks subscription as canceled
-- `invoice.paid` - Handles renewals, sends renewal confirmation
-- `invoice.payment_failed` - Updates status to past_due, sends payment alert
-
-**Email Triggers:**
-- New subscription -> `subscription_activated`
-- Cancellation scheduled -> `subscription_canceled`
-- Plan upgrade -> `subscription_upgraded`
-- Renewal success -> `subscription_renewed`
-- Payment failure -> `payment_failed`
-
 ## Test Credentials
 - Active User: test@example.com / testpassword123
 - Expired User: expired@test.com / testpass123
-
-## API Endpoints Summary
-
-### Stripe Webhook
-- `POST /api/stripe/webhook` - Handles subscription lifecycle events
-
-### Subscription
-- `GET /api/subscription` - Get subscription status
-- `POST /api/subscription/create-checkout` - Start Stripe checkout
-- `POST /api/subscription/create-portal` - Open Stripe portal
-- `POST /api/subscription/cancel` - Cancel at period end (triggers email)
-- `POST /api/subscription/reactivate` - Undo cancellation
-- `POST /api/subscription/upgrade` - Monthly to annual (triggers email)
-
-### Email
-- `GET /api/email/status` - View email config and 11 templates
-- `POST /api/email/test` - Send test email
 
 ## Prioritized Backlog
 
@@ -131,15 +90,15 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - [x] Background jobs (APScheduler)
 - [x] Stripe subscription management
 - [x] CSV data export
-- [x] Subscription gating (trial expiration enforcement)
-- [x] **Stripe webhook improvements with email notifications**
+- [x] Subscription gating
+- [x] Stripe webhook with email notifications
+- [x] **Dark mode toggle**
 
 ### P2 (Medium Priority)
 - [ ] Audit Log UI - view history of changes
 - [ ] Receipt/invoice download from billing page
 
 ### P3 (Nice to Have)
-- [ ] Dark mode toggle
 - [ ] Multi-trustee collaboration
 - [ ] Mobile-optimized views
 - [ ] AI-assisted minutes drafting
@@ -148,4 +107,4 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - Postmark is in sandbox mode (can only send to verified sender domain)
 - Stripe is in test mode (use test card 4242424242424242)
 - Background jobs run automatically on server startup
-- Webhook requires valid Stripe signature for event processing
+- Dark mode toggle is in the sidebar below user profile
