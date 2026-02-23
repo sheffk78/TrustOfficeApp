@@ -201,11 +201,14 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (response.ok) {
+        const result = await response.json();
         await loadTrustsInternal();
-        return await response.json();
+        return result;
       }
+      return { seeded: false, message: 'Request failed' };
     } catch (error) {
       console.error('Failed to seed demo data:', error);
+      return { seeded: false, message: error.message };
     }
   }, []);
 
