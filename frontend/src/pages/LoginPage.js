@@ -50,7 +50,7 @@ export default function LoginPage() {
           <img 
             src="https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/eqrftij2_Trust%20Office%20-%20Vertical.svg"
             alt="TrustOffice"
-            className="w-48 mb-8"
+            className="w-48 mb-8 brightness-0 invert"
           />
           <p className="text-white/80 font-mono text-xs uppercase tracking-widest text-center max-w-md">
             Trust Governance Workspace
