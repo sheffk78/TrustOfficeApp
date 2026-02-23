@@ -86,11 +86,11 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Prioritized Backlog
 
-### P1 (Short-term)
-- [ ] Profile editing (name change)
-- [ ] Search in minutes/distributions
-- [ ] Table horizontal scroll for mobile
-- [ ] Notification preferences
+### P1 (Short-term) - COMPLETE (Feb 23, 2026)
+- [x] Profile editing (name change) - Edit button in Settings > Profile section
+- [x] Search in minutes/distributions - Server-side search with debounced queries
+- [x] Table horizontal scroll for mobile - overflow-x-auto on table containers
+- [ ] Notification preferences - TODO
 
 ### P2 (Medium-term)
 - [ ] Audit Log UI
