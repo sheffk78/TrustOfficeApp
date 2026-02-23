@@ -26,7 +26,26 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(hasStoredToken());
   const [trusts, setTrusts] = useState([]);
   const [selectedTrust, setSelectedTrust] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const authCheckComplete = useRef(false);
+
+  const loadSubscription = useCallback(async () => {
+    try {
+      const response = await fetch(`${API}/subscription`, {
+        credentials: 'include',
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const subData = await response.json();
+        setSubscription(subData);
+        setSubscriptionExpired(!subData.is_active);
+      }
+    } catch (error) {
+      console.error('Failed to load subscription:', error);
+    }
+  }, []);
 
   const checkAuth = useCallback(async () => {
     // Prevent duplicate auth checks
