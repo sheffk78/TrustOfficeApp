@@ -382,16 +382,25 @@ class DistributionResponse(BaseModel):
 # Compensation Models
 class CompensationPlanCreate(BaseModel):
     trust_id: str
-    annual_approved_amount: float
+    trustee_name: str = ""
+    role: str = ""
+    annual_amount: float = 0
+    annual_approved_amount: float = 0  # Alias for annual_amount for backwards compatibility
+    fee_type: str = "fixed"
     effective_date: str
     notes: str = ""
 
 class CompensationPlanResponse(BaseModel):
     plan_id: str
     trust_id: str
-    annual_approved_amount: float
+    trustee_name: str = ""
+    role: str = ""
+    annual_fee: Optional[float] = None
+    annual_amount: Optional[float] = None
+    annual_approved_amount: Optional[float] = None
+    fee_type: str = "fixed"
     effective_date: str
-    notes: str
+    notes: str = ""
     created_at: str
 
 class CompensationPaymentCreate(BaseModel):
