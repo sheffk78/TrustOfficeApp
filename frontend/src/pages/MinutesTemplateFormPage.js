@@ -1131,6 +1131,94 @@ export default function MinutesTemplateFormPage() {
                 </div>
               )}
 
+              {templateType === 'benevolence_approval' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Benevolence Grant Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Beneficiary Name *</Label>
+                      <Input
+                        value={benevolenceData.beneficiary_name}
+                        onChange={(e) => setBenevolenceData({ ...benevolenceData, beneficiary_name: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Name of recipient"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Beneficiary Type</Label>
+                      <Select value={benevolenceData.beneficiary_type} onValueChange={(v) => setBenevolenceData({ ...benevolenceData, beneficiary_type: v })}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="individual">Individual</SelectItem>
+                          <SelectItem value="family">Family</SelectItem>
+                          <SelectItem value="organization">Organization</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Purpose Category</Label>
+                      <Select value={benevolenceData.benevolence_purpose} onValueChange={(v) => setBenevolenceData({ ...benevolenceData, benevolence_purpose: v })}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="medical">Medical Expenses</SelectItem>
+                          <SelectItem value="housing">Housing Assistance</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="food_necessities">Food & Necessities</SelectItem>
+                          <SelectItem value="utilities">Utilities</SelectItem>
+                          <SelectItem value="transportation">Transportation</SelectItem>
+                          <SelectItem value="emergency">Emergency Relief</SelectItem>
+                          <SelectItem value="spiritual">Spiritual/Ministry</SelectItem>
+                          <SelectItem value="assistance">General Assistance</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Purpose Description *</Label>
+                      <Textarea
+                        value={benevolenceData.purpose_description}
+                        onChange={(e) => setBenevolenceData({ ...benevolenceData, purpose_description: e.target.value })}
+                        className="mt-1"
+                        placeholder="Describe the need and how the assistance will help"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Grant Amount *</Label>
+                      <Input
+                        type="number"
+                        value={benevolenceData.amount}
+                        onChange={(e) => setBenevolenceData({ ...benevolenceData, amount: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="500.00"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Disbursement Date</Label>
+                      <Input
+                        value={benevolenceData.disbursement_date}
+                        onChange={(e) => setBenevolenceData({ ...benevolenceData, disbursement_date: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="March 1, 2024"
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-3 mt-2">
+                      <Checkbox
+                        checked={benevolenceData.add_to_benevolence_log}
+                        onCheckedChange={(checked) => setBenevolenceData({ ...benevolenceData, add_to_benevolence_log: checked })}
+                        id="add-benevolence-log"
+                      />
+                      <Label htmlFor="add-benevolence-log" className="cursor-pointer">
+                        Automatically add to Benevolence Log
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {templateType === 'general_meeting' && (
                 <div className="card-trust corner-mark p-6">
                   <div className="flex items-center justify-between mb-4">
