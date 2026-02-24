@@ -12,6 +12,9 @@ import {
   PlusCircle,
   UserPlus,
   UserCheck,
+  UsersRound,
+  Landmark,
+  MapPin,
   ChevronRight,
   ArrowLeft
 } from 'lucide-react';
@@ -22,7 +25,10 @@ const ICONS = {
   'dollar-sign': DollarSign,
   'plus-circle': PlusCircle,
   'user-plus': UserPlus,
-  'user-check': UserCheck
+  'user-check': UserCheck,
+  'users-round': UsersRound,
+  'landmark': Landmark,
+  'map-pin': MapPin
 };
 
 export default function MinutesTemplatesPage() {
