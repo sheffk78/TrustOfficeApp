@@ -811,6 +811,302 @@ export default function MinutesTemplateFormPage() {
                 </div>
               )}
 
+              {templateType === 'designation_of_beneficiaries' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Beneficiary Designation</h2>
+                  <div className="grid md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <Label className="label-trust">Designation Type</Label>
+                      <Select value={beneficiaryData.designation_type} onValueChange={(v) => setBeneficiaryData({ ...beneficiaryData, designation_type: v })}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="initial">Initial Designation</SelectItem>
+                          <SelectItem value="amendment">Amendment to Existing</SelectItem>
+                          <SelectItem value="restatement">Complete Restatement</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Total Units of Beneficial Interest</Label>
+                      <Input
+                        type="number"
+                        value={beneficiaryData.total_units}
+                        onChange={(e) => setBeneficiaryData({ ...beneficiaryData, total_units: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="100"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="label-trust">Beneficiaries</Label>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setBeneficiaryData(prev => ({
+                      ...prev,
+                      beneficiaries: [...prev.beneficiaries, { name: '', units: '', percentage: '', relationship: '' }]
+                    }))}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Beneficiary
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {beneficiaryData.beneficiaries.map((ben, index) => (
+                      <div key={index} className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <Input
+                            value={ben.name}
+                            onChange={(e) => {
+                              const newBens = [...beneficiaryData.beneficiaries];
+                              newBens[index].name = e.target.value;
+                              setBeneficiaryData({ ...beneficiaryData, beneficiaries: newBens });
+                            }}
+                            placeholder="Beneficiary name"
+                            className="input-trust"
+                          />
+                        </div>
+                        <div className="w-24">
+                          <Input
+                            type="number"
+                            value={ben.units}
+                            onChange={(e) => {
+                              const newBens = [...beneficiaryData.beneficiaries];
+                              newBens[index].units = e.target.value;
+                              setBeneficiaryData({ ...beneficiaryData, beneficiaries: newBens });
+                            }}
+                            placeholder="Units"
+                            className="input-trust"
+                          />
+                        </div>
+                        <div className="w-20">
+                          <Input
+                            type="number"
+                            value={ben.percentage}
+                            onChange={(e) => {
+                              const newBens = [...beneficiaryData.beneficiaries];
+                              newBens[index].percentage = e.target.value;
+                              setBeneficiaryData({ ...beneficiaryData, beneficiaries: newBens });
+                            }}
+                            placeholder="%"
+                            className="input-trust"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <Input
+                            value={ben.relationship}
+                            onChange={(e) => {
+                              const newBens = [...beneficiaryData.beneficiaries];
+                              newBens[index].relationship = e.target.value;
+                              setBeneficiaryData({ ...beneficiaryData, beneficiaries: newBens });
+                            }}
+                            placeholder="Relationship"
+                            className="input-trust"
+                          />
+                        </div>
+                        {beneficiaryData.beneficiaries.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => {
+                            setBeneficiaryData(prev => ({
+                              ...prev,
+                              beneficiaries: prev.beneficiaries.filter((_, i) => i !== index)
+                            }));
+                          }}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'bank_account_authorization' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Bank Account Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Bank/Institution Name</Label>
+                      <Input
+                        value={bankData.bank_name}
+                        onChange={(e) => setBankData({ ...bankData, bank_name: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="e.g., Chase Bank, Charles Schwab"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Account Type</Label>
+                      <Select value={bankData.account_type} onValueChange={(v) => setBankData({ ...bankData, account_type: v })}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="checking">Checking Account</SelectItem>
+                          <SelectItem value="savings">Savings Account</SelectItem>
+                          <SelectItem value="brokerage">Brokerage/Investment Account</SelectItem>
+                          <SelectItem value="money_market">Money Market Account</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Purpose</Label>
+                      <Input
+                        value={bankData.purpose}
+                        onChange={(e) => setBankData({ ...bankData, purpose: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="e.g., general trust administration, investment holdings"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Signature Requirement</Label>
+                      <Select value={bankData.signature_requirement} onValueChange={(v) => setBankData({ ...bankData, signature_requirement: v })}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any_one">Any One Trustee</SelectItem>
+                          <SelectItem value="any_two">Any Two Trustees</SelectItem>
+                          <SelectItem value="threshold">One up to threshold, Two above</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {bankData.signature_requirement === 'threshold' && (
+                      <div>
+                        <Label className="label-trust">Signature Threshold</Label>
+                        <Input
+                          type="number"
+                          value={bankData.signature_threshold}
+                          onChange={(e) => setBankData({ ...bankData, signature_threshold: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="10000"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <Label className="label-trust">Initial Deposit (optional)</Label>
+                      <Input
+                        type="number"
+                        value={bankData.initial_deposit}
+                        onChange={(e) => setBankData({ ...bankData, initial_deposit: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="label-trust">Authorized Signers</Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setBankData(prev => ({
+                        ...prev,
+                        authorized_signers: [...prev.authorized_signers, '']
+                      }))}>
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Signer
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {bankData.authorized_signers.map((signer, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            value={signer}
+                            onChange={(e) => {
+                              const newSigners = [...bankData.authorized_signers];
+                              newSigners[index] = e.target.value;
+                              setBankData({ ...bankData, authorized_signers: newSigners });
+                            }}
+                            className="input-trust"
+                            placeholder="Trustee name"
+                          />
+                          {bankData.authorized_signers.length > 1 && (
+                            <Button type="button" variant="ghost" size="icon" onClick={() => {
+                              setBankData(prev => ({
+                                ...prev,
+                                authorized_signers: prev.authorized_signers.filter((_, i) => i !== index)
+                              }));
+                            }}>
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'change_of_situs' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Change of Situs Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Current Situs (State/Jurisdiction)</Label>
+                      <Input
+                        value={situsData.current_situs}
+                        onChange={(e) => setSitusData({ ...situsData, current_situs: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="e.g., State of Texas"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">New Situs (State/Jurisdiction)</Label>
+                      <Input
+                        value={situsData.new_situs}
+                        onChange={(e) => setSitusData({ ...situsData, new_situs: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="e.g., State of Nevada"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Effective Date</Label>
+                      <Input
+                        value={situsData.effective_date}
+                        onChange={(e) => setSitusData({ ...situsData, effective_date: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="March 1, 2024"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="label-trust">Reasons for Change (optional)</Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setSitusData(prev => ({
+                        ...prev,
+                        reasons: [...prev.reasons, '']
+                      }))}>
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Reason
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {situsData.reasons.map((reason, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            value={reason}
+                            onChange={(e) => {
+                              const newReasons = [...situsData.reasons];
+                              newReasons[index] = e.target.value;
+                              setSitusData({ ...situsData, reasons: newReasons });
+                            }}
+                            className="input-trust"
+                            placeholder="e.g., Favorable trust laws, tax considerations"
+                          />
+                          {situsData.reasons.length > 1 && (
+                            <Button type="button" variant="ghost" size="icon" onClick={() => {
+                              setSitusData(prev => ({
+                                ...prev,
+                                reasons: prev.reasons.filter((_, i) => i !== index)
+                              }));
+                            }}>
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {templateType === 'general_meeting' && (
                 <div className="card-trust corner-mark p-6">
                   <div className="flex items-center justify-between mb-4">
