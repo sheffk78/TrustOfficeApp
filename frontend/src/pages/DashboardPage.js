@@ -577,34 +577,39 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* Quick Actions */}
+                {/* Quick Actions - Enhanced */}
                 <div className="card-trust">
-                  <p className="label-trust mb-4">Quick Actions</p>
-                  <div className="space-y-3">
-                    <Button 
-                      onClick={() => navigate('/minutes/new')}
-                      className="w-full btn-primary justify-start"
-                      data-testid="quick-record-minutes"
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="label-trust">Quick Actions</p>
+                    <Link 
+                      to="/minutes/templates"
+                      className="text-xs text-muted-foreground hover:text-navy"
                     >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Record Minutes
-                    </Button>
-                    <Button 
-                      onClick={() => navigate('/distributions')}
-                      className="w-full btn-secondary justify-start"
-                      data-testid="quick-add-distribution"
-                    >
-                      <DollarSign className="w-4 h-4 mr-2" />
-                      Add Distribution
-                    </Button>
-                    <Button 
-                      onClick={() => navigate('/expenses')}
-                      className="w-full btn-secondary justify-start"
-                      data-testid="quick-add-expense"
-                    >
-                      <Receipt className="w-4 h-4 mr-2" />
-                      Add Expense
-                    </Button>
+                      All Templates →
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {QUICK_ACTIONS.map((action, index) => {
+                      const Icon = action.icon;
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => navigate(action.path)}
+                          className="p-3 text-left border border-border hover:border-gold transition-colors group"
+                          data-testid={`quick-action-${index}`}
+                        >
+                          <div className={`w-8 h-8 ${action.color} flex items-center justify-center mb-2`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <p className="font-medium text-sm text-navy group-hover:text-gold transition-colors">
+                            {action.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                            {action.description}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Stats */}
