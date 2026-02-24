@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
@@ -28,6 +28,21 @@ import BenevolencePage from "@/pages/BenevolencePage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
+
+// GA4 page view tracking for SPA navigation
+const useGA4PageTracking = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    // Ensure gtag is available and send page view on route change
+    if (typeof window.gtag === 'function') {
+      window.gtag('config', 'G-MT6FBPRE60', {
+        page_path: location.pathname + location.search,
+        page_title: document.title
+      });
+    }
+  }, [location]);
+};
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
