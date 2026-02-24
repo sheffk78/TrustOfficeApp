@@ -186,7 +186,10 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - Dark mode toggle
 
 ### Integrations - COMPLETE
-- **Stripe**: Checkout, portal, cancel/reactivate/upgrade, webhooks
+- **Stripe** (LIVE): Checkout, portal, cancel/reactivate/upgrade, webhooks
+  - Monthly: $79/mo (price_1T4RVI2lZzmsSFmdoWliQfMu)
+  - Annual: $790/yr (price_1T4RWl2lZzmsSFmdvQAnlrOY)
+  - Webhook endpoint: /api/stripe/webhook
 - **Postmark**: 12 email templates (including password_reset)
 - **APScheduler**: Daily reminders, task updates, health snapshots
 
