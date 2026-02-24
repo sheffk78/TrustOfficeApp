@@ -199,6 +199,33 @@ export default function ScheduleAPage() {
     return ASSET_CATEGORIES.find(c => c.value === categoryValue) || ASSET_CATEGORIES[7];
   };
 
+  const handleExportPDF = async () => {
+    if (!selectedTrust) return;
+    
+    setExporting(true);
+    try {
+      const response = await fetchWithAuth(`/schedule-a/export/${selectedTrust.trust_id}/pdf`);
+      if (response.ok) {
+        const data = await response.json();
+        // Create download link
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${data.pdf_base64}`;
+        link.download = data.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Schedule A PDF downloaded');
+      } else {
+        toast.error('Failed to generate PDF');
+      }
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      toast.error('Failed to export PDF');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Group assets by category
   const groupedAssets = assets.reduce((acc, asset) => {
     const cat = asset.category;
