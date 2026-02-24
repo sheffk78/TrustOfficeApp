@@ -3544,12 +3544,9 @@ async def export_benevolence_pdf(
     if not trust.get("benevolence_enabled"):
         raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust")
     
-    # Check user preferences for watermark
-    user_prefs = await db.user_preferences.find_one(
-        {"user_id": user["user_id"]},
-        {"_id": 0}
-    )
-    hide_watermark = user_prefs.get("hide_watermark", False) if user_prefs else False
+    # Check if watermark should be shown (soft gating based on subscription)
+    show_watermark = await should_show_watermark(user["user_id"])
+    hide_watermark = not show_watermark
     
     # Get records, optionally filtered by year
     query = {"trust_id": trust_id, "user_id": user["user_id"]}
