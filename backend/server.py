@@ -1993,6 +1993,13 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
+    # Check user preferences for watermark
+    user_prefs = await db.user_preferences.find_one(
+        {"user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    hide_watermark = user_prefs.get("hide_watermark", False) if user_prefs else False
+    
     items = await db.schedule_a_items.find(
         {"trust_id": trust_id, "user_id": user["user_id"]}, 
         {"_id": 0}
