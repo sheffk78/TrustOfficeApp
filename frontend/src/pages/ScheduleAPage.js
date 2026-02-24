@@ -21,7 +21,8 @@ import {
   Package,
   Edit,
   Trash2,
-  Download
+  Download,
+  FileDown
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
