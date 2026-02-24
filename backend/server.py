@@ -5088,7 +5088,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
     # Create Schedule A assets (Trust Corpus)
     await db.schedule_a_items.insert_many([
         {
-            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
             "category": "real_property",
@@ -5101,7 +5101,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "created_at": now.isoformat()
         },
         {
-            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
             "category": "real_property",
@@ -5114,7 +5114,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "created_at": now.isoformat()
         },
         {
-            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
             "category": "financial_accounts",
@@ -5127,7 +5127,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "created_at": now.isoformat()
         },
         {
-            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
             "category": "financial_accounts",
@@ -5140,7 +5140,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "created_at": now.isoformat()
         },
         {
-            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
             "category": "business_interests",
@@ -5153,7 +5153,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "created_at": now.isoformat()
         },
         {
-            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
             "category": "personal_property",
@@ -5166,7 +5166,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "created_at": now.isoformat()
         },
         {
-            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user["user_id"],
             "category": "other_property",
