@@ -3907,7 +3907,9 @@ async def create_comp_payment(payment: CompensationPaymentCreate, user: dict = D
             {"_id": 0}
         ).to_list(1000)
         ytd_total = sum(p.get("amount", 0) for p in existing) + payment.amount
-        exceeds_plan = ytd_total > plan.get("annual_approved_amount", 0)
+        # Support both annual_approved_amount and annual_fee fields
+        approved_amount = plan.get("annual_approved_amount") or plan.get("annual_fee") or plan.get("annual_amount", 0)
+        exceeds_plan = ytd_total > approved_amount
     
     payment_doc = {
         "payment_id": payment_id,
