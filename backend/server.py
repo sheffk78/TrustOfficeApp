@@ -2289,7 +2289,7 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
             line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             story.append(Paragraph(line, body_style))
     
-    doc.build(story)
+    pdf_doc.build(story)
     pdf_bytes = buffer.getvalue()
     pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
     
