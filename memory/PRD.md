@@ -241,5 +241,6 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Notes
 - Postmark: Sandbox mode (verified domain only)
-- Stripe: Test mode (card 4242424242424242)
+- Stripe: LIVE MODE configured
+- 14-day trial handled locally (no Stripe trial needed)
 - Password reset tokens expire in 1 hour
