@@ -129,7 +129,9 @@ export const Sidebar = () => {
 
         {/* Navigation */}
         <nav className="flex-1 py-4">
-          {navItems.map((item) => {
+          {navItems
+            .filter(item => !item.requiresBenevolence || selectedTrust?.benevolence_enabled)
+            .map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path || 
               (item.path === '/minutes' && location.pathname.startsWith('/minutes'));
