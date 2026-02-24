@@ -2939,8 +2939,206 @@ async def get_template_options(user: dict = Depends(get_current_user)):
             "name": "Change Trust Situs",
             "description": "Change the jurisdiction and principal place of administration",
             "icon": "map-pin"
+        },
+        {
+            "type": "benevolence_approval",
+            "name": "Benevolence Assistance",
+            "description": "Approve and document a benevolence grant for charitable assistance",
+            "icon": "heart-handshake",
+            "requires_benevolence": True
         }
     ]
+
+# ==================== BENEVOLENCE ENDPOINTS ====================
+
+@api_router.post("/benevolence", response_model=BenevolenceRecordResponse)
+async def create_benevolence_record(record: BenevolenceRecordCreate, user: dict = Depends(get_current_user)):
+    """Create a new benevolence record"""
+    trust = await db.trusts.find_one({"trust_id": record.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    if not trust.get("benevolence_enabled"):
+        raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust")
+    
+    record_id = f"ben_{uuid.uuid4().hex[:12]}"
+    record_doc = {
+        "record_id": record_id,
+        "trust_id": record.trust_id,
+        "user_id": user["user_id"],
+        "beneficiary_name": record.beneficiary_name,
+        "beneficiary_type": record.beneficiary_type,
+        "purpose": record.purpose.value,
+        "purpose_description": record.purpose_description,
+        "amount": record.amount,
+        "date": record.date,
+        "approved_by": record.approved_by,
+        "approval_method": record.approval_method,
+        "minutes_id": record.minutes_id,
+        "notes": record.notes,
+        "status": record.status,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None
+    }
+    
+    await db.benevolence_records.insert_one(record_doc)
+    return BenevolenceRecordResponse(**record_doc)
+
+@api_router.get("/benevolence", response_model=List[BenevolenceRecordResponse])
+async def get_benevolence_records(
+    trust_id: str,
+    purpose: Optional[str] = None,
+    status: Optional[str] = None,
+    approver: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get benevolence records with optional filters"""
+    query = {"trust_id": trust_id, "user_id": user["user_id"]}
+    
+    if purpose:
+        query["purpose"] = purpose
+    if status:
+        query["status"] = status
+    if approver:
+        query["approved_by"] = {"$in": [approver]}
+    if start_date:
+        query["date"] = {"$gte": start_date}
+    if end_date:
+        if "date" in query:
+            query["date"]["$lte"] = end_date
+        else:
+            query["date"] = {"$lte": end_date}
+    
+    records = await db.benevolence_records.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    return [BenevolenceRecordResponse(**r) for r in records]
+
+@api_router.get("/benevolence/{record_id}", response_model=BenevolenceRecordResponse)
+async def get_benevolence_record(record_id: str, user: dict = Depends(get_current_user)):
+    """Get a single benevolence record"""
+    record = await db.benevolence_records.find_one(
+        {"record_id": record_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="Benevolence record not found")
+    return BenevolenceRecordResponse(**record)
+
+@api_router.put("/benevolence/{record_id}", response_model=BenevolenceRecordResponse)
+async def update_benevolence_record(record_id: str, update: BenevolenceRecordUpdate, user: dict = Depends(get_current_user)):
+    """Update a benevolence record"""
+    record = await db.benevolence_records.find_one(
+        {"record_id": record_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="Benevolence record not found")
+    
+    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    if "purpose" in update_data and hasattr(update_data["purpose"], "value"):
+        update_data["purpose"] = update_data["purpose"].value
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.benevolence_records.update_one(
+        {"record_id": record_id},
+        {"$set": update_data}
+    )
+    
+    updated = await db.benevolence_records.find_one({"record_id": record_id}, {"_id": 0})
+    return BenevolenceRecordResponse(**updated)
+
+@api_router.delete("/benevolence/{record_id}")
+async def delete_benevolence_record(record_id: str, user: dict = Depends(get_current_user)):
+    """Delete a benevolence record"""
+    result = await db.benevolence_records.delete_one(
+        {"record_id": record_id, "user_id": user["user_id"]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Benevolence record not found")
+    return {"message": "Benevolence record deleted"}
+
+@api_router.get("/benevolence/summary/{trust_id}")
+async def get_benevolence_summary(trust_id: str, user: dict = Depends(get_current_user)):
+    """Get benevolence summary with totals by period and purpose"""
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    records = await db.benevolence_records.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # Calculate totals
+    total_amount = sum(r.get("amount", 0) for r in records)
+    total_count = len(records)
+    
+    # Group by purpose
+    by_purpose = {}
+    for r in records:
+        purpose = r.get("purpose", "other")
+        if purpose not in by_purpose:
+            by_purpose[purpose] = {"count": 0, "total": 0}
+        by_purpose[purpose]["count"] += 1
+        by_purpose[purpose]["total"] += r.get("amount", 0)
+    
+    # Group by month/quarter/year
+    by_month = {}
+    by_quarter = {}
+    by_year = {}
+    
+    for r in records:
+        date_str = r.get("date", "")
+        amount = r.get("amount", 0)
+        
+        try:
+            if "T" in date_str:
+                date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            else:
+                date = datetime.strptime(date_str[:10], "%Y-%m-%d")
+            
+            # Month key (YYYY-MM)
+            month_key = date.strftime("%Y-%m")
+            if month_key not in by_month:
+                by_month[month_key] = {"count": 0, "total": 0}
+            by_month[month_key]["count"] += 1
+            by_month[month_key]["total"] += amount
+            
+            # Quarter key (YYYY-Q#)
+            quarter = (date.month - 1) // 3 + 1
+            quarter_key = f"{date.year}-Q{quarter}"
+            if quarter_key not in by_quarter:
+                by_quarter[quarter_key] = {"count": 0, "total": 0}
+            by_quarter[quarter_key]["count"] += 1
+            by_quarter[quarter_key]["total"] += amount
+            
+            # Year key
+            year_key = str(date.year)
+            if year_key not in by_year:
+                by_year[year_key] = {"count": 0, "total": 0}
+            by_year[year_key]["count"] += 1
+            by_year[year_key]["total"] += amount
+        except (ValueError, AttributeError):
+            pass
+    
+    # Get list of unique approvers
+    all_approvers = set()
+    for r in records:
+        for approver in r.get("approved_by", []):
+            all_approvers.add(approver)
+    
+    return {
+        "trust_id": trust_id,
+        "trust_name": trust.get("name", ""),
+        "total_amount": total_amount,
+        "total_count": total_count,
+        "by_purpose": by_purpose,
+        "by_month": dict(sorted(by_month.items(), reverse=True)),
+        "by_quarter": dict(sorted(by_quarter.items(), reverse=True)),
+        "by_year": dict(sorted(by_year.items(), reverse=True)),
+        "approvers": list(all_approvers)
+    }
 
 # ==================== DISTRIBUTION ENDPOINTS ====================
 
