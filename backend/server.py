@@ -2229,14 +2229,15 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     
     # Footer
     story.append(Spacer(1, 24))
-    story.append(Paragraph(
-        f"{trust_name} – Schedule A – Private Trust Document – Common Law Copyright",
-        footer_style
-    ))
-    story.append(Paragraph(
-        "This document is private and confidential. Not for public disclosure.",
-        footer_style
-    ))
+    if not hide_watermark:
+        story.append(Paragraph(
+            f"{trust_name} – Schedule A – Private Trust Document – Common Law Copyright",
+            footer_style
+        ))
+        story.append(Paragraph(
+            "This document is private and confidential. Not for public disclosure.",
+            footer_style
+        ))
     
     # Build PDF
     doc.build(story)
