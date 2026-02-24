@@ -5246,6 +5246,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "approved_by": ["John Smith", "Jane Smith"],
             "approval_method": "unanimous",
             "status": "approved",
+            "minutes_id": None,
             "notes": "Provided 200 family meal packages",
             "created_at": (now - timedelta(days=90)).isoformat()
         },
@@ -5262,6 +5263,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "approved_by": ["John Smith", "Jane Smith"],
             "approval_method": "unanimous",
             "status": "approved",
+            "minutes_id": None,
             "notes": "Recently laid off. Has new job starting next month.",
             "created_at": (now - timedelta(days=7)).isoformat()
         }
