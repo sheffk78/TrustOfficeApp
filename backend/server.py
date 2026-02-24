@@ -136,6 +136,29 @@ class SubscriptionStatus(str, Enum):
     canceled = "canceled"
     expired = "expired"
 
+# Schedule A Asset Categories
+class AssetCategory(str, Enum):
+    real_property = "real_property"
+    personal_property = "personal_property"
+    financial_accounts = "financial_accounts"
+    business_interests = "business_interests"
+    digital_assets = "digital_assets"
+    intellectual_property = "intellectual_property"
+    notes_receivable = "notes_receivable"
+    other_property = "other_property"
+
+# Minutes Template Types
+class MinutesTemplateType(str, Enum):
+    blank = "blank"
+    general_meeting = "general_meeting"
+    distribution_to_beneficiaries = "distribution_to_beneficiaries"
+    acceptance_of_property = "acceptance_of_property"
+    appointment_additional_trustee = "appointment_additional_trustee"
+    appointment_successor_trustee = "appointment_successor_trustee"
+    designation_of_beneficiaries = "designation_of_beneficiaries"
+    bank_account_authorization = "bank_account_authorization"
+    change_of_situs = "change_of_situs"
+
 # ==================== MODELS ====================
 
 # User Models
