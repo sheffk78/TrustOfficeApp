@@ -162,7 +162,8 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - [x] Search in minutes/distributions - Server-side search with debounced queries
 - [x] Table horizontal scroll for mobile - overflow-x-auto on table containers
 - [x] Benevolence Mode - Full feature for charitable trusts (toggle, log, template)
-- [ ] Notification preferences - TODO
+- [x] Notification preferences - Toggle switches in Settings page for email notification control
+- [x] Benevolence Report PDF Export - Styled PDF similar to Schedule A
 
 ### P2 (Medium-term)
 - [ ] Audit Log (backend + UI)
