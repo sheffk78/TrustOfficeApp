@@ -83,9 +83,12 @@ const SubscriptionProtectedRoute = ({ children }) => {
   );
 };
 
-// App Router with session_id detection
+// App Router with session_id detection and GA4 tracking
 const AppRouter = () => {
   const location = useLocation();
+  
+  // Track page views in GA4 on route changes
+  useGA4PageTracking();
 
   // CRITICAL: Check URL fragment synchronously for session_id (OAuth callback)
   // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
