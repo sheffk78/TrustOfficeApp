@@ -10,7 +10,7 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - **Backend**: FastAPI, Python 3.10+
 - **Database**: MongoDB (with indexes)
 - **Auth**: JWT + Google OAuth, Password Reset
-- **Payments**: Stripe (test mode)
+- **Payments**: Stripe (LIVE MODE - $79/mo, $790/yr)
 - **Email**: Postmark (12 templates)
 - **Background Jobs**: APScheduler
 
