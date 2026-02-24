@@ -2516,6 +2516,24 @@ async def get_template_options(user: dict = Depends(get_current_user)):
             "name": "Appoint Successor Trustee",
             "description": "Appoint a replacement trustee due to resignation, death, or removal",
             "icon": "user-check"
+        },
+        {
+            "type": "designation_of_beneficiaries",
+            "name": "Designate Beneficiaries",
+            "description": "Establish or amend beneficiary designations and units of beneficial interest",
+            "icon": "users-round"
+        },
+        {
+            "type": "bank_account_authorization",
+            "name": "Open Bank Account",
+            "description": "Authorize opening a bank or investment account for the trust",
+            "icon": "landmark"
+        },
+        {
+            "type": "change_of_situs",
+            "name": "Change Trust Situs",
+            "description": "Change the jurisdiction and principal place of administration",
+            "icon": "map-pin"
         }
     ]
 
