@@ -808,7 +808,9 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
             {"_id": 0}
         ).to_list(1000)
         ytd_total = sum(p.get("amount", 0) for p in ytd_payments)
-        comp_aligned = ytd_total <= comp_plan.get("annual_approved_amount", 0)
+        # Support both annual_approved_amount and annual_fee fields
+        approved_amount = comp_plan.get("annual_approved_amount") or comp_plan.get("annual_fee") or comp_plan.get("annual_amount", 0)
+        comp_aligned = ytd_total <= approved_amount
     else:
         comp_aligned = True  # No plan means no overage
     
