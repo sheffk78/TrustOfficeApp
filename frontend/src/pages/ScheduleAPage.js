@@ -44,6 +44,7 @@ export default function ScheduleAPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
+  const [showDisposed, setShowDisposed] = useState(false);
   const [formData, setFormData] = useState({
     category: 'real_property',
     description: '',
@@ -60,13 +61,14 @@ export default function ScheduleAPage() {
       loadAssets();
       loadSummary();
     }
-  }, [selectedTrust]);
+  }, [selectedTrust, showDisposed]);
 
   const loadAssets = async () => {
     if (!selectedTrust) return;
     setLoading(true);
     try {
-      const response = await fetchWithAuth(`/schedule-a?trust_id=${selectedTrust.trust_id}`);
+      const status = showDisposed ? 'all' : 'active';
+      const response = await fetchWithAuth(`/schedule-a?trust_id=${selectedTrust.trust_id}&status=${status}`);
       if (response.ok) {
         setAssets(await response.json());
       }
