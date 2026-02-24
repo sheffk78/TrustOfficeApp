@@ -196,10 +196,11 @@ class TrustResponse(BaseModel):
     trust_id: str
     user_id: str
     name: str
-    trust_type: str
-    jurisdiction: str
+    trust_type: Optional[str] = "irrevocable"
+    jurisdiction: Optional[str] = ""
     created_at: str
     governance_score: int = 0
+    trustees: Optional[List[str]] = []
 
 # Password Reset Models
 class PasswordResetRequest(BaseModel):
