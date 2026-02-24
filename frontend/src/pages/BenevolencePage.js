@@ -179,9 +179,11 @@ export default function BenevolencePage() {
       const currentYear = new Date().getFullYear();
       const url = `${process.env.REACT_APP_BACKEND_URL}/api/benevolence/export/${selectedTrust.trust_id}/pdf?year=${currentYear}`;
       
-      const token = localStorage.getItem('token');
+      // Get token from localStorage or cookie
+      const token = localStorage.getItem('auth_token') || document.cookie.split('; ').find(row => row.startsWith('session_token='))?.split('=')[1];
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       
       if (response.ok) {
