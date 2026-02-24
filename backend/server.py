@@ -715,7 +715,7 @@ async def should_show_watermark(user_id: str) -> bool:
             if trial_end.tzinfo is None:
                 trial_end = trial_end.replace(tzinfo=timezone.utc)
             is_subscribed = trial_end >= datetime.now(timezone.utc)
-        except:
+        except (ValueError, TypeError, AttributeError):
             is_subscribed = False
     
     if not is_subscribed:
