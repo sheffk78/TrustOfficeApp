@@ -53,6 +53,7 @@ export default function ScheduleAPage() {
     date_conveyed: new Date().toISOString().split('T')[0],
     notes: ''
   });
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (selectedTrust) {
