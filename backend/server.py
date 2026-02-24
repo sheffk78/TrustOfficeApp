@@ -2412,10 +2412,15 @@ def generate_distribution_content(data: dict) -> str:
     items = data.get("distribution_items", [])
     dist_date = data.get("distribution_date", "[Date]")
     characterization = data.get("distribution_characterization", "income")
+    article_ref = data.get("article_ref_distribution", "")
+    beneficiary_standard = data.get("beneficiary_standard", "")
+    
+    article_text = f", pursuant to {article_ref}" if article_ref else ""
+    standard_text = f" The distribution standard is: {beneficiary_standard}." if beneficiary_standard else ""
     
     content = f"""Resolution 1: Distribution of Trust Proceeds
 
-WHEREAS, the Trustees, in the exercise of their discretion, deem it appropriate to make a distribution to the Beneficiaries;
+WHEREAS, the Trustees, in the exercise of their discretion{article_text}, deem it appropriate to make a distribution to the Beneficiaries;{standard_text}
 
 NOW, THEREFORE, BE IT RESOLVED that:
 
