@@ -108,6 +108,21 @@ const AppRouter = () => {
           <NewMinutesPage />
         </SubscriptionProtectedRoute>
       } />
+      <Route path="/minutes/templates" element={
+        <SubscriptionProtectedRoute>
+          <MinutesTemplatesPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/minutes/template/:templateType" element={
+        <SubscriptionProtectedRoute>
+          <MinutesTemplateFormPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/schedule-a" element={
+        <SubscriptionProtectedRoute>
+          <ScheduleAPage />
+        </SubscriptionProtectedRoute>
+      } />
       <Route path="/distributions" element={
         <SubscriptionProtectedRoute>
           <DistributionsPage />
