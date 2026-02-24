@@ -1843,6 +1843,12 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
         doc += generate_trustee_appointment_content(template_data, "additional")
     elif template_type == "appointment_successor_trustee":
         doc += generate_trustee_appointment_content(template_data, "successor")
+    elif template_type == "designation_of_beneficiaries":
+        doc += generate_beneficiary_designation_content(template_data)
+    elif template_type == "bank_account_authorization":
+        doc += generate_bank_account_content(template_data)
+    elif template_type == "change_of_situs":
+        doc += generate_change_of_situs_content(template_data)
     
     # Add adjournment and certification
     doc += f"""
