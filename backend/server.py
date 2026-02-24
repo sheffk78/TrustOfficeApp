@@ -212,6 +212,12 @@ class NotificationPreferencesUpdate(BaseModel):
     subscription_updates: Optional[bool] = None
     weekly_digest: Optional[bool] = None
 
+class UserPreferences(BaseModel):
+    hide_watermark: bool = False
+
+class UserPreferencesUpdate(BaseModel):
+    hide_watermark: Optional[bool] = None
+
 # Trust Models
 class TrustCreate(BaseModel):
     name: str
