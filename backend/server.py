@@ -194,6 +194,24 @@ class UserResponse(BaseModel):
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
 
+class NotificationPreferences(BaseModel):
+    minutes_created: bool = True
+    distribution_created: bool = True
+    distribution_approved: bool = True
+    task_reminders: bool = True
+    task_overdue: bool = True
+    subscription_updates: bool = True
+    weekly_digest: bool = False
+
+class NotificationPreferencesUpdate(BaseModel):
+    minutes_created: Optional[bool] = None
+    distribution_created: Optional[bool] = None
+    distribution_approved: Optional[bool] = None
+    task_reminders: Optional[bool] = None
+    task_overdue: Optional[bool] = None
+    subscription_updates: Optional[bool] = None
+    weekly_digest: Optional[bool] = None
+
 # Trust Models
 class TrustCreate(BaseModel):
     name: str
