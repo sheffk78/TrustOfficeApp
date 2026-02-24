@@ -1862,14 +1862,6 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
         fontName='Helvetica-Oblique'
     )
     
-    normal_style = ParagraphStyle(
-        'ScheduleNormal',
-        parent=styles['Normal'],
-        fontSize=9,
-        leading=12,
-        fontName='Helvetica'
-    )
-    
     footer_style = ParagraphStyle(
         'ScheduleFooter',
         parent=styles['Normal'],
