@@ -21,7 +21,31 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Latest Updates (Feb 25, 2026) - P0 BUG FIXES & P1 FEATURE ✅
+### Latest Updates (Feb 25, 2026) - SCHEDULE A ENHANCEMENTS ✅
+
+1. **Enhanced "Accept Property into Trust" Template**
+   - Added structured asset data collection: category, description, identifier (VIN/account#), location, value, date conveyed
+   - "Add to Schedule A" checkbox auto-creates asset entry with `minutes_ref` linking to the authorizing minutes
+   - Asset category selection dropdown appears when checkbox is enabled
+
+2. **New "Dispose / Sell Asset" Minutes Template**
+   - Select existing active Schedule A assets from dropdown
+   - Record disposition details: reason (sale/transfer/donation/destruction), date, value, recipient, notes
+   - "Mark as disposed in Schedule A" checkbox updates asset status without deleting
+   - Generates proper legal WHEREAS/RESOLVED content for asset disposition
+
+3. **Schedule A Status & Historical Assets**
+   - Added `status` field (active/disposed) to Schedule A items
+   - "Show disposed assets" toggle to view historical records
+   - Status column with Active (green) / Disposed (orange) badges
+   - Minutes reference shows which minutes entry added or disposed each asset
+   - Disposed assets retain full history with `disposition_minutes_ref`, `disposition_date`, `disposition_notes`
+
+4. **Backward Compatibility**
+   - Legacy assets without status field are treated as "active"
+   - Query logic handles both explicit status and missing status fields
+
+### Previous Updates (Feb 25, 2026) - P0 BUG FIXES & P1 FEATURE ✅
 
 1. **GA4 Analytics Integration - COMPLETE (NEW)**
    - Measurement ID: G-MT6FBPRE60
