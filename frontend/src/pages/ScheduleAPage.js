@@ -439,7 +439,7 @@ export default function ScheduleAPage() {
                               <td className="p-3 text-sm">{asset.location || '—'}</td>
                               <td className="p-3 text-right font-mono">{formatValue(asset.approximate_value)}</td>
                               <td className="p-3 text-center text-sm">
-                                {asset.date_conveyed ? format(parseISO(asset.date_conveyed), 'MMM d, yyyy') : '—'}
+                                {formatDate(asset.date_conveyed)}
                               </td>
                               <td className="p-3 text-center">
                                 <div className="flex justify-center gap-2">
