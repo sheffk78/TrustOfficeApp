@@ -324,9 +324,24 @@ export default function MinutesTemplateFormPage() {
           grantor_name: propertyData.grantor_name,
           property_description: propertyData.property_description,
           property_value: parseFloat(propertyData.property_value) || null,
+          property_identifier: propertyData.property_identifier,
+          property_location: propertyData.property_location,
           conveyance_date: propertyData.conveyance_date,
           add_to_schedule_a: propertyData.add_to_schedule_a,
           schedule_a_category: propertyData.schedule_a_category
+        };
+      
+      case 'disposition_of_asset':
+        return {
+          ...baseData,
+          disposition_asset_id: dispositionData.disposition_asset_id,
+          disposition_asset_description: dispositionData.disposition_asset_description,
+          disposition_reason: dispositionData.disposition_reason,
+          disposition_date: dispositionData.disposition_date,
+          disposition_value: parseFloat(dispositionData.disposition_value) || null,
+          disposition_recipient: dispositionData.disposition_recipient,
+          disposition_notes: dispositionData.disposition_notes,
+          update_schedule_a: dispositionData.update_schedule_a
         };
       
       case 'appointment_additional_trustee':
