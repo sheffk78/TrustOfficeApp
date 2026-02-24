@@ -444,6 +444,7 @@ class ScheduleAItemCreate(BaseModel):
     approximate_value: Optional[float] = None
     date_conveyed: str
     notes: str = ""
+    minutes_ref: Optional[str] = None  # Reference to the minutes that authorized this asset
 
 class ScheduleAItemUpdate(BaseModel):
     description: Optional[str] = None
@@ -465,6 +466,11 @@ class ScheduleAItemResponse(BaseModel):
     notes: str
     created_at: str
     updated_at: Optional[str] = None
+    status: str = "active"  # active or disposed
+    minutes_ref: Optional[str] = None  # Reference to minutes that added this asset
+    disposition_minutes_ref: Optional[str] = None  # Reference to minutes that disposed this asset
+    disposition_date: Optional[str] = None  # Date of disposition
+    disposition_notes: Optional[str] = None  # Sale price, buyer, etc.
 
 # Minutes Template Models
 class MinutesResolution(BaseModel):
