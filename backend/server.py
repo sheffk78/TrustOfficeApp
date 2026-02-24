@@ -1266,25 +1266,28 @@ async def logout(request: Request, response: Response):
 @api_router.get("/notifications/preferences")
 async def get_notification_preferences(user: dict = Depends(get_current_user)):
     """Get user's notification preferences"""
+    # Default preferences
+    defaults = {
+        "user_id": user["user_id"],
+        "minutes_created": True,
+        "distribution_created": True,
+        "distribution_approved": True,
+        "task_reminders": True,
+        "task_overdue": True,
+        "subscription_updates": True,
+        "weekly_digest": False
+    }
+    
     prefs = await db.notification_preferences.find_one(
         {"user_id": user["user_id"]}, 
         {"_id": 0}
     )
     
     if not prefs:
-        # Return defaults
-        return {
-            "user_id": user["user_id"],
-            "minutes_created": True,
-            "distribution_created": True,
-            "distribution_approved": True,
-            "task_reminders": True,
-            "task_overdue": True,
-            "subscription_updates": True,
-            "weekly_digest": False
-        }
+        return defaults
     
-    return prefs
+    # Merge stored prefs with defaults (stored values take precedence)
+    return {**defaults, **prefs}
 
 @api_router.put("/notifications/preferences")
 async def update_notification_preferences(
