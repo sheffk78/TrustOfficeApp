@@ -2555,6 +2555,80 @@ Effective Date: Immediately upon adoption
     
     return content
 
+def generate_disposition_content(data: dict) -> str:
+    """Generate content for disposition/sale of an asset"""
+    asset_description = data.get("disposition_asset_description", "[Asset Description]")
+    disposition_reason = data.get("disposition_reason", "sale")
+    disposition_date = data.get("disposition_date", "[Date]")
+    disposition_value = data.get("disposition_value")
+    disposition_recipient = data.get("disposition_recipient", "")
+    disposition_notes = data.get("disposition_notes", "")
+    article_ref = data.get("article_ref_asset_disposition", data.get("article_ref_distribution", "Article [X]"))
+    
+    reason_text = {
+        "sale": "the Trustees have determined it is in the best interest of the Trust to sell",
+        "transfer": "the Trustees have determined it is appropriate to transfer",
+        "donation": "the Trustees have determined to donate",
+        "destruction": "the asset has been destroyed or rendered unusable",
+        "other": "the Trustees have determined to dispose of"
+    }.get(disposition_reason, "the Trustees have determined to dispose of")
+    
+    value_text = f"${disposition_value:,.2f}" if disposition_value else "[Fair Market Value]"
+    
+    recipient_text = f" to {disposition_recipient}" if disposition_recipient else ""
+    
+    content = f"""Resolution: Disposition of Trust Asset
+
+WHEREAS, pursuant to {article_ref} of the Trust Indenture, the Trustees have authority to manage, sell, exchange, or otherwise dispose of Trust property as they deem prudent and in the best interest of the Trust;
+
+WHEREAS, the following property is currently held in the corpus of the Trust and recorded on Schedule A:
+
+    {asset_description}
+
+WHEREAS, {reason_text} this property{recipient_text};
+
+"""
+    
+    if disposition_reason == "sale":
+        content += f"""WHEREAS, the Trustees have negotiated a sale price of {value_text}, which they believe represents fair market value for the property;
+
+"""
+    elif disposition_reason == "transfer" and disposition_recipient:
+        content += f"""WHEREAS, this transfer to {disposition_recipient} is being made {"in exchange for consideration of " + value_text if disposition_value else "for appropriate consideration as determined by the Trustees"};
+
+"""
+    elif disposition_reason == "donation":
+        content += f"""WHEREAS, the fair market value of the property at the time of donation is approximately {value_text};
+
+"""
+    elif disposition_reason == "destruction":
+        content += """WHEREAS, the loss of this property has been documented and any applicable insurance claims have been or will be filed;
+
+"""
+    
+    if disposition_notes:
+        content += f"""WHEREAS, the Trustees note the following additional details: {disposition_notes};
+
+"""
+    
+    content += f"""NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees approves the {"sale" if disposition_reason == "sale" else "disposition"} of the above-described property.
+
+• The Trustees are authorized to execute any and all documents necessary to complete the {"sale" if disposition_reason == "sale" else disposition_reason} and transfer title to the {"purchaser" if disposition_reason == "sale" else "recipient"}.
+
+• Schedule A to the Trust Indenture is hereby amended to reflect the removal of this property from the Trust corpus, effective {disposition_date}.
+
+• {"Any proceeds from this sale shall be deposited into the Trust's designated accounts and managed in accordance with the Trust Indenture." if disposition_reason == "sale" else "This disposition is recorded as part of the permanent Trust records."}
+
+Vote: Unanimous approval
+Requires unanimous consent per Indenture: YES
+Effective Date: {disposition_date}
+
+"""
+    
+    return content
+
 def generate_trustee_appointment_content(data: dict, appointment_type: str) -> str:
     """Generate content for trustee appointment (additional or successor)"""
     new_trustee = data.get("new_trustee_name", "[New Trustee Name]")
