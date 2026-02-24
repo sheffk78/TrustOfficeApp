@@ -35,8 +35,8 @@ export default function AuthCallback() {
         
         toast.success('Welcome!');
         
-        // Navigate to dashboard with user data to skip auth check
-        navigate('/dashboard', { 
+        // Navigate to onboarding with user data to skip auth check
+        navigate('/onboarding', { 
           replace: true,
           state: { user: data.user }
         });
