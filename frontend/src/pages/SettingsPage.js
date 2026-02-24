@@ -25,7 +25,9 @@ import {
   Mail,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  ExternalLink
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
