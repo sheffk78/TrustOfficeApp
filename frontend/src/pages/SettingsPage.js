@@ -51,6 +51,8 @@ export default function SettingsPage() {
     weekly_digest: false
   });
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [userPrefs, setUserPrefs] = useState({ hide_watermark: false });
+  const [userPrefsLoading, setUserPrefsLoading] = useState(false);
   
   const [trustData, setTrustData] = useState({
     name: selectedTrust?.name || '',
