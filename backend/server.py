@@ -2939,8 +2939,13 @@ async def get_minutes_template(minutes_id: str, user: dict = Depends(get_current
         raise HTTPException(status_code=404, detail="Minutes not found")
     return minutes
 
+class MinutesTemplateUpdate(BaseModel):
+    generated_document: Optional[str] = None
+    status: Optional[str] = None
+    template_data: Optional[dict] = None
+
 @api_router.put("/minutes-templates/{minutes_id}")
-async def update_minutes_template(minutes_id: str, update_data: dict, user: dict = Depends(get_current_user)):
+async def update_minutes_template(minutes_id: str, update_data: MinutesTemplateUpdate, user: dict = Depends(get_current_user)):
     """Update a template-based minutes (with audit trail)"""
     minutes = await db.minutes_templates.find_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]},
@@ -2956,12 +2961,12 @@ async def update_minutes_template(minutes_id: str, update_data: dict, user: dict
     }
     
     # Allow updating the generated document and status
-    if "generated_document" in update_data:
-        update_fields["generated_document"] = update_data["generated_document"]
-    if "status" in update_data:
-        update_fields["status"] = update_data["status"]
-    if "template_data" in update_data:
-        update_fields["template_data"] = update_data["template_data"]
+    if update_data.generated_document is not None:
+        update_fields["generated_document"] = update_data.generated_document
+    if update_data.status is not None:
+        update_fields["status"] = update_data.status
+    if update_data.template_data is not None:
+        update_fields["template_data"] = update_data.template_data
     
     await db.minutes_templates.update_one(
         {"minutes_id": minutes_id},
