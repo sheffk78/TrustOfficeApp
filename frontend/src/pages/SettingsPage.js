@@ -411,6 +411,45 @@ export default function SettingsPage() {
                   />
                 </div>
 
+                {/* Benevolence Mode Section */}
+                <div className="p-4 border border-navy/10 bg-navy/5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <HeartHandshake className="w-5 h-5 text-navy mt-0.5" />
+                      <div>
+                        <h3 className="font-medium text-navy">Benevolence Mode</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Enable charitable assistance tracking for 501/508-type trusts. 
+                          This adds a dedicated benevolence log and specialized minutes templates.
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={trustData.benevolence_enabled}
+                      onCheckedChange={(checked) => setTrustData({ ...trustData, benevolence_enabled: checked })}
+                      data-testid="benevolence-toggle"
+                    />
+                  </div>
+                  {trustData.benevolence_enabled && (
+                    <div className="mt-4 pl-8">
+                      <Label className="label-trust">Tax Status</Label>
+                      <Select 
+                        value={trustData.tax_status} 
+                        onValueChange={(value) => setTrustData({ ...trustData, tax_status: value })}
+                      >
+                        <SelectTrigger className="mt-1 input-trust max-w-xs" data-testid="tax-status-select">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="501c3">501(c)(3) Organization</SelectItem>
+                          <SelectItem value="508">508 Church/Religious Org</SelectItem>
+                          <SelectItem value="private">Private Foundation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between pt-4 border-t border-navy/10">
                   <Button
                     onClick={handleUpdateTrust}
