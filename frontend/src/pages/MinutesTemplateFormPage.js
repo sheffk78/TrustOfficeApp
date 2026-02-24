@@ -79,10 +79,28 @@ export default function MinutesTemplateFormPage() {
     grantor_name: '',
     property_description: '',
     property_value: '',
+    property_identifier: '',  // VIN, account number, legal description
+    property_location: '',    // Address, institution, platform
     conveyance_date: format(new Date(), 'MMMM d, yyyy'),
     add_to_schedule_a: true,
     schedule_a_category: 'real_property'
   });
+
+  // Asset disposition fields
+  const [dispositionData, setDispositionData] = useState({
+    disposition_asset_id: '',
+    disposition_asset_description: '',
+    disposition_reason: 'sale',
+    disposition_date: format(new Date(), 'MMMM d, yyyy'),
+    disposition_value: '',
+    disposition_recipient: '',
+    disposition_notes: '',
+    update_schedule_a: true
+  });
+
+  // Schedule A assets for disposition selection
+  const [scheduleAAssets, setScheduleAAssets] = useState([]);
+  const [loadingAssets, setLoadingAssets] = useState(false);
 
   // Trustee appointment fields
   const [trusteeData, setTrusteeData] = useState({
