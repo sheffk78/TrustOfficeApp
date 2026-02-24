@@ -377,6 +377,108 @@ class OnboardingState(BaseModel):
     distribution_logged: bool = False
     checklist_dismissed: bool = False
 
+# Schedule A Asset Models
+class ScheduleAItemCreate(BaseModel):
+    trust_id: str
+    category: AssetCategory
+    description: str
+    identifier: str = ""  # VIN, account number, legal description, etc.
+    location: str = ""  # Address, institution, platform
+    approximate_value: Optional[float] = None
+    date_conveyed: str
+    notes: str = ""
+
+class ScheduleAItemUpdate(BaseModel):
+    description: Optional[str] = None
+    identifier: Optional[str] = None
+    location: Optional[str] = None
+    approximate_value: Optional[float] = None
+    date_conveyed: Optional[str] = None
+    notes: Optional[str] = None
+
+class ScheduleAItemResponse(BaseModel):
+    item_id: str
+    trust_id: str
+    category: str
+    description: str
+    identifier: str
+    location: str
+    approximate_value: Optional[float]
+    date_conveyed: str
+    notes: str
+    created_at: str
+    updated_at: Optional[str] = None
+
+# Minutes Template Models
+class MinutesResolution(BaseModel):
+    title: str
+    whereas_clauses: List[str]
+    resolved_clauses: List[str]
+    vote: str = "Unanimous approval"
+    effective_date: str = "Immediately upon adoption"
+
+class MinutesTemplateData(BaseModel):
+    # General meeting info
+    minute_number: str = ""
+    meeting_date: str = ""
+    meeting_time: str = ""
+    meeting_location: str = ""
+    meeting_type: str = "unanimous_written_consent"  # in_person, video_conference, unanimous_written_consent
+    trustees_present: List[str] = []
+    protector_present: Optional[str] = None
+    quorum_met: bool = True
+    
+    # Trust indenture date
+    trust_indenture_date: str = ""
+    
+    # Resolutions
+    resolutions: List[dict] = []
+    
+    # Distribution specific
+    distribution_total: Optional[float] = None
+    distribution_items: List[dict] = []
+    distribution_date: Optional[str] = None
+    distribution_characterization: str = "income"  # income, principal, return_of_corpus
+    
+    # Property acceptance specific
+    property_description: str = ""
+    property_value: Optional[float] = None
+    grantor_name: str = ""
+    conveyance_date: str = ""
+    add_to_schedule_a: bool = True
+    schedule_a_category: Optional[str] = None
+    
+    # Trustee appointment specific
+    appointment_type: str = ""  # additional, successor
+    departing_trustee_name: str = ""
+    departing_reason: str = ""  # resigned, died, incapacitated, removed
+    new_trustee_name: str = ""
+    new_trustee_gender: str = "man"  # man, woman
+    signature_requirement: str = "any_one"  # any_one, any_two, all_trustees
+    signature_threshold: Optional[float] = None
+    banking_powers_granted: bool = True
+    executive_trustee: str = ""
+    secretary_trustee: str = ""
+    treasurer_trustee: str = ""
+
+class MinutesTemplateCreate(BaseModel):
+    trust_id: str
+    template_type: MinutesTemplateType
+    template_data: dict = {}  # Flexible JSON for template-specific data
+
+class MinutesTemplateResponse(BaseModel):
+    minutes_id: str
+    trust_id: str
+    template_type: str
+    template_data: dict
+    generated_document: str  # Full text of the minutes
+    original_document: str  # Original generated version for audit
+    meeting_date: str
+    status: str  # draft, final
+    created_at: str
+    updated_at: Optional[str] = None
+    updated_by: Optional[str] = None
+
 # Health Score Models
 class HealthScoreCriterion(BaseModel):
     name: str
