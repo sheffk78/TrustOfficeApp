@@ -1962,8 +1962,15 @@ async def get_schedule_a_items(
     query = {"trust_id": trust_id, "user_id": user["user_id"]}
     if category:
         query["category"] = category
+    
+    # Handle status filtering with backward compatibility
+    # Items without status field are treated as 'active'
     if status and status != "all":
-        query["status"] = status
+        if status == "active":
+            # Match either explicit 'active' OR no status field (legacy items)
+            query["$or"] = [{"status": "active"}, {"status": {"$exists": False}}]
+        else:
+            query["status"] = status
     
     items = await db.schedule_a_items.find(query, {"_id": 0}).sort("category", 1).to_list(1000)
     # Ensure backward compatibility - set defaults for items without status field
