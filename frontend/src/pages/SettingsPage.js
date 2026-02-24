@@ -326,6 +326,133 @@ export default function SettingsPage() {
             </Button>
           </div>
 
+          {/* Notification Preferences Section */}
+          <div className="card-trust mb-8" data-testid="notification-preferences-section">
+            <div className="flex items-center gap-2 mb-4">
+              <Bell className="w-5 h-5 text-navy" />
+              <h2 className="font-serif text-xl text-navy">Notification Preferences</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              Control which email notifications you receive from TrustOffice.
+            </p>
+            
+            <div className="space-y-4">
+              {/* Document Notifications */}
+              <div className="border-b border-navy/10 pb-4">
+                <h3 className="text-sm font-medium text-navy mb-3 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Document Notifications
+                </h3>
+                <div className="space-y-3 pl-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-normal">Minutes Created</Label>
+                      <p className="text-xs text-muted-foreground">Receive an email when new minutes are recorded</p>
+                    </div>
+                    <Switch
+                      checked={notificationPrefs.minutes_created}
+                      onCheckedChange={(v) => handleNotificationChange('minutes_created', v)}
+                      disabled={notificationLoading}
+                      data-testid="notif-minutes-created"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-normal">Distribution Created</Label>
+                      <p className="text-xs text-muted-foreground">Receive an email when a distribution is recorded</p>
+                    </div>
+                    <Switch
+                      checked={notificationPrefs.distribution_created}
+                      onCheckedChange={(v) => handleNotificationChange('distribution_created', v)}
+                      disabled={notificationLoading}
+                      data-testid="notif-distribution-created"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-normal">Distribution Approved</Label>
+                      <p className="text-xs text-muted-foreground">Receive an email when a distribution is approved</p>
+                    </div>
+                    <Switch
+                      checked={notificationPrefs.distribution_approved}
+                      onCheckedChange={(v) => handleNotificationChange('distribution_approved', v)}
+                      disabled={notificationLoading}
+                      data-testid="notif-distribution-approved"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Task Notifications */}
+              <div className="border-b border-navy/10 pb-4">
+                <h3 className="text-sm font-medium text-navy mb-3 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Task Reminders
+                </h3>
+                <div className="space-y-3 pl-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-normal">Task Reminders</Label>
+                      <p className="text-xs text-muted-foreground">Receive reminders for upcoming governance tasks</p>
+                    </div>
+                    <Switch
+                      checked={notificationPrefs.task_reminders}
+                      onCheckedChange={(v) => handleNotificationChange('task_reminders', v)}
+                      disabled={notificationLoading}
+                      data-testid="notif-task-reminders"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-normal">Overdue Task Alerts</Label>
+                      <p className="text-xs text-muted-foreground">Receive alerts when tasks become overdue</p>
+                    </div>
+                    <Switch
+                      checked={notificationPrefs.task_overdue}
+                      onCheckedChange={(v) => handleNotificationChange('task_overdue', v)}
+                      disabled={notificationLoading}
+                      data-testid="notif-task-overdue"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Account Notifications */}
+              <div>
+                <h3 className="text-sm font-medium text-navy mb-3 flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  Account & Subscription
+                </h3>
+                <div className="space-y-3 pl-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-normal">Subscription Updates</Label>
+                      <p className="text-xs text-muted-foreground">Payment confirmations, renewal notices, and billing alerts</p>
+                    </div>
+                    <Switch
+                      checked={notificationPrefs.subscription_updates}
+                      onCheckedChange={(v) => handleNotificationChange('subscription_updates', v)}
+                      disabled={notificationLoading}
+                      data-testid="notif-subscription-updates"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-normal">Weekly Digest</Label>
+                      <p className="text-xs text-muted-foreground">A weekly summary of trust activity and upcoming tasks</p>
+                    </div>
+                    <Switch
+                      checked={notificationPrefs.weekly_digest}
+                      onCheckedChange={(v) => handleNotificationChange('weekly_digest', v)}
+                      disabled={notificationLoading}
+                      data-testid="notif-weekly-digest"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Export Data Section */}
           <div className="card-trust mb-8">
             <div className="flex items-center gap-2 mb-4">
