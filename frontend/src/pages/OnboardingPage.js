@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,10 @@ import { ArrowRight, ArrowLeft, Building2, User, Calendar } from 'lucide-react';
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
-  const { user, loadTrusts, seedDemoData, setSelectedTrust } = useAuth();
+  const { user, trusts, loadTrusts, seedDemoData, setSelectedTrust } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [checkingTrusts, setCheckingTrusts] = useState(true);
   
   const [trustData, setTrustData] = useState({
     name: '',
@@ -22,6 +23,36 @@ export default function OnboardingPage() {
     review_cadence: 'quarterly',
     description: ''
   });
+
+  // Check if user already has trusts - redirect to dashboard if so
+  useEffect(() => {
+    const checkExistingTrusts = async () => {
+      try {
+        await loadTrusts();
+      } catch (error) {
+        console.error('Failed to check trusts:', error);
+      } finally {
+        setCheckingTrusts(false);
+      }
+    };
+    checkExistingTrusts();
+  }, []);
+
+  useEffect(() => {
+    if (!checkingTrusts && trusts && trusts.length > 0) {
+      // User already has trusts, redirect to dashboard
+      navigate('/dashboard', { replace: true });
+    }
+  }, [checkingTrusts, trusts, navigate]);
+
+  // Show loading while checking for existing trusts
+  if (checkingTrusts) {
+    return (
+      <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin"></div>
+      </div>
+    );
+  }
 
   const handleCreateTrust = async () => {
     if (!trustData.name.trim()) {
