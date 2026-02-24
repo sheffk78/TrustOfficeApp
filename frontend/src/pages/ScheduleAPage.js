@@ -474,15 +474,27 @@ export default function ScheduleAPage() {
                             <th className="text-left p-3">Location</th>
                             <th className="text-right p-3">Value</th>
                             <th className="text-center p-3">Date Conveyed</th>
+                            <th className="text-center p-3">Status</th>
                             <th className="text-center p-3">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {categoryAssets.map(asset => (
-                            <tr key={asset.item_id} className="border-t border-border">
+                            <tr key={asset.item_id} className={`border-t border-border ${asset.status === 'disposed' ? 'opacity-60' : ''}`}>
                               <td className="p-3">
                                 <p className="font-medium text-navy">{asset.description}</p>
                                 {asset.notes && <p className="text-xs text-muted-foreground mt-1">{asset.notes}</p>}
+                                {asset.minutes_ref && (
+                                  <p className="text-xs text-blue-600 mt-1">
+                                    Added via Minutes: {asset.minutes_ref}
+                                  </p>
+                                )}
+                                {asset.disposition_minutes_ref && (
+                                  <p className="text-xs text-orange-600 mt-1">
+                                    Disposed via Minutes: {asset.disposition_minutes_ref}
+                                    {asset.disposition_date && ` on ${formatDate(asset.disposition_date)}`}
+                                  </p>
+                                )}
                               </td>
                               <td className="p-3 font-mono text-sm">{asset.identifier || '—'}</td>
                               <td className="p-3 text-sm">{asset.location || '—'}</td>
@@ -491,25 +503,38 @@ export default function ScheduleAPage() {
                                 {formatDate(asset.date_conveyed)}
                               </td>
                               <td className="p-3 text-center">
-                                <div className="flex justify-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleEdit(asset)}
-                                    data-testid={`edit-asset-${asset.item_id}`}
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-red-600 hover:text-red-700"
-                                    onClick={() => handleDelete(asset.item_id)}
-                                    data-testid={`delete-asset-${asset.item_id}`}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
+                                {asset.status === 'disposed' ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                                    Disposed
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                    Active
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                {asset.status !== 'disposed' && (
+                                  <div className="flex justify-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEdit(asset)}
+                                      data-testid={`edit-asset-${asset.item_id}`}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="text-red-600 hover:text-red-700"
+                                      onClick={() => handleDelete(asset.item_id)}
+                                      data-testid={`delete-asset-${asset.item_id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           ))}
