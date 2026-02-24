@@ -606,7 +606,7 @@ export default function SettingsPage() {
               Have questions, need help, or want to share feedback? Our support team is here to assist you.
             </p>
             <Button
-              onClick={() => window.open('https://app.trustoffice.app/support', '_blank')}
+              onClick={() => window.open('https://trustoffice.app/support', '_blank')}
               className="btn-secondary"
               data-testid="go-to-support-btn"
             >
