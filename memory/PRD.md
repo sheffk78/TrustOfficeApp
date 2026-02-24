@@ -21,31 +21,27 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Recent Updates (Feb 24, 2026)
-1. **Minutes Templates System** - IN PROGRESS
-   - Template picker with 6 options (blank, general meeting, distribution, property acceptance, trustee appointment)
-   - Dynamic form generation based on template type
-   - Full WHEREAS/RESOLVED boilerplate language from WingPoint/Trust templates
-   - Editable preview with audit trail (stores original + updated versions)
+### Recent Updates (Feb 24, 2026) - COMPLETE ✅
+1. **Minutes Templates System**
+   - 6 templates: Blank, General Meeting, Distribution, Property Acceptance, Additional Trustee, Successor Trustee
+   - Dynamic forms with pre-filled WHEREAS/RESOLVED boilerplate from WingPoint templates
+   - Editable preview with audit trail (original + updated versions stored)
    - PDF export for generated documents
-   - API: `POST/GET /api/minutes-templates`
+   - APIs: `/api/minutes-templates`, `/api/template-options`
 
-2. **Schedule A (Trust Corpus Tracking)** - IN PROGRESS
+2. **Schedule A (Trust Corpus Tracking)**
    - 8 asset categories: Real Property, Personal Property, Financial Accounts, Business Interests, Digital Assets, IP, Notes Receivable, Other
-   - Full CRUD operations with summary totals
-   - Integration with "Accept Property into Trust" template (auto-add to Schedule A)
-   - API: `POST/GET/PUT/DELETE /api/schedule-a`
+   - Full CRUD with summary totals by category
+   - Integration: Property acceptance template auto-adds to Schedule A
+   - APIs: `/api/schedule-a`, `/api/schedule-a/summary/{trust_id}`
 
 3. **Bug Fixes**
    - Login page logo contrast (white on blue)
-   - Login error "body stream already read" fixed
-   - Trust selector updates when new trust created
+   - Login "body stream already read" error
+   - Trust selector updates on new trust creation
    - "Made with Emergent" watermark removed
-   - Page title updated to "TrustOffice | Trust Governance Workspace"
-   - Demo data button shows feedback when user already has trusts
-
-### P0 - Critical (Feb 23, 2026) - COMPLETE
-[rest of content unchanged...]
+   - Added /login route for React Router
+   - Fixed TrustResponse model for legacy data
 
 ### P0 - Critical (Feb 23, 2026) - COMPLETE
 1. **Password Reset Flow**
