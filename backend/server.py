@@ -1753,7 +1753,7 @@ async def delete_minutes(minutes_id: str, user: dict = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="Minutes not found")
     return {"message": "Minutes deleted"}
 
-def generate_minutes_pdf(minutes: dict, trust: dict) -> bytes:
+def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = False) -> bytes:
     """Generate a professional PDF for minutes record"""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
