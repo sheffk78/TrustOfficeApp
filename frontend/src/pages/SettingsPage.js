@@ -40,7 +40,9 @@ export default function SettingsPage() {
     name: selectedTrust?.name || '',
     role: selectedTrust?.role || 'Trustee',
     review_cadence: selectedTrust?.review_cadence || 'quarterly',
-    description: selectedTrust?.description || ''
+    description: selectedTrust?.description || '',
+    benevolence_enabled: selectedTrust?.benevolence_enabled || false,
+    tax_status: selectedTrust?.tax_status || 'private'
   });
 
   const handleUpdateProfile = async () => {
