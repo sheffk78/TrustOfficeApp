@@ -1939,6 +1939,11 @@ async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends
         "approximate_value": item.approximate_value,
         "date_conveyed": item.date_conveyed,
         "notes": item.notes,
+        "status": "active",
+        "minutes_ref": item.minutes_ref,
+        "disposition_minutes_ref": None,
+        "disposition_date": None,
+        "disposition_notes": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": None
     }
@@ -1947,13 +1952,32 @@ async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends
     return ScheduleAItemResponse(**item_doc)
 
 @api_router.get("/schedule-a", response_model=List[ScheduleAItemResponse])
-async def get_schedule_a_items(trust_id: str, category: Optional[str] = None, user: dict = Depends(get_current_user)):
-    """Get all Schedule A items for a trust"""
+async def get_schedule_a_items(
+    trust_id: str, 
+    category: Optional[str] = None, 
+    status: Optional[str] = "active",  # Default to active only, use "all" for all assets
+    user: dict = Depends(get_current_user)
+):
+    """Get all Schedule A items for a trust. Use status='all' to include disposed assets."""
     query = {"trust_id": trust_id, "user_id": user["user_id"]}
     if category:
         query["category"] = category
+    if status and status != "all":
+        query["status"] = status
     
     items = await db.schedule_a_items.find(query, {"_id": 0}).sort("category", 1).to_list(1000)
+    # Ensure backward compatibility - set defaults for items without status field
+    for item in items:
+        if "status" not in item:
+            item["status"] = "active"
+        if "minutes_ref" not in item:
+            item["minutes_ref"] = None
+        if "disposition_minutes_ref" not in item:
+            item["disposition_minutes_ref"] = None
+        if "disposition_date" not in item:
+            item["disposition_date"] = None
+        if "disposition_notes" not in item:
+            item["disposition_notes"] = None
     return [ScheduleAItemResponse(**item) for item in items]
 
 @api_router.get("/schedule-a/{item_id}", response_model=ScheduleAItemResponse)
@@ -1962,6 +1986,17 @@ async def get_schedule_a_item(item_id: str, user: dict = Depends(get_current_use
     item = await db.schedule_a_items.find_one({"item_id": item_id, "user_id": user["user_id"]}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Asset not found")
+    # Ensure backward compatibility
+    if "status" not in item:
+        item["status"] = "active"
+    if "minutes_ref" not in item:
+        item["minutes_ref"] = None
+    if "disposition_minutes_ref" not in item:
+        item["disposition_minutes_ref"] = None
+    if "disposition_date" not in item:
+        item["disposition_date"] = None
+    if "disposition_notes" not in item:
+        item["disposition_notes"] = None
     return ScheduleAItemResponse(**item)
 
 @api_router.put("/schedule-a/{item_id}", response_model=ScheduleAItemResponse)
