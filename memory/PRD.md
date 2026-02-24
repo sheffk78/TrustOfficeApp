@@ -22,18 +22,32 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 ## Completed Features
 
 ### Latest Updates (Feb 24, 2026) - COMPLETE ✅
-1. **Minutes Templates System - 9 Templates Total**
+1. **Benevolence Mode - COMPLETE (NEW)**
+   - Optional feature for 501/508-type charitable trusts
+   - **Settings Toggle**: Enable/disable per trust with tax status dropdown (501(c)(3), 508 Church/Religious Org, Private Foundation)
+   - **Benevolence Log Page** (`/benevolence`):
+     - Summary cards: Total Grants, Total Amount, This Year, Categories
+     - Record Grant dialog with full form (beneficiary, type, purpose category, amount, etc.)
+     - Data table with search/filter (by purpose, status)
+     - CRUD operations for benevolence records
+   - **Conditional Navigation**: "Benevolence" sidebar link only visible when enabled for active trust
+   - **Minutes Template Integration**: "Benevolence Assistance Approval" template in gallery with specialized form
+   - APIs: `POST/GET/PUT/DELETE /api/benevolence`, `GET /api/benevolence/summary/{trust_id}`
+   - DB Collection: `benevolence_records` with fields: record_id, trust_id, beneficiary_name, beneficiary_type, purpose, purpose_description, amount, date, approved_by, approval_method, status, notes
+
+2. **Minutes Templates System - 10 Templates Total**
    - Blank, General Meeting, Distribution to Beneficiaries
    - Accept Property into Trust (auto-adds to Schedule A)
    - Appoint Additional/Successor Trustee
-   - **NEW:** Designate Beneficiaries (units of beneficial interest)
-   - **NEW:** Open Bank Account (signature authority, threshold options)
-   - **NEW:** Change Trust Situs (jurisdiction change)
+   - Designate Beneficiaries (units of beneficial interest)
+   - Open Bank Account (signature authority, threshold options)
+   - Change Trust Situs (jurisdiction change)
+   - **NEW:** Benevolence Assistance Approval (auto-adds to Benevolence Log)
    - Dynamic forms with pre-filled WHEREAS/RESOLVED boilerplate from WingPoint templates
    - Editable preview with audit trail, PDF export
-   - APIs: `/api/minutes-templates`, `/api/template-options`
+   - APIs: `/api/minutes-templates`, `/api/template-options?trust_id={trust_id}`
 
-2. **Dashboard Quick Actions Panel**
+3. **Dashboard Quick Actions Panel**
    - 6 one-click actions: Record Distribution, Add Asset to Trust, Open Bank Account, Appoint Trustee, View Schedule A, General Meeting
    - "All Templates →" link to full template library
    - Color-coded icons per action type
