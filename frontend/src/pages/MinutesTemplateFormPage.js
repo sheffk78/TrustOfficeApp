@@ -249,6 +249,42 @@ export default function MinutesTemplateFormPage() {
           effective_date: trusteeData.effective_date
         };
       
+      case 'designation_of_beneficiaries':
+        return {
+          ...baseData,
+          designation_type: beneficiaryData.designation_type,
+          total_units: parseInt(beneficiaryData.total_units) || 100,
+          beneficiaries: beneficiaryData.beneficiaries
+            .filter(b => b.name)
+            .map(b => ({
+              name: b.name,
+              units: parseInt(b.units) || 0,
+              percentage: parseFloat(b.percentage) || 0,
+              relationship: b.relationship
+            }))
+        };
+      
+      case 'bank_account_authorization':
+        return {
+          ...baseData,
+          bank_name: bankData.bank_name,
+          account_type: bankData.account_type,
+          purpose: bankData.purpose,
+          authorized_signers: bankData.authorized_signers.filter(s => s.trim()),
+          signature_requirement: bankData.signature_requirement,
+          signature_threshold: parseFloat(bankData.signature_threshold) || null,
+          initial_deposit: parseFloat(bankData.initial_deposit) || null
+        };
+      
+      case 'change_of_situs':
+        return {
+          ...baseData,
+          current_situs: situsData.current_situs,
+          new_situs: situsData.new_situs,
+          effective_date: situsData.effective_date,
+          reasons: situsData.reasons.filter(r => r.trim())
+        };
+      
       case 'general_meeting':
       default:
         return {
