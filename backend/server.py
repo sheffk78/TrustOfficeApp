@@ -4914,7 +4914,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         }
     ])
     
-    # Create minutes
+    # Create minutes (including template-generated examples)
     await db.minutes_records.insert_many([
         {
             "minutes_id": f"minutes_{uuid.uuid4().hex[:12]}",
@@ -4935,6 +4935,78 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "participants_text": "John Smith, Jane Smith",
             "decisions_text": "Approved $15,000 distribution for spring semester tuition at State University. Solvency confirmed.",
             "created_at": (now - timedelta(days=30)).isoformat()
+        },
+        {
+            "minutes_id": f"minutes_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "minutes_type": "special",
+            "meeting_date": (now - timedelta(days=60)).isoformat(),
+            "participants_text": "John Smith, Jane Smith",
+            "decisions_text": """MINUTES OF SPECIAL MEETING OF THE TRUSTEES
+OF THE SMITH FAMILY TRUST
+
+ACCEPTANCE OF PROPERTY INTO TRUST
+
+WHEREAS, the Grantors have offered to convey additional property to the Trust; and
+WHEREAS, the Trustees have determined that accepting such property is in the best interests of the Trust and its beneficiaries;
+
+NOW, THEREFORE, BE IT RESOLVED, that the Trustees hereby accept the following property into the Trust corpus:
+
+Property Description: Vacation Property - Beach Condo Unit 4B
+Location: Rehoboth Beach, Delaware
+Estimated Value: $425,000
+Deed Reference: #2021-67890
+
+BE IT FURTHER RESOLVED, that Schedule A of the Trust shall be amended to include this property.
+
+The Trustees acknowledge that this property has been duly inspected and that accepting it poses no undue liability to the Trust.""",
+            "generated_from_template": "acceptance_of_property",
+            "template_data": {
+                "property_description": "Vacation Property - Beach Condo Unit 4B",
+                "property_location": "Rehoboth Beach, Delaware",
+                "estimated_value": 425000,
+                "add_to_schedule_a": True
+            },
+            "created_at": (now - timedelta(days=60)).isoformat()
+        },
+        {
+            "minutes_id": f"minutes_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "minutes_type": "special",
+            "meeting_date": (now - timedelta(days=45)).isoformat(),
+            "participants_text": "John Smith, Jane Smith",
+            "decisions_text": """MINUTES OF SPECIAL MEETING OF THE TRUSTEES
+OF THE SMITH FAMILY TRUST
+
+BENEVOLENCE ASSISTANCE APPROVAL
+
+WHEREAS, the Trust operates as a 501(c)(3) organization with charitable purposes; and
+WHEREAS, a request for benevolent assistance has been received and reviewed;
+
+NOW, THEREFORE, BE IT RESOLVED, that the Trustees hereby approve the following benevolence grant:
+
+Beneficiary: Grace Community Church
+Type: Organization
+Purpose: Spiritual/Ministry Support
+Description: Annual ministry support for youth programs and community outreach
+Amount: $25,000.00
+Disbursement Date: January 10, 2026
+
+BE IT FURTHER RESOLVED, that this grant shall be recorded in the Trust's Benevolence Log for tax reporting purposes.
+
+The Trustees have determined that this assistance aligns with the Trust's charitable mission and is financially prudent.""",
+            "generated_from_template": "benevolence_approval",
+            "template_data": {
+                "beneficiary_name": "Grace Community Church",
+                "beneficiary_type": "organization",
+                "benevolence_purpose": "spiritual",
+                "purpose_description": "Annual ministry support for youth programs and community outreach",
+                "amount": 25000,
+                "add_to_benevolence_log": True
+            },
+            "created_at": (now - timedelta(days=45)).isoformat()
         }
     ])
     
