@@ -529,6 +529,26 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Support & Feedback Section */}
+          <div className="card-trust mb-8" data-testid="support-section">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="w-5 h-5 text-navy" />
+              <h2 className="font-serif text-xl text-navy">Support & Feedback</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Have questions, need help, or want to share feedback? Our support team is here to assist you.
+            </p>
+            <Button
+              onClick={() => window.open('https://app.trustoffice.app/support', '_blank')}
+              className="btn-secondary"
+              data-testid="go-to-support-btn"
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Contact Support
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+
           {/* Trust Settings */}
           {selectedTrust && (
             <div className="card-trust mb-8">
