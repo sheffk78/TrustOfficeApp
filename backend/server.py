@@ -2165,6 +2165,8 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
         doc += generate_bank_account_content(template_data)
     elif template_type == "change_of_situs":
         doc += generate_change_of_situs_content(template_data)
+    elif template_type == "benevolence_approval":
+        doc += generate_benevolence_approval_content(template_data)
     
     # Add adjournment and certification
     doc += f"""
