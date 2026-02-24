@@ -179,20 +179,23 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 12. subscription_upgraded
 
 ## Test Credentials
+- demo@trustoffice.com / demopassword (main demo account with 2 trusts)
 - test@example.com / testpassword123
 - testuser@test.com / testpassword123 (created for P1 testing)
 
 ## Prioritized Backlog
 
-### P1 (Short-term) - COMPLETE (Feb 23-24, 2026)
+### P1 (Short-term) - COMPLETE (Feb 23-25, 2026)
 - [x] Profile editing (name change) - Edit button in Settings > Profile section
 - [x] Search in minutes/distributions - Server-side search with debounced queries
 - [x] Table horizontal scroll for mobile - overflow-x-auto on table containers
 - [x] Benevolence Mode - Full feature for charitable trusts (toggle, log, template)
 - [x] Notification preferences - Toggle switches in Settings page for email notification control
 - [x] Benevolence Report PDF Export - Styled PDF similar to Schedule A
+- [x] Auto-populate Minutes Form with Entity data (trust_indenture_date, trustees_present, article refs)
 
 ### P2 (Medium-term)
+- [x] Fix Compensation API schema mismatch (Feb 25, 2026)
 - [ ] Audit Log (backend + UI)
 - [ ] Receipt/invoice download
 - [ ] Feedback process
