@@ -20,9 +20,58 @@ import {
   Zap,
   TrendingUp,
   Building2,
-  Wallet
+  Wallet,
+  Package,
+  UserPlus,
+  Landmark,
+  PlusCircle
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+
+const QUICK_ACTIONS = [
+  {
+    title: 'Record Distribution',
+    description: 'Document a distribution to beneficiaries',
+    icon: DollarSign,
+    path: '/minutes/template/distribution_to_beneficiaries',
+    color: 'bg-green-500/10 text-green-600'
+  },
+  {
+    title: 'Add Asset to Trust',
+    description: 'Accept property and update Schedule A',
+    icon: PlusCircle,
+    path: '/minutes/template/acceptance_of_property',
+    color: 'bg-blue-500/10 text-blue-600'
+  },
+  {
+    title: 'Open Bank Account',
+    description: 'Authorize a new trust bank account',
+    icon: Landmark,
+    path: '/minutes/template/bank_account_authorization',
+    color: 'bg-purple-500/10 text-purple-600'
+  },
+  {
+    title: 'Appoint Trustee',
+    description: 'Add or replace a trustee',
+    icon: UserPlus,
+    path: '/minutes/template/appointment_additional_trustee',
+    color: 'bg-orange-500/10 text-orange-600'
+  },
+  {
+    title: 'View Schedule A',
+    description: 'Manage trust assets and corpus',
+    icon: Package,
+    path: '/schedule-a',
+    color: 'bg-navy/10 text-navy'
+  },
+  {
+    title: 'General Meeting',
+    description: 'Record a trustee meeting',
+    icon: FileText,
+    path: '/minutes/template/general_meeting',
+    color: 'bg-gold/20 text-gold'
+  }
+];
 
 export default function DashboardPage() {
   const navigate = useNavigate();
