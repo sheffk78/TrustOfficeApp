@@ -304,11 +304,21 @@ export default function MinutesPage() {
               </div>
             </div>
             <div className="flex-1 p-4 bg-subtle-bg overflow-auto">
-              <iframe
-                src={`data:application/pdf;base64,${pdfPreview.base64}`}
+              <object
+                data={`data:application/pdf;base64,${pdfPreview.base64}`}
+                type="application/pdf"
                 className="w-full h-full border border-navy/10"
                 title="Minutes PDF Preview"
-              />
+              >
+                <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                  <FileText className="w-16 h-16 text-navy/30 mb-4" />
+                  <p className="text-navy mb-4">PDF preview not supported in this browser.</p>
+                  <Button onClick={handleDownloadPdf} className="btn-primary">
+                    <Download className="w-4 h-4 mr-2" />
+                    Download PDF to View
+                  </Button>
+                </div>
+              </object>
             </div>
           </div>
         </div>
