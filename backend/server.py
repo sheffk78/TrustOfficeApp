@@ -4805,13 +4805,15 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     now = datetime.now(timezone.utc)
     trust_id = f"trust_{uuid.uuid4().hex[:12]}"
     
-    # Create trust
+    # Create trust with benevolence mode enabled
     await db.trusts.insert_one({
         "trust_id": trust_id,
         "user_id": user["user_id"],
         "name": "Smith Family Trust",
         "trust_type": "family",
         "jurisdiction": "Delaware",
+        "benevolence_enabled": True,
+        "tax_status": "501c3",
         "created_at": now.isoformat()
     })
     
