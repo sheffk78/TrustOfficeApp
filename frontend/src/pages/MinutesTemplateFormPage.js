@@ -26,7 +26,10 @@ const TEMPLATE_TITLES = {
   'distribution_to_beneficiaries': 'Distribution to Beneficiaries',
   'acceptance_of_property': 'Accept Property into Trust',
   'appointment_additional_trustee': 'Appoint Additional Trustee',
-  'appointment_successor_trustee': 'Appoint Successor Trustee'
+  'appointment_successor_trustee': 'Appoint Successor Trustee',
+  'designation_of_beneficiaries': 'Designate Beneficiaries',
+  'bank_account_authorization': 'Open Bank Account',
+  'change_of_situs': 'Change Trust Situs'
 };
 
 const ASSET_CATEGORIES = [
