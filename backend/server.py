@@ -1937,14 +1937,10 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
         {"_id": 0}
     )
     
-    # Check user preferences for watermark
-    user_prefs = await db.user_preferences.find_one(
-        {"user_id": user["user_id"]},
-        {"_id": 0}
-    )
-    hide_watermark = user_prefs.get("hide_watermark", False) if user_prefs else False
+    # Check if watermark should be shown (soft gating based on subscription)
+    show_watermark = await should_show_watermark(user["user_id"])
     
-    pdf_bytes = generate_minutes_pdf(minutes, trust or {}, hide_watermark=hide_watermark)
+    pdf_bytes = generate_minutes_pdf(minutes, trust or {}, hide_watermark=not show_watermark)
     pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
     
     return {
