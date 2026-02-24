@@ -153,12 +153,18 @@ class MinutesTemplateType(str, Enum):
     general_meeting = "general_meeting"
     distribution_to_beneficiaries = "distribution_to_beneficiaries"
     acceptance_of_property = "acceptance_of_property"
+    disposition_of_asset = "disposition_of_asset"
     appointment_additional_trustee = "appointment_additional_trustee"
     appointment_successor_trustee = "appointment_successor_trustee"
     designation_of_beneficiaries = "designation_of_beneficiaries"
     bank_account_authorization = "bank_account_authorization"
     change_of_situs = "change_of_situs"
     benevolence_approval = "benevolence_approval"
+
+# Asset Status for Schedule A
+class AssetStatus(str, Enum):
+    active = "active"
+    disposed = "disposed"
 
 # Benevolence Purpose Categories
 class BenevolencePurpose(str, Enum):
