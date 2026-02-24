@@ -29,7 +29,8 @@ const TEMPLATE_TITLES = {
   'appointment_successor_trustee': 'Appoint Successor Trustee',
   'designation_of_beneficiaries': 'Designate Beneficiaries',
   'bank_account_authorization': 'Open Bank Account',
-  'change_of_situs': 'Change Trust Situs'
+  'change_of_situs': 'Change Trust Situs',
+  'benevolence_approval': 'Benevolence Assistance Approval'
 };
 
 const ASSET_CATEGORIES = [
