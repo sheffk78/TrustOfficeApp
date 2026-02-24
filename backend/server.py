@@ -693,6 +693,40 @@ async def get_current_user(request: Request) -> dict:
     
     raise HTTPException(status_code=401, detail="Invalid token")
 
+async def should_show_watermark(user_id: str) -> bool:
+    """
+    Check if watermark should be shown on PDFs.
+    Returns True if watermark should show (not subscribed or preference not set).
+    Soft gating: unsubscribed users always see watermark.
+    """
+    # Check subscription status
+    sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+    
+    if not sub:
+        return True  # No subscription = show watermark
+    
+    # Check if subscription is active
+    is_subscribed = False
+    if sub["status"] == "active":
+        is_subscribed = True
+    elif sub["status"] == "trialing" and sub.get("trial_end_date"):
+        try:
+            trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
+            if trial_end.tzinfo is None:
+                trial_end = trial_end.replace(tzinfo=timezone.utc)
+            is_subscribed = trial_end >= datetime.now(timezone.utc)
+        except:
+            is_subscribed = False
+    
+    if not is_subscribed:
+        return True  # Not subscribed = show watermark
+    
+    # User is subscribed - check their preference
+    user_prefs = await db.user_preferences.find_one({"user_id": user_id}, {"_id": 0})
+    hide_watermark = user_prefs.get("hide_watermark", False) if user_prefs else False
+    
+    return not hide_watermark  # Show watermark if preference is False
+
 async def check_subscription_active(user: dict = Depends(get_current_user)) -> dict:
     """
     Dependency that checks if user has active subscription.
