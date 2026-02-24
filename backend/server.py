@@ -497,6 +497,50 @@ class MinutesTemplateResponse(BaseModel):
     updated_at: Optional[str] = None
     updated_by: Optional[str] = None
 
+# Benevolence Models
+class BenevolenceRecordCreate(BaseModel):
+    trust_id: str
+    beneficiary_name: str
+    beneficiary_type: str = "individual"  # individual, family, organization
+    purpose: BenevolencePurpose
+    purpose_description: str
+    amount: float
+    date: str
+    approved_by: List[str]  # List of trustee names who approved
+    approval_method: str = "unanimous"  # unanimous, majority, single_trustee
+    minutes_id: Optional[str] = None  # Link to minutes if created via template
+    notes: str = ""
+    status: str = "approved"  # pending, approved, disbursed, declined
+
+class BenevolenceRecordUpdate(BaseModel):
+    beneficiary_name: Optional[str] = None
+    beneficiary_type: Optional[str] = None
+    purpose: Optional[BenevolencePurpose] = None
+    purpose_description: Optional[str] = None
+    amount: Optional[float] = None
+    date: Optional[str] = None
+    approved_by: Optional[List[str]] = None
+    approval_method: Optional[str] = None
+    notes: Optional[str] = None
+    status: Optional[str] = None
+
+class BenevolenceRecordResponse(BaseModel):
+    record_id: str
+    trust_id: str
+    beneficiary_name: str
+    beneficiary_type: str
+    purpose: str
+    purpose_description: str
+    amount: float
+    date: str
+    approved_by: List[str]
+    approval_method: str
+    minutes_id: Optional[str]
+    notes: str
+    status: str
+    created_at: str
+    updated_at: Optional[str] = None
+
 # Health Score Models
 class HealthScoreCriterion(BaseModel):
     name: str
