@@ -3863,7 +3863,12 @@ async def create_comp_plan(plan: CompensationPlanCreate, user: dict = Depends(ge
         "plan_id": plan_id,
         "trust_id": plan.trust_id,
         "user_id": user["user_id"],
-        "annual_approved_amount": plan.annual_approved_amount,
+        "trustee_name": plan.trustee_name,
+        "role": plan.role,
+        "annual_fee": plan.annual_amount or plan.annual_approved_amount,
+        "annual_amount": plan.annual_amount or plan.annual_approved_amount,
+        "annual_approved_amount": plan.annual_approved_amount or plan.annual_amount,
+        "fee_type": plan.fee_type,
         "effective_date": plan.effective_date,
         "notes": plan.notes,
         "created_at": datetime.now(timezone.utc).isoformat()
