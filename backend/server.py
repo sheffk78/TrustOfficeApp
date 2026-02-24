@@ -510,6 +510,18 @@ class MinutesTemplateData(BaseModel):
     conveyance_date: str = ""
     add_to_schedule_a: bool = True
     schedule_a_category: Optional[str] = None
+    property_identifier: str = ""  # VIN, account number, legal description
+    property_location: str = ""  # Address, institution, platform
+    
+    # Asset disposition specific
+    disposition_asset_id: Optional[str] = None  # ID of the Schedule A asset being disposed
+    disposition_asset_description: str = ""  # Description of asset being disposed
+    disposition_reason: str = ""  # sale, transfer, destruction, donation
+    disposition_date: str = ""
+    disposition_value: Optional[float] = None  # Sale price or fair market value at disposition
+    disposition_recipient: str = ""  # Buyer, recipient, or new owner
+    disposition_notes: str = ""  # Additional details about the disposition
+    update_schedule_a: bool = True  # Whether to mark asset as disposed in Schedule A
     
     # Trustee appointment specific
     appointment_type: str = ""  # additional, successor
