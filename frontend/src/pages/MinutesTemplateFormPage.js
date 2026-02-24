@@ -169,6 +169,30 @@ export default function MinutesTemplateFormPage() {
     }
   }, [selectedTrust]);
 
+  // Load Schedule A assets when disposition template is selected
+  useEffect(() => {
+    if (selectedTrust && templateType === 'disposition_of_asset') {
+      loadScheduleAAssets();
+    }
+  }, [selectedTrust, templateType]);
+
+  const loadScheduleAAssets = async () => {
+    if (!selectedTrust) return;
+    setLoadingAssets(true);
+    try {
+      // Only load active assets
+      const response = await fetchWithAuth(`/schedule-a?trust_id=${selectedTrust.trust_id}&status=active`);
+      if (response.ok) {
+        const assets = await response.json();
+        setScheduleAAssets(assets);
+      }
+    } catch (error) {
+      console.error('Failed to load Schedule A assets:', error);
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
   const loadTrustEntityData = async () => {
     try {
       const response = await fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}`);
