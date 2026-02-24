@@ -122,6 +122,17 @@ export default function MinutesTemplateFormPage() {
     reasons: ['']
   });
 
+  // Benevolence approval fields
+  const [benevolenceData, setBenevolenceData] = useState({
+    beneficiary_name: '',
+    beneficiary_type: 'individual',
+    benevolence_purpose: 'assistance',
+    purpose_description: '',
+    amount: '',
+    disbursement_date: format(new Date(), 'MMMM d, yyyy'),
+    add_to_benevolence_log: true
+  });
+
   // General meeting resolutions
   const [resolutions, setResolutions] = useState([{
     title: '',
