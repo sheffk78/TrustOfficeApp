@@ -252,7 +252,12 @@ export default function MinutesTemplateFormPage() {
   const buildTemplateData = () => {
     const baseData = {
       ...formData,
-      trustees_present: formData.trustees_present.filter(t => t.trim())
+      trustees_present: formData.trustees_present.filter(t => t.trim()),
+      // Include article references from trust entity
+      article_ref_distribution: trustEntity?.article_ref_distribution || '',
+      article_ref_compensation: trustEntity?.article_ref_compensation || '',
+      article_ref_amendment: trustEntity?.article_ref_amendment || '',
+      beneficiary_standard: trustEntity?.beneficiary_standard || ''
     };
 
     switch (templateType) {
