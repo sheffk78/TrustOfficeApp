@@ -21,21 +21,30 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Recent Updates (Feb 24, 2026) - COMPLETE ✅
-1. **Minutes Templates System**
-   - 6 templates: Blank, General Meeting, Distribution, Property Acceptance, Additional Trustee, Successor Trustee
+### Latest Updates (Feb 24, 2026) - COMPLETE ✅
+1. **Minutes Templates System - 9 Templates Total**
+   - Blank, General Meeting, Distribution to Beneficiaries
+   - Accept Property into Trust (auto-adds to Schedule A)
+   - Appoint Additional/Successor Trustee
+   - **NEW:** Designate Beneficiaries (units of beneficial interest)
+   - **NEW:** Open Bank Account (signature authority, threshold options)
+   - **NEW:** Change Trust Situs (jurisdiction change)
    - Dynamic forms with pre-filled WHEREAS/RESOLVED boilerplate from WingPoint templates
-   - Editable preview with audit trail (original + updated versions stored)
-   - PDF export for generated documents
+   - Editable preview with audit trail, PDF export
    - APIs: `/api/minutes-templates`, `/api/template-options`
 
-2. **Schedule A (Trust Corpus Tracking)**
+2. **Dashboard Quick Actions Panel**
+   - 6 one-click actions: Record Distribution, Add Asset to Trust, Open Bank Account, Appoint Trustee, View Schedule A, General Meeting
+   - "All Templates →" link to full template library
+   - Color-coded icons per action type
+
+3. **Schedule A (Trust Corpus Tracking)**
    - 8 asset categories: Real Property, Personal Property, Financial Accounts, Business Interests, Digital Assets, IP, Notes Receivable, Other
    - Full CRUD with summary totals by category
    - Integration: Property acceptance template auto-adds to Schedule A
    - APIs: `/api/schedule-a`, `/api/schedule-a/summary/{trust_id}`
 
-3. **Bug Fixes**
+4. **Bug Fixes**
    - Login page logo contrast (white on blue)
    - Login "body stream already read" error
    - Trust selector updates on new trust creation
