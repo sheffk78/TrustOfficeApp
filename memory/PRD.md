@@ -23,7 +23,14 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ### Latest Updates (Feb 25, 2026) - P0 BUG FIXES & P1 FEATURE ✅
 
-1. **P0 Bug Fix: Save Minutes**
+1. **GA4 Analytics Integration - COMPLETE (NEW)**
+   - Measurement ID: G-MT6FBPRE60
+   - Added GA4 script to `public/index.html` (loads on all pages)
+   - Created `useGA4PageTracking` hook in App.js for SPA route change tracking
+   - Created `utils/analytics.js` utility with helper functions for custom events
+   - Ready for subscription event tracking (subscription_started, subscription_upgraded, etc.)
+
+2. **P0 Bug Fix: Save Minutes**
    - Issue: Saving generated minutes from templates was failing
    - Root Cause: PUT endpoint used plain `dict` instead of Pydantic model
    - Fix: Added `MinutesTemplateUpdate` Pydantic model with optional fields for `generated_document`, `status`, `template_data`
