@@ -95,6 +95,32 @@ export default function MinutesTemplateFormPage() {
     effective_date: format(new Date(), 'MMMM d, yyyy')
   });
 
+  // Beneficiary designation fields
+  const [beneficiaryData, setBeneficiaryData] = useState({
+    designation_type: 'initial',
+    total_units: 100,
+    beneficiaries: [{ name: '', units: '', percentage: '', relationship: '' }]
+  });
+
+  // Bank account fields
+  const [bankData, setBankData] = useState({
+    bank_name: '',
+    account_type: 'checking',
+    purpose: 'general trust administration',
+    authorized_signers: [],
+    signature_requirement: 'any_one',
+    signature_threshold: '',
+    initial_deposit: ''
+  });
+
+  // Change of situs fields
+  const [situsData, setSitusData] = useState({
+    current_situs: '',
+    new_situs: '',
+    effective_date: format(new Date(), 'MMMM d, yyyy'),
+    reasons: ['']
+  });
+
   // General meeting resolutions
   const [resolutions, setResolutions] = useState([{
     title: '',
@@ -109,6 +135,10 @@ export default function MinutesTemplateFormPage() {
       setFormData(prev => ({
         ...prev,
         trustees_present: selectedTrust.trustees
+      }));
+      setBankData(prev => ({
+        ...prev,
+        authorized_signers: selectedTrust.trustees
       }));
     }
   }, [selectedTrust]);
