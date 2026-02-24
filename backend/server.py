@@ -5013,6 +5013,197 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         }
     ])
     
+    # Create Schedule A assets (Trust Corpus)
+    await db.schedule_a_items.insert_many([
+        {
+            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "category": "real_property",
+            "description": "Primary Family Residence - 123 Oak Street",
+            "identifier": "Deed #2020-12345",
+            "location": "Wilmington, Delaware",
+            "approximate_value": 650000,
+            "date_conveyed": "2020-01-15",
+            "notes": "Original trust corpus contribution",
+            "created_at": now.isoformat()
+        },
+        {
+            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "category": "real_property",
+            "description": "Vacation Property - Beach Condo Unit 4B",
+            "identifier": "Deed #2021-67890",
+            "location": "Rehoboth Beach, Delaware",
+            "approximate_value": 425000,
+            "date_conveyed": "2021-06-01",
+            "notes": "Added via property acceptance minutes",
+            "created_at": now.isoformat()
+        },
+        {
+            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "category": "financial_accounts",
+            "description": "Schwab Brokerage Account - Growth Portfolio",
+            "identifier": "Acct #****7890",
+            "location": "Charles Schwab",
+            "approximate_value": 1250000,
+            "date_conveyed": "2020-01-15",
+            "notes": "Primary investment account",
+            "created_at": now.isoformat()
+        },
+        {
+            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "category": "financial_accounts",
+            "description": "First National Bank - Operating Account",
+            "identifier": "Acct #****1234",
+            "location": "First National Bank, DE",
+            "approximate_value": 85000,
+            "date_conveyed": "2020-02-01",
+            "notes": "Trust checking account for distributions",
+            "created_at": now.isoformat()
+        },
+        {
+            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "category": "business_interests",
+            "description": "Smith Holdings LLC - 100% Membership Interest",
+            "identifier": "Member Certificate #001",
+            "location": "Delaware",
+            "approximate_value": 500000,
+            "date_conveyed": "2020-03-01",
+            "notes": "Wholly-owned holding company",
+            "created_at": now.isoformat()
+        },
+        {
+            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "category": "personal_property",
+            "description": "2022 Mercedes-Benz S-Class",
+            "identifier": "VIN: WDDUG8FB2NA******",
+            "location": "Wilmington, Delaware",
+            "approximate_value": 95000,
+            "date_conveyed": "2022-04-15",
+            "notes": "Trust vehicle",
+            "created_at": now.isoformat()
+        },
+        {
+            "asset_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "category": "other_property",
+            "description": "Fine Art Collection - Various Works",
+            "identifier": "Appraised Inventory #2023-001",
+            "location": "Family Residence",
+            "approximate_value": 175000,
+            "date_conveyed": "2020-01-15",
+            "notes": "Includes 12 paintings and 3 sculptures",
+            "created_at": now.isoformat()
+        }
+    ])
+    
+    # Create benevolence records (charitable assistance)
+    await db.benevolence_records.insert_many([
+        {
+            "record_id": f"ben_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "beneficiary_name": "Grace Community Church",
+            "beneficiary_type": "organization",
+            "purpose": "spiritual",
+            "purpose_description": "Annual ministry support for youth programs and community outreach",
+            "amount": 25000,
+            "date": (now - timedelta(days=45)).isoformat(),
+            "approved_by": ["John Smith", "Jane Smith"],
+            "approval_method": "unanimous",
+            "status": "approved",
+            "notes": "Continuing annual support - 5th year",
+            "created_at": (now - timedelta(days=45)).isoformat()
+        },
+        {
+            "record_id": f"ben_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "beneficiary_name": "Johnson Family",
+            "beneficiary_type": "family",
+            "purpose": "medical",
+            "purpose_description": "Medical expenses for father's cancer treatment - chemotherapy and hospital bills",
+            "amount": 15000,
+            "date": (now - timedelta(days=30)).isoformat(),
+            "approved_by": ["John Smith", "Jane Smith"],
+            "approval_method": "unanimous",
+            "status": "approved",
+            "notes": "Referred by Pastor Williams. Family has exhausted insurance coverage.",
+            "created_at": (now - timedelta(days=30)).isoformat()
+        },
+        {
+            "record_id": f"ben_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "beneficiary_name": "Maria Rodriguez",
+            "beneficiary_type": "individual",
+            "purpose": "education",
+            "purpose_description": "Community college tuition and books for nursing program",
+            "amount": 4500,
+            "date": (now - timedelta(days=20)).isoformat(),
+            "approved_by": ["John Smith"],
+            "approval_method": "majority",
+            "status": "approved",
+            "notes": "Single mother pursuing RN degree. Church member.",
+            "created_at": (now - timedelta(days=20)).isoformat()
+        },
+        {
+            "record_id": f"ben_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "beneficiary_name": "Local Food Bank",
+            "beneficiary_type": "organization",
+            "purpose": "food_necessities",
+            "purpose_description": "Holiday food drive support - Thanksgiving meal packages",
+            "amount": 5000,
+            "date": (now - timedelta(days=90)).isoformat(),
+            "approved_by": ["John Smith", "Jane Smith"],
+            "approval_method": "unanimous",
+            "status": "approved",
+            "notes": "Provided 200 family meal packages",
+            "created_at": (now - timedelta(days=90)).isoformat()
+        },
+        {
+            "record_id": f"ben_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "beneficiary_name": "Thomas Williams",
+            "beneficiary_type": "individual",
+            "purpose": "housing",
+            "purpose_description": "Emergency rent assistance after job loss - 2 months rent",
+            "amount": 3200,
+            "date": (now - timedelta(days=7)).isoformat(),
+            "approved_by": ["John Smith", "Jane Smith"],
+            "approval_method": "unanimous",
+            "status": "approved",
+            "notes": "Recently laid off. Has new job starting next month.",
+            "created_at": (now - timedelta(days=7)).isoformat()
+        }
+    ])
+    
+    # Set notification preferences with some customization
+    await db.notification_preferences.insert_one({
+        "user_id": user["user_id"],
+        "minutes_created": True,
+        "distribution_created": True,
+        "distribution_approved": True,
+        "task_reminders": True,
+        "task_overdue": True,
+        "subscription_updates": True,
+        "weekly_digest": True  # Enable weekly digest to showcase the feature
+    })
+    
     # Update onboarding
     await db.user_onboarding.update_one(
         {"user_id": user["user_id"]},
