@@ -16,7 +16,8 @@ import {
   Landmark,
   MapPin,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  HeartHandshake
 } from 'lucide-react';
 
 const ICONS = {
@@ -28,7 +29,8 @@ const ICONS = {
   'user-check': UserCheck,
   'users-round': UsersRound,
   'landmark': Landmark,
-  'map-pin': MapPin
+  'map-pin': MapPin,
+  'heart-handshake': HeartHandshake
 };
 
 export default function MinutesTemplatesPage() {
