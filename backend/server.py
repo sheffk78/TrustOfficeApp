@@ -204,6 +204,8 @@ class TrustUpdate(BaseModel):
     name: Optional[str] = None
     trust_type: Optional[TrustType] = None
     jurisdiction: Optional[str] = None
+    benevolence_enabled: Optional[bool] = None
+    tax_status: Optional[str] = None  # e.g., "501c3", "508", "private"
 
 class TrustResponse(BaseModel):
     trust_id: str
@@ -211,6 +213,8 @@ class TrustResponse(BaseModel):
     name: str
     trust_type: Optional[str] = "irrevocable"
     jurisdiction: Optional[str] = ""
+    benevolence_enabled: Optional[bool] = False
+    tax_status: Optional[str] = "private"
     created_at: str
     governance_score: int = 0
     trustees: Optional[List[str]] = []
