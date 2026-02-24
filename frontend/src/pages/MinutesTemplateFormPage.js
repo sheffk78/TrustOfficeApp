@@ -297,6 +297,18 @@ export default function MinutesTemplateFormPage() {
           reasons: situsData.reasons.filter(r => r.trim())
         };
       
+      case 'benevolence_approval':
+        return {
+          ...baseData,
+          beneficiary_name: benevolenceData.beneficiary_name,
+          beneficiary_type: benevolenceData.beneficiary_type,
+          benevolence_purpose: benevolenceData.benevolence_purpose,
+          purpose_description: benevolenceData.purpose_description,
+          amount: parseFloat(benevolenceData.amount) || 0,
+          disbursement_date: benevolenceData.disbursement_date,
+          add_to_benevolence_log: benevolenceData.add_to_benevolence_log
+        };
+      
       case 'general_meeting':
       default:
         return {
