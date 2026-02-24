@@ -1874,6 +1874,7 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
         {"_id": 0}
     )
     hide_watermark = user_prefs.get("hide_watermark", False) if user_prefs else False
+    print(f"[DEBUG] hide_watermark = {hide_watermark}, user_prefs = {user_prefs}")
     
     pdf_bytes = generate_minutes_pdf(minutes, trust or {}, hide_watermark=hide_watermark)
     pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
