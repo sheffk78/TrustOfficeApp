@@ -138,15 +138,17 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Prioritized Backlog
 
-### P1 (Short-term) - COMPLETE (Feb 23, 2026)
+### P1 (Short-term) - COMPLETE (Feb 23-24, 2026)
 - [x] Profile editing (name change) - Edit button in Settings > Profile section
 - [x] Search in minutes/distributions - Server-side search with debounced queries
 - [x] Table horizontal scroll for mobile - overflow-x-auto on table containers
+- [x] Benevolence Mode - Full feature for charitable trusts (toggle, log, template)
 - [ ] Notification preferences - TODO
 
 ### P2 (Medium-term)
-- [ ] Audit Log UI
+- [ ] Audit Log (backend + UI)
 - [ ] Receipt/invoice download
+- [ ] Feedback process
 
 ### P3 (Future)
 - [ ] Multi-trustee collaboration
