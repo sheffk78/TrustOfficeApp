@@ -2384,6 +2384,8 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
         doc += generate_distribution_content(template_data)
     elif template_type == "acceptance_of_property":
         doc += generate_property_acceptance_content(template_data)
+    elif template_type == "disposition_of_asset":
+        doc += generate_disposition_content(template_data)
     elif template_type == "appointment_additional_trustee":
         doc += generate_trustee_appointment_content(template_data, "additional")
     elif template_type == "appointment_successor_trustee":
