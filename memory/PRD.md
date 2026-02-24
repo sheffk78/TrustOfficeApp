@@ -21,7 +21,34 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Latest Updates (Feb 24, 2026) - COMPLETE ✅
+### Latest Updates (Feb 25, 2026) - P0 BUG FIXES & P1 FEATURE ✅
+
+1. **P0 Bug Fix: Save Minutes**
+   - Issue: Saving generated minutes from templates was failing
+   - Root Cause: PUT endpoint used plain `dict` instead of Pydantic model
+   - Fix: Added `MinutesTemplateUpdate` Pydantic model with optional fields for `generated_document`, `status`, `template_data`
+   - API: `PUT /api/minutes-templates/{minutes_id}`
+   - Verified: Successfully creates, generates preview, saves, and navigates to /minutes
+
+2. **P0 Bug Fix: Distribution Clock Icon**
+   - Issue: Clicking clock icon on approved distributions caused error
+   - Root Cause: Frontend was using PUT with query param, needed JSON body
+   - Fix: Created new `PATCH /api/distributions/{id}/status` endpoint with `DistributionStatusUpdate` Pydantic model
+   - Frontend: Updated `handleUpdateStatus` to use PATCH with JSON body `{status: 'review'}`
+   - Verified: Clock icon now correctly sets approved distributions back to review
+
+3. **P1 Feature: Auto-populate Minutes Form with Entity Data**
+   - Implementation: `loadTrustEntityData()` in `MinutesTemplateFormPage.js`
+   - Auto-populates: Trust Indenture Date (from `formation_date`), Trustees Present (from `trustee_names`)
+   - Article References: Passes `article_ref_distribution`, `article_ref_compensation`, etc. to backend
+   - Backend: Content generation functions use article references in WHEREAS clauses
+
+4. **P2 Bug Fix: Compensation API**
+   - Issue: GET /api/compensation-plans returned 500 error due to schema mismatch
+   - Fix: Updated `CompensationPlanResponse` model to support both old (`annual_approved_amount`) and new (`annual_fee`, `trustee_name`) field schemas
+   - Added field fallback logic in health score calculation and payment endpoints
+
+### Previous Updates (Feb 24, 2026) - COMPLETE ✅
 
 1. **Notification Preferences - COMPLETE (NEW)**
    - Settings page section with toggle switches for email notifications
