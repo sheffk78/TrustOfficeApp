@@ -158,6 +158,19 @@ class MinutesTemplateType(str, Enum):
     designation_of_beneficiaries = "designation_of_beneficiaries"
     bank_account_authorization = "bank_account_authorization"
     change_of_situs = "change_of_situs"
+    benevolence_approval = "benevolence_approval"
+
+# Benevolence Purpose Categories
+class BenevolencePurpose(str, Enum):
+    medical = "medical"
+    housing = "housing"
+    education = "education"
+    food_necessities = "food_necessities"
+    utilities = "utilities"
+    transportation = "transportation"
+    emergency = "emergency"
+    spiritual = "spiritual"
+    other = "other"
 
 # ==================== MODELS ====================
 
