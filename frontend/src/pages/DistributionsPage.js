@@ -167,17 +167,21 @@ export default function DistributionsPage() {
       return;
     }
     
-    // For decline, just update directly
+    // For decline or review, use the PATCH endpoint
     try {
-      const response = await fetchWithAuth(`/distributions/${distributionId}?status=${newStatus}`, {
-        method: 'PUT'
+      const response = await fetchWithAuth(`/distributions/${distributionId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update status');
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to update status');
       }
 
-      toast.success(`Distribution declined`);
+      const statusMessage = newStatus === 'declined' ? 'declined' : 'set to review';
+      toast.success(`Distribution ${statusMessage}`);
       loadDistributions();
     } catch (error) {
       toast.error(error.message);
