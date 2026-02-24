@@ -2883,9 +2883,9 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
     }
 
 @api_router.get("/template-options")
-async def get_template_options(user: dict = Depends(get_current_user)):
+async def get_template_options(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
     """Get available minutes template options with descriptions"""
-    return [
+    templates = [
         {
             "type": "blank",
             "name": "Blank Minutes",
@@ -2948,6 +2948,16 @@ async def get_template_options(user: dict = Depends(get_current_user)):
             "requires_benevolence": True
         }
     ]
+    
+    # Filter benevolence template based on trust settings
+    if trust_id:
+        trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+        if trust and trust.get("benevolence_enabled"):
+            return templates
+        else:
+            return [t for t in templates if not t.get("requires_benevolence")]
+    
+    return templates
 
 # ==================== BENEVOLENCE ENDPOINTS ====================
 
