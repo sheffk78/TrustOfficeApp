@@ -1944,7 +1944,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
                         date_conveyed = dt.fromisoformat(date_conveyed.replace("Z", "+00:00")).strftime("%m/%d/%Y")
                     elif "-" in date_conveyed and len(date_conveyed) == 10:
                         date_conveyed = dt.strptime(date_conveyed, "%Y-%m-%d").strftime("%m/%d/%Y")
-                except:
+                except (ValueError, AttributeError):
                     pass
             
             table_data.append([desc, identifier, location, value, date_conveyed])
