@@ -1,0 +1,829 @@
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
+import { Sidebar } from '@/components/Sidebar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { fetchWithAuth } from '@/utils/api';
+import { toast } from 'sonner';
+import { 
+  ArrowLeft,
+  Plus,
+  Trash2,
+  FileText,
+  Download,
+  Save,
+  Eye
+} from 'lucide-react';
+import { format } from 'date-fns';
+
+const TEMPLATE_TITLES = {
+  'general_meeting': 'General Meeting Minutes',
+  'distribution_to_beneficiaries': 'Distribution to Beneficiaries',
+  'acceptance_of_property': 'Accept Property into Trust',
+  'appointment_additional_trustee': 'Appoint Additional Trustee',
+  'appointment_successor_trustee': 'Appoint Successor Trustee'
+};
+
+const ASSET_CATEGORIES = [
+  { value: 'real_property', label: 'Real Property' },
+  { value: 'personal_property', label: 'Personal Property' },
+  { value: 'financial_accounts', label: 'Financial Accounts' },
+  { value: 'business_interests', label: 'Business Interests' },
+  { value: 'digital_assets', label: 'Digital Assets' },
+  { value: 'intellectual_property', label: 'Intellectual Property' },
+  { value: 'notes_receivable', label: 'Notes Receivable' },
+  { value: 'other_property', label: 'Other Property' }
+];
+
+export default function MinutesTemplateFormPage() {
+  const navigate = useNavigate();
+  const { templateType } = useParams();
+  const { selectedTrust } = useAuth();
+  
+  const [loading, setLoading] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [generatedDoc, setGeneratedDoc] = useState('');
+  const [minutesId, setMinutesId] = useState(null);
+  
+  // Common fields
+  const [formData, setFormData] = useState({
+    minute_number: `${new Date().getFullYear()}-001`,
+    meeting_date: format(new Date(), 'MMMM d, yyyy'),
+    meeting_time: '10:00 AM',
+    meeting_type: 'unanimous_written_consent',
+    meeting_location: '',
+    trustees_present: [],
+    trust_indenture_date: '',
+    adjournment_time: '10:30 AM'
+  });
+
+  // Distribution fields
+  const [distributionData, setDistributionData] = useState({
+    distribution_total: '',
+    distribution_items: [{ beneficiary_name: '', amount: '', percentage: '' }],
+    distribution_date: format(new Date(), 'MMMM d, yyyy'),
+    distribution_characterization: 'income'
+  });
+
+  // Property acceptance fields
+  const [propertyData, setPropertyData] = useState({
+    grantor_name: '',
+    property_description: '',
+    property_value: '',
+    conveyance_date: format(new Date(), 'MMMM d, yyyy'),
+    add_to_schedule_a: true,
+    schedule_a_category: 'real_property'
+  });
+
+  // Trustee appointment fields
+  const [trusteeData, setTrusteeData] = useState({
+    new_trustee_name: '',
+    new_trustee_gender: 'man',
+    departing_trustee_name: '',
+    departing_reason: 'resigned',
+    signature_requirement: 'any_one',
+    signature_threshold: '',
+    banking_powers_granted: true,
+    effective_date: format(new Date(), 'MMMM d, yyyy')
+  });
+
+  // General meeting resolutions
+  const [resolutions, setResolutions] = useState([{
+    title: '',
+    whereas_clauses: [''],
+    resolved_clauses: [''],
+    vote: 'Unanimous approval',
+    effective_date: 'Immediately upon adoption'
+  }]);
+
+  useEffect(() => {
+    if (selectedTrust?.trustees) {
+      setFormData(prev => ({
+        ...prev,
+        trustees_present: selectedTrust.trustees
+      }));
+    }
+  }, [selectedTrust]);
+
+  const handleAddTrustee = () => {
+    setFormData(prev => ({
+      ...prev,
+      trustees_present: [...prev.trustees_present, '']
+    }));
+  };
+
+  const handleRemoveTrustee = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      trustees_present: prev.trustees_present.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleTrusteeChange = (index, value) => {
+    setFormData(prev => ({
+      ...prev,
+      trustees_present: prev.trustees_present.map((t, i) => i === index ? value : t)
+    }));
+  };
+
+  const handleAddDistributionItem = () => {
+    setDistributionData(prev => ({
+      ...prev,
+      distribution_items: [...prev.distribution_items, { beneficiary_name: '', amount: '', percentage: '' }]
+    }));
+  };
+
+  const handleRemoveDistributionItem = (index) => {
+    setDistributionData(prev => ({
+      ...prev,
+      distribution_items: prev.distribution_items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleDistributionItemChange = (index, field, value) => {
+    setDistributionData(prev => ({
+      ...prev,
+      distribution_items: prev.distribution_items.map((item, i) => 
+        i === index ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
+  const handleAddResolution = () => {
+    setResolutions(prev => [...prev, {
+      title: '',
+      whereas_clauses: [''],
+      resolved_clauses: [''],
+      vote: 'Unanimous approval',
+      effective_date: 'Immediately upon adoption'
+    }]);
+  };
+
+  const handleRemoveResolution = (index) => {
+    setResolutions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const buildTemplateData = () => {
+    const baseData = {
+      ...formData,
+      trustees_present: formData.trustees_present.filter(t => t.trim())
+    };
+
+    switch (templateType) {
+      case 'distribution_to_beneficiaries':
+        return {
+          ...baseData,
+          distribution_total: parseFloat(distributionData.distribution_total) || 0,
+          distribution_items: distributionData.distribution_items
+            .filter(item => item.beneficiary_name)
+            .map(item => ({
+              beneficiary_name: item.beneficiary_name,
+              amount: parseFloat(item.amount) || 0,
+              percentage: parseFloat(item.percentage) || 0
+            })),
+          distribution_date: distributionData.distribution_date,
+          distribution_characterization: distributionData.distribution_characterization
+        };
+      
+      case 'acceptance_of_property':
+        return {
+          ...baseData,
+          grantor_name: propertyData.grantor_name,
+          property_description: propertyData.property_description,
+          property_value: parseFloat(propertyData.property_value) || null,
+          conveyance_date: propertyData.conveyance_date,
+          add_to_schedule_a: propertyData.add_to_schedule_a,
+          schedule_a_category: propertyData.schedule_a_category
+        };
+      
+      case 'appointment_additional_trustee':
+      case 'appointment_successor_trustee':
+        return {
+          ...baseData,
+          appointment_type: templateType === 'appointment_successor_trustee' ? 'successor' : 'additional',
+          new_trustee_name: trusteeData.new_trustee_name,
+          new_trustee_gender: trusteeData.new_trustee_gender,
+          departing_trustee_name: trusteeData.departing_trustee_name,
+          departing_reason: trusteeData.departing_reason,
+          signature_requirement: trusteeData.signature_requirement,
+          signature_threshold: parseFloat(trusteeData.signature_threshold) || null,
+          banking_powers_granted: trusteeData.banking_powers_granted,
+          effective_date: trusteeData.effective_date
+        };
+      
+      case 'general_meeting':
+      default:
+        return {
+          ...baseData,
+          resolutions: resolutions.filter(r => r.title).map(r => ({
+            title: r.title,
+            whereas_clauses: r.whereas_clauses.filter(c => c.trim()),
+            resolved_clauses: r.resolved_clauses.filter(c => c.trim()),
+            vote: r.vote,
+            effective_date: r.effective_date
+          }))
+        };
+    }
+  };
+
+  const handleGeneratePreview = async () => {
+    if (!selectedTrust) {
+      toast.error('Please select a trust');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const templateData = buildTemplateData();
+      
+      const response = await fetchWithAuth('/minutes-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          template_type: templateType,
+          template_data: templateData
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setGeneratedDoc(result.generated_document);
+        setMinutesId(result.minutes_id);
+        setPreviewMode(true);
+        toast.success('Minutes generated');
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to generate minutes');
+      }
+    } catch (error) {
+      toast.error('Failed to generate minutes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveMinutes = async () => {
+    if (!minutesId) return;
+
+    setLoading(true);
+    try {
+      const response = await fetchWithAuth(`/minutes-templates/${minutesId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          generated_document: generatedDoc,
+          status: 'final'
+        })
+      });
+
+      if (response.ok) {
+        toast.success('Minutes saved');
+        navigate('/minutes');
+      } else {
+        toast.error('Failed to save minutes');
+      }
+    } catch (error) {
+      toast.error('Failed to save minutes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!minutesId) return;
+
+    try {
+      const response = await fetchWithAuth(`/minutes-templates/${minutesId}/pdf`);
+      if (response.ok) {
+        const data = await response.json();
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${data.pdf_base64}`;
+        link.download = data.filename;
+        link.click();
+        toast.success('PDF downloaded');
+      }
+    } catch (error) {
+      toast.error('Failed to download PDF');
+    }
+  };
+
+  if (!selectedTrust) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar />
+        <main className="lg:pl-64 pt-16 lg:pt-0">
+          <div className="p-8">
+            <div className="card-trust p-8 text-center">
+              <p className="text-muted-foreground">Select a trust to create minutes</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Sidebar />
+      <main className="lg:pl-64 pt-16 lg:pt-0">
+        <div className="p-4 lg:p-8">
+          {/* Header */}
+          <div className="mb-8">
+            <Button 
+              variant="ghost" 
+              className="mb-4"
+              onClick={() => previewMode ? setPreviewMode(false) : navigate('/minutes/templates')}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              {previewMode ? 'Back to Form' : 'Back to Templates'}
+            </Button>
+            <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">
+              {TEMPLATE_TITLES[templateType] || 'Create Minutes'}
+            </h1>
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              {selectedTrust.name}
+            </p>
+          </div>
+
+          {previewMode ? (
+            /* Preview Mode */
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="font-serif text-xl text-navy">Document Preview</h2>
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={handleDownloadPDF}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download PDF
+                  </Button>
+                  <Button className="btn-primary" onClick={handleSaveMinutes} disabled={loading}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {loading ? 'Saving...' : 'Save Minutes'}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="card-trust p-6">
+                <p className="text-xs text-muted-foreground mb-4">
+                  You can edit the document below before saving. Changes are tracked for audit purposes.
+                </p>
+                <Textarea
+                  value={generatedDoc}
+                  onChange={(e) => setGeneratedDoc(e.target.value)}
+                  className="font-mono text-sm min-h-[600px] whitespace-pre-wrap"
+                  data-testid="generated-document"
+                />
+              </div>
+            </div>
+          ) : (
+            /* Form Mode */
+            <div className="space-y-8">
+              {/* Common Fields */}
+              <div className="card-trust corner-mark p-6">
+                <h2 className="font-serif text-xl text-navy mb-4">Meeting Information</h2>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="label-trust">Minute Number</Label>
+                    <Input
+                      value={formData.minute_number}
+                      onChange={(e) => setFormData({ ...formData, minute_number: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="2024-001"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust">Meeting Date</Label>
+                    <Input
+                      value={formData.meeting_date}
+                      onChange={(e) => setFormData({ ...formData, meeting_date: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="February 23, 2024"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust">Meeting Time</Label>
+                    <Input
+                      value={formData.meeting_time}
+                      onChange={(e) => setFormData({ ...formData, meeting_time: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="10:00 AM"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust">Meeting Type</Label>
+                    <Select value={formData.meeting_type} onValueChange={(v) => setFormData({ ...formData, meeting_type: v })}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unanimous_written_consent">Unanimous Written Consent</SelectItem>
+                        <SelectItem value="in_person">In Person</SelectItem>
+                        <SelectItem value="video_conference">Video/Phone Conference</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {formData.meeting_type === 'in_person' && (
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Meeting Location</Label>
+                      <Input
+                        value={formData.meeting_location}
+                        onChange={(e) => setFormData({ ...formData, meeting_location: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="123 Main Street, City, State"
+                      />
+                    </div>
+                  )}
+                  <div className="md:col-span-2">
+                    <Label className="label-trust">Trust Indenture Date</Label>
+                    <Input
+                      value={formData.trust_indenture_date}
+                      onChange={(e) => setFormData({ ...formData, trust_indenture_date: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="January 1, 2020"
+                    />
+                  </div>
+                </div>
+
+                {/* Trustees Present */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="label-trust">Trustees Present</Label>
+                    <Button type="button" variant="ghost" size="sm" onClick={handleAddTrustee}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Trustee
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {formData.trustees_present.map((trustee, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={trustee}
+                          onChange={(e) => handleTrusteeChange(index, e.target.value)}
+                          className="input-trust"
+                          placeholder="Trustee name"
+                        />
+                        {formData.trustees_present.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveTrustee(index)}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Template-specific fields */}
+              {templateType === 'distribution_to_beneficiaries' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Distribution Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <Label className="label-trust">Total Distribution Amount</Label>
+                      <Input
+                        type="number"
+                        value={distributionData.distribution_total}
+                        onChange={(e) => setDistributionData({ ...distributionData, distribution_total: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="50000"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Distribution Date</Label>
+                      <Input
+                        value={distributionData.distribution_date}
+                        onChange={(e) => setDistributionData({ ...distributionData, distribution_date: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="March 1, 2024"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Characterization</Label>
+                      <Select value={distributionData.distribution_characterization} onValueChange={(v) => setDistributionData({ ...distributionData, distribution_characterization: v })}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="income">Income</SelectItem>
+                          <SelectItem value="principal">Principal</SelectItem>
+                          <SelectItem value="return_of_corpus">Return of Corpus</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="label-trust">Beneficiaries</Label>
+                    <Button type="button" variant="ghost" size="sm" onClick={handleAddDistributionItem}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Beneficiary
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {distributionData.distribution_items.map((item, index) => (
+                      <div key={index} className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <Input
+                            value={item.beneficiary_name}
+                            onChange={(e) => handleDistributionItemChange(index, 'beneficiary_name', e.target.value)}
+                            placeholder="Beneficiary name"
+                            className="input-trust"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <Input
+                            type="number"
+                            value={item.amount}
+                            onChange={(e) => handleDistributionItemChange(index, 'amount', e.target.value)}
+                            placeholder="Amount"
+                            className="input-trust"
+                          />
+                        </div>
+                        <div className="w-24">
+                          <Input
+                            type="number"
+                            value={item.percentage}
+                            onChange={(e) => handleDistributionItemChange(index, 'percentage', e.target.value)}
+                            placeholder="%"
+                            className="input-trust"
+                          />
+                        </div>
+                        {distributionData.distribution_items.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveDistributionItem(index)}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'acceptance_of_property' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Property Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Grantor/Creator Name</Label>
+                      <Input
+                        value={propertyData.grantor_name}
+                        onChange={(e) => setPropertyData({ ...propertyData, grantor_name: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="John Smith"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Property Description</Label>
+                      <Textarea
+                        value={propertyData.property_description}
+                        onChange={(e) => setPropertyData({ ...propertyData, property_description: e.target.value })}
+                        className="mt-1"
+                        placeholder="Single-family residence located at 123 Main Street, City, State 12345; Lot 4, Block 2, Subdivision XYZ"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Approximate Value</Label>
+                      <Input
+                        type="number"
+                        value={propertyData.property_value}
+                        onChange={(e) => setPropertyData({ ...propertyData, property_value: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="250000"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Date of Conveyance</Label>
+                      <Input
+                        value={propertyData.conveyance_date}
+                        onChange={(e) => setPropertyData({ ...propertyData, conveyance_date: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="February 23, 2024"
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-3 mt-2">
+                      <Checkbox
+                        checked={propertyData.add_to_schedule_a}
+                        onCheckedChange={(checked) => setPropertyData({ ...propertyData, add_to_schedule_a: checked })}
+                        id="add-schedule-a"
+                      />
+                      <Label htmlFor="add-schedule-a" className="cursor-pointer">
+                        Automatically add to Schedule A
+                      </Label>
+                    </div>
+                    {propertyData.add_to_schedule_a && (
+                      <div className="md:col-span-2">
+                        <Label className="label-trust">Asset Category (for Schedule A)</Label>
+                        <Select value={propertyData.schedule_a_category} onValueChange={(v) => setPropertyData({ ...propertyData, schedule_a_category: v })}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ASSET_CATEGORIES.map(cat => (
+                              <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(templateType === 'appointment_additional_trustee' || templateType === 'appointment_successor_trustee') && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">
+                    {templateType === 'appointment_successor_trustee' ? 'Successor Trustee Details' : 'New Trustee Details'}
+                  </h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">New Trustee Name</Label>
+                      <Input
+                        value={trusteeData.new_trustee_name}
+                        onChange={(e) => setTrusteeData({ ...trusteeData, new_trustee_name: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Jane Doe"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Gender (for document language)</Label>
+                      <Select value={trusteeData.new_trustee_gender} onValueChange={(v) => setTrusteeData({ ...trusteeData, new_trustee_gender: v })}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="man">Man</SelectItem>
+                          <SelectItem value="woman">Woman</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {templateType === 'appointment_successor_trustee' && (
+                      <>
+                        <div>
+                          <Label className="label-trust">Departing Trustee Name</Label>
+                          <Input
+                            value={trusteeData.departing_trustee_name}
+                            onChange={(e) => setTrusteeData({ ...trusteeData, departing_trustee_name: e.target.value })}
+                            className="mt-1 input-trust"
+                            placeholder="John Smith"
+                          />
+                        </div>
+                        <div>
+                          <Label className="label-trust">Reason for Departure</Label>
+                          <Select value={trusteeData.departing_reason} onValueChange={(v) => setTrusteeData({ ...trusteeData, departing_reason: v })}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="resigned">Resigned</SelectItem>
+                              <SelectItem value="died">Died</SelectItem>
+                              <SelectItem value="incapacitated">Become Incapacitated</SelectItem>
+                              <SelectItem value="removed">Been Removed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <Label className="label-trust">Effective Date</Label>
+                      <Input
+                        value={trusteeData.effective_date}
+                        onChange={(e) => setTrusteeData({ ...trusteeData, effective_date: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="February 23, 2024"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Signature Requirement</Label>
+                      <Select value={trusteeData.signature_requirement} onValueChange={(v) => setTrusteeData({ ...trusteeData, signature_requirement: v })}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any_one">Any One Trustee (no limit)</SelectItem>
+                          <SelectItem value="any_two">Any Two Trustees (all transactions)</SelectItem>
+                          <SelectItem value="threshold">One up to threshold, Two above</SelectItem>
+                          <SelectItem value="all_trustees">All Trustees (above threshold)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {(trusteeData.signature_requirement === 'threshold' || trusteeData.signature_requirement === 'all_trustees') && (
+                      <div>
+                        <Label className="label-trust">Signature Threshold Amount</Label>
+                        <Input
+                          type="number"
+                          value={trusteeData.signature_threshold}
+                          onChange={(e) => setTrusteeData({ ...trusteeData, signature_threshold: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="10000"
+                        />
+                      </div>
+                    )}
+
+                    <div className="md:col-span-2 flex items-center gap-3 mt-2">
+                      <Checkbox
+                        checked={trusteeData.banking_powers_granted}
+                        onCheckedChange={(checked) => setTrusteeData({ ...trusteeData, banking_powers_granted: checked })}
+                        id="banking-powers"
+                      />
+                      <Label htmlFor="banking-powers" className="cursor-pointer">
+                        Grant banking and signatory powers
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'general_meeting' && (
+                <div className="card-trust corner-mark p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-serif text-xl text-navy">Resolutions</h2>
+                    <Button type="button" variant="outline" onClick={handleAddResolution}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Resolution
+                    </Button>
+                  </div>
+                  
+                  {resolutions.map((res, index) => (
+                    <div key={index} className="mb-6 p-4 border border-border rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-medium">Resolution {index + 1}</h3>
+                        {resolutions.length > 1 && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveResolution(index)}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="label-trust">Title/Subject</Label>
+                          <Input
+                            value={res.title}
+                            onChange={(e) => {
+                              const newRes = [...resolutions];
+                              newRes[index].title = e.target.value;
+                              setResolutions(newRes);
+                            }}
+                            className="mt-1 input-trust"
+                            placeholder="e.g., Approval of Annual Report"
+                          />
+                        </div>
+                        <div>
+                          <Label className="label-trust">WHEREAS Clause(s)</Label>
+                          <Textarea
+                            value={res.whereas_clauses[0]}
+                            onChange={(e) => {
+                              const newRes = [...resolutions];
+                              newRes[index].whereas_clauses = [e.target.value];
+                              setResolutions(newRes);
+                            }}
+                            className="mt-1"
+                            placeholder="State the background, circumstances, or reason for the resolution"
+                            rows={2}
+                          />
+                        </div>
+                        <div>
+                          <Label className="label-trust">BE IT RESOLVED Clause(s)</Label>
+                          <Textarea
+                            value={res.resolved_clauses[0]}
+                            onChange={(e) => {
+                              const newRes = [...resolutions];
+                              newRes[index].resolved_clauses = [e.target.value];
+                              setResolutions(newRes);
+                            }}
+                            className="mt-1"
+                            placeholder="State the specific action, decision, or authorization"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Generate Button */}
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => navigate('/minutes/templates')}>
+                  Cancel
+                </Button>
+                <Button className="btn-primary" onClick={handleGeneratePreview} disabled={loading}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  {loading ? 'Generating...' : 'Generate Preview'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
