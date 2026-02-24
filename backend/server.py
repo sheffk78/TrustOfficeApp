@@ -1261,6 +1261,63 @@ async def logout(request: Request, response: Response):
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out"}
 
+# ==================== NOTIFICATION PREFERENCES ====================
+
+@api_router.get("/notifications/preferences")
+async def get_notification_preferences(user: dict = Depends(get_current_user)):
+    """Get user's notification preferences"""
+    prefs = await db.notification_preferences.find_one(
+        {"user_id": user["user_id"]}, 
+        {"_id": 0}
+    )
+    
+    if not prefs:
+        # Return defaults
+        return {
+            "user_id": user["user_id"],
+            "minutes_created": True,
+            "distribution_created": True,
+            "distribution_approved": True,
+            "task_reminders": True,
+            "task_overdue": True,
+            "subscription_updates": True,
+            "weekly_digest": False
+        }
+    
+    return prefs
+
+@api_router.put("/notifications/preferences")
+async def update_notification_preferences(
+    prefs: NotificationPreferencesUpdate, 
+    user: dict = Depends(get_current_user)
+):
+    """Update user's notification preferences"""
+    update_fields = {k: v for k, v in prefs.dict().items() if v is not None}
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    # Upsert preferences
+    await db.notification_preferences.update_one(
+        {"user_id": user["user_id"]},
+        {
+            "$set": update_fields,
+            "$setOnInsert": {"user_id": user["user_id"]}
+        },
+        upsert=True
+    )
+    
+    # Get updated preferences
+    updated_prefs = await db.notification_preferences.find_one(
+        {"user_id": user["user_id"]}, 
+        {"_id": 0}
+    )
+    
+    return {
+        "message": "Notification preferences updated",
+        "preferences": updated_prefs
+    }
+
 # ==================== TRUST ENDPOINTS ====================
 
 @api_router.post("/trusts", response_model=TrustResponse)
