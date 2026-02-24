@@ -3251,6 +3251,12 @@ async def get_template_options(trust_id: Optional[str] = None, user: dict = Depe
             "icon": "plus-circle"
         },
         {
+            "type": "disposition_of_asset",
+            "name": "Dispose / Sell Asset",
+            "description": "Record the sale, transfer, or removal of an asset from Schedule A",
+            "icon": "minus-circle"
+        },
+        {
             "type": "appointment_additional_trustee",
             "name": "Appoint Additional Trustee",
             "description": "Appoint a new trustee to serve alongside existing trustees",
