@@ -5195,6 +5195,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "approved_by": ["John Smith", "Jane Smith"],
             "approval_method": "unanimous",
             "status": "approved",
+            "minutes_id": None,
             "notes": "Continuing annual support - 5th year",
             "created_at": (now - timedelta(days=45)).isoformat()
         },
@@ -5211,6 +5212,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "approved_by": ["John Smith", "Jane Smith"],
             "approval_method": "unanimous",
             "status": "approved",
+            "minutes_id": None,
             "notes": "Referred by Pastor Williams. Family has exhausted insurance coverage.",
             "created_at": (now - timedelta(days=30)).isoformat()
         },
@@ -5227,6 +5229,7 @@ The Trustees have determined that this assistance aligns with the Trust's charit
             "approved_by": ["John Smith"],
             "approval_method": "majority",
             "status": "approved",
+            "minutes_id": None,
             "notes": "Single mother pursuing RN degree. Church member.",
             "created_at": (now - timedelta(days=20)).isoformat()
         },
