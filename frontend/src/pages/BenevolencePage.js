@@ -256,6 +256,14 @@ export default function BenevolencePage() {
             <div className="flex gap-3 mt-4 md:mt-0">
               <Button
                 variant="outline"
+                onClick={handleExportPDF}
+                data-testid="export-benevolence-pdf"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Report
+              </Button>
+              <Button
+                variant="outline"
                 onClick={() => navigate('/minutes/template/benevolence_approval')}
               >
                 <FileText className="w-4 h-4 mr-2" />
