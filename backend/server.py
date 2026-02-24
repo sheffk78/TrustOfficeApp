@@ -2600,6 +2600,93 @@ Effective Date: {effective_date}
     
     return content
 
+def generate_benevolence_approval_content(data: dict) -> str:
+    """Generate content for benevolence assistance approval"""
+    beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
+    beneficiary_type = data.get("beneficiary_type", "individual")
+    purpose = data.get("benevolence_purpose", "assistance")
+    purpose_description = data.get("purpose_description", "[Description of need]")
+    amount = data.get("amount", 0)
+    payment_method = data.get("payment_method", "check")
+    criteria_met = data.get("criteria_met", [])
+    
+    type_text = {
+        "individual": "an individual",
+        "family": "a family",
+        "organization": "an organization"
+    }.get(beneficiary_type, "an individual")
+    
+    purpose_text = {
+        "medical": "medical expenses and healthcare needs",
+        "housing": "housing assistance and shelter",
+        "education": "educational expenses and advancement",
+        "food_necessities": "food and basic necessities",
+        "utilities": "utility payments and essential services",
+        "transportation": "transportation needs",
+        "emergency": "emergency relief and crisis assistance",
+        "spiritual": "spiritual development and ministry support",
+        "other": "charitable assistance"
+    }.get(purpose, "charitable assistance")
+    
+    content = f"""Resolution 1: Approval of Benevolence Assistance
+
+WHEREAS, this Trust operates as a private ecclesiastical trust with charitable purposes, consistent with the principles set forth in the Trust Indenture;
+
+WHEREAS, the Board of Trustees has received and reviewed a request for benevolence assistance from {beneficiary_name}, {type_text}, for the purpose of {purpose_text};
+
+WHEREAS, the Trustees have evaluated the request and determined that:
+    • The need is genuine and verified
+    • The assistance aligns with the charitable purposes of this Trust
+    • The recipient meets the criteria established for benevolence assistance
+    • Providing this assistance is consistent with sound fiduciary principles
+
+WHEREAS, the following criteria have been confirmed:
+"""
+    
+    if criteria_met:
+        for criterion in criteria_met:
+            content += f"    • {criterion}\n"
+    else:
+        content += """    • Need has been verified through appropriate inquiry
+    • Assistance is consistent with the Trust's charitable mission
+    • Resources are available to provide the requested assistance
+    • No conflict of interest exists among the Trustees
+"""
+    
+    content += f"""
+WHEREAS, the request is summarized as follows:
+    Beneficiary: {beneficiary_name}
+    Type: {beneficiary_type.title()}
+    Purpose: {purpose_description}
+    Amount Requested: ${amount:,.2f}
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby approves benevolence assistance to {beneficiary_name} in the amount of ${amount:,.2f} for the purpose described above.
+
+• The assistance shall be disbursed via {payment_method} within a reasonable time following adoption of this resolution.
+
+• This benevolence grant is made without any obligation of repayment and is intended solely to assist with the stated need.
+
+• The Trustees affirm that this assistance is made in furtherance of the Trust's charitable purposes and is consistent with the Trust Indenture.
+
+• A record of this benevolence grant shall be maintained in the Trust's Benevolence Log for proper documentation and compliance purposes.
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees have exercised due diligence in evaluating this request and have acted in good faith.
+
+• This grant does not create any ongoing obligation or entitlement to future assistance.
+
+• All standard documentation requirements for benevolence grants shall be completed and maintained.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    
+    return content
+
 @api_router.post("/minutes-templates")
 async def create_minutes_from_template(template: MinutesTemplateCreate, user: dict = Depends(get_current_user)):
     """Create minutes from a template"""
