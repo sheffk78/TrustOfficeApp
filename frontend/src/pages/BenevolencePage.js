@@ -169,6 +169,41 @@ export default function BenevolencePage() {
     });
   };
 
+  const handleExportPDF = async () => {
+    if (!selectedTrust) return;
+    
+    try {
+      toast.loading('Generating report...', { id: 'export-pdf' });
+      
+      // Get current year for filtering
+      const currentYear = new Date().getFullYear();
+      const url = `${process.env.REACT_APP_BACKEND_URL}/api/benevolence/export/${selectedTrust.trust_id}/pdf?year=${currentYear}`;
+      
+      const token = localStorage.getItem('token');
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `benevolence_report_${currentYear}_${selectedTrust.trust_id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        a.remove();
+        toast.success('Report downloaded', { id: 'export-pdf' });
+      } else {
+        toast.error('Failed to generate report', { id: 'export-pdf' });
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export report', { id: 'export-pdf' });
+    }
+  };
+
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
   };
