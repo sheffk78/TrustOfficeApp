@@ -174,6 +174,25 @@ export default function ScheduleAPage() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
   };
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    try {
+      // Try ISO format first
+      const date = parseISO(dateStr);
+      if (isNaN(date.getTime())) {
+        // Try parsing as a plain date string
+        const plainDate = new Date(dateStr);
+        if (isNaN(plainDate.getTime())) {
+          return dateStr; // Return original if parsing fails
+        }
+        return format(plainDate, 'MMM d, yyyy');
+      }
+      return format(date, 'MMM d, yyyy');
+    } catch {
+      return dateStr;
+    }
+  };
+
   const getCategoryInfo = (categoryValue) => {
     return ASSET_CATEGORIES.find(c => c.value === categoryValue) || ASSET_CATEGORIES[7];
   };
