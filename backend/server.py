@@ -3953,7 +3953,10 @@ async def get_comp_ytd(trust_id: str, user: dict = Depends(get_current_user)):
         {"_id": 0},
         sort=[("effective_date", -1)]
     )
-    annual_approved = plan.get("annual_approved_amount", 0) if plan else 0
+    # Support both annual_approved_amount and annual_fee fields
+    annual_approved = 0
+    if plan:
+        annual_approved = plan.get("annual_approved_amount") or plan.get("annual_fee") or plan.get("annual_amount", 0)
     
     return {
         "ytd_total": ytd_total,
