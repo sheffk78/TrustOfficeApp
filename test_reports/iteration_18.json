@@ -1,0 +1,117 @@
+{
+  "summary": "Completed testing of Notification Preferences UI in Settings page and Benevolence PDF Export feature. All 11 backend API tests passed (100%). Frontend tests passed for notification toggles and PDF export functionality. Fixed a minor bug in BenevolencePage.js where the auth token was being retrieved from wrong localStorage key.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/notifications/preferences", "issue": "Response does not merge defaults with stored preferences - only returns stored fields. If user has only updated some preferences, the others are missing from response. Frontend works around this by setting defaults in component state."}
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings - Notification Preferences", "issues": ["Console warning: Switch component changing from controlled to uncontrolled - minor React anti-pattern, non-blocking"]}
+    ]
+  },
+
+  "passed_tests": {
+    "backend_api": [
+      "GET /api/notifications/preferences returns user preferences with user_id",
+      "PUT /api/notifications/preferences updates specific preference field (weekly_digest)",
+      "PUT /api/notifications/preferences can update multiple fields at once",
+      "PUT /api/notifications/preferences returns 400 for empty body",
+      "GET /api/notifications/preferences requires authentication (returns 401)",
+      "GET /api/benevolence/export/{trust_id}/pdf generates valid PDF with correct headers",
+      "GET /api/benevolence/export/{trust_id}/pdf?year=2026 filters by year",
+      "GET /api/benevolence/export/invalid_trust/pdf returns 404",
+      "GET /api/benevolence/export/{trust_id}/pdf returns 400 when benevolence disabled",
+      "GET /api/benevolence/export/{trust_id}/pdf requires authentication (returns 401)",
+      "Notification preference persistence verified (Create → GET verification)"
+    ],
+    "frontend_ui": [
+      "Notification Preferences section visible in Settings page (data-testid='notification-preferences-section')",
+      "Minutes Created toggle (notif-minutes-created) visible and functional",
+      "Distribution Created toggle (notif-distribution-created) visible",
+      "Distribution Approved toggle (notif-distribution-approved) visible",
+      "Task Reminders toggle (notif-task-reminders) visible and functional",
+      "Overdue Task Alerts toggle (notif-task-overdue) visible",
+      "Subscription Updates toggle (notif-subscription-updates) visible",
+      "Weekly Digest toggle (notif-weekly-digest) visible and functional",
+      "Toggle interaction works - state changes when clicked",
+      "Benevolence page loads with Export Report button visible",
+      "Export Report button (data-testid='export-benevolence-pdf') triggers PDF download",
+      "Success toast 'Report downloaded' appears after export"
+    ]
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_notification_prefs_benevolence_export.py",
+    "/app/test_reports/pytest/notification_benevolence_export_results.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "FIXED: BenevolencePage.js handleExportPDF was using wrong localStorage key ('token' instead of 'auth_token'), causing 401 errors on PDF export. Fixed by using correct key and adding credentials:include",
+    "Minor: GET /api/notifications/preferences should merge default values with stored values for complete response. Currently only returns user_id + any stored preferences.",
+    "Minor: Switch component in SettingsPage shows React warning about controlled/uncontrolled - should initialize with explicit values from loaded prefs"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_notification_prefs_benevolence_export.py",
+    "/app/frontend/src/pages/BenevolencePage.js"
+  ],
+
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (12/12 UI checks passed)"
+  },
+
+  "test_credentials": {
+    "email": "test@trustoffice.com",
+    "password": "testpassword123"
+  },
+
+  "seed_data_creation": "Used 'Use Demo Data' button to create Smith Family Trust with benevolence_enabled=true",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Notification Preferences and Benevolence PDF Export features are fully functional. The Settings page has 7 notification toggle switches that save changes in real-time via PUT /api/notifications/preferences. The Benevolence page has an Export Report button that downloads a styled PDF report grouped by purpose category. Both features are using the trust 'Smith Family Trust' (trust_f8896488ce03) which has benevolence_enabled=true.",
+
+  "features_verified": {
+    "notification_preferences": {
+      "location": "Settings page > Notification Preferences section",
+      "section_testid": "notification-preferences-section",
+      "toggles": [
+        {"testid": "notif-minutes-created", "label": "Minutes Created", "default": true},
+        {"testid": "notif-distribution-created", "label": "Distribution Created", "default": true},
+        {"testid": "notif-distribution-approved", "label": "Distribution Approved", "default": true},
+        {"testid": "notif-task-reminders", "label": "Task Reminders", "default": true},
+        {"testid": "notif-task-overdue", "label": "Overdue Task Alerts", "default": true},
+        {"testid": "notif-subscription-updates", "label": "Subscription Updates", "default": true},
+        {"testid": "notif-weekly-digest", "label": "Weekly Digest", "default": false}
+      ],
+      "api_endpoints": {
+        "get": "GET /api/notifications/preferences",
+        "update": "PUT /api/notifications/preferences"
+      }
+    },
+    "benevolence_pdf_export": {
+      "location": "Benevolence page > Export Report button",
+      "button_testid": "export-benevolence-pdf",
+      "api_endpoint": "GET /api/benevolence/export/{trust_id}/pdf",
+      "optional_params": "?year=YYYY for year filtering",
+      "pdf_content": "Styled PDF with trust info, summary statistics, and grants grouped by purpose category"
+    }
+  },
+
+  "bug_fixed": {
+    "file": "/app/frontend/src/pages/BenevolencePage.js",
+    "line": "182-185",
+    "issue": "handleExportPDF was using localStorage.getItem('token') but app stores token as 'auth_token'. Also was missing credentials:include for cookie auth.",
+    "fix": "Changed to use auth_token key with fallback to session_token cookie, added credentials:include"
+  }
+}
