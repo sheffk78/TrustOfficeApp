@@ -22,7 +22,25 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 ## Completed Features
 
 ### Latest Updates (Feb 24, 2026) - COMPLETE ✅
-1. **Benevolence Mode - COMPLETE (NEW)**
+
+1. **Notification Preferences - COMPLETE (NEW)**
+   - Settings page section with toggle switches for email notifications
+   - Categories: Document Notifications (minutes, distributions), Task Reminders, Account & Subscription
+   - 7 toggleable options: Minutes Created, Distribution Created, Distribution Approved, Task Reminders, Overdue Task Alerts, Subscription Updates, Weekly Digest
+   - Real-time save on toggle (PUT to backend)
+   - APIs: `GET /api/notifications/preferences`, `PUT /api/notifications/preferences`
+   - DB Collection: `notification_preferences` with user_id and boolean flags
+
+2. **Benevolence Report PDF Export - COMPLETE (NEW)**
+   - Styled PDF report similar to Schedule A export
+   - Contents: Trust info, tax status, summary statistics (total grants, amount, beneficiaries, categories)
+   - Grants grouped by purpose category (Medical, Housing, Education, etc.)
+   - Tables with date, beneficiary, description, amount columns
+   - Optional year filter (`?year=2026`)
+   - API: `GET /api/benevolence/export/{trust_id}/pdf`
+   - Export button on Benevolence page
+
+3. **Benevolence Mode - COMPLETE**
    - Optional feature for 501/508-type charitable trusts
    - **Settings Toggle**: Enable/disable per trust with tax status dropdown (501(c)(3), 508 Church/Religious Org, Private Foundation)
    - **Benevolence Log Page** (`/benevolence`):
@@ -30,12 +48,13 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
      - Record Grant dialog with full form (beneficiary, type, purpose category, amount, etc.)
      - Data table with search/filter (by purpose, status)
      - CRUD operations for benevolence records
+     - **Export Report button** for PDF download
    - **Conditional Navigation**: "Benevolence" sidebar link only visible when enabled for active trust
    - **Minutes Template Integration**: "Benevolence Assistance Approval" template in gallery with specialized form
    - APIs: `POST/GET/PUT/DELETE /api/benevolence`, `GET /api/benevolence/summary/{trust_id}`
    - DB Collection: `benevolence_records` with fields: record_id, trust_id, beneficiary_name, beneficiary_type, purpose, purpose_description, amount, date, approved_by, approval_method, status, notes
 
-2. **Minutes Templates System - 10 Templates Total**
+4. **Minutes Templates System - 10 Templates Total**
    - Blank, General Meeting, Distribution to Beneficiaries
    - Accept Property into Trust (auto-adds to Schedule A)
    - Appoint Additional/Successor Trustee
