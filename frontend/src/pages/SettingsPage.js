@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -21,7 +21,11 @@ import {
   FileText,
   ChevronRight,
   Loader2,
-  HeartHandshake
+  HeartHandshake,
+  Mail,
+  Clock,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
@@ -35,6 +39,16 @@ export default function SettingsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState(user?.name || '');
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    minutes_created: true,
+    distribution_created: true,
+    distribution_approved: true,
+    task_reminders: true,
+    task_overdue: true,
+    subscription_updates: true,
+    weekly_digest: false
+  });
+  const [notificationLoading, setNotificationLoading] = useState(false);
   
   const [trustData, setTrustData] = useState({
     name: selectedTrust?.name || '',
@@ -44,6 +58,48 @@ export default function SettingsPage() {
     benevolence_enabled: selectedTrust?.benevolence_enabled || false,
     tax_status: selectedTrust?.tax_status || 'private'
   });
+
+  // Load notification preferences on mount
+  useEffect(() => {
+    loadNotificationPreferences();
+  }, []);
+
+  const loadNotificationPreferences = async () => {
+    try {
+      const response = await fetchWithAuth('/notifications/preferences');
+      if (response.ok) {
+        const data = await response.json();
+        setNotificationPrefs(data);
+      }
+    } catch (error) {
+      console.error('Failed to load notification preferences:', error);
+    }
+  };
+
+  const handleNotificationChange = async (key, value) => {
+    const newPrefs = { ...notificationPrefs, [key]: value };
+    setNotificationPrefs(newPrefs);
+    
+    try {
+      setNotificationLoading(true);
+      const response = await fetchWithAuth('/notifications/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value })
+      });
+      
+      if (!response.ok) {
+        // Revert on error
+        setNotificationPrefs({ ...notificationPrefs });
+        toast.error('Failed to update preference');
+      }
+    } catch (error) {
+      setNotificationPrefs({ ...notificationPrefs });
+      toast.error('Failed to update preference');
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
 
   const handleUpdateProfile = async () => {
     if (!profileName.trim()) {
