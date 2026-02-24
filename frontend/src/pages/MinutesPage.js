@@ -142,14 +142,16 @@ export default function MinutesPage() {
                 {selectedTrust?.name || 'Select a trust'}
               </p>
             </div>
-            <Button 
-              onClick={() => navigate('/minutes/new')}
-              className="btn-primary"
-              data-testid="record-minutes-btn"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Record Minutes
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => navigate('/minutes/templates')}
+                className="btn-primary"
+                data-testid="record-minutes-btn"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Record Minutes
+              </Button>
+            </div>
           </div>
 
           {/* Filters */}
