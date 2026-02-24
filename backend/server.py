@@ -4632,10 +4632,21 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
     sub = await get_or_create_subscription(user["user_id"])
     
     try:
-        # Get or create Stripe customer
+        customer_id = None
+        
+        # Try to use existing customer if we have one
         if sub.get("stripe_customer_id"):
-            customer_id = sub["stripe_customer_id"]
-        else:
+            try:
+                # Verify the customer exists in Stripe (handles test->live mode switch)
+                stripe.Customer.retrieve(sub["stripe_customer_id"])
+                customer_id = sub["stripe_customer_id"]
+            except stripe.InvalidRequestError:
+                # Customer doesn't exist (likely switched from test to live mode)
+                logger.info(f"Customer {sub['stripe_customer_id']} not found in Stripe, creating new one")
+                customer_id = None
+        
+        # Create new customer if needed
+        if not customer_id:
             customer = stripe.Customer.create(
                 email=user["email"],
                 name=user.get("name", ""),
