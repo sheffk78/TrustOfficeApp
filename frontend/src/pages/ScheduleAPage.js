@@ -263,6 +263,15 @@ export default function ScheduleAPage() {
               </p>
             </div>
             <div className="flex gap-3 mt-4 md:mt-0">
+              <Button 
+                variant="outline" 
+                onClick={handleExportPDF}
+                disabled={exporting || assets.length === 0}
+                data-testid="export-pdf-btn"
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                {exporting ? 'Exporting...' : 'Export PDF'}
+              </Button>
               <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
                 <DialogTrigger asChild>
                   <Button className="btn-primary" data-testid="add-asset-btn">
