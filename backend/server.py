@@ -1670,6 +1670,681 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
         "filename": f"minutes_{minutes_id}.pdf"
     }
 
+# ==================== SCHEDULE A ENDPOINTS ====================
+
+@api_router.post("/schedule-a", response_model=ScheduleAItemResponse)
+async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends(get_current_user)):
+    """Add an asset to Schedule A"""
+    trust = await db.trusts.find_one({"trust_id": item.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    item_id = f"asset_{uuid.uuid4().hex[:12]}"
+    item_doc = {
+        "item_id": item_id,
+        "trust_id": item.trust_id,
+        "user_id": user["user_id"],
+        "category": item.category.value,
+        "description": item.description,
+        "identifier": item.identifier,
+        "location": item.location,
+        "approximate_value": item.approximate_value,
+        "date_conveyed": item.date_conveyed,
+        "notes": item.notes,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None
+    }
+    
+    await db.schedule_a_items.insert_one(item_doc)
+    return ScheduleAItemResponse(**item_doc)
+
+@api_router.get("/schedule-a", response_model=List[ScheduleAItemResponse])
+async def get_schedule_a_items(trust_id: str, category: Optional[str] = None, user: dict = Depends(get_current_user)):
+    """Get all Schedule A items for a trust"""
+    query = {"trust_id": trust_id, "user_id": user["user_id"]}
+    if category:
+        query["category"] = category
+    
+    items = await db.schedule_a_items.find(query, {"_id": 0}).sort("category", 1).to_list(1000)
+    return [ScheduleAItemResponse(**item) for item in items]
+
+@api_router.get("/schedule-a/{item_id}", response_model=ScheduleAItemResponse)
+async def get_schedule_a_item(item_id: str, user: dict = Depends(get_current_user)):
+    """Get a single Schedule A item"""
+    item = await db.schedule_a_items.find_one({"item_id": item_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return ScheduleAItemResponse(**item)
+
+@api_router.put("/schedule-a/{item_id}", response_model=ScheduleAItemResponse)
+async def update_schedule_a_item(item_id: str, update: ScheduleAItemUpdate, user: dict = Depends(get_current_user)):
+    """Update a Schedule A item"""
+    item = await db.schedule_a_items.find_one({"item_id": item_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.schedule_a_items.update_one(
+        {"item_id": item_id},
+        {"$set": update_data}
+    )
+    
+    updated_item = await db.schedule_a_items.find_one({"item_id": item_id}, {"_id": 0})
+    return ScheduleAItemResponse(**updated_item)
+
+@api_router.delete("/schedule-a/{item_id}")
+async def delete_schedule_a_item(item_id: str, user: dict = Depends(get_current_user)):
+    """Delete a Schedule A item"""
+    result = await db.schedule_a_items.delete_one({"item_id": item_id, "user_id": user["user_id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return {"message": "Asset deleted"}
+
+@api_router.get("/schedule-a/summary/{trust_id}")
+async def get_schedule_a_summary(trust_id: str, user: dict = Depends(get_current_user)):
+    """Get Schedule A summary with totals by category"""
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    items = await db.schedule_a_items.find({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0}).to_list(1000)
+    
+    # Group by category
+    categories = {}
+    total_value = 0
+    
+    for item in items:
+        cat = item["category"]
+        if cat not in categories:
+            categories[cat] = {"items": [], "total_value": 0, "count": 0}
+        categories[cat]["items"].append(item)
+        categories[cat]["count"] += 1
+        if item.get("approximate_value"):
+            categories[cat]["total_value"] += item["approximate_value"]
+            total_value += item["approximate_value"]
+    
+    return {
+        "trust_id": trust_id,
+        "trust_name": trust.get("name", ""),
+        "categories": categories,
+        "total_items": len(items),
+        "total_value": total_value
+    }
+
+# ==================== MINUTES TEMPLATES ENDPOINTS ====================
+
+def generate_template_document(trust: dict, template_type: str, template_data: dict) -> str:
+    """Generate the full text minutes document from template"""
+    trust_name = trust.get("name", "[Trust Name]")
+    trustees = trust.get("trustees", [])
+    trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
+    
+    # Get data from template_data with defaults
+    minute_number = template_data.get("minute_number", f"{datetime.now().year}-001")
+    meeting_date = template_data.get("meeting_date", datetime.now().strftime("%B %d, %Y"))
+    meeting_time = template_data.get("meeting_time", "10:00 AM")
+    meeting_type = template_data.get("meeting_type", "unanimous_written_consent")
+    trustees_present = template_data.get("trustees_present", trustee_names)
+    trust_indenture_date = template_data.get("trust_indenture_date", "[Date of Trust Indenture]")
+    
+    meeting_type_text = {
+        "in_person": f"In person at {template_data.get('meeting_location', '[Location]')}",
+        "video_conference": "By telephone/video conference",
+        "unanimous_written_consent": "By unanimous written consent without meeting"
+    }.get(meeting_type, "By unanimous written consent without meeting")
+    
+    # Build the document
+    doc = f"""TRUST MINUTES
+Private Irrevocable Ecclesiastical Trust
+
+Trust Name: {trust_name}
+Minute Number: {minute_number}
+Date of Meeting: {meeting_date}
+Time: {meeting_time}
+Location: {meeting_type_text}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TRUSTEES PRESENT
+
+"""
+    
+    for trustee in trustees_present:
+        doc += f"• {trustee}, Trustee\n"
+    
+    doc += f"""
+Quorum: YES
+
+═══════════════════════════════════════════════════════════════════════════════
+
+OPENING STATEMENT
+
+The Trustees, acting in their fiduciary capacity and not in any personal capacity, convened this meeting to conduct the business of the Trust in accordance with the Declaration and Indenture of Private Irrevocable Trust dated {trust_indenture_date}, and the principles of Natural Law, Common Law, Equity, and Ecclesiastical Jurisdiction declared therein.
+
+All Trustees present affirm they are acting as living men and women in private capacity, and not as surety, representative, or accommodation party for any artificial PERSON or all-capital-letter NAME.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
+
+"""
+    
+    # Generate template-specific content
+    if template_type == "general_meeting":
+        doc += generate_general_meeting_content(template_data)
+    elif template_type == "distribution_to_beneficiaries":
+        doc += generate_distribution_content(template_data)
+    elif template_type == "acceptance_of_property":
+        doc += generate_property_acceptance_content(template_data)
+    elif template_type == "appointment_additional_trustee":
+        doc += generate_trustee_appointment_content(template_data, "additional")
+    elif template_type == "appointment_successor_trustee":
+        doc += generate_trustee_appointment_content(template_data, "successor")
+    
+    # Add adjournment and certification
+    doc += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+ADJOURNMENT
+
+There being no further business to come before the Board of Trustees, the meeting was adjourned at {template_data.get('adjournment_time', meeting_time)}.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+CERTIFICATION AND AUTHENTICATION
+
+The undersigned Trustees hereby certify that the foregoing Minutes constitute a true, accurate, and complete record of the meeting and resolutions adopted, and that all decisions recorded herein were made in good faith, in accordance with the Trust Indenture, and for the benefit of the Trust and its Beneficiaries.
+
+These Trust Minutes are executed in the private capacity of the Trustees as living men and women, and not as surety, representative, or accommodation party for any artificial PERSON or all-capital-letter NAME.
+
+All Trust Minutes and records are private and confidential, held under Common Law Copyright, and are not to be disclosed to any third party except as unanimously authorized by the Board of Trustees.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TRUSTEE SIGNATURES
+
+"""
+    
+    for trustee in trustees_present:
+        doc += f"""
+Trustee: {trustee}
+Signature: _____________________________________
+Date: _________________
+
+"""
+    
+    doc += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+END OF TRUST MINUTES
+{trust_name} – Private Trust Minutes – Common Law Copyright – Not for Public Disclosure
+"""
+    
+    return doc
+
+def generate_general_meeting_content(data: dict) -> str:
+    """Generate content for general meeting with multiple resolutions"""
+    resolutions = data.get("resolutions", [])
+    content = ""
+    
+    if not resolutions:
+        # Default placeholder resolution
+        content += """Resolution 1: [Title/Subject]
+
+WHEREAS, [state the background, circumstances, or reason for the resolution];
+
+NOW, THEREFORE, BE IT RESOLVED that the Board of Trustees hereby:
+• [State the specific action, decision, or authorization clearly and completely.]
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    else:
+        for i, res in enumerate(resolutions, 1):
+            content += f"""Resolution {i}: {res.get('title', '[Title]')}
+
+"""
+            for whereas in res.get('whereas_clauses', ['[State the background, circumstances, or reason]']):
+                content += f"WHEREAS, {whereas};\n\n"
+            
+            content += "NOW, THEREFORE, BE IT RESOLVED that the Board of Trustees hereby:\n"
+            for resolved in res.get('resolved_clauses', ['[State the specific action]']):
+                content += f"• {resolved}\n"
+            
+            content += f"""
+Vote: {res.get('vote', 'Unanimous approval')}
+Effective Date: {res.get('effective_date', 'Immediately upon adoption')}
+
+"""
+    
+    return content
+
+def generate_distribution_content(data: dict) -> str:
+    """Generate content for distribution to beneficiaries"""
+    total = data.get("distribution_total", 0)
+    items = data.get("distribution_items", [])
+    dist_date = data.get("distribution_date", "[Date]")
+    characterization = data.get("distribution_characterization", "income")
+    
+    content = f"""Resolution 1: Distribution of Trust Proceeds
+
+WHEREAS, the Trustees, in the exercise of their discretion, deem it appropriate to make a distribution to the Beneficiaries;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• A distribution in the total amount of ${total:,.2f} shall be made from the Trust to the Beneficiaries as follows:
+
+"""
+    
+    if items:
+        for item in items:
+            name = item.get("beneficiary_name", "[Beneficiary Name]")
+            amount = item.get("amount", 0)
+            percentage = item.get("percentage", 0)
+            content += f"    • {name}: ${amount:,.2f} (representing {percentage}% beneficial interest)\n"
+    else:
+        content += "    • [Beneficiary Name]: $__________ (representing ____% beneficial interest)\n"
+    
+    char_text = {"income": "income", "principal": "principal", "return_of_corpus": "return of corpus"}.get(characterization, "income")
+    
+    content += f"""
+• Such distribution shall be made on or before {dist_date}.
+
+• The distribution is characterized as {char_text} for purposes of the Trust's internal accounting.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    
+    return content
+
+def generate_property_acceptance_content(data: dict) -> str:
+    """Generate content for acceptance of additional property into trust"""
+    grantor = data.get("grantor_name", "[Grantor/Creator]")
+    description = data.get("property_description", "[Description of property]")
+    value = data.get("property_value")
+    conveyance_date = data.get("conveyance_date", "[Date]")
+    
+    value_text = f"${value:,.2f}" if value else "$______________"
+    
+    content = f"""Resolution 1: Acceptance of Additional Property into Trust
+
+WHEREAS, {grantor} has offered to convey the following property to the Trust:
+
+    Description of property: {description}
+    Approximate value: {value_text}
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees accepts the conveyance of the above-described property into the corpus of this Trust.
+
+• The Trustees are authorized to execute any and all documents necessary to accept and perfect title to said property in the name of the Trust.
+
+• Schedule A to the Trust Indenture is hereby amended to include the above-described property, with an effective date of conveyance of {conveyance_date}.
+
+Vote: Unanimous approval
+Requires unanimous consent per Indenture: YES
+Effective Date: Immediately upon adoption
+
+"""
+    
+    return content
+
+def generate_trustee_appointment_content(data: dict, appointment_type: str) -> str:
+    """Generate content for trustee appointment (additional or successor)"""
+    new_trustee = data.get("new_trustee_name", "[New Trustee Name]")
+    gender = data.get("new_trustee_gender", "man")
+    departing_trustee = data.get("departing_trustee_name", "")
+    departing_reason = data.get("departing_reason", "resigned")
+    signature_req = data.get("signature_requirement", "any_one")
+    threshold = data.get("signature_threshold")
+    
+    if appointment_type == "successor":
+        whereas_reason = f"{departing_trustee} has {departing_reason}"
+        title = "Appointment of Successor Trustee"
+        role_text = "Successor Trustee"
+    else:
+        whereas_reason = "the existing Trustee(s) deem it prudent and in the best interest of the Trust to appoint an additional Trustee"
+        title = "Appointment of Additional Trustee"
+        role_text = "an additional Trustee"
+    
+    sig_text = {
+        "any_one": "Any one Trustee may sign individually for all transactions without limit.",
+        "any_two": "Any two Trustees must sign jointly for all transactions.",
+        "all_trustees": f"All Trustees must sign jointly for transactions exceeding ${threshold:,.2f}." if threshold else "All Trustees must sign jointly for all transactions.",
+        "threshold": f"Any one Trustee may sign individually for transactions up to ${threshold:,.2f}, and any two Trustees must sign jointly for transactions exceeding that amount." if threshold else "Any one Trustee may sign individually for transactions up to $[amount]."
+    }.get(signature_req, "Any one Trustee may sign individually for all transactions.")
+    
+    content = f"""Resolution 1: {title}
+
+WHEREAS, the Trust Indenture provides for the appointment of {'successor' if appointment_type == 'successor' else 'additional'} Trustees by decision of the Board of Trustees, or by appointment of the Protector, or by other means as provided in the Indenture;
+
+WHEREAS, {whereas_reason};
+
+WHEREAS, {new_trustee}, a living {gender} acting in private capacity, has been identified as a suitable and qualified person to serve as Trustee of this Trust, and has expressed willingness to accept such appointment;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• {new_trustee} is hereby appointed as {role_text} of this Trust, effective immediately upon acceptance of this appointment.
+
+• Upon acceptance, {new_trustee} shall have all the duties, rights, titles, powers, and discretions of a Trustee as set forth in the Trust Indenture, and shall serve as a member of the Board of Trustees with equal authority to the existing Trustees.
+
+• Legal title to the Trust property shall vest in {new_trustee} collectively with the existing Trustee(s) as the Board of Trustees, without the necessity of any further act or conveyance.
+
+• {new_trustee} shall execute the Trustee Acceptance and Oath attached hereto as Exhibit A.
+
+• The existing Trustees shall take all actions necessary to notify financial institutions, service providers, and other relevant parties of the appointment.
+
+Vote: Unanimous approval
+Requires unanimous consent per Indenture: YES
+Effective Date: Immediately upon adoption
+
+───────────────────────────────────────────────────────────────────────────────
+
+Resolution 2: Signature Authority and Banking Powers
+
+WHEREAS, the appointment of {'' if appointment_type == 'additional' else 'a successor '}Trustee may affect signature authority on financial accounts and banking relationships;
+
+WHEREAS, the Board of Trustees desires to establish clear signature requirements for the administration of Trust accounts;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• {new_trustee} is authorized to act as a signatory on all financial accounts of the Trust.
+
+• Signature Requirements: {sig_text}
+
+• The Trustees are authorized to update signature cards, resolutions, and certifications with all financial institutions.
+
+• An updated Certification of Trust reflecting the appointment shall be prepared and executed by all Trustees.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    
+    # Add Exhibit A - Trustee Acceptance
+    content += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+EXHIBIT A – TRUSTEE ACCEPTANCE AND OATH
+
+I, {new_trustee}, a living {gender} acting in private capacity, hereby accept the appointment as {'Successor' if appointment_type == 'successor' else 'Additional'} Trustee of this Trust.
+
+I affirm and declare:
+
+1. I have read the Declaration and Indenture of Private Irrevocable Trust and understand my duties, obligations, and responsibilities as Trustee.
+
+2. I agree to faithfully and diligently perform all duties as Trustee in accordance with the Trust Indenture and applicable principles of Natural Law, Common Law, and Equity.
+
+3. I will act at all times in the best interest of the Trust and its Beneficiaries, with loyalty, prudence, and good faith.
+
+4. I understand that I am accepting this appointment in my private capacity as a living {gender}, and not as surety, representative, or accommodation party for any artificial PERSON or all-capital-letter NAME.
+
+5. I agree to maintain the confidentiality of all Trust matters and records.
+
+Effective Date of Appointment: {data.get('effective_date', '[Date]')}
+
+
+_____________________________________
+{new_trustee}
+Date: _________________
+
+
+WITNESS (optional but recommended):
+
+_____________________________________
+Witness Signature
+Printed Name: __________________________________
+Date: _________________
+
+"""
+    
+    return content
+
+@api_router.post("/minutes-templates")
+async def create_minutes_from_template(template: MinutesTemplateCreate, user: dict = Depends(get_current_user)):
+    """Create minutes from a template"""
+    trust = await db.trusts.find_one({"trust_id": template.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    minutes_id = f"min_{uuid.uuid4().hex[:12]}"
+    
+    # Generate the document
+    generated_doc = generate_template_document(trust, template.template_type.value, template.template_data)
+    
+    # Extract meeting date from template data
+    meeting_date = template.template_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    
+    minutes_doc = {
+        "minutes_id": minutes_id,
+        "trust_id": template.trust_id,
+        "user_id": user["user_id"],
+        "template_type": template.template_type.value,
+        "template_data": template.template_data,
+        "generated_document": generated_doc,
+        "original_document": generated_doc,  # Store original for audit
+        "meeting_date": meeting_date,
+        "status": "draft",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None,
+        "updated_by": None
+    }
+    
+    await db.minutes_templates.insert_one(minutes_doc)
+    
+    # If accepting property and add_to_schedule_a is true, add to Schedule A
+    if template.template_type.value == "acceptance_of_property" and template.template_data.get("add_to_schedule_a"):
+        category = template.template_data.get("schedule_a_category", "other_property")
+        asset_doc = {
+            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
+            "trust_id": template.trust_id,
+            "user_id": user["user_id"],
+            "category": category,
+            "description": template.template_data.get("property_description", ""),
+            "identifier": "",
+            "location": "",
+            "approximate_value": template.template_data.get("property_value"),
+            "date_conveyed": template.template_data.get("conveyance_date", meeting_date),
+            "notes": f"Added via Minutes {minutes_id}",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": None
+        }
+        await db.schedule_a_items.insert_one(asset_doc)
+    
+    return {
+        "minutes_id": minutes_id,
+        "trust_id": template.trust_id,
+        "template_type": template.template_type.value,
+        "template_data": template.template_data,
+        "generated_document": generated_doc,
+        "original_document": generated_doc,
+        "meeting_date": meeting_date,
+        "status": "draft",
+        "created_at": minutes_doc["created_at"],
+        "updated_at": None,
+        "updated_by": None
+    }
+
+@api_router.get("/minutes-templates")
+async def get_minutes_templates(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    """Get all template-based minutes"""
+    query = {"user_id": user["user_id"]}
+    if trust_id:
+        query["trust_id"] = trust_id
+    
+    minutes = await db.minutes_templates.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return minutes
+
+@api_router.get("/minutes-templates/{minutes_id}")
+async def get_minutes_template(minutes_id: str, user: dict = Depends(get_current_user)):
+    """Get a single template-based minutes"""
+    minutes = await db.minutes_templates.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+    return minutes
+
+@api_router.put("/minutes-templates/{minutes_id}")
+async def update_minutes_template(minutes_id: str, update_data: dict, user: dict = Depends(get_current_user)):
+    """Update a template-based minutes (with audit trail)"""
+    minutes = await db.minutes_templates.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+    
+    # Track the update
+    update_fields = {
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_by": user["user_id"]
+    }
+    
+    # Allow updating the generated document and status
+    if "generated_document" in update_data:
+        update_fields["generated_document"] = update_data["generated_document"]
+    if "status" in update_data:
+        update_fields["status"] = update_data["status"]
+    if "template_data" in update_data:
+        update_fields["template_data"] = update_data["template_data"]
+    
+    await db.minutes_templates.update_one(
+        {"minutes_id": minutes_id},
+        {"$set": update_fields}
+    )
+    
+    updated = await db.minutes_templates.find_one({"minutes_id": minutes_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/minutes-templates/{minutes_id}")
+async def delete_minutes_template(minutes_id: str, user: dict = Depends(get_current_user)):
+    """Delete a template-based minutes"""
+    result = await db.minutes_templates.delete_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+    return {"message": "Minutes deleted"}
+
+@api_router.get("/minutes-templates/{minutes_id}/pdf")
+async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_current_user)):
+    """Generate PDF for template-based minutes"""
+    minutes = await db.minutes_templates.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+    
+    trust = await db.trusts.find_one(
+        {"trust_id": minutes["trust_id"], "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    # Generate PDF from the document text
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'TrustTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        spaceAfter=6,
+        textColor=colors.HexColor('#010079'),
+        alignment=1  # Center
+    )
+    body_style = ParagraphStyle(
+        'TrustBody',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,
+        spaceAfter=6
+    )
+    
+    story = []
+    
+    # Convert text document to PDF paragraphs
+    doc_text = minutes.get("generated_document", "")
+    lines = doc_text.split("\n")
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            story.append(Spacer(1, 6))
+        elif line.startswith("═") or line.startswith("─"):
+            story.append(Spacer(1, 12))
+        elif line == "TRUST MINUTES":
+            story.append(Paragraph(line, title_style))
+        elif line.startswith("Resolution") or line.isupper():
+            story.append(Paragraph(f"<b>{line}</b>", body_style))
+        elif line.startswith("WHEREAS") or line.startswith("NOW, THEREFORE"):
+            story.append(Paragraph(f"<i>{line}</i>", body_style))
+        elif line.startswith("•"):
+            story.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;{line}", body_style))
+        else:
+            # Escape special characters for reportlab
+            line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            story.append(Paragraph(line, body_style))
+    
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+    
+    return {
+        "pdf_base64": pdf_base64,
+        "filename": f"minutes_{minutes_id}.pdf"
+    }
+
+@api_router.get("/template-options")
+async def get_template_options(user: dict = Depends(get_current_user)):
+    """Get available minutes template options with descriptions"""
+    return [
+        {
+            "type": "blank",
+            "name": "Blank Minutes",
+            "description": "Start with a blank minutes document",
+            "icon": "file-text"
+        },
+        {
+            "type": "general_meeting",
+            "name": "General Meeting",
+            "description": "Record a general trustee meeting with multiple resolutions",
+            "icon": "users"
+        },
+        {
+            "type": "distribution_to_beneficiaries",
+            "name": "Distribution to Beneficiaries",
+            "description": "Document a distribution of trust proceeds to beneficiaries",
+            "icon": "dollar-sign"
+        },
+        {
+            "type": "acceptance_of_property",
+            "name": "Accept Property into Trust",
+            "description": "Accept additional property into the trust corpus and update Schedule A",
+            "icon": "plus-circle"
+        },
+        {
+            "type": "appointment_additional_trustee",
+            "name": "Appoint Additional Trustee",
+            "description": "Appoint a new trustee to serve alongside existing trustees",
+            "icon": "user-plus"
+        },
+        {
+            "type": "appointment_successor_trustee",
+            "name": "Appoint Successor Trustee",
+            "description": "Appoint a replacement trustee due to resignation, death, or removal",
+            "icon": "user-check"
+        }
+    ]
+
 # ==================== DISTRIBUTION ENDPOINTS ====================
 
 @api_router.post("/distributions", response_model=DistributionResponse)
