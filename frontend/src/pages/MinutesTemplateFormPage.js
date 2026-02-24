@@ -779,6 +779,24 @@ export default function MinutesTemplateFormPage() {
                       />
                     </div>
                     <div>
+                      <Label className="label-trust">Identifier (VIN, Account #, Legal Description)</Label>
+                      <Input
+                        value={propertyData.property_identifier}
+                        onChange={(e) => setPropertyData({ ...propertyData, property_identifier: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="VIN: 1HGBH41JXMN109186"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Location / Institution</Label>
+                      <Input
+                        value={propertyData.property_location}
+                        onChange={(e) => setPropertyData({ ...propertyData, property_location: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="123 Main St, City, State 12345"
+                      />
+                    </div>
+                    <div>
                       <Label className="label-trust">Approximate Value</Label>
                       <Input
                         type="number"
@@ -821,6 +839,137 @@ export default function MinutesTemplateFormPage() {
                           </SelectContent>
                         </Select>
                       </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'disposition_of_asset' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Asset Disposition Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Select Asset from Schedule A</Label>
+                      {loadingAssets ? (
+                        <div className="mt-2 text-muted-foreground">Loading assets...</div>
+                      ) : scheduleAAssets.length === 0 ? (
+                        <div className="mt-2 text-muted-foreground">No active assets found in Schedule A</div>
+                      ) : (
+                        <Select 
+                          value={dispositionData.disposition_asset_id} 
+                          onValueChange={(v) => {
+                            const asset = scheduleAAssets.find(a => a.item_id === v);
+                            setDispositionData({ 
+                              ...dispositionData, 
+                              disposition_asset_id: v,
+                              disposition_asset_description: asset ? `${asset.description} (${asset.category.replace(/_/g, ' ')})` : ''
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select an asset to dispose" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {scheduleAAssets.map(asset => (
+                              <SelectItem key={asset.item_id} value={asset.item_id}>
+                                {asset.description} - {asset.category.replace(/_/g, ' ')} 
+                                {asset.approximate_value && ` ($${asset.approximate_value.toLocaleString()})`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                    
+                    {dispositionData.disposition_asset_id && (
+                      <>
+                        <div className="md:col-span-2">
+                          <Label className="label-trust">Asset Description (for minutes)</Label>
+                          <Textarea
+                            value={dispositionData.disposition_asset_description}
+                            onChange={(e) => setDispositionData({ ...dispositionData, disposition_asset_description: e.target.value })}
+                            className="mt-1"
+                            placeholder="2020 Toyota Camry, VIN: 1HGBH41JXMN109186"
+                            rows={2}
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label className="label-trust">Reason for Disposition</Label>
+                          <Select 
+                            value={dispositionData.disposition_reason} 
+                            onValueChange={(v) => setDispositionData({ ...dispositionData, disposition_reason: v })}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sale">Sale</SelectItem>
+                              <SelectItem value="transfer">Transfer</SelectItem>
+                              <SelectItem value="donation">Donation</SelectItem>
+                              <SelectItem value="destruction">Destruction / Total Loss</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label className="label-trust">Date of Disposition</Label>
+                          <Input
+                            value={dispositionData.disposition_date}
+                            onChange={(e) => setDispositionData({ ...dispositionData, disposition_date: e.target.value })}
+                            className="mt-1 input-trust"
+                            placeholder="February 23, 2024"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label className="label-trust">
+                            {dispositionData.disposition_reason === 'sale' ? 'Sale Price' : 'Fair Market Value'}
+                          </Label>
+                          <Input
+                            type="number"
+                            value={dispositionData.disposition_value}
+                            onChange={(e) => setDispositionData({ ...dispositionData, disposition_value: e.target.value })}
+                            className="mt-1 input-trust"
+                            placeholder="25000"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label className="label-trust">
+                            {dispositionData.disposition_reason === 'sale' ? 'Buyer' : 'Recipient'} (if applicable)
+                          </Label>
+                          <Input
+                            value={dispositionData.disposition_recipient}
+                            onChange={(e) => setDispositionData({ ...dispositionData, disposition_recipient: e.target.value })}
+                            className="mt-1 input-trust"
+                            placeholder="ABC Motors LLC"
+                          />
+                        </div>
+                        
+                        <div className="md:col-span-2">
+                          <Label className="label-trust">Additional Notes</Label>
+                          <Textarea
+                            value={dispositionData.disposition_notes}
+                            onChange={(e) => setDispositionData({ ...dispositionData, disposition_notes: e.target.value })}
+                            className="mt-1"
+                            placeholder="Any additional details about the disposition..."
+                            rows={2}
+                          />
+                        </div>
+                        
+                        <div className="md:col-span-2 flex items-center gap-3 mt-2">
+                          <Checkbox
+                            checked={dispositionData.update_schedule_a}
+                            onCheckedChange={(checked) => setDispositionData({ ...dispositionData, update_schedule_a: checked })}
+                            id="update-schedule-a"
+                          />
+                          <Label htmlFor="update-schedule-a" className="cursor-pointer">
+                            Mark asset as disposed in Schedule A (keeps historical record)
+                          </Label>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
