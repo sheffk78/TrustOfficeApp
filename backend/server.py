@@ -3040,15 +3040,40 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
             "user_id": user["user_id"],
             "category": category,
             "description": template.template_data.get("property_description", ""),
-            "identifier": "",
-            "location": "",
+            "identifier": template.template_data.get("property_identifier", ""),
+            "location": template.template_data.get("property_location", ""),
             "approximate_value": template.template_data.get("property_value"),
             "date_conveyed": template.template_data.get("conveyance_date", meeting_date),
-            "notes": f"Added via Minutes {minutes_id}",
+            "notes": template.template_data.get("property_notes", ""),
+            "status": "active",
+            "minutes_ref": minutes_id,
+            "disposition_minutes_ref": None,
+            "disposition_date": None,
+            "disposition_notes": None,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": None
         }
         await db.schedule_a_items.insert_one(asset_doc)
+    
+    # If disposing of an asset and update_schedule_a is true, mark asset as disposed
+    if template.template_type.value == "disposition_of_asset" and template.template_data.get("update_schedule_a"):
+        asset_id = template.template_data.get("disposition_asset_id")
+        if asset_id:
+            # Update the Schedule A item to mark as disposed
+            disposition_update = {
+                "status": "disposed",
+                "disposition_minutes_ref": minutes_id,
+                "disposition_date": template.template_data.get("disposition_date", meeting_date),
+                "disposition_notes": f"Reason: {template.template_data.get('disposition_reason', 'sale')}. " +
+                    (f"Recipient: {template.template_data.get('disposition_recipient', '')}. " if template.template_data.get('disposition_recipient') else "") +
+                    (f"Value: ${template.template_data.get('disposition_value', 0):,.2f}. " if template.template_data.get('disposition_value') else "") +
+                    (template.template_data.get('disposition_notes', '')),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.schedule_a_items.update_one(
+                {"item_id": asset_id, "user_id": user["user_id"]},
+                {"$set": disposition_update}
+            )
     
     return {
         "minutes_id": minutes_id,
