@@ -21,6 +21,32 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
+### Recent Updates (Feb 24, 2026)
+1. **Minutes Templates System** - IN PROGRESS
+   - Template picker with 6 options (blank, general meeting, distribution, property acceptance, trustee appointment)
+   - Dynamic form generation based on template type
+   - Full WHEREAS/RESOLVED boilerplate language from WingPoint/Trust templates
+   - Editable preview with audit trail (stores original + updated versions)
+   - PDF export for generated documents
+   - API: `POST/GET /api/minutes-templates`
+
+2. **Schedule A (Trust Corpus Tracking)** - IN PROGRESS
+   - 8 asset categories: Real Property, Personal Property, Financial Accounts, Business Interests, Digital Assets, IP, Notes Receivable, Other
+   - Full CRUD operations with summary totals
+   - Integration with "Accept Property into Trust" template (auto-add to Schedule A)
+   - API: `POST/GET/PUT/DELETE /api/schedule-a`
+
+3. **Bug Fixes**
+   - Login page logo contrast (white on blue)
+   - Login error "body stream already read" fixed
+   - Trust selector updates when new trust created
+   - "Made with Emergent" watermark removed
+   - Page title updated to "TrustOffice | Trust Governance Workspace"
+   - Demo data button shows feedback when user already has trusts
+
+### P0 - Critical (Feb 23, 2026) - COMPLETE
+[rest of content unchanged...]
+
 ### P0 - Critical (Feb 23, 2026) - COMPLETE
 1. **Password Reset Flow**
    - `POST /api/auth/forgot-password` - Creates token, sends email
