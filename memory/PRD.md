@@ -42,7 +42,13 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
    - 8 asset categories: Real Property, Personal Property, Financial Accounts, Business Interests, Digital Assets, IP, Notes Receivable, Other
    - Full CRUD with summary totals by category
    - Integration: Property acceptance template auto-adds to Schedule A
-   - APIs: `/api/schedule-a`, `/api/schedule-a/summary/{trust_id}`
+   - **PDF Export** - Styled document with:
+     - Header (SCHEDULE A - Initial Corpus of the Trust)
+     - Trust name, date prepared, total assets, total value
+     - Asset tables grouped by category with subtotals
+     - Navy/white color scheme, professional styling
+     - Grand total at bottom
+   - APIs: `/api/schedule-a`, `/api/schedule-a/summary/{trust_id}`, `/api/schedule-a/export/{trust_id}/pdf`
 
 4. **Bug Fixes**
    - Login page logo contrast (white on blue)
