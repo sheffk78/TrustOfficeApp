@@ -2243,14 +2243,9 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
     if not minutes:
         raise HTTPException(status_code=404, detail="Minutes not found")
     
-    trust = await db.trusts.find_one(
-        {"trust_id": minutes["trust_id"], "user_id": user["user_id"]},
-        {"_id": 0}
-    )
-    
     # Generate PDF from the document text
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+    pdf_doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
     
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
