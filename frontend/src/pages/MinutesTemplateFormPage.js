@@ -142,18 +142,54 @@ export default function MinutesTemplateFormPage() {
     effective_date: 'Immediately upon adoption'
   }]);
 
+  // Trust entity data for auto-population
+  const [trustEntity, setTrustEntity] = useState(null);
+
   useEffect(() => {
-    if (selectedTrust?.trustees) {
-      setFormData(prev => ({
-        ...prev,
-        trustees_present: selectedTrust.trustees
-      }));
-      setBankData(prev => ({
-        ...prev,
-        authorized_signers: selectedTrust.trustees
-      }));
+    if (selectedTrust) {
+      loadTrustEntityData();
     }
   }, [selectedTrust]);
+
+  const loadTrustEntityData = async () => {
+    try {
+      const response = await fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}`);
+      if (response.ok) {
+        const entities = await response.json();
+        // Find the main trust entity (entity_type === 'Trust')
+        const mainTrust = entities.find(e => e.entity_type === 'Trust');
+        if (mainTrust) {
+          setTrustEntity(mainTrust);
+          
+          // Auto-populate trust_indenture_date
+          if (mainTrust.formation_date) {
+            const formattedDate = format(new Date(mainTrust.formation_date), 'MMMM d, yyyy');
+            setFormData(prev => ({
+              ...prev,
+              trust_indenture_date: formattedDate
+            }));
+          }
+          
+          // Auto-populate trustees from trustee_names field
+          if (mainTrust.trustee_names) {
+            const trustees = mainTrust.trustee_names.split(',').map(t => t.trim()).filter(t => t);
+            if (trustees.length > 0) {
+              setFormData(prev => ({
+                ...prev,
+                trustees_present: trustees
+              }));
+              setBankData(prev => ({
+                ...prev,
+                authorized_signers: trustees
+              }));
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load trust entity data:', error);
+    }
+  };
 
   const handleAddTrustee = () => {
     setFormData(prev => ({
