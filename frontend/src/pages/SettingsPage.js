@@ -66,6 +66,7 @@ export default function SettingsPage() {
   // Load notification preferences on mount
   useEffect(() => {
     loadNotificationPreferences();
+    loadUserPreferences();
   }, []);
 
   const loadNotificationPreferences = async () => {
@@ -77,6 +78,41 @@ export default function SettingsPage() {
       }
     } catch (error) {
       console.error('Failed to load notification preferences:', error);
+    }
+  };
+
+  const loadUserPreferences = async () => {
+    try {
+      const response = await fetchWithAuth('/user/preferences');
+      if (response.ok) {
+        const data = await response.json();
+        setUserPrefs(data);
+      }
+    } catch (error) {
+      console.error('Failed to load user preferences:', error);
+    }
+  };
+
+  const handleWatermarkToggle = async (checked) => {
+    try {
+      setUserPrefsLoading(true);
+      const response = await fetchWithAuth('/user/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hide_watermark: checked })
+      });
+      
+      if (response.ok) {
+        setUserPrefs({ ...userPrefs, hide_watermark: checked });
+        toast.success(checked ? 'Watermark hidden' : 'Watermark enabled');
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to update preference');
+      }
+    } catch (error) {
+      toast.error('Failed to update preference');
+    } finally {
+      setUserPrefsLoading(false);
     }
   };
 
