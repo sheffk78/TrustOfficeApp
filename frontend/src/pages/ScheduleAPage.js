@@ -264,7 +264,16 @@ export default function ScheduleAPage() {
                 {selectedTrust.name} • Initial Corpus of the Trust
               </p>
             </div>
-            <div className="flex gap-3 mt-4 md:mt-0">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showDisposed}
+                  onChange={(e) => setShowDisposed(e.target.checked)}
+                  className="rounded border-border"
+                />
+                <span className="text-muted-foreground">Show disposed assets</span>
+              </label>
               <Button 
                 variant="outline" 
                 onClick={handleExportPDF}
