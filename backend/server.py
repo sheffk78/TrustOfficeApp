@@ -2106,6 +2106,178 @@ Date: _________________
     
     return content
 
+def generate_beneficiary_designation_content(data: dict) -> str:
+    """Generate content for designation of beneficiaries"""
+    beneficiaries = data.get("beneficiaries", [])
+    designation_type = data.get("designation_type", "initial")  # initial, amendment, restatement
+    total_units = data.get("total_units", 100)
+    
+    type_text = {
+        "initial": "establish the initial",
+        "amendment": "amend the existing",
+        "restatement": "restate in full the"
+    }.get(designation_type, "establish the")
+    
+    content = f"""Resolution 1: Designation of Beneficiaries and Units of Beneficial Interest
+
+WHEREAS, the Trust Indenture provides for the designation of Beneficiaries and the allocation of Units of Beneficial Interest by the Board of Trustees;
+
+WHEREAS, the Trustees desire to {type_text} designation of Beneficiaries and allocation of beneficial interests;
+
+NOW, THEREFORE, BE IT RESOLVED that the Board of Trustees hereby designates the following as Beneficiaries of this Trust and allocates Units of Beneficial Interest as follows:
+
+"""
+    
+    if beneficiaries:
+        for ben in beneficiaries:
+            name = ben.get("name", "[Beneficiary Name]")
+            units = ben.get("units", 0)
+            percentage = ben.get("percentage", 0)
+            relationship = ben.get("relationship", "")
+            rel_text = f" ({relationship})" if relationship else ""
+            content += f"    • {name}{rel_text}: {units} Units ({percentage}% beneficial interest)\n"
+    else:
+        content += "    • [Beneficiary Name]: _____ Units (_____% beneficial interest)\n"
+    
+    content += f"""
+Total Units of Beneficial Interest: {total_units} Units (100%)
+
+BE IT FURTHER RESOLVED that:
+
+• The above designations shall be effective immediately and shall supersede any prior designation of beneficiaries.
+
+• Each Beneficiary's interest is subject to all terms and conditions of the Trust Indenture, including any spendthrift provisions.
+
+• The Trustees reserve the right to amend, modify, or revoke these designations at any time in accordance with the Trust Indenture.
+
+Vote: Unanimous approval
+Requires unanimous consent per Indenture: YES
+Effective Date: Immediately upon adoption
+
+"""
+    
+    return content
+
+def generate_bank_account_content(data: dict) -> str:
+    """Generate content for bank account authorization"""
+    bank_name = data.get("bank_name", "[Bank Name]")
+    account_type = data.get("account_type", "checking")  # checking, savings, brokerage, money_market
+    purpose = data.get("purpose", "general trust administration")
+    authorized_signers = data.get("authorized_signers", [])
+    signature_requirement = data.get("signature_requirement", "any_one")
+    initial_deposit = data.get("initial_deposit")
+    
+    account_type_text = {
+        "checking": "checking account",
+        "savings": "savings account",
+        "brokerage": "brokerage/investment account",
+        "money_market": "money market account"
+    }.get(account_type, "account")
+    
+    sig_text = {
+        "any_one": "Any one authorized Trustee may sign individually for all transactions.",
+        "any_two": "Any two authorized Trustees must sign jointly for all transactions.",
+        "threshold": f"Any one Trustee may sign for transactions up to ${data.get('signature_threshold', 10000):,.2f}; two signatures required above that amount."
+    }.get(signature_requirement, "Any one authorized Trustee may sign individually.")
+    
+    deposit_text = f"${initial_deposit:,.2f}" if initial_deposit else "[Amount]"
+    
+    content = f"""Resolution 1: Authorization to Open Bank Account
+
+WHEREAS, the Trustees deem it necessary and appropriate to establish a {account_type_text} for the purpose of {purpose};
+
+WHEREAS, the Trust Indenture authorizes the Trustees to open and maintain bank accounts in the name of the Trust;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Trustees are hereby authorized to open a {account_type_text} at {bank_name} in the name of this Trust.
+
+• The account shall be titled in substantially the following form:
+  "[Trust Name], a Private Irrevocable Trust"
+  or such similar title as the financial institution may require.
+
+• The following Trustees are designated as authorized signatories on the account:
+"""
+    
+    if authorized_signers:
+        for signer in authorized_signers:
+            content += f"    • {signer}, Trustee\n"
+    else:
+        content += "    • [Trustee Names], Trustee\n"
+    
+    content += f"""
+• Signature Authority: {sig_text}
+
+• The Trustees are authorized to deposit an initial amount of {deposit_text} from existing Trust funds or from new contributions to the Trust.
+
+• The Trustees are authorized to execute any and all documents, agreements, signature cards, resolutions, or certifications required by the financial institution to open and maintain the account.
+
+• Online banking and electronic transfer capabilities may be established as deemed appropriate by the Trustees.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    
+    return content
+
+def generate_change_of_situs_content(data: dict) -> str:
+    """Generate content for change of situs"""
+    current_situs = data.get("current_situs", "[Current State/Jurisdiction]")
+    new_situs = data.get("new_situs", "[New State/Jurisdiction]")
+    effective_date = data.get("effective_date", "[Date]")
+    reasons = data.get("reasons", [])
+    
+    content = f"""Resolution 1: Change of Trust Situs
+
+WHEREAS, the Trust is currently administered and has its principal place of administration (situs) in {current_situs};
+
+WHEREAS, the Trustees have determined that it is in the best interest of the Trust and its Beneficiaries to change the situs of the Trust to {new_situs};
+
+"""
+    
+    if reasons:
+        content += "WHEREAS, the reasons for this change include:\n"
+        for reason in reasons:
+            content += f"    • {reason}\n"
+        content += "\n"
+    else:
+        content += """WHEREAS, such change is being made for reasons including, but not limited to: favorable trust laws, tax considerations, proximity to Trustees or Beneficiaries, or administrative convenience;
+
+"""
+    
+    content += f"""WHEREAS, the Trust Indenture permits the Trustees to change the situs of the Trust;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The situs of this Trust is hereby changed from {current_situs} to {new_situs}, effective {effective_date}.
+
+• Henceforth, the Trust shall be administered under the laws of {new_situs}, to the extent such laws do not conflict with the express terms of the Trust Indenture or the ecclesiastical nature of this Trust.
+
+• The principal place of administration of the Trust shall be located in {new_situs}.
+
+• All references in the Trust Indenture or any prior Trust Minutes to the original situs or governing law shall be deemed amended to reflect the new situs of {new_situs}.
+
+• The Trustees are authorized to:
+    • Update the Trust's records to reflect the change of situs
+    • Notify all financial institutions, service providers, and relevant parties
+    • File any required notices or registrations in {new_situs}
+    • Execute any documents necessary to effectuate this change
+
+BE IT FURTHER RESOLVED that this change of situs shall not affect:
+    • The validity or continuity of this Trust
+    • The interests of any Beneficiary
+    • Any existing rights, duties, or obligations under the Trust Indenture
+    • The Trust's status as a private, ecclesiastical trust operating under Common Law principles
+
+Vote: Unanimous approval
+Requires unanimous consent per Indenture: YES
+Effective Date: {effective_date}
+
+"""
+    
+    return content
+
 @api_router.post("/minutes-templates")
 async def create_minutes_from_template(template: MinutesTemplateCreate, user: dict = Depends(get_current_user)):
     """Create minutes from a template"""
