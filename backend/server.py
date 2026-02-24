@@ -3726,6 +3726,50 @@ async def approve_distribution(distribution_id: str, approval: DistributionAppro
     
     return DistributionResponse(**updated)
 
+@api_router.put("/distributions/{distribution_id}")
+async def update_distribution_status(
+    distribution_id: str, 
+    status: str,
+    user: dict = Depends(get_current_user)
+):
+    """Update distribution status (e.g., set back to review or decline)"""
+    valid_statuses = ['review', 'declined', 'pending']
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+    
+    # Find the distribution
+    distribution = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not distribution:
+        raise HTTPException(status_code=404, detail="Distribution not found")
+    
+    # Update the status and clear approval fields if reverting
+    update_fields = {
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if status in ['review', 'declined', 'pending']:
+        # Clear approval fields
+        update_fields["approved_by"] = None
+        update_fields["approved_at"] = None
+        update_fields["solvency_confirmed"] = False
+        update_fields["recusal_acknowledged"] = False
+    
+    await db.distribution_records.update_one(
+        {"distribution_id": distribution_id},
+        {"$set": update_fields}
+    )
+    
+    # Fetch updated record
+    updated = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id},
+        {"_id": 0}
+    )
+    
+    return DistributionResponse(**updated)
+
 @api_router.delete("/distributions/{distribution_id}")
 async def delete_distribution(distribution_id: str, user: dict = Depends(get_current_user)):
     result = await db.distribution_records.delete_one({
