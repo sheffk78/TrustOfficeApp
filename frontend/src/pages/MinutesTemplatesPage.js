@@ -40,12 +40,17 @@ export default function MinutesTemplatesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    if (selectedTrust) {
+      loadTemplates();
+    }
+  }, [selectedTrust]);
 
   const loadTemplates = async () => {
     try {
-      const response = await fetchWithAuth('/template-options');
+      const url = selectedTrust 
+        ? `/template-options?trust_id=${selectedTrust.trust_id}` 
+        : '/template-options';
+      const response = await fetchWithAuth(url);
       if (response.ok) {
         setTemplates(await response.json());
       }
