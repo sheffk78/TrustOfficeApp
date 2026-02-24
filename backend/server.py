@@ -3332,14 +3332,6 @@ async def export_benevolence_pdf(
         fontName='Helvetica-Bold'
     )
     
-    summary_style = ParagraphStyle(
-        'SummaryText',
-        parent=styles['Normal'],
-        fontSize=10,
-        spaceAfter=4,
-        fontName='Helvetica'
-    )
-    
     story = []
     
     # Header
