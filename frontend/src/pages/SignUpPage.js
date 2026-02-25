@@ -7,9 +7,42 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Use XMLHttpRequest for maximum mobile compatibility
+const xhrPost = (url, data) => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Accept', 'application/json');
+    
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4) {
+        try {
+          const response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(response);
+          } else {
+            reject(new Error(response.detail || `Request failed with status ${xhr.status}`));
+          }
+        } catch (e) {
+          reject(new Error('Invalid server response'));
+        }
+      }
+    };
+    
+    xhr.onerror = function() {
+      reject(new Error('Network error - please check your connection'));
+    };
+    
+    xhr.send(JSON.stringify(data));
+  });
+};
+
 export default function SignUpPage() {
   const navigate = useNavigate();
-  const { register, login } = useAuth();
+  const { setUser } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,9 +52,18 @@ export default function SignUpPage() {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     
     // Prevent double submission
     if (loading) return;
+    
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+    
+    if (!trimmedEmail || !trimmedName || !password) {
+      toast.error('Please fill in all fields');
+      return;
+    }
     
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
@@ -36,18 +78,36 @@ export default function SignUpPage() {
     setLoading(true);
     
     try {
-      // Register first
-      await register(email.trim(), password, name.trim());
+      // Step 1: Register using XMLHttpRequest
+      await xhrPost(`${API_URL}/api/auth/register`, {
+        email: trimmedEmail,
+        password: password,
+        name: trimmedName
+      });
       
-      // Small delay to ensure registration is fully processed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Step 2: Login using XMLHttpRequest
+      const loginData = await xhrPost(`${API_URL}/api/auth/login`, {
+        email: trimmedEmail,
+        password: password
+      });
       
-      // Auto-login after registration
-      await login(email.trim(), password);
+      // Step 3: Store token and update user
+      if (loginData.token) {
+        localStorage.setItem('auth_token', loginData.token);
+      }
+      if (loginData.user) {
+        setUser(loginData.user);
+      }
+      
       toast.success('Account created successfully');
       navigate('/onboarding');
     } catch (error) {
       console.error('Signup error:', error);
+      toast.error(error.message || 'Failed to create account');
+    } finally {
+      setLoading(false);
+    }
+  };
       toast.error(error.message || 'Failed to create account');
     } finally {
       setLoading(false);
