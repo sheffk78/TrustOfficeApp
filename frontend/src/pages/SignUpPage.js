@@ -108,11 +108,6 @@ export default function SignUpPage() {
       setLoading(false);
     }
   };
-      toast.error(error.message || 'Failed to create account');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleSignUp = () => {
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
