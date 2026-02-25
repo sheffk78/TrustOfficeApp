@@ -168,8 +168,11 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="card-trust corner-mark">
             <h1 className="font-serif text-3xl text-navy mb-2">Welcome, {user?.name || 'User'}</h1>
-            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-8">
-              Let's set up your first trust
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-4">
+              Your 14-day free trial has started
+            </p>
+            <p className="text-sm text-muted-foreground mb-8">
+              Full access to all features. No credit card required.
             </p>
 
             <div className="space-y-6">
@@ -179,9 +182,9 @@ export default function OnboardingPage() {
                     <Building2 className="w-6 h-6 text-navy" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-serif text-xl text-navy mb-1">Create New Trust</h3>
+                    <h3 className="font-serif text-xl text-navy mb-1">Create Your Trust</h3>
                     <p className="text-sm text-muted-foreground">
-                      Set up a trust from scratch with your own details
+                      Set up your actual trust to start managing it
                     </p>
                   </div>
                   <ArrowRight className="w-5 h-5 text-navy" />
@@ -191,12 +194,12 @@ export default function OnboardingPage() {
               <div className="p-6 border border-gold/30 bg-gold/5 hover-lift cursor-pointer" onClick={handleSkipToDemo}>
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-gold/20 flex items-center justify-center">
-                    <User className="w-6 h-6 text-gold" />
+                    <Sparkles className="w-6 h-6 text-gold" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-serif text-xl text-navy mb-1">Use Demo Data</h3>
+                    <h3 className="font-serif text-xl text-navy mb-1">Explore with Demo Data</h3>
                     <p className="text-sm text-muted-foreground">
-                      Explore TrustOffice with sample trust data
+                      See how TrustOffice works with sample trusts
                     </p>
                   </div>
                   <ArrowRight className="w-5 h-5 text-gold" />
