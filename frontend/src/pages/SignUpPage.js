@@ -20,6 +20,9 @@ export default function SignUpPage() {
   const handleSignUp = async (e) => {
     e.preventDefault();
     
+    // Prevent double submission
+    if (loading) return;
+    
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -33,13 +36,19 @@ export default function SignUpPage() {
     setLoading(true);
     
     try {
-      await register(email, password, name);
+      // Register first
+      await register(email.trim(), password, name.trim());
+      
+      // Small delay to ensure registration is fully processed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Auto-login after registration
-      await login(email, password);
+      await login(email.trim(), password);
       toast.success('Account created successfully');
       navigate('/onboarding');
     } catch (error) {
-      toast.error(error.message);
+      console.error('Signup error:', error);
+      toast.error(error.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
