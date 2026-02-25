@@ -130,7 +130,16 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email, password })
     });
     
-    const data = await response.json();
+    // Clone response in case we need to read it twice for error handling
+    const responseClone = response.clone();
+    
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      const text = await responseClone.text();
+      throw new Error(text || 'Login failed - invalid response');
+    }
     
     if (!response.ok) {
       throw new Error(data.detail || 'Login failed');
