@@ -137,11 +137,6 @@ export default function OnboardingPage() {
   const handleSkipToDemo = async () => {
     await handleSeedDemo();
   };
-      navigate('/dashboard');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-subtle-bg" data-testid="onboarding-page">
