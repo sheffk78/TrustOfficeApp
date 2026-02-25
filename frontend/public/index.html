@@ -35,7 +35,22 @@
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
         <title>TrustOffice | Trust Governance Workspace</title>
-        <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
+        <script>
+            // Suppress DataCloneError from browser extensions and analytics
+            window.addEventListener("error", function(e) {
+                if (e.error instanceof DOMException && e.error.name === "DataCloneError") {
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                    return false;
+                }
+                // Also suppress "cannot be cloned" errors
+                if (e.message && (e.message.includes("cannot be cloned") || e.message.includes("could not be cloned"))) {
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                    return false;
+                }
+            }, true);
+        </script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
         <!--
         These two scripts have been added for the Visual Edits, please do not edit or remove them
