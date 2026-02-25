@@ -633,6 +633,7 @@ class CheckoutRequest(BaseModel):
     plan_type: str  # "monthly" or "annual"
     success_url: str
     cancel_url: str
+    promotion_code: Optional[str] = None  # Stripe promotion code (e.g., "WINGPOINT10")
 
 class PortalRequest(BaseModel):
     return_url: str
