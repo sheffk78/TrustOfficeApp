@@ -13,6 +13,48 @@ export const getAuthHeaders = () => {
   return headers;
 };
 
+// Robust POST request for auth endpoints (works on mobile)
+export const authPost = async (endpoint, data) => {
+  const url = `${API}${endpoint}`;
+  const body = JSON.stringify(data);
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: body
+    });
+    
+    // Read response as text first (more reliable on mobile)
+    const responseText = await response.text();
+    
+    let responseData = {};
+    if (responseText) {
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response:', responseText);
+        throw new Error('Invalid server response');
+      }
+    }
+    
+    if (!response.ok) {
+      throw new Error(responseData.detail || `Request failed with status ${response.status}`);
+    }
+    
+    return responseData;
+  } catch (error) {
+    // Check if it's a network error vs server error
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Network error - please check your connection');
+    }
+    throw error;
+  }
+};
+
 // Generic fetch with auth
 export const fetchWithAuth = async (endpoint, options = {}) => {
   const defaultOptions = {
