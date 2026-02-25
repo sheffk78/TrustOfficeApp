@@ -123,39 +123,37 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = useCallback(async (email, password) => {
-    // Create body string first to avoid any stream issues on mobile
-    const bodyString = JSON.stringify({ email, password });
+    // Use a simple fetch approach that works reliably on mobile
+    const url = `${API}/auth/login`;
+    const body = JSON.stringify({ email, password });
     
-    let response;
-    try {
-      response = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        credentials: 'include',
-        body: bodyString
-      });
-    } catch (fetchError) {
-      console.error('Login fetch error:', fetchError);
-      throw new Error('Network error - please check your connection');
-    }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include',
+      body: body
+    });
     
-    let data;
-    try {
-      const text = await response.text();
-      data = text ? JSON.parse(text) : {};
-    } catch (parseError) {
-      console.error('Login parse error:', parseError);
-      throw new Error('Invalid response from server');
+    // Read response text first (more reliable than .json() on mobile)
+    const responseText = await response.text();
+    let data = {};
+    
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error('Invalid server response');
+      }
     }
     
     if (!response.ok) {
       throw new Error(data.detail || 'Login failed');
     }
     
-    // Store token in localStorage as backup for cookie issues
+    // Store token in localStorage
     if (data.token) {
       localStorage.setItem('auth_token', data.token);
     }
@@ -164,31 +162,29 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const register = useCallback(async (email, password, name) => {
-    // Create body string first to avoid any stream issues on mobile
-    const bodyString = JSON.stringify({ email, password, name });
+    // Use a simple fetch approach that works reliably on mobile
+    const url = `${API}/auth/register`;
+    const body = JSON.stringify({ email, password, name });
     
-    let response;
-    try {
-      response = await fetch(`${API}/auth/register`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: bodyString
-      });
-    } catch (fetchError) {
-      console.error('Register fetch error:', fetchError);
-      throw new Error('Network error - please check your connection');
-    }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: body
+    });
     
-    let data;
-    try {
-      const text = await response.text();
-      data = text ? JSON.parse(text) : {};
-    } catch (parseError) {
-      console.error('Register parse error:', parseError);
-      throw new Error('Invalid response from server');
+    // Read response text first (more reliable than .json() on mobile)
+    const responseText = await response.text();
+    let data = {};
+    
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error('Invalid server response');
+      }
     }
     
     if (!response.ok) {
