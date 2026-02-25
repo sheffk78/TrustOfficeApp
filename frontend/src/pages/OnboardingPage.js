@@ -98,25 +98,16 @@ export default function OnboardingPage() {
     setLoading(true);
 
     try {
-      const response = await fetchWithAuth('/trusts', {
-        method: 'POST',
-        body: JSON.stringify(trustData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create trust');
-      }
-
-      const newTrust = await response.json();
+      const newTrust = await xhrRequest('POST', `${API_URL}/api/trusts`, trustData, getToken());
       
-      // Select the new trust first, then reload list
       setSelectedTrust(newTrust);
       await loadTrusts();
 
       toast.success('Trust created successfully');
       setStep(3);
     } catch (error) {
-      toast.error(error.message);
+      console.error('Create trust error:', error);
+      toast.error(error.message || 'Failed to create trust');
     } finally {
       setLoading(false);
     }
@@ -125,34 +116,27 @@ export default function OnboardingPage() {
   const handleSeedDemo = async () => {
     setLoading(true);
     try {
-      const result = await seedDemoData();
+      const result = await xhrRequest('POST', `${API_URL}/api/demo/seed`, null, getToken());
+      
       if (result?.seeded) {
         await loadTrusts();
-        toast.success('Demo data created');
+        toast.success('Demo data created - explore the app!');
         navigate('/dashboard');
       } else {
-        toast.info('You already have trusts. Demo data is only for new accounts.');
+        toast.info(result?.message || 'Demo data already exists');
+        navigate('/dashboard');
       }
     } catch (error) {
-      toast.error('Failed to create demo data');
+      console.error('Seed demo error:', error);
+      toast.error(error.message || 'Failed to create demo data');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSkipToDemo = async () => {
-    setLoading(true);
-    try {
-      const result = await seedDemoData();
-      if (result?.seeded) {
-        await loadTrusts();
-        toast.success('Welcome to TrustOffice');
-      } else {
-        toast.info('You already have trusts');
-      }
-      navigate('/dashboard');
-    } catch (error) {
-      toast.error('Failed to setup');
+    await handleSeedDemo();
+  };
       navigate('/dashboard');
     } finally {
       setLoading(false);
