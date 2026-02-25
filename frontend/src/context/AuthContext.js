@@ -123,22 +123,32 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = useCallback(async (email, password) => {
-    const response = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ email, password })
-    });
+    // Create body string first to avoid any stream issues on mobile
+    const bodyString = JSON.stringify({ email, password });
     
-    // Clone response in case we need to read it twice for error handling
-    const responseClone = response.clone();
+    let response;
+    try {
+      response = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: bodyString
+      });
+    } catch (fetchError) {
+      console.error('Login fetch error:', fetchError);
+      throw new Error('Network error - please check your connection');
+    }
     
     let data;
     try {
-      data = await response.json();
+      const text = await response.text();
+      data = text ? JSON.parse(text) : {};
     } catch (parseError) {
-      const text = await responseClone.text();
-      throw new Error(text || 'Login failed - invalid response');
+      console.error('Login parse error:', parseError);
+      throw new Error('Invalid response from server');
     }
     
     if (!response.ok) {
@@ -154,27 +164,38 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const register = useCallback(async (email, password, name) => {
-    const response = await fetch(`${API}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, name })
-    });
+    // Create body string first to avoid any stream issues on mobile
+    const bodyString = JSON.stringify({ email, password, name });
     
-    // Clone response in case we need to read it twice for error handling
-    const responseClone = response.clone();
-    
-    if (!response.ok) {
-      try {
-        const error = await response.json();
-        throw new Error(error.detail || 'Registration failed');
-      } catch (parseError) {
-        // If JSON parsing fails, try text
-        const text = await responseClone.text();
-        throw new Error(text || 'Registration failed');
-      }
+    let response;
+    try {
+      response = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: bodyString
+      });
+    } catch (fetchError) {
+      console.error('Register fetch error:', fetchError);
+      throw new Error('Network error - please check your connection');
     }
     
-    return await response.json();
+    let data;
+    try {
+      const text = await response.text();
+      data = text ? JSON.parse(text) : {};
+    } catch (parseError) {
+      console.error('Register parse error:', parseError);
+      throw new Error('Invalid response from server');
+    }
+    
+    if (!response.ok) {
+      throw new Error(data.detail || 'Registration failed');
+    }
+    
+    return data;
   }, []);
 
   const logout = useCallback(async () => {
