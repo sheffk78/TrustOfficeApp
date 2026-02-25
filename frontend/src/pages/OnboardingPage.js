@@ -7,12 +7,47 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { fetchWithAuth } from '@/utils/api';
-import { ArrowRight, ArrowLeft, Building2, User, Calendar } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Building2, User, Calendar, Sparkles } from 'lucide-react';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Use XMLHttpRequest for maximum mobile compatibility
+const xhrRequest = (method, url, data = null, token = null) => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Accept', 'application/json');
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+    
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4) {
+        try {
+          const response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(response);
+          } else {
+            reject(new Error(response.detail || `Request failed`));
+          }
+        } catch (e) {
+          reject(new Error('Invalid server response'));
+        }
+      }
+    };
+    
+    xhr.onerror = function() {
+      reject(new Error('Network error - please check your connection'));
+    };
+    
+    xhr.send(data ? JSON.stringify(data) : null);
+  });
+};
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
-  const { user, trusts, loadTrusts, seedDemoData, setSelectedTrust } = useAuth();
+  const { user, trusts, loadTrusts, setSelectedTrust } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [checkingTrusts, setCheckingTrusts] = useState(true);
@@ -23,6 +58,8 @@ export default function OnboardingPage() {
     review_cadence: 'quarterly',
     description: ''
   });
+
+  const getToken = () => localStorage.getItem('auth_token');
 
   // Check if user already has trusts - redirect to dashboard if so
   useEffect(() => {
@@ -40,12 +77,10 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!checkingTrusts && trusts && trusts.length > 0) {
-      // User already has trusts, redirect to dashboard
       navigate('/dashboard', { replace: true });
     }
   }, [checkingTrusts, trusts, navigate]);
 
-  // Show loading while checking for existing trusts
   if (checkingTrusts) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
