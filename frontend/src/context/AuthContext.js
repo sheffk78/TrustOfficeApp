@@ -151,9 +151,18 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email, password, name })
     });
     
+    // Clone response in case we need to read it twice for error handling
+    const responseClone = response.clone();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Registration failed');
+      try {
+        const error = await response.json();
+        throw new Error(error.detail || 'Registration failed');
+      } catch (parseError) {
+        // If JSON parsing fails, try text
+        const text = await responseClone.text();
+        throw new Error(text || 'Registration failed');
+      }
     }
     
     return await response.json();
