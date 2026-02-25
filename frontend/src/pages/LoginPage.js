@@ -7,9 +7,42 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Use XMLHttpRequest for maximum mobile compatibility
+const xhrPost = (url, data) => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Accept', 'application/json');
+    
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4) {
+        try {
+          const response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(response);
+          } else {
+            reject(new Error(response.detail || `Request failed with status ${xhr.status}`));
+          }
+        } catch (e) {
+          reject(new Error('Invalid server response'));
+        }
+      }
+    };
+    
+    xhr.onerror = function() {
+      reject(new Error('Network error - please check your connection'));
+    };
+    
+    xhr.send(JSON.stringify(data));
+  });
+};
+
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const { user, setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,14 +56,29 @@ export default function LoginPage() {
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    if (loading) return;
+    
     setLoading(true);
     
     try {
-      await login(email, password);
+      const data = await xhrPost(`${API_URL}/api/auth/login`, {
+        email: email.trim().toLowerCase(),
+        password: password
+      });
+      
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      if (data.user) {
+        setUser(data.user);
+      }
+      
       toast.success('Welcome back');
       navigate('/dashboard');
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
