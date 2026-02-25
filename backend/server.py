@@ -4659,15 +4659,31 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
                 {"$set": {"stripe_customer_id": customer_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
             )
         
+        # Create checkout session params
+        checkout_params = {
+            "customer": customer_id,
+            "mode": "subscription",
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "success_url": checkout.success_url,
+            "cancel_url": checkout.cancel_url,
+            "metadata": {"user_id": user["user_id"], "plan_type": checkout.plan_type},
+            "allow_promotion_codes": True  # Always allow entering promo codes
+        }
+        
+        # If a specific promotion code is provided, try to apply it
+        if checkout.promotion_code:
+            try:
+                # Look up the promotion code in Stripe
+                promo_codes = stripe.PromotionCode.list(code=checkout.promotion_code, active=True, limit=1)
+                if promo_codes.data:
+                    checkout_params["discounts"] = [{"promotion_code": promo_codes.data[0].id}]
+                    logger.info(f"Applied promotion code: {checkout.promotion_code}")
+            except stripe.StripeError as promo_error:
+                logger.warning(f"Could not apply promotion code {checkout.promotion_code}: {promo_error}")
+                # Continue without the promo code - user can still enter it manually
+        
         # Create checkout session
-        session = stripe.checkout.Session.create(
-            customer=customer_id,
-            mode="subscription",
-            line_items=[{"price": price_id, "quantity": 1}],
-            success_url=checkout.success_url,
-            cancel_url=checkout.cancel_url,
-            metadata={"user_id": user["user_id"], "plan_type": checkout.plan_type}
-        )
+        session = stripe.checkout.Session.create(**checkout_params)
         
         # Record transaction
         await db.payment_transactions.insert_one({
