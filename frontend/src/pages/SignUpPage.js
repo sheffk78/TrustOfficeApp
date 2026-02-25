@@ -78,7 +78,7 @@ export default function SignUpPage() {
             <img 
               src="https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/5h7i559r_Trust%20Office%20Logo%20%281%29.svg"
               alt="TrustOffice"
-              className="h-12 mx-auto"
+              className="h-12 mx-auto dark:brightness-0 dark:invert"
             />
           </div>
 
