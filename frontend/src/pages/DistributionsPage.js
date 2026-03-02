@@ -61,7 +61,12 @@ export default function DistributionsPage() {
     beneficiary: '',
     category: '',
     notes: '',
-    status: 'review'
+    status: 'review',
+    // Benevolence fields
+    is_benevolence: false,
+    benevolence_recipient_name: '',
+    benevolence_need_description: '',
+    benevolence_notes: ''
   });
 
   const debouncedSearch = useDebounce(searchTerm, 300);
