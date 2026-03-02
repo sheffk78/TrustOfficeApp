@@ -42,7 +42,7 @@ const xhrPost = (url, data) => {
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { user, setUser } = useAuth();
+  const { user, setUser, loadTrusts } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
