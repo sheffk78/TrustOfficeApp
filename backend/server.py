@@ -232,6 +232,7 @@ app.include_router(background_jobs_router, prefix="/api")
 app.include_router(categories_router, prefix="/api")
 app.include_router(beneficiaries_router, prefix="/api")
 app.include_router(demo_router, prefix="/api")
+app.include_router(ai_router, prefix="/api")
 
 
 # ==================== LIFECYCLE EVENTS ====================
