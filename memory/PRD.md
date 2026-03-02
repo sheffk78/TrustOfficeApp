@@ -63,28 +63,29 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Dec 30, 2025) - P2 PREMIUM FEATURE GATING ✅
+### Latest Updates (Dec 30, 2025) - SERVER.PY CLEANUP: AUTH ROUTER MIGRATION ✅
 
-**Session Summary:** Implemented hard feature gating for premium features:
+**Session Summary:** Migrated auth endpoints to router and cleaned up routers/__init__.py:
 
-| Feature Flag | Endpoint | Behavior |
-|--------------|----------|----------|
-| `MULTIPLE_TRUSTS` | POST /api/trusts | Trial users blocked when creating 2nd+ trust |
-| `GOVERNANCE_HISTORY` | GET /api/governance/{id}/history | Trial users get 402 |
-| `TRUST_UNITS` | GET /api/trust-units/* | Trial users get 402 |
-| `BENEFICIARY_DASHBOARD` | GET /api/beneficiaries/dashboard | Trial users get 402 |
+**auth.py Router** (356 lines)
+- POST /api/auth/register - User registration with email/password
+- POST /api/auth/login - Login with JWT token response
+- GET /api/auth/me - Get current user profile
+- PUT /api/auth/profile - Update user name
+- POST /api/auth/forgot-password - Request password reset (non-revealing)
+- POST /api/auth/reset-password - Reset with token
+- GET /api/auth/verify-reset-token - Validate reset token
+- POST /api/auth/session - OAuth session exchange
+- POST /api/auth/logout - Clear session
 
-**Implementation Details:**
-- Uses `check_feature_access()` and `require_premium_feature()` from dependencies.py
-- Returns 402 Payment Required for premium feature access
-- Core features remain accessible to trial users (trusts list, entities, tasks, minutes, distributions)
+**Code Changes:**
+- Removed 318 lines from server.py (auth endpoints)
+- Updated routers/__init__.py to reflect current state
+- Server.py: 2652 → **2342 lines** (69% reduction from 7538)
 
-**Testing:** All 34 tests passed including:
-- 4 new feature gate tests
-- Core feature accessibility for trial users
-- Regression tests for existing functionality
+**Testing:** All 29 tests passed including auth, regression, and feature gate tests.
 
-### Previous Updates (Dec 30, 2025) - P1 CORE ROUTERS MIGRATION ✅
+### Previous Updates (Dec 30, 2025) - P2 PREMIUM FEATURE GATING ✅
 
 1. **ReadOnlyBanner Component** (`/frontend/src/components/ReadOnlyBanner.js`)
    - Amber/warning color scheme banner at top of pages
