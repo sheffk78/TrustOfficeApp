@@ -18,7 +18,8 @@ import {
   GitBranch,
   Wallet,
   Package,
-  Award
+  Award,
+  Users
 } from 'lucide-react';
 import {
   DropdownMenu,
