@@ -2,9 +2,10 @@
 Claude Client - Wrapper for Anthropic Claude API calls
 Uses emergentintegrations library for Claude API integration
 
-IMPORTANT: The Claude API key must be provided via the CLAUDE_API_KEY environment
-variable. This app runs on Emergent, which provides this key automatically.
-If CLAUDE_API_KEY is not set, AI features will be unavailable.
+IMPORTANT: The Claude API key must be provided via environment variable.
+On Emergent platform, the key is provided as EMERGENT_LLM_KEY.
+Alternatively, CLAUDE_API_KEY can be used directly.
+If neither is set, AI features will be unavailable.
 """
 import os
 import logging
@@ -13,11 +14,12 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 logger = logging.getLogger(__name__)
 
-# Get Claude API key from environment - CLAUDE_API_KEY is the primary source
-CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY')
+# Get Claude API key from environment
+# CLAUDE_API_KEY is preferred, fallback to EMERGENT_LLM_KEY (Emergent platform default)
+CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
 
 if not CLAUDE_API_KEY:
-    logger.error("CLAUDE_API_KEY environment variable is not set. AI features will be unavailable.")
+    logger.error("Neither CLAUDE_API_KEY nor EMERGENT_LLM_KEY environment variable is set. AI features will be unavailable.")
 
 # Model IDs - using the exact model names required by the API
 CLAUDE_SONNET = "claude-3.5-sonnet"  # For complex drafting tasks
