@@ -57,6 +57,7 @@ from routers.trust_units import router as trust_units_router
 from routers.trusts import router as trusts_router
 from routers.entities import router as entities_router
 from routers.tasks import router as tasks_router
+from routers.auth import router as auth_router
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -2462,6 +2463,7 @@ app.include_router(trust_units_router, prefix="/api")
 app.include_router(trusts_router, prefix="/api")
 app.include_router(entities_router, prefix="/api")
 app.include_router(tasks_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
