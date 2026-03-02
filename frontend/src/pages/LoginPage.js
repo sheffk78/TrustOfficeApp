@@ -75,6 +75,9 @@ export default function LoginPage() {
         setUser(data.user);
       }
       
+      // Load trusts after successful authentication
+      await loadTrusts();
+      
       toast.success('Welcome back');
       navigate('/dashboard');
     } catch (error) {
