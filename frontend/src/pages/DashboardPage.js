@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { 
-  Plus, 
   FileText, 
   DollarSign, 
   Receipt,
@@ -16,7 +15,6 @@ import {
   CheckCircle2,
   Circle,
   X,
-  Lightbulb,
   Zap,
   TrendingUp,
   Building2,
@@ -24,7 +22,9 @@ import {
   Package,
   UserPlus,
   Landmark,
-  PlusCircle
+  PlusCircle,
+  Sparkles,
+  ChevronRight
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -73,13 +73,19 @@ const QUICK_ACTIONS = [
   }
 ];
 
+// Map insight types to icons
+const INSIGHT_ICONS = {
+  'Quarterly Minutes': FileText,
+  'Task Compliance': Calendar,
+  'Compensation Alignment': Wallet,
+  'Distribution Documentation': DollarSign,
+  'Annual Review': TrendingUp
+};
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, selectedTrust, trusts, loadTrusts, seedDemoData } = useAuth();
-  const [governance, setGovernance] = useState(null);
-  const [healthDetails, setHealthDetails] = useState(null);
-  const [onboarding, setOnboarding] = useState(null);
-  const [activities, setActivities] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -95,27 +101,13 @@ export default function DashboardPage() {
     
     setLoading(true);
     try {
-      // Load governance score
-      const govResponse = await fetchWithAuth(`/governance/${selectedTrust.trust_id}`);
-      if (govResponse.ok) {
-        const govData = await govResponse.json();
-        setGovernance(govData);
-        // Check if response has criteria (5-criteria health score)
-        if (govData.criteria) {
-          setHealthDetails(govData);
-        }
-      }
-
-      // Load onboarding state
-      const onboardingResponse = await fetchWithAuth('/onboarding');
-      if (onboardingResponse.ok) {
-        setOnboarding(await onboardingResponse.json());
-      }
-
-      // Load recent activity
-      const actResponse = await fetchWithAuth(`/activity?trust_id=${selectedTrust.trust_id}&limit=10`);
-      if (actResponse.ok) {
-        setActivities(await actResponse.json());
+      // Single unified API call
+      const response = await fetchWithAuth('/dashboard');
+      if (response.ok) {
+        const data = await response.json();
+        setDashboard(data);
+      } else {
+        console.error('Failed to load dashboard');
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -127,7 +119,10 @@ export default function DashboardPage() {
   const dismissOnboarding = async () => {
     try {
       await fetchWithAuth('/onboarding/dismiss', { method: 'POST' });
-      setOnboarding(prev => ({ ...prev, checklist_dismissed: true }));
+      setDashboard(prev => ({
+        ...prev,
+        onboarding_state: { ...prev.onboarding_state, checklist_dismissed: true }
+      }));
     } catch (error) {
       console.error('Failed to dismiss onboarding:', error);
     }
@@ -185,80 +180,9 @@ export default function DashboardPage() {
     }
   };
 
-  // Generate actionable insights from health criteria
-  const getInsights = () => {
-    if (!healthDetails?.criteria) return [];
-    
-    const insights = [];
-    const criteria = healthDetails.criteria;
-    
-    criteria.forEach(c => {
-      if (!c.achieved) {
-        switch (c.name) {
-          case 'Quarterly Minutes':
-            insights.push({
-              type: 'warning',
-              icon: <FileText className="w-4 h-4" />,
-              title: 'Missing Q Minutes',
-              description: 'Generate minutes this quarter to earn +20 points',
-              action: '/minutes/new',
-              actionLabel: 'Record Now',
-              points: 20
-            });
-            break;
-          case 'Task Compliance':
-            insights.push({
-              type: 'error',
-              icon: <Calendar className="w-4 h-4" />,
-              title: 'Overdue Tasks',
-              description: 'Complete overdue tasks to earn +20 points',
-              action: '/calendar',
-              actionLabel: 'View Tasks',
-              points: 20
-            });
-            break;
-          case 'Compensation Alignment':
-            insights.push({
-              type: 'error',
-              icon: <Wallet className="w-4 h-4" />,
-              title: 'Compensation Over Plan',
-              description: 'YTD compensation exceeds approved amount',
-              action: '/compensation',
-              actionLabel: 'Review',
-              points: 20
-            });
-            break;
-          case 'Distribution Documentation':
-            insights.push({
-              type: 'info',
-              icon: <DollarSign className="w-4 h-4" />,
-              title: 'No Distributions Logged',
-              description: 'Log your first distribution to earn +20 points',
-              action: '/distributions',
-              actionLabel: 'Add Distribution',
-              points: 20
-            });
-            break;
-          case 'Annual Review':
-            insights.push({
-              type: 'warning',
-              icon: <TrendingUp className="w-4 h-4" />,
-              title: 'Annual Review Due',
-              description: 'Complete annual review for +20 points',
-              action: '/calendar',
-              actionLabel: 'Schedule Review',
-              points: 20
-            });
-            break;
-        }
-      }
-    });
-    
-    return insights;
-  };
-
-  // Calculate onboarding progress
+  // Calculate onboarding progress from dashboard data
   const getOnboardingProgress = () => {
+    const onboarding = dashboard?.onboarding_state;
     if (!onboarding) return { completed: 0, total: 4, steps: [] };
     
     const steps = [
@@ -296,8 +220,13 @@ export default function DashboardPage() {
     return { completed, total: steps.length, steps };
   };
 
-  const insights = getInsights();
+  // Get insights from dashboard API (single source of truth)
+  const insights = dashboard?.governance_insights || [];
   const onboardingProgress = getOnboardingProgress();
+  const healthScore = dashboard?.health_score;
+  const stats = dashboard?.stats;
+  const activities = dashboard?.recent_activity || [];
+  const onboarding = dashboard?.onboarding_state;
 
   // Empty state - no trusts
   if (!loading && trusts.length === 0) {
@@ -338,7 +267,7 @@ export default function DashboardPage() {
           <div className="page-header">
             <h1 className="page-title">Dashboard</h1>
             <p className="page-subtitle">
-              {selectedTrust?.name || 'Select a trust'} • {selectedTrust?.role}
+              {dashboard?.trust_name || selectedTrust?.name || 'Select a trust'} • {selectedTrust?.role}
             </p>
           </div>
 
@@ -410,54 +339,93 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Governance Insights - Only show if there are issues */}
+              {/* What's Next Card - Using governance_insights from /api/dashboard */}
               {insights.length > 0 && (
-                <div className="mb-8 card-trust corner-mark border-l-4 border-l-warning" data-testid="governance-insights">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-warning/20 flex items-center justify-center text-warning">
-                      <Lightbulb className="w-5 h-5" />
+                <div className="mb-8 card-trust corner-mark" data-testid="whats-next-card">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-gold/20 to-navy/10 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-gold" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-lg text-navy">What's Next</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {insights.length} action{insights.length !== 1 ? 's' : ''} to boost your score by +{insights.reduce((sum, i) => sum + i.points, 0)} points
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-serif text-lg text-navy">Governance Insights</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Actions to improve your health score (+{insights.reduce((sum, i) => sum + i.points, 0)} potential points)
-                      </p>
-                    </div>
+                    <Link 
+                      to="/governance" 
+                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                    >
+                      Full Report <ArrowRight className="w-3 h-3" />
+                    </Link>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {insights.slice(0, 3).map((insight, index) => (
-                      <div 
-                        key={index}
-                        className={`p-4 border ${
-                          insight.type === 'error' ? 'border-error/30 bg-error/5' :
-                          insight.type === 'warning' ? 'border-warning/30 bg-warning/5' :
-                          'border-navy/20 bg-navy/5'
-                        }`}
-                        data-testid={`insight-${index}`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className={`w-8 h-8 flex items-center justify-center ${
-                            insight.type === 'error' ? 'bg-error/20 text-error' :
-                            insight.type === 'warning' ? 'bg-warning/20 text-warning' :
-                            'bg-navy/10 text-navy'
-                          }`}>
-                            {insight.icon}
-                          </div>
-                          <span className="badge-trust bg-navy/10 text-navy">+{insight.points} pts</span>
-                        </div>
-                        <h4 className="font-medium text-navy text-sm mb-1">{insight.title}</h4>
-                        <p className="text-xs text-muted-foreground mb-3">{insight.description}</p>
-                        <Button 
-                          onClick={() => navigate(insight.action)}
-                          size="sm"
-                          className="w-full btn-secondary text-xs"
+                  <div className="space-y-3">
+                    {insights.slice(0, 5).map((insight, index) => {
+                      const InsightIcon = INSIGHT_ICONS[insight.criterion_name] || AlertCircle;
+                      const isError = insight.type === 'error';
+                      const isWarning = insight.type === 'warning';
+                      
+                      return (
+                        <div 
+                          key={index}
+                          className={`flex items-center justify-between p-4 border transition-all hover:shadow-sm ${
+                            isError ? 'border-error/30 bg-error/5 hover:border-error/50' :
+                            isWarning ? 'border-warning/30 bg-warning/5 hover:border-warning/50' :
+                            'border-navy/20 bg-navy/5 hover:border-navy/30'
+                          }`}
+                          data-testid={`insight-${index}`}
                         >
-                          {insight.actionLabel}
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${
+                              isError ? 'bg-error/20 text-error' :
+                              isWarning ? 'bg-warning/20 text-warning' :
+                              'bg-navy/10 text-navy'
+                            }`}>
+                              <InsightIcon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <h4 className="font-medium text-navy">{insight.title}</h4>
+                                <span className={`px-2 py-0.5 text-xs font-mono ${
+                                  isError ? 'bg-error/20 text-error' :
+                                  isWarning ? 'bg-warning/20 text-warning' :
+                                  'bg-success/20 text-success'
+                                }`}>
+                                  +{insight.points} pts
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{insight.description}</p>
+                            </div>
+                          </div>
+                          <Button 
+                            onClick={() => navigate(insight.action_path)}
+                            size="sm"
+                            className={`flex-shrink-0 ${
+                              isError ? 'bg-error hover:bg-error/90 text-white' :
+                              isWarning ? 'bg-warning hover:bg-warning/90 text-white' :
+                              'btn-primary'
+                            }`}
+                            data-testid={`insight-action-${index}`}
+                          >
+                            {insight.action_label}
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
+                  
+                  {healthScore?.total_score === 100 && (
+                    <div className="mt-4 p-4 bg-success/10 border border-success/20 flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
+                      <p className="text-sm text-success font-medium">
+                        Excellent! Your governance is in perfect health. Keep up the great work!
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -468,7 +436,7 @@ export default function DashboardPage() {
                   <div className="flex items-start justify-between mb-6">
                     <div>
                       <p className="label-trust mb-1">Governance Health</p>
-                      <h2 className="font-serif text-2xl text-navy">{selectedTrust?.name}</h2>
+                      <h2 className="font-serif text-2xl text-navy">{dashboard?.trust_name || selectedTrust?.name}</h2>
                     </div>
                     <Link 
                       to="/governance" 
@@ -481,8 +449,8 @@ export default function DashboardPage() {
 
                   <div className="flex items-center gap-8">
                     <div className="score-circle">
-                      <span className={`score-indicator ${getScoreColor(healthDetails?.total_score || governance?.overall_score || 0)}`}>
-                        {healthDetails?.total_score || governance?.overall_score || 0}
+                      <span className={`score-indicator ${getScoreColor(healthScore?.total_score || 0)}`}>
+                        {healthScore?.total_score || 0}
                       </span>
                       <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
                         Score
@@ -490,9 +458,9 @@ export default function DashboardPage() {
                     </div>
 
                     {/* 5-Criteria Display */}
-                    {healthDetails?.criteria ? (
+                    {healthScore?.criteria ? (
                       <div className="flex-1 space-y-3">
-                        {healthDetails.criteria.map((criterion, i) => (
+                        {healthScore.criteria.map((criterion, i) => (
                           <div key={i} className="flex items-center justify-between">
                             <span className="text-sm text-muted-foreground flex items-center gap-2">
                               {criterion.achieved ? (
@@ -517,57 +485,22 @@ export default function DashboardPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="flex-1 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Meeting Recency</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-navy/10">
-                              <div 
-                                className="h-full bg-navy" 
-                                style={{ width: `${governance?.meeting_recency_score || 0}%` }}
-                              ></div>
-                            </div>
-                            <span className="font-mono text-xs w-8">{governance?.meeting_recency_score || 0}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Decisions (90 days)</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-navy/10">
-                              <div 
-                                className="h-full bg-gold" 
-                                style={{ width: `${governance?.decisions_count_score || 0}%` }}
-                              ></div>
-                            </div>
-                            <span className="font-mono text-xs w-8">{governance?.decisions_count_score || 0}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Pending Reviews</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-navy/10">
-                              <div 
-                                className="h-full bg-success" 
-                                style={{ width: `${governance?.pending_reviews_score || 0}%` }}
-                              ></div>
-                            </div>
-                            <span className="font-mono text-xs w-8">{governance?.pending_reviews_score || 0}</span>
-                          </div>
-                        </div>
+                      <div className="flex-1 text-muted-foreground text-sm">
+                        Loading criteria...
                       </div>
                     )}
                   </div>
 
-                  {(governance?.status === 'warning' || (healthDetails?.total_score < 60 && healthDetails?.total_score >= 40)) && (
+                  {healthScore?.total_score < 60 && healthScore?.total_score >= 40 && (
                     <div className="mt-6 p-4 bg-warning/10 border border-warning/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
                       <p className="text-sm text-warning">
-                        Your governance score needs attention. Consider scheduling a review meeting.
+                        Your governance score needs attention. Consider completing the suggested actions above.
                       </p>
                     </div>
                   )}
 
-                  {(governance?.status === 'critical' || (healthDetails?.total_score < 40)) && (
+                  {healthScore?.total_score < 40 && (
                     <div className="mt-6 p-4 bg-error/10 border border-error/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
                       <p className="text-sm text-error">
@@ -585,7 +518,7 @@ export default function DashboardPage() {
                       to="/minutes/templates"
                       className="text-xs text-muted-foreground hover:text-navy"
                     >
-                      All Templates →
+                      All Templates
                     </Link>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -612,15 +545,15 @@ export default function DashboardPage() {
                     })}
                   </div>
 
-                  {/* Stats */}
+                  {/* Stats from /api/dashboard */}
                   <div className="mt-6 pt-6 border-t border-navy/10">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="font-mono text-2xl text-navy">{governance?.total_decisions || 0}</p>
+                        <p className="font-mono text-2xl text-navy">{stats?.total_decisions || 0}</p>
                         <p className="label-trust">Decisions</p>
                       </div>
                       <div>
-                        <p className="font-mono text-2xl text-warning">{governance?.pending_reviews || 0}</p>
+                        <p className="font-mono text-2xl text-warning">{stats?.pending_reviews || 0}</p>
                         <p className="label-trust">Pending</p>
                       </div>
                     </div>
@@ -635,6 +568,16 @@ export default function DashboardPage() {
                     <p className="label-trust mb-1">Recent Activity</p>
                     <h2 className="font-serif text-xl text-navy">Timeline</h2>
                   </div>
+                  {stats && (
+                    <div className="text-right">
+                      <p className="font-mono text-sm text-muted-foreground">
+                        {stats.total_distributions} distributions
+                      </p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        ${stats.ytd_distributions_amount?.toLocaleString()} YTD
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {activities.length === 0 ? (
