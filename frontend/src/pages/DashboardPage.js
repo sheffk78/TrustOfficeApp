@@ -471,6 +471,90 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* AI-Generated Suggestions Card */}
+              <div className="mb-8 card-trust corner-mark" data-testid="ai-suggestions-card">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-gold/30 to-gold/10 flex items-center justify-center">
+                      <Bot className="w-5 h-5 text-gold" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-lg text-navy">AI Recommendations</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Personalized suggestions to improve governance
+                      </p>
+                    </div>
+                  </div>
+                  {!aiSuggestionsLoading && !aiSuggestionsError && (
+                    <button
+                      onClick={loadAiSuggestions}
+                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                    >
+                      Refresh <Sparkles className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                
+                {aiSuggestionsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-gold mr-2" />
+                    <span className="text-sm text-muted-foreground">Generating suggestions...</span>
+                  </div>
+                ) : aiSuggestionsError ? (
+                  <div className="p-4 bg-muted/50 border border-muted text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Unable to load AI suggestions. 
+                      <button 
+                        onClick={loadAiSuggestions} 
+                        className="text-navy hover:text-gold ml-1 underline"
+                      >
+                        Try again
+                      </button>
+                    </p>
+                  </div>
+                ) : aiSuggestions.length > 0 ? (
+                  <div className="space-y-3">
+                    {aiSuggestions.slice(0, 4).map((suggestion, index) => (
+                      <div 
+                        key={index}
+                        className="flex items-center justify-between p-4 border border-gold/20 bg-gold/5 hover:border-gold/40 transition-all hover:shadow-sm"
+                        data-testid={`ai-suggestion-${index}`}
+                      >
+                        <div className="flex-1 mr-4">
+                          <h4 className="font-medium text-navy text-sm mb-1">{suggestion.title}</h4>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{suggestion.description}</p>
+                          {suggestion.estimated_points_gain && (
+                            <span className="inline-block mt-1 px-2 py-0.5 text-xs font-mono bg-success/20 text-success">
+                              +{suggestion.estimated_points_gain} pts
+                            </span>
+                          )}
+                        </div>
+                        <Button 
+                          onClick={() => navigate(suggestion.route)}
+                          size="sm"
+                          className="btn-secondary flex-shrink-0"
+                          data-testid={`ai-suggestion-action-${index}`}
+                        >
+                          Go
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-success/10 border border-success/20 text-center">
+                    <p className="text-sm text-success">
+                      No additional suggestions. Your governance practices look good!
+                    </p>
+                  </div>
+                )}
+                
+                <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  AI-generated suggestions. You decide which actions to take.
+                </p>
+              </div>
+
               {/* Top Row - Governance Score & Quick Actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 {/* Governance Health Score */}
