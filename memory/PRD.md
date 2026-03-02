@@ -57,7 +57,40 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - DEMO DATA & FOREVER FREE ACCOUNT ✅
+### Latest Updates (Mar 2, 2026) - AI INTEGRATION LAYER ✅
+
+**Session Summary:** Added AI-powered features using Claude API for minutes drafting and governance suggestions.
+
+**Claude Client (`/backend/claude_client.py`):**
+- Wrapper for Claude API using `emergentintegrations` library
+- Uses EMERGENT_LLM_KEY environment variable
+- Two model configurations:
+  - Claude Sonnet (claude-sonnet-4-5-20250929) for complex drafting
+  - Claude Haiku (claude-haiku-4-5) for quick suggestions
+- Error handling with safe client-facing messages
+
+**AI Service (`/backend/ai_service.py`):**
+- `draft_minutes_from_structured_input()` - Generates formal WHEREAS/RESOLVED minutes
+  - Input: minutes_type, meeting_date, participants, decisions_outline, trust_name, jurisdiction, beneficiary_standard
+  - Output: draft_body, suggested_title, cautions
+- `generate_governance_suggestions()` - Analyzes health score and provides recommendations
+  - Input: health_score, criteria, recent_activity, trust_name
+  - Output: 2-4 suggestions with title, description, route, estimated_points_gain
+
+**API Endpoints (`/backend/routers/ai.py`):**
+- `GET /api/ai/status` - Check AI service status and available features
+- `POST /api/ai/minutes-draft` - Generate AI-drafted meeting minutes
+- `POST /api/ai/governance-suggestions` - Get actionable improvement suggestions
+
+**Features:**
+- Minutes drafting creates professional documents with formal language
+- Governance suggestions map to specific app routes (/minutes/new, /calendar, etc.)
+- Point gain estimates help prioritize actions
+- Proper authentication required for all endpoints
+
+**Testing:** All 10 backend tests passed.
+
+### Previous Updates (Mar 2, 2026) - DEMO DATA & FOREVER FREE ACCOUNT ✅
 
 **Session Summary:** Enhanced demo data to showcase all features, added delete endpoint, and implemented forever free account for admin@wingpointtrusts.com.
 
