@@ -323,6 +323,7 @@ async def create_comp_payment(payment: CompensationPaymentCreate, user: dict = D
         "amount": payment.amount,
         "date": payment.date,
         "classification_text": payment.classification_text,
+        "trustee_name": payment.trustee_name,
         "exceeds_plan_flag": exceeds_plan,
         "plan_id": primary_plan.get("plan_id") if primary_plan else None,
         "minutes_record_id": None,

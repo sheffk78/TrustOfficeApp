@@ -655,6 +655,7 @@ class CompensationPaymentCreate(BaseModel):
     amount: float
     date: str
     classification_text: str = ""
+    trustee_name: Optional[str] = None
 
 class CompensationPaymentResponse(BaseModel):
     payment_id: str
@@ -662,6 +663,7 @@ class CompensationPaymentResponse(BaseModel):
     amount: float
     date: Optional[str] = None  # Optional for legacy payments
     classification_text: str = ""  # Default empty for legacy payments
+    trustee_name: Optional[str] = None
     exceeds_plan_flag: bool = False  # Default false for legacy payments
     minutes_record_id: Optional[str] = None
     created_at: str
@@ -813,7 +815,8 @@ class GuidedMinutesDraftRequest(BaseModel):
     trust_id: str
     minutes_type: str = Field(..., description="Type: annual, quarterly, general")
     meeting_date: str = Field(..., description="ISO date of the meeting")
-    participants: List[str] = Field(..., description="List of selected trustees/participants")
+    participants: List[str] = Field(..., description="List of selected trustees")
+    other_attendees: List[str] = Field(default_factory=list, description="List of other attendees (guests, advisors, beneficiaries)")
     agenda_items: List[str] = Field(default_factory=list, description="Short bullet points of agenda topics")
     key_decisions: List[str] = Field(default_factory=list, description="Short bullet points of decisions made")
     additional_context: Optional[str] = Field(None, description="Optional freeform notes")
@@ -833,6 +836,7 @@ class GuidedMinutesSaveRequest(BaseModel):
     minutes_type: str
     meeting_date: str
     participants_text: str
+    other_attendees_text: Optional[str] = None
     decisions_text: str
 
 
@@ -854,6 +858,7 @@ class GuidedMinutesSaveWithRecordsRequest(BaseModel):
     minutes_type: str
     meeting_date: str
     participants_text: str
+    other_attendees_text: Optional[str] = None
     decisions_text: str
     records_to_create: List[RecordFromMinutes] = Field(default_factory=list)
 

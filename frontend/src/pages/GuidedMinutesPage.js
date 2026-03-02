@@ -71,8 +71,10 @@ export default function GuidedMinutesPage() {
   // Step 1: Meeting type and basic info
   const [meetingType, setMeetingType] = useState('');
   const [meetingDate, setMeetingDate] = useState(new Date());
-  const [selectedParticipants, setSelectedParticipants] = useState([]);
+  const [selectedTrustees, setSelectedTrustees] = useState([]); // Actual trustees
+  const [otherAttendees, setOtherAttendees] = useState([]); // Guests, advisors, etc.
   const [customParticipant, setCustomParticipant] = useState('');
+  const [customParticipantRole, setCustomParticipantRole] = useState('trustee'); // trustee or attendee
   
   // Step 2: Agenda and decisions
   const [agendaItems, setAgendaItems] = useState(['']);
@@ -148,21 +150,44 @@ export default function GuidedMinutesPage() {
     loadContext();
   }, [loadContext]);
 
-  // Handle participant selection
-  const handleParticipantToggle = (name) => {
-    setSelectedParticipants(prev => 
+  // Handle trustee selection (from known trustees)
+  const handleTrusteeToggle = (name) => {
+    setSelectedTrustees(prev => 
       prev.includes(name) 
         ? prev.filter(p => p !== name)
         : [...prev, name]
     );
   };
 
+  // Handle adding custom participant
   const handleAddCustomParticipant = () => {
-    if (customParticipant.trim() && !selectedParticipants.includes(customParticipant.trim())) {
-      setSelectedParticipants(prev => [...prev, customParticipant.trim()]);
+    if (customParticipant.trim()) {
+      const name = customParticipant.trim();
+      if (customParticipantRole === 'trustee') {
+        if (!selectedTrustees.includes(name)) {
+          setSelectedTrustees(prev => [...prev, name]);
+        }
+      } else {
+        if (!otherAttendees.includes(name)) {
+          setOtherAttendees(prev => [...prev, name]);
+        }
+      }
       setCustomParticipant('');
     }
   };
+
+  // Remove an other attendee
+  const handleRemoveAttendee = (name) => {
+    setOtherAttendees(prev => prev.filter(p => p !== name));
+  };
+
+  // Remove a trustee (custom ones only, not from trust context)
+  const handleRemoveTrustee = (name) => {
+    setSelectedTrustees(prev => prev.filter(p => p !== name));
+  };
+
+  // Get all participants for display
+  const allParticipants = [...selectedTrustees, ...otherAttendees];
 
   // Handle agenda items
   const handleAgendaChange = (index, value) => {
@@ -214,7 +239,8 @@ export default function GuidedMinutesPage() {
           trust_id: selectedTrust.trust_id,
           minutes_type: meetingType,
           meeting_date: format(meetingDate, 'yyyy-MM-dd'),
-          participants: selectedParticipants,
+          participants: selectedTrustees,
+          other_attendees: otherAttendees,
           agenda_items: agendaItems.filter(a => a.trim()),
           key_decisions: keyDecisions.filter(d => d.trim()),
           additional_context: additionalContext.trim() || null
@@ -259,7 +285,8 @@ export default function GuidedMinutesPage() {
         trust_id: selectedTrust.trust_id,
         minutes_type: meetingType,
         meeting_date: format(meetingDate, 'yyyy-MM-dd'),
-        participants_text: selectedParticipants.join(', '),
+        participants_text: selectedTrustees.join(', '),
+        other_attendees_text: otherAttendees.join(', '),
         decisions_text: editedDraft
       };
       
@@ -324,7 +351,7 @@ export default function GuidedMinutesPage() {
   };
 
   // Navigation validation
-  const canProceedToStep2 = meetingType && meetingDate && selectedParticipants.length > 0;
+  const canProceedToStep2 = meetingType && meetingDate && selectedTrustees.length > 0;
   const canProceedToStep3 = agendaItems.some(a => a.trim()) || keyDecisions.some(d => d.trim());
   const canSave = editedDraft.trim().length > 0;
 
@@ -412,34 +439,37 @@ export default function GuidedMinutesPage() {
         </Popover>
       </div>
 
-      {/* Participants */}
+      {/* Participants - Trustees */}
       <div>
         <Label className="font-mono text-xs uppercase tracking-widest text-navy/70 dark:text-white/70 mb-3 block">
-          Participants
+          Trustees Present *
         </Label>
+        <p className="text-sm text-muted-foreground mb-3">
+          Select the trustees who participated in this meeting. These will be titled as "Trustee" in the minutes.
+        </p>
         
         {/* Known trustees from context */}
         {trustContext?.trustees?.length > 0 && (
           <div className="space-y-2 mb-4">
-            <p className="text-sm text-muted-foreground">Select from known trustees:</p>
+            <p className="text-xs text-muted-foreground">Known trustees:</p>
             <div className="flex flex-wrap gap-2">
               {trustContext.trustees.map(trustee => (
                 <button
                   key={trustee}
-                  onClick={() => handleParticipantToggle(trustee)}
+                  onClick={() => handleTrusteeToggle(trustee)}
                   className={`flex items-center gap-2 px-3 py-2 border transition-all ${
-                    selectedParticipants.includes(trustee)
+                    selectedTrustees.includes(trustee)
                       ? 'border-navy dark:border-gold bg-navy/5 dark:bg-gold/5'
                       : 'border-navy/20 dark:border-white/20 hover:border-navy/40'
                   }`}
-                  data-testid={`participant-${trustee.replace(/\s+/g, '-').toLowerCase()}`}
+                  data-testid={`trustee-${trustee.replace(/\s+/g, '-').toLowerCase()}`}
                 >
                   <div className={`w-4 h-4 border flex items-center justify-center ${
-                    selectedParticipants.includes(trustee)
+                    selectedTrustees.includes(trustee)
                       ? 'border-navy dark:border-gold bg-navy dark:bg-gold'
                       : 'border-navy/30 dark:border-white/30'
                   }`}>
-                    {selectedParticipants.includes(trustee) && (
+                    {selectedTrustees.includes(trustee) && (
                       <CheckCircle className="w-3 h-3 text-white dark:text-navy" />
                     )}
                   </div>
@@ -450,12 +480,88 @@ export default function GuidedMinutesPage() {
           </div>
         )}
         
-        {/* Add custom participant */}
-        <div className="flex gap-2">
+        {/* Selected trustees display */}
+        {selectedTrustees.length > 0 && (
+          <div className="mt-3 p-3 bg-navy/5 dark:bg-gold/5 border border-navy/10 dark:border-gold/10">
+            <p className="text-xs font-mono uppercase tracking-widest text-navy/50 dark:text-white/50 mb-2">
+              Trustees ({selectedTrustees.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {selectedTrustees.map(p => (
+                <span 
+                  key={p} 
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-navy/10 dark:bg-gold/10 text-sm"
+                >
+                  {p}
+                  {/* Only allow removal if not in trust context */}
+                  {!trustContext?.trustees?.includes(p) && (
+                    <button onClick={() => handleRemoveTrustee(p)} className="text-navy/50 hover:text-navy dark:text-white/50 dark:hover:text-white">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                  {trustContext?.trustees?.includes(p) && (
+                    <button onClick={() => handleTrusteeToggle(p)} className="text-navy/50 hover:text-navy dark:text-white/50 dark:hover:text-white">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Other Attendees (Optional) */}
+      <div>
+        <Label className="font-mono text-xs uppercase tracking-widest text-navy/70 dark:text-white/70 mb-3 block">
+          Other Attendees (Optional)
+        </Label>
+        <p className="text-sm text-muted-foreground mb-3">
+          Add guests, advisors, beneficiaries, or others who attended. They will be listed as "Also Present" without the Trustee title.
+        </p>
+        
+        {/* Other attendees list */}
+        {otherAttendees.length > 0 && (
+          <div className="mb-3 p-3 bg-subtle-bg dark:bg-slate-800 border border-navy/10 dark:border-white/10">
+            <p className="text-xs font-mono uppercase tracking-widest text-navy/50 dark:text-white/50 mb-2">
+              Also Present ({otherAttendees.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {otherAttendees.map(p => (
+                <span 
+                  key={p} 
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-slate-700 border border-navy/10 dark:border-white/10 text-sm"
+                >
+                  {p}
+                  <button onClick={() => handleRemoveAttendee(p)} className="text-navy/50 hover:text-navy dark:text-white/50 dark:hover:text-white">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+        
+      {/* Add participant (trustee or other) */}
+      <div className="p-4 border border-dashed border-navy/20 dark:border-white/20">
+        <Label className="font-mono text-xs uppercase tracking-widest text-navy/70 dark:text-white/70 mb-3 block">
+          Add Participant
+        </Label>
+        <div className="flex gap-2 mb-3">
+          <Select value={customParticipantRole} onValueChange={setCustomParticipantRole}>
+            <SelectTrigger className="w-[140px]" data-testid="participant-role-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="trustee">Trustee</SelectItem>
+              <SelectItem value="attendee">Other Attendee</SelectItem>
+            </SelectContent>
+          </Select>
           <Input
             value={customParticipant}
             onChange={(e) => setCustomParticipant(e.target.value)}
-            placeholder="Add another participant..."
+            placeholder={customParticipantRole === 'trustee' ? "Trustee name..." : "Guest, advisor, beneficiary..."}
             className="flex-1"
             onKeyDown={(e) => e.key === 'Enter' && handleAddCustomParticipant()}
             data-testid="custom-participant-input"
@@ -469,28 +575,11 @@ export default function GuidedMinutesPage() {
             <Plus className="w-4 h-4" />
           </Button>
         </div>
-        
-        {/* Selected participants display */}
-        {selectedParticipants.length > 0 && (
-          <div className="mt-4 p-3 bg-subtle-bg dark:bg-slate-800 border border-navy/10 dark:border-white/10">
-            <p className="text-xs font-mono uppercase tracking-widest text-navy/50 dark:text-white/50 mb-2">
-              Selected ({selectedParticipants.length})
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {selectedParticipants.map(p => (
-                <span 
-                  key={p} 
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-navy/10 dark:bg-gold/10 text-sm"
-                >
-                  {p}
-                  <button onClick={() => handleParticipantToggle(p)} className="text-navy/50 hover:text-navy dark:text-white/50 dark:hover:text-white">
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        <p className="text-xs text-muted-foreground">
+          {customParticipantRole === 'trustee' 
+            ? "This person will be titled as 'Trustee' in the final document."
+            : "This person will be listed under 'Also Present' without a trustee title."}
+        </p>
       </div>
     </div>
   );
@@ -897,7 +986,8 @@ export default function GuidedMinutesPage() {
           onClick={() => {
             setStep(1);
             setMeetingType('');
-            setSelectedParticipants([]);
+            setSelectedTrustees([]);
+            setOtherAttendees([]);
             setAgendaItems(['']);
             setKeyDecisions(['']);
             setAdditionalContext('');

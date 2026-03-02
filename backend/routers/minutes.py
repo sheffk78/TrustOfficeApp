@@ -279,13 +279,22 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
     story.append(details_table)
     story.append(Spacer(1, 16))
     
-    # ==== PARTICIPANTS PRESENT ====
+    # ==== TRUSTEES PRESENT ====
     if minutes.get('participants_text'):
         story.append(Paragraph("TRUSTEES PRESENT", section_header_style))
         participants = minutes.get('participants_text', '').split(',')
         for p in participants:
             if p.strip():
                 story.append(Paragraph(f"• {p.strip()}, Trustee", bullet_style))
+        story.append(Spacer(1, 12))
+    
+    # ==== OTHER ATTENDEES (if present) ====
+    if minutes.get('other_attendees_text'):
+        story.append(Paragraph("ALSO PRESENT", section_header_style))
+        other_attendees = minutes.get('other_attendees_text', '').split(',')
+        for a in other_attendees:
+            if a.strip():
+                story.append(Paragraph(f"• {a.strip()}", bullet_style))
         story.append(Spacer(1, 12))
     
     # ==== MINUTES BODY - WITH FORMATTING PRESERVATION ====

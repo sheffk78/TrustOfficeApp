@@ -136,6 +136,12 @@ async def create_guided_minutes_draft(
     if request.additional_context:
         additional_context_parts.append(f"Additional notes: {request.additional_context}")
     
+    # Include other attendees in the context if present
+    if request.other_attendees:
+        additional_context_parts.append(
+            f"Other attendees present (not trustees): {', '.join(request.other_attendees)}"
+        )
+    
     additional_context_parts.append(
         "WIZARD INPUT: This is from a guided wizard where the user provided brief bullet points. "
         "Please expand these into proper formal minutes language with WHEREAS clauses for context "
@@ -228,6 +234,7 @@ async def save_guided_minutes(
         "minutes_type": minutes_type,
         "meeting_date": request.meeting_date,
         "participants_text": request.participants_text,
+        "other_attendees_text": request.other_attendees_text or "",
         "decisions_text": request.decisions_text,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "source": "guided_wizard"  # Track that this came from guided flow
@@ -359,6 +366,7 @@ async def save_guided_minutes_with_records(
         "minutes_type": minutes_type,
         "meeting_date": request.meeting_date,
         "participants_text": request.participants_text,
+        "other_attendees_text": request.other_attendees_text or "",
         "decisions_text": request.decisions_text,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "source": "guided_wizard"

@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Wallet, 
@@ -58,8 +59,12 @@ export default function CompensationPage() {
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
-    classification_text: ''
+    classification_text: '',
+    trustee_name: '' // Which trustee receives this payment
   });
+
+  // Get trustees from trust or plans
+  const [trustees, setTrustees] = useState([]);
 
   const currentYear = new Date().getFullYear();
 
@@ -73,15 +78,22 @@ export default function CompensationPage() {
     if (!selectedTrust) return;
     setLoading(true);
     try {
-      const [plansRes, paymentsRes, ytdRes] = await Promise.all([
+      const [plansRes, paymentsRes, ytdRes, contextRes] = await Promise.all([
         fetchWithAuth(`/compensation-plans?trust_id=${selectedTrust.trust_id}`),
         fetchWithAuth(`/compensation-payments?trust_id=${selectedTrust.trust_id}`),
-        fetchWithAuth(`/compensation-ytd?trust_id=${selectedTrust.trust_id}`)
+        fetchWithAuth(`/compensation-ytd?trust_id=${selectedTrust.trust_id}`),
+        fetchWithAuth(`/guided-minutes/context?trust_id=${selectedTrust.trust_id}`)
       ]);
       
       if (plansRes.ok) setPlans(await plansRes.json());
       if (paymentsRes.ok) setPayments(await paymentsRes.json());
       if (ytdRes.ok) setYtdData(await ytdRes.json());
+      
+      // Get trustees list from context
+      if (contextRes.ok) {
+        const context = await contextRes.json();
+        setTrustees(context.trustees || []);
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -161,7 +173,8 @@ export default function CompensationPage() {
           trust_id: selectedTrust.trust_id,
           amount: parseFloat(paymentForm.amount),
           date: paymentForm.date,
-          classification_text: paymentForm.classification_text
+          classification_text: paymentForm.classification_text,
+          trustee_name: paymentForm.trustee_name || null
         })
       });
       if (response.ok) {
@@ -170,7 +183,8 @@ export default function CompensationPage() {
         setPaymentForm({
           amount: '',
           date: format(new Date(), 'yyyy-MM-dd'),
-          classification_text: ''
+          classification_text: '',
+          trustee_name: ''
         });
         loadData();
       }
@@ -401,10 +415,10 @@ export default function CompensationPage() {
                     className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="label-trust">Trustee-Specific Plans (Advanced)</span>
+                      <span className="label-trust">Per-Trustee Compensation Caps (Optional)</span>
                       {additionalPlans.length > 0 && (
                         <span className="px-2 py-0.5 text-xs font-mono bg-navy/10 text-navy">
-                          {additionalPlans.length}
+                          {additionalPlans.length} configured
                         </span>
                       )}
                     </div>
@@ -419,7 +433,7 @@ export default function CompensationPage() {
                     <div className="p-4 pt-0 border-t border-border">
                       <p className="text-xs text-muted-foreground mb-4 flex items-start gap-1.5">
                         <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                        Optional: Set separate compensation caps for individual trustees or roles. These are in addition to the primary trust-wide plan.
+                        Set individual annual compensation limits for specific trustees. Useful when different trustees have different fee structures. The primary plan above tracks total trust compensation; these per-trustee caps provide additional oversight.
                       </p>
                       
                       {additionalPlans.length > 0 ? (
@@ -505,7 +519,14 @@ export default function CompensationPage() {
                       >
                         <div className="flex items-start justify-between">
                           <div>
-                            <p className="font-mono text-lg text-navy">{formatCurrency(payment.amount)}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-lg text-navy">{formatCurrency(payment.amount)}</p>
+                              {payment.trustee_name && (
+                                <span className="px-2 py-0.5 text-xs font-medium bg-navy/10 text-navy">
+                                  {payment.trustee_name}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground mt-1">
                               {formatDate(payment.date)}
                               {payment.classification_text && ` • ${payment.classification_text}`}
@@ -660,6 +681,34 @@ export default function CompensationPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* Trustee Selection */}
+            <div>
+              <Label className="label-trust">Recipient Trustee *</Label>
+              <Select
+                value={paymentForm.trustee_name}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, trustee_name: value })}
+              >
+                <SelectTrigger className="input-trust mt-1" data-testid="payment-trustee-select">
+                  <SelectValue placeholder="Select trustee..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {trustees.length > 0 ? (
+                    trustees.map((trustee) => (
+                      <SelectItem key={trustee} value={trustee}>
+                        {trustee}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="__other__" disabled>No trustees found</SelectItem>
+                  )}
+                  <SelectItem value="__other__">Other (specify in notes)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select which trustee is receiving this compensation payment
+              </p>
+            </div>
+
             <div>
               <Label className="label-trust">Amount *</Label>
               <Input
