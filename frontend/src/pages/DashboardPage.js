@@ -577,9 +577,12 @@ export default function DashboardPage() {
                   </div>
                 )}
                 
-                <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
+                <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1 font-mono">
                   <Sparkles className="w-3 h-3" />
-                  AI-generated suggestions. You decide which actions to take.
+                  {aiSuggestionsFallback 
+                    ? 'Showing governance insights. AI suggestions unavailable.'
+                    : 'AI-generated suggestions. You decide which actions to take.'
+                  }
                 </p>
               </div>
 
