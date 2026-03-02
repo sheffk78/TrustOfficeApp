@@ -319,6 +319,87 @@ class EntityRelationshipResponse(BaseModel):
     notes: str
     created_at: str
 
+# ==================== TRUST UNITS MODELS ====================
+
+class CertificateStatus(str, Enum):
+    active = "active"
+    cancelled = "cancelled"
+    replaced = "replaced"
+
+class TrustUnitsSettingsCreate(BaseModel):
+    trust_id: str
+    total_authorized_units: int = 100
+    unit_label: str = "Certificate Unit"
+    allow_fractional: bool = False
+
+class TrustUnitsSettingsUpdate(BaseModel):
+    total_authorized_units: Optional[int] = None
+    unit_label: Optional[str] = None
+    allow_fractional: Optional[bool] = None
+
+class TrustUnitsSettingsResponse(BaseModel):
+    trust_id: str
+    total_authorized_units: int
+    unit_label: str
+    allow_fractional: bool
+    created_at: str
+    updated_at: Optional[str] = None
+
+class TrustUnitCertificateCreate(BaseModel):
+    trust_id: str
+    holder_name: str
+    holder_identifier: Optional[str] = None
+    units: float
+    issue_date: str
+    notes: str = ""
+
+class TrustUnitCertificateUpdate(BaseModel):
+    holder_name: Optional[str] = None
+    holder_identifier: Optional[str] = None
+    units: Optional[float] = None
+    status: Optional[CertificateStatus] = None
+    notes: Optional[str] = None
+
+class TrustUnitCertificateResponse(BaseModel):
+    certificate_id: str
+    trust_id: str
+    holder_name: str
+    holder_identifier: Optional[str]
+    units: float
+    percentage: float  # Computed: units / total_authorized_units * 100
+    issue_date: str
+    certificate_number: str
+    status: str
+    replaced_by_certificate_id: Optional[str] = None
+    notes: str
+    created_at: str
+    updated_at: Optional[str] = None
+
+class TrustUnitTransferCreate(BaseModel):
+    trust_id: str
+    from_holder: Optional[str] = None  # Nullable for initial issuance
+    to_holder: str
+    units: float
+    reason: str
+    minutes_record_id: Optional[str] = None
+
+class TrustUnitTransferResponse(BaseModel):
+    transfer_id: str
+    trust_id: str
+    from_holder: Optional[str]
+    to_holder: str
+    units: float
+    reason: str
+    minutes_record_id: Optional[str]
+    created_at: str
+
+class TrustUnitsSummaryResponse(BaseModel):
+    settings: TrustUnitsSettingsResponse
+    certificates: List[TrustUnitCertificateResponse]
+    total_issued_units: float
+    remaining_units: float
+    active_certificate_count: int
+
 # Governance Task Models
 class GovernanceTaskCreate(BaseModel):
     trust_id: str
