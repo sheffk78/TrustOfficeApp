@@ -41,22 +41,38 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - BACKEND REFACTORING ✅
+### Latest Updates (Mar 2, 2026) - FRONTEND READ-ONLY MODE INTEGRATION ✅
 
-1. **Modular Backend Structure**
-   - Created `database.py` - MongoDB connection singleton
-   - Created `models.py` - All Pydantic models and enums centralized (~700 lines)
-   - Created `dependencies.py` - Shared auth functions, helpers, middleware
-   - Created `routers/` directory with domain-specific router modules
-   - Fully functional auth, trusts, entities, tasks, and units routers
+1. **ReadOnlyBanner Component** (`/frontend/src/components/ReadOnlyBanner.js`)
+   - Amber/warning color scheme banner at top of pages
+   - Shows "Your trial has expired" or "Subscription inactive" message
+   - "Subscribe Now" button links to `/settings?tab=subscription`
+   - Only appears when `isReadOnly` is true
 
-2. **Benefits of New Architecture**
-   - Shared code (models, dependencies) can be imported by any router
-   - Gradual migration path - server.py continues to work while routers are migrated
-   - Better separation of concerns
-   - Easier testing and maintenance
+2. **SubscriptionGate Updated** (`/frontend/src/components/SubscriptionGate.js`)
+   - No longer shows paywall - instead shows content with ReadOnlyBanner
+   - Users can VIEW all data in read-only mode
+   - Write operations blocked by backend (403 response)
 
-### Latest Updates (Mar 2, 2026) - SUBSCRIPTION STATE MANAGEMENT ✅
+3. **AuthContext Updates** (`/frontend/src/context/AuthContext.js`)
+   - New `isReadOnly` state from `/api/subscription/state`
+   - `loadSubscriptionState()` function fetches normalized state
+   - Event listeners for `subscription-expired` and `subscription-readonly`
+
+4. **LoginPage Updated** (`/frontend/src/pages/LoginPage.js`)
+   - Now calls `loadSubscriptionState()` after login
+   - Ensures read-only state is set before navigating to dashboard
+
+5. **API Utility Updated** (`/frontend/src/utils/api.js`)
+   - Dispatches `subscription-readonly` event on 403 with X-Subscription-Status header
+   - Doesn't consume response body (fixes JSON parse error)
+
+6. **Custom Hook** (`/frontend/src/hooks/useReadOnlyAwareSubmit.js`)
+   - `useReadOnlyAwareSubmit` - Form submission with read-only awareness
+   - `useReadOnlyCheck` - Simple hook to check read-only status
+   - Shows toast with "Subscribe" action on blocked operations
+
+### Previous Updates (Mar 2, 2026) - SUBSCRIPTION STATE MANAGEMENT ✅
 
 1. **Unified Subscription State Helper**
    - New `get_subscription_state(user_id)` function returns normalized `SubscriptionState` object
