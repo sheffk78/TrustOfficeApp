@@ -57,7 +57,41 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - BENEVOLENCE PAGE SIMPLIFIED ✅
+
+### Latest Updates (Mar 2, 2026) - STRUCTURES PAGE COMBINATION ✅
+
+**Session Summary:** Combined 'Entities' and 'Hierarchy' pages into a single unified 'Structures' page with tabs.
+
+**Problem Fixed:**
+- Navigation had separate "Entities" and "Hierarchy" links (cluttered sidebar)
+- Users had to switch between two pages to manage related data
+- Inconsistent navigation patterns for trust structure management
+
+**Solution Implemented:**
+- Created new `StructuresPage.js` with two tabs: "Entities" and "Hierarchy"
+- Tab state syncs with URL via `?tab=entities` or `?tab=hierarchy`
+- Old routes `/entities` and `/structure` redirect to new unified page
+- Sidebar updated with single "Structures" link
+- Old files `EntitiesPage.js` and `StructurePage.js` deleted
+
+**UI Structure:**
+1. **Header**: "Structures" + subtitle "[Trust Name] • Entities & Relationships"
+2. **Tabs**: "Entities" (default) | "Hierarchy"
+3. **Entities Tab**: Grid of entity cards + "New Entity" button
+4. **Hierarchy Tab**: Hierarchy Tree + Relationships table + "Add Relationship" button
+
+**Key Routes:**
+- `/structures` - Unified structures page (default: entities tab)
+- `/structures?tab=entities` - Entities tab
+- `/structures?tab=hierarchy` - Hierarchy tab
+- `/entities/:entityId` - Entity detail page (unchanged)
+- `/entities` - Redirects to `/structures?tab=entities`
+- `/structure` - Redirects to `/structures?tab=hierarchy`
+
+**Testing:** 100% pass rate - 12/12 frontend features verified (iteration_54)
+
+
+### Previous Updates (Mar 2, 2026) - BENEVOLENCE PAGE SIMPLIFIED ✅
 
 **Session Summary:** Simplified Benevolence section from confusing 2-tab system to single unified log with filters.
 
