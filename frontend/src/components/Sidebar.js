@@ -38,7 +38,7 @@ const navItems = [
   { path: '/entities', icon: Building2, label: 'Entities', group: 'Structures' },
   { path: '/structure', icon: GitBranch, label: 'Hierarchy', group: 'Structures' },
   { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
-  { path: '/units', icon: Award, label: 'Units', group: 'Structures' },
+  { path: '/trust/units', icon: Award, label: 'Units', group: 'Structures' },
   { path: '/governance', icon: Shield, label: 'Governance Health' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];

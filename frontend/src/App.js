@@ -146,7 +146,7 @@ const AppRouter = () => {
           <ScheduleAPage />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/units" element={
+      <Route path="/trust/units" element={
         <SubscriptionProtectedRoute>
           <TrustUnitsPage />
         </SubscriptionProtectedRoute>
