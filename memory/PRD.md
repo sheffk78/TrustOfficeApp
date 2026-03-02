@@ -34,6 +34,7 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
      - `POST /api/trust-units/transfers` - Transfer units between holders
      - `GET /api/trust-units/transfers` - List all transfers
      - `POST /api/trust-units/bootstrap-from-minutes/{minutes_id}` - Bootstrap certificates from beneficiary designation minutes (admin operation)
+   - `GET /api/dashboard` - Unified dashboard aggregating health_score, onboarding_state, recent_activity, stats, governance_insights
    - **Database Collections**:
      - `trust_units_settings`: total_authorized_units, unit_label, allow_fractional
      - `trust_unit_certificates`: certificate_id, holder_name, units, percentage, certificate_number (CU-XXX), status
