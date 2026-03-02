@@ -490,8 +490,8 @@ class TestPreviouslyMigratedRouters:
         )
         assert response.status_code == 200
         data = response.json()
-        assert "ytd_paid" in data
-        print(f"✓ Compensation YTD endpoint works (ytd=${data['ytd_paid']:,.2f})")
+        assert "ytd_total" in data  # Fixed: field name is ytd_total not ytd_paid
+        print(f"✓ Compensation YTD endpoint works (ytd=${data['ytd_total']:,.2f})")
     
     def test_subscription_state_still_works(self, auth_headers):
         """GET /api/subscription/state still returns subscription state"""
