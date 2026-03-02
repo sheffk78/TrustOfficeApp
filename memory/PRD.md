@@ -58,7 +58,62 @@ The backend now has a modular structure for better maintainability:
 ## Completed Features
 
 
-### Latest Updates (Mar 2, 2026) - GUIDED MINUTES WIZARD ✅
+### Latest Updates (Mar 2, 2026) - MINUTES ↔ MONEY INTEGRATION ✅
+
+**Session Summary:** Built bi-directional integration between Guided Minutes and Compensation/Distributions/Benevolence modules for proper governance workflows.
+
+**Feature Overview:**
+Two governance flows implemented:
+1. **Minutes → Money**: Create tracking records directly from approved minutes
+2. **Money → Minutes**: Link existing money records to minutes or create new minutes retroactively
+
+**Flow 1: Minutes → Money (Guided Minutes Step 3)**
+- Toggle switches: "Create tracking records from this approved decision"
+  - Compensation records
+  - Distribution records
+  - Benevolence records
+- Compact form to add records: Amount, Recipient, Date, Description, Purpose
+- On save: Creates minutes first, then linked records with `minutes_record_id`
+- Step 4 shows summary of created records
+
+**Flow 2: Money → Minutes (Money pages)**
+- New "Minutes" column in Distributions table
+- Dropdown menu on each unlinked record:
+  - "Link to existing minutes" → Opens AttachMinutesDialog
+  - "Document in minutes (retroactive)" → Navigates to Guided Minutes with prefill
+- Same actions added to Compensation payments and Benevolence records
+- Shows "Linked" indicator when minutes_record_id is set
+
+**Backend New Endpoints:**
+- `GET /api/guided-minutes/search` - Search minutes for attachment dialog
+- `POST /api/guided-minutes/save-with-records` - Save minutes + create linked records
+- `PATCH /api/distributions/{id}/attach-minutes` - Attach existing minutes to distribution
+- `PATCH /api/compensation-payments/{id}/attach-minutes` - Attach existing minutes to compensation
+- `PATCH /api/benevolence/{id}/attach-minutes` - Attach existing minutes to benevolence
+
+**New Models:**
+- `RecordFromMinutes` - Single money record to create from minutes
+- `GuidedMinutesSaveWithRecordsRequest` - Save minutes with linked records
+- `GuidedMinutesSaveWithRecordsResponse` - Response with created record counts
+- `AttachMinutesRequest` - Attach existing minutes to money record
+- `MinutesSearchResult` - Search result for minutes
+
+**Files Created/Updated:**
+- `/app/frontend/src/components/AttachMinutesDialog.js` (NEW)
+- `/app/frontend/src/pages/GuidedMinutesPage.js` (Step 3 record toggles)
+- `/app/frontend/src/pages/DistributionsPage.js` (Minutes column and dropdown)
+- `/app/frontend/src/pages/CompensationPage.js` (Minutes actions)
+- `/app/frontend/src/pages/BenevolencePage.js` (Minutes actions)
+- `/app/backend/routers/guided_minutes.py` (search, save-with-records endpoints)
+- `/app/backend/routers/distributions.py` (attach-minutes endpoint)
+- `/app/backend/routers/compensation.py` (attach-minutes endpoint)
+- `/app/backend/routers/benevolence.py` (attach-minutes endpoint)
+- `/app/backend/models.py` (New integration models)
+
+**Testing:** 100% pass rate - 14/14 backend tests + all frontend features verified (iteration_57)
+
+
+### Previous Updates (Mar 2, 2026) - GUIDED MINUTES WIZARD ✅
 
 **Session Summary:** Built a new AI-assisted "Guided Minutes" section with a 4-step wizard flow for creating meeting minutes.
 
