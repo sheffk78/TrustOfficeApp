@@ -5465,11 +5465,11 @@ async def get_recent_activity(user_id: str, trust_id: Optional[str] = None, limi
             "type": "compensation",
             "id": p["payment_id"],
             "trust_id": p["trust_id"],
-            "title": f"${p['amount']:,.2f} Compensation",
+            "title": f"${p.get('amount', 0):,.2f} Compensation",
             "subtitle": p.get("classification_text", ""),
             "status": "exceeds" if p.get("exceeds_plan_flag") else "within_plan",
-            "date": p["date"],
-            "created_at": p["created_at"]
+            "date": p.get("date", p.get("created_at", "")),
+            "created_at": p.get("created_at", "")
         })
     
     # Tasks completed
