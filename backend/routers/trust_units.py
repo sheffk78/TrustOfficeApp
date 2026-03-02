@@ -323,9 +323,13 @@ async def update_unit_certificate(
 async def list_unit_certificates(
     trust_id: str,
     status: Optional[str] = None,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_premium_feature(Feature.TRUST_UNITS))
 ):
-    """List all certificates for a trust, optionally filtered by status"""
+    """
+    List all certificates for a trust, optionally filtered by status.
+    
+    Feature Gate: TRUST_UNITS
+    """
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
