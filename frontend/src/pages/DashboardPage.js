@@ -264,6 +264,10 @@ export default function DashboardPage() {
     <div className="main-layout" data-testid="dashboard-page">
       <Sidebar />
       <main className="main-content dot-grid">
+        {/* Subscription Banners */}
+        <TrialBanner location="dashboard" />
+        <ReadOnlyBanner />
+        
         <div className="page-container">
           {/* Page Header */}
           <div className="page-header">
