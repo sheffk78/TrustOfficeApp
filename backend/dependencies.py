@@ -83,23 +83,63 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
     """
     now = datetime.now(timezone.utc)
     
+    # Check if user has a forever free account
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1})
+    user_email = user.get("email", "").lower() if user else ""
+    is_forever_free = user_email in FOREVER_FREE_EMAILS
+    
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
     
-    # If no subscription exists, create a trial
+    # If no subscription exists, create one (trial for normal users, active for forever free)
     if not sub:
-        sub = {
-            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
-            "user_id": user_id,
-            "plan_type": "trial",
-            "status": "trialing",
-            "trial_start_date": now.isoformat(),
-            "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
-            "stripe_customer_id": None,
-            "stripe_subscription_id": None,
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
-        }
+        if is_forever_free:
+            # Forever free account - give them a permanent active subscription
+            sub = {
+                "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+                "user_id": user_id,
+                "plan_type": "forever_free",
+                "status": "active",
+                "trial_start_date": None,
+                "trial_end_date": None,
+                "stripe_customer_id": None,
+                "stripe_subscription_id": None,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "Forever free account - admin@wingpointtrusts.com"
+            }
+        else:
+            sub = {
+                "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+                "user_id": user_id,
+                "plan_type": "trial",
+                "status": "trialing",
+                "trial_start_date": now.isoformat(),
+                "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
+                "stripe_customer_id": None,
+                "stripe_subscription_id": None,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat()
+            }
         await db.subscriptions.insert_one(sub)
+    
+    # For forever free accounts, always return active status regardless of stored status
+    if is_forever_free:
+        return SubscriptionState(
+            user_id=user_id,
+            subscription_id=sub.get("subscription_id"),
+            plan_type="forever_free",
+            status="active",
+            trial_start_date=None,
+            trial_end_date=None,
+            trial_days_remaining=None,
+            is_trial=False,
+            is_active=True,
+            is_read_only=False,
+            stripe_customer_id=None,
+            stripe_subscription_id=None,
+            current_period_end=None,
+            cancel_at_period_end=None,
+        )
     
     # Initialize state with base values
     state = SubscriptionState(
