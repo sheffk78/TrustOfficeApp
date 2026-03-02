@@ -57,7 +57,43 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - AI DRAFTING IMPROVEMENT ✅
+### Latest Updates (Mar 2, 2026) - COMPENSATION MODULE REFACTORED ✅
+
+**Session Summary:** Refactored Compensation module to use "one primary plan per trust per year" model with clearer UX.
+
+**Problem Addressed:**
+- Previous implementation allowed unlimited plans without clear hierarchy
+- Confusing UX for normal use case (single trust-wide compensation envelope)
+- YTD calculations didn't clearly indicate which plan they referenced
+
+**New Data Model:**
+- `compensation_plans` collection now has: `is_primary` (boolean), `year` (int)
+- One primary plan per trust per year (auto-determined if not specified)
+- Additional trustee-specific plans allowed when `trustee_name` is provided
+
+**Backend Changes (`/app/backend/routers/compensation.py`):**
+- `get_primary_plan_for_year(trust_id, user_id, year)` - finds primary plan with fallbacks
+- `POST /compensation-plans` - auto-sets `is_primary` based on context, demotes existing primary if needed
+- `PUT /compensation-plans/{plan_id}` - supports updating `is_primary`, `year`
+- `GET /compensation-plans/primary` - NEW: returns primary plan for specified year
+- `GET /compensation-ytd` - returns `year`, `ytd_total`, `annual_approved`, `exceeds_plan`, `remaining`, `percent_used`, `primary_plan` object
+
+**Frontend Changes (`/app/frontend/src/pages/CompensationPage.js`):**
+- **YTD Progress Card**: Shows year, total, envelope, remaining with progress bar, "Within Plan" / "Exceeds Plan" badge
+- **Primary Plan Card**: Shows annual amount, effective date, edit button, helper text: "This is the total annual compensation envelope for this trust. Individual payments are tracked against this amount."
+- **Advanced Section**: Collapsible "TRUSTEE-SPECIFIC PLANS (ADVANCED)" with badge showing count, helper text: "Optional: Set separate compensation caps for individual trustees or roles."
+- **Payment Modal**: Warning when payment would exceed plan: "This payment will exceed the annual plan" with calculation breakdown
+- **Plan Modal**: Different titles/descriptions for primary vs trustee-specific plans
+
+**UX Improvements:**
+- Default interaction is to edit the single primary plan
+- "Add Trustee-Specific Plan" button only in Advanced section
+- Trustee-specific plans require `trustee_name` field
+- Clear separation between trust-wide envelope and individual caps
+
+**Testing:** 100% pass rate - 14/14 backend tests, all UI elements verified (iteration_52)
+
+### Previous Updates (Mar 2, 2026) - AI DRAFTING IMPROVEMENT ✅
 
 **Session Summary:** Improved AI minutes drafting to enhance user's existing notes instead of ignoring them.
 
