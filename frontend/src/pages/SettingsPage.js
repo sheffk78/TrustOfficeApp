@@ -30,7 +30,8 @@ import {
   ExternalLink,
   Database,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Plus
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
@@ -61,6 +62,16 @@ export default function SettingsPage() {
   const [demoStatus, setDemoStatus] = useState(null);
   const [demoLoading, setDemoLoading] = useState(false);
   const [deleteDemoDialogOpen, setDeleteDemoDialogOpen] = useState(false);
+  
+  // Create trust modal state
+  const [createTrustOpen, setCreateTrustOpen] = useState(false);
+  const [newTrustData, setNewTrustData] = useState({
+    name: '',
+    trust_type: 'family',
+    jurisdiction: '',
+    role: 'Trustee'
+  });
+  const [createTrustLoading, setCreateTrustLoading] = useState(false);
   
   const [trustData, setTrustData] = useState({
     name: selectedTrust?.name || '',
@@ -329,6 +340,46 @@ export default function SettingsPage() {
       toast.error(error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateTrust = async () => {
+    if (!newTrustData.name.trim()) {
+      toast.error('Trust name is required');
+      return;
+    }
+    if (!newTrustData.jurisdiction.trim()) {
+      toast.error('Jurisdiction is required');
+      return;
+    }
+
+    setCreateTrustLoading(true);
+    try {
+      const response = await fetchWithAuth('/trusts', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newTrustData.name.trim(),
+          trust_type: newTrustData.trust_type,
+          jurisdiction: newTrustData.jurisdiction.trim(),
+          role: newTrustData.role
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create trust');
+      }
+
+      const createdTrust = await response.json();
+      toast.success('Trust created successfully!');
+      setCreateTrustOpen(false);
+      setNewTrustData({ name: '', trust_type: 'family', jurisdiction: '', role: 'Trustee' });
+      await loadTrusts();
+      setSelectedTrust(createdTrust);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setCreateTrustLoading(false);
     }
   };
 
@@ -698,11 +749,12 @@ export default function SettingsPage() {
               <h2 className="font-serif text-xl text-navy">Demo Data Management</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Seed comprehensive sample data to explore all TrustOffice features, or reset your account to start fresh.
+              Load sample data to explore TrustOffice features. You can remove it anytime using the reset button below.
             </p>
             
             {demoStatus && (
               <div className="mb-4 p-4 bg-navy/5 border border-navy/10">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Current Data in Your Account</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                   <div>
                     <p className="font-mono text-lg text-navy">{demoStatus.counts?.trusts || 0}</p>
@@ -748,14 +800,14 @@ export default function SettingsPage() {
                     data-testid="delete-data-btn"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Reset All Trust Data
+                    Remove All Data & Start Fresh
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle className="font-serif text-xl text-red-600">Reset All Trust Data?</DialogTitle>
+                    <DialogTitle className="font-serif text-xl text-red-600">Remove All Data & Start Fresh?</DialogTitle>
                     <DialogDescription>
-                      This will permanently delete all trust data from your account:
+                      This will permanently delete ALL trust data from your account (including demo data and any data you've created):
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
@@ -821,6 +873,110 @@ export default function SettingsPage() {
                 benevolence records, compensation plans, trust certificates, and governance tasks.
               </p>
             )}
+          </div>
+
+          {/* Create New Trust Section */}
+          <div className="card-trust mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-navy" />
+                <h2 className="font-serif text-xl text-navy">Create New Trust</h2>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add another trust or organization to your account. Each trust has its own minutes, assets, distributions, and governance tracking.
+            </p>
+            <Dialog open={createTrustOpen} onOpenChange={setCreateTrustOpen}>
+              <DialogTrigger asChild>
+                <Button className="btn-primary" data-testid="create-trust-btn">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New Trust
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="font-serif text-xl text-navy">Create New Trust</DialogTitle>
+                  <DialogDescription>
+                    Set up a new trust entity. You can add more details after creation.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div>
+                    <Label className="label-trust">Trust Name *</Label>
+                    <Input
+                      value={newTrustData.name}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, name: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="e.g., Smith Family Trust"
+                      data-testid="new-trust-name"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust">Trust Type</Label>
+                    <Select 
+                      value={newTrustData.trust_type} 
+                      onValueChange={(v) => setNewTrustData({ ...newTrustData, trust_type: v })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="family">Family Trust</SelectItem>
+                        <SelectItem value="charitable">Charitable Trust</SelectItem>
+                        <SelectItem value="business">Business Trust</SelectItem>
+                        <SelectItem value="ecclesiastical">Ecclesiastical Trust</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="label-trust">Jurisdiction *</Label>
+                    <Input
+                      value={newTrustData.jurisdiction}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, jurisdiction: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="e.g., Delaware, Nevada, Wyoming"
+                      data-testid="new-trust-jurisdiction"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust">Your Role</Label>
+                    <Select 
+                      value={newTrustData.role} 
+                      onValueChange={(v) => setNewTrustData({ ...newTrustData, role: v })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Trustee">Trustee</SelectItem>
+                        <SelectItem value="Co-Trustee">Co-Trustee</SelectItem>
+                        <SelectItem value="Successor Trustee">Successor Trustee</SelectItem>
+                        <SelectItem value="Trust Protector">Trust Protector</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setCreateTrustOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="btn-primary" 
+                    onClick={handleCreateTrust}
+                    disabled={createTrustLoading}
+                    data-testid="confirm-create-trust-btn"
+                  >
+                    {createTrustLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4 mr-2" />
+                    )}
+                    Create Trust
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Trust Settings */}

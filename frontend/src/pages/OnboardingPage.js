@@ -201,6 +201,9 @@ export default function OnboardingPage() {
                     <p className="text-sm text-muted-foreground">
                       See how TrustOffice works with sample trusts
                     </p>
+                    <p className="text-xs text-muted-foreground mt-2 italic">
+                      Demo data can be easily removed later in Settings → Demo Data Management
+                    </p>
                   </div>
                   <ArrowRight className="w-5 h-5 text-gold" />
                 </div>
