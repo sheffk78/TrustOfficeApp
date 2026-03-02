@@ -46,6 +46,7 @@ from .background_jobs import router as background_jobs_router
 from .categories import router as categories_router
 from .beneficiaries import router as beneficiaries_router
 from .demo import router as demo_router
+from .ai import router as ai_router
 
 __all__ = [
     "auth_router",
@@ -67,4 +68,5 @@ __all__ = [
     "categories_router",
     "beneficiaries_router",
     "demo_router",
+    "ai_router",
 ]
