@@ -42,7 +42,7 @@ const xhrPost = (url, data) => {
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { user, setUser, loadTrusts } = useAuth();
+  const { user, setUser, loadTrusts, loadSubscriptionState } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -75,8 +75,8 @@ export default function LoginPage() {
         setUser(data.user);
       }
       
-      // Load trusts after successful authentication
-      await loadTrusts();
+      // Load trusts and subscription state after successful authentication
+      await Promise.all([loadTrusts(), loadSubscriptionState()]);
       
       toast.success('Welcome back');
       navigate('/dashboard');
