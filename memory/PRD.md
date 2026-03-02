@@ -62,34 +62,28 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Dec 30, 2025) - P1 CORE ROUTERS MIGRATION ✅
+### Latest Updates (Dec 30, 2025) - P2 PREMIUM FEATURE GATING ✅
 
-**Session Summary:** Migrated the core CRUD routers for trusts, entities, and tasks:
+**Session Summary:** Implemented hard feature gating for premium features:
 
-1. **trusts.py Router** (101 lines)
-   - POST/GET/PUT/DELETE /api/trusts
-   - Includes governance_score calculation via calculate_health_score
-   - Cascade delete of related data (entities, tasks, minutes, etc.)
+| Feature Flag | Endpoint | Behavior |
+|--------------|----------|----------|
+| `MULTIPLE_TRUSTS` | POST /api/trusts | Trial users blocked when creating 2nd+ trust |
+| `GOVERNANCE_HISTORY` | GET /api/governance/{id}/history | Trial users get 402 |
+| `TRUST_UNITS` | GET /api/trust-units/* | Trial users get 402 |
+| `BENEFICIARY_DASHBOARD` | GET /api/beneficiaries/dashboard | Trial users get 402 |
 
-2. **entities.py Router** (144 lines)
-   - POST/GET/PATCH/DELETE /api/entities
-   - POST/GET/DELETE /api/entity-relationships
-   - auto_update_onboarding on entity creation
+**Implementation Details:**
+- Uses `check_feature_access()` and `require_premium_feature()` from dependencies.py
+- Returns 402 Payment Required for premium feature access
+- Core features remain accessible to trial users (trusts list, entities, tasks, minutes, distributions)
 
-3. **tasks.py Router** (98 lines)
-   - POST/GET /api/tasks with optional trust_id filter
-   - PATCH /api/tasks/{id}/complete and /uncomplete
-   - DELETE /api/tasks/{id}
-   - Dynamic status calculation (upcoming/overdue/completed)
+**Testing:** All 34 tests passed including:
+- 4 new feature gate tests
+- Core feature accessibility for trial users
+- Regression tests for existing functionality
 
-**Code Changes:**
-- Added calculate_health_score to dependencies.py (179 lines)
-- Fixed duplicate task endpoints in server.py
-- Server.py: 2721 → **2648 lines** (-73 lines after cleanup)
-
-**Testing:** All 41 tests passed including 12 regression tests for all migrated routers.
-
-### Previous Updates (Dec 30, 2025) - P1 TRUST UNITS ROUTER MIGRATION ✅
+### Previous Updates (Dec 30, 2025) - P1 CORE ROUTERS MIGRATION ✅
 
 1. **ReadOnlyBanner Component** (`/frontend/src/components/ReadOnlyBanner.js`)
    - Amber/warning color scheme banner at top of pages
