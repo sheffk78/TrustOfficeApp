@@ -59,29 +59,27 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Dec 30, 2025) - P1 BACKEND ROUTER MIGRATION (Session 2) ✅
+### Latest Updates (Dec 30, 2025) - P1 TRUST UNITS ROUTER MIGRATION ✅
 
-**Session Summary:** Continued backend refactoring by migrating two additional modules:
+**Session Summary:** Migrated the largest remaining module (Trust Units, ~1017 lines) from server.py:
 
-1. **benevolence.py Router** (510 lines)
-   - POST/GET/PUT/DELETE /api/benevolence (CRUD)
-   - GET /api/benevolence/summary/{trust_id} (aggregations by purpose/period)
-   - GET /api/benevolence/export/{trust_id}/pdf (PDF report)
-   - Uses require_write_access for write protection
-
-2. **exports.py Router** (167 lines)
-   - GET /api/export/minutes, /export/distributions, /export/compensation, /export/tasks
-   - All endpoints use require_premium_feature(CSV_EXPORT) - returns 402 for trial users
+**trust_units.py Router** (994 lines)
+- GET /api/trust-units/summary - Complete units summary with settings/certs/aggregates
+- PATCH /api/trust-units/settings - Update unit settings (label, fractional, authorized)
+- POST/PATCH/GET /api/trust-units/certificates - Certificate CRUD
+- GET /api/trust-units/certificates/{id}/pdf - PDF certificate generation
+- POST/GET /api/trust-units/transfers - Transfer recording and listing
+- POST /api/trust-units/create-from-minutes/{id} - Create certs from beneficiary designation
+- POST /api/trust-units/bootstrap-from-minutes/{id} - Full bootstrap with validation
 
 **Server.py Progress:**
-- Started session: 4526 lines
-- After benevolence migration: 4054 lines (-479)
-- After exports migration: 3907 lines (-154)
-- **Total reduction: ~48% from original 7538 lines**
+- Before this session: 3907 lines
+- After trust_units migration: **2899 lines** (-1008 lines, -25.8%)
+- **Total reduction: 61.5%** from original 7538 lines
 
-**Testing:** All 33 tests passed including regression tests for previously migrated routers.
+**Testing:** All 26 tests passed including regression tests for all 9 migrated routers.
 
-### Previous Updates (Dec 30, 2025) - P1 BACKEND ROUTER MIGRATION (Session 1) ✅
+### Previous Updates (Dec 30, 2025) - P1 BACKEND ROUTER MIGRATION (Session 2) ✅
 
 1. **ReadOnlyBanner Component** (`/frontend/src/components/ReadOnlyBanner.js`)
    - Amber/warning color scheme banner at top of pages
