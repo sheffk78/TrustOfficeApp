@@ -427,11 +427,13 @@ The backend now has a modular structure for better maintainability:
 - [x] Migration guide created at /app/backend/MIGRATION_GUIDE.md
 
 ### P1 (High Priority) - IN PROGRESS
-- [x] Migrate distributions router (with require_write_access for subscription gating)
-- [x] Created governance router (598 lines) - calculate_health_score, dashboard, onboarding, activity
-- [ ] Remove duplicate governance endpoints from server.py (router ready, needs old code removal)
-- [ ] Migrate minutes router (including templates)
+- [x] Migrate distributions router (with require_write_access for subscription gating) - 433 lines
+- [x] Migrate governance router (health score, dashboard, onboarding, activity) - 598 lines
+- [x] Removed 396 lines of duplicate governance code from server.py
+- [ ] Migrate minutes router (including templates) - largest remaining module
 - [ ] Implement hard feature gating for premium-only features
+
+**Server.py Reduction:** 7618 → 6819 lines (~800 lines removed, ~10% reduction)
 
 ### P2 (Short-term) - COMPLETE (Feb 23-25, 2026)
 - [x] Profile editing (name change) - Edit button in Settings > Profile section
