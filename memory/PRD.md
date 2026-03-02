@@ -693,11 +693,13 @@ beneficiaries.py, demo.py
 
 ### P3 (Future)
 - [ ] Multi-trustee collaboration
-- [ ] AI-assisted minutes drafting
+- [x] AI-assisted minutes drafting ✅ (Mar 2, 2026) - Claude Sonnet generates WHEREAS/RESOLVED format
 - [ ] Mobile app
 - [ ] Date range filters for Minutes page
 - [ ] More entity types (LLCs)
 - [ ] Email retry queue for Postmark failures
+- [ ] User-facing feedback submission system
+- [ ] Expand library of available minutes templates
 
 ## Notes
 - Postmark: Sandbox mode (verified domain only)
