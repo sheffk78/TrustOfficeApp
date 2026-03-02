@@ -398,9 +398,9 @@ class TestPreviouslyMigratedRoutersRegression:
         print(f"PASS: Subscriptions router accessible. Status: {data.get('status')}")
 
     def test_compensation_router_accessible(self, auth_headers):
-        """Compensation router regression - GET /api/compensation/plans"""
+        """Compensation router regression - GET /api/compensation-plans"""
         response = requests.get(
-            f"{BASE_URL}/api/compensation/plans",
+            f"{BASE_URL}/api/compensation-plans",
             params={"trust_id": TEST_TRUST_ID},
             headers=auth_headers
         )
@@ -408,9 +408,9 @@ class TestPreviouslyMigratedRoutersRegression:
         print("PASS: Compensation router accessible")
 
     def test_schedule_a_router_accessible(self, auth_headers):
-        """Schedule A router regression - GET /api/schedule-a/items"""
+        """Schedule A router regression - GET /api/schedule-a"""
         response = requests.get(
-            f"{BASE_URL}/api/schedule-a/items",
+            f"{BASE_URL}/api/schedule-a",
             params={"trust_id": TEST_TRUST_ID},
             headers=auth_headers
         )
