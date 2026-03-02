@@ -691,6 +691,132 @@ export default function SettingsPage() {
             </Button>
           </div>
 
+          {/* Demo Data Management Section */}
+          <div className="card-trust mb-8" data-testid="demo-data-section">
+            <div className="flex items-center gap-2 mb-4">
+              <Database className="w-5 h-5 text-navy" />
+              <h2 className="font-serif text-xl text-navy">Demo Data Management</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Seed comprehensive sample data to explore all TrustOffice features, or reset your account to start fresh.
+            </p>
+            
+            {demoStatus && (
+              <div className="mb-4 p-4 bg-navy/5 border border-navy/10">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <p className="font-mono text-lg text-navy">{demoStatus.counts?.trusts || 0}</p>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Trusts</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-lg text-navy">{demoStatus.counts?.minutes_records || 0}</p>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Minutes</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-lg text-navy">{demoStatus.counts?.schedule_a_items || 0}</p>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Assets</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-lg text-navy">{demoStatus.total_records || 0}</p>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Total Records</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={handleSeedDemoData}
+                disabled={demoLoading || (demoStatus?.has_data)}
+                className="btn-primary"
+                data-testid="seed-demo-btn"
+              >
+                {demoLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 mr-2" />
+                )}
+                Load Demo Data
+              </Button>
+              
+              <Dialog open={deleteDemoDialogOpen} onOpenChange={setDeleteDemoDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    disabled={demoLoading || !demoStatus?.has_data}
+                    className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    data-testid="delete-data-btn"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete All Data
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="font-serif text-xl text-red-600">Delete All Data?</DialogTitle>
+                    <DialogDescription>
+                      This will permanently delete all your trusts and associated data including:
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                      <li>All trusts and entities</li>
+                      <li>Schedule A assets</li>
+                      <li>Meeting minutes</li>
+                      <li>Distribution records</li>
+                      <li>Benevolence records</li>
+                      <li>Compensation plans and payments</li>
+                      <li>Governance tasks</li>
+                      <li>Trust unit certificates</li>
+                    </ul>
+                    <p className="mt-4 text-sm font-medium text-red-600">
+                      This action cannot be undone!
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Your account and subscription will be preserved.
+                    </p>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeleteDemoDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleDeleteDemoData}
+                      disabled={demoLoading}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                      data-testid="confirm-delete-data-btn"
+                    >
+                      {demoLoading ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 mr-2" />
+                      )}
+                      Yes, Delete Everything
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              
+              <Button
+                variant="ghost"
+                onClick={loadDemoStatus}
+                disabled={demoLoading}
+                className="text-muted-foreground"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${demoLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+            
+            {!demoStatus?.has_data && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Demo data includes 2 trusts, entity hierarchy, Schedule A with active & disposed assets, 
+                minutes of various types (quarterly, annual, disposition, benevolence), distributions, 
+                benevolence records, compensation plans, trust certificates, and governance tasks.
+              </p>
+            )}
+          </div>
+
           {/* Trust Settings */}
           {selectedTrust && (
             <div className="card-trust mb-8">
