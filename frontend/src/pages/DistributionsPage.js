@@ -42,7 +42,8 @@ function useDebounce(value, delay) {
 }
 
 export default function DistributionsPage() {
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
+  const { showUpgradeModal } = useUpgradeModal();
   const [distributions, setDistributions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
