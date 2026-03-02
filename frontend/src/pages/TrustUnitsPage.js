@@ -723,8 +723,8 @@ export default function TrustUnitsPage() {
               <Label className="label-trust">Units *</Label>
               <Input
                 type="number"
-                step={summary?.settings?.allow_fractional ? "0.0001" : "1"}
-                min="0.0001"
+                step={summary?.settings?.allow_fractional ? "any" : "1"}
+                min="0.01"
                 value={certificateForm.units}
                 onChange={(e) => setCertificateForm({ ...certificateForm, units: e.target.value })}
                 placeholder={summary?.settings?.allow_fractional ? "25.5" : "25"}
@@ -732,10 +732,21 @@ export default function TrustUnitsPage() {
                 className="mt-1"
                 data-testid="units-input"
               />
-              {summary && certificateForm.units && parseFloat(certificateForm.units) > 0 && (
-                <p className="text-xs text-muted-foreground mt-1 font-mono">
-                  = {((parseFloat(certificateForm.units) / summary.settings.total_authorized_units) * 100).toFixed(2)}% ownership
-                </p>
+              {/* Show available units and validation */}
+              {summary && (
+                <div className="mt-2 space-y-1">
+                  {certificateForm.units && parseFloat(certificateForm.units) > 0 && (
+                    <p className="text-xs text-muted-foreground font-mono">
+                      = {((parseFloat(certificateForm.units) / summary.settings.total_authorized_units) * 100).toFixed(2)}% ownership
+                    </p>
+                  )}
+                  {certificateForm.units && parseFloat(certificateForm.units) > summary.remaining_units && !editingCertificate && (
+                    <p className="text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Exceeds available units ({summary.remaining_units} remaining)
+                    </p>
+                  )}
+                </div>
               )}
             </div>
             
@@ -839,8 +850,8 @@ export default function TrustUnitsPage() {
               <Label className="label-trust">Units to Transfer *</Label>
               <Input
                 type="number"
-                step={summary?.settings?.allow_fractional ? "0.0001" : "1"}
-                min="0.0001"
+                step={summary?.settings?.allow_fractional ? "any" : "1"}
+                min="0.01"
                 value={transferForm.units}
                 onChange={(e) => setTransferForm({ ...transferForm, units: e.target.value })}
                 required
