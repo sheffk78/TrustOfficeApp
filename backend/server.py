@@ -4142,8 +4142,11 @@ async def get_categories():
 # ==================== EXPORT ENDPOINTS ====================
 
 @api_router.get("/export/minutes")
-async def export_minutes_csv(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
-    """Export minutes records as CSV"""
+async def export_minutes_csv(
+    trust_id: Optional[str] = None, 
+    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+):
+    """Export minutes records as CSV (Premium feature)"""
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
