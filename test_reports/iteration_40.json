@@ -1,0 +1,124 @@
+{
+  "summary": "Backend testing for P2 Feature Gating - Premium Feature Restrictions. All 34 tests passed. Verified 4 new feature gates (MULTIPLE_TRUSTS, GOVERNANCE_HISTORY, TRUST_UNITS, BENEFICIARY_DASHBOARD) returning 402 for trial users, plus regression tests for core features.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "TestMultipleTrustsGate::test_trial_user_can_view_trusts_list - PASS: Trial user can view trusts list",
+    "TestMultipleTrustsGate::test_trial_user_can_view_single_trust - PASS: Trial user can view single trust",
+    "TestMultipleTrustsGate::test_trial_user_blocked_from_creating_second_trust - PASS: 402 returned when creating 2nd trust",
+    "TestGovernanceHistoryGate::test_trial_user_can_access_governance_health - PASS: Trial user can access governance score (core)",
+    "TestGovernanceHistoryGate::test_trial_user_blocked_from_governance_history - PASS: 402 on /api/governance/{trust_id}/history",
+    "TestGovernanceHistoryGate::test_governance_history_with_days_param - PASS: 402 even with days param",
+    "TestTrustUnitsGate::test_trial_user_blocked_from_trust_units_summary - PASS: 402 on /api/trust-units/summary",
+    "TestTrustUnitsGate::test_trial_user_blocked_from_trust_units_certificates - PASS: 402 on /api/trust-units/certificates",
+    "TestTrustUnitsGate::test_trust_units_summary_requires_auth - PASS: 401 without auth",
+    "TestBeneficiaryDashboardGate::test_trial_user_blocked_from_beneficiary_dashboard - PASS: 402 on /api/beneficiaries/dashboard",
+    "TestBeneficiaryDashboardGate::test_trial_user_blocked_from_beneficiary_dashboard_with_trust_id - PASS: 402 with trust_id param",
+    "TestBeneficiaryDashboardGate::test_beneficiary_dashboard_requires_auth - PASS: 401 without auth",
+    "TestTrialUserCoreFeatures::test_trial_user_can_access_entities - PASS: Trial user can access entities (core)",
+    "TestTrialUserCoreFeatures::test_trial_user_can_access_tasks - PASS: Trial user can access tasks (core)",
+    "TestTrialUserCoreFeatures::test_trial_user_can_access_minutes - PASS: Trial user can access minutes (core)",
+    "TestTrialUserCoreFeatures::test_trial_user_can_access_distributions - PASS: Trial user can access distributions (core)",
+    "TestTrialUserCoreFeatures::test_trial_user_can_access_dashboard - PASS: Trial user can access main dashboard (core)",
+    "TestTrialUserCoreFeatures::test_trial_user_can_access_onboarding - PASS: Trial user can access onboarding (core)",
+    "TestFeatureFlagsEndpoint::test_new_premium_features_are_false_for_trial - PASS: All P2 features marked False for trial",
+    "TestSubscriptionFeatures::test_subscription_features_requires_auth - PASS",
+    "TestSubscriptionFeatures::test_subscription_features_returns_correct_structure - PASS",
+    "TestSubscriptionFeatures::test_trial_user_has_correct_feature_flags - PASS",
+    "TestSubscriptionFeatures::test_trial_user_csv_export_is_false - PASS",
+    "TestSubscriptionFeatures::test_trial_user_benevolence_mode_is_false - PASS",
+    "TestSubscriptionFeatures::test_trial_user_trust_units_is_false - PASS",
+    "TestExportFeatureGating::test_export_minutes_returns_402_for_trial - PASS",
+    "TestExportFeatureGating::test_export_distributions_returns_402_for_trial - PASS",
+    "TestExportFeatureGating::test_export_compensation_returns_402_for_trial - PASS",
+    "TestExportFeatureGating::test_export_tasks_returns_402_for_trial - PASS",
+    "TestExportAuthentication::test_export_minutes_requires_auth - PASS",
+    "TestExportAuthentication::test_export_distributions_requires_auth - PASS",
+    "TestExportAuthentication::test_export_compensation_requires_auth - PASS",
+    "TestExportAuthentication::test_export_tasks_requires_auth - PASS",
+    "TestPlanFeaturesConfiguration::test_trial_plan_has_only_core_features - PASS"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_p2_feature_gates.py",
+    "/app/backend/tests/test_premium_feature_gating.py",
+    "/app/test_reports/pytest/p2_feature_gates_results.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "trusts.py: MULTIPLE_TRUSTS gate correctly implemented at line 33, checks existing trust count before creating new one",
+    "governance.py: GOVERNANCE_HISTORY gate correctly implemented at line 442 using check_feature_access()",
+    "trust_units.py: TRUST_UNITS gate correctly implemented using require_premium_feature() dependency at lines 94, 326",
+    "server.py: BENEFICIARY_DASHBOARD gate correctly implemented at line 1729 using require_premium_feature()",
+    "dependencies.py: Feature class and PLAN_FEATURES correctly configured - trial has only core features, monthly/annual have all premium"
+  ],
+
+  "feature_gates_verified": {
+    "MULTIPLE_TRUSTS": {
+      "endpoint": "POST /api/trusts (creating 2nd+ trust)",
+      "implementation": "trusts.py line 33",
+      "status": "WORKING - Returns 402 for trial users with existing trust"
+    },
+    "GOVERNANCE_HISTORY": {
+      "endpoint": "GET /api/governance/{trust_id}/history",
+      "implementation": "governance.py line 442",
+      "status": "WORKING - Returns 402 for trial users"
+    },
+    "TRUST_UNITS": {
+      "endpoints": ["GET /api/trust-units/summary", "GET /api/trust-units/certificates"],
+      "implementation": "trust_units.py lines 94, 326",
+      "status": "WORKING - Returns 402 for trial users"
+    },
+    "BENEFICIARY_DASHBOARD": {
+      "endpoint": "GET /api/beneficiaries/dashboard",
+      "implementation": "server.py line 1729",
+      "status": "WORKING - Returns 402 for trial users"
+    }
+  },
+
+  "core_features_verified": [
+    "GET /api/trusts - Trial user can list trusts",
+    "GET /api/trusts/{id} - Trial user can view single trust",
+    "GET /api/governance/{trust_id} - Trial user can view health score",
+    "GET /api/entities - Trial user can access entities",
+    "GET /api/tasks - Trial user can access tasks",
+    "GET /api/minutes - Trial user can access minutes",
+    "GET /api/distributions - Trial user can access distributions",
+    "GET /api/dashboard - Trial user can access main dashboard",
+    "GET /api/onboarding - Trial user can access onboarding"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_p2_feature_gates.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (34/34 tests passed)",
+    "frontend": "N/A - backend only testing"
+  },
+
+  "test_credentials": {
+    "demo_user": "demo@trustoffice.com",
+    "demo_password": "demopassword",
+    "trust_id": "trust_b753cb8fe07f"
+  },
+
+  "seed_data_creation": "None - used existing demo data",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "P2 Feature Gating fully tested and working. All 4 premium feature gates (MULTIPLE_TRUSTS, GOVERNANCE_HISTORY, TRUST_UNITS, BENEFICIARY_DASHBOARD) return 402 for trial users. Core features remain accessible to trial users. Test file at /app/backend/tests/test_p2_feature_gates.py covers all feature gates."
+}
