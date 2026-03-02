@@ -515,9 +515,8 @@ async def list_unit_transfers(
 def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_watermark: bool = False) -> bytes:
     """Generate a professional landscape PDF certificate for trust units - stock certificate style"""
     from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib.pagesizes import landscape
     from reportlab.lib.colors import HexColor
-    from reportlab.lib.units import inch
     import math
     
     buffer = io.BytesIO()
