@@ -96,6 +96,7 @@ export default function DashboardPage() {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
   const [aiSuggestionsError, setAiSuggestionsError] = useState(false);
+  const [aiSuggestionsFallback, setAiSuggestionsFallback] = useState(false); // True when using static fallback
 
   useEffect(() => {
     if (selectedTrust) {
