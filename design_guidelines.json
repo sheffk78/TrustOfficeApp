@@ -105,6 +105,39 @@
     "grid_columns": "grid-cols-1 md:grid-cols-12",
     "gap": "gap-6"
   },
+  "pdf_certificate_design": {
+    "specs": {
+      "page_size": "Letter Landscape (11 x 8.5 inches)",
+      "margins": "0.75 inch all sides",
+      "background_color": "#FFFFFF",
+      "fonts": {
+        "title": "Times-Bold (32pt, Navy)",
+        "subtitle": "Times-Roman (14pt, Navy)",
+        "trust_name": "Times-Bold (24pt, Black)",
+        "body": "Times-Roman (14pt, Black)",
+        "data_labels": "Helvetica (10pt, Grey #666666)",
+        "data_values": "Courier-Bold (12pt, Black)",
+        "certificate_number": "Courier-Bold (18pt, Navy)"
+      },
+      "colors": {
+        "navy": "#010079",
+        "gold": "#D5AD36",
+        "grey": "#CCCCCC"
+      }
+    },
+    "visual_elements": {
+      "border": "Double-line border. Outer: 3pt Navy. Inner: 1pt Gold. Gap: 4pt. Corner Ornaments: Gold filled squares (8pt) at inner border corners.",
+      "seal": "Gold (#D5AD36) 30-point star polygon (Programmatic). Text inside: 'OFFICIAL SEAL' (Helvetica-Bold, White).",
+      "watermark": "Diagonal text 'TRUST CERTIFICATE' or Trust Name. Light Grey (#F0F0F0). Opacity 0.15.",
+      "layout": "Landscape. Central alignment for Title and Trust Name. Two-column layout for details if needed, but preferably inline text 'This certifies that...'. Bottom section for 2 Signatures."
+    },
+    "content_structure": {
+      "header": "CERTIFICATE OF BENEFICIAL INTEREST",
+      "trust_name_display": "Prominent, Centered",
+      "data_fields": ["Certificate Number (Top Right)", "Units (Top Left)", "Holder Name (Center Body)", "Issue Date", "Signatures"],
+      "signature_labels": ["Trustee Signature", "Date"]
+    }
+  },
   "instructions_to_main_agent": [
     "1. UPDATE TAILWIND CONFIG: Add the custom colors (primary: #010079, secondary: #D5AD36) and fonts (Cormorant Garamond, DM Sans, JetBrains Mono) immediately.",
     "2. INSTALL FONTS: Add the Google Fonts import to index.css: @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');",
@@ -114,7 +147,8 @@
     "6. SIDEBAR: Implement the fixed sidebar with the specific Navy background (#010079).",
     "7. TRUST SCORE: Display the Governance Health Score prominently using a large Serif font or a radial chart with Navy/Gold colors.",
     "8. CORNER MARKS: Add decorative 'L' shapes (Gold color) to the corners of key dashboard cards using pseudo-elements to reinforce the 'technical/blueprint' aesthetic.",
-    "9. LOGIN PAGE: Use the provided marble texture as a subtle background with a Navy overlay (opacity 90%) or as a side panel."
+    "9. LOGIN PAGE: Use the provided marble texture as a subtle background with a Navy overlay (opacity 90%) or as a side panel.",
+    "10. PDF GENERATION (Backend): Update 'generate_certificate_pdf' in 'trust_units.py' to use ReportLab Canvas (not SimpleDocTemplate) for landscape orientation. Draw a Double Border (Navy/Gold), add a programmatic Gold Seal (star polygon), and format text as per 'pdf_certificate_design' specs."
   ],
   "universal_guidelines": [
     "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
