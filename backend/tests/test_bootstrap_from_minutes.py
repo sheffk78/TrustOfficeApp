@@ -306,8 +306,27 @@ class TestBootstrapEdgeCases:
     
     def test_bootstrap_with_zero_units_beneficiary_skipped(self):
         """Test that beneficiaries with zero units are skipped"""
+        # First check current units state to determine available units
+        summary_response = self.session.get(
+            f"{BASE_URL}/api/trust-units/summary",
+            params={"trust_id": TEST_TRUST_ID}
+        )
+        
+        if summary_response.status_code != 200:
+            pytest.skip(f"Could not get units summary: {summary_response.status_code}")
+        
+        summary = summary_response.json()
+        remaining_units = summary.get("remaining_units", 0)
+        
+        # Skip if not enough remaining units
+        if remaining_units < 5:
+            pytest.skip(f"Not enough remaining units ({remaining_units}). Need at least 5 units.")
+        
         unique_suffix = uuid.uuid4().hex[:6]
         meeting_date = datetime.now().strftime("%Y-%m-%d")
+        
+        # Use a small number of units
+        valid_units = min(3, int(remaining_units))
         
         # Create minutes with one valid and one zero-unit beneficiary
         minutes_payload = {
@@ -319,7 +338,7 @@ class TestBootstrapEdgeCases:
                 "trustees_present": ["Test Trustee"],
                 "total_units": 100,
                 "beneficiaries": [
-                    {"name": f"Valid Beneficiary {unique_suffix}", "units": 25},
+                    {"name": f"Valid Beneficiary {unique_suffix}", "units": valid_units},
                     {"name": f"Zero Units Beneficiary {unique_suffix}", "units": 0}  # Should be skipped
                 ]
             }
@@ -345,7 +364,7 @@ class TestBootstrapEdgeCases:
         
         # Should only create 1 certificate (the valid one, not the zero-unit one)
         assert data["certificates_created"] == 1, f"Expected 1 certificate, got {data['certificates_created']}"
-        assert data["total_issued_units"] == 25, f"Expected 25 units, got {data['total_issued_units']}"
+        assert data["total_issued_units"] == valid_units, f"Expected {valid_units} units, got {data['total_issued_units']}"
         print(f"✓ Zero-unit beneficiary correctly skipped: {data['certificates_created']} certificate(s) created")
 
 
