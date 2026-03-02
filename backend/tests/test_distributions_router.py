@@ -147,7 +147,7 @@ class TestDistributionsWrite:
             "beneficiary_name": f"TEST_Beneficiary_{unique_id}",
             "amount": 1000.00,
             "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "purpose_classification": "discretionary",
+            "purpose_classification": "distribution",  # Valid enum: distribution, compensation, expense, other
             "authority_clause_ref": "Section 5.1",
             "notes": f"TEST distribution created by pytest {unique_id}",
             "is_benevolence": False
@@ -175,7 +175,7 @@ class TestDistributionsWrite:
             "beneficiary_name": f"TEST_Benevolence_{unique_id}",
             "amount": 500.00,
             "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "purpose_classification": "benevolent",
+            "purpose_classification": "other",  # Valid enum: distribution, compensation, expense, other
             "authority_clause_ref": "Section 6.2",
             "notes": f"TEST benevolence distribution {unique_id}",
             "is_benevolence": True,
@@ -200,7 +200,7 @@ class TestDistributionsWrite:
             "beneficiary_name": "TEST_Should_Fail",
             "amount": 100.00,
             "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "purpose_classification": "benevolent",
+            "purpose_classification": "other",  # Valid enum: distribution, compensation, expense, other
             "is_benevolence": True,
             # Missing benevolence_recipient_name and benevolence_need_description
         }
@@ -282,7 +282,7 @@ class TestDistributionsWrite:
             "beneficiary_name": f"TEST_ToDelete_{unique_id}",
             "amount": 100.00,
             "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "purpose_classification": "discretionary",
+            "purpose_classification": "distribution",  # Valid enum: distribution, compensation, expense, other
             "is_benevolence": False
         }
         
