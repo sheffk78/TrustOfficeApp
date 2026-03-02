@@ -62,27 +62,34 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Dec 30, 2025) - P1 TRUST UNITS ROUTER MIGRATION ✅
+### Latest Updates (Dec 30, 2025) - P1 CORE ROUTERS MIGRATION ✅
 
-**Session Summary:** Migrated the largest remaining module (Trust Units, ~1017 lines) from server.py:
+**Session Summary:** Migrated the core CRUD routers for trusts, entities, and tasks:
 
-**trust_units.py Router** (994 lines)
-- GET /api/trust-units/summary - Complete units summary with settings/certs/aggregates
-- PATCH /api/trust-units/settings - Update unit settings (label, fractional, authorized)
-- POST/PATCH/GET /api/trust-units/certificates - Certificate CRUD
-- GET /api/trust-units/certificates/{id}/pdf - PDF certificate generation
-- POST/GET /api/trust-units/transfers - Transfer recording and listing
-- POST /api/trust-units/create-from-minutes/{id} - Create certs from beneficiary designation
-- POST /api/trust-units/bootstrap-from-minutes/{id} - Full bootstrap with validation
+1. **trusts.py Router** (101 lines)
+   - POST/GET/PUT/DELETE /api/trusts
+   - Includes governance_score calculation via calculate_health_score
+   - Cascade delete of related data (entities, tasks, minutes, etc.)
 
-**Server.py Progress:**
-- Before this session: 3907 lines
-- After trust_units migration: **2899 lines** (-1008 lines, -25.8%)
-- **Total reduction: 61.5%** from original 7538 lines
+2. **entities.py Router** (144 lines)
+   - POST/GET/PATCH/DELETE /api/entities
+   - POST/GET/DELETE /api/entity-relationships
+   - auto_update_onboarding on entity creation
 
-**Testing:** All 26 tests passed including regression tests for all 9 migrated routers.
+3. **tasks.py Router** (98 lines)
+   - POST/GET /api/tasks with optional trust_id filter
+   - PATCH /api/tasks/{id}/complete and /uncomplete
+   - DELETE /api/tasks/{id}
+   - Dynamic status calculation (upcoming/overdue/completed)
 
-### Previous Updates (Dec 30, 2025) - P1 BACKEND ROUTER MIGRATION (Session 2) ✅
+**Code Changes:**
+- Added calculate_health_score to dependencies.py (179 lines)
+- Fixed duplicate task endpoints in server.py
+- Server.py: 2721 → **2648 lines** (-73 lines after cleanup)
+
+**Testing:** All 41 tests passed including 12 regression tests for all migrated routers.
+
+### Previous Updates (Dec 30, 2025) - P1 TRUST UNITS ROUTER MIGRATION ✅
 
 1. **ReadOnlyBanner Component** (`/frontend/src/components/ReadOnlyBanner.js`)
    - Amber/warning color scheme banner at top of pages
