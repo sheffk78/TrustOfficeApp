@@ -265,7 +265,7 @@
 
 /* Sidebar styles */
 .sidebar-trust {
-    @apply w-64 fixed left-0 top-0 h-full text-white border-r border-primary z-50;
+    @apply w-64 fixed left-0 top-0 h-full text-white border-r border-primary z-50 flex flex-col;
     background-color: var(--navy);
 }
 
