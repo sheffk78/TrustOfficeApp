@@ -553,6 +553,108 @@ class TestUnitTransfers:
         print(f"✓ Transfer fails for non-existent from_holder")
 
 
+class TestCertificatePDF:
+    """Tests for GET /api/trust-units/certificates/{id}/pdf endpoint"""
+    
+    @pytest.fixture(scope="class")
+    def auth_token(self):
+        response = requests.post(
+            f"{BASE_URL}/api/auth/login",
+            json=DEMO_USER,
+            headers={"Content-Type": "application/json"}
+        )
+        return response.json().get("token")
+    
+    @pytest.fixture(scope="class")
+    def api_client(self, auth_token):
+        session = requests.Session()
+        session.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {auth_token}"
+        })
+        return session
+    
+    def test_generate_certificate_pdf(self, api_client):
+        """GET /api/trust-units/certificates/{id}/pdf - generates PDF"""
+        # Get first active certificate
+        summary = api_client.get(f"{BASE_URL}/api/trust-units/summary?trust_id={TRUST_ID}").json()
+        active_certs = [c for c in summary["certificates"] if c["status"] == "active"]
+        
+        if len(active_certs) == 0:
+            pytest.skip("No active certificates to test PDF generation")
+        
+        cert = active_certs[0]
+        cert_id = cert["certificate_id"]
+        
+        response = api_client.get(f"{BASE_URL}/api/trust-units/certificates/{cert_id}/pdf")
+        
+        assert response.status_code == 200, f"Failed to get PDF: {response.text}"
+        data = response.json()
+        
+        # Verify response structure
+        assert "pdf_base64" in data, "Missing pdf_base64 field"
+        assert "filename" in data, "Missing filename field"
+        
+        # Verify base64 is valid and non-empty
+        pdf_base64 = data["pdf_base64"]
+        assert len(pdf_base64) > 100, "PDF content too small"
+        
+        # Verify filename follows expected pattern
+        assert "certificate_" in data["filename"]
+        assert ".pdf" in data["filename"]
+        
+        print(f"✓ PDF generated for certificate {cert['certificate_number']}")
+        print(f"  - Filename: {data['filename']}")
+        print(f"  - PDF size (base64): {len(pdf_base64)} chars")
+    
+    def test_pdf_contains_required_content(self, api_client):
+        """PDF response includes certificate data for rendering"""
+        summary = api_client.get(f"{BASE_URL}/api/trust-units/summary?trust_id={TRUST_ID}").json()
+        active_certs = [c for c in summary["certificates"] if c["status"] == "active"]
+        
+        if len(active_certs) == 0:
+            pytest.skip("No active certificates to test PDF content")
+        
+        cert = active_certs[0]
+        response = api_client.get(f"{BASE_URL}/api/trust-units/certificates/{cert['certificate_id']}/pdf")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Decode base64 to verify it's valid PDF
+        import base64
+        try:
+            pdf_bytes = base64.b64decode(data["pdf_base64"])
+            # Check PDF magic bytes
+            assert pdf_bytes[:4] == b'%PDF', "Invalid PDF header"
+            print(f"✓ PDF content is valid PDF format")
+            print(f"  - PDF size: {len(pdf_bytes)} bytes")
+        except Exception as e:
+            pytest.fail(f"Invalid base64 or PDF content: {e}")
+    
+    def test_pdf_404_for_nonexistent_certificate(self, api_client):
+        """PDF endpoint returns 404 for non-existent certificate"""
+        response = api_client.get(f"{BASE_URL}/api/trust-units/certificates/invalid_cert_xyz/pdf")
+        
+        assert response.status_code == 404
+        print(f"✓ Returns 404 for non-existent certificate PDF")
+    
+    def test_pdf_for_cancelled_certificate(self, api_client):
+        """PDF can be generated for cancelled certificates too (for records)"""
+        summary = api_client.get(f"{BASE_URL}/api/trust-units/summary?trust_id={TRUST_ID}").json()
+        cancelled_certs = [c for c in summary["certificates"] if c["status"] == "cancelled"]
+        
+        if len(cancelled_certs) == 0:
+            print("✓ No cancelled certificates to test (skipping)")
+            return
+        
+        cert = cancelled_certs[0]
+        response = api_client.get(f"{BASE_URL}/api/trust-units/certificates/{cert['certificate_id']}/pdf")
+        
+        assert response.status_code == 200, "Should be able to generate PDF for cancelled certificate"
+        print(f"✓ PDF generated for cancelled certificate {cert['certificate_number']}")
+
+
 class TestSummaryAggregates:
     """Tests to verify summary aggregates are calculated correctly"""
     
