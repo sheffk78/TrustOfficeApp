@@ -57,7 +57,53 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - AI v1 INTEGRATION HARDENED FOR PRODUCTION ✅
+### Latest Updates (Mar 2, 2026) - UI/UX IMPROVEMENTS ✅
+
+**Session Summary:** Fixed sidebar scrolling, combined Benevolence pages, updated Trust Units with 100-unit cap, redesigned PDF certificate, and improved demo data reset clarity.
+
+**1. Sidebar Scrolling Fix:**
+- Added `overflow-y-auto` to nav element in Sidebar.js (line 135)
+- Users can now scroll to see all menu items when viewport is small
+
+**2. Combined Benevolence Pages:**
+- Merged "Benevolence" and "Benevolence Log" into single page with tabs
+- Grants tab: Create/manage benevolence records
+- History tab: View distribution log with summaries (This Month/Year/All Time)
+- Removed "Benevolence Log" from sidebar navigation
+
+**3. Trust Units 100-Unit Cap:**
+- Default total authorized units set to 100 (was 1000)
+- Demo data updated: Emily (25%), Michael (30%), James Jr (15%) = 70 units, 30 remaining
+- UI displays "X units remaining" prominently
+- Backend validation prevents exceeding 100% allocation
+
+**4. Trust Units PDF Certificate (Landscape):**
+- Redesigned as stock certificate style using canvas-based PDF generation
+- Landscape orientation (11 x 8.5 inches)
+- Decorative double border (Navy outer, Gold inner with corner ornaments)
+- Beneficiary name centered and prominent
+- 12-point gold star seal with "OFFICIAL SEAL" text
+- Trust name watermark
+- Signature lines for trustee
+
+**5. Demo Data Reset Clarity:**
+- Renamed "Delete All Data" to "Reset All Trust Data"
+- Modal shows clear warning: "Warning: This action cannot be undone!"
+- Explains all data types that will be deleted
+- Notes that account and billing are preserved
+
+**Files Updated:**
+- `/app/frontend/src/components/Sidebar.js` - scrolling fix
+- `/app/frontend/src/pages/BenevolencePage.js` - combined with tabs
+- `/app/frontend/src/pages/TrustUnitsPage.js` - 100-unit default
+- `/app/frontend/src/pages/SettingsPage.js` - Reset button text
+- `/app/frontend/src/App.js` - removed BenevolenceLogPage route
+- `/app/backend/routers/trust_units.py` - landscape PDF certificate
+- `/app/backend/routers/demo.py` - updated demo unit values
+
+**Testing:** 100% pass rate - 10/10 frontend tests verified (iteration_51)
+
+### Previous Updates (Mar 2, 2026) - AI v1 INTEGRATION HARDENED FOR PRODUCTION ✅
 
 **Session Summary:** Hardened AI integration for production with rate limiting, safe error handling, logging, UI guardrails, and fallback behavior.
 
