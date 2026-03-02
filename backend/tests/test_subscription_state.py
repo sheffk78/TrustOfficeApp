@@ -150,14 +150,14 @@ class TestActiveSubscriptionCRUD:
         if not state["is_active"]:
             pytest.skip("Subscription is not active - skipping active subscription CRUD test")
         
-        # Try to create a governance task (POST operation)
+        # Try to create a governance task (POST operation) using correct endpoint
         task_data = {
             "trust_id": TEST_TRUST_ID,
             "task_type": "custom",
             "due_date": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
             "description": "TEST_subscription_test_task"
         }
-        response = authenticated_client.post(f"{BASE_URL}/api/governance-tasks", json=task_data)
+        response = authenticated_client.post(f"{BASE_URL}/api/tasks", json=task_data)
         
         # Should succeed with active subscription
         assert response.status_code in [200, 201], f"POST failed: {response.status_code} {response.text}"
@@ -167,7 +167,7 @@ class TestActiveSubscriptionCRUD:
         if response.status_code in [200, 201]:
             task_id = response.json().get("task_id")
             if task_id:
-                authenticated_client.delete(f"{BASE_URL}/api/governance-tasks/{task_id}")
+                authenticated_client.delete(f"{BASE_URL}/api/tasks/{task_id}")
     
     def test_put_request_allowed_with_active_subscription(self, authenticated_client):
         """PUT/PATCH requests should be allowed with active subscription"""
