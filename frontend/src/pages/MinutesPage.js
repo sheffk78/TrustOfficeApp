@@ -161,7 +161,7 @@ export default function MinutesPage() {
             </div>
             <div className="flex gap-2">
               <Button 
-                onClick={() => navigate('/minutes/templates')}
+                onClick={handleRecordMinutes}
                 className="btn-primary"
                 data-testid="record-minutes-btn"
               >
