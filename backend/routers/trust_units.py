@@ -14,7 +14,10 @@ from reportlab.lib import colors
 from pydantic import BaseModel
 
 from database import db
-from dependencies import get_current_user, require_write_access, should_show_watermark
+from dependencies import (
+    get_current_user, require_write_access, should_show_watermark,
+    require_premium_feature, Feature
+)
 from models import (
     TrustUnitsSettingsUpdate, TrustUnitsSettingsResponse,
     TrustUnitCertificateCreate, TrustUnitCertificateUpdate, TrustUnitCertificateResponse,
