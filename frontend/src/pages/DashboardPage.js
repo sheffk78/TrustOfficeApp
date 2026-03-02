@@ -149,19 +149,19 @@ export default function DashboardPage() {
       } else {
         // AI failed - use static governance insights as fallback
         console.error('AI suggestions unavailable, using static fallback');
-        useFallbackSuggestions();
+        applyFallbackSuggestions();
       }
     } catch (error) {
       console.error('Failed to load AI suggestions:', error);
       // AI failed - use static governance insights as fallback
-      useFallbackSuggestions();
+      applyFallbackSuggestions();
     } finally {
       setAiSuggestionsLoading(false);
     }
   };
 
   // Fallback to static governance insights when AI is unavailable
-  const useFallbackSuggestions = () => {
+  const applyFallbackSuggestions = () => {
     // Use the existing governance_insights from dashboard data as fallback
     const insights = dashboard?.governance_insights || [];
     const fallbackSuggestions = insights.slice(0, 4).map(insight => ({
