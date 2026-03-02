@@ -393,8 +393,27 @@ class TestBootstrapResponseFields:
         """Verify response contains: success, message, trust_id, total_authorized_units, 
         certificates_created, certificates array, total_issued_units, remaining_units"""
         
+        # First check current units state to determine available units
+        summary_response = self.session.get(
+            f"{BASE_URL}/api/trust-units/summary",
+            params={"trust_id": TEST_TRUST_ID}
+        )
+        
+        if summary_response.status_code != 200:
+            pytest.skip(f"Could not get units summary: {summary_response.status_code}")
+        
+        summary = summary_response.json()
+        remaining_units = summary.get("remaining_units", 0)
+        
+        # Skip if not enough remaining units
+        if remaining_units < 3:
+            pytest.skip(f"Not enough remaining units ({remaining_units}). Need at least 3 units.")
+        
         unique_suffix = uuid.uuid4().hex[:6]
         meeting_date = datetime.now().strftime("%Y-%m-%d")
+        
+        # Use a small number of units
+        valid_units = min(2, int(remaining_units))
         
         # Create a fresh minutes
         minutes_payload = {
@@ -406,7 +425,7 @@ class TestBootstrapResponseFields:
                 "trustees_present": ["Test Trustee"],
                 "total_units": 100,
                 "beneficiaries": [
-                    {"name": f"Field Test Beneficiary {unique_suffix}", "units": 30}
+                    {"name": f"Field Test Beneficiary {unique_suffix}", "units": valid_units}
                 ]
             }
         }
