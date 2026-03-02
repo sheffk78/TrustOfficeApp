@@ -54,7 +54,37 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - FRONTEND READ-ONLY MODE INTEGRATION ✅
+### Latest Updates (Dec 30, 2025) - P1 BACKEND ROUTER MIGRATION ✅
+
+**Session Summary:** Continued the backend refactoring by migrating three additional modules from server.py to dedicated router files:
+
+1. **schedule_a.py Router** (427 lines → 16,796 bytes)
+   - All Schedule A asset CRUD endpoints migrated
+   - GET/POST/PUT/DELETE /api/schedule-a
+   - GET /api/schedule-a/summary/{trust_id}
+   - GET /api/schedule-a/export/{trust_id}/pdf
+   - Uses require_write_access for write operations
+
+2. **compensation.py Router** (191 lines → 5,800 bytes)
+   - Compensation plans CRUD: GET/POST /api/compensation-plans
+   - Compensation payments CRUD: GET/POST/DELETE /api/compensation-payments
+   - GET /api/compensation-ytd - YTD totals and plan comparison
+   - Auto-onboarding updates on payment creation
+
+3. **subscriptions.py Router** (655 lines → 21,000 bytes)
+   - GET /api/subscription - Current subscription details
+   - GET /api/subscription/state - Normalized state with computed fields
+   - GET /api/subscription/features - Premium feature flags
+   - POST /api/subscription/create-checkout - Stripe checkout session
+   - POST /api/subscription/create-portal - Billing portal
+   - POST /api/subscription/cancel, /reactivate, /upgrade
+   - POST /api/stripe/webhook - All Stripe webhook handlers
+
+**Code Reduction:** server.py reduced from ~5647 to ~4526 lines (-20%)
+
+**Testing:** All 30 backend tests passed. Fixed backward compatibility issue in CompensationPaymentResponse model.
+
+### Previous Updates (Mar 2, 2026) - FRONTEND READ-ONLY MODE INTEGRATION ✅
 
 1. **ReadOnlyBanner Component** (`/frontend/src/components/ReadOnlyBanner.js`)
    - Amber/warning color scheme banner at top of pages
