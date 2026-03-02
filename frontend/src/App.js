@@ -224,8 +224,10 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <AppRouter />
-          <Toaster position="top-right" />
+          <UpgradeModalProvider>
+            <AppRouter />
+            <Toaster position="top-right" />
+          </UpgradeModalProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
