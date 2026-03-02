@@ -124,6 +124,34 @@ export default function DashboardPage() {
     }
   };
 
+  // Load AI-generated governance suggestions
+  const loadAiSuggestions = async () => {
+    if (!selectedTrust) return;
+    
+    setAiSuggestionsLoading(true);
+    setAiSuggestionsError(false);
+    try {
+      const response = await fetchWithAuth('/ai/governance-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trust_id: selectedTrust.trust_id })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAiSuggestions(data.suggestions || []);
+      } else {
+        console.error('Failed to load AI suggestions');
+        setAiSuggestionsError(true);
+      }
+    } catch (error) {
+      console.error('Failed to load AI suggestions:', error);
+      setAiSuggestionsError(true);
+    } finally {
+      setAiSuggestionsLoading(false);
+    }
+  };
+
   const dismissOnboarding = async () => {
     try {
       await fetchWithAuth('/onboarding/dismiss', { method: 'POST' });
