@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import uuid
 
 class TrustOfficeAPITester:
-    def __init__(self, base_url="https://minutes-ai-1.preview.emergentagent.com"):
+    def __init__(self, base_url="https://trust-governance-5.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.session_token = None

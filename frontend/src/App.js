@@ -18,9 +18,8 @@ import GovernancePage from "@/pages/GovernancePage";
 import SettingsPage from "@/pages/SettingsPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import CalendarPage from "@/pages/CalendarPage";
-import EntitiesPage from "@/pages/EntitiesPage";
 import EntityDetailPage from "@/pages/EntityDetailPage";
-import StructurePage from "@/pages/StructurePage";
+import StructuresPage from "@/pages/StructuresPage";
 import CompensationPage from "@/pages/CompensationPage";
 import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
@@ -178,19 +177,17 @@ const AppRouter = () => {
           <ExpensesPage />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/entities" element={
+      <Route path="/structures" element={
         <SubscriptionProtectedRoute>
-          <EntitiesPage />
+          <StructuresPage />
         </SubscriptionProtectedRoute>
       } />
+      {/* Redirect old routes to new unified Structures page */}
+      <Route path="/entities" element={<Navigate to="/structures?tab=entities" replace />} />
+      <Route path="/structure" element={<Navigate to="/structures?tab=hierarchy" replace />} />
       <Route path="/entities/:entityId" element={
         <SubscriptionProtectedRoute>
           <EntityDetailPage />
-        </SubscriptionProtectedRoute>
-      } />
-      <Route path="/structure" element={
-        <SubscriptionProtectedRoute>
-          <StructurePage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/governance" element={
