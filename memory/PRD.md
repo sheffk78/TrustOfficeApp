@@ -21,7 +21,13 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - DASHBOARD UI REFACTORING ✅
+### Latest Updates (Mar 2, 2026) - LOGIN FLOW FIX ✅
+
+1. **Fixed trusts not loading after login**
+   - Added `loadTrusts()` call after successful authentication in LoginPage.js
+   - Trust selector now populates immediately after login (no page refresh needed)
+
+### Previous Updates (Mar 2, 2026) - DASHBOARD UI REFACTORING ✅
 
 1. **Unified Dashboard API Integration**
    - DashboardPage.js now calls single `GET /api/dashboard` instead of 3 separate API calls
