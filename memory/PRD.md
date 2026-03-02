@@ -57,7 +57,39 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - SERVER.PY CLEANUP COMPLETE ✅
+### Latest Updates (Mar 2, 2026) - DISPOSITION/SALE OF ASSET FLOW ✅
+
+**Session Summary:** Implemented complete Disposition/Sale of Asset flow connecting Schedule A with Minutes.
+
+**Backend Changes:**
+- Added `POST /api/schedule-a/{item_id}/dispose` endpoint for direct disposition without minutes
+- Validates already-disposed assets (400 error), non-existent assets (404)
+- Supports all disposition types: sale, transfer, donation, destruction
+- Status filtering: active (default), all (includes disposed)
+
+**Schedule A UI Enhancements:**
+1. **Status Badges:** Active (green) / Disposed (orange) for each asset
+2. **Active/All Tabs:** Filter between active and all assets
+3. **Summary Cards:** Now show "Active Assets" count and "Disposed" count
+4. **Dispose Button:** Opens modal with:
+   - Asset info display (description, category, value)
+   - Disposition type dropdown (Sale/Transfer/Donation/Destruction)
+   - Date, Value, Recipient, Notes fields
+   - "Create minutes for this disposition" checkbox
+5. **Disposition Minutes Link:** Click-through from Schedule A to disposition minutes
+
+**Disposition Flow Paths:**
+1. **Direct Dispose:** Uncheck "Create minutes" → "Mark as Disposed" → Immediate update
+2. **With Minutes:** Keep checkbox checked → "Continue to Minutes" → Navigate to disposition template with pre-filled data via URL params
+
+**Minutes Template Updates:**
+- Added `disposition_of_asset` to TEMPLATE_TITLES
+- URL params pre-fill: asset_id, description, date, reason, value, recipient, notes
+- Existing disposition template generates WHEREAS/RESOLVED language
+
+**Testing:** All 19 backend tests + all UI flows passed. Verified both dispose paths work correctly.
+
+### Previous Updates (Mar 2, 2026) - SERVER.PY CLEANUP COMPLETE ✅
 
 **Session Summary:** Completed final server.py modularization by migrating remaining endpoints.
 
