@@ -21,7 +21,38 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Latest Updates (Feb 25, 2026) - SCHEDULE A ENHANCEMENTS ✅
+### Latest Updates (Mar 2, 2026) - TRUST CERTIFICATE UNITS FEATURE ✅
+
+1. **Trust Certificate Units - Complete Backend & Frontend**
+   - Full certificate management system for tracking trust ownership/beneficial interest
+   - **Backend API Endpoints**:
+     - `GET /api/trust-units/summary?trust_id={id}` - Returns settings, certificates, aggregates
+     - `PATCH /api/trust-units/settings?trust_id={id}` - Update unit settings
+     - `POST /api/trust-units/certificates` - Issue new certificate
+     - `PATCH /api/trust-units/certificates/{id}` - Update certificate
+     - `POST /api/trust-units/transfers` - Transfer units between holders
+     - `GET /api/trust-units/transfers` - List all transfers
+     - `POST /api/trust-units/create-from-minutes/{id}` - Create certificates from beneficiary designation minutes
+   - **Database Collections**:
+     - `trust_units_settings`: total_authorized_units, unit_label, allow_fractional
+     - `trust_unit_certificates`: certificate_id, holder_name, units, percentage, certificate_number (CU-XXX), status
+     - `trust_unit_transfers`: transfer records with from/to holders
+   - **Frontend Page** (`/units`):
+     - Summary cards: Total Authorized, Issued Units, Remaining, Active Certificates
+     - Certificates table with status badges (Active/Cancelled/Replaced)
+     - Issue Certificate dialog with validation
+     - Settings dialog for unit configuration
+     - Transfer dialog for moving units between holders
+     - Navigation link in sidebar under "Structures" group
+
+2. **Validation Rules**:
+   - Units cannot exceed total_authorized_units
+   - Cannot reduce total_authorized_units below currently issued
+   - Sequential certificate numbering (CU-001, CU-002, etc.)
+   - Fractional units only allowed when setting enabled
+   - Transfer validates source holder has sufficient units
+
+### Previous Updates (Feb 25, 2026) - SCHEDULE A ENHANCEMENTS ✅
 
 1. **Enhanced "Accept Property into Trust" Template**
    - Added structured asset data collection: category, description, identifier (VIN/account#), location, value, date conveyed
