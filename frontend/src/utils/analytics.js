@@ -27,6 +27,9 @@ export const isGtagAvailable = () => {
 export const trackEvent = (eventName, eventParams = {}) => {
   if (isGtagAvailable()) {
     window.gtag('event', eventName, eventParams);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[GA4] Event: ${eventName}`, eventParams);
+    }
   } else {
     console.warn('GA4 gtag not available');
   }
@@ -69,23 +72,117 @@ export const setUserId = (userId) => {
 };
 
 // ============================================================
-// SUBSCRIPTION EVENT HELPERS (Ready for future implementation)
+// SUBSCRIPTION FUNNEL EVENTS
 // ============================================================
 
 /**
- * Track subscription-related events
- * These are placeholder functions ready for future use
- * 
- * Event naming convention:
- * - subscription_started: New subscription created
- * - subscription_upgraded: Upgraded from monthly to annual
- * - subscription_downgraded: Downgraded from annual to monthly
- * - subscription_canceled: Subscription canceled
- * - subscription_reactivated: Canceled subscription reactivated
- * - trial_started: Free trial started
- * - trial_ended: Free trial ended (converted or expired)
+ * Track when a user starts their trial
+ * @param {Object} params - Event parameters
+ * @param {string} params.plan_type - 'trial'
+ * @param {string} params.origin - 'direct' | 'pricing_page' | 'register'
+ * @param {number} params.trial_length_days - Number of trial days (default 14)
  */
+export const trackTrialStarted = (params = {}) => {
+  trackEvent('subscription_trial_started', {
+    event_category: 'subscription',
+    plan_type: 'trial',
+    origin: params.origin || 'direct',
+    trial_length_days: params.trial_length_days || 14,
+    ...params
+  });
+};
 
+/**
+ * Track when a trial user converts to a paid subscription
+ * @param {Object} params - Event parameters
+ * @param {string} params.plan_type - 'monthly' | 'annual'
+ * @param {string} params.origin - Where the conversion originated
+ * @param {number} params.trial_length_days - Original trial length
+ * @param {number} params.days_until_trial_end - Days remaining when converted
+ */
+export const trackTrialConverted = (params = {}) => {
+  trackEvent('subscription_trial_converted', {
+    event_category: 'subscription',
+    plan_type: params.plan_type || 'monthly',
+    origin: params.origin || 'billing_page',
+    trial_length_days: params.trial_length_days || 14,
+    days_until_trial_end: params.days_until_trial_end,
+    value: params.plan_type === 'annual' ? 790 : 79,
+    currency: 'USD',
+    ...params
+  });
+};
+
+/**
+ * Track when a subscription is canceled
+ * @param {Object} params - Event parameters
+ * @param {string} params.plan_type - 'monthly' | 'annual'
+ * @param {string} params.cancellation_reason - Optional reason
+ */
+export const trackSubscriptionCanceled = (params = {}) => {
+  trackEvent('subscription_canceled', {
+    event_category: 'subscription',
+    plan_type: params.plan_type || 'monthly',
+    cancellation_reason: params.cancellation_reason || 'user_initiated',
+    ...params
+  });
+};
+
+/**
+ * Track when a subscription goes past due (payment failed)
+ * @param {Object} params - Event parameters
+ * @param {string} params.plan_type - 'monthly' | 'annual'
+ */
+export const trackSubscriptionPastDue = (params = {}) => {
+  trackEvent('subscription_past_due', {
+    event_category: 'subscription',
+    plan_type: params.plan_type || 'monthly',
+    ...params
+  });
+};
+
+/**
+ * Track checkout initiated
+ * @param {Object} params - Event parameters
+ */
+export const trackCheckoutInitiated = (params = {}) => {
+  trackEvent('checkout_initiated', {
+    event_category: 'subscription',
+    plan_type: params.plan_type || 'monthly',
+    origin: params.origin || 'billing_page',
+    value: params.plan_type === 'annual' ? 790 : 79,
+    currency: 'USD',
+    ...params
+  });
+};
+
+/**
+ * Track upgrade prompt shown (for conversion optimization)
+ * @param {Object} params - Event parameters
+ */
+export const trackUpgradePromptShown = (params = {}) => {
+  trackEvent('upgrade_prompt_shown', {
+    event_category: 'subscription',
+    prompt_location: params.location || 'unknown',
+    prompt_type: params.type || 'modal',
+    ...params
+  });
+};
+
+/**
+ * Track upgrade prompt clicked
+ * @param {Object} params - Event parameters
+ */
+export const trackUpgradePromptClicked = (params = {}) => {
+  trackEvent('upgrade_prompt_clicked', {
+    event_category: 'subscription',
+    prompt_location: params.location || 'unknown',
+    prompt_type: params.type || 'modal',
+    ...params
+  });
+};
+
+// Legacy subscription event tracker (backward compatible)
 export const trackSubscriptionEvent = (eventType, params = {}) => {
   const validEvents = [
     'subscription_started',
@@ -114,5 +211,12 @@ export default {
   setUserProperties,
   setUserId,
   trackSubscriptionEvent,
+  trackTrialStarted,
+  trackTrialConverted,
+  trackSubscriptionCanceled,
+  trackSubscriptionPastDue,
+  trackCheckoutInitiated,
+  trackUpgradePromptShown,
+  trackUpgradePromptClicked,
   isGtagAvailable
 };
