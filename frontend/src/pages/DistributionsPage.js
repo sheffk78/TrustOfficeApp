@@ -125,25 +125,44 @@ export default function DistributionsPage() {
       return;
     }
 
+    // Validate benevolence fields if is_benevolence is true
+    if (formData.is_benevolence) {
+      if (!formData.benevolence_recipient_name?.trim()) {
+        toast.error('Benevolence recipient name is required');
+        return;
+      }
+      if (!formData.benevolence_need_description?.trim()) {
+        toast.error('Benevolence need description is required');
+        return;
+      }
+    }
+
     setFormLoading(true);
     try {
+      const payload = {
+        trust_id: selectedTrust.trust_id,
+        beneficiary_name: formData.beneficiary,
+        amount: parseFloat(formData.amount),
+        date: formData.date.toISOString().split('T')[0],
+        purpose_classification: formData.category,
+        notes: formData.notes || '',
+        is_benevolence: formData.is_benevolence,
+        benevolence_recipient_name: formData.is_benevolence ? formData.benevolence_recipient_name : null,
+        benevolence_need_description: formData.is_benevolence ? formData.benevolence_need_description : null,
+        benevolence_notes: formData.is_benevolence ? formData.benevolence_notes : null
+      };
+
       const response = await fetchWithAuth('/distributions', {
         method: 'POST',
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          beneficiary_name: formData.beneficiary,
-          amount: parseFloat(formData.amount),
-          date: formData.date.toISOString().split('T')[0],
-          purpose_classification: formData.category,
-          notes: formData.notes || ''
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create distribution');
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create distribution');
       }
 
-      toast.success('Distribution created');
+      toast.success(formData.is_benevolence ? 'Benevolence distribution created' : 'Distribution created');
       setDialogOpen(false);
       setFormData({
         date: new Date(),
@@ -152,7 +171,11 @@ export default function DistributionsPage() {
         beneficiary: '',
         category: '',
         notes: '',
-        status: 'review'
+        status: 'review',
+        is_benevolence: false,
+        benevolence_recipient_name: '',
+        benevolence_need_description: '',
+        benevolence_notes: ''
       });
       loadDistributions();
     } catch (error) {
