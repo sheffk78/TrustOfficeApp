@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
+import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { 
   AlertTriangle, 
   CreditCard,
@@ -9,10 +10,43 @@ import {
 } from 'lucide-react';
 
 /**
- * SubscriptionGate - Wraps protected content and shows paywall if subscription expired
- * Use on pages that require active subscription (NOT on settings/billing pages)
+ * SubscriptionGate - Wraps protected content
+ * 
+ * NEW BEHAVIOR (Read-Only Mode):
+ * - If subscription is active: Show content normally
+ * - If subscription is expired/inactive: Show content with ReadOnlyBanner
+ *   Users can VIEW all data but cannot CREATE/UPDATE/DELETE
+ * 
+ * Use on pages that require subscription awareness (NOT on settings/billing pages)
  */
 export const SubscriptionGate = ({ children }) => {
+  const { subscription, subscriptionExpired, isReadOnly, loading } = useAuth();
+
+  // Don't block while loading
+  if (loading) {
+    return children;
+  }
+
+  // If subscription is active, show content without banner
+  if (!subscriptionExpired && !isReadOnly) {
+    return children;
+  }
+
+  // Subscription expired or read-only - show content with banner
+  // Users can still view all their data
+  return (
+    <div className="flex flex-col min-h-screen">
+      <ReadOnlyBanner />
+      {children}
+    </div>
+  );
+};
+
+/**
+ * FullSubscriptionGate - Hard paywall for features that absolutely require subscription
+ * Use this sparingly - only for premium features that shouldn't be accessible at all
+ */
+export const FullSubscriptionGate = ({ children }) => {
   const navigate = useNavigate();
   const { subscription, subscriptionExpired, loading } = useAuth();
 
