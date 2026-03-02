@@ -59,7 +59,39 @@ The backend now has a modular structure for better maintainability:
 
 
 
-### Latest Updates (Mar 2, 2026) - ENHANCED PDF FORMATTING FOR LEGAL DOCUMENTS ✅
+### Latest Updates (Mar 2, 2026) - GUIDED MINUTES PARTICIPANT FIX + COMPENSATION TRUSTEE SELECTOR ✅
+
+**Session Summary:** Fixed two user-reported UX issues:
+1. Guided Minutes now separates trustees from other attendees
+2. Compensation page now has trustee selector for payments
+
+**Issue 1 Fixed - Guided Minutes Participant Titles:**
+- **Problem:** All participants were titled as "Trustees" in the final PDF, even guests/advisors/beneficiaries
+- **Solution:** 
+  - Split participants into "TRUSTEES PRESENT" and "OTHER ATTENDEES (OPTIONAL)" sections
+  - Added dropdown to select participant type when adding manually
+  - PDF now shows "TRUSTEES PRESENT" section (with Trustee titles) and "ALSO PRESENT" section (no title)
+  
+**Issue 2 Fixed - Compensation Trustee Selection:**
+- **Problem:** When recording payments, users couldn't specify which trustee received the payment
+- **Solution:**
+  - Added "RECIPIENT TRUSTEE" dropdown in Record Payment modal
+  - Dropdown populated with known trustees from trust context
+  - Payments display trustee name badges in the payment list
+  - Renamed "Trustee-Specific Plans" to "Per-Trustee Compensation Caps" for clarity
+
+**Files Updated:**
+- `/app/frontend/src/pages/GuidedMinutesPage.js` - Separate trustees/attendees UI
+- `/app/frontend/src/pages/CompensationPage.js` - Added trustee selector
+- `/app/backend/routers/guided_minutes.py` - Added other_attendees_text field
+- `/app/backend/routers/minutes.py` - PDF shows "ALSO PRESENT" section
+- `/app/backend/routers/compensation.py` - Store trustee_name with payments
+- `/app/backend/models.py` - Updated Pydantic models
+
+**Testing:** 100% pass rate (iteration_59) - 9 backend tests + all frontend features verified
+
+
+### Previous Updates (Mar 2, 2026) - ENHANCED PDF FORMATTING FOR LEGAL DOCUMENTS ✅
 
 **Session Summary:** Completely rewrote the PDF generation function to preserve formatting and create professional legal-style documents.
 
