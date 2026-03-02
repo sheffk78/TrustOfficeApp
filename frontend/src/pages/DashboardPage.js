@@ -112,8 +112,8 @@ export default function DashboardPage() {
     
     setLoading(true);
     try {
-      // Single unified API call
-      const response = await fetchWithAuth('/dashboard');
+      // Single unified API call with trust_id parameter
+      const response = await fetchWithAuth(`/dashboard?trust_id=${selectedTrust.trust_id}`);
       if (response.ok) {
         const data = await response.json();
         setDashboard(data);
