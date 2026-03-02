@@ -4389,6 +4389,25 @@ async def get_subscription_state_endpoint(user: dict = Depends(get_current_user)
     state = await get_subscription_state(user["user_id"])
     return state.model_dump()
 
+@api_router.get("/subscription/features")
+async def get_subscription_features(user: dict = Depends(get_current_user)):
+    """
+    Get available features for the user's subscription plan.
+    Used by frontend to show/hide premium features.
+    
+    Returns:
+        - plan_type: Current plan
+        - is_active: Whether subscription is active
+        - is_trial: Whether on trial
+        - features: Dict of feature flags (feature_name -> boolean)
+    
+    Feature flags:
+        - minutes_basic, distributions_basic, governance_basic, single_trust (core)
+        - pdf_no_watermark, csv_export, multiple_trusts, benevolence_mode,
+          beneficiary_dashboard, trust_units, governance_history, advanced_templates (premium)
+    """
+    return await get_user_features(user["user_id"])
+
 @api_router.post("/subscription/create-checkout")
 async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depends(get_current_user)):
     """Create a Stripe checkout session for subscription"""
