@@ -58,7 +58,55 @@ The backend now has a modular structure for better maintainability:
 ## Completed Features
 
 
-### Latest Updates (Mar 2, 2026) - PDF PREVIEW FIX ✅
+### Latest Updates (Mar 2, 2026) - GUIDED MINUTES WIZARD ✅
+
+**Session Summary:** Built a new AI-assisted "Guided Minutes" section with a 4-step wizard flow for creating meeting minutes.
+
+**Feature Overview:**
+- New navigation item under "Governance" with a gold "BETA" badge
+- 4-step wizard that walks users through creating minutes like an interview
+- AI generates formal WHEREAS/RESOLVED style minutes from simple bullet points
+- Integrates with existing minutes_records collection
+
+**Backend Implementation:**
+- **New Router:** `/app/backend/routers/guided_minutes.py`
+- **New Models:** `GuidedMinutesContext`, `GuidedMinutesDraftRequest`, `GuidedMinutesDraftResponse`, `GuidedMinutesSaveRequest`
+- **Endpoints:**
+  - `GET /api/guided-minutes/context` - Returns trust info (name, jurisdiction, trustees, beneficiary standard)
+  - `POST /api/guided-minutes/draft` - Generates AI draft using Claude Sonnet
+  - `POST /api/guided-minutes/save` - Saves as minutes_records entry
+
+**Frontend Implementation:**
+- **New Page:** `/app/frontend/src/pages/GuidedMinutesPage.js`
+- **Route:** `/guided-minutes` (subscription-protected)
+- **Sidebar:** "Guided Minutes" with gold "BETA" badge under Governance
+
+**Wizard Steps:**
+1. **Meeting Type & Date**: Select Annual/Quarterly/General, pick date, select participants from known trustees or add custom
+2. **Topics & Decisions**: Enter bullet points for agenda items and key decisions (AI drafts formal language)
+3. **Review Draft**: View/edit AI-generated WHEREAS/RESOLVED minutes with cautions displayed
+4. **Save**: Confirmation screen with "View All Minutes" and "Create Another" buttons
+
+**Key Features:**
+- Auto-pulls trust context (trustees, jurisdiction, beneficiary standard)
+- Simple bullet point input - AI handles formal language
+- Editable draft with regenerate option
+- Clear AI disclaimer and caution notices
+- Mobile-responsive stepper design
+
+**Files Created/Updated:**
+- `/app/backend/routers/guided_minutes.py` (NEW)
+- `/app/backend/models.py` (Added guided minutes models)
+- `/app/backend/server.py` (Router registration)
+- `/app/frontend/src/pages/GuidedMinutesPage.js` (NEW)
+- `/app/frontend/src/App.js` (Route added)
+- `/app/frontend/src/components/Sidebar.js` (Navigation updated)
+- `/app/frontend/src/pages/MinutesPage.js` (Link to guided minutes)
+
+**Testing:** 100% pass rate - 19/19 frontend features + 10/10 backend tests (iteration_56)
+
+
+### Previous Updates (Mar 2, 2026) - PDF PREVIEW FIX ✅
 
 **Session Summary:** Fixed PDF preview showing "PDF preview not supported in this browser" by creating a robust reusable PDFPreviewModal component.
 
