@@ -40,7 +40,8 @@ function useDebounce(value, delay) {
 
 export default function MinutesPage() {
   const navigate = useNavigate();
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
+  const { showUpgradeModal } = useUpgradeModal();
   const [minutes, setMinutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
