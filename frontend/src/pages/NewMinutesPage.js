@@ -92,6 +92,9 @@ export default function NewMinutesPage() {
       return;
     }
 
+    // Clear previous error
+    setAiError(null);
+
     // Extract decision points from summary (split by newlines or periods)
     const decisionsOutline = formData.summary
       ? formData.summary.split(/[.\n]+/).map(s => s.trim()).filter(s => s.length > 0)
@@ -123,13 +126,17 @@ export default function NewMinutesPage() {
         const data = await response.json();
         setAiDraft(data);
         setAiDraftModalOpen(true);
+        setAiError(null);
       } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Failed to generate AI draft');
+        const error = await response.json().catch(() => ({}));
+        const errorMessage = error.detail || 'AI assistant is currently unavailable.';
+        setAiError(errorMessage);
+        // Don't use toast - show inline error instead
+        console.error('AI draft error:', errorMessage);
       }
     } catch (error) {
       console.error('AI draft error:', error);
-      toast.error('Failed to connect to AI service');
+      setAiError('Unable to connect to AI service. You can still draft manually.');
     } finally {
       setAiDrafting(false);
     }
