@@ -755,6 +755,175 @@ export default function BenevolencePage() {
               </div>
             )
           )}
+            </TabsContent>
+
+            {/* History Tab */}
+            <TabsContent value="history">
+              {distLogLoading ? (
+                <div className="card-trust p-8 text-center">
+                  <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin mx-auto mb-4"></div>
+                  <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading...</p>
+                </div>
+              ) : !distLogData ? (
+                <div className="card-trust p-8 text-center">
+                  <p className="text-muted-foreground">No distribution history available</p>
+                </div>
+              ) : (
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gold/20 flex items-center justify-center">
+                          <Calendar className="w-5 h-5 text-gold" />
+                        </div>
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">This Month</p>
+                          <p className="font-serif text-2xl text-navy dark:text-foreground">{formatCurrency(getCurrentMonthTotal())}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                          <TrendingUp className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">This Year</p>
+                          <p className="font-serif text-2xl text-navy dark:text-foreground">{formatCurrency(getCurrentYearTotal())}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                          <HeartHandshake className="w-5 h-5 text-green-700 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">All Time</p>
+                          <p className="font-serif text-2xl text-navy dark:text-foreground">{formatCurrency(distLogData.total_all_time)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 flex items-center justify-center ${
+                          distLogData.incomplete_documentation_count > 0 ? 'bg-warning/20' : 'bg-success/20'
+                        }`}>
+                          {distLogData.incomplete_documentation_count > 0 ? (
+                            <AlertCircle className="w-5 h-5 text-warning" />
+                          ) : (
+                            <CheckCircle2 className="w-5 h-5 text-success" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Documentation</p>
+                          <p className={`font-serif text-xl ${distLogData.incomplete_documentation_count > 0 ? 'text-warning' : 'text-success'}`}>
+                            {distLogData.incomplete_documentation_count > 0 ? `${distLogData.incomplete_documentation_count} Pending` : 'Complete'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filters */}
+                  <div className="card-trust mb-6">
+                    <div className="p-4 flex flex-col sm:flex-row gap-4">
+                      <div className="flex-1">
+                        <Label className="label-trust">Search Recipient</Label>
+                        <div className="relative mt-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            value={searchRecipient}
+                            onChange={(e) => setSearchRecipient(e.target.value)}
+                            placeholder="Search by recipient name..."
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+                      <div className="w-full sm:w-48">
+                        <Label className="label-trust">Date Range</Label>
+                        <Select value={dateFilter} onValueChange={setDateFilter}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Time</SelectItem>
+                            <SelectItem value="this_month">This Month</SelectItem>
+                            <SelectItem value="last_month">Last Month</SelectItem>
+                            <SelectItem value="this_year">This Year</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distributions Table */}
+                  <div className="card-trust overflow-hidden">
+                    <div className="p-4 border-b border-border flex items-center gap-2">
+                      <HeartHandshake className="w-4 h-4 text-navy dark:text-gold" />
+                      <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                        Benevolence Distributions ({filteredDistributions.length})
+                      </h2>
+                    </div>
+                    
+                    {filteredDistributions.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <HeartHandshake className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
+                        <p className="text-muted-foreground">
+                          {distLogData.total_count === 0 ? 'No benevolence distributions yet' : 'No distributions match your filters'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-border bg-muted/30">
+                              <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Recipient</th>
+                              <th className="text-right p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Amount</th>
+                              <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Date</th>
+                              <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Need/Purpose</th>
+                              <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredDistributions.map((dist) => (
+                              <tr key={dist.distribution_id} className="border-b border-border hover:bg-muted/20">
+                                <td className="p-3">
+                                  <p className="font-medium text-navy dark:text-foreground">
+                                    {dist.benevolence_recipient_name || dist.beneficiary_name}
+                                  </p>
+                                </td>
+                                <td className="p-3 text-right">
+                                  <span className="font-mono text-lg text-navy dark:text-foreground">{formatCurrency(dist.amount)}</span>
+                                </td>
+                                <td className="p-3">
+                                  <span className="font-mono text-sm text-muted-foreground">{formatDate(dist.date)}</span>
+                                </td>
+                                <td className="p-3">
+                                  <p className="text-sm text-muted-foreground line-clamp-2 max-w-[200px]">
+                                    {dist.benevolence_need_description || dist.notes || '—'}
+                                  </p>
+                                </td>
+                                <td className="p-3">
+                                  <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-mono uppercase ${
+                                    dist.approved_at || dist.minutes_record_id ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'
+                                  }`}>
+                                    {getDistStatusIcon(dist)}
+                                    {getDistStatusText(dist)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
     </div>
