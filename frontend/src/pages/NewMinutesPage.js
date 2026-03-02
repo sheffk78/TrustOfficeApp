@@ -376,7 +376,7 @@ export default function NewMinutesPage() {
                         size="sm"
                         onClick={handleDraftWithAI}
                         disabled={aiDrafting || !selectedTrust}
-                        className="text-xs flex items-center gap-1.5 border-gold/50 text-gold hover:bg-gold/10 hover:text-gold"
+                        className="text-xs flex items-center gap-1.5 border-gold/50 text-gold hover:bg-gold/10 hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed"
                         data-testid="draft-with-ai-btn"
                       >
                         {aiDrafting ? (
@@ -392,6 +392,15 @@ export default function NewMinutesPage() {
                         )}
                       </Button>
                     </div>
+                    
+                    {/* Inline AI error - does not block manual drafting */}
+                    {aiError && (
+                      <div className="mb-2 p-2 bg-warning/10 border border-warning/30 text-xs text-warning flex items-start gap-2" data-testid="ai-error-inline">
+                        <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                        <span>{aiError}</span>
+                      </div>
+                    )}
+                    
                     <Textarea
                       value={formData.details}
                       onChange={(e) => setFormData({ ...formData, details: e.target.value })}
@@ -399,7 +408,7 @@ export default function NewMinutesPage() {
                       className="mt-1 input-trust min-h-[150px]"
                       data-testid="details-input"
                     />
-                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1 font-mono">
                       <Sparkles className="w-3 h-3" />
                       AI helps draft language; you remain responsible for accuracy and legal sufficiency.
                     </p>
