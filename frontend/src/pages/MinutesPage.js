@@ -133,10 +133,23 @@ export default function MinutesPage() {
     return matchesType;
   });
 
+  // Handle record minutes button with read-only check
+  const handleRecordMinutes = () => {
+    if (isReadOnly) {
+      showUpgradeModal('create meeting minutes', 'button_click', 'minutes_page');
+      return;
+    }
+    navigate('/minutes/templates');
+  };
+
   return (
     <div className="main-layout" data-testid="minutes-page">
       <Sidebar />
       <main className="main-content">
+        {/* Subscription Banners */}
+        <TrialBanner location="minutes" />
+        <ReadOnlyBanner />
+        
         <div className="page-container">
           {/* Page Header */}
           <div className="flex items-start justify-between mb-8">
