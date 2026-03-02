@@ -1,10 +1,13 @@
 """
 AI Router - FastAPI endpoints for AI-powered features
 Provides minutes drafting and governance suggestions using Claude
+
+Note: Claude API key must be provided via CLAUDE_API_KEY environment variable.
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 import logging
+import os
 
 from dependencies import get_current_user, require_write_access
 from database import db
@@ -18,6 +21,7 @@ from ai_service import (
     draft_minutes_from_structured_input,
     generate_governance_suggestions
 )
+from claude_client import ping_claude, CLAUDE_API_KEY
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 logger = logging.getLogger(__name__)
