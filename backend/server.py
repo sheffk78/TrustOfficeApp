@@ -7024,6 +7024,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
 # Include router and middleware
 app.include_router(api_router)
 app.include_router(distributions_router, prefix="/api")
+app.include_router(governance_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
