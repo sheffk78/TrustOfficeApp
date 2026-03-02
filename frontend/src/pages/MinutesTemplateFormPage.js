@@ -32,7 +32,7 @@ const TEMPLATE_TITLES = {
   'bank_account_authorization': 'Open Bank Account',
   'change_of_situs': 'Change Trust Situs',
   'benevolence_approval': 'Benevolence Assistance Approval',
-  // New templates
+  // Batch 1 templates
   'investment_policy': 'Investment Policy Approval',
   'loan_authorization': 'Loan Authorization',
   'insurance_authorization': 'Insurance Authorization',
@@ -42,7 +42,18 @@ const TEMPLATE_TITLES = {
   'trustee_resignation': 'Trustee Resignation/Removal',
   'beneficiary_request_denial': 'Beneficiary Request Denial',
   'hems_distribution': 'HEMS Distribution',
-  'beneficiary_loan': 'Loan to Beneficiary'
+  'beneficiary_loan': 'Loan to Beneficiary',
+  // Batch 2 templates
+  'trust_amendment': 'Trust Amendment',
+  'power_of_attorney': 'Power of Attorney Authorization',
+  'trust_termination': 'Trust Termination/Dissolution',
+  'real_estate_purchase': 'Real Estate Purchase Authorization',
+  'business_interest_acquisition': 'Business Interest Acquisition',
+  'real_estate_lease': 'Real Estate Lease Authorization',
+  'fiscal_year_election': 'Fiscal Year Election',
+  'tax_filing_authorization': 'Tax Filing Authorization',
+  'emergency_ratification': 'Emergency Action Ratification',
+  'conflict_of_interest': 'Conflict of Interest Disclosure'
 };
 
 const ASSET_CATEGORIES = [
@@ -279,6 +290,104 @@ export default function MinutesTemplateFormPage() {
     loan_purpose: '',
     collateral_description: '',
     repayment_terms: 'monthly installments'
+  });
+
+  // ========== BATCH 2 TEMPLATE STATES ==========
+
+  // Trust amendment fields
+  const [amendmentData, setAmendmentData] = useState({
+    amendment_type: 'modification',
+    article_section: '',
+    current_provision: '',
+    amended_provision: '',
+    effective_date: 'immediately upon execution',
+    reason: ''
+  });
+
+  // Power of attorney fields
+  const [poaData, setPoaData] = useState({
+    agent_name: '',
+    scope: 'limited',
+    powers_granted: [''],
+    expiration: 'upon completion of specified purpose',
+    purpose: ''
+  });
+
+  // Trust termination fields
+  const [terminationData, setTerminationData] = useState({
+    termination_reason: '',
+    termination_date: format(new Date(), 'MMMM d, yyyy'),
+    distribution_plan: '',
+    final_accounting_date: 'within 60 days',
+    outstanding_obligations: 'None known at this time'
+  });
+
+  // Real estate purchase fields
+  const [realEstatePurchaseData, setRealEstatePurchaseData] = useState({
+    property_address: '',
+    property_type: 'residential',
+    purchase_price: '',
+    financing: 'all cash',
+    purpose: 'investment and income production',
+    inspection_period: 'standard due diligence period'
+  });
+
+  // Business interest acquisition fields
+  const [businessInterestData, setBusinessInterestData] = useState({
+    entity_name: '',
+    entity_type: 'LLC',
+    ownership_percentage: '',
+    purchase_price: '',
+    purpose: 'investment diversification',
+    due_diligence: 'financial review completed'
+  });
+
+  // Real estate lease fields
+  const [realEstateLeaseData, setRealEstateLeaseData] = useState({
+    property_address: '',
+    tenant_name: '',
+    lease_term: '',
+    monthly_rent: '',
+    security_deposit: 'equivalent to one month\'s rent',
+    permitted_use: 'residential occupancy'
+  });
+
+  // Fiscal year election fields
+  const [fiscalYearData, setFiscalYearData] = useState({
+    fiscal_year_end: 'December 31',
+    election_type: 'initial',
+    effective_year: String(new Date().getFullYear()),
+    reason: 'administrative convenience and alignment with beneficiary tax years'
+  });
+
+  // Tax filing authorization fields
+  const [taxFilingData, setTaxFilingData] = useState({
+    tax_year: String(new Date().getFullYear() - 1),
+    preparer_name: '',
+    returns_to_file: ['Form 1041 - U.S. Income Tax Return for Estates and Trusts'],
+    filing_deadline: 'April 15',
+    extension_authorized: true
+  });
+
+  // Emergency ratification fields
+  const [emergencyData, setEmergencyData] = useState({
+    action_date: format(new Date(), 'MMMM d, yyyy'),
+    emergency_type: '',
+    actions_taken: [''],
+    trustee_acting: '',
+    cost_incurred: '',
+    outcome: ''
+  });
+
+  // Conflict of interest fields
+  const [conflictData, setConflictData] = useState({
+    trustee_name: '',
+    conflict_type: 'financial_interest',
+    description: '',
+    related_transaction: '',
+    disclosure_date: format(new Date(), 'MMMM d, yyyy'),
+    waiver_granted: true,
+    conditions: 'None'
   });
 
   // General meeting resolutions
@@ -682,6 +791,114 @@ export default function MinutesTemplateFormPage() {
           loan_purpose: beneficiaryLoanData.loan_purpose,
           collateral_description: beneficiaryLoanData.collateral_description,
           repayment_terms: beneficiaryLoanData.repayment_terms
+        };
+      
+      // ========== BATCH 2 TEMPLATES ==========
+      
+      case 'trust_amendment':
+        return {
+          ...baseData,
+          amendment_type: amendmentData.amendment_type,
+          article_section: amendmentData.article_section,
+          current_provision: amendmentData.current_provision,
+          amended_provision: amendmentData.amended_provision,
+          effective_date: amendmentData.effective_date,
+          reason: amendmentData.reason
+        };
+      
+      case 'power_of_attorney':
+        return {
+          ...baseData,
+          agent_name: poaData.agent_name,
+          scope: poaData.scope,
+          powers_granted: poaData.powers_granted.filter(p => p.trim()),
+          expiration: poaData.expiration,
+          purpose: poaData.purpose
+        };
+      
+      case 'trust_termination':
+        return {
+          ...baseData,
+          termination_reason: terminationData.termination_reason,
+          termination_date: terminationData.termination_date,
+          distribution_plan: terminationData.distribution_plan,
+          final_accounting_date: terminationData.final_accounting_date,
+          outstanding_obligations: terminationData.outstanding_obligations
+        };
+      
+      case 'real_estate_purchase':
+        return {
+          ...baseData,
+          property_address: realEstatePurchaseData.property_address,
+          property_type: realEstatePurchaseData.property_type,
+          purchase_price: realEstatePurchaseData.purchase_price,
+          financing: realEstatePurchaseData.financing,
+          purpose: realEstatePurchaseData.purpose,
+          inspection_period: realEstatePurchaseData.inspection_period
+        };
+      
+      case 'business_interest_acquisition':
+        return {
+          ...baseData,
+          entity_name: businessInterestData.entity_name,
+          entity_type: businessInterestData.entity_type,
+          ownership_percentage: businessInterestData.ownership_percentage,
+          purchase_price: businessInterestData.purchase_price,
+          purpose: businessInterestData.purpose,
+          due_diligence: businessInterestData.due_diligence
+        };
+      
+      case 'real_estate_lease':
+        return {
+          ...baseData,
+          property_address: realEstateLeaseData.property_address,
+          tenant_name: realEstateLeaseData.tenant_name,
+          lease_term: realEstateLeaseData.lease_term,
+          monthly_rent: realEstateLeaseData.monthly_rent,
+          security_deposit: realEstateLeaseData.security_deposit,
+          permitted_use: realEstateLeaseData.permitted_use
+        };
+      
+      case 'fiscal_year_election':
+        return {
+          ...baseData,
+          fiscal_year_end: fiscalYearData.fiscal_year_end,
+          election_type: fiscalYearData.election_type,
+          effective_year: fiscalYearData.effective_year,
+          reason: fiscalYearData.reason
+        };
+      
+      case 'tax_filing_authorization':
+        return {
+          ...baseData,
+          tax_year: taxFilingData.tax_year,
+          preparer_name: taxFilingData.preparer_name,
+          returns_to_file: taxFilingData.returns_to_file.filter(r => r.trim()),
+          filing_deadline: taxFilingData.filing_deadline,
+          extension_authorized: taxFilingData.extension_authorized
+        };
+      
+      case 'emergency_ratification':
+        return {
+          ...baseData,
+          action_date: emergencyData.action_date,
+          emergency_type: emergencyData.emergency_type,
+          actions_taken: emergencyData.actions_taken.filter(a => a.trim()),
+          trustee_acting: emergencyData.trustee_acting,
+          cost_incurred: emergencyData.cost_incurred,
+          outcome: emergencyData.outcome
+        };
+      
+      case 'conflict_of_interest':
+        return {
+          ...baseData,
+          trustee_name: conflictData.trustee_name,
+          conflict_type: conflictData.conflict_type,
+          description: conflictData.description,
+          related_transaction: conflictData.related_transaction,
+          disclosure_date: conflictData.disclosure_date,
+          waiver_granted: conflictData.waiver_granted,
+          conditions: conflictData.conditions
         };
       
       case 'general_meeting':
@@ -2207,6 +2424,379 @@ export default function MinutesTemplateFormPage() {
                       <Label className="label-trust">Collateral (if any)</Label>
                       <Input value={beneficiaryLoanData.collateral_description} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, collateral_description: e.target.value })} className="mt-1 input-trust" placeholder="Real property, vehicle, etc." />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ========== BATCH 2 TEMPLATES ========== */}
+
+              {templateType === 'trust_amendment' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Trust Amendment Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Amendment Type</Label>
+                      <Select value={amendmentData.amendment_type} onValueChange={(v) => setAmendmentData({ ...amendmentData, amendment_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="modification">Modification of Existing Provision</SelectItem>
+                          <SelectItem value="addition">Addition of New Provision</SelectItem>
+                          <SelectItem value="deletion">Deletion of Provision</SelectItem>
+                          <SelectItem value="restatement">Full Article Restatement</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Article/Section Reference *</Label>
+                      <Input value={amendmentData.article_section} onChange={(e) => setAmendmentData({ ...amendmentData, article_section: e.target.value })} className="mt-1 input-trust" placeholder="Article III, Section 2" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Effective Date</Label>
+                      <Input value={amendmentData.effective_date} onChange={(e) => setAmendmentData({ ...amendmentData, effective_date: e.target.value })} className="mt-1 input-trust" placeholder="immediately upon execution" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Reason for Amendment</Label>
+                      <Input value={amendmentData.reason} onChange={(e) => setAmendmentData({ ...amendmentData, reason: e.target.value })} className="mt-1 input-trust" placeholder="Changed family circumstances, tax law changes, etc." />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Current Provision Language *</Label>
+                      <Textarea value={amendmentData.current_provision} onChange={(e) => setAmendmentData({ ...amendmentData, current_provision: e.target.value })} className="mt-1" placeholder="Quote the exact current language from the Trust Indenture" rows={4} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Amended Provision Language *</Label>
+                      <Textarea value={amendmentData.amended_provision} onChange={(e) => setAmendmentData({ ...amendmentData, amended_provision: e.target.value })} className="mt-1" placeholder="The new language that will replace the current provision" rows={4} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'power_of_attorney' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Power of Attorney Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Agent Name *</Label>
+                      <Input value={poaData.agent_name} onChange={(e) => setPoaData({ ...poaData, agent_name: e.target.value })} className="mt-1 input-trust" placeholder="Full legal name of agent" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Scope of Authority</Label>
+                      <Select value={poaData.scope} onValueChange={(v) => setPoaData({ ...poaData, scope: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="limited">Limited (Specific Tasks)</SelectItem>
+                          <SelectItem value="special">Special (Defined Transactions)</SelectItem>
+                          <SelectItem value="general">General (Broad Authority)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Purpose/Description *</Label>
+                      <Input value={poaData.purpose} onChange={(e) => setPoaData({ ...poaData, purpose: e.target.value })} className="mt-1 input-trust" placeholder="e.g., execute real estate closing documents, manage bank account" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Expiration</Label>
+                      <Input value={poaData.expiration} onChange={(e) => setPoaData({ ...poaData, expiration: e.target.value })} className="mt-1 input-trust" placeholder="upon completion of transaction, 90 days, etc." />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Powers Granted (one per line)</Label>
+                      <Textarea value={poaData.powers_granted.join('\n')} onChange={(e) => setPoaData({ ...poaData, powers_granted: e.target.value.split('\n') })} className="mt-1" placeholder="Execute documents on behalf of the Trust&#10;Access trust bank accounts&#10;Sign closing documents" rows={4} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'trust_termination' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Trust Termination Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Termination Date *</Label>
+                      <Input value={terminationData.termination_date} onChange={(e) => setTerminationData({ ...terminationData, termination_date: e.target.value })} className="mt-1 input-trust" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Final Accounting Due</Label>
+                      <Input value={terminationData.final_accounting_date} onChange={(e) => setTerminationData({ ...terminationData, final_accounting_date: e.target.value })} className="mt-1 input-trust" placeholder="within 60 days" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Reason for Termination *</Label>
+                      <Textarea value={terminationData.termination_reason} onChange={(e) => setTerminationData({ ...terminationData, termination_reason: e.target.value })} className="mt-1" placeholder="Trust has accomplished its purposes, all beneficiaries have received distributions, etc." rows={2} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Distribution Plan *</Label>
+                      <Textarea value={terminationData.distribution_plan} onChange={(e) => setTerminationData({ ...terminationData, distribution_plan: e.target.value })} className="mt-1" placeholder="Describe how remaining assets will be distributed to beneficiaries" rows={3} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Outstanding Obligations</Label>
+                      <Textarea value={terminationData.outstanding_obligations} onChange={(e) => setTerminationData({ ...terminationData, outstanding_obligations: e.target.value })} className="mt-1" placeholder="List any debts, taxes, or obligations to be paid before distribution" rows={2} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'real_estate_purchase' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Real Estate Purchase Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Property Address *</Label>
+                      <Input value={realEstatePurchaseData.property_address} onChange={(e) => setRealEstatePurchaseData({ ...realEstatePurchaseData, property_address: e.target.value })} className="mt-1 input-trust" placeholder="123 Main Street, City, State ZIP" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Property Type</Label>
+                      <Select value={realEstatePurchaseData.property_type} onValueChange={(v) => setRealEstatePurchaseData({ ...realEstatePurchaseData, property_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="residential">Residential</SelectItem>
+                          <SelectItem value="commercial">Commercial</SelectItem>
+                          <SelectItem value="industrial">Industrial</SelectItem>
+                          <SelectItem value="land">Vacant Land</SelectItem>
+                          <SelectItem value="mixed_use">Mixed Use</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Purchase Price *</Label>
+                      <Input value={realEstatePurchaseData.purchase_price} onChange={(e) => setRealEstatePurchaseData({ ...realEstatePurchaseData, purchase_price: e.target.value })} className="mt-1 input-trust" placeholder="$500,000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Financing Method</Label>
+                      <Select value={realEstatePurchaseData.financing} onValueChange={(v) => setRealEstatePurchaseData({ ...realEstatePurchaseData, financing: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all cash">All Cash</SelectItem>
+                          <SelectItem value="mortgage financing">Mortgage Financing</SelectItem>
+                          <SelectItem value="seller financing">Seller Financing</SelectItem>
+                          <SelectItem value="mixed">Cash + Financing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Due Diligence Period</Label>
+                      <Input value={realEstatePurchaseData.inspection_period} onChange={(e) => setRealEstatePurchaseData({ ...realEstatePurchaseData, inspection_period: e.target.value })} className="mt-1 input-trust" placeholder="30 days" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Purpose of Acquisition</Label>
+                      <Input value={realEstatePurchaseData.purpose} onChange={(e) => setRealEstatePurchaseData({ ...realEstatePurchaseData, purpose: e.target.value })} className="mt-1 input-trust" placeholder="investment and rental income, beneficiary residence, etc." />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'business_interest_acquisition' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Business Interest Acquisition Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Entity Name *</Label>
+                      <Input value={businessInterestData.entity_name} onChange={(e) => setBusinessInterestData({ ...businessInterestData, entity_name: e.target.value })} className="mt-1 input-trust" placeholder="ABC Holdings, LLC" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Entity Type</Label>
+                      <Select value={businessInterestData.entity_type} onValueChange={(v) => setBusinessInterestData({ ...businessInterestData, entity_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="LLC">LLC</SelectItem>
+                          <SelectItem value="Corporation">Corporation</SelectItem>
+                          <SelectItem value="Limited Partnership">Limited Partnership</SelectItem>
+                          <SelectItem value="General Partnership">General Partnership</SelectItem>
+                          <SelectItem value="S Corporation">S Corporation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Ownership Percentage *</Label>
+                      <Input value={businessInterestData.ownership_percentage} onChange={(e) => setBusinessInterestData({ ...businessInterestData, ownership_percentage: e.target.value })} className="mt-1 input-trust" placeholder="25%" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Purchase Price *</Label>
+                      <Input value={businessInterestData.purchase_price} onChange={(e) => setBusinessInterestData({ ...businessInterestData, purchase_price: e.target.value })} className="mt-1 input-trust" placeholder="$100,000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Investment Purpose</Label>
+                      <Input value={businessInterestData.purpose} onChange={(e) => setBusinessInterestData({ ...businessInterestData, purpose: e.target.value })} className="mt-1 input-trust" placeholder="diversification, income generation, family business" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Due Diligence Status</Label>
+                      <Input value={businessInterestData.due_diligence} onChange={(e) => setBusinessInterestData({ ...businessInterestData, due_diligence: e.target.value })} className="mt-1 input-trust" placeholder="financial review completed, legal review pending" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'real_estate_lease' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Real Estate Lease Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Property Address *</Label>
+                      <Input value={realEstateLeaseData.property_address} onChange={(e) => setRealEstateLeaseData({ ...realEstateLeaseData, property_address: e.target.value })} className="mt-1 input-trust" placeholder="123 Main Street, City, State ZIP" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Tenant Name *</Label>
+                      <Input value={realEstateLeaseData.tenant_name} onChange={(e) => setRealEstateLeaseData({ ...realEstateLeaseData, tenant_name: e.target.value })} className="mt-1 input-trust" placeholder="John Doe or ABC Company" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Lease Term *</Label>
+                      <Input value={realEstateLeaseData.lease_term} onChange={(e) => setRealEstateLeaseData({ ...realEstateLeaseData, lease_term: e.target.value })} className="mt-1 input-trust" placeholder="1 year, 3 years, month-to-month" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Monthly Rent *</Label>
+                      <Input value={realEstateLeaseData.monthly_rent} onChange={(e) => setRealEstateLeaseData({ ...realEstateLeaseData, monthly_rent: e.target.value })} className="mt-1 input-trust" placeholder="$2,500" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Security Deposit</Label>
+                      <Input value={realEstateLeaseData.security_deposit} onChange={(e) => setRealEstateLeaseData({ ...realEstateLeaseData, security_deposit: e.target.value })} className="mt-1 input-trust" placeholder="$2,500 (one month's rent)" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Permitted Use</Label>
+                      <Input value={realEstateLeaseData.permitted_use} onChange={(e) => setRealEstateLeaseData({ ...realEstateLeaseData, permitted_use: e.target.value })} className="mt-1 input-trust" placeholder="residential occupancy, retail business, office use" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'fiscal_year_election' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Fiscal Year Election Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Fiscal Year End *</Label>
+                      <Select value={fiscalYearData.fiscal_year_end} onValueChange={(v) => setFiscalYearData({ ...fiscalYearData, fiscal_year_end: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="December 31">December 31 (Calendar Year)</SelectItem>
+                          <SelectItem value="January 31">January 31</SelectItem>
+                          <SelectItem value="March 31">March 31</SelectItem>
+                          <SelectItem value="June 30">June 30</SelectItem>
+                          <SelectItem value="September 30">September 30</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Election Type</Label>
+                      <Select value={fiscalYearData.election_type} onValueChange={(v) => setFiscalYearData({ ...fiscalYearData, election_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="initial">Initial Election</SelectItem>
+                          <SelectItem value="change">Change from Prior Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Effective Tax Year *</Label>
+                      <Input value={fiscalYearData.effective_year} onChange={(e) => setFiscalYearData({ ...fiscalYearData, effective_year: e.target.value })} className="mt-1 input-trust" placeholder="2024" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Reason for Election</Label>
+                      <Input value={fiscalYearData.reason} onChange={(e) => setFiscalYearData({ ...fiscalYearData, reason: e.target.value })} className="mt-1 input-trust" placeholder="administrative convenience, alignment with beneficiary tax years, etc." />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'tax_filing_authorization' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Tax Filing Authorization Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Tax Year *</Label>
+                      <Input value={taxFilingData.tax_year} onChange={(e) => setTaxFilingData({ ...taxFilingData, tax_year: e.target.value })} className="mt-1 input-trust" placeholder="2023" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Tax Preparer/CPA *</Label>
+                      <Input value={taxFilingData.preparer_name} onChange={(e) => setTaxFilingData({ ...taxFilingData, preparer_name: e.target.value })} className="mt-1 input-trust" placeholder="Smith & Associates CPA" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Filing Deadline</Label>
+                      <Input value={taxFilingData.filing_deadline} onChange={(e) => setTaxFilingData({ ...taxFilingData, filing_deadline: e.target.value })} className="mt-1 input-trust" placeholder="April 15" />
+                    </div>
+                    <div className="flex items-center gap-2 pt-6">
+                      <Checkbox checked={taxFilingData.extension_authorized} onCheckedChange={(checked) => setTaxFilingData({ ...taxFilingData, extension_authorized: checked })} />
+                      <Label className="label-trust cursor-pointer">Extension Authorized if Needed</Label>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Returns to File (one per line)</Label>
+                      <Textarea value={taxFilingData.returns_to_file.join('\n')} onChange={(e) => setTaxFilingData({ ...taxFilingData, returns_to_file: e.target.value.split('\n') })} className="mt-1" placeholder="Form 1041 - U.S. Income Tax Return for Estates and Trusts&#10;State fiduciary income tax return&#10;Schedule K-1s for beneficiaries" rows={4} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'emergency_ratification' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Emergency Action Ratification Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Date of Emergency *</Label>
+                      <Input value={emergencyData.action_date} onChange={(e) => setEmergencyData({ ...emergencyData, action_date: e.target.value })} className="mt-1 input-trust" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Trustee Who Acted *</Label>
+                      <Input value={emergencyData.trustee_acting} onChange={(e) => setEmergencyData({ ...emergencyData, trustee_acting: e.target.value })} className="mt-1 input-trust" placeholder="John Smith" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Type of Emergency *</Label>
+                      <Input value={emergencyData.emergency_type} onChange={(e) => setEmergencyData({ ...emergencyData, emergency_type: e.target.value })} className="mt-1 input-trust" placeholder="Property damage, medical emergency, market event, etc." />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Cost Incurred</Label>
+                      <Input value={emergencyData.cost_incurred} onChange={(e) => setEmergencyData({ ...emergencyData, cost_incurred: e.target.value })} className="mt-1 input-trust" placeholder="$5,000" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Actions Taken (one per line) *</Label>
+                      <Textarea value={emergencyData.actions_taken.join('\n')} onChange={(e) => setEmergencyData({ ...emergencyData, actions_taken: e.target.value.split('\n') })} className="mt-1" placeholder="Authorized emergency repairs&#10;Contacted insurance company&#10;Secured the property" rows={4} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Outcome/Result</Label>
+                      <Input value={emergencyData.outcome} onChange={(e) => setEmergencyData({ ...emergencyData, outcome: e.target.value })} className="mt-1 input-trust" placeholder="the emergency was successfully addressed with minimal Trust loss" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {templateType === 'conflict_of_interest' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Conflict of Interest Disclosure Details</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Trustee with Conflict *</Label>
+                      <Input value={conflictData.trustee_name} onChange={(e) => setConflictData({ ...conflictData, trustee_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Type of Conflict</Label>
+                      <Select value={conflictData.conflict_type} onValueChange={(v) => setConflictData({ ...conflictData, conflict_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="financial_interest">Financial Interest</SelectItem>
+                          <SelectItem value="family_relationship">Family Relationship</SelectItem>
+                          <SelectItem value="business_relationship">Business Relationship</SelectItem>
+                          <SelectItem value="self_dealing">Self-Dealing Transaction</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Disclosure Date</Label>
+                      <Input value={conflictData.disclosure_date} onChange={(e) => setConflictData({ ...conflictData, disclosure_date: e.target.value })} className="mt-1 input-trust" />
+                    </div>
+                    <div className="flex items-center gap-2 pt-6">
+                      <Checkbox checked={conflictData.waiver_granted} onCheckedChange={(checked) => setConflictData({ ...conflictData, waiver_granted: checked })} />
+                      <Label className="label-trust cursor-pointer">Waiver Granted (Trustee may participate)</Label>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Related Transaction/Matter *</Label>
+                      <Input value={conflictData.related_transaction} onChange={(e) => setConflictData({ ...conflictData, related_transaction: e.target.value })} className="mt-1 input-trust" placeholder="Sale of property to trustee's family member" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Description of Conflict *</Label>
+                      <Textarea value={conflictData.description} onChange={(e) => setConflictData({ ...conflictData, description: e.target.value })} className="mt-1" placeholder="Describe the nature of the conflict and how it relates to the transaction" rows={3} />
+                    </div>
+                    {conflictData.waiver_granted && (
+                      <div className="md:col-span-2">
+                        <Label className="label-trust">Conditions of Waiver</Label>
+                        <Input value={conflictData.conditions} onChange={(e) => setConflictData({ ...conflictData, conditions: e.target.value })} className="mt-1 input-trust" placeholder="None, or specify conditions" />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

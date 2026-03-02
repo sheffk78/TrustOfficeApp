@@ -573,6 +573,27 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
         doc += generate_hems_distribution_content(template_data)
     elif template_type == "beneficiary_loan":
         doc += generate_beneficiary_loan_content(template_data)
+    # Batch 2 templates
+    elif template_type == "trust_amendment":
+        doc += generate_trust_amendment_content(template_data)
+    elif template_type == "power_of_attorney":
+        doc += generate_power_of_attorney_content(template_data)
+    elif template_type == "trust_termination":
+        doc += generate_trust_termination_content(template_data)
+    elif template_type == "real_estate_purchase":
+        doc += generate_real_estate_purchase_content(template_data)
+    elif template_type == "business_interest_acquisition":
+        doc += generate_business_interest_content(template_data)
+    elif template_type == "real_estate_lease":
+        doc += generate_real_estate_lease_content(template_data)
+    elif template_type == "fiscal_year_election":
+        doc += generate_fiscal_year_content(template_data)
+    elif template_type == "tax_filing_authorization":
+        doc += generate_tax_filing_content(template_data)
+    elif template_type == "emergency_ratification":
+        doc += generate_emergency_ratification_content(template_data)
+    elif template_type == "conflict_of_interest":
+        doc += generate_conflict_of_interest_content(template_data)
     
     # Add adjournment and certification
     doc += f"""
@@ -1980,6 +2001,643 @@ Effective Date: Upon execution of Promissory Note
     return content
 
 
+# ============= BATCH 2 CONTENT GENERATORS =============
+
+def generate_trust_amendment_content(data: dict) -> str:
+    """Generate content for trust amendment"""
+    amendment_type = data.get("amendment_type", "modification")
+    article_section = data.get("article_section", "Article [X], Section [Y]")
+    current_provision = data.get("current_provision", "[Current language]")
+    amended_provision = data.get("amended_provision", "[New language]")
+    effective_date = data.get("effective_date", "immediately upon execution")
+    reason = data.get("reason", "the Settlor and Trustees have determined this amendment is in the best interest of the Trust and its beneficiaries")
+    
+    content = f"""
+TRUST AMENDMENT
+
+Amendment Type: {amendment_type.replace('_', ' ').title()}
+Article/Section: {article_section}
+Effective Date: {effective_date}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS the Trust Indenture grants the power to amend certain provisions of the Trust; and
+
+WHEREAS {reason}; and
+
+WHEREAS this amendment is consistent with the purposes and intent of the Trust as originally established; and
+
+WHEREAS proper notice (if required) has been provided to all interested parties;
+
+NOW, THEREFORE, BE IT RESOLVED that {article_section} of the Trust Indenture is hereby amended as follows:
+
+───────────────────────────────────────────────────────────────────────────────
+
+CURRENT PROVISION:
+
+{current_provision}
+
+───────────────────────────────────────────────────────────────────────────────
+
+AMENDED PROVISION (Effective {effective_date}):
+
+{amended_provision}
+
+───────────────────────────────────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• This amendment shall be effective {effective_date}.
+
+• All other provisions of the Trust Indenture not specifically amended hereby shall remain in full force and effect.
+
+• This amendment shall be attached to and become part of the original Trust Indenture.
+
+• The Trustees are authorized to execute any documents necessary to effectuate this amendment.
+
+• Copies of this amendment shall be provided to all Trustees and may be provided to beneficiaries as appropriate.
+
+Vote: Unanimous approval
+Effective: {effective_date}
+
+"""
+    return content
+
+
+def generate_power_of_attorney_content(data: dict) -> str:
+    """Generate content for power of attorney authorization"""
+    agent_name = data.get("agent_name", "[Agent Name]")
+    scope = data.get("scope", "limited")
+    powers_granted = data.get("powers_granted", ["Execute documents", "Access accounts"])
+    expiration = data.get("expiration", "upon completion of specified purpose")
+    purpose = data.get("purpose", "act on behalf of the Trust in specified matters")
+    
+    powers_list = "\n".join([f"    • {power}" for power in powers_granted]) if isinstance(powers_granted, list) else f"    • {powers_granted}"
+    
+    content = f"""
+POWER OF ATTORNEY AUTHORIZATION
+
+Agent Appointed: {agent_name}
+Scope of Authority: {scope.title()}
+Expiration: {expiration}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS the Trustees require assistance in conducting certain Trust business; and
+
+WHEREAS {agent_name} is a competent and trustworthy individual capable of acting in the Trust's best interest; and
+
+WHEREAS the Trust Indenture authorizes the Trustees to appoint agents to assist in Trust administration;
+
+NOW, THEREFORE, BE IT RESOLVED that {agent_name} is hereby appointed as Agent with {scope} power of attorney to {purpose}.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+POWERS GRANTED:
+
+{powers_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+LIMITATIONS AND CONDITIONS:
+
+• This Power of Attorney is {scope} in scope and applies only to the specific powers enumerated above.
+
+• The Agent shall act in good faith and in the best interest of the Trust at all times.
+
+• The Agent shall keep accurate records of all actions taken and provide reports to the Trustees upon request.
+
+• The Agent may not delegate these powers without express written consent of the Trustees.
+
+• This Power of Attorney shall expire {expiration}.
+
+• The Trustees reserve the right to revoke this Power of Attorney at any time with or without cause.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The Agent is authorized to execute documents and take actions within the scope of authority granted herein.
+
+• Third parties may rely on this Power of Attorney until notified of its revocation.
+
+• A certified copy of these Minutes shall serve as evidence of the Agent's authority.
+
+Vote: Unanimous approval
+Effective: Immediately
+
+"""
+    return content
+
+
+def generate_trust_termination_content(data: dict) -> str:
+    """Generate content for trust termination/dissolution"""
+    termination_reason = data.get("termination_reason", "the Trust has accomplished its purposes")
+    termination_date = data.get("termination_date", "[Date]")
+    distribution_plan = data.get("distribution_plan", "pro rata to beneficiaries according to their interests")
+    final_accounting = data.get("final_accounting_date", "within 60 days")
+    outstanding_obligations = data.get("outstanding_obligations", "None known at this time")
+    
+    content = f"""
+TRUST TERMINATION AND DISSOLUTION
+
+Termination Date: {termination_date}
+Reason: {termination_reason}
+Final Distribution: {distribution_plan}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS {termination_reason}; and
+
+WHEREAS all conditions precedent to termination have been satisfied; and
+
+WHEREAS the Trustees have determined that termination is appropriate and in accordance with the Trust Indenture; and
+
+WHEREAS proper notice has been provided to all beneficiaries and interested parties;
+
+NOW, THEREFORE, BE IT RESOLVED that the Trust shall be terminated effective {termination_date}.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+FINAL ACCOUNTING:
+
+• A final accounting shall be prepared {final_accounting}.
+• The accounting shall include all assets, liabilities, income, and expenses.
+• Copies shall be provided to all beneficiaries prior to final distribution.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+OUTSTANDING OBLIGATIONS:
+
+{outstanding_obligations}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DISTRIBUTION PLAN:
+
+{distribution_plan}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• All outstanding debts and obligations shall be paid prior to any distribution to beneficiaries.
+
+• The Trustees shall liquidate assets as necessary to make final distributions.
+
+• Each beneficiary shall execute a receipt and release upon receiving their final distribution.
+
+• The Trustees shall file all required final tax returns and obtain tax clearance.
+
+• Upon completion of distributions and administrative tasks, the Trustees shall be discharged from further duty.
+
+• All Trust records shall be retained for the period required by applicable law.
+
+Vote: Unanimous approval
+Effective: {termination_date}
+
+"""
+    return content
+
+
+def generate_real_estate_purchase_content(data: dict) -> str:
+    """Generate content for real estate purchase authorization"""
+    property_address = data.get("property_address", "[Property Address]")
+    property_type = data.get("property_type", "residential")
+    purchase_price = data.get("purchase_price", "$[Amount]")
+    financing = data.get("financing", "all cash")
+    purpose = data.get("purpose", "investment and income production")
+    inspection_period = data.get("inspection_period", "standard due diligence period")
+    
+    content = f"""
+REAL ESTATE PURCHASE AUTHORIZATION
+
+Property: {property_address}
+Property Type: {property_type.title()}
+Purchase Price: {purchase_price}
+Financing: {financing}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS the Trustees have identified real property suitable for acquisition by the Trust; and
+
+WHEREAS the acquisition of this property is consistent with the Trust's investment objectives; and
+
+WHEREAS the purchase is expected to benefit the Trust through {purpose}; and
+
+WHEREAS adequate funds are available for this acquisition;
+
+NOW, THEREFORE, BE IT RESOLVED that the Trustees are authorized to acquire the following real property:
+
+PROPERTY DESCRIPTION:
+Address: {property_address}
+Type: {property_type.title()}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PURCHASE TERMS:
+
+• Purchase Price: {purchase_price}
+• Financing: {financing}
+• Due Diligence: {inspection_period}
+• Purpose: {purpose}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees are authorized to negotiate terms and execute all documents necessary to complete the purchase.
+
+• Title shall be taken in the name of the Trust.
+
+• The Trustees shall obtain title insurance, surveys, and inspections as appropriate.
+
+• The property shall be added to Schedule A upon closing.
+
+• The Trustees are authorized to take all actions necessary for property management following acquisition.
+
+• If financing is required, the Trustees are authorized to execute mortgages or deeds of trust as needed.
+
+Vote: Unanimous approval
+Authorization: Valid for 180 days
+
+"""
+    return content
+
+
+def generate_business_interest_content(data: dict) -> str:
+    """Generate content for business interest acquisition"""
+    entity_name = data.get("entity_name", "[Entity Name]")
+    entity_type = data.get("entity_type", "LLC")
+    ownership_percentage = data.get("ownership_percentage", "[X]%")
+    purchase_price = data.get("purchase_price", "$[Amount]")
+    purpose = data.get("purpose", "investment diversification")
+    due_diligence = data.get("due_diligence", "financial review completed")
+    
+    content = f"""
+BUSINESS INTEREST ACQUISITION
+
+Entity: {entity_name}
+Entity Type: {entity_type}
+Interest: {ownership_percentage} ownership
+Price: {purchase_price}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS the Trustees have identified an opportunity to acquire an interest in {entity_name}; and
+
+WHEREAS this acquisition is consistent with the Trust's investment strategy and objectives; and
+
+WHEREAS {due_diligence}; and
+
+WHEREAS the investment is expected to provide {purpose};
+
+NOW, THEREFORE, BE IT RESOLVED that the Trust is authorized to acquire {ownership_percentage} ownership interest in {entity_name}, a {entity_type}, for {purchase_price}.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ACQUISITION DETAILS:
+
+• Entity Name: {entity_name}
+• Entity Type: {entity_type}
+• Ownership Percentage: {ownership_percentage}
+• Purchase Price: {purchase_price}
+• Purpose: {purpose}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees are authorized to negotiate and execute subscription agreements, operating agreements, or other documents necessary to complete the acquisition.
+
+• The Trustees shall obtain and review all entity governing documents prior to closing.
+
+• The interest shall be recorded on Schedule A upon acquisition.
+
+• The Trustees are authorized to exercise all rights of ownership including voting, receiving distributions, and participating in management as permitted.
+
+• The Trustees shall monitor the investment and report on its performance periodically.
+
+Vote: Unanimous approval
+Authorization: Valid for 120 days
+
+"""
+    return content
+
+
+def generate_real_estate_lease_content(data: dict) -> str:
+    """Generate content for real estate lease authorization"""
+    property_address = data.get("property_address", "[Property Address]")
+    tenant_name = data.get("tenant_name", "[Tenant Name]")
+    lease_term = data.get("lease_term", "[X] years")
+    monthly_rent = data.get("monthly_rent", "$[Amount]")
+    security_deposit = data.get("security_deposit", "equivalent to one month's rent")
+    permitted_use = data.get("permitted_use", "residential occupancy")
+    
+    content = f"""
+REAL ESTATE LEASE AUTHORIZATION
+
+Property: {property_address}
+Tenant: {tenant_name}
+Term: {lease_term}
+Monthly Rent: {monthly_rent}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS the Trust owns real property located at {property_address}; and
+
+WHEREAS leasing said property will provide income for the Trust; and
+
+WHEREAS the proposed tenant has been vetted and approved by the Trustees; and
+
+WHEREAS the lease terms are fair and reasonable;
+
+NOW, THEREFORE, BE IT RESOLVED that the Trustees are authorized to enter into a lease agreement for the property.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+LEASE TERMS:
+
+• Property: {property_address}
+• Tenant: {tenant_name}
+• Term: {lease_term}
+• Monthly Rent: {monthly_rent}
+• Security Deposit: {security_deposit}
+• Permitted Use: {permitted_use}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees are authorized to execute the lease agreement and all related documents.
+
+• The lease shall contain standard provisions protecting the Trust's interests.
+
+• The Trustees shall collect and hold security deposits in compliance with applicable law.
+
+• The Trustees are authorized to enforce the lease terms and take appropriate action for any default.
+
+• Rent collected shall be deposited into the Trust operating account.
+
+• The Trustees shall maintain appropriate property insurance.
+
+Vote: Unanimous approval
+Effective: Upon lease execution
+
+"""
+    return content
+
+
+def generate_fiscal_year_content(data: dict) -> str:
+    """Generate content for fiscal year election"""
+    fiscal_year_end = data.get("fiscal_year_end", "December 31")
+    election_type = data.get("election_type", "initial")
+    effective_year = data.get("effective_year", "[Year]")
+    reason = data.get("reason", "administrative convenience and alignment with beneficiary tax years")
+    
+    content = f"""
+FISCAL YEAR ELECTION
+
+Fiscal Year End: {fiscal_year_end}
+Election Type: {election_type.replace('_', ' ').title()}
+Effective: Tax Year {effective_year}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS the Trust is required to select a fiscal year for tax reporting purposes; and
+
+WHEREAS the Trustees have considered the advantages of various fiscal year endings; and
+
+WHEREAS a {fiscal_year_end} fiscal year end is appropriate for {reason};
+
+NOW, THEREFORE, BE IT RESOLVED that the Trust adopts a fiscal year ending {fiscal_year_end}, effective for the {effective_year} tax year and all subsequent years until changed.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ELECTION DETAILS:
+
+• Fiscal Year End: {fiscal_year_end}
+• Election Type: {election_type.replace('_', ' ').title()}
+• First Applicable Year: {effective_year}
+• Reason: {reason}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The Trust's tax preparer is authorized to make any required filings with the IRS to effectuate this election.
+
+• The Trust's books and records shall be maintained on a fiscal year basis consistent with this election.
+
+• All required estimated tax payments shall be made based on this fiscal year.
+
+• This election shall remain in effect until formally changed by resolution of the Trustees.
+
+Vote: Unanimous approval
+Effective: Tax Year {effective_year}
+
+"""
+    return content
+
+
+def generate_tax_filing_content(data: dict) -> str:
+    """Generate content for tax filing authorization"""
+    tax_year = data.get("tax_year", "[Year]")
+    preparer_name = data.get("preparer_name", "[Tax Preparer/CPA]")
+    returns_to_file = data.get("returns_to_file", ["Form 1041 - U.S. Income Tax Return for Estates and Trusts"])
+    filing_deadline = data.get("filing_deadline", "April 15")
+    extension_authorized = data.get("extension_authorized", True)
+    
+    returns_list = "\n".join([f"    • {ret}" for ret in returns_to_file]) if isinstance(returns_to_file, list) else f"    • {returns_to_file}"
+    
+    content = f"""
+TAX FILING AUTHORIZATION
+
+Tax Year: {tax_year}
+Tax Preparer: {preparer_name}
+Filing Deadline: {filing_deadline}
+Extension Authorized: {"Yes" if extension_authorized else "No"}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS the Trust is required to file income tax returns for the {tax_year} tax year; and
+
+WHEREAS {preparer_name} has been engaged to prepare the Trust's tax returns; and
+
+WHEREAS the Trustees have reviewed and approved the information to be used in the returns;
+
+NOW, THEREFORE, BE IT RESOLVED that the Trustees authorize the preparation and filing of the following tax returns:
+
+{returns_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+AUTHORIZATIONS:
+
+• {preparer_name} is authorized to prepare all required federal, state, and local tax returns for the Trust.
+
+• The Trustees authorize electronic filing of all returns where permitted.
+
+• {"An automatic extension may be filed if additional time is needed to complete the returns." if extension_authorized else "No extension is authorized; returns must be filed by the original deadline."}
+
+• The Trustees authorize payment of any taxes due from Trust funds.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees shall review and approve the returns prior to filing.
+
+• Copies of all filed returns shall be maintained in the Trust records.
+
+• K-1 schedules shall be provided to beneficiaries as required.
+
+• The tax preparer is authorized to respond to routine IRS inquiries regarding the returns.
+
+Vote: Unanimous approval
+Tax Year: {tax_year}
+
+"""
+    return content
+
+
+def generate_emergency_ratification_content(data: dict) -> str:
+    """Generate content for emergency action ratification"""
+    action_date = data.get("action_date", "[Date]")
+    emergency_type = data.get("emergency_type", "[Type of Emergency]")
+    actions_taken = data.get("actions_taken", ["Action 1", "Action 2"])
+    trustee_acting = data.get("trustee_acting", "[Trustee Name]")
+    cost_incurred = data.get("cost_incurred", "$[Amount]")
+    outcome = data.get("outcome", "the emergency was successfully addressed")
+    
+    actions_list = "\n".join([f"    • {action}" for action in actions_taken]) if isinstance(actions_taken, list) else f"    • {actions_taken}"
+    
+    content = f"""
+EMERGENCY ACTION RATIFICATION
+
+Emergency Date: {action_date}
+Emergency Type: {emergency_type}
+Trustee Acting: {trustee_acting}
+Cost Incurred: {cost_incurred}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS on {action_date}, an emergency situation arose involving {emergency_type}; and
+
+WHEREAS immediate action was required to protect Trust assets and/or beneficiaries; and
+
+WHEREAS {trustee_acting} took prompt action to address the emergency; and
+
+WHEREAS {outcome}; and
+
+WHEREAS it was not possible to convene a formal Trustee meeting prior to taking action;
+
+NOW, THEREFORE, BE IT RESOLVED that the following emergency actions taken on {action_date} are hereby ratified and confirmed:
+
+{actions_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+EMERGENCY DETAILS:
+
+• Date of Emergency: {action_date}
+• Type: {emergency_type}
+• Trustee Acting: {trustee_acting}
+• Cost Incurred: {cost_incurred}
+• Outcome: {outcome}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The actions taken were reasonable and necessary under the circumstances.
+
+• The Trustee acted in good faith and in the best interest of the Trust.
+
+• All costs incurred ({cost_incurred}) are approved as proper Trust expenses.
+
+• The Trustee is indemnified for all actions taken in connection with this emergency.
+
+• This ratification shall serve as full authorization for the actions taken.
+
+• Documentation of the emergency and actions taken shall be maintained in Trust records.
+
+Vote: Unanimous approval
+Effective: Retroactive to {action_date}
+
+"""
+    return content
+
+
+def generate_conflict_of_interest_content(data: dict) -> str:
+    """Generate content for conflict of interest disclosure"""
+    trustee_name = data.get("trustee_name", "[Trustee Name]")
+    conflict_type = data.get("conflict_type", "financial interest")
+    description = data.get("description", "[Description of the conflict]")
+    related_transaction = data.get("related_transaction", "[Related transaction or matter]")
+    disclosure_date = data.get("disclosure_date", "[Date]")
+    waiver_granted = data.get("waiver_granted", True)
+    conditions = data.get("conditions", "None")
+    
+    content = f"""
+CONFLICT OF INTEREST DISCLOSURE AND WAIVER
+
+Trustee: {trustee_name}
+Conflict Type: {conflict_type.replace('_', ' ').title()}
+Related Matter: {related_transaction}
+Waiver: {"Granted" if waiver_granted else "Denied"}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHEREAS {trustee_name} has disclosed a potential conflict of interest regarding {related_transaction}; and
+
+WHEREAS the nature of the conflict is {conflict_type}: {description}; and
+
+WHEREAS the disclosure was made on {disclosure_date} in compliance with the Trustee's fiduciary duties; and
+
+WHEREAS the remaining Trustees have considered the disclosure and its implications;
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DISCLOSURE DETAILS:
+
+• Trustee with Conflict: {trustee_name}
+• Type of Conflict: {conflict_type.replace('_', ' ').title()}
+• Description: {description}
+• Related Transaction: {related_transaction}
+• Date of Disclosure: {disclosure_date}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The disclosure by {trustee_name} is hereby acknowledged and accepted.
+
+• {"The conflict is hereby WAIVED, and the Trustee is authorized to participate in deliberations and voting on the related matter." if waiver_granted else "The conflict is NOT waived, and the Trustee shall RECUSE from all deliberations and voting on the related matter."}
+
+{"• Conditions of waiver: " + conditions if waiver_granted and conditions != "None" else ""}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• This disclosure and resolution shall be documented in the Trust records.
+
+• {trustee_name} shall provide additional disclosures if circumstances change.
+
+• Future similar conflicts shall require separate disclosure and consideration.
+
+• The remaining Trustees have determined that {"proceeding with waiver" if waiver_granted else "requiring recusal"} is in the best interest of the Trust.
+
+Vote: {"Unanimous approval (excluding conflicted Trustee)" if not waiver_granted else "Unanimous approval"}
+Effective: Immediately
+
+"""
+    return content
+
+
 @router.post("/minutes-templates")
 async def create_minutes_from_template(template: MinutesTemplateCreate, user: dict = Depends(require_write_access)):
     """Create minutes from a template"""
@@ -2369,6 +3027,80 @@ async def get_template_options(trust_id: Optional[str] = None, user: dict = Depe
             "icon": "heart-handshake",
             "category": "benevolence",
             "requires_benevolence": True
+        },
+        # Legal/Amendment templates
+        {
+            "type": "trust_amendment",
+            "name": "Trust Amendment",
+            "description": "Modify specific provisions of the trust instrument",
+            "icon": "file-edit",
+            "category": "legal"
+        },
+        {
+            "type": "power_of_attorney",
+            "name": "Power of Attorney",
+            "description": "Grant limited power of attorney to a trustee or agent",
+            "icon": "stamp",
+            "category": "legal"
+        },
+        {
+            "type": "trust_termination",
+            "name": "Trust Termination",
+            "description": "Document trust dissolution and final distribution",
+            "icon": "file-x",
+            "category": "legal"
+        },
+        # Asset Management templates
+        {
+            "type": "real_estate_purchase",
+            "name": "Real Estate Purchase",
+            "description": "Authorize acquisition of real property for the trust",
+            "icon": "home",
+            "category": "assets"
+        },
+        {
+            "type": "business_interest_acquisition",
+            "name": "Business Interest Acquisition",
+            "description": "Authorize purchase of LLC, partnership, or corporate interest",
+            "icon": "building-2",
+            "category": "assets"
+        },
+        {
+            "type": "real_estate_lease",
+            "name": "Real Estate Lease",
+            "description": "Authorize leasing of trust real property to third parties",
+            "icon": "key",
+            "category": "assets"
+        },
+        # Tax & Compliance templates
+        {
+            "type": "fiscal_year_election",
+            "name": "Fiscal Year Election",
+            "description": "Document the trust's fiscal year choice for tax purposes",
+            "icon": "calendar-range",
+            "category": "administrative"
+        },
+        {
+            "type": "tax_filing_authorization",
+            "name": "Tax Filing Authorization",
+            "description": "Authorize preparation and filing of trust tax returns",
+            "icon": "receipt",
+            "category": "administrative"
+        },
+        # Special Situation templates
+        {
+            "type": "emergency_ratification",
+            "name": "Emergency Action Ratification",
+            "description": "Ratify trustee actions taken during an emergency",
+            "icon": "alert-triangle",
+            "category": "governance"
+        },
+        {
+            "type": "conflict_of_interest",
+            "name": "Conflict of Interest Disclosure",
+            "description": "Document trustee's disclosure and waiver of conflict",
+            "icon": "scale",
+            "category": "governance"
         }
     ]
     
