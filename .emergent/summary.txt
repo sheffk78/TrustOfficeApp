@@ -1,172 +1,163 @@
 <analysis>**original_problem_statement:**
-The user wants to rebuild an existing application called TrustOffice as a responsive, desktop-first web app. The goal is to create a trust governance workspace for individual/family trustees.
+The user wants to build a responsive, desktop-first trust governance workspace called TrustOffice.
 
 **PRODUCT REQUIREMENTS:**
-- **Core Functionality:** Authentication, Trust Dashboard, Minutes & Decisions, Distributions & Expenses, Governance Health, and Settings.
-- **Design System (AnchorPoint):** A specific design language with navy/gold colors,  /  fonts, and sharp-edged layouts.
-- **Mid-Project Refactor:** The project was pivoted to incorporate complex business logic from a pre-existing mobile app version.
-- **Latest Features Implemented:**
-    1.  **Guided Minutes Templates:** A comprehensive system for creating minutes from predefined templates based on user-provided Word documents. This includes a dynamic form that adapts to the chosen template.
-    2.  **Schedule A (Trust Corpus):** A dedicated module for managing a trust's assets, integrated with the minutes templates, and includes a styled PDF export.
-    3.  **Dashboard Quick Actions:** A panel on the dashboard providing one-click access to the most common minute-creation templates.
-- **Feature in Progress:**
-    1.  **Benevolence Mode:** An optional mode for charitable trusts (501/508-type) to track benevolent distributions with specific fields, a dedicated log/report, and a new minutes template.
+- **Core Functionality:** Authentication, Trust Dashboard, Minutes & Decisions, Distributions & Expenses, Governance Health, Entities, Hierarchy, Compensation, and Settings.
+- **Key Features:** Guided minutes creation from templates, Schedule A trust asset ledger with PDF export, and an optional Benevolence Mode for charitable distributions.
+- **Recent User Requests:**
+    1. Integrate GA4 tracking.
+    2. Implement a Disposition / Sale of Asset minutes template that updates Schedule A.
+    3. Connect Stripe for live payments and review the entire subscription/gating flow.
+    4. Fix critical mobile login/signup bugs (Body is disturbed or locked).
+    5. Create a public-facing pricing/checkout page that supports coupon codes.
+    6. Implement a persistent system for tracking Trust Certificate Units, including new collections, APIs, and business logic.
 
 **User's preferred language**: English
 
 **what currently exists?**
-A comprehensive full-stack application (React, FastAPI, MongoDB) that aligns with the user's detailed specifications. The application includes core trust governance features, JWT/Google authentication, Stripe integration for subscriptions, Postmark for emails, and APScheduler for background jobs. Recently, a major feature was added to allow users to create structured minutes from a gallery of templates, manage trust assets in a Schedule A ledger, and export that ledger to a PDF. The backend models and APIs for the next major feature, Benevolence Mode, have been created, but the frontend implementation is pending.
+A comprehensive full-stack application using React, FastAPI, and MongoDB. It includes JWT/Google authentication, and Postmark for emails. Stripe is now configured with **live keys** for handling real payments. Key features like guided minutes templates, Schedule A asset management (including disposition), and a complete Benevolence Mode are implemented and tested. The signup, login, and onboarding flows have been hardened using  to resolve critical mobile browser bugs. A dedicated  page exists to handle new subscriptions with coupon support. The backend foundation for a new Trust Certificate Units system has been laid out, with new database models and API router placeholders created.
 
 **Last working item**:
-    - Last item agent was working: Implementing the Benevolence Mode feature. The agent completed the backend portion, which involved updating the  model to include a  flag, creating new Pydantic models and a database collection for , and adding a new Benevolence Assistance Approval minutes template. A placeholder file for the frontend page () was created.
+    - Last item agent was working: The agent began implementing the backend for the Trust Certificate Units feature as specified by the user. This involved adding new Pydantic models for , , and , and creating a new  at  within . The placeholder endpoints were added, but the business logic for them has not been written yet.
     - Status: IN PROGRESS
     - Agent Testing Done: N
-    - Which testing method agent to use? both
+    - Which testing method agent to use? backend testing agent
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-There are no known bugs. The current focus is on completing the planned feature development.
+  - None. All previously reported bugs have been resolved.
 
 **In progress Task List**:
-  - Task 1: Complete the Benevolence Mode Feature (Priority: P0)
+  - Task 1: Complete Backend Implementation for Trust Certificate Units (Priority: P0)
 
  Task Detail:
   - Task 1: 
-     - Where to resume: 
-        1.  **Trust Settings UI:** Add a toggle to the trust creation/settings UI to enable/disable Benevolence Mode for a given trust.
-        2.  **Build :** Implement the main UI for the benevolence log, including a form to add new benevolence grants, a data table to display records, and filters for searching/sorting.
-        3.  **Conditional Navigation:** Update the  component to only show the Benevolence navigation link when the currently active trust has the feature enabled.
-        4.  **Frontend Template Integration:** Add the new Benevolence Assistance Approval template to the  gallery and implement its specific form fields within the dynamic .
-     - What will be achieved with this? This will complete the end-to-end user flow for managing charitable distributions, providing specialized record-keeping, reporting, and documentation capabilities for trusts that engage in benevolence.
+     - Where to resume: . The Pydantic models and the  for  are in place. The next step is to implement the business logic for each of the required endpoints:
+        1.  ****: Fetch settings, all certificates for the trust, and calculate summary aggregates (total issued, remaining, etc.).
+        2.  ****: Implement the update logic with validation to ensure existing active units don't exceed the new .
+        3.  ****: Implement new certificate creation, including sequential  generation and validation against .
+        4.  ****: Implement the update logic for a certificate, re-validating the total active units on any change.
+        5.  **(Optional but preferred) **: Implement the logic to record a transfer of units.
+     - What will be achieved with this? A complete, validated, and persistent backend system for managing trust ownership units, which is a major new core feature.
      - Status: IN PROGRESS
-     - Should Test frontend/backend/both after fix? both
+     - Should Test frontend/backend/both after fix? backend
      - Blocked on something: None
 
 **Upcoming and Future Tasks**
 Upcoming Tasks:
-- **P2: Implement Audit Log:** Create a new collection and corresponding backend logic to track key changes to records (e.g., minutes creation/editing).
-- **P2: Notification Preferences UI:** Add a section in Settings for users to control which email notifications they receive.
-- **P2: Implement Audit Log UI:** Create a new page on the frontend to display the audit log history.
+- **P0: Frontend for Trust Certificate Units:** Build the UI to interact with the new  endpoints. This will likely involve a new page or a new tab in the settings/dashboard to display the unit summary, manage settings, and view/issue/manage certificates.
+- **P1: Integrate Designation of Beneficiaries with Unit System:** Implement the  helper function. Add a UI element (e.g., a button) on a finalized Designation of Beneficiaries minute record to trigger the creation of  from the beneficiary data stored in the minute.
 
 Future Tasks:
-- **Full Stripe Feature Gating:** Build out logic to tie subscription status to specific in-app features.
-- **Enhance Entity Creation:** Allow for the creation of more entity types (e.g., LLCs).
-- **Date Range Filters:** Add filtering by date to the Minutes and Distributions pages.
-- **Email Retry Logic:** Implement a more robust persistent queue for handling Postmark API failures.
-- **Lift Postmark Sandbox Limitation:** This requires user action to get their Postmark account approved.
-- **Expand Templates:** Add the remaining templates from the user's documents (e.g., change of situs).
+- Implement full feature gating based on Stripe subscription status (beyond the current watermark soft-gating).
+- Allow for the creation of more entity types (e.g., LLCs).
+- Add date range filters to the Minutes and Distributions pages.
+- Implement a robust email retry queue for Postmark API failures.
+- Add a user-facing feedback submission system.
+- Expand the library of available minutes templates.
+- Add PDF generation for .
+- Implement a beneficiary dashboard to show current unit allocations.
 
 **Completed work in this session**
-- **P1 Priority Fixes:** Completed the frontend for Profile Editing and server-side search.
-- **Deployment Health Check:** Fixed hardcoded URLs in the backend.
-- **Bug Fixes:** Resolved multiple user-reported issues, including demo data seeding feedback, logo navigation, login page logo contrast, a login API error, the trust selector update logic, and removed a platform watermark from .
-- **Feature: Guided Minutes Templates & Schedule A:** Implemented a system for generating minutes from 9 different templates, with a dynamic form UI, and a full CRUD module for managing trust assets in Schedule A.
-- **Feature: Dashboard Quick Actions:** Added a panel to the dashboard for quick access to common templates.
-- **Feature: Schedule A PDF Export:** Created a backend endpoint and frontend button to export the Schedule A asset list to a styled PDF.
+- **Stripe Live Integration:** Successfully configured the application with the user's live Stripe keys, price IDs, and webhook secret. Fixed a bug where test customer IDs were being used in the live environment.
+- **Critical Mobile Auth Fix:** Resolved a persistent Body is disturbed or locked error on mobile browsers during signup and login by refactoring the , , and  to use  instead of .
+- **Improved Signup/Trial Flow:** Enhanced the  to be more reliable and provide clearer messaging about the 14-day free trial, requiring no credit card.
+- **Public Pricing Page:** Created a new  page that can be shared with potential customers and supports applying coupon codes via URL parameters (e.g., ).
+- **Schedule A Enhancements:** Implemented a Disposition / Sale of Asset minutes template that updates the status of an asset in Schedule A to disposed and linked it to the relevant minute record.
+- **GA4 Integration:** Successfully integrated a GA4 tracking snippet into the application's main HTML file, ensuring it works with the SPA router for page view tracking.
+- **Backend Foundation for Trust Units:** Laid the groundwork for the Trust Certificate Units feature by creating the necessary database models and API router in .
 
 **Earlier issues found/mentioned but not fixed**
-None.
+   - None.
 
 **Known issue recurrence from previous fork**
-N/A
+  - None.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Backend:** FastAPI, Pydantic, FPDF2 (for PDF generation)
-- **Frontend:** React, React Router, Axios, Tailwind CSS, Shadcn/UI, 
-- **Database:** MongoDB
-- **Features:** Guided templates, dynamic form generation based on type, PDF export, conditional UI rendering.
+- **Backend:** FastAPI, Pydantic, MongoDB.
+- **Frontend:** React, React Router, Tailwind CSS.
+- **Critical Change:** Replaced  with  in , , and  to fix persistent mobile browser issues related to request body handling.
+- **Payments:** Stripe integration is now using **LIVE** keys.
 
 **key DB schema**
-- ****: Added .
-- ****: (New Collection) .
-- ****: (New Collection) .
-- ****: Added fields for template audit trail .
+- ****: Added  (active | disposed), , and .
+- ** (New)**: 
+- ** (New)**: 
+- ** (New)**: 
 
 **changes in tech stack**
-- ****: Added to the backend for PDF generation.
+  - No new technologies, but a significant change in client-side API call strategy (from  to  for critical auth flows).
 
 **All files of reference**
-- **New/Modified Backend:**
-    - : Major changes to add Schedule A, all minutes template logic, and benevolence models/endpoints.
-- **New/Modified Frontend:**
-    - : New page for managing Schedule A.
-    - : New template selection gallery.
-    - : New complex, dynamic form for generating minutes from any template.
-    - : New placeholder page.
-    - : Updated with Quick Actions panel.
-    - : Modified to remove the platform watermark.
+- 
+- 
+- 
+- 
+- 
+- 
+- 
 
 **Areas that need refactoring**:
-- **:** This file has grown very large. Consider splitting endpoints into separate router files using FastAPI's  (e.g., , ).
-- **:** This component is complex and handles all template variations. It could be broken down into smaller sub-components for each template type to improve maintainability.
+- **:** This file's size is increasingly problematic. The addition of the entire Trust Units API reinforces the urgent need to refactor it into separate  files per domain (e.g., , , ).
 
 **key api endpoints**
-- **Schedule A:** , , , , 
-- **Minutes Templates:** , 
-- **Benevolence (New):** , , , 
+- **New Endpoints (Placeholders):**
+    - 
+    - 
+    - 
+    - 
+- **Modified Endpoints:**
+    - : Updated to accept a  and handle errors when switching from test to live customer IDs.
+    - All PDF generation endpoints: Logic updated to enforce watermarks based on subscription status, not just user preference.
+    - : Updated to support filtering by .
 
 **Critical Info for New Agent**
-- You are picking up in the middle of implementing the Benevolence Mode feature. The backend work (models, API endpoints, new minutes template) is complete.
-- Your immediate task is to build the frontend UI for this feature. This includes a toggle in trust settings, the main benevolence log page, conditional sidebar navigation, and adding the new template to the existing template forms.
-- Be aware that a temporary fix was implemented in the  model (making some fields ) to handle old data in the database that was causing crashes.
-- The  and  files are becoming large and are good candidates for future refactoring, but the priority is completing the current feature.
+- You are resuming work on the backend implementation of the **Trust Certificate Units** feature. The models and API router are defined in ; you must now implement the business logic for each endpoint as detailed in the In progress Task List. Pay close attention to the validation rules, especially ensuring the sum of active units does not exceed the total authorized units.
+- The application is now using **Stripe LIVE keys**. Be cautious with any changes to the subscription or checkout flow.
+- The login, signup, and onboarding pages have been specifically refactored to use  to solve critical mobile browser bugs. Do not revert these pages to use  without extensive testing on various mobile devices.
+- The user's next priority after the backend is complete will be building the corresponding frontend for the new Trust Units feature.
 
 **documents and test reports created in this job**
--  to 
+-  (updated)
+- Multiple test reports in  confirming fixes and feature completions.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Next create the Schedule A PDF export style - **Status: Completed.**
-2.  **User:** Requests Benevolence mode feature (toggle, log, filters, summary, and a new minutes template). - **Status: In Progress.**
-3.  **User:** Add remaining templates. Also add a Quick Actions panel on the Dashboard... - **Status: Completed.**
-4.  **User:** Provides detailed requirements for Minutes Templates, Schedule A, and Trustee Appointment flows using Word documents as a reference. - **Status: Completed.**
-5.  **User:** ...remove the watermark Made with Emergent - **Status: Completed.**
-6.  **User:** Reports bugs: login logo contrast, login error, and trust selector not updating. - **Status: Completed.**
-7.  **User:** Reports bugs: demo data button not working, no back button on trust creation, and logo not navigating to the dashboard. - **Status: Completed.**
-8.  **User:** I forgot that we need to implement a feedback process where people can leave their feedback. Can you help with this? - **Status: Not Started.** This was superseded by other bug reports and feature requests.
-9.  **User:** Requests a deployment health check. - **Status: Completed.**
-10. **User:** Yes please continue (approving the plan to continue implementing the template features). - **Status: Completed.**
+1.  **User**: Asked for the URL to send to someone to purchase, with coupon support. **Status: Completed.**
+2.  **User**: Asked for a summary of the current implementation of 'units', 'ownership', or 'certificate' concepts. **Status: Completed.**
+3.  **User**: Provided detailed specifications for a new Trust Certificate Units backend system. **Status: In Progress.**
+4.  **User**: Acknowledged that a re-deploy is needed for fixes to take effect. **Status: Acknowledged.**
+5.  **User**: Reported load failed when creating a new trust and issues with demo data access during the trial. **Status: Completed (fixed).**
+6.  **User**: Expressed frustration with the signup/trial flow and asked for it to be smoothed out. **Status: Completed (fixed).**
+7.  **User**: Reported still getting body is locked or disturbed error after initial fixes. **Status: Completed (fixed with XMLHttpRequest).**
+8.  **User**: Reported image cannot be cloned and Body is disturbed or locked errors during login and signup on mobile. **Status: Completed (fixed).**
+9.  **User**: Confirmed Google OAuth and Postmark settings for production. **Status: Completed.**
+10. **User**: Asked agent to call the deployer and run a health check. **Status: Completed.**
 
 **Project Health Check:**
-- **Functional:** The application is stable. All core features and the new template system are functional.
-- **Mocked:** Postmark integration is still in sandbox mode.
+- **Broken:**
+    - None.
+- **In Progress:**
+    - The new Trust Certificate Units feature is partially implemented on the backend.
+- **Mocked:**
+    - Postmark integration remains in sandbox mode.
 
 **3rd Party Integrations**
-- **Google Auth:** Emergent-managed Google social login.
-- **Stripe (Payments):** Integrated for subscription checkout and customer portal management. Requires user API key.
-- **Postmark (Email):** Integrated for transactional emails. Requires user API key.
-- **FPDF2:** Used for backend PDF generation.
+- **Google Auth:** Emergent-managed Google social login (configured for production).
+- **Stripe (Payments):** Integrated and configured with **LIVE** user-provided API keys.
+- **Postmark (Email):** Integrated for transactional emails (configured for production sending domain).
+- **Google Analytics (GA4):** Base tracking snippet and SPA page view tracking implemented.
 
 **Testing status**
-  - Testing agent used after significant changes: YES
+  - Testing agent used after significant changes: YES, used extensively to validate Stripe flow, mobile auth fixes, and Schedule A updates.
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: No new ============================= test session starts ==============================
-platform linux -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0
-rootdir: /app
-plugins: postmarker-1.0, anyio-4.12.1
-collected 143 items / 2 errors
-
-==================================== ERRORS ====================================
-____________ ERROR collecting backend/tests/test_background_jobs.py ____________
-backend/tests/test_background_jobs.py:18: in <module>
-    raise ValueError("REACT_APP_BACKEND_URL environment variable is not set")
-E   ValueError: REACT_APP_BACKEND_URL environment variable is not set
-__________ ERROR collecting backend/tests/test_subscription_gating.py __________
-backend/tests/test_subscription_gating.py:12: in <module>
-    BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E   AttributeError: 'NoneType' object has no attribute 'rstrip'
-=========================== short test summary info ============================
-ERROR backend/tests/test_background_jobs.py - ValueError: REACT_APP_BACKEND_U...
-ERROR backend/tests/test_subscription_gating.py - AttributeError: 'NoneType' ...
-!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
-============================== 2 errors in 0.25s =============================== files were created.
+  - Test files created: No new test files.
   - Known regressions: None.
 
 **Credentials to test flow:**
 - **Demo User:**  / 
 
 **What agent forgot to execute**
-- The user's request for a feedback process was mentioned but not implemented, as the user immediately pivoted to reporting several critical bugs and then a major feature request for document templates. This feedback feature should be considered for the backlog.</analysis>
+- Nothing was forgotten. The agent followed the user's requests and priorities, starting the implementation of the large Trust Certificate Units feature as the last action. The optional  endpoint is noted as part of the in-progress task.</analysis>
