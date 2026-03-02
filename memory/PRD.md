@@ -18,11 +18,11 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 The backend now has a modular structure for better maintainability:
 ```
 /app/backend/
-├── server.py           # Main FastAPI app (3907 lines, down from 7538 - 48% reduction)
+├── server.py           # Main FastAPI app (2899 lines, down from 7538 - 61.5% reduction)
 ├── database.py         # MongoDB connection singleton
 ├── models.py           # All Pydantic models and enums (~778 lines)
 ├── dependencies.py     # Shared auth, helpers, feature gating functions
-├── routers/            # Domain-specific router modules
+├── routers/            # Domain-specific router modules (9 migrated)
 │   ├── auth.py         # Auth endpoints (already extracted)
 │   ├── distributions.py # Distribution + benevolence log endpoints (MIGRATED)
 │   ├── governance.py    # Governance health/history/insights (MIGRATED)
@@ -32,10 +32,10 @@ The backend now has a modular structure for better maintainability:
 │   ├── subscriptions.py # Stripe payments + webhooks (MIGRATED Dec 30)
 │   ├── benevolence.py   # Benevolence CRUD + summary + PDF (MIGRATED Dec 30)
 │   ├── exports.py       # CSV exports (premium feature) (MIGRATED Dec 30)
+│   ├── trust_units.py   # Trust units certificates + transfers (MIGRATED Dec 30)
 │   ├── trusts.py        # Trust CRUD (pending migration)
 │   ├── entities.py      # Entity management (pending migration)
-│   ├── tasks.py         # Governance tasks (pending migration)
-│   └── units.py         # Trust certificate units (pending migration)
+│   └── tasks.py         # Governance tasks (pending migration)
 ├── email_service.py    # Postmark email integration
 ├── email_templates.py  # Email template content
 └── background_tasks.py # APScheduler background jobs
@@ -50,6 +50,7 @@ The backend now has a modular structure for better maintainability:
 - subscriptions.py: 21,000 bytes - Stripe checkout, portal, webhooks
 - benevolence.py: 510 lines - Benevolence CRUD + summary + PDF export
 - exports.py: 167 lines - CSV exports (minutes, distributions, compensation, tasks)
+- trust_units.py: 994 lines - Certificates, transfers, PDF, bootstrap-from-minutes
 
 ### Design System (AnchorPoint)
 - Light: Navy #010079, Gold #D5AD36
