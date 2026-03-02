@@ -57,45 +57,44 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - AI INTEGRATION COMPLETE ✅
+### Latest Updates (Mar 2, 2026) - AI INTEGRATION REFINED & FINALIZED ✅
 
-**Session Summary:** Completed full AI integration - backend Claude API + frontend UI components.
+**Session Summary:** Refined and finalized Claude AI integration with proper model names, env var handling, and health check endpoint.
 
-**Backend - Claude Integration (`/backend/claude_client.py` & `/backend/ai_service.py`):**
-- Wrapper for Claude API using `emergentintegrations` library
-- Uses EMERGENT_LLM_KEY environment variable
-- Two model configurations:
-  - Claude Sonnet (claude-sonnet-4-5-20250929) for complex drafting
-  - Claude Haiku (claude-haiku-4-5) for quick suggestions
-- `draft_minutes_from_structured_input()` - Generates formal WHEREAS/RESOLVED minutes
-- `generate_governance_suggestions()` - Analyzes health score and provides recommendations
+**Backend - Claude Integration (`/backend/claude_client.py`):**
+- API key read from `CLAUDE_API_KEY` or fallback to `EMERGENT_LLM_KEY` (Emergent platform default)
+- Clear error logging if neither env var is set
+- Returns HTTP 500 with safe message "AI service not configured" when key is missing
+- Model names (note: claude-3.5-* not supported by emergentintegrations):
+  - `claude-sonnet-4-5` for complex drafting tasks
+  - `claude-haiku-4-5` for quick suggestions
+- Added `ping_claude()` function for health checks
 
 **API Endpoints (`/backend/routers/ai.py`):**
 - `GET /api/ai/status` - Check AI service status and available features
-- `POST /api/ai/minutes-draft` - Generate AI-drafted meeting minutes
-- `POST /api/ai/governance-suggestions` - Get actionable improvement suggestions
+- `POST /api/ai/minutes-draft` - Generate AI-drafted meeting minutes (uses claude-sonnet-4-5)
+- `POST /api/ai/governance-suggestions` - Get actionable suggestions (uses claude-haiku-4-5)
+- `GET /api/ai/health` - NEW: Health check endpoint that:
+  - Performs a ping to claude-haiku-4-5 with trivial prompt "Reply with the word PONG"
+  - Returns `{"ok": true}` on success
+  - Returns `{"ok": false, "error": "..."}` on failure (no Claude error details exposed)
 
-**Frontend - Dashboard AI Recommendations Card (`/frontend/src/pages/DashboardPage.js`):**
-- Lines 474-556: AI Suggestions Card component
-- Loading state with spinner ("Generating suggestions...")
-- Displays 2-4 AI suggestions with title, description, points badge, "GO" action button
-- Refresh button to regenerate suggestions
-- Error state with retry option
-- "No suggestions" state when governance is healthy
-- AI attribution text: "AI-generated suggestions. You decide which actions to take."
+**Frontend UI Hooks Verified:**
+- **Minutes page** (`NewMinutesPage.js`):
+  - `handleDraftWithAI()` (line 88) calls `POST /api/ai/minutes-draft`
+  - Button `data-testid="draft-with-ai-btn"` triggers the handler
+  - Response parsed into AI Draft modal with suggested_title, draft_body, cautions
+- **Dashboard page** (`DashboardPage.js`):
+  - `loadAiSuggestions()` (line 130) calls `POST /api/ai/governance-suggestions`
+  - Called on mount when trust is selected (line 103)
+  - Suggestions rendered in "AI Recommendations" card (lines 515-517)
 
-**Frontend - Minutes AI Drafting (`/frontend/src/pages/NewMinutesPage.js`):**
-- Lines 366-385: "Draft with AI" button on Step 4 (What was decided?)
-- Lines 88-135: `handleDraftWithAI()` function sends data to Claude Sonnet
-- Lines 466-536: AI Draft Modal with:
-  - Yellow cautions section ("REVIEW BEFORE USE") with important warnings
-  - Suggested title field
-  - Draft content preview (scrollable, formatted)
-  - "Cancel" and "Insert Draft" buttons
-- Lines 138-148: `handleInsertDraft()` populates Summary and Details fields
-- Success toast: "AI draft inserted. Please review and edit as needed."
+**Usage Notes in Code:**
+- Brief comments at top of claude_client.py and ai_service.py documenting:
+  - Required environment variables (CLAUDE_API_KEY or EMERGENT_LLM_KEY)
+  - Supported model names (claude-*-4-5 variants)
 
-**Testing:** 100% pass rate - 3/3 backend curl tests, all frontend UI flows verified.
+**Testing:** All endpoints verified via curl - status, health, suggestions, and drafting all working.
 
 ### Previous Updates (Mar 2, 2026) - DEMO DATA & FOREVER FREE ACCOUNT ✅
 
