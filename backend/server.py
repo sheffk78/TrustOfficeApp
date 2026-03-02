@@ -695,6 +695,31 @@ class HealthScoreResponse(BaseModel):
     criteria: List[HealthScoreCriterion]
     calculated_at: str
 
+# Dashboard Models
+class GovernanceInsight(BaseModel):
+    type: str  # "warning", "error", "info"
+    criterion_name: str
+    title: str
+    description: str
+    action_path: str
+    action_label: str
+    points: int = 20
+
+class DashboardStats(BaseModel):
+    total_decisions: int
+    pending_reviews: int
+    total_distributions: int
+    ytd_distributions_amount: float
+
+class DashboardResponse(BaseModel):
+    trust_id: str
+    trust_name: str
+    health_score: HealthScoreResponse
+    onboarding_state: OnboardingState
+    recent_activity: List[dict]
+    stats: DashboardStats
+    governance_insights: List[GovernanceInsight]
+
 # Subscription Models
 class SubscriptionResponse(BaseModel):
     subscription_id: str
