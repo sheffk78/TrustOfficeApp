@@ -59,7 +59,38 @@ The backend now has a modular structure for better maintainability:
 
 
 
-### Latest Updates (Mar 2, 2026) - GUIDED MINUTES PARTICIPANT FIX + COMPENSATION TRUSTEE SELECTOR ✅
+### Latest Updates (Mar 2, 2026) - COMBINED BENEFICIARIES + UNITS PAGE ✅
+
+**Session Summary:** Merged the separate "Units" and "Beneficiaries" pages into a single "Beneficiaries" page with tabs, and fixed Trust Units validation issues.
+
+**Page Combination:**
+- Created new `/app/frontend/src/pages/BeneficiariesPage.js` with 3 tabs:
+  - **Overview Tab**: Ownership pie chart, summary cards (Total Authorized, Issued, Remaining, Beneficiaries count), Certificate Holders list with expandable details
+  - **Certificates Tab**: Full certificate management (issue, edit, transfer, revoke), status filter, PDF generation
+  - **Transfers Tab**: Transfer history with audit trail
+- Updated routes to redirect `/trust/units` and `/trust/beneficiaries` to `/beneficiaries`
+- Updated sidebar to show single "Beneficiaries" link
+
+**Trust Units Fixes:**
+1. **Demo data cleaned up** - Now shows 4 realistic certificates totaling exactly 100 units:
+   - John Smith: 40 units (40%)
+   - Jane Smith: 30 units (30%)
+   - Smith Family Trust: 20 units (20%)
+   - Robert Smith Jr.: 10 units (10%)
+2. **Decimal input fixed** - Changed `step="0.0001"` to `step="any"` so users can enter any number without forced decimals
+3. **Validation feedback added** - Shows warning when trying to issue more units than available
+
+**Files Changed:**
+- `/app/frontend/src/pages/BeneficiariesPage.js` - NEW combined page
+- `/app/frontend/src/App.js` - Updated routes with redirects
+- `/app/frontend/src/components/Sidebar.js` - Single Beneficiaries link
+- `/app/frontend/src/pages/TrustUnitsPage.js` - Fixed decimal step values
+- Database: Updated demo user subscription to `forever_free`, cleaned up certificate data
+
+**Testing:** 100% pass rate (iteration_60) - 11 frontend features verified
+
+
+### Previous Updates (Mar 2, 2026) - GUIDED MINUTES PARTICIPANT FIX + COMPENSATION TRUSTEE SELECTOR ✅
 
 **Session Summary:** Fixed two user-reported UX issues:
 1. Guided Minutes now separates trustees from other attendees
