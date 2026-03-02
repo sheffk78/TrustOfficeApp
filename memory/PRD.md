@@ -417,16 +417,22 @@ The backend now has a modular structure for better maintainability:
 
 ## Prioritized Backlog
 
-### P0 (Technical Debt) - IN PROGRESS (Mar 2, 2026)
+### P0 (Technical Debt) - COMPLETE (Mar 2, 2026)
 - [x] Backend modular structure - Created database.py, models.py, dependencies.py
 - [x] Created routers/ directory with domain-specific router modules
 - [x] Completed routers: auth.py, trusts.py, entities.py, tasks.py, units.py
 - [x] Frontend read-only mode integration with ReadOnlyBanner
 - [x] Unified subscription state management (get_subscription_state helper)
-- [ ] Migrate remaining endpoints from server.py to routers (minutes, distributions, governance, etc.)
-- [ ] Migration guide created at /app/backend/MIGRATION_GUIDE.md
+- [x] **Distributions router migrated** - 405 lines removed from server.py, now in routers/distributions.py (433 lines)
+- [x] Migration guide created at /app/backend/MIGRATION_GUIDE.md
 
-### P1 (Short-term) - COMPLETE (Feb 23-25, 2026)
+### P1 (High Priority) - IN PROGRESS
+- [x] Migrate distributions router (with require_write_access for subscription gating)
+- [ ] Migrate minutes router (including templates)
+- [ ] Migrate governance router (health score)
+- [ ] Implement hard feature gating for premium-only features
+
+### P2 (Short-term) - COMPLETE (Feb 23-25, 2026)
 - [x] Profile editing (name change) - Edit button in Settings > Profile section
 - [x] Search in minutes/distributions - Server-side search with debounced queries
 - [x] Table horizontal scroll for mobile - overflow-x-auto on table containers
