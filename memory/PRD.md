@@ -14,6 +14,26 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - **Email**: Postmark (12 templates)
 - **Background Jobs**: APScheduler
 
+### Backend Architecture (Refactored Mar 2, 2026)
+The backend now has a modular structure for better maintainability:
+```
+/app/backend/
+├── server.py           # Main FastAPI app with all endpoints (7538 lines)
+├── database.py         # MongoDB connection singleton
+├── models.py           # All Pydantic models and enums (~700 lines)
+├── dependencies.py     # Shared auth, helpers, and middleware functions
+├── routers/            # Domain-specific router modules (for gradual migration)
+│   ├── auth.py         # Auth endpoints (ready for migration)
+│   ├── trusts.py       # Trust CRUD (ready for migration)
+│   ├── entities.py     # Entity management (ready for migration)
+│   ├── tasks.py        # Governance tasks (ready for migration)
+│   ├── units.py        # Trust certificate units (ready for migration)
+│   └── [others]        # Placeholder stubs for future migration
+├── email_service.py    # Postmark email integration
+├── email_templates.py  # Email template content
+└── background_tasks.py # APScheduler background jobs
+```
+
 ### Design System (AnchorPoint)
 - Light: Navy #010079, Gold #D5AD36
 - Dark: Gold on slate backgrounds
@@ -21,7 +41,22 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - BENEVOLENCE MODE FOR DISTRIBUTIONS ✅
+### Latest Updates (Mar 2, 2026) - BACKEND REFACTORING ✅
+
+1. **Modular Backend Structure**
+   - Created `database.py` - MongoDB connection singleton
+   - Created `models.py` - All Pydantic models and enums centralized (~700 lines)
+   - Created `dependencies.py` - Shared auth functions, helpers, middleware
+   - Created `routers/` directory with domain-specific router modules
+   - Fully functional auth, trusts, entities, tasks, and units routers
+
+2. **Benefits of New Architecture**
+   - Shared code (models, dependencies) can be imported by any router
+   - Gradual migration path - server.py continues to work while routers are migrated
+   - Better separation of concerns
+   - Easier testing and maintenance
+
+### Previous Updates (Mar 2, 2026) - BENEVOLENCE MODE FOR DISTRIBUTIONS ✅
 
 1. **Data Model Extensions**
    - Added `is_benevolence` boolean field on distribution_records (default false)
