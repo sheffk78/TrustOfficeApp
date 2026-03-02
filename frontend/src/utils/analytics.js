@@ -287,5 +287,10 @@ export default {
   trackCheckoutInitiated,
   trackUpgradePromptShown,
   trackUpgradePromptClicked,
+  trackFeatureBlocked,
+  trackTrialBannerViewed,
+  trackTrialBannerClicked,
+  trackUpgradeModalShown,
+  trackUpgradeModalClicked,
   isGtagAvailable
 };
