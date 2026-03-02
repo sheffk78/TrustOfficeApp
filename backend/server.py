@@ -4179,8 +4179,11 @@ async def export_minutes_csv(
     )
 
 @api_router.get("/export/distributions")
-async def export_distributions_csv(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
-    """Export distribution records as CSV"""
+async def export_distributions_csv(
+    trust_id: Optional[str] = None, 
+    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+):
+    """Export distribution records as CSV (Premium feature)"""
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
