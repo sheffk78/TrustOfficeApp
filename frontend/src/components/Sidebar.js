@@ -39,8 +39,7 @@ const navItems = [
   { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', group: 'Money', requiresBenevolence: true },
   { path: '/structures', icon: Building2, label: 'Structures', group: 'Structures' },
   { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
-  { path: '/trust/units', icon: Award, label: 'Units', group: 'Structures' },
-  { path: '/trust/beneficiaries', icon: Users, label: 'Beneficiaries', group: 'Structures' },
+  { path: '/beneficiaries', icon: Users, label: 'Beneficiaries', group: 'Structures' },
   { path: '/governance', icon: Shield, label: 'Governance Health' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];

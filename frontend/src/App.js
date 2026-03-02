@@ -27,7 +27,7 @@ import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
 import PricingPage from "@/pages/PricingPage";
 import TrustUnitsPage from "@/pages/TrustUnitsPage";
-import BeneficiaryDashboardPage from "@/pages/BeneficiaryDashboardPage";
+import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
@@ -154,13 +154,14 @@ const AppRouter = () => {
         </SubscriptionProtectedRoute>
       } />
       <Route path="/trust/units" element={
-        <SubscriptionProtectedRoute>
-          <TrustUnitsPage />
-        </SubscriptionProtectedRoute>
+        <Navigate to="/beneficiaries" replace />
       } />
       <Route path="/trust/beneficiaries" element={
+        <Navigate to="/beneficiaries" replace />
+      } />
+      <Route path="/beneficiaries" element={
         <SubscriptionProtectedRoute>
-          <BeneficiaryDashboardPage />
+          <BeneficiariesPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/benevolence" element={

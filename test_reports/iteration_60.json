@@ -1,0 +1,74 @@
+{
+  "summary": "Frontend testing of combined Beneficiaries page - All 8 features verified working. The Units and Beneficiaries pages were successfully merged into a single /beneficiaries page with 3 tabs (Overview, Certificates, Transfers). Demo data shows correct 100 total units across 4 holders. Validation feedback works when issuing more units than available. Old URLs properly redirect.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Beneficiaries page at /beneficiaries combines former Units and Beneficiaries pages. Has 3 tabs: Overview (pie chart + holder list), Certificates (issue/transfer/revoke), Transfers (history). Demo data: 4 holders with 100 total units - John Smith 40, Jane Smith 30, Smith Family Trust 20, Robert Smith Jr 10. Old routes /trust/units and /trust/beneficiaries redirect to /beneficiaries.",
+  "features_tested": {
+    "/beneficiaries_page_loads_with_overview_tab": {
+      "status": "PASS",
+      "details": "Page loads at /beneficiaries with Overview tab active by default. Shows pie chart, 4 summary cards (Total Authorized: 100, Issued: 100, Remaining: 0, Beneficiaries: 4), and Certificate Holders list."
+    },
+    "overview_tab_pie_chart": {
+      "status": "PASS",
+      "details": "Ownership Distribution pie chart displays correctly showing 4 colored segments for each holder with percentages in legend."
+    },
+    "overview_tab_4_beneficiaries_percentages": {
+      "status": "PASS",
+      "details": "4 beneficiaries displayed with correct data: John Smith 40 units (40.00%), Jane Smith 30 units (30.00%), Smith Family Trust 20 units (20.00%), Robert Smith Jr 10 units (10.00%)"
+    },
+    "certificates_tab_4_certificates": {
+      "status": "PASS",
+      "details": "Certificates tab shows 4 certificates with correct data: CU-001 John Smith 40 Units (40.00%) active, CU-002 Jane Smith 30 Units (30.00%) active, CU-003 Smith Family Trust 20 Units (20.00%) active, CU-004 Robert Smith Jr 10 Units (10.00%) active. Shows 'Available: 0 units of 100'."
+    },
+    "issue_units_button_opens_modal": {
+      "status": "PASS",
+      "details": "Clicking 'Issue Units' button opens modal with holder name, holder identifier, units, issue date, and notes fields. Modal shows '0 units available' message."
+    },
+    "validation_error_exceeds_available_units": {
+      "status": "PASS",
+      "details": "When entering units > 0 available (tried 50), red validation error appears: 'Exceeds available units (0 remaining)' with warning icon. Prevents issuing more than available."
+    },
+    "old_urls_redirect": {
+      "status": "PASS",
+      "details": "/trust/units redirects to /beneficiaries. /trust/beneficiaries redirects to /beneficiaries. Both redirects work correctly."
+    },
+    "sidebar_single_beneficiaries_link": {
+      "status": "PASS",
+      "details": "Sidebar shows single 'Beneficiaries' link with Users icon. No separate 'Units' link exists (correctly merged). Link navigates to /beneficiaries."
+    },
+    "transfers_tab_works": {
+      "status": "PASS",
+      "details": "Transfers tab shows 'TRANSFER HISTORY' section. Currently displays 'No transfers recorded yet' with message 'Transfers will appear here when units are moved between holders'."
+    },
+    "decimal_input_no_forced_decimals": {
+      "status": "PASS",
+      "details": "Settings modal 'Total Authorized Units' input accepts integer values without forcing decimal places. Typing '150' keeps value as '150' not '150.000'."
+    },
+    "settings_modal_allow_fractional": {
+      "status": "PASS",
+      "details": "Settings modal includes 'Allow Fractional Units' toggle with description 'Enable decimals (e.g., 12.5 units)'."
+    }
+  },
+  "test_credentials": {
+    "email": "demo@trustoffice.com",
+    "password": "demopassword"
+  }
+}
