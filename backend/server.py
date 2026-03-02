@@ -61,6 +61,7 @@ from routers.background_jobs import router as background_jobs_router
 from routers.categories import router as categories_router
 from routers.beneficiaries import router as beneficiaries_router
 from routers.demo import router as demo_router
+from routers.ai import router as ai_router
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
