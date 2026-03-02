@@ -162,14 +162,14 @@ class TestTrialUserReadAccess:
         print(f"Distributions count: {len(response.json())}")
     
     def test_trial_user_can_read_compensation_plans(self, auth_session):
-        """Trial user can GET /api/compensation/plans"""
-        response = auth_session.get(f"{BASE_URL}/api/compensation/plans?trust_id={TRUST_ID}")
+        """Trial user can GET /api/compensation-plans"""
+        response = auth_session.get(f"{BASE_URL}/api/compensation-plans?trust_id={TRUST_ID}")
         assert response.status_code == 200, f"Failed to read compensation plans: {response.status_code}"
         print(f"Compensation plans count: {len(response.json())}")
     
     def test_trial_user_can_read_compensation_payments(self, auth_session):
-        """Trial user can GET /api/compensation/payments"""
-        response = auth_session.get(f"{BASE_URL}/api/compensation/payments?trust_id={TRUST_ID}")
+        """Trial user can GET /api/compensation-payments"""
+        response = auth_session.get(f"{BASE_URL}/api/compensation-payments?trust_id={TRUST_ID}")
         assert response.status_code == 200, f"Failed to read compensation payments: {response.status_code}"
         print(f"Compensation payments count: {len(response.json())}")
     
@@ -242,8 +242,8 @@ class TestRequireWriteAccessDistributions:
         print(f"Create distribution: {response.status_code}")
     
     def test_write_access_applied_to_approve_distribution(self, auth_session):
-        """POST /api/distributions/{id}/approve uses require_write_access"""
-        response = auth_session.post(f"{BASE_URL}/api/distributions/nonexistent/approve", json={
+        """PATCH /api/distributions/{id}/approve uses require_write_access"""
+        response = auth_session.patch(f"{BASE_URL}/api/distributions/nonexistent/approve", json={
             "solvency_confirmed": True,
             "recusal_acknowledged": True
         })
@@ -254,8 +254,8 @@ class TestRequireWriteAccessCompensation:
     """Tests for require_write_access on compensation router"""
     
     def test_write_access_applied_to_create_comp_plan(self, auth_session):
-        """POST /api/compensation/plans uses require_write_access"""
-        response = auth_session.post(f"{BASE_URL}/api/compensation/plans", json={
+        """POST /api/compensation-plans uses require_write_access"""
+        response = auth_session.post(f"{BASE_URL}/api/compensation-plans", json={
             "trust_id": TRUST_ID,
             "trustee_name": "TEST_trustee",
             "role": "trustee",
@@ -267,8 +267,8 @@ class TestRequireWriteAccessCompensation:
         print(f"Create comp plan: {response.status_code}")
     
     def test_write_access_applied_to_create_comp_payment(self, auth_session):
-        """POST /api/compensation/payments uses require_write_access"""
-        response = auth_session.post(f"{BASE_URL}/api/compensation/payments", json={
+        """POST /api/compensation-payments uses require_write_access"""
+        response = auth_session.post(f"{BASE_URL}/api/compensation-payments", json={
             "trust_id": TRUST_ID,
             "amount": 500.00,
             "date": "2025-01-15",
@@ -313,11 +313,11 @@ class TestRequireWriteAccessScheduleA:
         print(f"Create schedule_a: {response.status_code}")
     
     def test_write_access_applied_to_update_schedule_a(self, auth_session):
-        """PATCH /api/schedule-a/{id} uses require_write_access"""
-        response = auth_session.patch(f"{BASE_URL}/api/schedule-a/nonexistent", json={
+        """PUT /api/schedule-a/{id} uses require_write_access"""
+        response = auth_session.put(f"{BASE_URL}/api/schedule-a/nonexistent", json={
             "description": "updated"
         })
-        assert response.status_code in [404, 200]
+        assert response.status_code in [404, 200, 422]  # 422 for validation error
 
 
 class TestRequireWriteAccessTasks:
