@@ -1,10 +1,10 @@
 # TrustOffice API Routers
 # 
-# MIGRATION STATUS (Dec 30, 2025):
-# Successfully migrated 13 routers from monolithic server.py
-# server.py reduced from 7538 to ~2300 lines (69% reduction)
+# MIGRATION STATUS (Mar 2, 2026):
+# Successfully migrated ALL routers from monolithic server.py
+# server.py reduced from 7538 to ~350 lines (95% reduction)
 #
-# COMPLETED ROUTERS:
+# COMPLETED ROUTERS (19 total):
 # - auth.py: Authentication, profile management
 # - trusts.py: Trust CRUD with governance score
 # - entities.py: Entity management and relationships
@@ -18,14 +18,12 @@
 # - governance.py: Health score, history, insights, dashboard
 # - subscriptions.py: Stripe integration and webhooks
 # - exports.py: CSV export endpoints (premium feature)
-#
-# REMAINING IN SERVER.PY:
-# - Notification preferences endpoints
-# - User preferences endpoints
-# - Email admin endpoints
-# - Background jobs endpoints
-# - Demo data seeding
-# - Categories endpoint
+# - preferences.py: Notification and user preferences
+# - email.py: Email status and test endpoints
+# - background_jobs.py: Background job status and triggers
+# - categories.py: Enum values for forms
+# - beneficiaries.py: Beneficiary dashboard (premium)
+# - demo.py: Demo data seeding
 #
 # All routers import from: database.py, models.py, dependencies.py
 
@@ -42,6 +40,12 @@ from .compensation import router as compensation_router
 from .governance import router as governance_router
 from .subscriptions import router as subscriptions_router
 from .exports import router as exports_router
+from .preferences import router as preferences_router
+from .email import router as email_router
+from .background_jobs import router as background_jobs_router
+from .categories import router as categories_router
+from .beneficiaries import router as beneficiaries_router
+from .demo import router as demo_router
 
 __all__ = [
     "auth_router",
@@ -57,4 +61,10 @@ __all__ = [
     "governance_router",
     "subscriptions_router",
     "exports_router",
+    "preferences_router",
+    "email_router",
+    "background_jobs_router",
+    "categories_router",
+    "beneficiaries_router",
+    "demo_router",
 ]
