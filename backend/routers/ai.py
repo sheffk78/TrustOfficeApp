@@ -200,18 +200,42 @@ async def get_ai_status(user: dict = Depends(get_current_user)):
     """
     Check if AI services are configured and available.
     """
-    import os
-    
-    claude_key = os.environ.get('CLAUDE_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
+    ai_enabled = bool(CLAUDE_API_KEY)
     
     return {
-        "ai_enabled": bool(claude_key),
+        "ai_enabled": ai_enabled,
         "features": {
-            "minutes_drafting": bool(claude_key),
-            "governance_suggestions": bool(claude_key)
+            "minutes_drafting": ai_enabled,
+            "governance_suggestions": ai_enabled
         },
         "models": {
-            "drafting": "claude-sonnet-4-5" if claude_key else None,
-            "suggestions": "claude-3-5-haiku" if claude_key else None
+            "drafting": "claude-3.5-sonnet" if ai_enabled else None,
+            "suggestions": "claude-3.5-haiku" if ai_enabled else None
         }
     }
+
+
+@router.get("/health")
+async def ai_health_check(user: dict = Depends(get_current_user)):
+    """
+    Health check endpoint for AI service.
+    
+    Performs a simple ping to Claude Haiku to verify the service is operational.
+    Returns { "ok": true } on success, { "ok": false, "error": "..." } on failure.
+    
+    This endpoint is for internal testing only - no Claude error details are exposed.
+    """
+    if not CLAUDE_API_KEY:
+        logger.error("AI health check failed: CLAUDE_API_KEY not configured")
+        return {"ok": False, "error": "AI service not configured"}
+    
+    try:
+        is_healthy = await ping_claude()
+        if is_healthy:
+            return {"ok": True}
+        else:
+            logger.warning("AI health check: ping succeeded but response unexpected")
+            return {"ok": False, "error": "AI service responded unexpectedly"}
+    except Exception as e:
+        logger.error(f"AI health check failed with exception: {str(e)}")
+        return {"ok": False, "error": "AI service unavailable"}
