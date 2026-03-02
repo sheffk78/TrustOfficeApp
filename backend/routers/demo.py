@@ -629,7 +629,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     await db.trust_unit_settings.insert_one({
         "trust_id": trust1_id,
         "user_id": user["user_id"],
-        "total_authorized_units": 1000,
+        "total_authorized_units": 100,
         "unit_label": "Certificate Unit",
         "allow_fractional": False,
         "created_at": now.isoformat()
