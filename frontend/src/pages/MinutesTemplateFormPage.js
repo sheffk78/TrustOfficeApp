@@ -48,6 +48,7 @@ const ASSET_CATEGORIES = [
 export default function MinutesTemplateFormPage() {
   const navigate = useNavigate();
   const { templateType } = useParams();
+  const [searchParams] = useSearchParams();
   const { selectedTrust } = useAuth();
   
   const [loading, setLoading] = useState(false);
