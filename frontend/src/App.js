@@ -27,6 +27,7 @@ import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
 import PricingPage from "@/pages/PricingPage";
 import TrustUnitsPage from "@/pages/TrustUnitsPage";
+import BeneficiaryDashboardPage from "@/pages/BeneficiaryDashboardPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
