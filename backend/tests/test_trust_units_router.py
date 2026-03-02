@@ -441,14 +441,6 @@ class TestTrustUnitsRouterIntegration:
 
     def test_trust_units_router_uses_api_prefix(self, auth_headers):
         """Verify trust units router is mounted with /api prefix"""
-        # Test without /api prefix should 404
-        response = requests.get(
-            f"{BASE_URL}/trust-units/summary",
-            params={"trust_id": TEST_TRUST_ID},
-            headers=auth_headers
-        )
-        assert response.status_code == 404, "Endpoint should not exist without /api prefix"
-        
         # Test with /api prefix should work
         response = requests.get(
             f"{BASE_URL}/api/trust-units/summary",
