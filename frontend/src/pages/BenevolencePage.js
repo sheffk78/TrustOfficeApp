@@ -57,12 +57,21 @@ export default function BenevolencePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   
+  // Active tab
+  const [activeTab, setActiveTab] = useState('grants');
+  
+  // Distribution log state (from BenevolenceLogPage)
+  const [distLogData, setDistLogData] = useState(null);
+  const [distLogLoading, setDistLogLoading] = useState(false);
+  const [searchRecipient, setSearchRecipient] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
+  
   // Filters
   const [filterPurpose, setFilterPurpose] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // View mode
+  // View mode (for grants tab)
   const [viewMode, setViewMode] = useState('list'); // list, summary
   
   // Form data
