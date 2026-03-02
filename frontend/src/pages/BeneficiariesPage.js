@@ -815,7 +815,22 @@ export default function BeneficiariesPage() {
           <div className="space-y-4 py-4">
             <div>
               <Label className="label-trust">From Certificate *</Label>
-              <Select value={transferForm.from_certificate_id} onValueChange={(v) => setTransferForm({ ...transferForm, from_certificate_id: v })}>
+              <Select 
+                value={transferForm.from_certificate_id} 
+                onValueChange={(v) => {
+                  // When changing "from", check if current "to" holder is the same as new "from" holder
+                  const newFromCert = summary?.certificates?.find(c => c.certificate_id === v);
+                  const shouldClearTo = transferForm.to_holder_name === newFromCert?.holder_name;
+                  
+                  setTransferForm({ 
+                    ...transferForm, 
+                    from_certificate_id: v,
+                    // Clear "to" selection if it's now the same as "from"
+                    to_holder_name: shouldClearTo ? '' : transferForm.to_holder_name,
+                    to_holder_identifier: shouldClearTo ? '' : transferForm.to_holder_identifier
+                  });
+                }}
+              >
                 <SelectTrigger className="mt-1" data-testid="from-cert-select">
                   <SelectValue placeholder="Select source certificate" />
                 </SelectTrigger>
@@ -829,14 +844,47 @@ export default function BeneficiariesPage() {
               </Select>
             </div>
             <div>
-              <Label className="label-trust">To Holder Name *</Label>
-              <Input
-                value={transferForm.to_holder_name}
-                onChange={(e) => setTransferForm({ ...transferForm, to_holder_name: e.target.value })}
-                placeholder="New holder name"
-                className="mt-1"
-                data-testid="to-holder-input"
-              />
+              <Label className="label-trust">To Beneficiary *</Label>
+              <Select 
+                value={transferForm.to_holder_name} 
+                onValueChange={(v) => {
+                  // Find the selected certificate to get the identifier
+                  const selectedCert = summary?.certificates?.find(c => c.holder_name === v);
+                  setTransferForm({ 
+                    ...transferForm, 
+                    to_holder_name: v,
+                    to_holder_identifier: selectedCert?.holder_identifier || ''
+                  });
+                }}
+              >
+                <SelectTrigger className="mt-1" data-testid="to-holder-select">
+                  <SelectValue placeholder="Select destination beneficiary" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(() => {
+                    // Get the holder name of the selected "from" certificate
+                    const fromCert = summary?.certificates?.find(c => c.certificate_id === transferForm.from_certificate_id);
+                    const fromHolderName = fromCert?.holder_name;
+                    
+                    // Get unique active beneficiaries, excluding the "from" holder
+                    const uniqueHolders = [];
+                    const seenNames = new Set();
+                    
+                    summary?.certificates?.filter(c => c.status === 'active').forEach(cert => {
+                      if (!seenNames.has(cert.holder_name) && cert.holder_name !== fromHolderName) {
+                        seenNames.add(cert.holder_name);
+                        uniqueHolders.push(cert);
+                      }
+                    });
+                    
+                    return uniqueHolders.map((cert) => (
+                      <SelectItem key={cert.holder_name} value={cert.holder_name}>
+                        {cert.holder_name}
+                      </SelectItem>
+                    ));
+                  })()}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="label-trust">Units to Transfer *</Label>
