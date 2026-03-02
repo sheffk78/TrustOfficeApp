@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
 import { 
@@ -18,7 +19,11 @@ import {
   Users,
   FileText,
   CheckCircle,
-  X
+  X,
+  Sparkles,
+  Loader2,
+  AlertTriangle,
+  Copy
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -27,6 +32,11 @@ export default function NewMinutesPage() {
   const { selectedTrust } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  
+  // AI Drafting state
+  const [aiDrafting, setAiDrafting] = useState(false);
+  const [aiDraftModalOpen, setAiDraftModalOpen] = useState(false);
+  const [aiDraft, setAiDraft] = useState(null);
   
   const [formData, setFormData] = useState({
     entry_type: '',
@@ -74,6 +84,69 @@ export default function NewMinutesPage() {
     }
   };
 
+  // AI Draft function
+  const handleDraftWithAI = async () => {
+    if (!selectedTrust) {
+      toast.error('Please select a trust first');
+      return;
+    }
+
+    // Extract decision points from summary (split by newlines or periods)
+    const decisionsOutline = formData.summary
+      ? formData.summary.split(/[.\n]+/).map(s => s.trim()).filter(s => s.length > 0)
+      : [];
+    
+    // If no summary yet, use entry type as a placeholder
+    if (decisionsOutline.length === 0) {
+      decisionsOutline.push(`Review and document ${formData.entry_type || 'meeting'} proceedings`);
+    }
+
+    setAiDrafting(true);
+    try {
+      const response = await fetchWithAuth('/ai/minutes-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          minutes_type: formData.entry_type || 'general',
+          meeting_date: formData.date.toISOString().split('T')[0],
+          participants: formData.participants.filter(p => p.trim() !== ''),
+          decisions_outline: decisionsOutline,
+          trust_name: selectedTrust.name,
+          jurisdiction: selectedTrust.jurisdiction || null,
+          beneficiary_standard: selectedTrust.beneficiary_standard || null,
+          additional_context: formData.best_interest_rationale || null
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAiDraft(data);
+        setAiDraftModalOpen(true);
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to generate AI draft');
+      }
+    } catch (error) {
+      console.error('AI draft error:', error);
+      toast.error('Failed to connect to AI service');
+    } finally {
+      setAiDrafting(false);
+    }
+  };
+
+  // Insert AI draft into form
+  const handleInsertDraft = () => {
+    if (aiDraft) {
+      setFormData(prev => ({
+        ...prev,
+        summary: aiDraft.suggested_title || prev.summary,
+        details: aiDraft.draft_body || prev.details
+      }));
+      setAiDraftModalOpen(false);
+      toast.success('AI draft inserted. Please review and edit as needed.');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedTrust) {
       toast.error('Please select a trust first');
@@ -99,85 +172,97 @@ export default function NewMinutesPage() {
         throw new Error('Failed to create minutes');
       }
 
-      toast.success('Minutes recorded successfully');
+      toast.success('Minutes created successfully');
       navigate('/minutes');
     } catch (error) {
-      toast.error(error.message);
+      console.error('Failed to create minutes:', error);
+      toast.error('Failed to create minutes');
     } finally {
       setLoading(false);
     }
   };
 
-  const entryTypes = [
-    { value: 'meeting', label: 'Meeting', description: 'Regular trust meeting or review session' },
-    { value: 'decision', label: 'Decision', description: 'Specific decision or resolution' },
-    { value: 'distribution_approval', label: 'Distribution Approval', description: 'Approval of a distribution request' }
-  ];
+  if (!selectedTrust) {
+    return (
+      <div className="main-layout" data-testid="new-minutes-page">
+        <Sidebar />
+        <main className="main-content">
+          <div className="page-container">
+            <div className="card-trust p-8 text-center">
+              <p className="text-muted-foreground">Select a trust to create minutes</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="main-layout" data-testid="new-minutes-page">
       <Sidebar />
       <main className="main-content">
-        <div className="page-container max-w-3xl">
-          {/* Back button */}
-          <button 
-            onClick={() => navigate('/minutes')}
-            className="flex items-center gap-2 text-muted-foreground hover:text-navy mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase tracking-widest">Back to Minutes</span>
-          </button>
-
-          {/* Page Header */}
-          <div className="page-header">
-            <h1 className="page-title">Record Minutes</h1>
-            <p className="page-subtitle">
-              {selectedTrust?.name || 'Select a trust'}
-            </p>
+        <div className="page-container max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/minutes')}
+              className="mb-4 text-muted-foreground hover:text-navy"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Minutes
+            </Button>
+            <h1 className="font-serif text-3xl text-navy">Create Minutes</h1>
+            <p className="text-sm text-muted-foreground mt-1">{selectedTrust?.name}</p>
           </div>
 
-          {/* Progress */}
-          <div className="wizard-steps mb-8">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <div 
-                key={s} 
-                className={`wizard-step ${step >= s ? 'active' : ''} ${step > s ? 'completed' : ''}`}
-              ></div>
-            ))}
+          {/* Progress Steps */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <div 
+                  key={s}
+                  className={`flex items-center justify-center w-8 h-8 text-sm font-mono transition-colors ${
+                    s === step ? 'bg-navy text-white' : 
+                    s < step ? 'bg-success text-white' : 
+                    'bg-navy/10 text-muted-foreground'
+                  }`}
+                >
+                  {s < step ? '✓' : s}
+                </div>
+              ))}
+            </div>
           </div>
 
+          {/* Form Steps */}
           <div className="card-trust corner-mark">
             {/* Step 1: Entry Type */}
             {step === 1 && (
               <div>
                 <p className="label-trust mb-2">Step 1 of 5</p>
-                <h2 className="font-serif text-2xl text-navy mb-6">What type of entry is this?</h2>
+                <h2 className="font-serif text-2xl text-navy mb-6">What type of entry?</h2>
                 
-                <div className="space-y-3">
-                  {entryTypes.map((type) => (
+                <div className="grid grid-cols-2 gap-4">
+                  {['annual', 'quarterly', 'distribution', 'compensation', 'solvency', 'special'].map((type) => (
                     <button
-                      key={type.value}
-                      onClick={() => setFormData({ ...formData, entry_type: type.value })}
-                      className={`w-full p-4 border text-left hover-lift ${
-                        formData.entry_type === type.value 
-                          ? 'border-gold bg-gold/5' 
-                          : 'border-navy/10 hover:border-navy/30'
+                      key={type}
+                      onClick={() => setFormData({ ...formData, entry_type: type })}
+                      className={`p-4 border text-left transition-all ${
+                        formData.entry_type === type 
+                          ? 'border-gold bg-gold/10' 
+                          : 'border-navy/20 hover:border-navy/40'
                       }`}
-                      data-testid={`entry-type-${type.value}`}
+                      data-testid={`entry-type-${type}`}
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 flex items-center justify-center ${
-                          formData.entry_type === type.value ? 'bg-gold/20' : 'bg-navy/5'
-                        }`}>
-                          <FileText className={`w-5 h-5 ${
-                            formData.entry_type === type.value ? 'text-gold' : 'text-navy'
-                          }`} />
-                        </div>
-                        <div>
-                          <p className="font-medium text-navy">{type.label}</p>
-                          <p className="text-sm text-muted-foreground">{type.description}</p>
-                        </div>
-                      </div>
+                      <span className="font-serif text-navy capitalize">{type}</span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {type === 'annual' && 'Annual trust review'}
+                        {type === 'quarterly' && 'Quarterly governance meeting'}
+                        {type === 'distribution' && 'Distribution decision'}
+                        {type === 'compensation' && 'Trustee compensation review'}
+                        {type === 'solvency' && 'Solvency confirmation'}
+                        {type === 'special' && 'Special resolution'}
+                      </p>
                     </button>
                   ))}
                 </div>
@@ -192,10 +277,10 @@ export default function NewMinutesPage() {
                 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-mono input-trust h-12"
-                      data-testid="date-picker-trigger"
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start btn-secondary"
+                      data-testid="date-picker-btn"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {formData.date ? format(formData.date, 'MMMM d, yyyy') : 'Select date'}
@@ -257,7 +342,7 @@ export default function NewMinutesPage() {
               </div>
             )}
 
-            {/* Step 4: Details */}
+            {/* Step 4: Details with AI Draft Button */}
             {step === 4 && (
               <div>
                 <p className="label-trust mb-2">Step 4 of 5</p>
@@ -276,7 +361,29 @@ export default function NewMinutesPage() {
                   </div>
 
                   <div>
-                    <Label className="label-trust">Details *</Label>
+                    <div className="flex items-center justify-between mb-1">
+                      <Label className="label-trust">Details *</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDraftWithAI}
+                        disabled={aiDrafting || !selectedTrust}
+                        className="text-xs flex items-center gap-1.5 border-gold/50 text-gold hover:bg-gold/10 hover:text-gold"
+                        data-testid="draft-with-ai-btn"
+                      >
+                        {aiDrafting ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Drafting...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3" />
+                            Draft with AI
+                          </>
+                        )}
+                      </Button>
+                    </div>
                     <Textarea
                       value={formData.details}
                       onChange={(e) => setFormData({ ...formData, details: e.target.value })}
@@ -284,6 +391,10 @@ export default function NewMinutesPage() {
                       className="mt-1 input-trust min-h-[150px]"
                       data-testid="details-input"
                     />
+                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      AI helps draft language; you remain responsible for accuracy and legal sufficiency.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -351,6 +462,78 @@ export default function NewMinutesPage() {
           </div>
         </div>
       </main>
+
+      {/* AI Draft Modal */}
+      <Dialog open={aiDraftModalOpen} onOpenChange={setAiDraftModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="ai-draft-modal">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl text-navy flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-gold" />
+              AI Draft
+            </DialogTitle>
+            <DialogDescription>
+              Review the AI-generated minutes below. Edit as needed after inserting.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {aiDraft && (
+            <div className="flex-1 overflow-auto space-y-4">
+              {/* Cautions */}
+              {aiDraft.cautions && aiDraft.cautions.length > 0 && (
+                <div className="p-3 bg-warning/10 border border-warning/30">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-mono text-xs uppercase tracking-widest text-warning mb-1">Review Before Use</p>
+                      <ul className="text-xs text-warning/80 space-y-1">
+                        {aiDraft.cautions.map((caution, i) => (
+                          <li key={i}>• {caution}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Suggested Title */}
+              <div>
+                <Label className="label-trust">Suggested Title</Label>
+                <p className="mt-1 p-3 bg-navy/5 border border-navy/10 font-medium text-navy">
+                  {aiDraft.suggested_title}
+                </p>
+              </div>
+              
+              {/* Draft Body */}
+              <div>
+                <Label className="label-trust">Draft Content</Label>
+                <div className="mt-1 p-4 bg-navy/5 border border-navy/10 max-h-[300px] overflow-auto">
+                  <pre className="whitespace-pre-wrap font-serif text-sm text-navy leading-relaxed">
+                    {aiDraft.draft_body}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="border-t pt-4 mt-4">
+            <p className="text-xs text-muted-foreground mr-auto flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              AI-generated. Review before signing.
+            </p>
+            <Button variant="outline" onClick={() => setAiDraftModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleInsertDraft}
+              className="btn-gold flex items-center gap-2"
+              data-testid="insert-draft-btn"
+            >
+              <Copy className="w-4 h-4" />
+              Insert Draft
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
