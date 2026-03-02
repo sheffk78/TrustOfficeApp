@@ -5433,9 +5433,12 @@ async def dismiss_onboarding(user: dict = Depends(get_current_user)):
 
 # ==================== ACTIVITY TIMELINE ====================
 
-@api_router.get("/activity")
-async def get_activity(trust_id: Optional[str] = None, limit: int = 20, user: dict = Depends(get_current_user)):
-    query = {"user_id": user["user_id"]}
+async def get_recent_activity(user_id: str, trust_id: Optional[str] = None, limit: int = 20) -> List[dict]:
+    """
+    Helper function to get recent activity for a user/trust.
+    Used by both /api/activity and /api/dashboard endpoints.
+    """
+    query = {"user_id": user_id}
     if trust_id:
         query["trust_id"] = trust_id
     
@@ -5498,6 +5501,10 @@ async def get_activity(trust_id: Optional[str] = None, limit: int = 20, user: di
     
     activities.sort(key=lambda x: x["created_at"], reverse=True)
     return activities[:limit]
+
+@api_router.get("/activity")
+async def get_activity(trust_id: Optional[str] = None, limit: int = 20, user: dict = Depends(get_current_user)):
+    return await get_recent_activity(user["user_id"], trust_id, limit)
 
 # ==================== CATEGORIES ====================
 
