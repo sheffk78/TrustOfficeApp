@@ -5,6 +5,8 @@ import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import { TrialBanner } from '@/components/TrialBanner';
+import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { 
   FileText, 
   DollarSign, 
