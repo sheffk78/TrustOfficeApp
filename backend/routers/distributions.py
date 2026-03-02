@@ -311,6 +311,55 @@ async def update_distribution_status(
     return DistributionResponse(**updated)
 
 
+@router.patch("/distributions/{distribution_id}/attach-minutes", response_model=DistributionResponse)
+async def attach_minutes_to_distribution(
+    distribution_id: str,
+    request: dict,
+    user: dict = Depends(require_write_access)
+):
+    """
+    Attach existing minutes to a distribution record.
+    
+    This is the "Money → Minutes" flow where the trustee links an existing
+    distribution to a minutes record that documented the approval decision.
+    Does NOT modify the minutes text - only creates the reference link.
+    """
+    from datetime import timezone
+    
+    dist = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not dist:
+        raise HTTPException(status_code=404, detail="Distribution not found")
+    
+    minutes_record_id = request.get("minutes_record_id")
+    if not minutes_record_id:
+        raise HTTPException(status_code=400, detail="minutes_record_id is required")
+    
+    # Verify the minutes record exists and belongs to the user
+    minutes = await db.minutes_records.find_one(
+        {"minutes_id": minutes_record_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes record not found")
+    
+    await db.distribution_records.update_one(
+        {"distribution_id": distribution_id},
+        {"$set": {
+            "minutes_record_id": minutes_record_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id},
+        {"_id": 0}
+    )
+    return DistributionResponse(**updated)
+
+
 @router.delete("/distributions/{distribution_id}")
 async def delete_distribution(distribution_id: str, user: dict = Depends(require_write_access)):
     """Delete a distribution record"""

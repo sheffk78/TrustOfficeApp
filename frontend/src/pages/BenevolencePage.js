@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
 import { 
@@ -25,7 +28,10 @@ import {
   AlertCircle,
   Loader2,
   Filter,
-  X
+  X,
+  MoreVertical,
+  Link2,
+  FileText
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays } from 'date-fns';
 
@@ -57,6 +63,7 @@ const DATE_FILTER_OPTIONS = [
 ];
 
 export default function BenevolencePage() {
+  const navigate = useNavigate();
   const { selectedTrust } = useAuth();
   
   // Unified log state
@@ -73,6 +80,9 @@ export default function BenevolencePage() {
   // Modal states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  
+  // Attach minutes dialog state
+  const [attachMinutesDialog, setAttachMinutesDialog] = useState({ open: false, recordId: null });
   
   // Form data for new benevolence grant
   const [formData, setFormData] = useState({
@@ -667,8 +677,39 @@ export default function BenevolencePage() {
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-mono text-lg text-navy">{formatCurrency(record.amount)}</p>
+                      <div className="flex items-center gap-3">
+                        {/* Minutes Actions */}
+                        {!record.is_documented && record.source_type === 'benevolence' && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" data-testid={`minutes-menu-${record.id}`}>
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setAttachMinutesDialog({ open: true, recordId: record.id })}>
+                                <Link2 className="w-4 h-4 mr-2" />
+                                Link to existing minutes
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => {
+                                const params = new URLSearchParams({
+                                  prefill_type: 'benevolence',
+                                  prefill_amount: record.amount.toString(),
+                                  prefill_recipient: record.recipient_name || '',
+                                  prefill_description: record.description || record.category || ''
+                                });
+                                navigate(`/guided-minutes?${params.toString()}`);
+                              }}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Document in minutes (retroactive)
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                        <div className="text-right">
+                          <p className="font-mono text-lg text-navy">{formatCurrency(record.amount)}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -678,6 +719,19 @@ export default function BenevolencePage() {
           </div>
         </div>
       </main>
+
+      {/* Attach Minutes Dialog */}
+      <AttachMinutesDialog
+        open={attachMinutesDialog.open}
+        onOpenChange={(open) => setAttachMinutesDialog({ open, recordId: open ? attachMinutesDialog.recordId : null })}
+        trustId={selectedTrust?.trust_id}
+        recordType="benevolence"
+        recordId={attachMinutesDialog.recordId}
+        onAttached={() => {
+          loadAllData();
+          setAttachMinutesDialog({ open: false, recordId: null });
+        }}
+      />
     </div>
   );
 }

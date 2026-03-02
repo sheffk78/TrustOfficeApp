@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchWithAuth } from '@/utils/api';
 import { 
@@ -18,12 +21,16 @@ import {
   Edit2,
   Info,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MoreVertical,
+  Link2,
+  FileText
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function CompensationPage() {
+  const navigate = useNavigate();
   const { selectedTrust } = useAuth();
   const [plans, setPlans] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -35,6 +42,9 @@ export default function CompensationPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showAdvancedPlans, setShowAdvancedPlans] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null); // null for new, plan object for edit
+  
+  // Attach minutes dialog state
+  const [attachMinutesDialog, setAttachMinutesDialog] = useState({ open: false, recordId: null });
   
   // Form states
   const [planForm, setPlanForm] = useState({
@@ -500,12 +510,47 @@ export default function CompensationPage() {
                               {formatDate(payment.date)}
                               {payment.classification_text && ` • ${payment.classification_text}`}
                             </p>
+                            {/* Minutes link indicator */}
+                            {payment.minutes_record_id && (
+                              <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                                <Link2 className="w-3 h-3" /> Linked to minutes
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             {payment.exceeds_plan_flag && (
                               <span className="badge-trust badge-error flex items-center gap-1">
                                 <AlertTriangle className="w-3 h-3" /> Exceeds
                               </span>
+                            )}
+                            {/* Minutes Actions */}
+                            {!payment.minutes_record_id && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" data-testid={`minutes-menu-${payment.payment_id}`}>
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => setAttachMinutesDialog({ open: true, recordId: payment.payment_id })}>
+                                    <Link2 className="w-4 h-4 mr-2" />
+                                    Link to existing minutes
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => {
+                                    const params = new URLSearchParams({
+                                      prefill_type: 'compensation',
+                                      prefill_amount: payment.amount.toString(),
+                                      prefill_recipient: payment.classification_text || 'Trustee',
+                                      prefill_description: `Compensation payment on ${formatDate(payment.date)}`
+                                    });
+                                    navigate(`/guided-minutes?${params.toString()}`);
+                                  }}>
+                                    <FileText className="w-4 h-4 mr-2" />
+                                    Document in minutes (retroactive)
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                             <Button
                               onClick={() => handleDeletePayment(payment.payment_id)}
@@ -675,6 +720,19 @@ export default function CompensationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Attach Minutes Dialog */}
+      <AttachMinutesDialog
+        open={attachMinutesDialog.open}
+        onOpenChange={(open) => setAttachMinutesDialog({ open, recordId: open ? attachMinutesDialog.recordId : null })}
+        trustId={selectedTrust?.trust_id}
+        recordType="compensation"
+        recordId={attachMinutesDialog.recordId}
+        onAttached={() => {
+          loadData();
+          setAttachMinutesDialog({ open: false, recordId: null });
+        }}
+      />
     </div>
   );
 }

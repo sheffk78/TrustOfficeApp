@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { TrialBanner } from '@/components/TrialBanner';
+import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { fetchWithAuth, API } from '@/utils/api';
@@ -24,7 +27,10 @@ import {
   Check,
   X,
   Clock,
-  HeartHandshake
+  HeartHandshake,
+  MoreVertical,
+  Link2,
+  FileText
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -44,6 +50,7 @@ function useDebounce(value, delay) {
 }
 
 export default function DistributionsPage() {
+  const navigate = useNavigate();
   const { selectedTrust, isReadOnly } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
   const [distributions, setDistributions] = useState([]);
@@ -59,6 +66,9 @@ export default function DistributionsPage() {
   const [solvencyConfirmed, setSolvencyConfirmed] = useState(false);
   const [recusalAcknowledged, setRecusalAcknowledged] = useState(false);
   const [approvalLoading, setApprovalLoading] = useState(false);
+  
+  // Attach minutes dialog state
+  const [attachMinutesDialog, setAttachMinutesDialog] = useState({ open: false, recordId: null });
   
   const [formData, setFormData] = useState({
     date: new Date(),
@@ -294,6 +304,23 @@ export default function DistributionsPage() {
       return;
     }
     setDialogOpen(open);
+  };
+
+  // Navigate to Guided Minutes to document this distribution (retroactive)
+  const handleCreateMinutesFromDistribution = (dist) => {
+    const params = new URLSearchParams({
+      prefill_type: 'distribution',
+      prefill_amount: dist.amount.toString(),
+      prefill_recipient: dist.beneficiary_name || dist.beneficiary || '',
+      prefill_description: dist.purpose_classification || dist.category || ''
+    });
+    navigate(`/guided-minutes?${params.toString()}`);
+  };
+
+  // Handle successful minutes attachment
+  const handleMinutesAttached = () => {
+    loadDistributions();
+    setAttachMinutesDialog({ open: false, recordId: null });
   };
 
   return (
@@ -580,6 +607,7 @@ export default function DistributionsPage() {
                     <th className="text-left">Category</th>
                     <th className="text-right">Amount</th>
                     <th className="text-center">Status</th>
+                    <th className="text-center">Minutes</th>
                     <th className="text-center">Actions</th>
                   </tr>
                 </thead>
@@ -596,6 +624,33 @@ export default function DistributionsPage() {
                         <span className={`badge-trust ${getStatusBadgeClass(status)}`}>
                           {status}
                         </span>
+                      </td>
+                      <td className="text-center">
+                        {dist.minutes_record_id ? (
+                          <span className="flex items-center justify-center gap-1 text-xs text-green-600 dark:text-green-400">
+                            <Link2 className="w-3 h-3" />
+                            Linked
+                          </span>
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="p-1 hover:bg-navy/10 dark:hover:bg-white/10" data-testid={`minutes-menu-${dist.distribution_id}`}>
+                                <MoreVertical className="w-4 h-4 text-navy/60 dark:text-white/60" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setAttachMinutesDialog({ open: true, recordId: dist.distribution_id })}>
+                                <Link2 className="w-4 h-4 mr-2" />
+                                Link to existing minutes
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleCreateMinutesFromDistribution(dist)}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Document in minutes (retroactive)
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </td>
                       <td className="text-center">
                         {status === 'review' && (
@@ -736,6 +791,16 @@ export default function DistributionsPage() {
           </div>
         </div>
       )}
+
+      {/* Attach Minutes Dialog */}
+      <AttachMinutesDialog
+        open={attachMinutesDialog.open}
+        onOpenChange={(open) => setAttachMinutesDialog({ open, recordId: open ? attachMinutesDialog.recordId : null })}
+        trustId={selectedTrust?.trust_id}
+        recordType="distribution"
+        recordId={attachMinutesDialog.recordId}
+        onAttached={handleMinutesAttached}
+      />
     </div>
   );
 }

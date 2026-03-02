@@ -399,6 +399,53 @@ async def get_comp_ytd(trust_id: str, year: Optional[int] = None, user: dict = D
     }
 
 
+@router.patch("/compensation-payments/{payment_id}/attach-minutes", response_model=CompensationPaymentResponse)
+async def attach_minutes_to_compensation(
+    payment_id: str,
+    request: dict,
+    user: dict = Depends(require_write_access)
+):
+    """
+    Attach existing minutes to a compensation payment record.
+    
+    This is the "Money → Minutes" flow where the trustee links an existing
+    compensation payment to a minutes record that documented the approval decision.
+    Does NOT modify the minutes text - only creates the reference link.
+    """
+    payment = await db.compensation_payments.find_one(
+        {"payment_id": payment_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not payment:
+        raise HTTPException(status_code=404, detail="Compensation payment not found")
+    
+    minutes_record_id = request.get("minutes_record_id")
+    if not minutes_record_id:
+        raise HTTPException(status_code=400, detail="minutes_record_id is required")
+    
+    # Verify the minutes record exists and belongs to the user
+    minutes = await db.minutes_records.find_one(
+        {"minutes_id": minutes_record_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes record not found")
+    
+    await db.compensation_payments.update_one(
+        {"payment_id": payment_id},
+        {"$set": {
+            "minutes_record_id": minutes_record_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.compensation_payments.find_one(
+        {"payment_id": payment_id},
+        {"_id": 0}
+    )
+    return CompensationPaymentResponse(**updated)
+
+
 @router.delete("/compensation-payments/{payment_id}")
 async def delete_comp_payment(payment_id: str, user: dict = Depends(require_write_access)):
     """Delete a compensation payment"""

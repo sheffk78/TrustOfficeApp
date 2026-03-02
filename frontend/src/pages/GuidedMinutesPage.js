@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
 import { 
@@ -26,7 +28,11 @@ import {
   Save,
   ListChecks,
   MessageSquare,
-  RefreshCw
+  RefreshCw,
+  DollarSign,
+  Wallet,
+  HeartHandshake,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -43,8 +49,17 @@ const STEPS = [
   { id: 4, label: 'Save', icon: CheckCircle }
 ];
 
+const DISTRIBUTION_PURPOSES = [
+  { value: 'hems_health', label: 'Health' },
+  { value: 'hems_education', label: 'Education' },
+  { value: 'hems_maintenance', label: 'Maintenance' },
+  { value: 'hems_support', label: 'Support' },
+  { value: 'discretionary', label: 'Discretionary' }
+];
+
 export default function GuidedMinutesPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { selectedTrust } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -70,8 +85,43 @@ export default function GuidedMinutesPage() {
   const [editedDraft, setEditedDraft] = useState('');
   const [editedTitle, setEditedTitle] = useState('');
   
+  // Step 3: Record creation toggles (Minutes → Money flow)
+  const [createCompensationRecords, setCreateCompensationRecords] = useState(false);
+  const [createDistributionRecords, setCreateDistributionRecords] = useState(false);
+  const [createBenevolenceRecords, setCreateBenevolenceRecords] = useState(false);
+  const [recordsToCreate, setRecordsToCreate] = useState([]);
+  
   // Step 4: Save
   const [saving, setSaving] = useState(false);
+  const [createdRecordsCounts, setCreatedRecordsCounts] = useState(null);
+
+  // Handle URL params for prefill (Money → Minutes flow)
+  useEffect(() => {
+    const prefillType = searchParams.get('prefill_type');
+    const prefillAmount = searchParams.get('prefill_amount');
+    const prefillRecipient = searchParams.get('prefill_recipient');
+    const prefillDescription = searchParams.get('prefill_description');
+    
+    if (prefillType && prefillAmount) {
+      // Prefill from money record
+      const decision = `${prefillType === 'compensation' ? 'Approved compensation' : prefillType === 'distribution' ? 'Approved distribution' : 'Approved benevolence'} of $${parseFloat(prefillAmount).toLocaleString()} to ${prefillRecipient || 'recipient'}${prefillDescription ? ` for ${prefillDescription}` : ''}`;
+      setKeyDecisions([decision]);
+      
+      // Auto-enable the corresponding record type
+      if (prefillType === 'compensation') setCreateCompensationRecords(true);
+      if (prefillType === 'distribution') setCreateDistributionRecords(true);
+      if (prefillType === 'benevolence') setCreateBenevolenceRecords(true);
+      
+      // Pre-populate record to create
+      setRecordsToCreate([{
+        record_type: prefillType,
+        amount: parseFloat(prefillAmount),
+        recipient: prefillRecipient || '',
+        date: format(new Date(), 'yyyy-MM-dd'),
+        description: prefillDescription || ''
+      }]);
+    }
+  }, [searchParams]);
 
   // Load trust context on mount
   const loadContext = useCallback(async () => {
@@ -199,19 +249,42 @@ export default function GuidedMinutesPage() {
 
     setSaving(true);
     try {
-      const response = await fetchWithAuth('/guided-minutes/save', {
+      // Determine if we need to create linked records
+      const hasRecordsToCreate = recordsToCreate.length > 0 && 
+        (createCompensationRecords || createDistributionRecords || createBenevolenceRecords);
+      
+      const endpoint = hasRecordsToCreate ? '/guided-minutes/save-with-records' : '/guided-minutes/save';
+      
+      const requestBody = {
+        trust_id: selectedTrust.trust_id,
+        minutes_type: meetingType,
+        meeting_date: format(meetingDate, 'yyyy-MM-dd'),
+        participants_text: selectedParticipants.join(', '),
+        decisions_text: editedDraft
+      };
+      
+      if (hasRecordsToCreate) {
+        // Filter records by enabled toggles
+        const filteredRecords = recordsToCreate.filter(r => {
+          if (r.record_type === 'compensation' && !createCompensationRecords) return false;
+          if (r.record_type === 'distribution' && !createDistributionRecords) return false;
+          if (r.record_type === 'benevolence' && !createBenevolenceRecords) return false;
+          return r.amount > 0 && r.recipient;
+        });
+        requestBody.records_to_create = filteredRecords;
+      }
+      
+      const response = await fetchWithAuth(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          minutes_type: meetingType,
-          meeting_date: format(meetingDate, 'yyyy-MM-dd'),
-          participants_text: selectedParticipants.join(', '),
-          decisions_text: editedDraft
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
+        const data = await response.json();
+        if (hasRecordsToCreate && data.created_records) {
+          setCreatedRecordsCounts(data.created_records);
+        }
         toast.success('Minutes saved successfully');
         setStep(4);
       } else {
@@ -224,6 +297,30 @@ export default function GuidedMinutesPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Add a new record to create
+  const handleAddRecord = (type) => {
+    setRecordsToCreate([...recordsToCreate, {
+      record_type: type,
+      amount: 0,
+      recipient: '',
+      date: format(meetingDate, 'yyyy-MM-dd'),
+      description: '',
+      purpose_classification: type === 'distribution' ? 'hems_support' : undefined
+    }]);
+  };
+
+  // Update a record
+  const handleUpdateRecord = (index, field, value) => {
+    const updated = [...recordsToCreate];
+    updated[index] = { ...updated[index], [field]: value };
+    setRecordsToCreate(updated);
+  };
+
+  // Remove a record
+  const handleRemoveRecord = (index) => {
+    setRecordsToCreate(recordsToCreate.filter((_, i) => i !== index));
   };
 
   // Navigation validation
@@ -569,10 +666,175 @@ export default function GuidedMinutesPage() {
         <Textarea
           value={editedDraft}
           onChange={(e) => setEditedDraft(e.target.value)}
-          rows={16}
+          rows={12}
           className="font-mono text-sm"
           data-testid="draft-body"
         />
+      </div>
+
+      {/* Create Tracking Records Section */}
+      <div className="border border-navy/20 dark:border-white/20 p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <DollarSign className="w-5 h-5 text-navy dark:text-gold" />
+          <h3 className="font-mono text-sm uppercase tracking-widest text-navy dark:text-gold">
+            Create Tracking Records from This Approved Decision
+          </h3>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Optionally create compensation, distribution, or benevolence records that will be automatically linked to these minutes.
+        </p>
+        
+        {/* Toggle switches */}
+        <div className="space-y-3 mb-4">
+          <div className="flex items-center justify-between p-3 bg-subtle-bg dark:bg-slate-800">
+            <div className="flex items-center gap-3">
+              <Wallet className="w-4 h-4 text-navy/60 dark:text-white/60" />
+              <span className="text-sm">Compensation payment records</span>
+            </div>
+            <Switch
+              checked={createCompensationRecords}
+              onCheckedChange={setCreateCompensationRecords}
+              data-testid="toggle-compensation"
+            />
+          </div>
+          <div className="flex items-center justify-between p-3 bg-subtle-bg dark:bg-slate-800">
+            <div className="flex items-center gap-3">
+              <DollarSign className="w-4 h-4 text-navy/60 dark:text-white/60" />
+              <span className="text-sm">Distribution records</span>
+            </div>
+            <Switch
+              checked={createDistributionRecords}
+              onCheckedChange={setCreateDistributionRecords}
+              data-testid="toggle-distributions"
+            />
+          </div>
+          {selectedTrust?.benevolence_enabled && (
+            <div className="flex items-center justify-between p-3 bg-subtle-bg dark:bg-slate-800">
+              <div className="flex items-center gap-3">
+                <HeartHandshake className="w-4 h-4 text-navy/60 dark:text-white/60" />
+                <span className="text-sm">Benevolence records</span>
+              </div>
+              <Switch
+                checked={createBenevolenceRecords}
+                onCheckedChange={setCreateBenevolenceRecords}
+                data-testid="toggle-benevolence"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Records to create */}
+        {(createCompensationRecords || createDistributionRecords || createBenevolenceRecords) && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              {createCompensationRecords && (
+                <Button variant="outline" size="sm" onClick={() => handleAddRecord('compensation')} data-testid="add-compensation-record">
+                  <Plus className="w-3 h-3 mr-1" /> Compensation
+                </Button>
+              )}
+              {createDistributionRecords && (
+                <Button variant="outline" size="sm" onClick={() => handleAddRecord('distribution')} data-testid="add-distribution-record">
+                  <Plus className="w-3 h-3 mr-1" /> Distribution
+                </Button>
+              )}
+              {createBenevolenceRecords && selectedTrust?.benevolence_enabled && (
+                <Button variant="outline" size="sm" onClick={() => handleAddRecord('benevolence')} data-testid="add-benevolence-record">
+                  <Plus className="w-3 h-3 mr-1" /> Benevolence
+                </Button>
+              )}
+            </div>
+
+            {recordsToCreate.length > 0 && (
+              <div className="space-y-3">
+                {recordsToCreate.map((record, index) => (
+                  <div 
+                    key={index} 
+                    className="p-3 border border-navy/10 dark:border-white/10 bg-white dark:bg-slate-900"
+                    data-testid={`record-${index}`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-mono text-xs uppercase tracking-widest text-navy dark:text-gold flex items-center gap-2">
+                        {record.record_type === 'compensation' && <Wallet className="w-3 h-3" />}
+                        {record.record_type === 'distribution' && <DollarSign className="w-3 h-3" />}
+                        {record.record_type === 'benevolence' && <HeartHandshake className="w-3 h-3" />}
+                        {record.record_type}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveRecord(index)}
+                        className="text-red-500 hover:text-red-700 h-6 w-6 p-0"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Amount ($)</Label>
+                        <Input
+                          type="number"
+                          value={record.amount || ''}
+                          onChange={(e) => handleUpdateRecord(index, 'amount', parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="mt-1"
+                          data-testid={`record-${index}-amount`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Recipient</Label>
+                        <Input
+                          value={record.recipient || ''}
+                          onChange={(e) => handleUpdateRecord(index, 'recipient', e.target.value)}
+                          placeholder="Name"
+                          className="mt-1"
+                          data-testid={`record-${index}-recipient`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Date</Label>
+                        <Input
+                          type="date"
+                          value={record.date || format(meetingDate, 'yyyy-MM-dd')}
+                          onChange={(e) => handleUpdateRecord(index, 'date', e.target.value)}
+                          className="mt-1"
+                          data-testid={`record-${index}-date`}
+                        />
+                      </div>
+                    </div>
+                    {record.record_type === 'distribution' && (
+                      <div className="mt-3">
+                        <Label className="text-xs text-muted-foreground">Purpose</Label>
+                        <Select 
+                          value={record.purpose_classification || 'hems_support'}
+                          onValueChange={(val) => handleUpdateRecord(index, 'purpose_classification', val)}
+                        >
+                          <SelectTrigger className="mt-1" data-testid={`record-${index}-purpose`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DISTRIBUTION_PURPOSES.map(p => (
+                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="mt-3">
+                      <Label className="text-xs text-muted-foreground">Description (optional)</Label>
+                      <Input
+                        value={record.description || ''}
+                        onChange={(e) => handleUpdateRecord(index, 'description', e.target.value)}
+                        placeholder="Brief description..."
+                        className="mt-1"
+                        data-testid={`record-${index}-description`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Disclaimer */}
@@ -591,9 +853,37 @@ export default function GuidedMinutesPage() {
         <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
       </div>
       <h2 className="font-serif text-2xl text-navy dark:text-gold mb-4">Minutes Saved</h2>
-      <p className="text-muted-foreground mb-8">
+      <p className="text-muted-foreground mb-4">
         Your meeting minutes have been saved successfully and are now available in your Minutes list.
       </p>
+      
+      {/* Show created records summary */}
+      {createdRecordsCounts && (createdRecordsCounts.compensation > 0 || createdRecordsCounts.distribution > 0 || createdRecordsCounts.benevolence > 0) && (
+        <div className="inline-flex flex-wrap justify-center gap-3 mb-8 p-4 bg-navy/5 dark:bg-gold/5 border border-navy/10 dark:border-gold/10">
+          <span className="font-mono text-xs uppercase tracking-widest text-navy/70 dark:text-white/70">
+            Linked Records Created:
+          </span>
+          {createdRecordsCounts.compensation > 0 && (
+            <span className="flex items-center gap-1 text-sm">
+              <Wallet className="w-4 h-4 text-navy dark:text-gold" />
+              {createdRecordsCounts.compensation} Compensation
+            </span>
+          )}
+          {createdRecordsCounts.distribution > 0 && (
+            <span className="flex items-center gap-1 text-sm">
+              <DollarSign className="w-4 h-4 text-navy dark:text-gold" />
+              {createdRecordsCounts.distribution} Distribution
+            </span>
+          )}
+          {createdRecordsCounts.benevolence > 0 && (
+            <span className="flex items-center gap-1 text-sm">
+              <HeartHandshake className="w-4 h-4 text-navy dark:text-gold" />
+              {createdRecordsCounts.benevolence} Benevolence
+            </span>
+          )}
+        </div>
+      )}
+      
       <div className="flex justify-center gap-4">
         <Button
           variant="outline"
@@ -614,6 +904,11 @@ export default function GuidedMinutesPage() {
             setDraftResponse(null);
             setEditedDraft('');
             setEditedTitle('');
+            setCreateCompensationRecords(false);
+            setCreateDistributionRecords(false);
+            setCreateBenevolenceRecords(false);
+            setRecordsToCreate([]);
+            setCreatedRecordsCounts(null);
           }}
           className="btn-primary"
           data-testid="create-another-btn"

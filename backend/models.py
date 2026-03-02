@@ -825,5 +825,47 @@ class GuidedMinutesSaveRequest(BaseModel):
     decisions_text: str
 
 
+# ==================== MINUTES ↔ MONEY INTEGRATION MODELS ====================
+
+class RecordFromMinutes(BaseModel):
+    """A single money record to create from minutes"""
+    record_type: str = Field(..., description="compensation, distribution, or benevolence")
+    amount: float
+    recipient: str
+    date: str
+    description: Optional[str] = None
+    purpose_classification: Optional[str] = None  # For distributions
+    benevolence_need: Optional[str] = None  # For benevolence
+
+class GuidedMinutesSaveWithRecordsRequest(BaseModel):
+    """Request model for saving guided minutes with linked money records"""
+    trust_id: str
+    minutes_type: str
+    meeting_date: str
+    participants_text: str
+    decisions_text: str
+    records_to_create: List[RecordFromMinutes] = Field(default_factory=list)
+
+class GuidedMinutesSaveWithRecordsResponse(BaseModel):
+    """Response after saving minutes with linked records"""
+    minutes_id: str
+    minutes_type: str
+    meeting_date: str
+    created_records: dict = Field(default_factory=dict, description="Count of created records by type")
+
+class AttachMinutesRequest(BaseModel):
+    """Request to attach existing minutes to a money record"""
+    minutes_record_id: str
+
+class MinutesSearchResult(BaseModel):
+    """Search result for minutes"""
+    minutes_id: str
+    minutes_type: str
+    meeting_date: str
+    participants_text: Optional[str] = None
+    preview: Optional[str] = None  # First 100 chars of decisions_text
+    created_at: str
+
+
 # Fix forward reference
 DashboardResponse.model_rebuild()
