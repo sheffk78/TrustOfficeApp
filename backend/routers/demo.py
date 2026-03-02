@@ -46,7 +46,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "description": "Irrevocable family trust for asset protection and generational wealth transfer.",
         "review_cadence": "quarterly",
         "role": "Trustee",
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
+        "is_demo": True
     })
     
     # ==================== TRUST 2: Johnson Education Trust ====================
@@ -62,7 +63,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "description": "Education trust for grandchildren's college expenses.",
         "review_cadence": "annual",
         "role": "Trustee",
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
+        "is_demo": True
     })
     
     # ==================== ENTITIES for Trust 1 (Multi-level Hierarchy) ====================
@@ -87,7 +89,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "manager_names": "",
         "article_ref_authority": "",
         "article_ref_profit_distribution": "",
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
+        "is_demo": True
     })
     
     holding_llc_id = f"entity_{uuid.uuid4().hex[:12]}"
@@ -111,7 +114,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "manager_names": "John Smith",
         "article_ref_authority": "Section 3.2",
         "article_ref_profit_distribution": "Section 5.1",
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
+        "is_demo": True
     })
     
     real_estate_llc_id = f"entity_{uuid.uuid4().hex[:12]}"
@@ -135,7 +139,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "manager_names": "John Smith",
         "article_ref_authority": "Section 3.1",
         "article_ref_profit_distribution": "Section 4.2",
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
+        "is_demo": True
     })
     
     investment_corp_id = f"entity_{uuid.uuid4().hex[:12]}"
@@ -159,7 +164,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "manager_names": "John Smith (President), Jane Smith (Secretary)",
         "article_ref_authority": "Bylaws Article III",
         "article_ref_profit_distribution": "Bylaws Article V",
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
+        "is_demo": True
     })
     
     # ==================== ENTITY RELATIONSHIPS (Hierarchy) for Trust 1 ====================
@@ -173,7 +179,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "relationship_type": "owns",
             "ownership_percentage": 100,
             "notes": "Trust is sole member of holding LLC",
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
@@ -184,7 +191,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "relationship_type": "owns",
             "ownership_percentage": 100,
             "notes": "Holding LLC is sole member of real estate entity",
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
@@ -195,7 +203,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "relationship_type": "owns",
             "ownership_percentage": 100,
             "notes": "Holding LLC is sole shareholder of investment corp",
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         }
     ])
     
@@ -221,7 +230,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "manager_names": "",
         "article_ref_authority": "",
         "article_ref_profit_distribution": "",
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
+        "is_demo": True
     })
     
     # ==================== SCHEDULE A ASSETS (Including DISPOSED examples) ====================
@@ -250,7 +260,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "item_id": f"asset_{uuid.uuid4().hex[:12]}", 
@@ -268,7 +279,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "item_id": f"asset_{uuid.uuid4().hex[:12]}", 
@@ -286,7 +298,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "item_id": f"asset_{uuid.uuid4().hex[:12]}", 
@@ -304,7 +317,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "item_id": f"asset_{uuid.uuid4().hex[:12]}", 
@@ -322,7 +336,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         # DISPOSED Asset - Vehicle sold
         {
@@ -341,7 +356,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": vehicle_disposition_minutes_id,
             "disposition_date": (now - timedelta(days=120)).isoformat()[:10],
             "disposition_notes": "Reason: sale. Buyer: CarMax Delaware. Value: $38,500. Proceeds deposited to trust operating account.",
-            "created_at": (now - timedelta(days=365)).isoformat()
+            "created_at": (now - timedelta(days=365)).isoformat(),
+            "is_demo": True
         },
         # Active personal property
         {
@@ -360,7 +376,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "item_id": f"asset_{uuid.uuid4().hex[:12]}", 
@@ -378,7 +395,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "item_id": f"asset_{uuid.uuid4().hex[:12]}", 
@@ -396,7 +414,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         # Trust 2 Assets
         {
@@ -415,7 +434,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         },
         {
             "item_id": f"asset_{uuid.uuid4().hex[:12]}", 
@@ -433,7 +453,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "disposition_minutes_ref": None,
             "disposition_date": None,
             "disposition_notes": None,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
+            "is_demo": True
         }
     ])
     
@@ -632,7 +653,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "total_authorized_units": 100,
         "unit_label": "Certificate Unit",
         "allow_fractional": False,
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
+        "is_demo": True
     })
     
     await db.trust_unit_certificates.insert_many([
@@ -685,9 +707,8 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
 @router.delete("/data")
 async def delete_demo_data(user: dict = Depends(require_write_access)):
     """
-    Delete all user data (trusts and related records).
-    This allows users to start fresh or clean up demo data.
-    CAUTION: This action is irreversible!
+    Delete only demo data (records with is_demo: True).
+    User-created data is preserved.
     """
     user_id = user["user_id"]
     
@@ -695,6 +716,7 @@ async def delete_demo_data(user: dict = Depends(require_write_access)):
     deleted_counts = {}
     
     # Delete in order (children first, then parents)
+    # Only delete records that have is_demo: True
     collections_to_clean = [
         ("trust_unit_certificates", "trust_unit_certificates"),
         ("trust_unit_transfers", "trust_unit_transfers"),
@@ -714,31 +736,17 @@ async def delete_demo_data(user: dict = Depends(require_write_access)):
     
     for collection_name, display_name in collections_to_clean:
         collection = db[collection_name]
-        result = await collection.delete_many({"user_id": user_id})
+        # Only delete records marked as demo data
+        result = await collection.delete_many({"user_id": user_id, "is_demo": True})
         if result.deleted_count > 0:
             deleted_counts[display_name] = result.deleted_count
-    
-    # Keep notification preferences and subscription - just reset preferences
-    await db.notification_preferences.update_one(
-        {"user_id": user_id},
-        {"$set": {
-            "minutes_created": True,
-            "distribution_created": True,
-            "distribution_approved": True,
-            "task_reminders": True,
-            "task_overdue": True,
-            "subscription_updates": True,
-            "weekly_digest": True
-        }},
-        upsert=True
-    )
     
     total_deleted = sum(deleted_counts.values())
     
     return {
-        "message": f"Successfully deleted {total_deleted} records",
+        "message": f"Successfully deleted {total_deleted} demo records",
         "deleted_counts": deleted_counts,
-        "notes": "Subscription and notification preferences were preserved. You can now seed new demo data with POST /api/demo/seed"
+        "notes": "Only demo data was removed. Your custom trusts and data remain intact."
     }
 
 
@@ -746,10 +754,11 @@ async def delete_demo_data(user: dict = Depends(require_write_access)):
 async def get_demo_status(user: dict = Depends(get_current_user)):
     """
     Check if user has demo data and get counts of all records.
-    Useful for determining if demo data should be seeded or deleted.
+    Separates demo data from user-created data.
     """
     user_id = user["user_id"]
     
+    # Count all records
     counts = {
         "trusts": await db.trusts.count_documents({"user_id": user_id}),
         "entities": await db.entities.count_documents({"user_id": user_id}),
@@ -763,13 +772,32 @@ async def get_demo_status(user: dict = Depends(get_current_user)):
         "trust_unit_certificates": await db.trust_unit_certificates.count_documents({"user_id": user_id}),
     }
     
+    # Count demo records only
+    demo_counts = {
+        "trusts": await db.trusts.count_documents({"user_id": user_id, "is_demo": True}),
+        "entities": await db.entities.count_documents({"user_id": user_id, "is_demo": True}),
+        "schedule_a_items": await db.schedule_a_items.count_documents({"user_id": user_id, "is_demo": True}),
+        "minutes_records": await db.minutes_records.count_documents({"user_id": user_id, "is_demo": True}),
+        "distribution_records": await db.distribution_records.count_documents({"user_id": user_id, "is_demo": True}),
+        "benevolence_records": await db.benevolence_records.count_documents({"user_id": user_id, "is_demo": True}),
+        "governance_tasks": await db.governance_tasks.count_documents({"user_id": user_id, "is_demo": True}),
+        "compensation_plans": await db.compensation_plans.count_documents({"user_id": user_id, "is_demo": True}),
+        "compensation_payments": await db.compensation_payments.count_documents({"user_id": user_id, "is_demo": True}),
+        "trust_unit_certificates": await db.trust_unit_certificates.count_documents({"user_id": user_id, "is_demo": True}),
+    }
+    
     total = sum(counts.values())
+    total_demo = sum(demo_counts.values())
     has_data = total > 0
+    has_demo_data = total_demo > 0
     
     return {
         "has_data": has_data,
+        "has_demo_data": has_demo_data,
         "total_records": total,
+        "total_demo_records": total_demo,
         "counts": counts,
-        "can_seed": not has_data,
-        "can_delete": has_data
+        "demo_counts": demo_counts,
+        "can_seed": not has_demo_data,
+        "can_delete_demo": has_demo_data
     }

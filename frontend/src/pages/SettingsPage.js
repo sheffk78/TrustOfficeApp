@@ -749,7 +749,7 @@ export default function SettingsPage() {
               <h2 className="font-serif text-xl text-navy">Demo Data Management</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Load sample data to explore TrustOffice features. You can remove it anytime using the reset button below.
+              Load sample data to explore TrustOffice features. Demo data can be removed at any time without affecting your own trusts and records.
             </p>
             
             {demoStatus && (
@@ -759,18 +759,30 @@ export default function SettingsPage() {
                   <div>
                     <p className="font-mono text-lg text-navy">{demoStatus.counts?.trusts || 0}</p>
                     <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Trusts</p>
+                    {demoStatus.demo_counts?.trusts > 0 && (
+                      <p className="font-mono text-[9px] text-gold">({demoStatus.demo_counts.trusts} demo)</p>
+                    )}
                   </div>
                   <div>
                     <p className="font-mono text-lg text-navy">{demoStatus.counts?.minutes_records || 0}</p>
                     <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Minutes</p>
+                    {demoStatus.demo_counts?.minutes_records > 0 && (
+                      <p className="font-mono text-[9px] text-gold">({demoStatus.demo_counts.minutes_records} demo)</p>
+                    )}
                   </div>
                   <div>
                     <p className="font-mono text-lg text-navy">{demoStatus.counts?.schedule_a_items || 0}</p>
                     <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Assets</p>
+                    {demoStatus.demo_counts?.schedule_a_items > 0 && (
+                      <p className="font-mono text-[9px] text-gold">({demoStatus.demo_counts.schedule_a_items} demo)</p>
+                    )}
                   </div>
                   <div>
                     <p className="font-mono text-lg text-navy">{demoStatus.total_records || 0}</p>
                     <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Total Records</p>
+                    {demoStatus.total_demo_records > 0 && (
+                      <p className="font-mono text-[9px] text-gold">({demoStatus.total_demo_records} demo)</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -779,7 +791,7 @@ export default function SettingsPage() {
             <div className="flex flex-wrap gap-3">
               <Button
                 onClick={handleSeedDemoData}
-                disabled={demoLoading || (demoStatus?.has_data)}
+                disabled={demoLoading || (demoStatus?.has_demo_data)}
                 className="btn-primary"
                 data-testid="seed-demo-btn"
               >
@@ -795,44 +807,43 @@ export default function SettingsPage() {
                 <DialogTrigger asChild>
                   <Button
                     variant="outline"
-                    disabled={demoLoading || !demoStatus?.has_data}
+                    disabled={demoLoading || !demoStatus?.has_demo_data}
                     className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                     data-testid="delete-data-btn"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Remove All Data & Start Fresh
+                    Remove Demo Data
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle className="font-serif text-xl text-red-600">Remove All Data & Start Fresh?</DialogTitle>
+                    <DialogTitle className="font-serif text-xl text-red-600">Remove Demo Data?</DialogTitle>
                     <DialogDescription>
-                      This will permanently delete ALL trust data from your account (including demo data and any data you've created):
+                      This will remove all sample/demo data from your account. Your own trusts and records will NOT be affected.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      The following demo/sample items will be removed:
+                    </p>
                     <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                      <li>All trusts and entities</li>
-                      <li>Schedule A assets</li>
-                      <li>Meeting minutes</li>
-                      <li>Distribution records</li>
-                      <li>Benevolence records</li>
-                      <li>Compensation plans and payments</li>
-                      <li>Governance tasks</li>
-                      <li>Trust unit certificates</li>
+                      <li>Demo trusts and entities</li>
+                      <li>Demo Schedule A assets</li>
+                      <li>Demo meeting minutes</li>
+                      <li>Demo distribution records</li>
+                      <li>Demo benevolence records</li>
+                      <li>Demo compensation plans and payments</li>
+                      <li>Demo governance tasks</li>
+                      <li>Demo trust unit certificates</li>
                     </ul>
-                    <div className="mt-4 p-3 bg-red-50 border border-red-200">
-                      <p className="text-sm font-medium text-red-600">
-                        Warning: This action cannot be undone!
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200">
+                      <p className="text-sm font-medium text-green-700">
+                        Your custom data is safe!
                       </p>
-                      <p className="mt-1 text-xs text-red-500">
-                        This will delete all trust data, including any data you've created. 
-                        Use this to start fresh or after testing with demo data.
+                      <p className="mt-1 text-xs text-green-600">
+                        Any trusts, minutes, or records you created yourself will NOT be deleted.
                       </p>
                     </div>
-                    <p className="mt-4 text-sm text-muted-foreground">
-                      Your account and billing information will be preserved.
-                    </p>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setDeleteDemoDialogOpen(false)}>
@@ -849,7 +860,7 @@ export default function SettingsPage() {
                       ) : (
                         <Trash2 className="w-4 h-4 mr-2" />
                       )}
-                      Yes, Reset Everything
+                      Remove Demo Data
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -866,7 +877,7 @@ export default function SettingsPage() {
               </Button>
             </div>
             
-            {!demoStatus?.has_data && (
+            {!demoStatus?.has_demo_data && (
               <p className="mt-4 text-xs text-muted-foreground">
                 Demo data includes 2 trusts, entity hierarchy, Schedule A with active & disposed assets, 
                 minutes of various types (quarterly, annual, disposition, benevolence), distributions, 
