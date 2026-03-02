@@ -261,6 +261,8 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ### P2 (Medium-term)
 - [x] Fix Compensation API schema mismatch (Feb 25, 2026)
+- [ ] PDF Export for Trust Unit Certificates
+- [ ] Beneficiary Dashboard for unit allocations
 - [ ] Audit Log (backend + UI)
 - [ ] Receipt/invoice download
 - [ ] Feedback process
