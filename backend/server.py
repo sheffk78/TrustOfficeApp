@@ -67,7 +67,7 @@ from routers.compensation import router as compensation_router
 from routers.subscriptions import router as subscriptions_router
 from routers.benevolence import router as benevolence_router
 from routers.exports import router as exports_router
-from routers.trust_units import router as trust_units_router
+from routers.trust_units import router as trust_units_router, get_or_create_units_settings
 from routers.trusts import router as trusts_router
 from routers.entities import router as entities_router
 from routers.tasks import router as tasks_router
