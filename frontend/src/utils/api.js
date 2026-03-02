@@ -71,11 +71,44 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
     }
   });
   
-  // Handle 402 Payment Required (subscription expired)
+  // Handle 402 Payment Required (subscription expired - blocks all access)
   if (response.status === 402) {
-    // Emit a custom event for subscription expiration
     window.dispatchEvent(new CustomEvent('subscription-expired'));
   }
   
+  // Handle 403 Forbidden (read-only mode - blocks write operations)
+  if (response.status === 403) {
+    // Parse response to check if it's a subscription read-only error
+    try {
+      const errorData = await response.clone().json();
+      if (errorData.is_read_only) {
+        window.dispatchEvent(new CustomEvent('subscription-readonly', {
+          detail: {
+            message: errorData.detail,
+            status: errorData.subscription_status,
+            trialDaysRemaining: errorData.trial_days_remaining
+          }
+        }));
+      }
+    } catch (e) {
+      // Not a JSON response, ignore
+    }
+  }
+  
   return response;
+};
+
+// Helper to check if a response is a read-only error
+export const isReadOnlyError = (response) => {
+  return response.status === 403;
+};
+
+// Helper to extract error message from response
+export const getErrorMessage = async (response) => {
+  try {
+    const data = await response.json();
+    return data.detail || 'An error occurred';
+  } catch {
+    return 'An error occurred';
+  }
 };
