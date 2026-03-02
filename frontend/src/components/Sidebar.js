@@ -40,6 +40,7 @@ const navItems = [
   { path: '/structure', icon: GitBranch, label: 'Hierarchy', group: 'Structures' },
   { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
   { path: '/trust/units', icon: Award, label: 'Units', group: 'Structures' },
+  { path: '/trust/beneficiaries', icon: Users, label: 'Beneficiaries', group: 'Structures' },
   { path: '/governance', icon: Shield, label: 'Governance Health' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
