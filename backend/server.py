@@ -5506,6 +5506,188 @@ async def get_recent_activity(user_id: str, trust_id: Optional[str] = None, limi
 async def get_activity(trust_id: Optional[str] = None, limit: int = 20, user: dict = Depends(get_current_user)):
     return await get_recent_activity(user["user_id"], trust_id, limit)
 
+# ==================== UNIFIED DASHBOARD ENDPOINT ====================
+
+def generate_governance_insights(criteria: List[dict]) -> List[GovernanceInsight]:
+    """
+    Generate actionable insights from health score criteria.
+    Same logic as frontend Governance Insights card.
+    """
+    insights = []
+    
+    for c in criteria:
+        if not c["achieved"]:
+            if c["name"] == "Quarterly Minutes":
+                insights.append(GovernanceInsight(
+                    type="warning",
+                    criterion_name="Quarterly Minutes",
+                    title="Missing Q Minutes",
+                    description="Generate minutes this quarter to earn +20 points",
+                    action_path="/minutes/new",
+                    action_label="Record Now",
+                    points=20
+                ))
+            elif c["name"] == "Task Compliance":
+                insights.append(GovernanceInsight(
+                    type="error",
+                    criterion_name="Task Compliance",
+                    title="Overdue Tasks",
+                    description="Complete overdue tasks to earn +20 points",
+                    action_path="/calendar",
+                    action_label="View Tasks",
+                    points=20
+                ))
+            elif c["name"] == "Compensation Alignment":
+                insights.append(GovernanceInsight(
+                    type="error",
+                    criterion_name="Compensation Alignment",
+                    title="Compensation Over Plan",
+                    description="YTD compensation exceeds approved amount",
+                    action_path="/compensation",
+                    action_label="Review",
+                    points=20
+                ))
+            elif c["name"] == "Distribution Documentation":
+                insights.append(GovernanceInsight(
+                    type="info",
+                    criterion_name="Distribution Documentation",
+                    title="No Distributions Logged",
+                    description="Log your first distribution to earn +20 points",
+                    action_path="/distributions",
+                    action_label="Add Distribution",
+                    points=20
+                ))
+            elif c["name"] == "Annual Review":
+                insights.append(GovernanceInsight(
+                    type="warning",
+                    criterion_name="Annual Review",
+                    title="Annual Review Due",
+                    description="Complete annual review for +20 points",
+                    action_path="/calendar",
+                    action_label="Schedule Review",
+                    points=20
+                ))
+    
+    return insights
+
+async def get_dashboard_stats(trust_id: str, user_id: str) -> DashboardStats:
+    """
+    Calculate dashboard statistics for a trust.
+    """
+    now = datetime.now(timezone.utc)
+    year_start = get_year_start(now)
+    
+    # Total decisions (approved minutes)
+    total_decisions = await db.minutes_records.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    
+    # Pending reviews (incomplete tasks)
+    pending_reviews = await db.governance_tasks.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "completed_at": None
+    })
+    
+    # Total distributions
+    total_distributions = await db.distribution_records.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    
+    # YTD distributions amount
+    ytd_distributions = await db.distribution_records.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "date": {"$gte": year_start.isoformat()}
+    }, {"_id": 0, "amount": 1}).to_list(1000)
+    ytd_amount = sum(d.get("amount", 0) for d in ytd_distributions)
+    
+    return DashboardStats(
+        total_decisions=total_decisions,
+        pending_reviews=pending_reviews,
+        total_distributions=total_distributions,
+        ytd_distributions_amount=ytd_amount
+    )
+
+async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> OnboardingState:
+    """
+    Get onboarding state for a user, auto-updating if trust provided.
+    Shared logic used by /api/onboarding and /api/dashboard.
+    """
+    if trust_id:
+        await auto_update_onboarding(user_id, trust_id)
+    
+    state = await db.user_onboarding.find_one({"user_id": user_id}, {"_id": 0})
+    if not state:
+        state = {
+            "user_id": user_id,
+            "entities_confirmed": False,
+            "calendar_set": False,
+            "minutes_generated": False,
+            "distribution_logged": False,
+            "checklist_dismissed": False
+        }
+    
+    return OnboardingState(**state)
+
+@api_router.get("/dashboard", response_model=DashboardResponse)
+async def get_dashboard(user: dict = Depends(get_current_user)):
+    """
+    Unified dashboard endpoint that aggregates:
+    - Health score (from calculate_health_score)
+    - Onboarding state
+    - Recent activity
+    - Stats (total decisions, pending reviews, etc.)
+    - Governance insights (actionable suggestions)
+    
+    Automatically resolves the user's primary trust.
+    """
+    user_id = user["user_id"]
+    
+    # Get user's primary trust (first trust or most recently accessed)
+    trust = await db.trusts.find_one(
+        {"user_id": user_id},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    
+    if not trust:
+        raise HTTPException(
+            status_code=404, 
+            detail="No trust found. Please create a trust first."
+        )
+    
+    trust_id = trust["trust_id"]
+    trust_name = trust.get("name", "Unnamed Trust")
+    
+    # Calculate health score (reuses same function as /api/governance/{trust_id})
+    health_data = await calculate_health_score(trust_id, user_id)
+    health_score = HealthScoreResponse(**health_data)
+    
+    # Get onboarding state (reuses same logic as /api/onboarding)
+    onboarding_state = await get_onboarding_state(user_id, trust_id)
+    
+    # Get recent activity (reuses same function as /api/activity)
+    recent_activity = await get_recent_activity(user_id, trust_id, limit=10)
+    
+    # Calculate stats
+    stats = await get_dashboard_stats(trust_id, user_id)
+    
+    # Generate governance insights from unachieved criteria
+    governance_insights = generate_governance_insights(health_data["criteria"])
+    
+    return DashboardResponse(
+        trust_id=trust_id,
+        trust_name=trust_name,
+        health_score=health_score,
+        onboarding_state=onboarding_state,
+        recent_activity=recent_activity,
+        stats=stats,
+        governance_insights=governance_insights
+    )
+
 # ==================== CATEGORIES ====================
 
 @api_router.get("/categories")
