@@ -31,6 +31,7 @@ import TrustUnitsPage from "@/pages/TrustUnitsPage";
 import BeneficiaryDashboardPage from "@/pages/BeneficiaryDashboardPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
 
 // GA4 page view tracking for SPA navigation
