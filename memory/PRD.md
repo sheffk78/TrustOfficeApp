@@ -418,10 +418,13 @@ The backend now has a modular structure for better maintainability:
 ## Prioritized Backlog
 
 ### P0 (Technical Debt) - IN PROGRESS (Mar 2, 2026)
-- [x] Backend refactoring - Created modular structure with database.py, models.py, dependencies.py
+- [x] Backend modular structure - Created database.py, models.py, dependencies.py
 - [x] Created routers/ directory with domain-specific router modules
-- [ ] Complete migration of endpoints from server.py to individual routers (gradual)
-- [ ] Implement hard feature gating based on Stripe subscription status
+- [x] Completed routers: auth.py, trusts.py, entities.py, tasks.py, units.py
+- [x] Frontend read-only mode integration with ReadOnlyBanner
+- [x] Unified subscription state management (get_subscription_state helper)
+- [ ] Migrate remaining endpoints from server.py to routers (minutes, distributions, governance, etc.)
+- [ ] Migration guide created at /app/backend/MIGRATION_GUIDE.md
 
 ### P1 (Short-term) - COMPLETE (Feb 23-25, 2026)
 - [x] Profile editing (name change) - Edit button in Settings > Profile section
