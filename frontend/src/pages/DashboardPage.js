@@ -127,12 +127,14 @@ export default function DashboardPage() {
     }
   };
 
-  // Load AI-generated governance suggestions
+  // Load AI-generated governance suggestions with fallback to static insights
   const loadAiSuggestions = async () => {
     if (!selectedTrust) return;
     
     setAiSuggestionsLoading(true);
     setAiSuggestionsError(false);
+    setAiSuggestionsFallback(false);
+    
     try {
       const response = await fetchWithAuth('/ai/governance-suggestions', {
         method: 'POST',
@@ -143,15 +145,40 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         setAiSuggestions(data.suggestions || []);
+        setAiSuggestionsFallback(false);
       } else {
-        console.error('Failed to load AI suggestions');
-        setAiSuggestionsError(true);
+        // AI failed - use static governance insights as fallback
+        console.error('AI suggestions unavailable, using static fallback');
+        useFallbackSuggestions();
       }
     } catch (error) {
       console.error('Failed to load AI suggestions:', error);
-      setAiSuggestionsError(true);
+      // AI failed - use static governance insights as fallback
+      useFallbackSuggestions();
     } finally {
       setAiSuggestionsLoading(false);
+    }
+  };
+
+  // Fallback to static governance insights when AI is unavailable
+  const useFallbackSuggestions = () => {
+    // Use the existing governance_insights from dashboard data as fallback
+    const insights = dashboard?.governance_insights || [];
+    const fallbackSuggestions = insights.slice(0, 4).map(insight => ({
+      title: insight.title,
+      description: insight.description,
+      route: insight.action_path,
+      estimated_points_gain: insight.points
+    }));
+    
+    if (fallbackSuggestions.length > 0) {
+      setAiSuggestions(fallbackSuggestions);
+      setAiSuggestionsFallback(true);
+      setAiSuggestionsError(false);
+    } else {
+      // No fallback data available either
+      setAiSuggestionsError(true);
+      setAiSuggestions([]);
     }
   };
 
