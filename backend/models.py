@@ -689,6 +689,7 @@ class DashboardResponse(BaseModel):
     recent_activity: List[dict]
     stats: DashboardStats
     governance_insights: List[GovernanceInsight]
+    subscription: Optional["DashboardSubscriptionState"] = None
 
 class OnboardingState(BaseModel):
     user_id: str
