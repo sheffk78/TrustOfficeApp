@@ -5426,6 +5426,121 @@ async def delete_distribution(distribution_id: str, user: dict = Depends(get_cur
         raise HTTPException(status_code=404, detail="Distribution not found")
     return {"message": "Distribution deleted"}
 
+# ==================== BENEVOLENCE LOG ENDPOINT ====================
+
+@api_router.get("/benevolence-log", response_model=BenevolenceLogResponse)
+async def get_benevolence_log(
+    trust_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Get all benevolence distributions for a trust with aggregated totals.
+    
+    Returns:
+    - All distributions where is_benevolence = true
+    - Monthly aggregates (amount and count)
+    - Yearly aggregates (amount and count)
+    - Count of distributions with incomplete documentation
+    """
+    user_id = user["user_id"]
+    
+    # Get trust
+    if trust_id:
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"_id": 0}
+        )
+        if not trust:
+            raise HTTPException(status_code=404, detail="Trust not found")
+    else:
+        trust = await db.trusts.find_one(
+            {"user_id": user_id},
+            {"_id": 0},
+            sort=[("created_at", -1)]
+        )
+        if not trust:
+            raise HTTPException(status_code=404, detail="No trust found")
+    
+    trust_id = trust["trust_id"]
+    trust_name = trust.get("name", "Unnamed Trust")
+    
+    # Get all benevolence distributions
+    query = {
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "is_benevolence": True
+    }
+    
+    benevolence_dists = await db.distribution_records.find(
+        query, {"_id": 0}
+    ).sort("date", -1).to_list(10000)
+    
+    # Calculate aggregates
+    monthly_map = {}
+    yearly_map = {}
+    total_amount = 0
+    incomplete_count = 0
+    
+    for dist in benevolence_dists:
+        amount = dist.get("amount", 0)
+        total_amount += amount
+        
+        # Check for incomplete documentation
+        if not dist.get("benevolence_recipient_name") or not dist.get("benevolence_need_description"):
+            incomplete_count += 1
+        # Also check if approved (has minutes reference or approval)
+        if not dist.get("approved_at") and not dist.get("minutes_record_id"):
+            incomplete_count += 1
+        
+        # Parse date for aggregation
+        date_str = dist.get("date", "")
+        if date_str:
+            try:
+                # Extract year and month
+                parts = date_str.split("-")
+                if len(parts) >= 2:
+                    year = int(parts[0])
+                    month = f"{parts[0]}-{parts[1]}"
+                    
+                    # Monthly
+                    if month not in monthly_map:
+                        monthly_map[month] = {"total_amount": 0, "count": 0}
+                    monthly_map[month]["total_amount"] += amount
+                    monthly_map[month]["count"] += 1
+                    
+                    # Yearly
+                    if year not in yearly_map:
+                        yearly_map[year] = {"total_amount": 0, "count": 0}
+                    yearly_map[year]["total_amount"] += amount
+                    yearly_map[year]["count"] += 1
+            except (ValueError, IndexError):
+                pass
+    
+    # Convert aggregates to lists
+    monthly_aggregates = [
+        BenevolenceMonthlyAggregate(month=k, total_amount=v["total_amount"], count=v["count"])
+        for k, v in sorted(monthly_map.items(), reverse=True)
+    ]
+    
+    yearly_aggregates = [
+        BenevolenceYearlyAggregate(year=k, total_amount=v["total_amount"], count=v["count"])
+        for k, v in sorted(yearly_map.items(), reverse=True)
+    ]
+    
+    # Convert distributions to response format
+    distributions = [DistributionResponse(**d) for d in benevolence_dists]
+    
+    return BenevolenceLogResponse(
+        trust_id=trust_id,
+        trust_name=trust_name,
+        distributions=distributions,
+        monthly_aggregates=monthly_aggregates,
+        yearly_aggregates=yearly_aggregates,
+        total_all_time=total_amount,
+        total_count=len(benevolence_dists),
+        incomplete_documentation_count=incomplete_count
+    )
+
 # ==================== COMPENSATION PLAN ENDPOINTS ====================
 
 @api_router.post("/compensation-plans", response_model=CompensationPlanResponse)
