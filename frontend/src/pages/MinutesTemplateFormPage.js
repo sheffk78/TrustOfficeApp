@@ -25,6 +25,7 @@ const TEMPLATE_TITLES = {
   'general_meeting': 'General Meeting Minutes',
   'distribution_to_beneficiaries': 'Distribution to Beneficiaries',
   'acceptance_of_property': 'Accept Property into Trust',
+  'disposition_of_asset': 'Dispose / Sell Asset',
   'appointment_additional_trustee': 'Appoint Additional Trustee',
   'appointment_successor_trustee': 'Appoint Successor Trustee',
   'designation_of_beneficiaries': 'Designate Beneficiaries',
