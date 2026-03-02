@@ -126,3 +126,25 @@ async def call_claude_haiku(
         max_tokens=max_tokens,
         temperature=temperature
     )
+
+
+
+async def ping_claude() -> bool:
+    """
+    Health check function - sends a trivial prompt to Claude Haiku.
+    Returns True if the response matches expectations, False otherwise.
+    Used by /api/ai/health endpoint for internal testing.
+    """
+    try:
+        response = await call_claude(
+            model=CLAUDE_HAIKU,
+            system_prompt="You are a simple echo bot. Respond with exactly the word requested.",
+            user_content="Reply with the word PONG",
+            max_tokens=10,
+            temperature=0.0
+        )
+        # Check if response contains "PONG" (case insensitive)
+        return "pong" in response.lower()
+    except Exception as e:
+        logger.error(f"Claude health check failed: {str(e)}")
+        return False
