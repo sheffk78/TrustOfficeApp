@@ -289,7 +289,7 @@ class TestBootstrapEdgeCases:
             json=minutes_payload
         )
         
-        if create_response.status_code != 201:
+        if create_response.status_code not in [200, 201]:
             pytest.skip(f"Could not create test minutes: {create_response.status_code}")
         
         minutes_id = create_response.json()["minutes_id"]
@@ -349,7 +349,7 @@ class TestBootstrapEdgeCases:
             json=minutes_payload
         )
         
-        if create_response.status_code != 201:
+        if create_response.status_code not in [200, 201]:
             pytest.skip(f"Could not create test minutes: {create_response.status_code}")
         
         minutes_id = create_response.json()["minutes_id"]
@@ -435,7 +435,7 @@ class TestBootstrapResponseFields:
             json=minutes_payload
         )
         
-        if create_response.status_code != 201:
+        if create_response.status_code not in [200, 201]:
             pytest.skip(f"Could not create test minutes: {create_response.status_code}")
         
         minutes_id = create_response.json()["minutes_id"]
