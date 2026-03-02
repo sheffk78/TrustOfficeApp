@@ -45,6 +45,149 @@ SUBSCRIPTION_EXEMPT_PATHS = {
 READ_ONLY_ERROR_MESSAGE = "Your subscription is inactive. Please subscribe to create, update, or delete data."
 READ_ONLY_ERROR_CODE = 403
 
+# Premium feature error message
+PREMIUM_FEATURE_ERROR_MESSAGE = "This feature requires a paid subscription. Please upgrade from trial to access."
+PREMIUM_FEATURE_ERROR_CODE = 402
+
+
+# ==================== FEATURE GATING ====================
+
+class Feature:
+    """Feature flags for premium gating"""
+    # Core features - available to all (trial + paid)
+    MINUTES_BASIC = "minutes_basic"
+    DISTRIBUTIONS_BASIC = "distributions_basic"
+    GOVERNANCE_BASIC = "governance_basic"
+    SINGLE_TRUST = "single_trust"
+    
+    # Premium features - paid only (monthly/annual)
+    PDF_NO_WATERMARK = "pdf_no_watermark"
+    CSV_EXPORT = "csv_export"
+    MULTIPLE_TRUSTS = "multiple_trusts"
+    BENEVOLENCE_MODE = "benevolence_mode"
+    BENEFICIARY_DASHBOARD = "beneficiary_dashboard"
+    TRUST_UNITS = "trust_units"
+    GOVERNANCE_HISTORY = "governance_history"
+    ADVANCED_TEMPLATES = "advanced_templates"
+
+
+# Features available to each plan type
+PLAN_FEATURES = {
+    "trial": {
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.SINGLE_TRUST,
+        # Trial gets limited features with watermark
+    },
+    "monthly": {
+        # All core features
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.SINGLE_TRUST,
+        # Plus all premium features
+        Feature.PDF_NO_WATERMARK,
+        Feature.CSV_EXPORT,
+        Feature.MULTIPLE_TRUSTS,
+        Feature.BENEVOLENCE_MODE,
+        Feature.BENEFICIARY_DASHBOARD,
+        Feature.TRUST_UNITS,
+        Feature.GOVERNANCE_HISTORY,
+        Feature.ADVANCED_TEMPLATES,
+    },
+    "annual": {
+        # Same as monthly
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.SINGLE_TRUST,
+        Feature.PDF_NO_WATERMARK,
+        Feature.CSV_EXPORT,
+        Feature.MULTIPLE_TRUSTS,
+        Feature.BENEVOLENCE_MODE,
+        Feature.BENEFICIARY_DASHBOARD,
+        Feature.TRUST_UNITS,
+        Feature.GOVERNANCE_HISTORY,
+        Feature.ADVANCED_TEMPLATES,
+    }
+}
+
+
+async def check_feature_access(user_id: str, feature: str) -> bool:
+    """
+    Check if a user has access to a specific feature based on their subscription plan.
+    Returns True if access is granted, False otherwise.
+    """
+    state = await get_subscription_state(user_id)
+    
+    # If subscription is not active, no premium features
+    if not state.is_active:
+        return feature in PLAN_FEATURES.get("trial", set())
+    
+    plan_features = PLAN_FEATURES.get(state.plan_type, set())
+    return feature in plan_features
+
+
+async def require_feature(feature: str, user: dict) -> dict:
+    """
+    Dependency that checks if user has access to a specific feature.
+    Raises 402 if feature is not available on their plan.
+    """
+    has_access = await check_feature_access(user["user_id"], feature)
+    
+    if not has_access:
+        state = await get_subscription_state(user["user_id"])
+        raise HTTPException(
+            status_code=PREMIUM_FEATURE_ERROR_CODE,
+            detail=f"{PREMIUM_FEATURE_ERROR_MESSAGE} Feature: {feature}",
+            headers={
+                "X-Required-Feature": feature,
+                "X-Current-Plan": state.plan_type
+            }
+        )
+    
+    return user
+
+
+def require_premium_feature(feature: str):
+    """
+    Factory function to create a dependency that requires a specific feature.
+    Usage: user = Depends(require_premium_feature(Feature.CSV_EXPORT))
+    """
+    async def _require_feature(user: dict = Depends(get_current_user)) -> dict:
+        return await require_feature(feature, user)
+    return _require_feature
+
+
+async def get_user_features(user_id: str) -> dict:
+    """
+    Get a dictionary of all features and whether the user has access to them.
+    Useful for frontend to show/hide features.
+    """
+    state = await get_subscription_state(user_id)
+    plan_features = PLAN_FEATURES.get(state.plan_type, set()) if state.is_active else PLAN_FEATURES.get("trial", set())
+    
+    return {
+        "plan_type": state.plan_type,
+        "is_active": state.is_active,
+        "is_trial": state.is_trial,
+        "features": {
+            Feature.MINUTES_BASIC: Feature.MINUTES_BASIC in plan_features,
+            Feature.DISTRIBUTIONS_BASIC: Feature.DISTRIBUTIONS_BASIC in plan_features,
+            Feature.GOVERNANCE_BASIC: Feature.GOVERNANCE_BASIC in plan_features,
+            Feature.SINGLE_TRUST: Feature.SINGLE_TRUST in plan_features,
+            Feature.PDF_NO_WATERMARK: Feature.PDF_NO_WATERMARK in plan_features,
+            Feature.CSV_EXPORT: Feature.CSV_EXPORT in plan_features,
+            Feature.MULTIPLE_TRUSTS: Feature.MULTIPLE_TRUSTS in plan_features,
+            Feature.BENEVOLENCE_MODE: Feature.BENEVOLENCE_MODE in plan_features,
+            Feature.BENEFICIARY_DASHBOARD: Feature.BENEFICIARY_DASHBOARD in plan_features,
+            Feature.TRUST_UNITS: Feature.TRUST_UNITS in plan_features,
+            Feature.GOVERNANCE_HISTORY: Feature.GOVERNANCE_HISTORY in plan_features,
+            Feature.ADVANCED_TEMPLATES: Feature.ADVANCED_TEMPLATES in plan_features,
+        }
+    }
+
 
 # ==================== SUBSCRIPTION STATE ====================
 
