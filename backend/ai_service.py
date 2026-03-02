@@ -6,16 +6,28 @@ Note: Requires CLAUDE_API_KEY or EMERGENT_LLM_KEY environment variable.
 This app runs on Emergent which provides the key automatically.
 - Minutes drafting uses claude-sonnet-4-5 for complex document generation
 - Governance suggestions uses claude-haiku-4-5 for quick recommendations
+
+=== MANUAL TESTING ===
+To test minutes drafting, send POST to /api/ai/minutes-draft with body:
+  {"minutes_type":"quarterly","meeting_date":"2026-01-15","participants":["Trustee Name"],
+   "decisions_outline":["Reviewed assets","Approved distribution"],"trust_name":"Family Trust"}
+Then verify the draft appears in the Minutes UI.
+
+To test governance suggestions, load the Dashboard with some existing minutes/tasks
+and confirm suggestions populate the AI Recommendations card.
 """
 import json
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from fastapi import HTTPException
 
 from claude_client import call_claude_sonnet, call_claude_haiku, ClaudeClientError
 
 logger = logging.getLogger(__name__)
+
+# Standard error message for client - does not expose internal details
+AI_UNAVAILABLE_MESSAGE = "AI assistant is currently unavailable. Please try again later."
 
 
 # ==================== MINUTES DRAFTING ====================
