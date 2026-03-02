@@ -18,6 +18,11 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
 TRIAL_DAYS = 14
 
+# Forever free accounts - these emails get unlimited access without payment
+FOREVER_FREE_EMAILS = {
+    "admin@wingpointtrusts.com",
+}
+
 security = HTTPBearer(auto_error=False)
 
 # Paths that don't require active subscription (allow full access)
