@@ -18,24 +18,24 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 The backend now has a modular structure for better maintainability:
 ```
 /app/backend/
-├── server.py           # Main FastAPI app (2899 lines, down from 7538 - 61.5% reduction)
+├── server.py           # Main FastAPI app (2648 lines, down from 7538 - 65% reduction)
 ├── database.py         # MongoDB connection singleton
 ├── models.py           # All Pydantic models and enums (~778 lines)
-├── dependencies.py     # Shared auth, helpers, feature gating functions
-├── routers/            # Domain-specific router modules (9 migrated)
+├── dependencies.py     # Shared auth, helpers, feature gating, health score (751 lines)
+├── routers/            # Domain-specific router modules (12 migrated)
 │   ├── auth.py         # Auth endpoints (already extracted)
-│   ├── distributions.py # Distribution + benevolence log endpoints (MIGRATED)
+│   ├── distributions.py # Distribution endpoints (MIGRATED)
 │   ├── governance.py    # Governance health/history/insights (MIGRATED)
 │   ├── minutes.py       # Minutes CRUD + templates + PDF (MIGRATED)
-│   ├── schedule_a.py    # Schedule A assets CRUD + PDF export (MIGRATED Dec 30)
-│   ├── compensation.py  # Compensation plans + payments (MIGRATED Dec 30)
-│   ├── subscriptions.py # Stripe payments + webhooks (MIGRATED Dec 30)
-│   ├── benevolence.py   # Benevolence CRUD + summary + PDF (MIGRATED Dec 30)
-│   ├── exports.py       # CSV exports (premium feature) (MIGRATED Dec 30)
-│   ├── trust_units.py   # Trust units certificates + transfers (MIGRATED Dec 30)
-│   ├── trusts.py        # Trust CRUD (pending migration)
-│   ├── entities.py      # Entity management (pending migration)
-│   └── tasks.py         # Governance tasks (pending migration)
+│   ├── schedule_a.py    # Schedule A assets CRUD + PDF (MIGRATED)
+│   ├── compensation.py  # Compensation plans + payments (MIGRATED)
+│   ├── subscriptions.py # Stripe payments + webhooks (MIGRATED)
+│   ├── benevolence.py   # Benevolence CRUD + PDF (MIGRATED)
+│   ├── exports.py       # CSV exports (premium feature) (MIGRATED)
+│   ├── trust_units.py   # Trust units certificates + transfers (MIGRATED)
+│   ├── trusts.py        # Trust CRUD (MIGRATED Dec 30)
+│   ├── entities.py      # Entity + relationship management (MIGRATED Dec 30)
+│   └── tasks.py         # Governance tasks (MIGRATED Dec 30)
 ├── email_service.py    # Postmark email integration
 ├── email_templates.py  # Email template content
 └── background_tasks.py # APScheduler background jobs
@@ -51,6 +51,9 @@ The backend now has a modular structure for better maintainability:
 - benevolence.py: 510 lines - Benevolence CRUD + summary + PDF export
 - exports.py: 167 lines - CSV exports (minutes, distributions, compensation, tasks)
 - trust_units.py: 994 lines - Certificates, transfers, PDF, bootstrap-from-minutes
+- trusts.py: 101 lines - Trust CRUD with governance score
+- entities.py: 144 lines - Entities + relationships CRUD
+- tasks.py: 98 lines - Task management with completion tracking
 
 ### Design System (AnchorPoint)
 - Light: Navy #010079, Gold #D5AD36
