@@ -40,6 +40,9 @@ from dependencies import (
     READ_ONLY_ERROR_CODE
 )
 
+# Import routers
+from routers.distributions import router as distributions_router
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
