@@ -492,9 +492,9 @@ class TestPreviouslyMigratedRoutersRegression:
         print(f"PASS: Exports router regression - status: {response.status_code}")
     
     def test_compensation_router(self, auth_headers):
-        """Compensation router - GET /api/compensation/plans"""
+        """Compensation router - GET /api/compensation-plans"""
         response = requests.get(
-            f"{BASE_URL}/api/compensation/plans?trust_id={TEST_TRUST_ID}",
+            f"{BASE_URL}/api/compensation-plans?trust_id={TEST_TRUST_ID}",
             headers=auth_headers
         )
         assert response.status_code == 200
@@ -519,9 +519,9 @@ class TestPreviouslyMigratedRoutersRegression:
         print("PASS: Distributions router regression - GET distributions works")
     
     def test_governance_router(self, auth_headers):
-        """Governance router - GET /api/governance/dashboard"""
+        """Governance router - GET /api/dashboard"""
         response = requests.get(
-            f"{BASE_URL}/api/governance/dashboard?trust_id={TEST_TRUST_ID}",
+            f"{BASE_URL}/api/dashboard?trust_id={TEST_TRUST_ID}",
             headers=auth_headers
         )
         assert response.status_code == 200
