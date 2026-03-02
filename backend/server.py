@@ -43,6 +43,7 @@ from dependencies import (
 # Import routers
 from routers.distributions import router as distributions_router
 from routers.governance import router as governance_router
+from routers.minutes import router as minutes_router
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
