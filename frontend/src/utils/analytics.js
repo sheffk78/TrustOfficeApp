@@ -182,6 +182,75 @@ export const trackUpgradePromptClicked = (params = {}) => {
   });
 };
 
+/**
+ * Track when a feature is blocked due to read-only/expired subscription
+ * @param {Object} params - Event parameters
+ * @param {string} params.feature_name - Name of the blocked feature
+ * @param {string} params.location - Where the block occurred
+ */
+export const trackFeatureBlocked = (params = {}) => {
+  trackEvent('feature_blocked', {
+    event_category: 'subscription',
+    feature_name: params.feature_name || 'unknown',
+    location: params.location || 'unknown',
+    subscription_status: params.subscription_status || 'expired',
+    ...params
+  });
+};
+
+/**
+ * Track when trial banner is viewed
+ * @param {Object} params - Event parameters
+ * @param {number} params.days_remaining - Days left in trial
+ */
+export const trackTrialBannerViewed = (params = {}) => {
+  trackEvent('trial_banner_viewed', {
+    event_category: 'subscription',
+    days_remaining: params.days_remaining,
+    location: params.location || 'dashboard',
+    ...params
+  });
+};
+
+/**
+ * Track when user clicks upgrade from trial banner
+ * @param {Object} params - Event parameters
+ */
+export const trackTrialBannerClicked = (params = {}) => {
+  trackEvent('trial_banner_clicked', {
+    event_category: 'subscription',
+    days_remaining: params.days_remaining,
+    location: params.location || 'dashboard',
+    ...params
+  });
+};
+
+/**
+ * Track when upgrade modal is shown
+ * @param {Object} params - Event parameters
+ */
+export const trackUpgradeModalShown = (params = {}) => {
+  trackEvent('upgrade_modal_shown', {
+    event_category: 'subscription',
+    trigger: params.trigger || 'blocked_action',
+    feature_attempted: params.feature_attempted || 'unknown',
+    ...params
+  });
+};
+
+/**
+ * Track when user clicks upgrade from modal
+ * @param {Object} params - Event parameters
+ */
+export const trackUpgradeModalClicked = (params = {}) => {
+  trackEvent('upgrade_modal_clicked', {
+    event_category: 'subscription',
+    trigger: params.trigger || 'blocked_action',
+    feature_attempted: params.feature_attempted || 'unknown',
+    ...params
+  });
+};
+
 // Legacy subscription event tracker (backward compatible)
 export const trackSubscriptionEvent = (eventType, params = {}) => {
   const validEvents = [
