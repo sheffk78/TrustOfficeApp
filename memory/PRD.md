@@ -57,7 +57,42 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - UI/UX IMPROVEMENTS ✅
+### Latest Updates (Mar 2, 2026) - AI DRAFTING IMPROVEMENT ✅
+
+**Session Summary:** Improved AI minutes drafting to enhance user's existing notes instead of ignoring them.
+
+**Problem Fixed:**
+- Previously, the AI ignored content written in the Details field
+- Users expected AI to improve their draft, but it generated generic content instead
+
+**Solution Implemented:**
+
+1. **Frontend (`NewMinutesPage.js`):**
+   - Now sends `formData.details` (user's draft) as `additional_context`
+   - Labels it as "USER'S DRAFT TO IMPROVE AND EXPAND"
+   - Button text changes dynamically:
+     - "Draft with AI" when Details field is empty
+     - "Improve with AI" when user has written content
+   - Updated placeholder: "Write your notes here... AI will improve and formalize them"
+   - Updated helper text explains the workflow clearly
+
+2. **Backend (`ai_service.py`):**
+   - Updated system prompt with explicit instructions to:
+     - Keep the user's core content and decisions
+     - Improve language to be more formal
+     - Add WHEREAS/RESOLVED structure where appropriate
+     - NOT replace user content with generic text
+   - Generates context-aware cautions specific to user's content
+
+**User Workflow Now:**
+1. Write rough notes in Details field (e.g., "We met to review accounts. Discussed giving Emily money for college.")
+2. Click "Improve with AI" button
+3. AI transforms notes into formal minutes while preserving all key points
+4. Review in modal, then click "Insert Draft" to populate form
+
+**Testing:** Verified via curl and UI screenshots - AI now preserves and formalizes user content.
+
+### Previous Updates (Mar 2, 2026) - UI/UX IMPROVEMENTS ✅
 
 **Session Summary:** Fixed sidebar scrolling, combined Benevolence pages, updated Trust Units with 100-unit cap, redesigned PDF certificate, and improved demo data reset clarity.
 

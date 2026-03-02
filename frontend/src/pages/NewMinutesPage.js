@@ -85,7 +85,7 @@ export default function NewMinutesPage() {
     }
   };
 
-  // AI Draft function
+  // AI Draft function - enhances user's existing draft or creates new one
   const handleDraftWithAI = async () => {
     if (!selectedTrust) {
       toast.error('Please select a trust first');
@@ -95,14 +95,30 @@ export default function NewMinutesPage() {
     // Clear previous error
     setAiError(null);
 
+    // Combine summary and details for better context
+    // The user's existing details are the PRIMARY content to enhance
+    const userDraft = formData.details?.trim() || '';
+    const summaryNotes = formData.summary?.trim() || '';
+    
     // Extract decision points from summary (split by newlines or periods)
-    const decisionsOutline = formData.summary
-      ? formData.summary.split(/[.\n]+/).map(s => s.trim()).filter(s => s.length > 0)
+    const decisionsOutline = summaryNotes
+      ? summaryNotes.split(/[.\n]+/).map(s => s.trim()).filter(s => s.length > 0)
       : [];
     
     // If no summary yet, use entry type as a placeholder
-    if (decisionsOutline.length === 0) {
+    if (decisionsOutline.length === 0 && !userDraft) {
       decisionsOutline.push(`Review and document ${formData.entry_type || 'meeting'} proceedings`);
+    }
+
+    // Build additional context that includes the user's draft prominently
+    let additionalContext = '';
+    if (userDraft) {
+      additionalContext = `USER'S DRAFT TO IMPROVE AND EXPAND:\n${userDraft}`;
+      if (formData.best_interest_rationale) {
+        additionalContext += `\n\nBEST INTEREST RATIONALE:\n${formData.best_interest_rationale}`;
+      }
+    } else if (formData.best_interest_rationale) {
+      additionalContext = formData.best_interest_rationale;
     }
 
     setAiDrafting(true);
@@ -118,7 +134,7 @@ export default function NewMinutesPage() {
           trust_name: selectedTrust.name,
           jurisdiction: selectedTrust.jurisdiction || null,
           beneficiary_standard: selectedTrust.beneficiary_standard || null,
-          additional_context: formData.best_interest_rationale || null
+          additional_context: additionalContext || null
         })
       });
 
@@ -378,16 +394,17 @@ export default function NewMinutesPage() {
                         disabled={aiDrafting || !selectedTrust}
                         className="text-xs flex items-center gap-1.5 border-gold/50 text-gold hover:bg-gold/10 hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed"
                         data-testid="draft-with-ai-btn"
+                        title="AI will improve and formalize your notes below"
                       >
                         {aiDrafting ? (
                           <>
                             <Loader2 className="w-3 h-3 animate-spin" />
-                            Drafting...
+                            Improving...
                           </>
                         ) : (
                           <>
                             <Sparkles className="w-3 h-3" />
-                            Draft with AI
+                            {formData.details?.trim() ? 'Improve with AI' : 'Draft with AI'}
                           </>
                         )}
                       </Button>
@@ -404,13 +421,13 @@ export default function NewMinutesPage() {
                     <Textarea
                       value={formData.details}
                       onChange={(e) => setFormData({ ...formData, details: e.target.value })}
-                      placeholder="Full details of the meeting, decision, or approval..."
+                      placeholder="Write your notes here... AI will improve and formalize them when you click the button above."
                       className="mt-1 input-trust min-h-[150px]"
                       data-testid="details-input"
                     />
                     <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1 font-mono">
                       <Sparkles className="w-3 h-3" />
-                      AI helps draft language; you remain responsible for accuracy and legal sufficiency.
+                      Write your notes, then click "{formData.details?.trim() ? 'Improve with AI' : 'Draft with AI'}" to formalize them. You remain responsible for accuracy.
                     </p>
                   </div>
                 </div>
