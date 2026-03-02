@@ -27,7 +27,7 @@ class TestSetup:
             json={"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
         )
         if response.status_code == 200:
-            return response.json().get("access_token")
+            return response.json().get("token")
         pytest.skip(f"Authentication failed: {response.status_code}")
         return None
 
