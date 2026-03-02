@@ -615,6 +615,7 @@ class CompensationPlanCreate(BaseModel):
     fee_type: str = "fixed"
     effective_date: str
     notes: str = ""
+    is_primary: Optional[bool] = None  # If None, auto-determined based on context
 
 class CompensationPlanResponse(BaseModel):
     plan_id: str
@@ -626,8 +627,11 @@ class CompensationPlanResponse(BaseModel):
     annual_approved_amount: Optional[float] = None
     fee_type: str = "fixed"
     effective_date: str
+    year: Optional[int] = None
+    is_primary: Optional[bool] = None
     notes: str = ""
     created_at: str
+    updated_at: Optional[str] = None
 
 class CompensationPaymentCreate(BaseModel):
     trust_id: str

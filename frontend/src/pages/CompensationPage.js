@@ -3,6 +3,10 @@ import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Wallet, 
@@ -10,8 +14,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   TrendingUp,
-  X,
-  Trash2
+  Trash2,
+  Edit2,
+  Info,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -22,18 +29,29 @@ export default function CompensationPage() {
   const [payments, setPayments] = useState([]);
   const [ytdData, setYtdData] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Modal states
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [newPlan, setNewPlan] = useState({
+  const [showAdvancedPlans, setShowAdvancedPlans] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null); // null for new, plan object for edit
+  
+  // Form states
+  const [planForm, setPlanForm] = useState({
     annual_approved_amount: '',
     effective_date: format(new Date(), 'yyyy-MM-dd'),
-    notes: ''
+    notes: '',
+    trustee_name: '',
+    role: '',
+    is_primary: true
   });
-  const [newPayment, setNewPayment] = useState({
+  const [paymentForm, setPaymentForm] = useState({
     amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     classification_text: ''
   });
+
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     if (selectedTrust) {
@@ -61,38 +79,68 @@ export default function CompensationPage() {
     }
   };
 
-  const handleCreatePlan = async () => {
-    if (!selectedTrust || !newPlan.annual_approved_amount) {
+  const handleSavePlan = async () => {
+    if (!selectedTrust || !planForm.annual_approved_amount) {
       toast.error('Annual amount is required');
       return;
     }
+    
     try {
-      const response = await fetchWithAuth('/compensation-plans', {
-        method: 'POST',
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          annual_approved_amount: parseFloat(newPlan.annual_approved_amount),
-          effective_date: newPlan.effective_date,
-          notes: newPlan.notes
-        })
+      const payload = {
+        trust_id: selectedTrust.trust_id,
+        annual_approved_amount: parseFloat(planForm.annual_approved_amount),
+        effective_date: planForm.effective_date,
+        notes: planForm.notes,
+        trustee_name: planForm.trustee_name,
+        role: planForm.role,
+        is_primary: planForm.is_primary
+      };
+
+      let response;
+      if (editingPlan) {
+        response = await fetchWithAuth(`/compensation-plans/${editingPlan.plan_id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+      } else {
+        response = await fetchWithAuth('/compensation-plans', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      }
+      
+      if (response.ok) {
+        toast.success(editingPlan ? 'Plan updated' : 'Plan created');
+        setShowPlanModal(false);
+        setEditingPlan(null);
+        resetPlanForm();
+        loadData();
+      } else {
+        const error = await response.json().catch(() => ({}));
+        toast.error(error.detail || 'Failed to save plan');
+      }
+    } catch (error) {
+      toast.error('Failed to save plan');
+    }
+  };
+
+  const handleDeletePlan = async (planId) => {
+    if (!confirm('Delete this compensation plan?')) return;
+    try {
+      const response = await fetchWithAuth(`/compensation-plans/${planId}`, {
+        method: 'DELETE'
       });
       if (response.ok) {
-        toast.success('Plan created');
-        setShowPlanModal(false);
-        setNewPlan({
-          annual_approved_amount: '',
-          effective_date: format(new Date(), 'yyyy-MM-dd'),
-          notes: ''
-        });
+        toast.success('Plan deleted');
         loadData();
       }
     } catch (error) {
-      toast.error('Failed to create plan');
+      toast.error('Failed to delete plan');
     }
   };
 
   const handleCreatePayment = async () => {
-    if (!selectedTrust || !newPayment.amount) {
+    if (!selectedTrust || !paymentForm.amount) {
       toast.error('Amount is required');
       return;
     }
@@ -101,15 +149,15 @@ export default function CompensationPage() {
         method: 'POST',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
-          amount: parseFloat(newPayment.amount),
-          date: newPayment.date,
-          classification_text: newPayment.classification_text
+          amount: parseFloat(paymentForm.amount),
+          date: paymentForm.date,
+          classification_text: paymentForm.classification_text
         })
       });
       if (response.ok) {
         toast.success('Payment recorded');
         setShowPaymentModal(false);
-        setNewPayment({
+        setPaymentForm({
           amount: '',
           date: format(new Date(), 'yyyy-MM-dd'),
           classification_text: ''
@@ -136,6 +184,44 @@ export default function CompensationPage() {
     }
   };
 
+  const openEditPlan = (plan) => {
+    setEditingPlan(plan);
+    setPlanForm({
+      annual_approved_amount: plan.annual_approved_amount || plan.annual_fee || '',
+      effective_date: plan.effective_date?.split('T')[0] || format(new Date(), 'yyyy-MM-dd'),
+      notes: plan.notes || '',
+      trustee_name: plan.trustee_name || '',
+      role: plan.role || '',
+      is_primary: plan.is_primary !== false
+    });
+    setShowPlanModal(true);
+  };
+
+  const openNewPrimaryPlan = () => {
+    setEditingPlan(null);
+    resetPlanForm();
+    setPlanForm(prev => ({ ...prev, is_primary: true }));
+    setShowPlanModal(true);
+  };
+
+  const openNewAdditionalPlan = () => {
+    setEditingPlan(null);
+    resetPlanForm();
+    setPlanForm(prev => ({ ...prev, is_primary: false }));
+    setShowPlanModal(true);
+  };
+
+  const resetPlanForm = () => {
+    setPlanForm({
+      annual_approved_amount: '',
+      effective_date: format(new Date(), 'yyyy-MM-dd'),
+      notes: '',
+      trustee_name: '',
+      role: '',
+      is_primary: true
+    });
+  };
+
   const formatDate = (dateString) => {
     try {
       return format(parseISO(dateString), 'MMM d, yyyy');
@@ -148,10 +234,12 @@ export default function CompensationPage() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
-    }).format(amount);
+    }).format(amount || 0);
   };
 
-  const currentPlan = plans.length > 0 ? plans[0] : null;
+  // Get primary plan from ytdData or plans array
+  const primaryPlan = ytdData?.primary_plan || plans.find(p => p.is_primary);
+  const additionalPlans = plans.filter(p => !p.is_primary && p.trustee_name);
   const progressPercent = ytdData && ytdData.annual_approved 
     ? Math.min(100, (ytdData.ytd_total / ytdData.annual_approved) * 100)
     : 0;
@@ -169,23 +257,13 @@ export default function CompensationPage() {
                 {selectedTrust?.name || 'Select a trust'} • Trustee Compensation Tracking
               </p>
             </div>
-            <div className="flex gap-3">
-              <Button 
-                onClick={() => setShowPlanModal(true)} 
-                variant="outline"
-                className="btn-secondary"
-                data-testid="create-plan-btn"
-              >
-                <Plus className="w-4 h-4 mr-2" /> New Plan
-              </Button>
-              <Button 
-                onClick={() => setShowPaymentModal(true)} 
-                className="btn-primary"
-                data-testid="record-payment-btn"
-              >
-                <Plus className="w-4 h-4 mr-2" /> Record Payment
-              </Button>
-            </div>
+            <Button 
+              onClick={() => setShowPaymentModal(true)} 
+              className="btn-primary"
+              data-testid="record-payment-btn"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Record Payment
+            </Button>
           </div>
 
           {loading ? (
@@ -199,14 +277,15 @@ export default function CompensationPage() {
             </div>
           ) : (
             <>
-              {/* YTD Summary */}
+              {/* Main YTD Summary & Primary Plan */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                {/* YTD Progress Card */}
                 <div className="lg:col-span-2 card-trust corner-mark">
                   <div className="flex items-start justify-between mb-6">
                     <div>
-                      <p className="label-trust mb-1">Year-to-Date Compensation</p>
+                      <p className="label-trust mb-1">{currentYear} Year-to-Date Compensation</p>
                       <h2 className="font-serif text-3xl text-navy">
-                        {ytdData ? formatCurrency(ytdData.ytd_total) : '$0.00'}
+                        {formatCurrency(ytdData?.ytd_total)}
                       </h2>
                     </div>
                     {ytdData?.exceeds_plan ? (
@@ -214,7 +293,7 @@ export default function CompensationPage() {
                         <AlertTriangle className="w-4 h-4" />
                         <span className="font-mono text-xs uppercase">Exceeds Plan</span>
                       </div>
-                    ) : ytdData?.annual_approved ? (
+                    ) : primaryPlan ? (
                       <div className="flex items-center gap-2 px-3 py-1 bg-success/10 text-success">
                         <CheckCircle2 className="w-4 h-4" />
                         <span className="font-mono text-xs uppercase">Within Plan</span>
@@ -222,11 +301,11 @@ export default function CompensationPage() {
                     ) : null}
                   </div>
 
-                  {currentPlan && (
+                  {primaryPlan ? (
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Annual Approved</span>
-                        <span className="font-mono">{formatCurrency(currentPlan.annual_approved_amount)}</span>
+                        <span className="text-muted-foreground">Annual Approved Envelope</span>
+                        <span className="font-mono">{formatCurrency(ytdData?.annual_approved)}</span>
                       </div>
                       <div className="h-3 bg-navy/10">
                         <div 
@@ -236,55 +315,162 @@ export default function CompensationPage() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Remaining</span>
-                        <span className="font-mono">{formatCurrency(ytdData?.remaining || 0)}</span>
+                        <span className={`font-mono ${ytdData?.remaining <= 0 ? 'text-error' : ''}`}>
+                          {formatCurrency(ytdData?.remaining)}
+                        </span>
                       </div>
                     </div>
-                  )}
-
-                  {!currentPlan && (
+                  ) : (
                     <div className="text-center py-4">
-                      <p className="text-muted-foreground mb-3">No compensation plan set</p>
-                      <Button onClick={() => setShowPlanModal(true)} className="btn-secondary">
-                        Create Plan
+                      <p className="text-muted-foreground mb-3">No compensation plan set for {currentYear}</p>
+                      <Button onClick={openNewPrimaryPlan} className="btn-secondary">
+                        Set Annual Compensation Plan
                       </Button>
                     </div>
                   )}
                 </div>
 
+                {/* Primary Plan Card */}
                 <div className="card-trust">
-                  <p className="label-trust mb-4">Current Plan</p>
-                  {currentPlan ? (
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="label-trust">{currentYear} Compensation Plan</p>
+                    {primaryPlan && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => openEditPlan(primaryPlan)}
+                        className="text-navy hover:text-gold"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {primaryPlan ? (
                     <div className="space-y-4">
                       <div>
                         <p className="font-mono text-2xl text-navy">
-                          {formatCurrency(currentPlan.annual_approved_amount)}
+                          {formatCurrency(primaryPlan.annual_approved_amount || primaryPlan.annual_fee)}
                         </p>
-                        <p className="text-sm text-muted-foreground">Annual Amount</p>
+                        <p className="text-sm text-muted-foreground">Annual Approved Amount</p>
                       </div>
                       <div>
                         <p className="font-mono text-sm text-navy">
-                          Effective: {formatDate(currentPlan.effective_date)}
+                          Effective: {formatDate(primaryPlan.effective_date)}
                         </p>
                       </div>
-                      {currentPlan.notes && (
-                        <p className="text-sm text-muted-foreground">{currentPlan.notes}</p>
+                      {primaryPlan.notes && (
+                        <p className="text-sm text-muted-foreground">{primaryPlan.notes}</p>
                       )}
+                      
+                      {/* Helper text */}
+                      <div className="pt-3 border-t border-border">
+                        <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                          <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                          This is the total annual compensation envelope for this trust. Individual payments are tracked against this amount.
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-4">
                       <Wallet className="w-8 h-8 text-navy/30 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No plan configured</p>
+                      <p className="text-sm text-muted-foreground mb-3">No plan configured</p>
+                      <Button onClick={openNewPrimaryPlan} className="btn-secondary">
+                        Create Plan
+                      </Button>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Additional Plans Section (Advanced) */}
+              {(additionalPlans.length > 0 || primaryPlan) && (
+                <div className="card-trust mb-8">
+                  <button 
+                    onClick={() => setShowAdvancedPlans(!showAdvancedPlans)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="label-trust">Trustee-Specific Plans (Advanced)</span>
+                      {additionalPlans.length > 0 && (
+                        <span className="px-2 py-0.5 text-xs font-mono bg-navy/10 text-navy">
+                          {additionalPlans.length}
+                        </span>
+                      )}
+                    </div>
+                    {showAdvancedPlans ? (
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  
+                  {showAdvancedPlans && (
+                    <div className="p-4 pt-0 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-4 flex items-start gap-1.5">
+                        <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        Optional: Set separate compensation caps for individual trustees or roles. These are in addition to the primary trust-wide plan.
+                      </p>
+                      
+                      {additionalPlans.length > 0 ? (
+                        <div className="space-y-3 mb-4">
+                          {additionalPlans.map(plan => (
+                            <div 
+                              key={plan.plan_id}
+                              className="p-3 border border-navy/10 flex items-center justify-between"
+                            >
+                              <div>
+                                <p className="font-medium text-navy">
+                                  {plan.trustee_name || plan.role || 'Unnamed'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {formatCurrency(plan.annual_approved_amount)} • {formatDate(plan.effective_date)}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => openEditPlan(plan)}
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleDeletePlan(plan.plan_id)}
+                                  className="text-error hover:text-error"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground mb-4">No trustee-specific plans configured.</p>
+                      )}
+                      
+                      <Button 
+                        variant="outline" 
+                        onClick={openNewAdditionalPlan}
+                        className="btn-secondary"
+                      >
+                        <Plus className="w-4 h-4 mr-2" /> Add Trustee-Specific Plan
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Payments List */}
               <div className="card-trust">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <p className="label-trust mb-1">Payment History</p>
-                    <h2 className="font-serif text-xl text-navy">Compensation Payments</h2>
+                    <h2 className="font-serif text-xl text-navy">
+                      {currentYear} Compensation Payments ({payments.filter(p => p.date?.startsWith(currentYear.toString())).length})
+                    </h2>
                   </div>
                 </div>
 
@@ -341,119 +527,154 @@ export default function CompensationPage() {
         </div>
       </main>
 
-      {/* Create Plan Modal */}
-      {showPlanModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 w-full max-w-md corner-mark" data-testid="create-plan-modal">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-serif text-xl text-navy">Create Compensation Plan</h2>
-              <button onClick={() => setShowPlanModal(false)} className="text-navy hover:text-gold">
-                <X className="w-5 h-5" />
-              </button>
+      {/* Plan Modal (Create/Edit) */}
+      <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
+        <DialogContent className="sm:max-w-md" data-testid="plan-modal">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl text-navy">
+              {editingPlan ? 'Edit Compensation Plan' : (planForm.is_primary ? 'Set Annual Compensation Plan' : 'Add Trustee-Specific Plan')}
+            </DialogTitle>
+            <DialogDescription>
+              {planForm.is_primary 
+                ? 'Set the total annual compensation envelope for this trust.'
+                : 'Set a compensation cap for a specific trustee or role.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Trustee Name (only for non-primary) */}
+            {!planForm.is_primary && (
+              <div>
+                <Label className="label-trust">Trustee / Role Name *</Label>
+                <Input
+                  value={planForm.trustee_name}
+                  onChange={(e) => setPlanForm({ ...planForm, trustee_name: e.target.value })}
+                  placeholder="e.g., John Smith or Executive Trustee"
+                  className="input-trust mt-1"
+                  data-testid="plan-trustee-name"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Identify which trustee or role this cap applies to
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label className="label-trust">Annual Approved Amount *</Label>
+              <Input
+                type="number"
+                value={planForm.annual_approved_amount}
+                onChange={(e) => setPlanForm({ ...planForm, annual_approved_amount: e.target.value })}
+                placeholder="e.g., 25000"
+                className="input-trust mt-1"
+                data-testid="plan-amount"
+              />
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="label-trust mb-2 block">Annual Approved Amount *</label>
-                <Input
-                  type="number"
-                  value={newPlan.annual_approved_amount}
-                  onChange={(e) => setNewPlan({ ...newPlan, annual_approved_amount: e.target.value })}
-                  placeholder="e.g., 25000"
-                  className="input-trust"
-                  data-testid="plan-amount"
-                />
-              </div>
+            <div>
+              <Label className="label-trust">Effective Date</Label>
+              <Input
+                type="date"
+                value={planForm.effective_date}
+                onChange={(e) => setPlanForm({ ...planForm, effective_date: e.target.value })}
+                className="input-trust mt-1"
+              />
+            </div>
 
-              <div>
-                <label className="label-trust mb-2 block">Effective Date</label>
-                <Input
-                  type="date"
-                  value={newPlan.effective_date}
-                  onChange={(e) => setNewPlan({ ...newPlan, effective_date: e.target.value })}
-                  className="input-trust"
-                />
-              </div>
-
-              <div>
-                <label className="label-trust mb-2 block">Notes (Optional)</label>
-                <Input
-                  value={newPlan.notes}
-                  onChange={(e) => setNewPlan({ ...newPlan, notes: e.target.value })}
-                  placeholder="e.g., Approved by trust protector"
-                  className="input-trust"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button onClick={() => setShowPlanModal(false)} variant="outline" className="flex-1 btn-secondary">
-                  Cancel
-                </Button>
-                <Button onClick={handleCreatePlan} className="flex-1 btn-primary" data-testid="submit-plan-btn">
-                  Create Plan
-                </Button>
-              </div>
+            <div>
+              <Label className="label-trust">Notes (Optional)</Label>
+              <Textarea
+                value={planForm.notes}
+                onChange={(e) => setPlanForm({ ...planForm, notes: e.target.value })}
+                placeholder="e.g., Approved by trust protector, per Article IV.2"
+                className="input-trust mt-1"
+                rows={2}
+              />
             </div>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPlanModal(false)} className="btn-secondary">
+              Cancel
+            </Button>
+            <Button onClick={handleSavePlan} className="btn-primary" data-testid="submit-plan-btn">
+              {editingPlan ? 'Save Changes' : 'Create Plan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Record Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 w-full max-w-md corner-mark" data-testid="record-payment-modal">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-serif text-xl text-navy">Record Payment</h2>
-              <button onClick={() => setShowPaymentModal(false)} className="text-navy hover:text-gold">
-                <X className="w-5 h-5" />
-              </button>
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="sm:max-w-md" data-testid="payment-modal">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl text-navy">Record Compensation Payment</DialogTitle>
+            <DialogDescription>
+              Record a trustee compensation payment. This will be tracked against the annual plan.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="label-trust">Amount *</Label>
+              <Input
+                type="number"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                placeholder="e.g., 5000"
+                className="input-trust mt-1"
+                data-testid="payment-amount"
+              />
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="label-trust mb-2 block">Amount *</label>
-                <Input
-                  type="number"
-                  value={newPayment.amount}
-                  onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
-                  placeholder="e.g., 6250"
-                  className="input-trust"
-                  data-testid="payment-amount"
-                />
-              </div>
-
-              <div>
-                <label className="label-trust mb-2 block">Date</label>
-                <Input
-                  type="date"
-                  value={newPayment.date}
-                  onChange={(e) => setNewPayment({ ...newPayment, date: e.target.value })}
-                  className="input-trust"
-                />
-              </div>
-
-              <div>
-                <label className="label-trust mb-2 block">Classification (Optional)</label>
-                <Input
-                  value={newPayment.classification_text}
-                  onChange={(e) => setNewPayment({ ...newPayment, classification_text: e.target.value })}
-                  placeholder="e.g., Q1 2026 trustee services"
-                  className="input-trust"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button onClick={() => setShowPaymentModal(false)} variant="outline" className="flex-1 btn-secondary">
-                  Cancel
-                </Button>
-                <Button onClick={handleCreatePayment} className="flex-1 btn-primary" data-testid="submit-payment-btn">
-                  Record Payment
-                </Button>
-              </div>
+            <div>
+              <Label className="label-trust">Payment Date</Label>
+              <Input
+                type="date"
+                value={paymentForm.date}
+                onChange={(e) => setPaymentForm({ ...paymentForm, date: e.target.value })}
+                className="input-trust mt-1"
+              />
             </div>
+
+            <div>
+              <Label className="label-trust">Classification / Notes (Optional)</Label>
+              <Input
+                value={paymentForm.classification_text}
+                onChange={(e) => setPaymentForm({ ...paymentForm, classification_text: e.target.value })}
+                placeholder="e.g., Q1 trustee fee, Administrative services"
+                className="input-trust mt-1"
+              />
+            </div>
+
+            {/* Show warning if this would exceed plan */}
+            {ytdData && paymentForm.amount && (
+              (parseFloat(paymentForm.amount) + ytdData.ytd_total) > ytdData.annual_approved && ytdData.annual_approved > 0
+            ) && (
+              <div className="p-3 bg-warning/10 border border-warning/30 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-warning">This payment will exceed the annual plan</p>
+                  <p className="text-muted-foreground">
+                    Current YTD: {formatCurrency(ytdData.ytd_total)} + {formatCurrency(parseFloat(paymentForm.amount))} = {formatCurrency(ytdData.ytd_total + parseFloat(paymentForm.amount))}
+                    <br />
+                    Annual Plan: {formatCurrency(ytdData.annual_approved)}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentModal(false)} className="btn-secondary">
+              Cancel
+            </Button>
+            <Button onClick={handleCreatePayment} className="btn-primary" data-testid="submit-payment-btn">
+              Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
