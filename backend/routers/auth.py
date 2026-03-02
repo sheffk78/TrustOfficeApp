@@ -349,7 +349,11 @@ async def exchange_session(request: Request, response: Response):
     
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     
+    # Generate JWT token for localStorage-based auth (same as login)
+    jwt_token = create_jwt_token(user["user_id"], user["email"])
+    
     return {
+        "token": jwt_token,
         "user": {
             "user_id": user["user_id"],
             "email": user["email"],

@@ -235,6 +235,12 @@ export const AuthProvider = ({ children }) => {
     }
     
     const data = await response.json();
+    
+    // Store token in localStorage (CRITICAL for subsequent API calls)
+    if (data.token) {
+      localStorage.setItem('auth_token', data.token);
+    }
+    
     setUser(data.user);
     return data;
   }, []);
