@@ -2546,6 +2546,210 @@ async def create_certificates_from_minutes(
         "certificate_ids": created_ids
     }
 
+class BootstrapFromMinutesResponse(BaseModel):
+    """Response model for bootstrap-from-minutes endpoint"""
+    success: bool
+    message: str
+    minutes_id: str
+    trust_id: str
+    total_authorized_units: int
+    certificates_created: int
+    certificates: List[TrustUnitCertificateResponse]
+    total_issued_units: float
+    remaining_units: float
+
+@api_router.post("/trust-units/bootstrap-from-minutes/{minutes_id}", response_model=BootstrapFromMinutesResponse)
+async def bootstrap_certificates_from_minutes(
+    minutes_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Populate Trust Unit Certificates from an existing 'Designation of Beneficiaries' minutes record.
+    
+    This is an explicit admin/advanced operation that:
+    1. Reads template_data.total_units and beneficiaries array from the minutes
+    2. Creates trust_units_settings if it doesn't exist (with total_authorized_units = template_data.total_units)
+    3. Creates trust_unit_certificates for each beneficiary
+    4. Validates that summed units do not exceed total_authorized_units
+    5. Returns the resulting certificates summary
+    
+    Note: This does not duplicate certificates if called multiple times - it checks for existing certificates.
+    """
+    # Find the minutes template
+    minutes = await db.minutes_templates.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+    
+    if minutes.get("template_type") != "designation_of_beneficiaries":
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Minutes is not a beneficiary designation template. Found type: {minutes.get('template_type')}"
+        )
+    
+    template_data = minutes.get("template_data", {})
+    beneficiaries = template_data.get("beneficiaries", [])
+    total_units_from_minutes = template_data.get("total_units", 100)
+    trust_id = minutes["trust_id"]
+    meeting_date = minutes.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    
+    if not beneficiaries:
+        raise HTTPException(status_code=400, detail="No beneficiaries found in minutes template_data")
+    
+    # Calculate total units requested from beneficiaries
+    total_requested_units = 0
+    valid_beneficiaries = []
+    for ben in beneficiaries:
+        name = ben.get("name", "").strip()
+        units = ben.get("units", 0)
+        
+        if not name or not units:
+            continue
+        
+        try:
+            units = float(units)
+        except (ValueError, TypeError):
+            continue
+        
+        if units <= 0:
+            continue
+        
+        total_requested_units += units
+        valid_beneficiaries.append({"name": name, "units": units})
+    
+    if not valid_beneficiaries:
+        raise HTTPException(status_code=400, detail="No valid beneficiaries with units found in minutes template_data")
+    
+    # Validate total requested doesn't exceed what's designated
+    if total_requested_units > total_units_from_minutes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Sum of beneficiary units ({total_requested_units}) exceeds total_units in designation ({total_units_from_minutes})"
+        )
+    
+    # Get or create settings
+    existing_settings = await db.trust_units_settings.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not existing_settings:
+        # Create settings with total_units from the minutes
+        settings = {
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "total_authorized_units": total_units_from_minutes,
+            "unit_label": "Certificate Unit",
+            "allow_fractional": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": None
+        }
+        await db.trust_units_settings.insert_one(settings)
+        total_authorized = total_units_from_minutes
+        allow_fractional = False
+    else:
+        total_authorized = existing_settings["total_authorized_units"]
+        allow_fractional = existing_settings.get("allow_fractional", False)
+    
+    # Check current active units
+    current_active_units = await get_total_active_units(trust_id, user["user_id"])
+    
+    # Validate total won't exceed authorized
+    if current_active_units + total_requested_units > total_authorized:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot create certificates. Current active: {current_active_units}, "
+                   f"Requested: {total_requested_units}, Authorized: {total_authorized}. "
+                   f"Would exceed by {current_active_units + total_requested_units - total_authorized} units."
+        )
+    
+    # Check for existing certificates from this minutes record to avoid duplicates
+    existing_from_minutes = await db.trust_unit_certificates.count_documents({
+        "trust_id": trust_id,
+        "user_id": user["user_id"],
+        "notes": {"$regex": f"minutes \\({minutes_id}\\)"}
+    })
+    
+    if existing_from_minutes > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Certificates have already been created from this minutes record ({existing_from_minutes} found). "
+                   "This operation can only be performed once per minutes record."
+        )
+    
+    # Create certificates for each beneficiary
+    created_certificates = []
+    
+    for ben in valid_beneficiaries:
+        name = ben["name"]
+        units = ben["units"]
+        
+        # Normalize units based on fractional setting
+        if not allow_fractional:
+            units = int(units)
+        else:
+            units = round(units, 4)
+        
+        certificate_id = f"cert_{uuid.uuid4().hex[:12]}"
+        certificate_number = await get_next_certificate_number(trust_id, user["user_id"])
+        
+        cert_doc = {
+            "certificate_id": certificate_id,
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "holder_name": name,
+            "holder_identifier": None,
+            "units": units,
+            "issue_date": meeting_date,
+            "certificate_number": certificate_number,
+            "status": "active",
+            "replaced_by_certificate_id": None,
+            "notes": f"Created from beneficiary designation minutes ({minutes_id})",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": None
+        }
+        
+        await db.trust_unit_certificates.insert_one(cert_doc)
+        
+        # Record transfer (issuance)
+        transfer_doc = {
+            "transfer_id": f"transfer_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "from_holder": None,
+            "to_holder": name,
+            "units": units,
+            "reason": f"Initial designation per minutes {minutes_id}",
+            "minutes_record_id": minutes_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.trust_unit_transfers.insert_one(transfer_doc)
+        
+        # Add to created list with computed percentage
+        percentage = (units / total_authorized * 100) if total_authorized > 0 else 0
+        created_certificates.append(TrustUnitCertificateResponse(
+            **cert_doc,
+            percentage=round(percentage, 4)
+        ))
+    
+    # Calculate summary
+    total_issued = sum(cert.units for cert in created_certificates)
+    
+    return BootstrapFromMinutesResponse(
+        success=True,
+        message=f"Successfully created {len(created_certificates)} certificates from beneficiary designation",
+        minutes_id=minutes_id,
+        trust_id=trust_id,
+        total_authorized_units=total_authorized,
+        certificates_created=len(created_certificates),
+        certificates=created_certificates,
+        total_issued_units=total_issued,
+        remaining_units=total_authorized - (current_active_units + total_issued)
+    )
+
 # ==================== GOVERNANCE TASK ENDPOINTS ====================
 
 @api_router.post("/tasks", response_model=GovernanceTaskResponse)
