@@ -320,6 +320,27 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
         doc += generate_change_of_situs_content(template_data)
     elif template_type == "benevolence_approval":
         doc += generate_benevolence_approval_content(template_data)
+    # New templates
+    elif template_type == "investment_policy":
+        doc += generate_investment_policy_content(template_data)
+    elif template_type == "loan_authorization":
+        doc += generate_loan_authorization_content(template_data)
+    elif template_type == "insurance_authorization":
+        doc += generate_insurance_authorization_content(template_data)
+    elif template_type == "annual_review":
+        doc += generate_annual_review_content(template_data)
+    elif template_type == "quarterly_review":
+        doc += generate_quarterly_review_content(template_data)
+    elif template_type == "trustee_compensation":
+        doc += generate_trustee_compensation_content(template_data)
+    elif template_type == "trustee_resignation":
+        doc += generate_trustee_resignation_content(template_data)
+    elif template_type == "beneficiary_request_denial":
+        doc += generate_beneficiary_denial_content(template_data)
+    elif template_type == "hems_distribution":
+        doc += generate_hems_distribution_content(template_data)
+    elif template_type == "beneficiary_loan":
+        doc += generate_beneficiary_loan_content(template_data)
     
     # Add adjournment and certification
     doc += f"""
@@ -921,6 +942,812 @@ Effective Date: Immediately upon adoption
     
     return content
 
+
+# ==================== NEW TEMPLATES ====================
+
+def generate_investment_policy_content(data: dict) -> str:
+    """Generate content for investment policy approval"""
+    policy_type = data.get("policy_type", "adopt")  # adopt, amend, review
+    risk_tolerance = data.get("risk_tolerance", "moderate")
+    asset_allocation = data.get("asset_allocation", [])
+    restrictions = data.get("investment_restrictions", [])
+    review_frequency = data.get("review_frequency", "annually")
+    
+    action_text = {
+        "adopt": "adopt a formal Investment Policy Statement",
+        "amend": "amend the existing Investment Policy Statement",
+        "review": "review and reaffirm the current Investment Policy Statement"
+    }.get(policy_type, "adopt a formal Investment Policy Statement")
+    
+    content = f"""Resolution 1: Investment Policy {policy_type.title()}
+
+WHEREAS, the prudent administration of Trust assets requires a clearly defined investment policy;
+
+WHEREAS, the Board of Trustees has a fiduciary duty to invest Trust assets in accordance with the Prudent Investor Rule and applicable principles of trust administration;
+
+WHEREAS, the Trustees desire to {action_text} governing the investment of Trust assets;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby {'adopts' if policy_type == 'adopt' else 'approves'} the following Investment Policy Statement for this Trust:
+
+INVESTMENT OBJECTIVES:
+    Primary Objective: Preservation of capital and purchasing power
+    Secondary Objective: Generation of income sufficient for Trust purposes
+    Tertiary Objective: Long-term growth consistent with risk tolerance
+
+RISK TOLERANCE: {risk_tolerance.title()}
+"""
+
+    if asset_allocation:
+        content += "\nTARGET ASSET ALLOCATION:\n"
+        for allocation in asset_allocation:
+            content += f"    • {allocation.get('asset_class', 'Asset Class')}: {allocation.get('percentage', 0)}%\n"
+    else:
+        content += """
+TARGET ASSET ALLOCATION:
+    • Fixed Income Securities: 40-60%
+    • Equity Securities: 30-50%
+    • Cash and Cash Equivalents: 5-15%
+    • Alternative Investments: 0-10%
+"""
+
+    if restrictions:
+        content += "\nINVESTMENT RESTRICTIONS:\n"
+        for restriction in restrictions:
+            content += f"    • {restriction}\n"
+    else:
+        content += """
+INVESTMENT RESTRICTIONS:
+    • No speculative or margin trading
+    • No investments in derivatives except for hedging purposes
+    • No single security shall exceed 10% of portfolio value
+    • No investments in entities that conflict with Trust purposes
+"""
+
+    content += f"""
+REVIEW AND MONITORING:
+    • Investment performance shall be reviewed {review_frequency}
+    • Asset allocation shall be rebalanced when deviation exceeds 5%
+    • The Investment Policy shall be reviewed and reaffirmed annually
+
+• The Trustees are authorized to engage qualified investment advisors and managers as needed.
+
+• All investment decisions shall be documented and made in accordance with this policy.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    return content
+
+
+def generate_loan_authorization_content(data: dict) -> str:
+    """Generate content for loan authorization (making or receiving)"""
+    loan_direction = data.get("loan_direction", "making")  # making or receiving
+    borrower_name = data.get("borrower_name", "[Borrower Name]")
+    lender_name = data.get("lender_name", "[Lender Name]")
+    loan_amount = float(data.get("loan_amount", 0))
+    interest_rate = data.get("interest_rate", "AFR")
+    term_months = data.get("term_months", 60)
+    purpose = data.get("loan_purpose", "")
+    collateral = data.get("collateral_description", "")
+    
+    if loan_direction == "making":
+        content = f"""Resolution 1: Authorization of Loan from Trust
+
+WHEREAS, {borrower_name} has requested a loan from this Trust in the principal amount of ${loan_amount:,.2f};
+
+WHEREAS, the Board of Trustees has evaluated this loan request and determined that:
+    • The loan serves a legitimate purpose consistent with Trust administration
+    • The terms are fair and reasonable
+    • Adequate security exists to protect Trust assets
+    • The loan will not impair the Trust's ability to fulfill its obligations
+
+WHEREAS, loans from Trust assets must be documented and administered in accordance with applicable requirements;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Trust is hereby authorized to make a loan to {borrower_name} under the following terms:
+
+LOAN TERMS:
+    Principal Amount: ${loan_amount:,.2f}
+    Interest Rate: {interest_rate}
+    Term: {term_months} months
+    Purpose: {purpose if purpose else 'As described in loan application'}
+    Collateral: {collateral if collateral else 'Promissory note and personal guarantee'}
+
+• A formal Promissory Note shall be executed documenting all loan terms.
+
+• Payment records shall be maintained and interest shall be charged at the stated rate.
+
+• The Trustees are authorized to take all actions necessary to document and administer this loan.
+
+"""
+    else:
+        content = f"""Resolution 1: Authorization to Obtain Loan for Trust
+
+WHEREAS, the Board of Trustees has determined that obtaining financing would benefit the Trust;
+
+WHEREAS, {lender_name} has offered to provide financing under acceptable terms;
+
+WHEREAS, the Trustees have evaluated the terms and determined they are reasonable and in the Trust's interest;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Trust is hereby authorized to obtain a loan from {lender_name} under the following terms:
+
+LOAN TERMS:
+    Principal Amount: ${loan_amount:,.2f}
+    Interest Rate: {interest_rate}
+    Term: {term_months} months
+    Purpose: {purpose if purpose else 'Trust administration and investment purposes'}
+    Collateral: {collateral if collateral else 'As required by lender'}
+
+• The Trustees are authorized to execute all necessary loan documents.
+
+• Loan payments shall be made from Trust assets in accordance with the repayment schedule.
+
+• A record of this loan shall be maintained in the Trust's financial records.
+
+"""
+
+    content += """Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    return content
+
+
+def generate_insurance_authorization_content(data: dict) -> str:
+    """Generate content for insurance authorization"""
+    insurance_type = data.get("insurance_type", "property")
+    policy_action = data.get("policy_action", "obtain")  # obtain, renew, cancel, modify
+    insurer_name = data.get("insurer_name", "[Insurance Company]")
+    coverage_amount = float(data.get("coverage_amount", 0))
+    premium_amount = float(data.get("premium_amount", 0))
+    coverage_description = data.get("coverage_description", "")
+    policy_number = data.get("policy_number", "")
+    
+    type_descriptions = {
+        "property": "property and casualty insurance",
+        "liability": "liability insurance",
+        "life": "life insurance",
+        "health": "health insurance",
+        "umbrella": "umbrella/excess liability insurance",
+        "professional": "professional liability insurance",
+        "other": "insurance coverage"
+    }
+    type_text = type_descriptions.get(insurance_type, "insurance coverage")
+    
+    action_text = {
+        "obtain": "obtain new",
+        "renew": "renew existing",
+        "cancel": "cancel",
+        "modify": "modify"
+    }.get(policy_action, "obtain")
+    
+    content = f"""Resolution 1: Insurance Policy Authorization
+
+WHEREAS, prudent Trust administration requires appropriate insurance coverage to protect Trust assets and mitigate risks;
+
+WHEREAS, the Board of Trustees has evaluated the need for {type_text};
+
+WHEREAS, the Trustees have reviewed available coverage options and determined the following action is appropriate;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby authorizes the Trust to {action_text} {type_text} as follows:
+
+INSURANCE DETAILS:
+    Insurance Type: {insurance_type.replace('_', ' ').title()}
+    Insurer: {insurer_name}
+    Coverage Amount: ${coverage_amount:,.2f}
+    Annual Premium: ${premium_amount:,.2f}
+    {f'Policy Number: {policy_number}' if policy_number else ''}
+    Coverage Description: {coverage_description if coverage_description else 'Standard coverage for Trust assets and operations'}
+
+• The Trustees are authorized to execute all necessary applications and policy documents.
+
+• Premium payments shall be made from Trust assets as they become due.
+
+• The insurance policy shall name the Trust as the insured party.
+
+• Policy documents shall be maintained with the Trust records.
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees shall review insurance coverage annually and make adjustments as needed.
+
+• Claims under this policy shall be handled in accordance with policy terms and fiduciary duties.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    return content
+
+
+def generate_annual_review_content(data: dict) -> str:
+    """Generate content for annual review meeting"""
+    fiscal_year = data.get("fiscal_year", str(datetime.now().year - 1))
+    total_assets = float(data.get("total_assets", 0))
+    total_income = float(data.get("total_income", 0))
+    total_expenses = float(data.get("total_expenses", 0))
+    total_distributions = float(data.get("total_distributions", 0))
+    investment_return = data.get("investment_return", "0%")
+    key_accomplishments = data.get("key_accomplishments", [])
+    upcoming_priorities = data.get("upcoming_priorities", [])
+    governance_items = data.get("governance_items", [])
+    
+    content = f"""Resolution 1: Annual Review and Affirmation
+
+WHEREAS, the Board of Trustees is required to conduct an annual review of Trust operations, finances, and governance;
+
+WHEREAS, the fiscal year {fiscal_year} has concluded and a comprehensive review has been completed;
+
+WHEREAS, the Trustees have examined the financial statements, investment performance, distributions, and administrative matters;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby acknowledges and approves the following Annual Report for fiscal year {fiscal_year}:
+
+═══════════════════════════════════════════════════════════════════════════════
+
+FINANCIAL SUMMARY – FISCAL YEAR {fiscal_year}
+
+    Total Trust Assets (Year End): ${total_assets:,.2f}
+    Total Income Received: ${total_income:,.2f}
+    Total Expenses Paid: ${total_expenses:,.2f}
+    Total Distributions Made: ${total_distributions:,.2f}
+    Investment Return: {investment_return}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+KEY ACCOMPLISHMENTS:
+"""
+
+    if key_accomplishments:
+        for item in key_accomplishments:
+            content += f"    • {item}\n"
+    else:
+        content += """    • Trust assets were prudently managed and preserved
+    • All required distributions were made timely
+    • Proper records and documentation were maintained
+    • Fiduciary duties were fulfilled in good faith
+"""
+
+    content += """
+═══════════════════════════════════════════════════════════════════════════════
+
+GOVERNANCE REVIEW:
+"""
+
+    if governance_items:
+        for item in governance_items:
+            content += f"    • {item}\n"
+    else:
+        content += """    • Trust Indenture remains in full force and effect
+    • All Trustees continue to serve and fulfill their duties
+    • Insurance coverage has been reviewed and is adequate
+    • Investment policy has been reviewed and reaffirmed
+    • Beneficiary designations have been reviewed
+"""
+
+    content += """
+═══════════════════════════════════════════════════════════════════════════════
+
+PRIORITIES FOR UPCOMING YEAR:
+"""
+
+    if upcoming_priorities:
+        for item in upcoming_priorities:
+            content += f"    • {item}\n"
+    else:
+        content += """    • Continue prudent investment management
+    • Maintain comprehensive records and documentation
+    • Review and update Schedule A as needed
+    • Fulfill all distribution obligations
+    • Monitor compliance with Trust Indenture
+"""
+
+    content += """
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees affirm that all actions taken during the fiscal year were in accordance with the Trust Indenture and fiduciary duties.
+
+• The financial records accurately reflect the Trust's position and activities.
+
+• The Trust remains in good standing and continues to operate for its intended purposes.
+
+Vote: Unanimous approval
+Effective Date: Upon adoption
+
+"""
+    return content
+
+
+def generate_quarterly_review_content(data: dict) -> str:
+    """Generate content for quarterly review meeting"""
+    quarter = data.get("quarter", "Q1")
+    year = data.get("year", str(datetime.now().year))
+    beginning_balance = float(data.get("beginning_balance", 0))
+    ending_balance = float(data.get("ending_balance", 0))
+    income_received = float(data.get("income_received", 0))
+    expenses_paid = float(data.get("expenses_paid", 0))
+    distributions_made = float(data.get("distributions_made", 0))
+    discussion_items = data.get("discussion_items", [])
+    action_items = data.get("action_items", [])
+    
+    content = f"""Resolution 1: Quarterly Review and Report – {quarter} {year}
+
+WHEREAS, the Board of Trustees conducts regular quarterly reviews to monitor Trust operations;
+
+WHEREAS, the {quarter} {year} quarter has concluded and a review has been completed;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby acknowledges and approves the following Quarterly Report:
+
+═══════════════════════════════════════════════════════════════════════════════
+
+QUARTERLY FINANCIAL SUMMARY – {quarter} {year}
+
+    Beginning Balance: ${beginning_balance:,.2f}
+    Income Received: ${income_received:,.2f}
+    Expenses Paid: ${expenses_paid:,.2f}
+    Distributions Made: ${distributions_made:,.2f}
+    Ending Balance: ${ending_balance:,.2f}
+    Net Change: ${ending_balance - beginning_balance:,.2f}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+MATTERS DISCUSSED:
+"""
+
+    if discussion_items:
+        for item in discussion_items:
+            content += f"    • {item}\n"
+    else:
+        content += """    • Review of financial statements and account balances
+    • Investment performance and asset allocation
+    • Pending distribution requests or obligations
+    • Administrative matters and compliance items
+"""
+
+    content += """
+═══════════════════════════════════════════════════════════════════════════════
+
+ACTION ITEMS FOR NEXT QUARTER:
+"""
+
+    if action_items:
+        for item in action_items:
+            content += f"    • {item}\n"
+    else:
+        content += """    • Continue monitoring investment performance
+    • Process any pending distribution requests
+    • Review upcoming obligations and deadlines
+    • Prepare for annual review (if Q4)
+"""
+
+    content += """
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees have reviewed the quarterly report and find it to be accurate and complete.
+
+• All actions taken during the quarter were in accordance with the Trust Indenture.
+
+• The Trust continues to operate in compliance with its governing documents.
+
+Vote: Unanimous approval
+Effective Date: Upon adoption
+
+"""
+    return content
+
+
+def generate_trustee_compensation_content(data: dict) -> str:
+    """Generate content for trustee compensation approval"""
+    trustee_name = data.get("trustee_name", "[Trustee Name]")
+    compensation_type = data.get("compensation_type", "annual")  # annual, hourly, per_meeting, percentage
+    compensation_amount = float(data.get("compensation_amount", 0))
+    effective_date = data.get("effective_date", "[Effective Date]")
+    compensation_basis = data.get("compensation_basis", "")
+    duties_description = data.get("duties_description", "")
+    all_trustees = data.get("all_trustees", False)
+    
+    type_text = {
+        "annual": f"${compensation_amount:,.2f} per year",
+        "hourly": f"${compensation_amount:,.2f} per hour",
+        "per_meeting": f"${compensation_amount:,.2f} per meeting attended",
+        "percentage": f"{compensation_amount}% of Trust assets annually"
+    }.get(compensation_type, f"${compensation_amount:,.2f}")
+    
+    trustee_text = "all serving Trustees" if all_trustees else trustee_name
+    
+    content = f"""Resolution 1: Trustee Compensation Approval
+
+WHEREAS, the Trust Indenture authorizes reasonable compensation to Trustees for their services;
+
+WHEREAS, the Board of Trustees has evaluated the duties, responsibilities, and time commitment required of Trustees;
+
+WHEREAS, the proposed compensation is reasonable and consistent with compensation paid to trustees of similar trusts;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby approves compensation for {trustee_text} as follows:
+
+COMPENSATION TERMS:
+    Trustee(s): {trustee_text}
+    Compensation Amount: {type_text}
+    Effective Date: {effective_date}
+    Compensation Basis: {compensation_basis if compensation_basis else 'Services rendered as Trustee'}
+
+DUTIES AND RESPONSIBILITIES:
+{duties_description if duties_description else '''    • Administration of Trust assets and operations
+    • Attendance at regular and special meetings
+    • Review and approval of distributions
+    • Investment oversight and monitoring
+    • Maintenance of Trust records and compliance
+    • Communication with beneficiaries as appropriate'''}
+
+• Compensation shall be paid {'monthly' if compensation_type == 'annual' else 'quarterly'} from Trust assets.
+
+• The compensation arrangement shall be reviewed annually and may be adjusted by unanimous Trustee action.
+
+• This compensation is for services rendered in the Trustee's private capacity and does not create an employment relationship.
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees affirm that this compensation is reasonable and does not constitute self-dealing.
+
+• Proper records of compensation payments shall be maintained.
+
+• Any Trustee receiving compensation shall recuse from voting on their own compensation.
+
+Vote: Unanimous approval (with appropriate recusals)
+Effective Date: {effective_date}
+
+"""
+    return content
+
+
+def generate_trustee_resignation_content(data: dict) -> str:
+    """Generate content for trustee resignation or removal"""
+    departing_trustee = data.get("departing_trustee_name", "[Trustee Name]")
+    departure_type = data.get("departure_type", "resignation")  # resignation, removal, death, incapacity
+    departure_reason = data.get("departure_reason", "")
+    effective_date = data.get("effective_date", "[Effective Date]")
+    remaining_trustees = data.get("remaining_trustees", [])
+    successor_appointed = data.get("successor_appointed", False)
+    successor_name = data.get("successor_name", "")
+    
+    type_text = {
+        "resignation": "has tendered their resignation",
+        "removal": "is being removed from office",
+        "death": "has passed away",
+        "incapacity": "is no longer able to serve due to incapacity"
+    }.get(departure_type, "is departing from the position of Trustee")
+    
+    content = f"""Resolution 1: Acknowledgment of Trustee {departure_type.title()}
+
+WHEREAS, {departing_trustee} currently serves as a Trustee of this Trust;
+
+WHEREAS, {departing_trustee} {type_text}{f' for the following reason: {departure_reason}' if departure_reason else ''};
+
+WHEREAS, the Board of Trustees must take appropriate action to document this change and ensure continuity of Trust administration;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby acknowledges and accepts the {departure_type} of {departing_trustee} as Trustee, effective {effective_date}.
+
+• {departing_trustee} is released from all ongoing duties and obligations as Trustee, effective upon the date specified above.
+
+• The Trust extends its {'gratitude for faithful service' if departure_type in ['resignation', 'death'] else 'acknowledgment'} rendered during the tenure as Trustee.
+
+"""
+
+    if remaining_trustees:
+        content += """
+CONTINUING TRUSTEES:
+The following Trustees shall continue to serve:
+"""
+        for trustee in remaining_trustees:
+            content += f"    • {trustee}\n"
+    
+    if successor_appointed and successor_name:
+        content += f"""
+• {successor_name} has been appointed as Successor Trustee pursuant to separate resolution.
+
+"""
+    else:
+        content += """
+• The remaining Trustees shall continue to administer the Trust in accordance with the Trust Indenture.
+
+• A successor Trustee {'will be appointed pursuant to the Trust Indenture' if departure_type != 'removal' else 'may be appointed if deemed necessary'}.
+
+"""
+
+    content += f"""
+BE IT FURTHER RESOLVED that:
+
+• All necessary updates shall be made to bank accounts, service providers, and official records.
+
+• An updated Certification of Trust shall be prepared reflecting this change.
+
+• {departing_trustee} {'shall execute any documents necessary to effectuate a smooth transition' if departure_type == 'resignation' else 'or their representative shall cooperate in the transition of duties'}.
+
+• The departing Trustee's signature authority is hereby revoked effective {effective_date}.
+
+Vote: Unanimous approval
+Effective Date: {effective_date}
+
+"""
+    return content
+
+
+def generate_beneficiary_denial_content(data: dict) -> str:
+    """Generate content for beneficiary request denial"""
+    beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
+    request_type = data.get("request_type", "distribution")
+    request_amount = float(data.get("request_amount", 0))
+    request_purpose = data.get("request_purpose", "")
+    request_date = data.get("request_date", "[Request Date]")
+    denial_reasons = data.get("denial_reasons", [])
+    alternative_offered = data.get("alternative_offered", "")
+    
+    content = f"""Resolution 1: Denial of Beneficiary Request
+
+WHEREAS, {beneficiary_name}, a beneficiary of this Trust, submitted a request dated {request_date};
+
+WHEREAS, the request was for a {request_type} in the amount of ${request_amount:,.2f}{f' for the purpose of: {request_purpose}' if request_purpose else ''};
+
+WHEREAS, the Board of Trustees has carefully reviewed and considered this request in light of the Trust Indenture, the interests of all beneficiaries, and sound fiduciary principles;
+
+WHEREAS, after due deliberation, the Trustees have determined that the request cannot be approved;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby denies the request from {beneficiary_name} for the following reasons:
+
+REASONS FOR DENIAL:
+"""
+
+    if denial_reasons:
+        for reason in denial_reasons:
+            content += f"    • {reason}\n"
+    else:
+        content += """    • The request does not meet the distribution standards set forth in the Trust Indenture
+    • Approval would not be consistent with the Trustees' fiduciary duties
+    • The Trust's resources and obligations do not permit approval at this time
+"""
+
+    content += """
+• This decision was made in good faith, with careful consideration of all relevant factors, and in accordance with the Trustees' fiduciary duties to all beneficiaries.
+
+• The Trustees affirm that they have acted impartially and have not been influenced by improper considerations.
+
+"""
+
+    if alternative_offered:
+        content += f"""
+ALTERNATIVE OFFERED:
+While the specific request cannot be approved, the Trustees offer the following alternative:
+    {alternative_offered}
+
+"""
+
+    content += """
+BE IT FURTHER RESOLVED that:
+
+• The beneficiary shall be notified of this decision in writing.
+
+• This denial does not preclude the beneficiary from making future requests.
+
+• A record of this request and denial shall be maintained in the Trust's records.
+
+• The Trustees' decision in this matter is final.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    return content
+
+
+def generate_hems_distribution_content(data: dict) -> str:
+    """Generate content for HEMS distribution (Health, Education, Maintenance, Support)"""
+    beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
+    hems_category = data.get("hems_category", "support")  # health, education, maintenance, support
+    distribution_amount = float(data.get("distribution_amount", 0))
+    specific_purpose = data.get("specific_purpose", "")
+    supporting_documentation = data.get("supporting_documentation", [])
+    recurring = data.get("recurring", False)
+    recurring_frequency = data.get("recurring_frequency", "monthly")
+    
+    category_descriptions = {
+        "health": "health and medical expenses",
+        "education": "educational expenses",
+        "maintenance": "maintenance of accustomed standard of living",
+        "support": "support and general welfare"
+    }
+    category_text = category_descriptions.get(hems_category, "support")
+    
+    category_details = {
+        "health": """This distribution qualifies under the Health standard as it is for:
+    • Medical treatment, procedures, or care
+    • Health insurance premiums or medical expenses
+    • Prescription medications or medical supplies
+    • Mental health services or therapy
+    • Preventive care or wellness services""",
+        "education": """This distribution qualifies under the Education standard as it is for:
+    • Tuition and academic fees
+    • Books, supplies, and educational materials
+    • Room and board for educational purposes
+    • Tutoring or educational support services
+    • Professional development or vocational training""",
+        "maintenance": """This distribution qualifies under the Maintenance standard as it is for:
+    • Housing costs (mortgage, rent, utilities)
+    • Transportation expenses
+    • Food and household expenses
+    • Clothing and personal necessities
+    • Maintaining the beneficiary's accustomed lifestyle""",
+        "support": """This distribution qualifies under the Support standard as it is for:
+    • General living expenses and welfare
+    • Emergency assistance or unexpected needs
+    • Quality of life enhancement
+    • Other needs consistent with the beneficiary's wellbeing"""
+    }
+    
+    content = f"""Resolution 1: HEMS Distribution Approval
+
+WHEREAS, this Trust is authorized to make distributions for the Health, Education, Maintenance, and Support (HEMS) of beneficiaries;
+
+WHEREAS, {beneficiary_name}, a beneficiary of this Trust, has a qualifying need for {category_text};
+
+WHEREAS, the Board of Trustees has evaluated this need and determined it falls within the HEMS distribution standard;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby approves a {'recurring ' if recurring else ''}distribution to {beneficiary_name} under the {hems_category.upper()} standard:
+
+DISTRIBUTION DETAILS:
+    Beneficiary: {beneficiary_name}
+    HEMS Category: {hems_category.title()}
+    Amount: ${distribution_amount:,.2f}{f' {recurring_frequency}' if recurring else ''}
+    Purpose: {specific_purpose if specific_purpose else category_text}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+HEMS STANDARD COMPLIANCE:
+
+{category_details.get(hems_category, category_details['support'])}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+"""
+
+    if supporting_documentation:
+        content += "SUPPORTING DOCUMENTATION REVIEWED:\n"
+        for doc in supporting_documentation:
+            content += f"    • {doc}\n"
+        content += "\n"
+
+    if recurring:
+        content += f"""
+RECURRING DISTRIBUTION TERMS:
+    • This distribution shall recur {recurring_frequency} until modified or terminated by the Trustees.
+    • The beneficiary shall provide updated documentation as requested.
+    • The Trustees reserve the right to modify or terminate this arrangement.
+
+"""
+
+    content += """
+BE IT FURTHER RESOLVED that:
+
+• The Trustees have determined this distribution is consistent with the HEMS standard and the Trust Indenture.
+
+• The distribution shall be made within a reasonable time following adoption.
+
+• Appropriate records shall be maintained documenting this distribution.
+
+• The Solvency Declaration requirements have been satisfied.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    return content
+
+
+def generate_beneficiary_loan_content(data: dict) -> str:
+    """Generate content for loan to beneficiary"""
+    beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
+    loan_amount = float(data.get("loan_amount", 0))
+    interest_rate = data.get("interest_rate", "AFR (Applicable Federal Rate)")
+    term_months = data.get("term_months", 60)
+    loan_purpose = data.get("loan_purpose", "")
+    collateral = data.get("collateral_description", "")
+    repayment_terms = data.get("repayment_terms", "monthly installments")
+    
+    content = f"""Resolution 1: Authorization of Intra-Family Loan to Beneficiary
+
+WHEREAS, {beneficiary_name}, a beneficiary of this Trust, has requested a loan from Trust assets;
+
+WHEREAS, the Trust Indenture permits loans to beneficiaries under appropriate terms and conditions;
+
+WHEREAS, the Board of Trustees has evaluated this request and determined that:
+    • The loan serves a legitimate purpose
+    • The terms are fair and comply with applicable requirements
+    • The beneficiary has the ability to repay the loan
+    • The loan will not impair the Trust's ability to fulfill its obligations;
+
+WHEREAS, intra-family loans must be properly documented and administered to maintain their tax treatment;
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby authorizes a loan to {beneficiary_name} under the following terms:
+
+═══════════════════════════════════════════════════════════════════════════════
+
+LOAN TERMS AND CONDITIONS
+
+    Borrower: {beneficiary_name}
+    Principal Amount: ${loan_amount:,.2f}
+    Interest Rate: {interest_rate}
+    Term: {term_months} months
+    Purpose: {loan_purpose if loan_purpose else 'Personal use'}
+    Collateral: {collateral if collateral else 'Unsecured; beneficiary interest may serve as informal security'}
+    Repayment: {repayment_terms}
+
+═══════════════════════════════════════════════════════════════════════════════
+
+REQUIRED DOCUMENTATION:
+
+• A formal Promissory Note shall be executed containing all material terms.
+
+• The Note shall include:
+    - Fixed repayment schedule
+    - Interest rate at or above AFR
+    - Default provisions
+    - Prepayment terms
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ADMINISTRATION REQUIREMENTS:
+
+• Interest shall be charged at the stated rate and must be paid at least annually.
+
+• All payments shall be recorded and receipts provided.
+
+• Late payments shall be documented and addressed per the Note terms.
+
+• The loan shall be treated as a Trust asset on the books and records.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BE IT FURTHER RESOLVED that:
+
+• This loan is made on arm's-length terms and is not a disguised gift.
+
+• Failure to repay may result in offset against future distributions to the borrower.
+
+• The Trustees shall monitor repayment and take appropriate action if the loan becomes delinquent.
+
+• If the borrower's interest in the Trust is less than the outstanding loan balance at any time, additional security may be required.
+
+Vote: Unanimous approval
+Effective Date: Upon execution of Promissory Note
+
+"""
+    return content
+
+
 @router.post("/minutes-templates")
 async def create_minutes_from_template(template: MinutesTemplateCreate, user: dict = Depends(require_write_access)):
     """Create minutes from a template"""
@@ -1167,67 +1994,148 @@ async def get_template_options(trust_id: Optional[str] = None, user: dict = Depe
             "type": "blank",
             "name": "Blank Minutes",
             "description": "Start with a blank minutes document",
-            "icon": "file-text"
+            "icon": "file-text",
+            "category": "basic"
         },
         {
             "type": "general_meeting",
             "name": "General Meeting",
             "description": "Record a general trustee meeting with multiple resolutions",
-            "icon": "users"
+            "icon": "users",
+            "category": "basic"
         },
         {
             "type": "distribution_to_beneficiaries",
             "name": "Distribution to Beneficiaries",
             "description": "Document a distribution of trust proceeds to beneficiaries",
-            "icon": "dollar-sign"
+            "icon": "dollar-sign",
+            "category": "distributions"
+        },
+        {
+            "type": "hems_distribution",
+            "name": "HEMS Distribution",
+            "description": "Health, Education, Maintenance, Support distribution with standard compliance",
+            "icon": "heart-pulse",
+            "category": "distributions"
         },
         {
             "type": "acceptance_of_property",
             "name": "Accept Property into Trust",
             "description": "Accept additional property into the trust corpus and update Schedule A",
-            "icon": "plus-circle"
+            "icon": "plus-circle",
+            "category": "assets"
         },
         {
             "type": "disposition_of_asset",
             "name": "Dispose / Sell Asset",
             "description": "Record the sale, transfer, or removal of an asset from Schedule A",
-            "icon": "minus-circle"
+            "icon": "minus-circle",
+            "category": "assets"
         },
         {
             "type": "appointment_additional_trustee",
             "name": "Appoint Additional Trustee",
             "description": "Appoint a new trustee to serve alongside existing trustees",
-            "icon": "user-plus"
+            "icon": "user-plus",
+            "category": "governance"
         },
         {
             "type": "appointment_successor_trustee",
             "name": "Appoint Successor Trustee",
             "description": "Appoint a replacement trustee due to resignation, death, or removal",
-            "icon": "user-check"
+            "icon": "user-check",
+            "category": "governance"
+        },
+        {
+            "type": "trustee_resignation",
+            "name": "Trustee Resignation/Removal",
+            "description": "Document a trustee's departure from office",
+            "icon": "user-minus",
+            "category": "governance"
+        },
+        {
+            "type": "trustee_compensation",
+            "name": "Trustee Compensation",
+            "description": "Approve trustee fee arrangements and compensation",
+            "icon": "wallet",
+            "category": "governance"
         },
         {
             "type": "designation_of_beneficiaries",
             "name": "Designate Beneficiaries",
             "description": "Establish or amend beneficiary designations and units of beneficial interest",
-            "icon": "users-round"
+            "icon": "users-round",
+            "category": "beneficiaries"
+        },
+        {
+            "type": "beneficiary_request_denial",
+            "name": "Beneficiary Request Denial",
+            "description": "Document denial of a beneficiary request with proper reasoning",
+            "icon": "x-circle",
+            "category": "beneficiaries"
+        },
+        {
+            "type": "beneficiary_loan",
+            "name": "Loan to Beneficiary",
+            "description": "Authorize an intra-family loan to a beneficiary",
+            "icon": "hand-coins",
+            "category": "beneficiaries"
         },
         {
             "type": "bank_account_authorization",
             "name": "Open Bank Account",
             "description": "Authorize opening a bank or investment account for the trust",
-            "icon": "landmark"
+            "icon": "landmark",
+            "category": "financial"
+        },
+        {
+            "type": "investment_policy",
+            "name": "Investment Policy",
+            "description": "Adopt, amend, or review the trust's investment policy statement",
+            "icon": "trending-up",
+            "category": "financial"
+        },
+        {
+            "type": "loan_authorization",
+            "name": "Loan Authorization",
+            "description": "Authorize the trust to make or receive a loan",
+            "icon": "banknote",
+            "category": "financial"
+        },
+        {
+            "type": "insurance_authorization",
+            "name": "Insurance Authorization",
+            "description": "Approve trust insurance policies and coverage",
+            "icon": "shield-check",
+            "category": "financial"
+        },
+        {
+            "type": "annual_review",
+            "name": "Annual Review Meeting",
+            "description": "Year-end financial and governance review with comprehensive report",
+            "icon": "calendar-check",
+            "category": "reviews"
+        },
+        {
+            "type": "quarterly_review",
+            "name": "Quarterly Review Meeting",
+            "description": "Routine quarterly trustee meeting and financial review",
+            "icon": "calendar-days",
+            "category": "reviews"
         },
         {
             "type": "change_of_situs",
             "name": "Change Trust Situs",
             "description": "Change the jurisdiction and principal place of administration",
-            "icon": "map-pin"
+            "icon": "map-pin",
+            "category": "administrative"
         },
         {
             "type": "benevolence_approval",
             "name": "Benevolence Assistance",
             "description": "Approve and document a benevolence grant for charitable assistance",
             "icon": "heart-handshake",
+            "category": "benevolence",
             "requires_benevolence": True
         }
     ]

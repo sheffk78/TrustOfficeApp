@@ -87,6 +87,17 @@ class MinutesTemplateType(str, Enum):
     bank_account_authorization = "bank_account_authorization"
     change_of_situs = "change_of_situs"
     benevolence_approval = "benevolence_approval"
+    # New templates added
+    investment_policy = "investment_policy"
+    loan_authorization = "loan_authorization"
+    insurance_authorization = "insurance_authorization"
+    annual_review = "annual_review"
+    quarterly_review = "quarterly_review"
+    trustee_compensation = "trustee_compensation"
+    trustee_resignation = "trustee_resignation"
+    beneficiary_request_denial = "beneficiary_request_denial"
+    hems_distribution = "hems_distribution"
+    beneficiary_loan = "beneficiary_loan"
 
 class AssetStatus(str, Enum):
     active = "active"

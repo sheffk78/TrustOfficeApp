@@ -4,80 +4,74 @@ The user wants to build a responsive, desktop-first trust governance workspace c
 **PRODUCT REQUIREMENTS:**
 - **Core Functionality:** Authentication, Trust Dashboard, Minutes & Decisions, Distributions & Expenses, Governance Health, Entities, Hierarchy, Compensation, and Settings.
 - **Recent User Requests (this session):**
-    1.  **AI Drafting Experience:** Improve the AI minutes feature to use the user's draft as input for enhancement, rather than generating from scratch. (Completed)
-    2.  **Compensation Module Refactor:** Overhaul the compensation section to be based on a one primary plan per trust per year model, with clearer UX for primary vs. trustee-specific plans. (Completed)
-    3.  **Benevolence Section Unification:** Combine the confusing Grants and History views into a single, filterable Benevolence Log to provide a coherent experience. (Completed)
-    4.  **UI/UX Fixes:**
-        - Fix the non-scrolling sidebar menu. (Completed)
-        - Update the Trust Units PDF to look like a professional, landscape-oriented certificate. (Completed)
-        - Improve the demo data Delete button text for clarity. (Completed)
-    5.  **Combine Entities & Hierarchy:** Merge the separate 'Entities' and 'Hierarchy' pages into a single 'Structures' section with tabs to simplify navigation. (In Progress)
+    1.  **Combine Entities & Hierarchy:** Merge the separate 'Entities' and 'Hierarchy' pages into a single 'Structures' section with tabs to simplify navigation. (Completed)
+    2.  **Fix PDF Previews:** Identify why PDF previews fail, implement a robust viewer that works across browsers, and provide a graceful fallback with download/open options when preview is not possible. (Completed)
+    3.  **Add Guided Minutes Wizard:** Create a new, parallel AI-assisted flow for creating minutes that feels like an interview, using a multi-step wizard to gather structured input and automatically pull in trust context. (Completed)
+    4.  **Integrate Minutes with Financial Modules:** Create a bi-directional link between Minutes and the Compensation, Distributions, and Benevolence modules. This should support both creating financial records from an approved minute (Minutes → Money) and documenting a past financial transaction in minutes (Money → Minutes). (Completed)
+    5.  **Expand Minutes Template Library:** Add a significant number of new, specific templates for common governance tasks. (In Progress)
 
 **User's preferred language**: English
 
 **what currently exists?**
-The application is a mature full-stack solution (React/FastAPI/MongoDB). The UI/UX has been significantly refined based on user feedback. The AI integration for minutes drafting now intelligently enhances user-provided notes. The Compensation and Benevolence modules have been completely refactored for better usability and clarity. Several UI bugs, including a non-scrolling sidebar, have been fixed. The agent was in the process of combining the 'Entities' and 'Hierarchy' pages into a new unified 'Structures' page.
+The application is a mature full-stack solution (React/FastAPI/MongoDB). In this session, several major features were completed. The 'Entities' and 'Hierarchy' pages were successfully merged into a unified 'Structures' page. A robust, reusable  was built to handle PDF previews gracefully, fixing a long-standing issue with browser security policies. A major new feature, Guided Minutes, was introduced as an AI-powered wizard to simplify minutes creation. This was followed by a deep, bi-directional integration between the new Guided Minutes feature and all financial modules (Compensation, Distributions, Benevolence), allowing for better governance tracking. The agent is currently in the middle of expanding the minutes template library.
 
 **Last working item**:
-    - Last item agent was working: Combining the 'Entities' and 'Hierarchy' pages into a single, tabbed 'Structures' page to streamline navigation and user experience. The agent created the new file  but has not yet migrated the logic from the old pages into it.
+    - Last item agent was working: Implementing the first 10 of a newly requested series of minutes templates. The agent completed the backend logic for PDF generation and the frontend forms for data entry.
     - Status: IN PROGRESS
     - Agent Testing Done: N
-    - Which testing method agent to use? Frontend testing agent
+    - Which testing method agent to use? Frontend testing agent. The agent needs to verify that the forms for each of the 10 new templates render correctly and that submitting them generates a valid, well-formatted PDF document.
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
   - None.
 
 **In progress Task List**:
-  - **Task 1: Complete the 'Structures' Page Combination (P0)**
-     - **Description**: Merge the functionality of the existing  and  into the newly created  as two separate tabs.
+  - **Task 1: Test and Finalize New Minutes Templates (P0)**
+     - **Description**: The agent has implemented the code for the first 10 new minutes templates but has not yet tested the functionality end-to-end. The next step is to ensure they work as expected.
      - **Where to resume**:
-        1.  Open .
-        2.  Migrate the component logic and JSX from  into an Entities tab within .
-        3.  Migrate the component logic and JSX from  into a Hierarchy tab within .
-        4.  Update  to remove the routes for  and  and add a new route for .
-        5.  Update  to replace the Entities and Hierarchy links with a single Structures link pointing to the new page.
-        6.  Delete the old files:  and .
-     - **What will be achieved with this?**: A more intuitive and unified user experience for managing trust structures, combining the entity list view and the visual relationship tree into one logical section.
+        1. Navigate to the  page.
+        2. Systematically test each of the 10 new templates. For each one:
+            - Select the template from the dropdown.
+            - Verify the correct input form is displayed.
+            - Fill in the form with sample data.
+            - Click Generate PDF and confirm a PDF is created without errors.
+            - Visually inspect the generated PDF for correct formatting and content.
+        3. A comprehensive test should be run using the  to automate this verification.
+     - **What will be achieved with this?**: A richer, more useful template library for users, covering a wider range of common governance tasks.
      - **Status**: IN PROGRESS
-     - **Should Test frontend/backend/both after fix?**: Frontend
+     - **Should Test frontend/backend/both after fix?**: Both
      - **Blocked on something**: No.
 
 **Upcoming and Future Tasks**
+Upcoming Tasks:
+-   **Implement Remaining Minutes Templates (P1):** The user approved a large list of new templates, and only the first 10 have been implemented. The next task is to implement the remaining templates from that list.
+
 Future Tasks:
-- Add date range filters to the Minutes page.
-- Allow for the creation of more entity types (e.g., LLCs).
-- Implement a robust email retry queue for Postmark API failures.
-- Add a user-facing feedback submission system.
-- Expand the library of available minutes templates.
+-   Add date range filters to the Minutes page.
+-   Allow for the creation of more entity types (e.g., LLCs).
+-   Implement a robust email retry queue for Postmark API failures.
+-   Add a user-facing feedback submission system.
 
 **Completed work in this session**
-- **AI Drafting Enhancement:**
-  - Reworked the AI minutes feature to take the user's text from the 'Details' field as input.
-  - Updated the backend prompt in  to focus on enhancing and formalizing the user's draft rather than overwriting it.
-  - Changed the UI button to Improve with AI when content is present, improving UX.
+- **Structures Page Combination:**
+  - Merged  and  into a single, tabbed .
+  - Updated application routing () and navigation ().
+  - Removed the old, redundant page files.
 
-- **Compensation Module Overhaul:**
-  - Refactored the backend () and data model to enforce a one primary plan per trust per year logic.
-  - Completely redesigned  to feature a main card for the primary annual plan and a collapsible Advanced section for optional trustee-specific plans.
+- **PDF Preview Enhancement:**
+  - Created a reusable .
+  - The component uses a Blob URL for reliable rendering and includes a graceful fallback UI (with Open in New Tab and Download options) when inline preview is blocked by browser security.
+  - Integrated the new modal into  and .
 
-- **Benevolence Section Unification:**
-  - Combined two separate data sources ( and ) into a single, unified view in .
-  - Replaced confusing Grants and History tabs with a single Benevolence Log page featuring a summary strip and filters for date, recipient, and category.
+- **Guided Minutes AI Wizard:**
+  - Built a new feature at  with a multi-step wizard UI ().
+  - Added a new backend router () with endpoints to fetch trust context and generate AI drafts.
+  - The wizard gathers structured input (meeting type, participants, agenda) and uses an AI service to generate a formal minutes document.
 
-- **Trust Units PDF Certificate:**
-  - Engaged the  to create specifications for a formal certificate.
-  - Implemented the new landscape, certificate-style design in , replacing the basic table format.
-
-- **General UI/UX Fixes:**
-  - **Sidebar Scrolling:** Fixed the left sidebar in  to be scrollable, allowing access to all menu items.
-  - **Demo Data Button:** Renamed the Delete All Data button to Reset All Trust Data on the  for better clarity.
-  - **Trust Units Data:** Updated the demo data script () to use a 100-unit cap for trusts, reflecting a more realistic percentage-based ownership.
-
-- **AI Integration Hardening:**
-  - Implemented robust error handling, rate-limiting, and improved logging for all AI endpoints.
-  - Added frontend fallbacks (e.g., showing static insights if AI suggestions fail on the dashboard).
-  - Added a  endpoint for internal testing.
+- **Minutes ↔ Money Integration:**
+  - Implemented a Minutes → Money flow within the Guided Minutes wizard, allowing users to create financial records (Compensation, Distributions, etc.) directly from an approved minute.
+  - Implemented a Money → Minutes flow on the financial module pages (, etc.), allowing users to link existing transactions to minutes or create new retroactive minutes.
+  - Created a reusable  for searching and linking existing minutes.
 
 **Earlier issues found/mentioned but not fixed**
    - None.
@@ -89,27 +83,28 @@ Future Tasks:
 
 
 **Key Technical Concepts**
-- **Component Merging:** Combining separate React pages (, ) into a single, tabbed component ().
-- **UX-Driven Refactoring:** Overhauling major features (Compensation, Benevolence) based on user feedback to improve clarity and workflow.
-- **AI Prompt Engineering:** Modifying backend prompts to change the behavior of an LLM from generate to enhance, using user input as a base.
-- **Graceful Degradation:** Implementing frontend fallbacks and clear error states for external service (AI) failures.
-- **PDF Generation:** Using  canvas to create custom, landscape-oriented, certificate-style documents.
+- **Blob URLs for PDF Preview:** Using  to create temporary, browser-friendly URLs for embedding PDFs, which is more reliable than base64 data URIs.
+- **Graceful Fallback UI:** Detecting iframe load failures (due to environment security) and displaying a user-friendly alternative UI with clear action buttons.
+- **AI-Powered Wizard:** Building a multi-step form that collects structured data and uses it to prompt an LLM for a complex document generation task.
+- **Bi-Directional Data Linking:** Implementing UI and API logic to connect two different data models (Minutes and financial records) from either direction, improving data integrity and user workflow.
+- **Dynamic Form Generation:** Extending a system where frontend forms are dynamically rendered based on a selected template type.
 
 **key DB schema**
-  - **compensation_plans:** The model was effectively updated to include  and  fields to enforce the one-primary-plan-per-year logic.
-  - **benevolence_records & distribution_records:** These two collections are now queried together on the backend to create the unified Benevolence Log.
+  - A  field (ObjectId, nullable) has been added to the schemas for , , and  to create a direct link to a minutes entry.
 
 **changes in tech stack**
   - None.
 
 **All files of reference**
-- **Current Task (Structures Page):**
-    -  (NEW, IN PROGRESS)
-    -  (To be migrated from and then deleted)
-    -  (To be migrated from and then deleted)
-    -  (Routing will be updated)
-    -  (Navigation will be updated)
+- **Current Task (Templates):**
+    - 
+    - 
 - **Recently Completed/Modified:**
+    - 
+    - 
+    - 
+    - 
+    - 
     - 
     - 
     - 
@@ -117,39 +112,45 @@ Future Tasks:
     - 
 
 **Areas that need refactoring**:
--  and  will be redundant once the 'Structures' task is complete and should be deleted.
+- None.
 
 **key api endpoints**
--  (Significantly refactored to support primary/additional plans)
--  (New endpoint to serve the combined benevolence view)
--  (Payload updated to include user's draft)
--  (New health-check endpoint)
--  (Generates the new certificate design)
+- **Guided Minutes:**
+    - 
+    - 
+    - 
+    - 
+- **Financial Record Linking:**
+    - 
+    - 
+    - 
+- **Templates:**
+    -  (Updated to include 10 new templates)
 
 **Critical Info for New Agent**
-- Your immediate priority is to complete the combination of the 'Entities' and 'Hierarchy' pages into the new . Follow the plan laid out in the In progress Task List.
-- The user is highly engaged and provides detailed, actionable feedback. Expect to work on refining existing features for better UX rather than building entirely new ones.
-- The forever free admin account () is critical for testing all features without subscription limitations.
+- Your immediate priority is to thoroughly test the 10 new minutes templates implemented at the end of the last session. Follow the test plan under In progress Task List.
+- The user is highly focused on improving governance workflows. Features that connect different parts of the application (like the Minutes ↔ Money integration) are well-received.
+- The codebase now contains several powerful reusable components (, ). Familiarize yourself with them to avoid re-implementing similar functionality.
 
 **documents and test reports created in this job**
 -  (Continuously updated)
--  (Contains multiple reports from successful test runs)
+- Multiple test reports in , with the latest being  and .
 
 **Last 10 User Messages and any pending HUMAN messages**
-1. **User:** Combine 'Entities' and 'Hierarchy' into a single 'Structures' section. (IN PROGRESS)
-2. **Agent:** Acknowledged and started the task by creating the new page file.
-3. **User:** Fix the 'Benevolence' section; the 'History' tab is empty and confusing. (RESOLVED)
-4. **Agent:** Summarized the issue (two different data sources) and proposed a unified log with filters.
-5. **User:** Improve the 'Compensation' section; it should have one primary plan per year. (RESOLVED)
-6. **Agent:** Summarized the current behavior and proposed a refactor with a new UX.
-7. **User:** The AI for minutes is disappointing; it ignores my notes. (RESOLVED)
-8. **Agent:** Acknowledged the issue and identified the cause (not sending the  field to the AI).
-9. **User:** Provided a detailed feature summary of the application as requested. (COMPLETED)
-10. **User:** Can you give me a summary of all the benefits and features? (COMPLETED)
+1. **User:** Approved the plan to expand the minutes template library.
+2. **User:** Please do the first 10 (referring to the list of new templates).
+3. **Agent:** Started implementation of the 10 templates.
+4. **User:** The Minutes ↔ Money feature has been implemented. Is there anything else?
+5. **Agent:** Showed screenshots confirming the Money → Minutes flow is complete and working.
+6. **User:** Expand minutes templates library
+7. **Agent:** Proposed a detailed plan for a large number of new templates, categorized by function.
+8. **User:** approve (approving the plan for the Minutes ↔ Money integration).
+9. **Agent:** Proposed a detailed, multi-step plan to implement the full bi-directional Minutes ↔ Money integration.
+10. **User:** Please refine the integration between Guided Minutes and the Compensation / Distributions / Benevolence modules... (Detailed feature request for Minutes ↔ Money).
 
 **Project Health Check:**
 - **Broken:** None
-- **Mocked:** Postmark integration for transactional emails is still in sandbox mode.
+- **Mocked:** Postmark integration for transactional emails remains in sandbox mode.
 
 **3rd Party Integrations**
 - **Anthropic Claude:** (Text Generation) Integrated via  library, uses Emergent LLM Key.
@@ -159,7 +160,7 @@ Future Tasks:
 - **Google Analytics (GA4):** Base tracking snippet and page view tracking implemented.
 
 **Testing status**
-  - Testing agent used after significant changes: YES. Used successfully after the Compensation, Benevolence, and AI improvements.
+  - Testing agent used after significant changes: YES. The testing agent was used successfully after every major feature completion in this session (Structures, PDF Preview, Guided Minutes, Minutes↔Money).
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
   - Known regressions: None
@@ -169,4 +170,4 @@ Future Tasks:
 - **Full-Access Admin:**  / 
 
 **What agent forgot to execute**
-- The agent correctly planned to combine the 'Entities' and 'Hierarchy' pages but only created the new  file before the session ended. The core work of migrating the code and updating the routes/navigation is still pending.</analysis>
+- The agent has not yet tested the 10 newly implemented minutes templates. This is the primary pending item and should be the immediate next step.</analysis>

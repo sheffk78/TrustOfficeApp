@@ -31,7 +31,18 @@ const TEMPLATE_TITLES = {
   'designation_of_beneficiaries': 'Designate Beneficiaries',
   'bank_account_authorization': 'Open Bank Account',
   'change_of_situs': 'Change Trust Situs',
-  'benevolence_approval': 'Benevolence Assistance Approval'
+  'benevolence_approval': 'Benevolence Assistance Approval',
+  // New templates
+  'investment_policy': 'Investment Policy Approval',
+  'loan_authorization': 'Loan Authorization',
+  'insurance_authorization': 'Insurance Authorization',
+  'annual_review': 'Annual Review Meeting',
+  'quarterly_review': 'Quarterly Review Meeting',
+  'trustee_compensation': 'Trustee Compensation Approval',
+  'trustee_resignation': 'Trustee Resignation/Removal',
+  'beneficiary_request_denial': 'Beneficiary Request Denial',
+  'hems_distribution': 'HEMS Distribution',
+  'beneficiary_loan': 'Loan to Beneficiary'
 };
 
 const ASSET_CATEGORIES = [
@@ -151,6 +162,123 @@ export default function MinutesTemplateFormPage() {
     amount: '',
     disbursement_date: format(new Date(), 'MMMM d, yyyy'),
     add_to_benevolence_log: true
+  });
+
+  // Investment policy fields
+  const [investmentPolicyData, setInvestmentPolicyData] = useState({
+    policy_type: 'adopt',
+    risk_tolerance: 'moderate',
+    asset_allocation: [
+      { asset_class: 'Fixed Income', percentage: 50 },
+      { asset_class: 'Equities', percentage: 40 },
+      { asset_class: 'Cash', percentage: 10 }
+    ],
+    investment_restrictions: ['No speculative trading', 'No margin accounts'],
+    review_frequency: 'annually'
+  });
+
+  // Loan authorization fields
+  const [loanAuthData, setLoanAuthData] = useState({
+    loan_direction: 'making',
+    borrower_name: '',
+    lender_name: '',
+    loan_amount: '',
+    interest_rate: 'AFR (Applicable Federal Rate)',
+    term_months: '60',
+    loan_purpose: '',
+    collateral_description: ''
+  });
+
+  // Insurance authorization fields
+  const [insuranceData, setInsuranceData] = useState({
+    insurance_type: 'property',
+    policy_action: 'obtain',
+    insurer_name: '',
+    coverage_amount: '',
+    premium_amount: '',
+    coverage_description: '',
+    policy_number: ''
+  });
+
+  // Annual review fields
+  const [annualReviewData, setAnnualReviewData] = useState({
+    fiscal_year: String(new Date().getFullYear() - 1),
+    total_assets: '',
+    total_income: '',
+    total_expenses: '',
+    total_distributions: '',
+    investment_return: '',
+    key_accomplishments: [''],
+    upcoming_priorities: [''],
+    governance_items: ['']
+  });
+
+  // Quarterly review fields
+  const [quarterlyReviewData, setQuarterlyReviewData] = useState({
+    quarter: 'Q1',
+    year: String(new Date().getFullYear()),
+    beginning_balance: '',
+    ending_balance: '',
+    income_received: '',
+    expenses_paid: '',
+    distributions_made: '',
+    discussion_items: [''],
+    action_items: ['']
+  });
+
+  // Trustee compensation fields
+  const [trusteeCompData, setTrusteeCompData] = useState({
+    trustee_name: '',
+    compensation_type: 'annual',
+    compensation_amount: '',
+    effective_date: format(new Date(), 'MMMM d, yyyy'),
+    compensation_basis: '',
+    duties_description: '',
+    all_trustees: false
+  });
+
+  // Trustee resignation fields
+  const [trusteeResignData, setTrusteeResignData] = useState({
+    departing_trustee_name: '',
+    departure_type: 'resignation',
+    departure_reason: '',
+    effective_date: format(new Date(), 'MMMM d, yyyy'),
+    remaining_trustees: [''],
+    successor_appointed: false,
+    successor_name: ''
+  });
+
+  // Beneficiary denial fields
+  const [denialData, setDenialData] = useState({
+    beneficiary_name: '',
+    request_type: 'distribution',
+    request_amount: '',
+    request_purpose: '',
+    request_date: format(new Date(), 'MMMM d, yyyy'),
+    denial_reasons: [''],
+    alternative_offered: ''
+  });
+
+  // HEMS distribution fields
+  const [hemsData, setHemsData] = useState({
+    beneficiary_name: '',
+    hems_category: 'support',
+    distribution_amount: '',
+    specific_purpose: '',
+    supporting_documentation: [''],
+    recurring: false,
+    recurring_frequency: 'monthly'
+  });
+
+  // Beneficiary loan fields
+  const [beneficiaryLoanData, setBeneficiaryLoanData] = useState({
+    beneficiary_name: '',
+    loan_amount: '',
+    interest_rate: 'AFR (Applicable Federal Rate)',
+    term_months: '60',
+    loan_purpose: '',
+    collateral_description: '',
+    repayment_terms: 'monthly installments'
   });
 
   // General meeting resolutions
@@ -430,6 +558,130 @@ export default function MinutesTemplateFormPage() {
           amount: parseFloat(benevolenceData.amount) || 0,
           disbursement_date: benevolenceData.disbursement_date,
           add_to_benevolence_log: benevolenceData.add_to_benevolence_log
+        };
+      
+      // NEW TEMPLATES
+      case 'investment_policy':
+        return {
+          ...baseData,
+          policy_type: investmentPolicyData.policy_type,
+          risk_tolerance: investmentPolicyData.risk_tolerance,
+          asset_allocation: investmentPolicyData.asset_allocation,
+          investment_restrictions: investmentPolicyData.investment_restrictions.filter(r => r.trim()),
+          review_frequency: investmentPolicyData.review_frequency
+        };
+      
+      case 'loan_authorization':
+        return {
+          ...baseData,
+          loan_direction: loanAuthData.loan_direction,
+          borrower_name: loanAuthData.borrower_name,
+          lender_name: loanAuthData.lender_name,
+          loan_amount: parseFloat(loanAuthData.loan_amount) || 0,
+          interest_rate: loanAuthData.interest_rate,
+          term_months: parseInt(loanAuthData.term_months) || 60,
+          loan_purpose: loanAuthData.loan_purpose,
+          collateral_description: loanAuthData.collateral_description
+        };
+      
+      case 'insurance_authorization':
+        return {
+          ...baseData,
+          insurance_type: insuranceData.insurance_type,
+          policy_action: insuranceData.policy_action,
+          insurer_name: insuranceData.insurer_name,
+          coverage_amount: parseFloat(insuranceData.coverage_amount) || 0,
+          premium_amount: parseFloat(insuranceData.premium_amount) || 0,
+          coverage_description: insuranceData.coverage_description,
+          policy_number: insuranceData.policy_number
+        };
+      
+      case 'annual_review':
+        return {
+          ...baseData,
+          fiscal_year: annualReviewData.fiscal_year,
+          total_assets: parseFloat(annualReviewData.total_assets) || 0,
+          total_income: parseFloat(annualReviewData.total_income) || 0,
+          total_expenses: parseFloat(annualReviewData.total_expenses) || 0,
+          total_distributions: parseFloat(annualReviewData.total_distributions) || 0,
+          investment_return: annualReviewData.investment_return,
+          key_accomplishments: annualReviewData.key_accomplishments.filter(a => a.trim()),
+          upcoming_priorities: annualReviewData.upcoming_priorities.filter(p => p.trim()),
+          governance_items: annualReviewData.governance_items.filter(g => g.trim())
+        };
+      
+      case 'quarterly_review':
+        return {
+          ...baseData,
+          quarter: quarterlyReviewData.quarter,
+          year: quarterlyReviewData.year,
+          beginning_balance: parseFloat(quarterlyReviewData.beginning_balance) || 0,
+          ending_balance: parseFloat(quarterlyReviewData.ending_balance) || 0,
+          income_received: parseFloat(quarterlyReviewData.income_received) || 0,
+          expenses_paid: parseFloat(quarterlyReviewData.expenses_paid) || 0,
+          distributions_made: parseFloat(quarterlyReviewData.distributions_made) || 0,
+          discussion_items: quarterlyReviewData.discussion_items.filter(d => d.trim()),
+          action_items: quarterlyReviewData.action_items.filter(a => a.trim())
+        };
+      
+      case 'trustee_compensation':
+        return {
+          ...baseData,
+          trustee_name: trusteeCompData.trustee_name,
+          compensation_type: trusteeCompData.compensation_type,
+          compensation_amount: parseFloat(trusteeCompData.compensation_amount) || 0,
+          effective_date: trusteeCompData.effective_date,
+          compensation_basis: trusteeCompData.compensation_basis,
+          duties_description: trusteeCompData.duties_description,
+          all_trustees: trusteeCompData.all_trustees
+        };
+      
+      case 'trustee_resignation':
+        return {
+          ...baseData,
+          departing_trustee_name: trusteeResignData.departing_trustee_name,
+          departure_type: trusteeResignData.departure_type,
+          departure_reason: trusteeResignData.departure_reason,
+          effective_date: trusteeResignData.effective_date,
+          remaining_trustees: trusteeResignData.remaining_trustees.filter(t => t.trim()),
+          successor_appointed: trusteeResignData.successor_appointed,
+          successor_name: trusteeResignData.successor_name
+        };
+      
+      case 'beneficiary_request_denial':
+        return {
+          ...baseData,
+          beneficiary_name: denialData.beneficiary_name,
+          request_type: denialData.request_type,
+          request_amount: parseFloat(denialData.request_amount) || 0,
+          request_purpose: denialData.request_purpose,
+          request_date: denialData.request_date,
+          denial_reasons: denialData.denial_reasons.filter(r => r.trim()),
+          alternative_offered: denialData.alternative_offered
+        };
+      
+      case 'hems_distribution':
+        return {
+          ...baseData,
+          beneficiary_name: hemsData.beneficiary_name,
+          hems_category: hemsData.hems_category,
+          distribution_amount: parseFloat(hemsData.distribution_amount) || 0,
+          specific_purpose: hemsData.specific_purpose,
+          supporting_documentation: hemsData.supporting_documentation.filter(d => d.trim()),
+          recurring: hemsData.recurring,
+          recurring_frequency: hemsData.recurring_frequency
+        };
+      
+      case 'beneficiary_loan':
+        return {
+          ...baseData,
+          beneficiary_name: beneficiaryLoanData.beneficiary_name,
+          loan_amount: parseFloat(beneficiaryLoanData.loan_amount) || 0,
+          interest_rate: beneficiaryLoanData.interest_rate,
+          term_months: parseInt(beneficiaryLoanData.term_months) || 60,
+          loan_purpose: beneficiaryLoanData.loan_purpose,
+          collateral_description: beneficiaryLoanData.collateral_description,
+          repayment_terms: beneficiaryLoanData.repayment_terms
         };
       
       case 'general_meeting':
@@ -1486,6 +1738,474 @@ export default function MinutesTemplateFormPage() {
                       <Label htmlFor="add-benevolence-log" className="cursor-pointer">
                         Automatically add to Benevolence Log
                       </Label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* INVESTMENT POLICY TEMPLATE */}
+              {templateType === 'investment_policy' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Investment Policy Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Policy Action</Label>
+                      <Select value={investmentPolicyData.policy_type} onValueChange={(v) => setInvestmentPolicyData({ ...investmentPolicyData, policy_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="adopt">Adopt New Policy</SelectItem>
+                          <SelectItem value="amend">Amend Existing Policy</SelectItem>
+                          <SelectItem value="review">Review & Reaffirm</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Risk Tolerance</Label>
+                      <Select value={investmentPolicyData.risk_tolerance} onValueChange={(v) => setInvestmentPolicyData({ ...investmentPolicyData, risk_tolerance: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="conservative">Conservative</SelectItem>
+                          <SelectItem value="moderate">Moderate</SelectItem>
+                          <SelectItem value="moderately_aggressive">Moderately Aggressive</SelectItem>
+                          <SelectItem value="aggressive">Aggressive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Review Frequency</Label>
+                      <Select value={investmentPolicyData.review_frequency} onValueChange={(v) => setInvestmentPolicyData({ ...investmentPolicyData, review_frequency: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
+                          <SelectItem value="semi-annually">Semi-Annually</SelectItem>
+                          <SelectItem value="annually">Annually</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* LOAN AUTHORIZATION TEMPLATE */}
+              {templateType === 'loan_authorization' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Loan Authorization Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Loan Direction</Label>
+                      <Select value={loanAuthData.loan_direction} onValueChange={(v) => setLoanAuthData({ ...loanAuthData, loan_direction: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="making">Trust Making Loan</SelectItem>
+                          <SelectItem value="receiving">Trust Receiving Loan</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">{loanAuthData.loan_direction === 'making' ? 'Borrower Name' : 'Lender Name'}</Label>
+                      <Input
+                        value={loanAuthData.loan_direction === 'making' ? loanAuthData.borrower_name : loanAuthData.lender_name}
+                        onChange={(e) => setLoanAuthData({ ...loanAuthData, [loanAuthData.loan_direction === 'making' ? 'borrower_name' : 'lender_name']: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Name"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Loan Amount ($)</Label>
+                      <Input type="number" value={loanAuthData.loan_amount} onChange={(e) => setLoanAuthData({ ...loanAuthData, loan_amount: e.target.value })} className="mt-1 input-trust" placeholder="50000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Interest Rate</Label>
+                      <Input value={loanAuthData.interest_rate} onChange={(e) => setLoanAuthData({ ...loanAuthData, interest_rate: e.target.value })} className="mt-1 input-trust" placeholder="AFR or 5%" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Term (Months)</Label>
+                      <Input type="number" value={loanAuthData.term_months} onChange={(e) => setLoanAuthData({ ...loanAuthData, term_months: e.target.value })} className="mt-1 input-trust" placeholder="60" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Purpose</Label>
+                      <Input value={loanAuthData.loan_purpose} onChange={(e) => setLoanAuthData({ ...loanAuthData, loan_purpose: e.target.value })} className="mt-1 input-trust" placeholder="Home purchase, business capital, etc." />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Collateral Description (if any)</Label>
+                      <Input value={loanAuthData.collateral_description} onChange={(e) => setLoanAuthData({ ...loanAuthData, collateral_description: e.target.value })} className="mt-1 input-trust" placeholder="Real property, securities, etc." />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* INSURANCE AUTHORIZATION TEMPLATE */}
+              {templateType === 'insurance_authorization' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Insurance Authorization Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Insurance Type</Label>
+                      <Select value={insuranceData.insurance_type} onValueChange={(v) => setInsuranceData({ ...insuranceData, insurance_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="property">Property & Casualty</SelectItem>
+                          <SelectItem value="liability">Liability</SelectItem>
+                          <SelectItem value="life">Life Insurance</SelectItem>
+                          <SelectItem value="health">Health Insurance</SelectItem>
+                          <SelectItem value="umbrella">Umbrella/Excess</SelectItem>
+                          <SelectItem value="professional">Professional Liability</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Action</Label>
+                      <Select value={insuranceData.policy_action} onValueChange={(v) => setInsuranceData({ ...insuranceData, policy_action: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="obtain">Obtain New Policy</SelectItem>
+                          <SelectItem value="renew">Renew Existing</SelectItem>
+                          <SelectItem value="modify">Modify Coverage</SelectItem>
+                          <SelectItem value="cancel">Cancel Policy</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Insurance Company</Label>
+                      <Input value={insuranceData.insurer_name} onChange={(e) => setInsuranceData({ ...insuranceData, insurer_name: e.target.value })} className="mt-1 input-trust" placeholder="Company name" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Coverage Amount ($)</Label>
+                      <Input type="number" value={insuranceData.coverage_amount} onChange={(e) => setInsuranceData({ ...insuranceData, coverage_amount: e.target.value })} className="mt-1 input-trust" placeholder="1000000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Annual Premium ($)</Label>
+                      <Input type="number" value={insuranceData.premium_amount} onChange={(e) => setInsuranceData({ ...insuranceData, premium_amount: e.target.value })} className="mt-1 input-trust" placeholder="5000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Policy Number (if existing)</Label>
+                      <Input value={insuranceData.policy_number} onChange={(e) => setInsuranceData({ ...insuranceData, policy_number: e.target.value })} className="mt-1 input-trust" placeholder="POL-123456" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Coverage Description</Label>
+                      <Textarea value={insuranceData.coverage_description} onChange={(e) => setInsuranceData({ ...insuranceData, coverage_description: e.target.value })} className="mt-1" rows={2} placeholder="Describe what is covered" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ANNUAL REVIEW TEMPLATE */}
+              {templateType === 'annual_review' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Annual Review Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Fiscal Year</Label>
+                      <Input value={annualReviewData.fiscal_year} onChange={(e) => setAnnualReviewData({ ...annualReviewData, fiscal_year: e.target.value })} className="mt-1 input-trust" placeholder="2025" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Investment Return</Label>
+                      <Input value={annualReviewData.investment_return} onChange={(e) => setAnnualReviewData({ ...annualReviewData, investment_return: e.target.value })} className="mt-1 input-trust" placeholder="7.5%" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Total Assets (Year End)</Label>
+                      <Input type="number" value={annualReviewData.total_assets} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_assets: e.target.value })} className="mt-1 input-trust" placeholder="1000000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Total Income</Label>
+                      <Input type="number" value={annualReviewData.total_income} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_income: e.target.value })} className="mt-1 input-trust" placeholder="50000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Total Expenses</Label>
+                      <Input type="number" value={annualReviewData.total_expenses} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_expenses: e.target.value })} className="mt-1 input-trust" placeholder="10000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Total Distributions</Label>
+                      <Input type="number" value={annualReviewData.total_distributions} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_distributions: e.target.value })} className="mt-1 input-trust" placeholder="30000" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* QUARTERLY REVIEW TEMPLATE */}
+              {templateType === 'quarterly_review' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Quarterly Review Details</h2>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="label-trust">Quarter</Label>
+                      <Select value={quarterlyReviewData.quarter} onValueChange={(v) => setQuarterlyReviewData({ ...quarterlyReviewData, quarter: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+                          <SelectItem value="Q2">Q2 (Apr-Jun)</SelectItem>
+                          <SelectItem value="Q3">Q3 (Jul-Sep)</SelectItem>
+                          <SelectItem value="Q4">Q4 (Oct-Dec)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Year</Label>
+                      <Input value={quarterlyReviewData.year} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, year: e.target.value })} className="mt-1 input-trust" placeholder="2026" />
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <Label className="label-trust">Beginning Balance</Label>
+                      <Input type="number" value={quarterlyReviewData.beginning_balance} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, beginning_balance: e.target.value })} className="mt-1 input-trust" placeholder="500000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Ending Balance</Label>
+                      <Input type="number" value={quarterlyReviewData.ending_balance} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, ending_balance: e.target.value })} className="mt-1 input-trust" placeholder="510000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Income Received</Label>
+                      <Input type="number" value={quarterlyReviewData.income_received} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, income_received: e.target.value })} className="mt-1 input-trust" placeholder="15000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Distributions Made</Label>
+                      <Input type="number" value={quarterlyReviewData.distributions_made} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, distributions_made: e.target.value })} className="mt-1 input-trust" placeholder="5000" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TRUSTEE COMPENSATION TEMPLATE */}
+              {templateType === 'trustee_compensation' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Trustee Compensation Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2 flex items-center gap-3">
+                      <Checkbox checked={trusteeCompData.all_trustees} onCheckedChange={(c) => setTrusteeCompData({ ...trusteeCompData, all_trustees: c })} id="all-trustees" />
+                      <Label htmlFor="all-trustees" className="cursor-pointer">Apply to all trustees</Label>
+                    </div>
+                    {!trusteeCompData.all_trustees && (
+                      <div>
+                        <Label className="label-trust">Trustee Name</Label>
+                        <Input value={trusteeCompData.trustee_name} onChange={(e) => setTrusteeCompData({ ...trusteeCompData, trustee_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith" />
+                      </div>
+                    )}
+                    <div>
+                      <Label className="label-trust">Compensation Type</Label>
+                      <Select value={trusteeCompData.compensation_type} onValueChange={(v) => setTrusteeCompData({ ...trusteeCompData, compensation_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="annual">Annual Fee</SelectItem>
+                          <SelectItem value="hourly">Hourly Rate</SelectItem>
+                          <SelectItem value="per_meeting">Per Meeting</SelectItem>
+                          <SelectItem value="percentage">% of Assets</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Amount</Label>
+                      <Input type="number" value={trusteeCompData.compensation_amount} onChange={(e) => setTrusteeCompData({ ...trusteeCompData, compensation_amount: e.target.value })} className="mt-1 input-trust" placeholder="5000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Effective Date</Label>
+                      <Input value={trusteeCompData.effective_date} onChange={(e) => setTrusteeCompData({ ...trusteeCompData, effective_date: e.target.value })} className="mt-1 input-trust" placeholder="January 1, 2026" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Compensation Basis/Justification</Label>
+                      <Textarea value={trusteeCompData.compensation_basis} onChange={(e) => setTrusteeCompData({ ...trusteeCompData, compensation_basis: e.target.value })} className="mt-1" rows={2} placeholder="Based on comparable trustee fees in the region..." />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TRUSTEE RESIGNATION TEMPLATE */}
+              {templateType === 'trustee_resignation' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Trustee Departure Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Departing Trustee Name</Label>
+                      <Input value={trusteeResignData.departing_trustee_name} onChange={(e) => setTrusteeResignData({ ...trusteeResignData, departing_trustee_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Departure Type</Label>
+                      <Select value={trusteeResignData.departure_type} onValueChange={(v) => setTrusteeResignData({ ...trusteeResignData, departure_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="resignation">Resignation</SelectItem>
+                          <SelectItem value="removal">Removal</SelectItem>
+                          <SelectItem value="death">Death</SelectItem>
+                          <SelectItem value="incapacity">Incapacity</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Effective Date</Label>
+                      <Input value={trusteeResignData.effective_date} onChange={(e) => setTrusteeResignData({ ...trusteeResignData, effective_date: e.target.value })} className="mt-1 input-trust" placeholder="March 1, 2026" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Reason (optional)</Label>
+                      <Input value={trusteeResignData.departure_reason} onChange={(e) => setTrusteeResignData({ ...trusteeResignData, departure_reason: e.target.value })} className="mt-1 input-trust" placeholder="Personal reasons, relocation, etc." />
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-3">
+                      <Checkbox checked={trusteeResignData.successor_appointed} onCheckedChange={(c) => setTrusteeResignData({ ...trusteeResignData, successor_appointed: c })} id="successor-appointed" />
+                      <Label htmlFor="successor-appointed" className="cursor-pointer">Successor trustee being appointed</Label>
+                    </div>
+                    {trusteeResignData.successor_appointed && (
+                      <div className="md:col-span-2">
+                        <Label className="label-trust">Successor Name</Label>
+                        <Input value={trusteeResignData.successor_name} onChange={(e) => setTrusteeResignData({ ...trusteeResignData, successor_name: e.target.value })} className="mt-1 input-trust" placeholder="Jane Doe" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* BENEFICIARY REQUEST DENIAL TEMPLATE */}
+              {templateType === 'beneficiary_request_denial' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Request Denial Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Beneficiary Name</Label>
+                      <Input value={denialData.beneficiary_name} onChange={(e) => setDenialData({ ...denialData, beneficiary_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith Jr." />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Request Type</Label>
+                      <Select value={denialData.request_type} onValueChange={(v) => setDenialData({ ...denialData, request_type: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="distribution">Distribution Request</SelectItem>
+                          <SelectItem value="loan">Loan Request</SelectItem>
+                          <SelectItem value="early_distribution">Early Distribution</SelectItem>
+                          <SelectItem value="special_request">Special Request</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Request Amount ($)</Label>
+                      <Input type="number" value={denialData.request_amount} onChange={(e) => setDenialData({ ...denialData, request_amount: e.target.value })} className="mt-1 input-trust" placeholder="25000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Request Date</Label>
+                      <Input value={denialData.request_date} onChange={(e) => setDenialData({ ...denialData, request_date: e.target.value })} className="mt-1 input-trust" placeholder="February 15, 2026" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Request Purpose</Label>
+                      <Input value={denialData.request_purpose} onChange={(e) => setDenialData({ ...denialData, request_purpose: e.target.value })} className="mt-1 input-trust" placeholder="Vacation, luxury purchase, etc." />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Reasons for Denial</Label>
+                      <div className="space-y-2 mt-1">
+                        {denialData.denial_reasons.map((reason, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <Input value={reason} onChange={(e) => {
+                              const newReasons = [...denialData.denial_reasons];
+                              newReasons[idx] = e.target.value;
+                              setDenialData({ ...denialData, denial_reasons: newReasons });
+                            }} className="input-trust" placeholder="Reason for denial" />
+                            {denialData.denial_reasons.length > 1 && (
+                              <Button variant="ghost" size="icon" onClick={() => setDenialData({ ...denialData, denial_reasons: denialData.denial_reasons.filter((_, i) => i !== idx) })}>
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        <Button variant="ghost" size="sm" onClick={() => setDenialData({ ...denialData, denial_reasons: [...denialData.denial_reasons, ''] })}>
+                          <Plus className="w-4 h-4 mr-1" /> Add Reason
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Alternative Offered (optional)</Label>
+                      <Textarea value={denialData.alternative_offered} onChange={(e) => setDenialData({ ...denialData, alternative_offered: e.target.value })} className="mt-1" rows={2} placeholder="Smaller distribution, loan instead, etc." />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* HEMS DISTRIBUTION TEMPLATE */}
+              {templateType === 'hems_distribution' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">HEMS Distribution Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Beneficiary Name</Label>
+                      <Input value={hemsData.beneficiary_name} onChange={(e) => setHemsData({ ...hemsData, beneficiary_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith Jr." />
+                    </div>
+                    <div>
+                      <Label className="label-trust">HEMS Category</Label>
+                      <Select value={hemsData.hems_category} onValueChange={(v) => setHemsData({ ...hemsData, hems_category: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="health">Health (Medical)</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="maintenance">Maintenance</SelectItem>
+                          <SelectItem value="support">Support</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Distribution Amount ($)</Label>
+                      <Input type="number" value={hemsData.distribution_amount} onChange={(e) => setHemsData({ ...hemsData, distribution_amount: e.target.value })} className="mt-1 input-trust" placeholder="10000" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Checkbox checked={hemsData.recurring} onCheckedChange={(c) => setHemsData({ ...hemsData, recurring: c })} id="recurring-hems" />
+                      <Label htmlFor="recurring-hems" className="cursor-pointer">Recurring Distribution</Label>
+                    </div>
+                    {hemsData.recurring && (
+                      <div>
+                        <Label className="label-trust">Frequency</Label>
+                        <Select value={hemsData.recurring_frequency} onValueChange={(v) => setHemsData({ ...hemsData, recurring_frequency: v })}>
+                          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                            <SelectItem value="semi-annually">Semi-Annually</SelectItem>
+                            <SelectItem value="annually">Annually</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Specific Purpose</Label>
+                      <Textarea value={hemsData.specific_purpose} onChange={(e) => setHemsData({ ...hemsData, specific_purpose: e.target.value })} className="mt-1" rows={2} placeholder="Describe the specific HEMS need" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* BENEFICIARY LOAN TEMPLATE */}
+              {templateType === 'beneficiary_loan' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4">Beneficiary Loan Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Beneficiary Name</Label>
+                      <Input value={beneficiaryLoanData.beneficiary_name} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, beneficiary_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith Jr." />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Loan Amount ($)</Label>
+                      <Input type="number" value={beneficiaryLoanData.loan_amount} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, loan_amount: e.target.value })} className="mt-1 input-trust" placeholder="50000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Interest Rate</Label>
+                      <Input value={beneficiaryLoanData.interest_rate} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, interest_rate: e.target.value })} className="mt-1 input-trust" placeholder="AFR or 5%" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Term (Months)</Label>
+                      <Input type="number" value={beneficiaryLoanData.term_months} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, term_months: e.target.value })} className="mt-1 input-trust" placeholder="60" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Repayment Terms</Label>
+                      <Select value={beneficiaryLoanData.repayment_terms} onValueChange={(v) => setBeneficiaryLoanData({ ...beneficiaryLoanData, repayment_terms: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly installments">Monthly Installments</SelectItem>
+                          <SelectItem value="quarterly installments">Quarterly Installments</SelectItem>
+                          <SelectItem value="annual installments">Annual Installments</SelectItem>
+                          <SelectItem value="balloon payment">Balloon at Maturity</SelectItem>
+                          <SelectItem value="interest only">Interest Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Purpose</Label>
+                      <Input value={beneficiaryLoanData.loan_purpose} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, loan_purpose: e.target.value })} className="mt-1 input-trust" placeholder="Home purchase, education, etc." />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Collateral (if any)</Label>
+                      <Input value={beneficiaryLoanData.collateral_description} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, collateral_description: e.target.value })} className="mt-1 input-trust" placeholder="Real property, vehicle, etc." />
                     </div>
                   </div>
                 </div>
