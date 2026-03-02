@@ -169,7 +169,7 @@ export const Sidebar = () => {
               <img src={user.picture} alt={user.name} className="w-10 h-10 object-cover" />
             ) : (
               <div className="w-10 h-10 bg-gold flex items-center justify-center">
-                <span className="font-serif text-navy font-bold">
+                <span className="font-serif font-bold text-[#010079]">
                   {user?.name?.charAt(0) || 'U'}
                 </span>
               </div>
