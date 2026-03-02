@@ -57,7 +57,46 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Dec 30, 2025) - SUBSCRIPTION STATE VERIFICATION ✅
+### Latest Updates (Mar 2, 2026) - GA4 EVENTS & UPGRADE PROMPTS ✅
+
+**Session Summary:** Implemented GA4 subscription funnel tracking and enhanced user prompts for trial/expired accounts.
+
+**New GA4 Event Functions (in `/frontend/src/utils/analytics.js`):**
+- `trackFeatureBlocked()` - When read-only user tries a blocked action
+- `trackTrialBannerViewed()` - When trial banner displays (with days_remaining, location)
+- `trackTrialBannerClicked()` - When user clicks Upgrade from banner
+- `trackUpgradeModalShown()` - When upgrade modal appears
+- `trackUpgradeModalClicked()` - When user clicks Subscribe from modal
+
+**New Components:**
+1. **TrialBanner** (`/frontend/src/components/TrialBanner.js`)
+   - Shows "X days left in your trial" countdown
+   - Color-coded urgency: Red (≤3 days), Amber (4-7 days), Blue (>7 days)
+   - "Upgrade Now" button links to /settings?tab=subscription
+   - Tracks GA4 events: trial_banner_viewed, trial_banner_clicked
+
+2. **UpgradeModal** (`/frontend/src/components/UpgradeModal.js`)
+   - Subscription Required dialog for read-only users
+   - Shows feature list and pricing ($79/mo, $790/yr)
+   - Triggered when blocked actions attempted
+
+3. **UpgradeModalContext** (`/frontend/src/context/UpgradeModalContext.js`)
+   - Global context provider for upgrade modal
+   - `useUpgradeModal()` hook for triggering modal from any component
+   - Automatically tracks GA4 feature_blocked events
+
+**Page Updates:**
+- DashboardPage, DistributionsPage, MinutesPage now include TrialBanner and ReadOnlyBanner
+- Add Distribution button shows upgrade modal for read-only users
+- Record Minutes button shows upgrade modal for read-only users
+
+**Testing:** All 15 frontend tests passed verifying:
+- TrialBanner displays correctly with days remaining
+- GA4 events fire with correct parameters
+- ReadOnlyBanner hidden for active trial users
+- UpgradeModal not triggered for active trial users
+
+### Previous Updates (Dec 30, 2025) - SUBSCRIPTION STATE VERIFICATION ✅
 
 **Session Summary:** Verified and refined subscription/trial handling for consistent state across modules:
 
