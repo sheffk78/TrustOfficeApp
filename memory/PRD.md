@@ -21,7 +21,28 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - LOGIN FLOW FIX ✅
+### Latest Updates (Mar 2, 2026) - P2 FEATURES COMPLETE ✅
+
+1. **Dashboard Trust Selection Parameter**
+   - `GET /api/dashboard` now accepts optional `trust_id` query param
+   - Validates trust ownership - returns 404 if trust doesn't exist or belongs to another user
+   - Defaults to most recently created trust if not specified
+
+2. **Beneficiary Dashboard** (`/trust/beneficiaries`)
+   - New endpoint: `GET /api/beneficiaries/dashboard`
+   - Returns: trust_name, total_authorized_units, total_issued_units, remaining_units, beneficiaries array, recent_transfers
+   - Beneficiaries aggregated by holder with total units, percentage, certificate count
+   - Sorted by total_units descending
+   
+3. **Beneficiary Dashboard Frontend**
+   - Summary cards: Total Authorized, Issued, Remaining, Beneficiaries count
+   - **Ownership Distribution pie chart** with color-coded legend
+   - **Certificate Holders list** - expandable rows showing certificate details
+   - **Recent Transfers section** with transfer history
+   - Navigation link in sidebar under "Structures" group
+   - "Manage Units" button links to `/trust/units`
+
+### Previous Updates (Mar 2, 2026) - LOGIN FLOW FIX ✅
 
 1. **Fixed trusts not loading after login**
    - Added `loadTrusts()` call after successful authentication in LoginPage.js
