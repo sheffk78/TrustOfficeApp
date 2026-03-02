@@ -372,6 +372,12 @@ The backend now has a modular structure for better maintainability:
 
 ## Prioritized Backlog
 
+### P0 (Technical Debt) - IN PROGRESS (Mar 2, 2026)
+- [x] Backend refactoring - Created modular structure with database.py, models.py, dependencies.py
+- [x] Created routers/ directory with domain-specific router modules
+- [ ] Complete migration of endpoints from server.py to individual routers (gradual)
+- [ ] Implement hard feature gating based on Stripe subscription status
+
 ### P1 (Short-term) - COMPLETE (Feb 23-25, 2026)
 - [x] Profile editing (name change) - Edit button in Settings > Profile section
 - [x] Search in minutes/distributions - Server-side search with debounced queries
@@ -383,8 +389,8 @@ The backend now has a modular structure for better maintainability:
 
 ### P2 (Medium-term)
 - [x] Fix Compensation API schema mismatch (Feb 25, 2026)
-- [ ] PDF Export for Trust Unit Certificates
-- [ ] Beneficiary Dashboard for unit allocations
+- [x] Trust Certificate Units UI (Mar 2, 2026)
+- [x] Beneficiary Dashboard for unit allocations (Mar 2, 2026)
 - [ ] Audit Log (backend + UI)
 - [ ] Receipt/invoice download
 - [ ] Feedback process
@@ -393,6 +399,9 @@ The backend now has a modular structure for better maintainability:
 - [ ] Multi-trustee collaboration
 - [ ] AI-assisted minutes drafting
 - [ ] Mobile app
+- [ ] Date range filters for Minutes page
+- [ ] More entity types (LLCs)
+- [ ] Email retry queue for Postmark failures
 
 ## Notes
 - Postmark: Sandbox mode (verified domain only)
