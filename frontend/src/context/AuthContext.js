@@ -267,14 +267,24 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const handleSubscriptionExpired = () => {
       setSubscriptionExpired(true);
-      loadSubscription();
+      setIsReadOnly(true);
+      loadSubscriptionState();
+    };
+    
+    const handleSubscriptionReadOnly = (event) => {
+      setIsReadOnly(true);
+      // Optionally refresh subscription state
+      loadSubscriptionState();
     };
     
     window.addEventListener('subscription-expired', handleSubscriptionExpired);
+    window.addEventListener('subscription-readonly', handleSubscriptionReadOnly);
+    
     return () => {
       window.removeEventListener('subscription-expired', handleSubscriptionExpired);
+      window.removeEventListener('subscription-readonly', handleSubscriptionReadOnly);
     };
-  }, [loadSubscription]);
+  }, [loadSubscriptionState]);
 
   // Wrapper to persist trust selection
   const selectTrust = useCallback((trust) => {
@@ -295,7 +305,9 @@ export const AuthProvider = ({ children }) => {
     setSelectedTrust: selectTrust,
     subscription,
     subscriptionExpired,
+    isReadOnly,
     loadSubscription,
+    loadSubscriptionState,
     checkAuth,
     loadTrusts,
     login,
