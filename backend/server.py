@@ -6055,6 +6055,7 @@ async def get_dashboard(
     - Recent activity
     - Stats (total decisions, pending reviews, etc.)
     - Governance insights (actionable suggestions)
+    - Subscription state (for read-only mode awareness)
     
     Args:
         trust_id: Optional trust ID. If not provided, uses the user's most recent trust.
@@ -6105,6 +6106,17 @@ async def get_dashboard(
     # Generate governance insights from unachieved criteria
     governance_insights = generate_governance_insights(health_data["criteria"])
     
+    # Get subscription state using unified helper
+    sub_state = await get_subscription_state(user_id)
+    subscription = DashboardSubscriptionState(
+        plan_type=sub_state.plan_type,
+        status=sub_state.status,
+        is_trial=sub_state.is_trial,
+        is_active=sub_state.is_active,
+        is_read_only=sub_state.is_read_only,
+        trial_days_remaining=sub_state.trial_days_remaining
+    )
+    
     return DashboardResponse(
         trust_id=trust_id,
         trust_name=trust_name,
@@ -6112,7 +6124,8 @@ async def get_dashboard(
         onboarding_state=onboarding_state,
         recent_activity=recent_activity,
         stats=stats,
-        governance_insights=governance_insights
+        governance_insights=governance_insights,
+        subscription=subscription
     )
 
 # ==================== CATEGORIES ====================
