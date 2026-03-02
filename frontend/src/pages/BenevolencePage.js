@@ -274,6 +274,76 @@ export default function BenevolencePage() {
     );
   });
 
+  // Distribution log filtering (for History tab)
+  const getFilteredDistributions = () => {
+    if (!distLogData?.distributions) return [];
+    
+    let filtered = distLogData.distributions;
+    
+    if (searchRecipient) {
+      const search = searchRecipient.toLowerCase();
+      filtered = filtered.filter(d => 
+        d.benevolence_recipient_name?.toLowerCase().includes(search) ||
+        d.beneficiary_name?.toLowerCase().includes(search)
+      );
+    }
+    
+    const now = new Date();
+    if (dateFilter === 'this_month') {
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+      filtered = filtered.filter(d => {
+        const date = parseISO(d.date);
+        return date >= monthStart && date <= monthEnd;
+      });
+    } else if (dateFilter === 'this_year') {
+      const yearStart = startOfYear(now);
+      const yearEnd = endOfYear(now);
+      filtered = filtered.filter(d => {
+        const date = parseISO(d.date);
+        return date >= yearStart && date <= yearEnd;
+      });
+    } else if (dateFilter === 'last_month') {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const monthStart = startOfMonth(lastMonth);
+      const monthEnd = endOfMonth(lastMonth);
+      filtered = filtered.filter(d => {
+        const date = parseISO(d.date);
+        return date >= monthStart && date <= monthEnd;
+      });
+    }
+    
+    return filtered;
+  };
+
+  const getDistStatusIcon = (dist) => {
+    if (dist.approved_at || dist.minutes_record_id) {
+      return <CheckCircle2 className="w-4 h-4 text-success" />;
+    }
+    return <Clock className="w-4 h-4 text-warning" />;
+  };
+
+  const getDistStatusText = (dist) => {
+    if (dist.approved_at) return 'Approved';
+    if (dist.minutes_record_id) return 'Documented';
+    return 'Pending';
+  };
+
+  const getCurrentMonthTotal = () => {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthData = distLogData?.monthly_aggregates?.find(m => m.month === currentMonth);
+    return monthData?.total_amount || 0;
+  };
+
+  const getCurrentYearTotal = () => {
+    const currentYear = new Date().getFullYear();
+    const yearData = distLogData?.yearly_aggregates?.find(y => y.year === currentYear);
+    return yearData?.total_amount || 0;
+  };
+
+  const filteredDistributions = getFilteredDistributions();
+
   if (!selectedTrust) {
     return (
       <div className="min-h-screen bg-background">
