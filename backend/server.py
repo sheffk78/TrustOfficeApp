@@ -5926,15 +5926,29 @@ def generate_governance_insights(criteria: List[dict]) -> List[GovernanceInsight
                     points=20
                 ))
             elif c["name"] == "Distribution Documentation":
-                insights.append(GovernanceInsight(
-                    type="info",
-                    criterion_name="Distribution Documentation",
-                    title="No Distributions Logged",
-                    description="Log your first distribution to earn +20 points",
-                    action_path="/distributions",
-                    action_label="Add Distribution",
-                    points=20
-                ))
+                # Check if this is a benevolence-related issue
+                desc = c.get("description", "")
+                if "benevolence" in desc.lower():
+                    # Benevolence documentation issue
+                    insights.append(GovernanceInsight(
+                        type="warning",
+                        criterion_name="Distribution Documentation",
+                        title="Benevolence Documentation Needed",
+                        description=desc,
+                        action_path="/benevolence/log",
+                        action_label="Review Benevolence",
+                        points=c.get("max_points", 20) - c.get("points", 0)
+                    ))
+                else:
+                    insights.append(GovernanceInsight(
+                        type="info",
+                        criterion_name="Distribution Documentation",
+                        title="No Distributions Logged",
+                        description="Log your first distribution to earn +20 points",
+                        action_path="/distributions",
+                        action_label="Add Distribution",
+                        points=20
+                    ))
             elif c["name"] == "Annual Review":
                 insights.append(GovernanceInsight(
                     type="warning",
