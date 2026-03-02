@@ -58,37 +58,29 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Dec 30, 2025) - P1 BACKEND ROUTER MIGRATION ✅
+### Latest Updates (Dec 30, 2025) - P1 BACKEND ROUTER MIGRATION (Session 2) ✅
 
-**Session Summary:** Continued the backend refactoring by migrating three additional modules from server.py to dedicated router files:
+**Session Summary:** Continued backend refactoring by migrating two additional modules:
 
-1. **schedule_a.py Router** (427 lines → 16,796 bytes)
-   - All Schedule A asset CRUD endpoints migrated
-   - GET/POST/PUT/DELETE /api/schedule-a
-   - GET /api/schedule-a/summary/{trust_id}
-   - GET /api/schedule-a/export/{trust_id}/pdf
-   - Uses require_write_access for write operations
+1. **benevolence.py Router** (510 lines)
+   - POST/GET/PUT/DELETE /api/benevolence (CRUD)
+   - GET /api/benevolence/summary/{trust_id} (aggregations by purpose/period)
+   - GET /api/benevolence/export/{trust_id}/pdf (PDF report)
+   - Uses require_write_access for write protection
 
-2. **compensation.py Router** (191 lines → 5,800 bytes)
-   - Compensation plans CRUD: GET/POST /api/compensation-plans
-   - Compensation payments CRUD: GET/POST/DELETE /api/compensation-payments
-   - GET /api/compensation-ytd - YTD totals and plan comparison
-   - Auto-onboarding updates on payment creation
+2. **exports.py Router** (167 lines)
+   - GET /api/export/minutes, /export/distributions, /export/compensation, /export/tasks
+   - All endpoints use require_premium_feature(CSV_EXPORT) - returns 402 for trial users
 
-3. **subscriptions.py Router** (655 lines → 21,000 bytes)
-   - GET /api/subscription - Current subscription details
-   - GET /api/subscription/state - Normalized state with computed fields
-   - GET /api/subscription/features - Premium feature flags
-   - POST /api/subscription/create-checkout - Stripe checkout session
-   - POST /api/subscription/create-portal - Billing portal
-   - POST /api/subscription/cancel, /reactivate, /upgrade
-   - POST /api/stripe/webhook - All Stripe webhook handlers
+**Server.py Progress:**
+- Started session: 4526 lines
+- After benevolence migration: 4054 lines (-479)
+- After exports migration: 3907 lines (-154)
+- **Total reduction: ~48% from original 7538 lines**
 
-**Code Reduction:** server.py reduced from ~5647 to ~4526 lines (-20%)
+**Testing:** All 33 tests passed including regression tests for previously migrated routers.
 
-**Testing:** All 30 backend tests passed. Fixed backward compatibility issue in CompensationPaymentResponse model.
-
-### Previous Updates (Mar 2, 2026) - FRONTEND READ-ONLY MODE INTEGRATION ✅
+### Previous Updates (Dec 30, 2025) - P1 BACKEND ROUTER MIGRATION (Session 1) ✅
 
 1. **ReadOnlyBanner Component** (`/frontend/src/components/ReadOnlyBanner.js`)
    - Amber/warning color scheme banner at top of pages
