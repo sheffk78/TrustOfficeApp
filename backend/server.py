@@ -5386,23 +5386,10 @@ async def get_governance_history(trust_id: str, days: int = 30, user: dict = Dep
 
 @api_router.get("/onboarding", response_model=OnboardingState)
 async def get_onboarding(user: dict = Depends(get_current_user)):
-    # Get user's trust to auto-update
+    # Get user's trust for auto-update
     trust = await db.trusts.find_one({"user_id": user["user_id"]}, {"_id": 0})
-    if trust:
-        await auto_update_onboarding(user["user_id"], trust["trust_id"])
-    
-    state = await db.user_onboarding.find_one({"user_id": user["user_id"]}, {"_id": 0})
-    if not state:
-        state = {
-            "user_id": user["user_id"],
-            "entities_confirmed": False,
-            "calendar_set": False,
-            "minutes_generated": False,
-            "distribution_logged": False,
-            "checklist_dismissed": False
-        }
-    
-    return OnboardingState(**state)
+    trust_id = trust["trust_id"] if trust else None
+    return await get_onboarding_state(user["user_id"], trust_id)
 
 @api_router.patch("/onboarding")
 async def update_onboarding(updates: dict, user: dict = Depends(get_current_user)):
