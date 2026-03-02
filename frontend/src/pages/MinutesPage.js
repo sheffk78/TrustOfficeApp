@@ -5,6 +5,7 @@ import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { TrialBanner } from '@/components/TrialBanner';
+import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
@@ -15,9 +16,7 @@ import {
   Calendar,
   Users,
   ChevronRight,
-  Download,
   Eye,
-  X,
   Loader2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -96,18 +95,6 @@ export default function MinutesPage() {
     } finally {
       setPdfLoading(false);
     }
-  };
-
-  const handleDownloadPdf = () => {
-    if (!pdfPreview) return;
-    
-    const link = document.createElement('a');
-    link.href = `data:application/pdf;base64,${pdfPreview.base64}`;
-    link.download = pdfPreview.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success('PDF downloaded');
   };
 
   const formatDate = (dateString) => {
@@ -297,49 +284,13 @@ export default function MinutesPage() {
       </main>
 
       {/* PDF Preview Modal */}
-      {pdfPreview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="pdf-preview-modal">
-          <div className="bg-white w-full max-w-4xl h-[80vh] flex flex-col corner-mark">
-            <div className="flex items-center justify-between p-4 border-b border-navy/10">
-              <h2 className="font-serif text-xl text-navy">Minutes PDF Preview</h2>
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={handleDownloadPdf}
-                  className="btn-primary"
-                  data-testid="download-pdf-btn"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-                <button 
-                  onClick={() => setPdfPreview(null)}
-                  className="text-navy hover:text-gold"
-                  data-testid="close-pdf-modal"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 p-4 bg-subtle-bg overflow-auto">
-              <object
-                data={`data:application/pdf;base64,${pdfPreview.base64}`}
-                type="application/pdf"
-                className="w-full h-full border border-navy/10"
-                title="Minutes PDF Preview"
-              >
-                <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                  <FileText className="w-16 h-16 text-navy/30 mb-4" />
-                  <p className="text-navy mb-4">PDF preview not supported in this browser.</p>
-                  <Button onClick={handleDownloadPdf} className="btn-primary">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download PDF to View
-                  </Button>
-                </div>
-              </object>
-            </div>
-          </div>
-        </div>
-      )}
+      <PDFPreviewModal
+        open={!!pdfPreview}
+        onOpenChange={(open) => !open && setPdfPreview(null)}
+        pdfBase64={pdfPreview?.base64}
+        title="Minutes PDF Preview"
+        filename={pdfPreview?.filename || 'minutes.pdf'}
+      />
     </div>
   );
 }

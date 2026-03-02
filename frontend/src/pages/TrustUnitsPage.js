@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,8 +26,7 @@ import {
   Printer,
   RefreshCw,
   Save,
-  Eye,
-  X
+  Eye
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -312,6 +312,7 @@ export default function TrustUnitsPage() {
   };
 
   const handleDownloadPdf = () => {
+    // Kept for backwards compatibility if needed elsewhere, but PDFPreviewModal handles this
     if (!pdfData) return;
     const link = document.createElement('a');
     link.href = `data:application/pdf;base64,${pdfData.pdf_base64}`;
@@ -873,34 +874,14 @@ export default function TrustUnitsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* PDF Preview Dialog */}
-      <Dialog open={pdfPreviewOpen} onOpenChange={setPdfPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl text-navy dark:text-gold flex items-center justify-between">
-              <span>Certificate Preview</span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleDownloadPdf} data-testid="download-pdf-btn">
-                  <Eye className="w-4 h-4 mr-2" />
-                  Download PDF
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setPdfPreviewOpen(false)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="mt-4 overflow-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
-            {pdfData && (
-              <iframe
-                src={`data:application/pdf;base64,${pdfData.pdf_base64}`}
-                className="w-full h-[600px] border border-border"
-                title="Certificate PDF Preview"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* PDF Preview Modal */}
+      <PDFPreviewModal
+        open={pdfPreviewOpen}
+        onOpenChange={setPdfPreviewOpen}
+        pdfBase64={pdfData?.pdf_base64}
+        title="Certificate Preview"
+        filename={pdfData?.filename || 'certificate.pdf'}
+      />
     </div>
   );
 }
