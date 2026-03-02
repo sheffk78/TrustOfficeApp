@@ -54,7 +54,7 @@ export default function TrustUnitsPage() {
   // Settings form (editable in top card)
   const [settingsForm, setSettingsForm] = useState({
     total_authorized_units: 100,
-    unit_label: 'Certificate Unit',
+    unit_label: 'Unit',
     allow_fractional: false
   });
   const [settingsDirty, setSettingsDirty] = useState(false);
