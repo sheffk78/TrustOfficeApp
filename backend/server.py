@@ -5133,6 +5133,19 @@ async def create_distribution(dist: DistributionCreate, background_tasks: Backgr
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
+    # Validate benevolence fields if is_benevolence is true
+    if dist.is_benevolence:
+        if not dist.benevolence_recipient_name or not dist.benevolence_recipient_name.strip():
+            raise HTTPException(
+                status_code=400, 
+                detail="Benevolence recipient name is required when is_benevolence is true"
+            )
+        if not dist.benevolence_need_description or not dist.benevolence_need_description.strip():
+            raise HTTPException(
+                status_code=400, 
+                detail="Benevolence need description is required when is_benevolence is true"
+            )
+    
     dist_id = f"dist_{uuid.uuid4().hex[:12]}"
     dist_doc = {
         "distribution_id": dist_id,
@@ -5149,7 +5162,12 @@ async def create_distribution(dist: DistributionCreate, background_tasks: Backgr
         "approved_by": None,
         "approved_at": None,
         "minutes_record_id": None,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        # Benevolence fields
+        "is_benevolence": dist.is_benevolence,
+        "benevolence_recipient_name": dist.benevolence_recipient_name if dist.is_benevolence else None,
+        "benevolence_need_description": dist.benevolence_need_description if dist.is_benevolence else None,
+        "benevolence_notes": dist.benevolence_notes if dist.is_benevolence else None
     }
     
     await db.distribution_records.insert_one(dist_doc)
