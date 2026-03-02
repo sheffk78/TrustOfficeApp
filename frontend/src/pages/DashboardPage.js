@@ -89,10 +89,16 @@ export default function DashboardPage() {
   const { user, selectedTrust, trusts, loadTrusts, seedDemoData } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // AI Suggestions state
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
+  const [aiSuggestionsError, setAiSuggestionsError] = useState(false);
 
   useEffect(() => {
     if (selectedTrust) {
       loadDashboardData();
+      loadAiSuggestions();
     } else if (trusts.length === 0) {
       setLoading(false);
     }
