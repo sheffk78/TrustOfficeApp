@@ -534,13 +534,42 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
          "minutes_type": "annual", "meeting_date": (now - timedelta(days=180)).isoformat(),
          "participants_text": "John Smith, Jane Smith, Attorney Bob Wilson",
          "decisions_text": "Annual review completed. 1) Reviewed all distributions for the year. 2) Confirmed Schedule A accuracy. 3) Approved trustee compensation continuation. 4) Reaffirmed investment policy statement.",
-         "created_at": (now - timedelta(days=180)).isoformat()},
+         "created_at": (now - timedelta(days=180)).isoformat(),
+         "is_demo": True},
+        # Bank Account Authorization
+        {"minutes_id": f"minutes_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
+         "minutes_type": "special", "meeting_date": (now - timedelta(days=250)).isoformat(),
+         "participants_text": "John Smith, Jane Smith",
+         "decisions_text": "RESOLVED: Authorize opening a trust brokerage account at Charles Schwab for investment management purposes.",
+         "generated_from_template": "bank_account_authorization",
+         "template_data": {"bank_name": "Charles Schwab", "account_type": "Brokerage", "signatories": ["John Smith", "Jane Smith"]},
+         "created_at": (now - timedelta(days=250)).isoformat(),
+         "is_demo": True},
+        # Investment Policy
+        {"minutes_id": f"minutes_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
+         "minutes_type": "special", "meeting_date": (now - timedelta(days=200)).isoformat(),
+         "participants_text": "John Smith, Jane Smith, Financial Advisor Mark Thompson",
+         "decisions_text": "RESOLVED: Adopt Investment Policy Statement with 60/40 equity-bond allocation, quarterly rebalancing, and ESG screening criteria.",
+         "generated_from_template": "investment_policy",
+         "template_data": {"allocation": "60/40 equity-bond", "review_frequency": "quarterly"},
+         "created_at": (now - timedelta(days=200)).isoformat(),
+         "is_demo": True},
+        # Trustee Compensation Approval
+        {"minutes_id": f"minutes_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
+         "minutes_type": "special", "meeting_date": (now - timedelta(days=365)).isoformat(),
+         "participants_text": "John Smith, Jane Smith, Attorney Bob Wilson",
+         "decisions_text": "RESOLVED: Approve annual trustee compensation of $24,000 per trustee, payable quarterly. Compensation is reasonable based on trust size and complexity.",
+         "generated_from_template": "trustee_compensation",
+         "template_data": {"annual_fee": 24000, "payment_frequency": "quarterly"},
+         "created_at": (now - timedelta(days=365)).isoformat(),
+         "is_demo": True},
         # Trust 2 Minutes
         {"minutes_id": f"minutes_{uuid.uuid4().hex[:12]}", "trust_id": trust2_id, "user_id": user["user_id"],
          "minutes_type": "annual", "meeting_date": (now - timedelta(days=90)).isoformat(),
          "participants_text": "John Smith",
          "decisions_text": "Annual review of education trust. 529 account performing well. Reviewed beneficiary designations.",
-         "created_at": (now - timedelta(days=90)).isoformat()}
+         "created_at": (now - timedelta(days=90)).isoformat(),
+         "is_demo": True}
     ])
     
     # ==================== DISTRIBUTIONS (Approved and Pending) ====================
@@ -657,19 +686,43 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "is_demo": True
     })
     
+    # Generate certificate IDs for transfer history
+    cert1_id = f"cert_{uuid.uuid4().hex[:12]}"
+    cert2_id = f"cert_{uuid.uuid4().hex[:12]}"
+    cert3_id = f"cert_{uuid.uuid4().hex[:12]}"
+    cert4_id = f"cert_{uuid.uuid4().hex[:12]}"
+    
     await db.trust_unit_certificates.insert_many([
-        {"certificate_id": f"cert_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
+        {"certificate_id": cert1_id, "trust_id": trust1_id, "user_id": user["user_id"],
          "certificate_number": "CERT-001", "holder_name": "Emily Smith", "holder_identifier": "Beneficiary - Daughter",
          "units": 25, "issue_date": "2020-01-15", "status": "active",
-         "notes": "Primary beneficiary - 25% interest", "created_at": now.isoformat()},
-        {"certificate_id": f"cert_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
+         "notes": "Primary beneficiary - 25% interest", "created_at": now.isoformat(), "is_demo": True},
+        {"certificate_id": cert2_id, "trust_id": trust1_id, "user_id": user["user_id"],
          "certificate_number": "CERT-002", "holder_name": "Michael Smith", "holder_identifier": "Beneficiary - Son",
          "units": 30, "issue_date": "2020-01-15", "status": "active",
-         "notes": "Primary beneficiary - 30% interest", "created_at": now.isoformat()},
-        {"certificate_id": f"cert_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
+         "notes": "Primary beneficiary - 30% interest", "created_at": now.isoformat(), "is_demo": True},
+        {"certificate_id": cert3_id, "trust_id": trust1_id, "user_id": user["user_id"],
          "certificate_number": "CERT-003", "holder_name": "James Smith Jr.", "holder_identifier": "Beneficiary - Grandson",
          "units": 15, "issue_date": "2022-06-01", "status": "active",
-         "notes": "Contingent beneficiary - 15% interest", "created_at": now.isoformat()}
+         "notes": "Contingent beneficiary - 15% interest", "created_at": now.isoformat(), "is_demo": True},
+        {"certificate_id": cert4_id, "trust_id": trust1_id, "user_id": user["user_id"],
+         "certificate_number": "CERT-004", "holder_name": "Sarah Smith", "holder_identifier": "Beneficiary - Spouse",
+         "units": 30, "issue_date": "2020-01-15", "status": "active",
+         "notes": "Primary beneficiary - 30% interest", "created_at": now.isoformat(), "is_demo": True}
+    ])
+    
+    # ==================== TRUST UNIT TRANSFERS (Transfer History) ====================
+    await db.trust_unit_transfers.insert_many([
+        {"transfer_id": f"transfer_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
+         "from_holder": "Sarah Smith", "to_holder": "James Smith Jr.",
+         "units": 5, "reason": "Gift to grandson for college graduation",
+         "transfer_date": (now - timedelta(days=180)).isoformat(),
+         "created_at": (now - timedelta(days=180)).isoformat(), "is_demo": True},
+        {"transfer_id": f"transfer_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
+         "from_holder": "Michael Smith", "to_holder": "Emily Smith",
+         "units": 5, "reason": "Voluntary reallocation per family agreement",
+         "transfer_date": (now - timedelta(days=90)).isoformat(),
+         "created_at": (now - timedelta(days=90)).isoformat(), "is_demo": True}
     ])
     
     # ==================== NOTIFICATION PREFERENCES ====================
