@@ -720,6 +720,26 @@ class DashboardResponse(BaseModel):
     stats: DashboardStats
     governance_insights: List[GovernanceInsight]
 
+# Beneficiary Dashboard Models
+class BeneficiaryAllocation(BaseModel):
+    holder_name: str
+    holder_identifier: Optional[str] = None
+    total_units: float
+    percentage: float
+    certificate_count: int
+    certificates: List[dict]
+
+class BeneficiaryDashboardResponse(BaseModel):
+    trust_id: str
+    trust_name: str
+    total_authorized_units: int
+    total_issued_units: float
+    remaining_units: float
+    unit_label: str
+    active_certificate_count: int
+    beneficiaries: List[BeneficiaryAllocation]
+    recent_transfers: List[dict]
+
 # Subscription Models
 class SubscriptionResponse(BaseModel):
     subscription_id: str
