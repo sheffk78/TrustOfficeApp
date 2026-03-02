@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
@@ -7,16 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Plus, 
   HeartHandshake,
   Search,
-  Filter,
-  FileText,
   DollarSign,
   Calendar,
   User,
@@ -26,20 +22,23 @@ import {
   Download,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  Filter,
+  X
 } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays } from 'date-fns';
 
 const PURPOSE_OPTIONS = [
-  { value: 'medical', label: 'Medical Expenses', icon: '🏥' },
-  { value: 'housing', label: 'Housing Assistance', icon: '🏠' },
-  { value: 'education', label: 'Education', icon: '📚' },
-  { value: 'food_necessities', label: 'Food & Necessities', icon: '🍎' },
-  { value: 'utilities', label: 'Utilities', icon: '💡' },
-  { value: 'transportation', label: 'Transportation', icon: '🚗' },
-  { value: 'emergency', label: 'Emergency Relief', icon: '🆘' },
-  { value: 'spiritual', label: 'Spiritual/Ministry', icon: '✝️' },
-  { value: 'other', label: 'Other', icon: '📋' }
+  { value: 'medical', label: 'Medical Expenses' },
+  { value: 'housing', label: 'Housing Assistance' },
+  { value: 'education', label: 'Education' },
+  { value: 'food_necessities', label: 'Food & Necessities' },
+  { value: 'utilities', label: 'Utilities' },
+  { value: 'transportation', label: 'Transportation' },
+  { value: 'emergency', label: 'Emergency Relief' },
+  { value: 'spiritual', label: 'Spiritual/Ministry' },
+  { value: 'other', label: 'Other' }
 ];
 
 const BENEFICIARY_TYPES = [
@@ -48,123 +47,220 @@ const BENEFICIARY_TYPES = [
   { value: 'organization', label: 'Organization', icon: Building2 }
 ];
 
+const DATE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All History' },
+  { value: 'last_30', label: 'Last 30 Days' },
+  { value: 'this_month', label: 'This Month' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'this_year', label: 'This Year' },
+  { value: 'last_year', label: 'Last Year' }
+];
+
 export default function BenevolencePage() {
-  const navigate = useNavigate();
   const { selectedTrust } = useAuth();
-  const [records, setRecords] = useState([]);
+  
+  // Unified log state
+  const [allRecords, setAllRecords] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Filters
+  const [dateFilter, setDateFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [purposeFilter, setPurposeFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Modal states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   
-  // Active tab
-  const [activeTab, setActiveTab] = useState('grants');
-  
-  // Distribution log state (from BenevolenceLogPage)
-  const [distLogData, setDistLogData] = useState(null);
-  const [distLogLoading, setDistLogLoading] = useState(false);
-  const [searchRecipient, setSearchRecipient] = useState('');
-  const [dateFilter, setDateFilter] = useState('all');
-  
-  // Filters
-  const [filterPurpose, setFilterPurpose] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  // View mode (for grants tab)
-  const [viewMode, setViewMode] = useState('list'); // list, summary
-  
-  // Form data
+  // Form data for new benevolence grant
   const [formData, setFormData] = useState({
     beneficiary_name: '',
     beneficiary_type: 'individual',
     purpose: 'other',
     purpose_description: '',
     amount: '',
-    date: new Date().toISOString().split('T')[0],
+    date: format(new Date(), 'yyyy-MM-dd'),
     approved_by: [],
     approval_method: 'unanimous',
     notes: '',
     status: 'approved'
   });
 
+  // Load all benevolence data on mount
   useEffect(() => {
     if (selectedTrust?.benevolence_enabled) {
-      loadRecords();
-      loadSummary();
+      loadAllData();
     }
   }, [selectedTrust]);
 
-  const loadRecords = async () => {
+  const loadAllData = useCallback(async () => {
     if (!selectedTrust) return;
     setLoading(true);
+    
     try {
-      let url = `/benevolence?trust_id=${selectedTrust.trust_id}`;
-      if (filterPurpose !== 'all') url += `&purpose=${filterPurpose}`;
-      if (filterStatus !== 'all') url += `&status=${filterStatus}`;
+      // Load from both sources in parallel
+      const [recordsRes, logRes, summaryRes] = await Promise.all([
+        fetchWithAuth(`/benevolence?trust_id=${selectedTrust.trust_id}`),
+        fetchWithAuth(`/benevolence-log?trust_id=${selectedTrust.trust_id}`),
+        fetchWithAuth(`/benevolence/summary/${selectedTrust.trust_id}`)
+      ]);
       
-      const response = await fetchWithAuth(url);
-      if (response.ok) {
-        setRecords(await response.json());
+      let combinedRecords = [];
+      
+      // Get benevolence_records (grants)
+      if (recordsRes.ok) {
+        const grants = await recordsRes.json();
+        combinedRecords = grants.map(g => ({
+          ...g,
+          id: g.record_id,
+          source: 'grant',
+          recipient_name: g.beneficiary_name,
+          description: g.purpose_description || g.notes,
+          category: g.purpose,
+          is_documented: g.status === 'approved'
+        }));
+      }
+      
+      // Get benevolence distributions (from distribution_records with is_benevolence=true)
+      if (logRes.ok) {
+        const logData = await logRes.json();
+        const distributions = (logData.distributions || []).map(d => ({
+          ...d,
+          id: d.distribution_id,
+          source: 'distribution',
+          recipient_name: d.benevolence_recipient_name || d.beneficiary_name,
+          description: d.benevolence_need_description || d.notes,
+          category: d.benevolence_category || 'other',
+          is_documented: !!(d.approved_at || d.minutes_record_id)
+        }));
+        
+        // Merge, avoiding duplicates by checking amount+date+recipient
+        distributions.forEach(dist => {
+          const isDuplicate = combinedRecords.some(r => 
+            r.amount === dist.amount && 
+            r.date === dist.date && 
+            r.recipient_name?.toLowerCase() === dist.recipient_name?.toLowerCase()
+          );
+          if (!isDuplicate) {
+            combinedRecords.push(dist);
+          }
+        });
+      }
+      
+      // Sort by date descending
+      combinedRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setAllRecords(combinedRecords);
+      
+      // Get summary
+      if (summaryRes.ok) {
+        setSummary(await summaryRes.json());
       }
     } catch (error) {
-      console.error('Failed to load benevolence records:', error);
+      console.error('Failed to load benevolence data:', error);
+      toast.error('Failed to load benevolence records');
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadSummary = async () => {
-    if (!selectedTrust) return;
-    try {
-      const response = await fetchWithAuth(`/benevolence/summary/${selectedTrust.trust_id}`);
-      if (response.ok) {
-        setSummary(await response.json());
-      }
-    } catch (error) {
-      console.error('Failed to load summary:', error);
-    }
-  };
-
-  // Load distribution log data (for History tab)
-  const loadDistributionLog = useCallback(async () => {
-    if (!selectedTrust) return;
-    setDistLogLoading(true);
-    try {
-      const response = await fetchWithAuth(`/benevolence-log?trust_id=${selectedTrust.trust_id}`);
-      if (response.ok) {
-        setDistLogData(await response.json());
-      }
-    } catch (error) {
-      console.error('Failed to load distribution log:', error);
-    } finally {
-      setDistLogLoading(false);
-    }
   }, [selectedTrust]);
 
-  // Load distribution log when switching to history tab
-  useEffect(() => {
-    if (activeTab === 'history' && selectedTrust && !distLogData) {
-      loadDistributionLog();
+  // Filter records based on current filters
+  const getFilteredRecords = useCallback(() => {
+    let filtered = [...allRecords];
+    
+    // Date filter
+    const now = new Date();
+    if (dateFilter === 'last_30') {
+      const cutoff = subDays(now, 30);
+      filtered = filtered.filter(r => new Date(r.date) >= cutoff);
+    } else if (dateFilter === 'this_month') {
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+      filtered = filtered.filter(r => {
+        const d = new Date(r.date);
+        return d >= monthStart && d <= monthEnd;
+      });
+    } else if (dateFilter === 'last_month') {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const monthStart = startOfMonth(lastMonth);
+      const monthEnd = endOfMonth(lastMonth);
+      filtered = filtered.filter(r => {
+        const d = new Date(r.date);
+        return d >= monthStart && d <= monthEnd;
+      });
+    } else if (dateFilter === 'this_year') {
+      const yearStart = startOfYear(now);
+      const yearEnd = endOfYear(now);
+      filtered = filtered.filter(r => {
+        const d = new Date(r.date);
+        return d >= yearStart && d <= yearEnd;
+      });
+    } else if (dateFilter === 'last_year') {
+      const lastYear = new Date(now.getFullYear() - 1, 0, 1);
+      const yearStart = startOfYear(lastYear);
+      const yearEnd = endOfYear(lastYear);
+      filtered = filtered.filter(r => {
+        const d = new Date(r.date);
+        return d >= yearStart && d <= yearEnd;
+      });
     }
-  }, [activeTab, selectedTrust, distLogData, loadDistributionLog]);
+    
+    // Search filter (recipient name)
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(r => 
+        r.recipient_name?.toLowerCase().includes(term) ||
+        r.description?.toLowerCase().includes(term)
+      );
+    }
+    
+    // Purpose filter
+    if (purposeFilter !== 'all') {
+      filtered = filtered.filter(r => r.category === purposeFilter || r.purpose === purposeFilter);
+    }
+    
+    return filtered;
+  }, [allRecords, dateFilter, searchTerm, purposeFilter]);
 
-  useEffect(() => {
-    if (selectedTrust?.benevolence_enabled) {
-      loadRecords();
-    }
-  }, [filterPurpose, filterStatus]);
+  const filteredRecords = getFilteredRecords();
+
+  // Calculate summary stats based on current filter
+  const getFilteredStats = useCallback(() => {
+    const records = filteredRecords;
+    const total = records.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const count = records.length;
+    const documented = records.filter(r => r.is_documented).length;
+    return { total, count, documented, pending: count - documented };
+  }, [filteredRecords]);
+
+  const filteredStats = getFilteredStats();
+
+  // Real summary stats (all time)
+  const allTimeTotal = allRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const thisYearRecords = allRecords.filter(r => new Date(r.date).getFullYear() === new Date().getFullYear());
+  const thisYearTotal = thisYearRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const thisMonthRecords = allRecords.filter(r => {
+    const d = new Date(r.date);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const thisMonthTotal = thisMonthRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setFormLoading(true);
+    if (!formData.beneficiary_name || !formData.amount) {
+      toast.error('Recipient name and amount are required');
+      return;
+    }
     
+    setFormLoading(true);
     try {
       const payload = {
         ...formData,
         trust_id: selectedTrust.trust_id,
         amount: parseFloat(formData.amount) || 0,
-        approved_by: formData.approved_by.length > 0 ? formData.approved_by : (selectedTrust.trustees || ['Trustee'])
+        approved_by: formData.approved_by.length > 0 ? formData.approved_by : ['Trustee']
       };
       
       const response = await fetchWithAuth('/benevolence', {
@@ -174,13 +270,12 @@ export default function BenevolencePage() {
       });
       
       if (response.ok) {
-        toast.success('Benevolence record created');
+        toast.success('Benevolence grant recorded');
         setDialogOpen(false);
         resetForm();
-        loadRecords();
-        loadSummary();
+        loadAllData();
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         toast.error(error.detail || 'Failed to create record');
       }
     } catch (error) {
@@ -197,7 +292,7 @@ export default function BenevolencePage() {
       purpose: 'other',
       purpose_description: '',
       amount: '',
-      date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'),
       approved_by: [],
       approval_method: 'unanimous',
       notes: '',
@@ -205,175 +300,48 @@ export default function BenevolencePage() {
     });
   };
 
-  const handleExportPDF = async () => {
-    if (!selectedTrust) return;
-    
-    try {
-      toast.loading('Generating report...', { id: 'export-pdf' });
-      
-      // Get current year for filtering
-      const currentYear = new Date().getFullYear();
-      const url = `${process.env.REACT_APP_BACKEND_URL}/api/benevolence/export/${selectedTrust.trust_id}/pdf?year=${currentYear}`;
-      
-      // Get token from localStorage or cookie
-      const token = localStorage.getItem('auth_token') || document.cookie.split('; ').find(row => row.startsWith('session_token='))?.split('=')[1];
-      const response = await fetch(url, {
-        credentials: 'include',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = `benevolence_report_${currentYear}_${selectedTrust.trust_id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(downloadUrl);
-        a.remove();
-        toast.success('Report downloaded', { id: 'export-pdf' });
-      } else {
-        toast.error('Failed to generate report', { id: 'export-pdf' });
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export report', { id: 'export-pdf' });
-    }
+  const clearFilters = () => {
+    setDateFilter('all');
+    setSearchTerm('');
+    setPurposeFilter('all');
   };
 
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
+  const hasActiveFilters = dateFilter !== 'all' || searchTerm || purposeFilter !== 'all';
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount || 0);
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
+  const formatDate = (dateString) => {
     try {
-      const date = parseISO(dateStr);
-      return format(date, 'MMM d, yyyy');
+      return format(parseISO(dateString), 'MMM d, yyyy');
     } catch {
-      return dateStr;
+      return dateString;
     }
   };
 
-  const getPurposeLabel = (value) => {
-    return PURPOSE_OPTIONS.find(p => p.value === value)?.label || value;
+  const getPurposeLabel = (purpose) => {
+    const opt = PURPOSE_OPTIONS.find(p => p.value === purpose);
+    return opt?.label || purpose || 'Other';
   };
 
-  const getPurposeIcon = (value) => {
-    return PURPOSE_OPTIONS.find(p => p.value === value)?.icon || '📋';
-  };
-
-  const filteredRecords = records.filter(r => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
+  // Not enabled state
+  if (!selectedTrust?.benevolence_enabled) {
     return (
-      r.beneficiary_name.toLowerCase().includes(search) ||
-      r.purpose_description.toLowerCase().includes(search) ||
-      r.notes?.toLowerCase().includes(search)
-    );
-  });
-
-  // Distribution log filtering (for History tab)
-  const getFilteredDistributions = () => {
-    if (!distLogData?.distributions) return [];
-    
-    let filtered = distLogData.distributions;
-    
-    if (searchRecipient) {
-      const search = searchRecipient.toLowerCase();
-      filtered = filtered.filter(d => 
-        d.benevolence_recipient_name?.toLowerCase().includes(search) ||
-        d.beneficiary_name?.toLowerCase().includes(search)
-      );
-    }
-    
-    const now = new Date();
-    if (dateFilter === 'this_month') {
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
-      filtered = filtered.filter(d => {
-        const date = parseISO(d.date);
-        return date >= monthStart && date <= monthEnd;
-      });
-    } else if (dateFilter === 'this_year') {
-      const yearStart = startOfYear(now);
-      const yearEnd = endOfYear(now);
-      filtered = filtered.filter(d => {
-        const date = parseISO(d.date);
-        return date >= yearStart && date <= yearEnd;
-      });
-    } else if (dateFilter === 'last_month') {
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const monthStart = startOfMonth(lastMonth);
-      const monthEnd = endOfMonth(lastMonth);
-      filtered = filtered.filter(d => {
-        const date = parseISO(d.date);
-        return date >= monthStart && date <= monthEnd;
-      });
-    }
-    
-    return filtered;
-  };
-
-  const getDistStatusIcon = (dist) => {
-    if (dist.approved_at || dist.minutes_record_id) {
-      return <CheckCircle2 className="w-4 h-4 text-success" />;
-    }
-    return <Clock className="w-4 h-4 text-warning" />;
-  };
-
-  const getDistStatusText = (dist) => {
-    if (dist.approved_at) return 'Approved';
-    if (dist.minutes_record_id) return 'Documented';
-    return 'Pending';
-  };
-
-  const getCurrentMonthTotal = () => {
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const monthData = distLogData?.monthly_aggregates?.find(m => m.month === currentMonth);
-    return monthData?.total_amount || 0;
-  };
-
-  const getCurrentYearTotal = () => {
-    const currentYear = new Date().getFullYear();
-    const yearData = distLogData?.yearly_aggregates?.find(y => y.year === currentYear);
-    return yearData?.total_amount || 0;
-  };
-
-  const filteredDistributions = getFilteredDistributions();
-
-  if (!selectedTrust) {
-    return (
-      <div className="min-h-screen bg-background">
+      <div className="main-layout" data-testid="benevolence-page">
         <Sidebar />
-        <main className="lg:pl-64 pt-16 lg:pt-0">
-          <div className="p-8">
+        <main className="main-content dot-grid">
+          <div className="page-container">
             <div className="card-trust p-8 text-center">
-              <HeartHandshake className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Select a trust to view benevolence records</p>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (!selectedTrust.benevolence_enabled) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar />
-        <main className="lg:pl-64 pt-16 lg:pt-0">
-          <div className="p-8">
-            <div className="card-trust corner-mark p-8 text-center">
-              <HeartHandshake className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="font-serif text-2xl text-navy mb-2">Benevolence Mode Not Enabled</h2>
-              <p className="text-muted-foreground mb-6">
-                Benevolence tracking is available for 501/508-type charitable trusts.
-                Enable it in your trust settings to start tracking benevolence grants.
+              <HeartHandshake className="w-12 h-12 text-navy/30 mx-auto mb-4" />
+              <h2 className="font-serif text-xl text-navy mb-2">Benevolence Not Enabled</h2>
+              <p className="text-muted-foreground mb-4">
+                Enable benevolence tracking in Trust Settings to record charitable assistance.
               </p>
-              <Button onClick={() => navigate('/settings')} className="btn-primary">
+              <Button onClick={() => window.location.href = '/settings'} className="btn-secondary">
                 Go to Settings
               </Button>
             </div>
@@ -384,546 +352,330 @@ export default function BenevolencePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="main-layout" data-testid="benevolence-page">
       <Sidebar />
-      <main className="lg:pl-64 pt-16 lg:pt-0">
-        <div className="p-4 lg:p-8">
+      <main className="main-content dot-grid">
+        <div className="page-container">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
             <div>
-              <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">Benevolence</h1>
-              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                {selectedTrust.name} • Charitable Assistance
+              <h1 className="page-title">Benevolence Log</h1>
+              <p className="page-subtitle">
+                {selectedTrust?.name} • Charitable Assistance Tracking
               </p>
             </div>
             <div className="flex gap-3 mt-4 md:mt-0">
-              <Button
-                variant="outline"
-                onClick={handleExportPDF}
-                data-testid="export-benevolence-pdf"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export Report
-              </Button>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="btn-primary" data-testid="add-benevolence-btn">
+                  <Button className="btn-primary" data-testid="record-grant-btn">
                     <Plus className="w-4 h-4 mr-2" />
                     Record Grant
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogContent className="sm:max-w-lg" data-testid="grant-modal">
                   <DialogHeader>
                     <DialogTitle className="font-serif text-xl text-navy">Record Benevolence Grant</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                    <div>
-                      <Label className="label-trust">Beneficiary Name *</Label>
-                      <Input
-                        value={formData.beneficiary_name}
-                        onChange={(e) => setFormData({ ...formData, beneficiary_name: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="Name of recipient"
-                        required
-                      />
-                    </div>
-                    
+                  <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <Label className="label-trust">Recipient Name *</Label>
+                        <Input
+                          value={formData.beneficiary_name}
+                          onChange={(e) => setFormData({ ...formData, beneficiary_name: e.target.value })}
+                          placeholder="Enter recipient name"
+                          className="input-trust mt-1"
+                          data-testid="recipient-name"
+                          required
+                        />
+                      </div>
                       <div>
-                        <Label className="label-trust">Beneficiary Type</Label>
+                        <Label className="label-trust">Recipient Type</Label>
                         <Select value={formData.beneficiary_type} onValueChange={(v) => setFormData({ ...formData, beneficiary_type: v })}>
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="input-trust mt-1">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {BENEFICIARY_TYPES.map(type => (
-                              <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                            {BENEFICIARY_TYPES.map(t => (
+                              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <Label className="label-trust">Purpose Category</Label>
+                        <Label className="label-trust">Purpose/Category</Label>
                         <Select value={formData.purpose} onValueChange={(v) => setFormData({ ...formData, purpose: v })}>
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="input-trust mt-1">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {PURPOSE_OPTIONS.map(p => (
-                              <SelectItem key={p.value} value={p.value}>{p.icon} {p.label}</SelectItem>
+                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <Label className="label-trust">Purpose Description *</Label>
-                      <Textarea
-                        value={formData.purpose_description}
-                        onChange={(e) => setFormData({ ...formData, purpose_description: e.target.value })}
-                        className="mt-1"
-                        placeholder="Describe the need and how assistance will help"
-                        rows={2}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="label-trust">Amount *</Label>
                         <Input
                           type="number"
                           value={formData.amount}
                           onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                          className="mt-1 input-trust"
                           placeholder="0.00"
+                          className="input-trust mt-1"
+                          data-testid="grant-amount"
                           required
                         />
                       </div>
                       <div>
-                        <Label className="label-trust">Date *</Label>
+                        <Label className="label-trust">Date</Label>
                         <Input
                           type="date"
                           value={formData.date}
                           onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                          className="mt-1 input-trust"
-                          required
+                          className="input-trust mt-1"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="label-trust">Description / Need</Label>
+                        <Textarea
+                          value={formData.purpose_description}
+                          onChange={(e) => setFormData({ ...formData, purpose_description: e.target.value })}
+                          placeholder="Describe the need or purpose of this grant..."
+                          className="input-trust mt-1"
+                          rows={2}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="label-trust">Notes (Optional)</Label>
+                        <Textarea
+                          value={formData.notes}
+                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                          placeholder="Any additional notes..."
+                          className="input-trust mt-1"
+                          rows={2}
                         />
                       </div>
                     </div>
-                    
-                    <div>
-                      <Label className="label-trust">Approval Method</Label>
-                      <Select value={formData.approval_method} onValueChange={(v) => setFormData({ ...formData, approval_method: v })}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unanimous">Unanimous Approval</SelectItem>
-                          <SelectItem value="majority">Majority Vote</SelectItem>
-                          <SelectItem value="single_trustee">Single Trustee (within authority)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <Label className="label-trust">Internal Notes</Label>
-                      <Textarea
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        className="mt-1"
-                        placeholder="Internal notes (not included in formal records)"
-                        rows={2}
-                      />
-                    </div>
-                    
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="btn-secondary">
                         Cancel
                       </Button>
-                      <Button type="submit" className="btn-primary" disabled={formLoading}>
-                        {formLoading ? 'Saving...' : 'Record Grant'}
+                      <Button type="submit" disabled={formLoading} className="btn-primary" data-testid="submit-grant-btn">
+                        {formLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                        Record Grant
                       </Button>
-                    </div>
+                    </DialogFooter>
                   </form>
                 </DialogContent>
               </Dialog>
             </div>
           </div>
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-              <TabsTrigger value="grants" data-testid="tab-grants">Grants</TabsTrigger>
-              <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
-            </TabsList>
-
-            {/* Grants Tab */}
-            <TabsContent value="grants">
-              {/* Summary Cards */}
-              {summary && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  <div className="card-trust p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Grants</p>
-                    <p className="font-serif text-2xl text-navy">{summary.total_count}</p>
-                  </div>
-                  <div className="card-trust p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Amount</p>
-                    <p className="font-serif text-2xl text-navy">{formatCurrency(summary.total_amount)}</p>
-                  </div>
-                  <div className="card-trust p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">This Year</p>
-                    <p className="font-serif text-2xl text-navy">
-                      {formatCurrency(summary.by_year?.[new Date().getFullYear().toString()]?.total || 0)}
-                    </p>
-                  </div>
-                  <div className="card-trust p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Categories</p>
-                    <p className="font-serif text-2xl text-navy">{Object.keys(summary.by_purpose || {}).length}</p>
-                  </div>
+          {/* Summary Strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="card-trust p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gold/20 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-gold" />
                 </div>
-              )}
-
-              {/* View Toggle & Filters */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex gap-2">
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                List View
-              </Button>
-              <Button
-                variant={viewMode === 'summary' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('summary')}
-              >
-                Summary
-              </Button>
-            </div>
-            
-            {viewMode === 'list' && (
-              <div className="flex flex-1 gap-3">
-                <div className="relative flex-1 max-w-xs">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search grants..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 input-trust"
-                  />
+                <div>
+                  <p className="label-trust">This Month</p>
+                  <p className="font-serif text-xl text-navy">{formatCurrency(thisMonthTotal)}</p>
                 </div>
-                <Select value={filterPurpose} onValueChange={setFilterPurpose}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Purpose" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Purposes</SelectItem>
-                    {PURPOSE_OPTIONS.map(p => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="disbursed">Disbursed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-            )}
+            </div>
+            <div className="card-trust p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="label-trust">This Year</p>
+                  <p className="font-serif text-xl text-navy">{formatCurrency(thisYearTotal)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="card-trust p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <HeartHandshake className="w-5 h-5 text-green-700 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="label-trust">All Time</p>
+                  <p className="font-serif text-xl text-navy">{formatCurrency(allTimeTotal)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="card-trust p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-navy/10 flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-navy" />
+                </div>
+                <div>
+                  <p className="label-trust">Total Grants</p>
+                  <p className="font-serif text-xl text-navy">{allRecords.length}</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Content */}
-          {viewMode === 'list' ? (
-            loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="card-trust p-4 animate-pulse">
-                    <div className="h-5 bg-muted rounded w-1/3 mb-2"></div>
-                    <div className="h-4 bg-muted rounded w-2/3"></div>
+          {/* Filters */}
+          <div className="card-trust mb-6">
+            <div className="p-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                {/* Search */}
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Search by recipient..."
+                      className="pl-10 input-trust"
+                      data-testid="search-recipient"
+                    />
                   </div>
-                ))}
+                </div>
+                
+                {/* Date Filter */}
+                <div className="w-full sm:w-48">
+                  <Select value={dateFilter} onValueChange={setDateFilter}>
+                    <SelectTrigger className="input-trust" data-testid="date-filter">
+                      <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATE_FILTER_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Purpose Filter */}
+                <div className="w-full sm:w-48">
+                  <Select value={purposeFilter} onValueChange={setPurposeFilter}>
+                    <SelectTrigger className="input-trust" data-testid="purpose-filter">
+                      <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {PURPOSE_OPTIONS.map(p => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Clear Filters */}
+                {hasActiveFilters && (
+                  <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground hover:text-navy">
+                    <X className="w-4 h-4 mr-1" /> Clear
+                  </Button>
+                )}
+              </div>
+              
+              {/* Active filter indicator */}
+              {hasActiveFilters && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {filteredRecords.length} of {allRecords.length} records
+                    {dateFilter !== 'all' && ` • ${DATE_FILTER_OPTIONS.find(o => o.value === dateFilter)?.label}`}
+                    {purposeFilter !== 'all' && ` • ${getPurposeLabel(purposeFilter)}`}
+                    {searchTerm && ` • Matching "${searchTerm}"`}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Records List */}
+          <div className="card-trust">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HeartHandshake className="w-4 h-4 text-navy" />
+                <span className="label-trust">Benevolence Records</span>
+              </div>
+              <span className="text-sm text-muted-foreground">{filteredRecords.length} records</span>
+            </div>
+
+            {loading ? (
+              <div className="p-8 text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-navy" />
+                <p className="label-trust">Loading benevolence records...</p>
               </div>
             ) : filteredRecords.length === 0 ? (
-              <div className="card-trust corner-mark p-12 text-center">
-                <HeartHandshake className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="font-serif text-xl text-navy mb-2">No Benevolence Records</h3>
-                <p className="text-muted-foreground mb-6">
-                  Start tracking charitable assistance grants for your trust.
-                </p>
-                <Button className="btn-primary" onClick={() => setDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Record First Grant
-                </Button>
+              <div className="p-8 text-center" data-testid="empty-state">
+                <HeartHandshake className="w-12 h-12 text-navy/20 mx-auto mb-4" />
+                {allRecords.length === 0 ? (
+                  <>
+                    <h3 className="font-serif text-lg text-navy mb-2">No Benevolence Records Yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Record your first benevolence grant to start tracking charitable assistance.
+                    </p>
+                    <Button onClick={() => setDialogOpen(true)} className="btn-secondary">
+                      Record First Grant
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-serif text-lg text-navy mb-2">No Records Match Filters</h3>
+                    <p className="text-muted-foreground mb-4">
+                      No benevolence records match these filters. Try broadening your date range or clearing filters.
+                    </p>
+                    <Button onClick={clearFilters} className="btn-secondary">
+                      Clear All Filters
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
-              <div className="space-y-3">
-                {filteredRecords.map(record => (
-                  <div key={record.record_id} className="card-trust p-4 hover:border-gold transition-colors">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-gold/20 flex items-center justify-center text-xl">
-                          {getPurposeIcon(record.purpose)}
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-navy">{record.beneficiary_name}</h3>
-                          <p className="text-sm text-muted-foreground">{record.purpose_description}</p>
-                          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {formatDate(record.date)}
+              <div className="divide-y divide-border">
+                {filteredRecords.map((record) => (
+                  <div 
+                    key={record.id} 
+                    className="p-4 hover:bg-muted/30 transition-colors"
+                    data-testid={`benevolence-record-${record.id}`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-navy truncate">
+                            {record.recipient_name || 'Unknown Recipient'}
+                          </p>
+                          {record.is_documented ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono uppercase bg-success/10 text-success">
+                              <CheckCircle2 className="w-3 h-3" /> Documented
                             </span>
-                            <span className="capitalize">{record.beneficiary_type}</span>
-                            <span className="capitalize">{getPurposeLabel(record.purpose)}</span>
-                          </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono uppercase bg-warning/10 text-warning">
+                              <Clock className="w-3 h-3" /> Pending
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                          <span>{formatDate(record.date)}</span>
+                          <span className="text-navy/30">•</span>
+                          <span>{getPurposeLabel(record.category || record.purpose)}</span>
+                          {record.description && (
+                            <>
+                              <span className="text-navy/30">•</span>
+                              <span className="truncate max-w-[200px]">{record.description}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="font-mono text-lg text-navy">{formatCurrency(record.amount)}</p>
-                        <span className={`text-xs px-2 py-0.5 ${
-                          record.status === 'disbursed' ? 'bg-green-100 text-green-700' :
-                          record.status === 'approved' ? 'bg-blue-100 text-blue-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {record.status}
-                        </span>
                       </div>
                     </div>
-                    {record.notes && (
-                      <p className="mt-3 text-xs text-muted-foreground italic border-t pt-3">
-                        Note: {record.notes}
-                      </p>
-                    )}
                   </div>
                 ))}
               </div>
-            )
-          ) : (
-            /* Summary View */
-            summary && (
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* By Purpose */}
-                <div className="card-trust p-6">
-                  <h3 className="font-serif text-lg text-navy mb-4">By Purpose Category</h3>
-                  <div className="space-y-3">
-                    {Object.entries(summary.by_purpose || {}).map(([purpose, data]) => (
-                      <div key={purpose} className="flex items-center justify-between p-2 bg-muted/30">
-                        <div className="flex items-center gap-2">
-                          <span>{getPurposeIcon(purpose)}</span>
-                          <span className="text-sm">{getPurposeLabel(purpose)}</span>
-                          <span className="text-xs text-muted-foreground">({data.count})</span>
-                        </div>
-                        <span className="font-mono text-sm">{formatCurrency(data.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* By Quarter */}
-                <div className="card-trust p-6">
-                  <h3 className="font-serif text-lg text-navy mb-4">By Quarter</h3>
-                  <div className="space-y-3">
-                    {Object.entries(summary.by_quarter || {}).slice(0, 8).map(([quarter, data]) => (
-                      <div key={quarter} className="flex items-center justify-between p-2 bg-muted/30">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4 text-navy" />
-                          <span className="text-sm font-mono">{quarter}</span>
-                          <span className="text-xs text-muted-foreground">({data.count} grants)</span>
-                        </div>
-                        <span className="font-mono text-sm">{formatCurrency(data.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* By Year */}
-                <div className="card-trust p-6">
-                  <h3 className="font-serif text-lg text-navy mb-4">By Year</h3>
-                  <div className="space-y-3">
-                    {Object.entries(summary.by_year || {}).map(([year, data]) => (
-                      <div key={year} className="flex items-center justify-between p-2 bg-muted/30">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-navy" />
-                          <span className="text-sm font-mono">{year}</span>
-                          <span className="text-xs text-muted-foreground">({data.count} grants)</span>
-                        </div>
-                        <span className="font-mono text-sm">{formatCurrency(data.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Approvers */}
-                <div className="card-trust p-6">
-                  <h3 className="font-serif text-lg text-navy mb-4">Approvers</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {(summary.approvers || []).map(approver => (
-                      <span key={approver} className="px-3 py-1 bg-navy/10 text-navy text-sm">
-                        {approver}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )
-          )}
-            </TabsContent>
-
-            {/* History Tab */}
-            <TabsContent value="history">
-              {distLogLoading ? (
-                <div className="card-trust p-8 text-center">
-                  <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin mx-auto mb-4"></div>
-                  <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading...</p>
-                </div>
-              ) : !distLogData ? (
-                <div className="card-trust p-8 text-center">
-                  <p className="text-muted-foreground">No distribution history available</p>
-                </div>
-              ) : (
-                <>
-                  {/* Summary Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div className="card-trust p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gold/20 flex items-center justify-center">
-                          <Calendar className="w-5 h-5 text-gold" />
-                        </div>
-                        <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">This Month</p>
-                          <p className="font-serif text-2xl text-navy dark:text-foreground">{formatCurrency(getCurrentMonthTotal())}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="card-trust p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                          <TrendingUp className="w-5 h-5 text-blue-700 dark:text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">This Year</p>
-                          <p className="font-serif text-2xl text-navy dark:text-foreground">{formatCurrency(getCurrentYearTotal())}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="card-trust p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                          <HeartHandshake className="w-5 h-5 text-green-700 dark:text-green-400" />
-                        </div>
-                        <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">All Time</p>
-                          <p className="font-serif text-2xl text-navy dark:text-foreground">{formatCurrency(distLogData.total_all_time)}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="card-trust p-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 flex items-center justify-center ${
-                          distLogData.incomplete_documentation_count > 0 ? 'bg-warning/20' : 'bg-success/20'
-                        }`}>
-                          {distLogData.incomplete_documentation_count > 0 ? (
-                            <AlertCircle className="w-5 h-5 text-warning" />
-                          ) : (
-                            <CheckCircle2 className="w-5 h-5 text-success" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Documentation</p>
-                          <p className={`font-serif text-xl ${distLogData.incomplete_documentation_count > 0 ? 'text-warning' : 'text-success'}`}>
-                            {distLogData.incomplete_documentation_count > 0 ? `${distLogData.incomplete_documentation_count} Pending` : 'Complete'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Filters */}
-                  <div className="card-trust mb-6">
-                    <div className="p-4 flex flex-col sm:flex-row gap-4">
-                      <div className="flex-1">
-                        <Label className="label-trust">Search Recipient</Label>
-                        <div className="relative mt-1">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            value={searchRecipient}
-                            onChange={(e) => setSearchRecipient(e.target.value)}
-                            placeholder="Search by recipient name..."
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                      <div className="w-full sm:w-48">
-                        <Label className="label-trust">Date Range</Label>
-                        <Select value={dateFilter} onValueChange={setDateFilter}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Time</SelectItem>
-                            <SelectItem value="this_month">This Month</SelectItem>
-                            <SelectItem value="last_month">Last Month</SelectItem>
-                            <SelectItem value="this_year">This Year</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Distributions Table */}
-                  <div className="card-trust overflow-hidden">
-                    <div className="p-4 border-b border-border flex items-center gap-2">
-                      <HeartHandshake className="w-4 h-4 text-navy dark:text-gold" />
-                      <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                        Benevolence Distributions ({filteredDistributions.length})
-                      </h2>
-                    </div>
-                    
-                    {filteredDistributions.length === 0 ? (
-                      <div className="p-8 text-center">
-                        <HeartHandshake className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                        <p className="text-muted-foreground">
-                          {distLogData.total_count === 0 ? 'No benevolence distributions yet' : 'No distributions match your filters'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b border-border bg-muted/30">
-                              <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Recipient</th>
-                              <th className="text-right p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Amount</th>
-                              <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Date</th>
-                              <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Need/Purpose</th>
-                              <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredDistributions.map((dist) => (
-                              <tr key={dist.distribution_id} className="border-b border-border hover:bg-muted/20">
-                                <td className="p-3">
-                                  <p className="font-medium text-navy dark:text-foreground">
-                                    {dist.benevolence_recipient_name || dist.beneficiary_name}
-                                  </p>
-                                </td>
-                                <td className="p-3 text-right">
-                                  <span className="font-mono text-lg text-navy dark:text-foreground">{formatCurrency(dist.amount)}</span>
-                                </td>
-                                <td className="p-3">
-                                  <span className="font-mono text-sm text-muted-foreground">{formatDate(dist.date)}</span>
-                                </td>
-                                <td className="p-3">
-                                  <p className="text-sm text-muted-foreground line-clamp-2 max-w-[200px]">
-                                    {dist.benevolence_need_description || dist.notes || '—'}
-                                  </p>
-                                </td>
-                                <td className="p-3">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-mono uppercase ${
-                                    dist.approved_at || dist.minutes_record_id ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'
-                                  }`}>
-                                    {getDistStatusIcon(dist)}
-                                    {getDistStatusText(dist)}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
+            )}
+          </div>
         </div>
       </main>
     </div>
