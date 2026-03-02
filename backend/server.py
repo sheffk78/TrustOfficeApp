@@ -764,6 +764,15 @@ class DashboardStats(BaseModel):
     total_distributions: int
     ytd_distributions_amount: float
 
+class DashboardSubscriptionState(BaseModel):
+    """Subscription state for dashboard - subset of full SubscriptionState"""
+    plan_type: str
+    status: str
+    is_trial: bool
+    is_active: bool
+    is_read_only: bool
+    trial_days_remaining: Optional[int] = None
+
 class DashboardResponse(BaseModel):
     trust_id: str
     trust_name: str
@@ -772,6 +781,7 @@ class DashboardResponse(BaseModel):
     recent_activity: List[dict]
     stats: DashboardStats
     governance_insights: List[GovernanceInsight]
+    subscription: Optional[DashboardSubscriptionState] = None
 
 # Beneficiary Dashboard Models
 class BeneficiaryAllocation(BaseModel):
