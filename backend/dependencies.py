@@ -267,6 +267,21 @@ PLAN_FEATURES = {
         Feature.TRUST_UNITS,
         Feature.GOVERNANCE_HISTORY,
         Feature.ADVANCED_TEMPLATES,
+    },
+    "forever_free": {
+        # All features - forever free accounts get everything
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.SINGLE_TRUST,
+        Feature.PDF_NO_WATERMARK,
+        Feature.CSV_EXPORT,
+        Feature.MULTIPLE_TRUSTS,
+        Feature.BENEVOLENCE_MODE,
+        Feature.BENEFICIARY_DASHBOARD,
+        Feature.TRUST_UNITS,
+        Feature.GOVERNANCE_HISTORY,
+        Feature.ADVANCED_TEMPLATES,
     }
 }
 
