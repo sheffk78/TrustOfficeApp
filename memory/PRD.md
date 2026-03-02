@@ -57,29 +57,36 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Dec 30, 2025) - SERVER.PY CLEANUP: AUTH ROUTER MIGRATION ✅
+### Latest Updates (Dec 30, 2025) - MAJOR SERVER.PY CLEANUP ✅
 
-**Session Summary:** Migrated auth endpoints to router and cleaned up routers/__init__.py:
+**Session Summary:** Completed massive cleanup of server.py with three major changes:
 
-**auth.py Router** (356 lines)
-- POST /api/auth/register - User registration with email/password
-- POST /api/auth/login - Login with JWT token response
-- GET /api/auth/me - Get current user profile
-- PUT /api/auth/profile - Update user name
-- POST /api/auth/forgot-password - Request password reset (non-revealing)
-- POST /api/auth/reset-password - Reset with token
-- GET /api/auth/verify-reset-token - Validate reset token
-- POST /api/auth/session - OAuth session exchange
-- POST /api/auth/logout - Clear session
+1. **Removed Duplicate Enums/Models** (-737 lines)
+   - All enums (TrustType, EntityType, TaskType, etc.) now imported from models.py
+   - All Pydantic models now imported from models.py
+   - Added centralized import block at top of server.py
 
-**Code Changes:**
-- Removed 318 lines from server.py (auth endpoints)
-- Updated routers/__init__.py to reflect current state
-- Server.py: 2652 → **2342 lines** (69% reduction from 7538)
+2. **Removed Duplicate Helper Functions** (-417 lines)
+   - hash_password, verify_password, create_jwt_token
+   - get_current_user, should_show_watermark, check_subscription_active
+   - get_task_status, get_quarter_start, get_year_start
+   - calculate_health_score, auto_update_onboarding, create_initial_governance_tasks
+   - All now imported from dependencies.py
 
-**Testing:** All 29 tests passed including auth, regression, and feature gate tests.
+3. **Migrated Preferences Endpoints** (-117 lines)
+   - Created preferences.py router (133 lines)
+   - GET/PUT /api/notifications/preferences
+   - GET/PUT /api/user/preferences
 
-### Previous Updates (Dec 30, 2025) - P2 PREMIUM FEATURE GATING ✅
+**Results:**
+- server.py: 2342 → **1128 lines** (52% reduction this session)
+- **Total reduction: 85%** from original 7538 lines
+- 14 routers now handle all domain logic
+- All 49 tests passed (20 new + 29 regression)
+
+**Bug Fixed:** Testing agent found and fixed missing `get_or_create_units_settings` import.
+
+### Previous Updates (Dec 30, 2025) - SERVER.PY CLEANUP: AUTH ROUTER MIGRATION ✅
 
 1. **ReadOnlyBanner Component** (`/frontend/src/components/ReadOnlyBanner.js`)
    - Amber/warning color scheme banner at top of pages
