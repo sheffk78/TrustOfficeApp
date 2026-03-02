@@ -5,7 +5,11 @@ from typing import List, Optional
 import uuid
 
 from database import db
-from dependencies import get_current_user, get_subscription_state
+from dependencies import (
+    get_current_user, get_subscription_state, 
+    check_feature_access, Feature,
+    PREMIUM_FEATURE_ERROR_MESSAGE, PREMIUM_FEATURE_ERROR_CODE
+)
 from models import (
     HealthScoreResponse, HealthScoreCriterion, HealthColor,
     OnboardingState, GovernanceInsight, DashboardStats,
