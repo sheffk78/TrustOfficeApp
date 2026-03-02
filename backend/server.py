@@ -1727,10 +1727,14 @@ async def update_user_preferences(
 @api_router.get("/beneficiaries/dashboard", response_model=BeneficiaryDashboardResponse)
 async def get_beneficiary_dashboard(
     trust_id: Optional[str] = None,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
 ):
     """
     Beneficiary Dashboard showing current unit allocations per certificate holder.
+    
+    Feature Gate: BENEFICIARY_DASHBOARD
+    - Trial users cannot access the beneficiary dashboard
+    - Paid users can view unit allocations and transfer history
     
     Returns:
     - Trust unit settings and totals
