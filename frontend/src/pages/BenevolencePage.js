@@ -126,6 +126,29 @@ export default function BenevolencePage() {
     }
   };
 
+  // Load distribution log data (for History tab)
+  const loadDistributionLog = useCallback(async () => {
+    if (!selectedTrust) return;
+    setDistLogLoading(true);
+    try {
+      const response = await fetchWithAuth(`/benevolence-log?trust_id=${selectedTrust.trust_id}`);
+      if (response.ok) {
+        setDistLogData(await response.json());
+      }
+    } catch (error) {
+      console.error('Failed to load distribution log:', error);
+    } finally {
+      setDistLogLoading(false);
+    }
+  }, [selectedTrust]);
+
+  // Load distribution log when switching to history tab
+  useEffect(() => {
+    if (activeTab === 'history' && selectedTrust && !distLogData) {
+      loadDistributionLog();
+    }
+  }, [activeTab, selectedTrust, distLogData, loadDistributionLog]);
+
   useEffect(() => {
     if (selectedTrust?.benevolence_enabled) {
       loadRecords();
