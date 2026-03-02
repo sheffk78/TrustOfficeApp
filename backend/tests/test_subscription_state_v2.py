@@ -335,8 +335,8 @@ class TestRequireWriteAccessTasks:
         print(f"Create task: {response.status_code}")
     
     def test_write_access_applied_to_complete_task(self, auth_session):
-        """POST /api/tasks/{id}/complete uses require_write_access"""
-        response = auth_session.post(f"{BASE_URL}/api/tasks/nonexistent/complete")
+        """PATCH /api/tasks/{id}/complete uses require_write_access"""
+        response = auth_session.patch(f"{BASE_URL}/api/tasks/nonexistent/complete")
         assert response.status_code in [404, 200]
 
 
