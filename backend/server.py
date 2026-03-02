@@ -4257,8 +4257,11 @@ async def export_compensation_csv(
     )
 
 @api_router.get("/export/tasks")
-async def export_tasks_csv(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
-    """Export governance tasks as CSV"""
+async def export_tasks_csv(
+    trust_id: Optional[str] = None, 
+    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+):
+    """Export governance tasks as CSV (Premium feature)"""
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
