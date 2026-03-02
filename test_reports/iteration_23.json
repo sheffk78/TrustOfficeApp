@@ -1,0 +1,121 @@
+{
+  "summary": "Completed comprehensive testing of Trust Units Management UI enhancement. All 25 backend API tests passed (100%). Frontend page layout, settings card, summary section, certificates table, filter dropdown, and all dialogs (Issue, Edit, Transfer, PDF Preview) verified working correctly.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": {
+    "backend_api": [
+      "POST /api/auth/login - Demo user authentication",
+      "GET /api/trust-units/summary - Returns settings, certificates, and aggregates (200)",
+      "GET /api/trust-units/summary - Contains total_issued_units, remaining_units, active_certificate_count",
+      "GET /api/trust-units/summary - Settings include total_authorized_units, unit_label, allow_fractional",
+      "GET /api/trust-units/summary - Returns 404 for invalid trust_id",
+      "PATCH /api/trust-units/settings - Can update unit_label",
+      "PATCH /api/trust-units/settings - Can toggle allow_fractional",
+      "PATCH /api/trust-units/settings - Returns updated_at timestamp",
+      "POST /api/trust-units/certificates - Creates new certificate with sequential numbering (CU-XXX)",
+      "POST /api/trust-units/certificates - Validates units don't exceed authorized total",
+      "PATCH /api/trust-units/certificates/{id} - Can update holder_name",
+      "PATCH /api/trust-units/certificates/{id} - Can change status to cancelled",
+      "PATCH /api/trust-units/certificates/{id} - Returns 404 for non-existent certificate",
+      "POST /api/trust-units/transfers - Transfers units between holders",
+      "POST /api/trust-units/transfers - Validates insufficient units",
+      "POST /api/trust-units/transfers - Returns 404 for non-existent from_holder",
+      "GET /api/trust-units/certificates/{id}/pdf - Generates PDF with pdf_base64 and filename",
+      "GET /api/trust-units/certificates/{id}/pdf - PDF content is valid (PDF magic bytes)",
+      "GET /api/trust-units/certificates/{id}/pdf - Returns 404 for non-existent certificate",
+      "GET /api/trust-units/certificates/{id}/pdf - Works for cancelled certificates too",
+      "Summary aggregates: total_issued_units equals sum of active certificates",
+      "Summary aggregates: remaining_units = total_authorized - total_issued",
+      "Summary aggregates: active_certificate_count is accurate"
+    ],
+    "frontend_ui": [
+      "Route /trust/units loads Trust Units page",
+      "Units navigation link visible in sidebar under Structures group",
+      "Page title shows 'Trust Units' with trust name subtitle",
+      "Settings card at top with editable fields: total_authorized_units, unit_label, allow_fractional",
+      "Save Changes button appears when settings are modified",
+      "Summary section shows read-only: Total Issued (35 units), Remaining (65 units), Active Certificates (5)",
+      "Certificates table renders with columns: Certificate #, Holder, Units, Percentage, Status, Issue Date, Actions",
+      "Filter dropdown with 'Active Only' / 'All Certificates' options",
+      "Issue Units button opens Issue New Certificate dialog",
+      "Issue Certificate dialog has fields: Holder Name, Holder Identifier, Units, Issue Date, Notes",
+      "Transfer button visible (enabled when active certificates exist)",
+      "Row action buttons: Print, Edit, Reissue, Cancel for active certificates",
+      "Print Certificate opens PDF preview dialog with Download PDF button",
+      "PDF preview shows iframe with certificate content"
+    ]
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_trust_units.py",
+    "/app/test_reports/pytest/trust_units_v2_results.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "PDF generation endpoint properly returns base64-encoded PDF with certificate details",
+    "PDF includes trust name, jurisdiction, certificate number, holder, units, percentage, and signature blocks",
+    "Settings card layout with editable inputs at top and read-only summary below follows good UX pattern",
+    "All interactive elements have proper data-testid attributes for testing",
+    "Row actions (Print, Edit, Reissue, Cancel) correctly show/hide based on certificate status"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_trust_units.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (25/25 tests passed)",
+    "frontend": "100% (all UI elements verified)"
+  },
+
+  "test_credentials": {
+    "demo_user": "demo@trustoffice.com / demopassword",
+    "trust_id": "trust_b753cb8fe07f"
+  },
+
+  "seed_data_creation": "Demo data created via 'USE DEMO DATA' button - Smith Family Trust with 5 active certificates totaling 35 units",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Trust Units feature fully functional. Backend PDF endpoint GET /api/trust-units/certificates/{id}/pdf tested and working. Frontend /trust/units page shows Settings card (editable), Summary (read-only), and Certificates table with all CRUD actions. PDF preview dialog opens with Download PDF button. Test data includes CU-004 (John Smith, 24 units), CU-005, CU-006, CU-008, CU-009.",
+
+  "features_verified": {
+    "trust_units_page": {
+      "route": "/trust/units",
+      "nav_item": "Units link in sidebar under Structures group",
+      "layout": "Settings card at top, Summary section, Certificates table below"
+    },
+    "settings_card": {
+      "editable_fields": ["total_authorized_units", "unit_label", "allow_fractional"],
+      "save_button": "Appears when changes are made",
+      "endpoint": "PATCH /api/trust-units/settings?trust_id={id}"
+    },
+    "summary_section": {
+      "read_only_fields": ["Total Issued", "Remaining", "Active Certificates"],
+      "computed_from": "Certificate data aggregation"
+    },
+    "certificates_table": {
+      "columns": ["Certificate #", "Holder", "Units", "Percentage", "Status", "Issue Date", "Actions"],
+      "filters": ["Active Only", "All Certificates"],
+      "row_actions": ["Print", "Edit", "Reissue", "Cancel"]
+    },
+    "pdf_generation": {
+      "endpoint": "GET /api/trust-units/certificates/{id}/pdf",
+      "response": {"pdf_base64": "base64 encoded PDF", "filename": "certificate_{number}.pdf"},
+      "content": "Trust name, jurisdiction, certificate number, holder, units, percentage, signature blocks"
+    }
+  }
+}
