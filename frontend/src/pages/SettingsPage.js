@@ -748,14 +748,14 @@ export default function SettingsPage() {
                     data-testid="delete-data-btn"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Delete All Data
+                    Reset All Trust Data
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle className="font-serif text-xl text-red-600">Delete All Data?</DialogTitle>
+                    <DialogTitle className="font-serif text-xl text-red-600">Reset All Trust Data?</DialogTitle>
                     <DialogDescription>
-                      This will permanently delete all your trusts and associated data including:
+                      This will permanently delete all trust data from your account:
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
@@ -769,11 +769,17 @@ export default function SettingsPage() {
                       <li>Governance tasks</li>
                       <li>Trust unit certificates</li>
                     </ul>
-                    <p className="mt-4 text-sm font-medium text-red-600">
-                      This action cannot be undone!
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Your account and subscription will be preserved.
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200">
+                      <p className="text-sm font-medium text-red-600">
+                        Warning: This action cannot be undone!
+                      </p>
+                      <p className="mt-1 text-xs text-red-500">
+                        This will delete all trust data, including any data you've created. 
+                        Use this to start fresh or after testing with demo data.
+                      </p>
+                    </div>
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      Your account and billing information will be preserved.
                     </p>
                   </div>
                   <DialogFooter>
@@ -791,7 +797,7 @@ export default function SettingsPage() {
                       ) : (
                         <Trash2 className="w-4 h-4 mr-2" />
                       )}
-                      Yes, Delete Everything
+                      Yes, Reset Everything
                     </Button>
                   </DialogFooter>
                 </DialogContent>
