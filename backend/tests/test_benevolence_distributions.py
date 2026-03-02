@@ -331,13 +331,8 @@ class TestGovernanceHealthScoreBenevolence:
 
     def test_health_score_distribution_documentation_criterion(self, api_client):
         """Health score includes Distribution Documentation criterion"""
-        response = api_client.get(f"{BASE_URL}/api/trusts/{TRUST_ID}")
-        assert response.status_code == 200
-        
-        # Get detailed health score
-        health_resp = api_client.get(f"{BASE_URL}/api/health-score", params={
-            "trust_id": TRUST_ID
-        })
+        # Get detailed health score via /api/governance/{trust_id}
+        health_resp = api_client.get(f"{BASE_URL}/api/governance/{TRUST_ID}")
         assert health_resp.status_code == 200, f"Health score failed: {health_resp.text}"
         data = health_resp.json()
         
@@ -359,9 +354,7 @@ class TestGovernanceHealthScoreBenevolence:
 
     def test_health_score_benevolence_quality_description(self, api_client):
         """Health score description reflects benevolence documentation quality"""
-        health_resp = api_client.get(f"{BASE_URL}/api/health-score", params={
-            "trust_id": TRUST_ID
-        })
+        health_resp = api_client.get(f"{BASE_URL}/api/governance/{TRUST_ID}")
         assert health_resp.status_code == 200
         data = health_resp.json()
         
@@ -387,9 +380,7 @@ class TestGovernanceHealthScoreBenevolence:
         # - All benevolence distributions have recipient_name, need_description
         # - All benevolence distributions have approval or minutes
         
-        health_resp = api_client.get(f"{BASE_URL}/api/health-score", params={
-            "trust_id": TRUST_ID
-        })
+        health_resp = api_client.get(f"{BASE_URL}/api/governance/{TRUST_ID}")
         assert health_resp.status_code == 200
         data = health_resp.json()
         
