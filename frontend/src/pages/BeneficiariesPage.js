@@ -751,11 +751,11 @@ export default function BeneficiariesPage() {
               <Label className="label-trust">Units *</Label>
               <Input
                 type="number"
-                step={summary?.settings?.allow_fractional ? "any" : "1"}
-                min="0.01"
+                step="any"
+                min="0"
                 value={certificateForm.units}
                 onChange={(e) => setCertificateForm({ ...certificateForm, units: e.target.value })}
-                placeholder={summary?.settings?.allow_fractional ? "25.5" : "25"}
+                placeholder="25"
                 required
                 className="mt-1"
                 data-testid="units-input"
@@ -842,8 +842,8 @@ export default function BeneficiariesPage() {
               <Label className="label-trust">Units to Transfer *</Label>
               <Input
                 type="number"
-                step={summary?.settings?.allow_fractional ? "any" : "1"}
-                min="0.01"
+                step="any"
+                min="0"
                 value={transferForm.units}
                 onChange={(e) => setTransferForm({ ...transferForm, units: e.target.value })}
                 required
