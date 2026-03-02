@@ -21,7 +21,28 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - TRUST CERTIFICATE UNITS FEATURE ✅
+### Latest Updates (Mar 2, 2026) - DASHBOARD UI REFACTORING ✅
+
+1. **Unified Dashboard API Integration**
+   - DashboardPage.js now calls single `GET /api/dashboard` instead of 3 separate API calls
+   - All data flows through `dashboard` state from unified response
+   - Removed redundant `getInsights()` function - now uses `governance_insights` from API
+
+2. **Enhanced "What's Next" Card**
+   - Displays governance insights from `/api/dashboard` response
+   - Each insight shows: title, description, +points badge, action button
+   - Color-coded by type: error (red), warning (yellow), info (blue)
+   - Action buttons navigate to correct routes (action_path)
+   - Shows total potential points gain in header
+
+3. **Preserved Visual Components**
+   - Health score circle with 5-criteria progress bars
+   - Quick Actions grid (6 actions)
+   - Stats section with total_decisions, pending_reviews
+   - Recent Activity timeline with status badges
+   - Onboarding checklist (when not dismissed)
+
+### Previous Updates (Mar 2, 2026) - TRUST CERTIFICATE UNITS FEATURE ✅
 
 1. **Trust Certificate Units - Complete Backend & Frontend**
    - Full certificate management system for tracking trust ownership/beneficial interest
