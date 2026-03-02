@@ -406,8 +406,8 @@ class TestBootstrapResponseFields:
         remaining_units = summary.get("remaining_units", 0)
         
         # Skip if not enough remaining units
-        if remaining_units < 3:
-            pytest.skip(f"Not enough remaining units ({remaining_units}). Need at least 3 units.")
+        if remaining_units < 2:
+            pytest.skip(f"Not enough remaining units ({remaining_units}). Need at least 2 units.")
         
         unique_suffix = uuid.uuid4().hex[:6]
         meeting_date = datetime.now().strftime("%Y-%m-%d")
