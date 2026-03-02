@@ -285,6 +285,15 @@ export default function DistributionsPage() {
   const totalAmount = filteredDistributions.reduce((sum, d) => sum + d.amount, 0);
   const pendingCount = distributions.filter(d => !d.approved_at).length;
 
+  // Handle dialog open with read-only check
+  const handleDialogOpenChange = (open) => {
+    if (open && isReadOnly) {
+      showUpgradeModal('create a distribution', 'button_click', 'distributions_page');
+      return;
+    }
+    setDialogOpen(open);
+  };
+
   return (
     <div className="main-layout" data-testid="distributions-page">
       <Sidebar />
