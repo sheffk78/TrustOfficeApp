@@ -6373,6 +6373,23 @@ async def get_subscription(user: dict = Depends(get_current_user)):
     enriched = calculate_subscription_status(sub)
     return SubscriptionResponse(**enriched)
 
+@api_router.get("/subscription/state")
+async def get_subscription_state_endpoint(user: dict = Depends(get_current_user)):
+    """
+    Get normalized subscription state with all computed fields.
+    This endpoint provides the single source of truth for subscription status.
+    
+    Returns:
+        - plan_type: "trial", "monthly", "annual"
+        - status: "trialing", "active", "past_due", "canceled", "expired"
+        - is_trial: boolean
+        - is_active: boolean
+        - is_read_only: boolean (determines if write operations are blocked)
+        - trial_days_remaining: int or null
+    """
+    state = await get_subscription_state(user["user_id"])
+    return state.model_dump()
+
 @api_router.post("/subscription/create-checkout")
 async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depends(get_current_user)):
     """Create a Stripe checkout session for subscription"""
