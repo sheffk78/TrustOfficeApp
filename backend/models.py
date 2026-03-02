@@ -639,9 +639,9 @@ class CompensationPaymentResponse(BaseModel):
     payment_id: str
     trust_id: str
     amount: float
-    date: str
-    classification_text: str
-    exceeds_plan_flag: bool
+    date: Optional[str] = None  # Optional for legacy payments
+    classification_text: str = ""  # Default empty for legacy payments
+    exceeds_plan_flag: bool = False  # Default false for legacy payments
     minutes_record_id: Optional[str] = None
     created_at: str
 
