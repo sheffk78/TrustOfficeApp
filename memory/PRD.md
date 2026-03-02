@@ -18,12 +18,12 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 The backend now has a modular structure for better maintainability:
 ```
 /app/backend/
-├── server.py           # Main FastAPI app (2648 lines, down from 7538 - 65% reduction)
+├── server.py           # Main FastAPI app (2342 lines, down from 7538 - 69% reduction)
 ├── database.py         # MongoDB connection singleton
 ├── models.py           # All Pydantic models and enums (~778 lines)
 ├── dependencies.py     # Shared auth, helpers, feature gating, health score (751 lines)
-├── routers/            # Domain-specific router modules (12 migrated)
-│   ├── auth.py         # Auth endpoints (already extracted)
+├── routers/            # Domain-specific router modules (13 migrated)
+│   ├── auth.py          # Auth, register, login, profile, OAuth (MIGRATED Dec 30)
 │   ├── distributions.py # Distribution endpoints (MIGRATED)
 │   ├── governance.py    # Governance health/history/insights (MIGRATED)
 │   ├── minutes.py       # Minutes CRUD + templates + PDF (MIGRATED)
@@ -33,15 +33,16 @@ The backend now has a modular structure for better maintainability:
 │   ├── benevolence.py   # Benevolence CRUD + PDF (MIGRATED)
 │   ├── exports.py       # CSV exports (premium feature) (MIGRATED)
 │   ├── trust_units.py   # Trust units certificates + transfers (MIGRATED)
-│   ├── trusts.py        # Trust CRUD (MIGRATED Dec 30)
-│   ├── entities.py      # Entity + relationship management (MIGRATED Dec 30)
-│   └── tasks.py         # Governance tasks (MIGRATED Dec 30)
+│   ├── trusts.py        # Trust CRUD (MIGRATED)
+│   ├── entities.py      # Entity + relationship management (MIGRATED)
+│   └── tasks.py         # Governance tasks (MIGRATED)
 ├── email_service.py    # Postmark email integration
 ├── email_templates.py  # Email template content
 └── background_tasks.py # APScheduler background jobs
 ```
 
 **Router Migration Progress (Dec 30, 2025):**
+- auth.py: 356 lines - Registration, login, profile, password reset, OAuth
 - distributions.py: 15,820 bytes - Full CRUD + benevolence log
 - governance.py: 21,826 bytes - Health scoring, history, insights
 - minutes.py: 54,851 bytes - Templates, CRUD, PDF generation
