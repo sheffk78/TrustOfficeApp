@@ -89,8 +89,17 @@ def validate_units(units: float, allow_fractional: bool) -> float:
 # ==================== TRUST UNITS SUMMARY ====================
 
 @router.get("/trust-units/summary", response_model=TrustUnitsSummaryResponse)
-async def get_trust_units_summary(trust_id: str, user: dict = Depends(get_current_user)):
-    """Get complete units summary for a trust including settings, certificates, and aggregates"""
+async def get_trust_units_summary(
+    trust_id: str, 
+    user: dict = Depends(require_premium_feature(Feature.TRUST_UNITS))
+):
+    """
+    Get complete units summary for a trust including settings, certificates, and aggregates.
+    
+    Feature Gate: TRUST_UNITS
+    - Trial users cannot access trust unit management
+    - Paid users can manage unit certificates and transfers
+    """
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
