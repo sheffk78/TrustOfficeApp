@@ -2184,7 +2184,7 @@ async def create_unit_transfer(
             "certificate_number": new_cert_number,
             "status": "active",
             "replaced_by_certificate_id": None,
-            "notes": f"Transfer" + (f" from {transfer.from_holder}" if transfer.from_holder else " (new issuance)"),
+            "notes": "Transfer" + (f" from {transfer.from_holder}" if transfer.from_holder else " (new issuance)"),
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": None
         }
