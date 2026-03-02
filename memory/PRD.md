@@ -57,7 +57,44 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - DISPOSITION/SALE OF ASSET FLOW ✅
+### Latest Updates (Mar 2, 2026) - DEMO DATA & FOREVER FREE ACCOUNT ✅
+
+**Session Summary:** Enhanced demo data to showcase all features, added delete endpoint, and implemented forever free account for admin@wingpointtrusts.com.
+
+**Demo Data Enhancements:**
+- Comprehensive demo data now includes:
+  - 2 Trusts with different configurations (benevolence enabled/disabled)
+  - Multi-level entity hierarchy (Trust → Holding LLC → Operating LLCs)
+  - Schedule A with **active AND disposed assets** (BMW X5 sold to CarMax)
+  - Various minutes types: quarterly, annual, special, **disposition**, distribution, property acceptance
+  - Distributions: approved and pending
+  - Benevolence records: approved and pending
+  - Compensation plans and payments
+  - Trust unit certificates
+  - Governance tasks: upcoming, overdue, completed
+
+**New Demo Endpoints:**
+- `GET /api/demo/status` - Returns data counts for user (trusts, minutes, assets, etc.)
+- `POST /api/demo/seed` - Seeds comprehensive demo data (if no existing data)
+- `DELETE /api/demo/data` - Deletes all user data (preserves account & subscription)
+
+**Settings Page - Demo Data Management:**
+- New section with data summary cards (Trusts, Minutes, Assets, Total Records)
+- "Load Demo Data" button (disabled if user has data)
+- "Delete All Data" button with confirmation dialog
+- Refresh button to reload status
+
+**Forever Free Account:**
+- Email: `admin@wingpointtrusts.com`
+- Automatically gets `forever_free` plan type with:
+  - `status: active`, `is_read_only: false`
+  - Access to ALL 8 premium features (PDF, CSV, multiple trusts, benevolence, beneficiary dashboard, trust units, governance history, advanced templates)
+  - No trial expiration, no payment required ever
+- Implemented via `FOREVER_FREE_EMAILS` set in `dependencies.py`
+
+**Testing:** All 12 backend tests + all UI flows passed.
+
+### Previous Updates (Mar 2, 2026) - DISPOSITION/SALE OF ASSET FLOW ✅
 
 **Session Summary:** Implemented complete Disposition/Sale of Asset flow connecting Schedule A with Minutes.
 
