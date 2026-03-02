@@ -3091,37 +3091,8 @@ async def get_beneficiary_dashboard(
 # Endpoints: POST/GET/DELETE /minutes, GET /minutes/{id}/pdf
 
 # ==================== SCHEDULE A ENDPOINTS ====================
-
-@api_router.post("/schedule-a", response_model=ScheduleAItemResponse)
-async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends(get_current_user)):
-    """Add an asset to Schedule A"""
-    trust = await db.trusts.find_one({"trust_id": item.trust_id, "user_id": user["user_id"]}, {"_id": 0})
-    if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
-    
-    item_id = f"asset_{uuid.uuid4().hex[:12]}"
-    item_doc = {
-        "item_id": item_id,
-        "trust_id": item.trust_id,
-        "user_id": user["user_id"],
-        "category": item.category.value,
-        "description": item.description,
-        "identifier": item.identifier,
-        "location": item.location,
-        "approximate_value": item.approximate_value,
-        "date_conveyed": item.date_conveyed,
-        "notes": item.notes,
-        "status": "active",
-        "minutes_ref": item.minutes_ref,
-        "disposition_minutes_ref": None,
-        "disposition_date": None,
-        "disposition_notes": None,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": None
-    }
-    
-    await db.schedule_a_items.insert_one(item_doc)
-    return ScheduleAItemResponse(**item_doc)
+# MIGRATED TO: /app/backend/routers/schedule_a.py
+# Endpoints: POST/GET/PUT/DELETE /schedule-a, GET /schedule-a/summary/{trust_id}, GET /schedule-a/export/{trust_id}/pdf
 
 @api_router.get("/schedule-a", response_model=List[ScheduleAItemResponse])
 async def get_schedule_a_items(
