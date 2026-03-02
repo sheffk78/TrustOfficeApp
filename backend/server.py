@@ -5620,7 +5620,10 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
     return OnboardingState(**state)
 
 @api_router.get("/dashboard", response_model=DashboardResponse)
-async def get_dashboard(user: dict = Depends(get_current_user)):
+async def get_dashboard(
+    trust_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
     """
     Unified dashboard endpoint that aggregates:
     - Health score (from calculate_health_score)
@@ -5629,22 +5632,35 @@ async def get_dashboard(user: dict = Depends(get_current_user)):
     - Stats (total decisions, pending reviews, etc.)
     - Governance insights (actionable suggestions)
     
-    Automatically resolves the user's primary trust.
+    Args:
+        trust_id: Optional trust ID. If not provided, uses the user's most recent trust.
     """
     user_id = user["user_id"]
     
-    # Get user's primary trust (first trust or most recently accessed)
-    trust = await db.trusts.find_one(
-        {"user_id": user_id},
-        {"_id": 0},
-        sort=[("created_at", -1)]
-    )
-    
-    if not trust:
-        raise HTTPException(
-            status_code=404, 
-            detail="No trust found. Please create a trust first."
+    if trust_id:
+        # Validate the provided trust_id belongs to this user
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"_id": 0}
         )
+        if not trust:
+            raise HTTPException(
+                status_code=404,
+                detail="Trust not found or access denied."
+            )
+    else:
+        # Get user's primary trust (most recently created)
+        trust = await db.trusts.find_one(
+            {"user_id": user_id},
+            {"_id": 0},
+            sort=[("created_at", -1)]
+        )
+        
+        if not trust:
+            raise HTTPException(
+                status_code=404, 
+                detail="No trust found. Please create a trust first."
+            )
     
     trust_id = trust["trust_id"]
     trust_name = trust.get("name", "Unnamed Trust")
