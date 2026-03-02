@@ -175,8 +175,31 @@ export default function MinutesTemplateFormPage() {
   useEffect(() => {
     if (selectedTrust && templateType === 'disposition_of_asset') {
       loadScheduleAAssets();
+      
+      // Pre-fill disposition data from URL parameters (coming from Schedule A page)
+      const assetId = searchParams.get('asset_id');
+      const assetDescription = searchParams.get('asset_description');
+      const dispositionDate = searchParams.get('disposition_date');
+      const dispositionReason = searchParams.get('disposition_reason');
+      const dispositionValue = searchParams.get('disposition_value');
+      const dispositionRecipient = searchParams.get('disposition_recipient');
+      const dispositionNotes = searchParams.get('disposition_notes');
+      
+      if (assetId || assetDescription) {
+        setDispositionData(prev => ({
+          ...prev,
+          disposition_asset_id: assetId || '',
+          disposition_asset_description: assetDescription || '',
+          disposition_date: dispositionDate ? format(new Date(dispositionDate), 'MMMM d, yyyy') : prev.disposition_date,
+          disposition_reason: dispositionReason || prev.disposition_reason,
+          disposition_value: dispositionValue || '',
+          disposition_recipient: dispositionRecipient || '',
+          disposition_notes: dispositionNotes || '',
+          update_schedule_a: true
+        }));
+      }
     }
-  }, [selectedTrust, templateType]);
+  }, [selectedTrust, templateType, searchParams]);
 
   const loadScheduleAAssets = async () => {
     if (!selectedTrust) return;
