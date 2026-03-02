@@ -999,11 +999,11 @@ export default function BeneficiariesPage() {
 
       {/* PDF Preview Modal */}
       <PDFPreviewModal
-        show={pdfPreview.show}
-        onClose={() => setPdfPreview({ show: false, loading: false, data: null, filename: '' })}
-        loading={pdfPreview.loading}
+        open={pdfPreview.show}
+        onOpenChange={(isOpen) => !isOpen && setPdfPreview({ show: false, loading: false, data: null, filename: '' })}
         pdfBase64={pdfPreview.data}
         filename={pdfPreview.filename}
+        title="Unit Certificate"
       />
     </div>
   );
