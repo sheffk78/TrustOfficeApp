@@ -57,44 +57,45 @@ The backend now has a modular structure for better maintainability:
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - AI INTEGRATION REFINED & FINALIZED ✅
+### Latest Updates (Mar 2, 2026) - AI v1 INTEGRATION HARDENED FOR PRODUCTION ✅
 
-**Session Summary:** Refined and finalized Claude AI integration with proper model names, env var handling, and health check endpoint.
+**Session Summary:** Hardened AI integration for production with rate limiting, safe error handling, logging, UI guardrails, and fallback behavior.
 
-**Backend - Claude Integration (`/backend/claude_client.py`):**
-- API key read from `CLAUDE_API_KEY` or fallback to `EMERGENT_LLM_KEY` (Emergent platform default)
-- Clear error logging if neither env var is set
-- Returns HTTP 500 with safe message "AI service not configured" when key is missing
-- Model names (note: claude-3.5-* not supported by emergentintegrations):
-  - `claude-sonnet-4-5` for complex drafting tasks
-  - `claude-haiku-4-5` for quick suggestions
-- Added `ping_claude()` function for health checks
+**1. Robust Error Handling and Fallbacks:**
+- Backend returns safe message: "AI assistant is currently unavailable. Please try again later."
+- No internal details, stack traces, or API keys exposed in error responses
+- Frontend Minutes page shows inline error near AI button (does not block manual drafting)
+- Frontend Dashboard falls back to static governance_insights when AI fails
 
-**API Endpoints (`/backend/routers/ai.py`):**
-- `GET /api/ai/status` - Check AI service status and available features
-- `POST /api/ai/minutes-draft` - Generate AI-drafted meeting minutes (uses claude-sonnet-4-5)
-- `POST /api/ai/governance-suggestions` - Get actionable suggestions (uses claude-haiku-4-5)
-- `GET /api/ai/health` - NEW: Health check endpoint that:
-  - Performs a ping to claude-haiku-4-5 with trivial prompt "Reply with the word PONG"
-  - Returns `{"ok": true}` on success
-  - Returns `{"ok": false, "error": "..."}` on failure (no Claude error details exposed)
+**2. Rate Limiting (Per User Per Hour):**
+- Minutes drafting: Max 10 requests per hour
+- Governance suggestions: Max 20 requests per hour
+- 429 response with clear message when limit exceeded
+- In-memory store with automatic cleanup of old entries
 
-**Frontend UI Hooks Verified:**
-- **Minutes page** (`NewMinutesPage.js`):
-  - `handleDraftWithAI()` (line 88) calls `POST /api/ai/minutes-draft`
-  - Button `data-testid="draft-with-ai-btn"` triggers the handler
-  - Response parsed into AI Draft modal with suggested_title, draft_body, cautions
-- **Dashboard page** (`DashboardPage.js`):
-  - `loadAiSuggestions()` (line 130) calls `POST /api/ai/governance-suggestions`
-  - Called on mount when trust is selected (line 103)
-  - Suggestions rendered in "AI Recommendations" card (lines 515-517)
+**3. Logging and Tracing:**
+- Log format: `AI_CALL | user={user_id} | trust={trust_id} | endpoint={endpoint} | model={model} | input_chars={N}`
+- Does NOT log raw AI response text (protects sensitive data)
+- Logged for both minutes-draft and governance-suggestions endpoints
 
-**Usage Notes in Code:**
-- Brief comments at top of claude_client.py and ai_service.py documenting:
-  - Required environment variables (CLAUDE_API_KEY or EMERGENT_LLM_KEY)
-  - Supported model names (claude-*-4-5 variants)
+**4. UI Copy and Guardrails:**
+- Minutes page disclaimer: "AI helps draft language; you remain responsible for accuracy and legal sufficiency."
+- Dashboard disclaimer: "AI-generated suggestions. You decide which actions to take."
+- Both use mono font as specified
+- Draft with AI button disabled while request in progress
 
-**Testing:** All endpoints verified via curl - status, health, suggestions, and drafting all working.
+**5. Manual Testing Instructions (in code comments):**
+- `ai.py` and `ai_service.py` contain testing instructions at the top
+
+**Backend Files Updated:**
+- `/app/backend/routers/ai.py` - Rate limiting, logging, error handling
+- `/app/backend/ai_service.py` - Safe error messages, testing instructions
+
+**Frontend Files Updated:**
+- `/app/frontend/src/pages/NewMinutesPage.js` - Inline error state, disclaimer
+- `/app/frontend/src/pages/DashboardPage.js` - Fallback to static insights, disclaimer
+
+**Testing:** 100% pass rate - 12/12 pytest tests, all UI elements verified (iteration_50)
 
 ### Previous Updates (Mar 2, 2026) - DEMO DATA & FOREVER FREE ACCOUNT ✅
 
