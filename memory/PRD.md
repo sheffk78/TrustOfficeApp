@@ -18,18 +18,20 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 The backend now has a modular structure for better maintainability:
 ```
 /app/backend/
-├── server.py           # Main FastAPI app (4526 lines, down from 7538)
+├── server.py           # Main FastAPI app (3907 lines, down from 7538 - 48% reduction)
 ├── database.py         # MongoDB connection singleton
 ├── models.py           # All Pydantic models and enums (~778 lines)
 ├── dependencies.py     # Shared auth, helpers, feature gating functions
 ├── routers/            # Domain-specific router modules
 │   ├── auth.py         # Auth endpoints (already extracted)
-│   ├── distributions.py # Distribution + benevolence endpoints (MIGRATED)
+│   ├── distributions.py # Distribution + benevolence log endpoints (MIGRATED)
 │   ├── governance.py    # Governance health/history/insights (MIGRATED)
 │   ├── minutes.py       # Minutes CRUD + templates + PDF (MIGRATED)
 │   ├── schedule_a.py    # Schedule A assets CRUD + PDF export (MIGRATED Dec 30)
 │   ├── compensation.py  # Compensation plans + payments (MIGRATED Dec 30)
 │   ├── subscriptions.py # Stripe payments + webhooks (MIGRATED Dec 30)
+│   ├── benevolence.py   # Benevolence CRUD + summary + PDF (MIGRATED Dec 30)
+│   ├── exports.py       # CSV exports (premium feature) (MIGRATED Dec 30)
 │   ├── trusts.py        # Trust CRUD (pending migration)
 │   ├── entities.py      # Entity management (pending migration)
 │   ├── tasks.py         # Governance tasks (pending migration)
@@ -46,6 +48,8 @@ The backend now has a modular structure for better maintainability:
 - schedule_a.py: 16,796 bytes - Asset ledger CRUD + PDF export
 - compensation.py: 5,800 bytes - Plans + payments + YTD calculation
 - subscriptions.py: 21,000 bytes - Stripe checkout, portal, webhooks
+- benevolence.py: 510 lines - Benevolence CRUD + summary + PDF export
+- exports.py: 167 lines - CSV exports (minutes, distributions, compensation, tasks)
 
 ### Design System (AnchorPoint)
 - Light: Navy #010079, Gold #D5AD36
