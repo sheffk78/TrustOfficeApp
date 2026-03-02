@@ -434,7 +434,15 @@ The backend now has a modular structure for better maintainability:
 
 **Server.py Reduction:** 7618 → 5611 lines (~26% reduction)
 
-### P2 (Medium Priority) - NEXT
+### P2 (Medium Priority) - IN PROGRESS
+- [x] Implement hard feature gating for premium-only features
+  - Created `Feature` class with core (trial) and premium (paid) features
+  - `PLAN_FEATURES` dict maps plans to available features
+  - `require_premium_feature()` dependency returns 402 for blocked features
+  - CSV export endpoints gated: /api/export/minutes, distributions, compensation, tasks
+  - New endpoint: GET /api/subscription/features returns feature flags
+- [ ] Migrate remaining routers (schedule_a, compensation, subscriptions)
+- [ ] Add Audit Log (backend + UI)
 - [x] Profile editing (name change) - Edit button in Settings > Profile section
 - [x] Search in minutes/distributions - Server-side search with debounced queries
 - [x] Table horizontal scroll for mobile - overflow-x-auto on table containers
