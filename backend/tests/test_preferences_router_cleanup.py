@@ -179,8 +179,8 @@ class TestCoreFeatures:
         print(f"✓ GET /api/trusts works - returned {len(data)} trusts")
     
     def test_get_entities_endpoint(self):
-        """GET /api/entities should return entities"""
-        response = self.session.get(f"{BASE_URL}/api/entities")
+        """GET /api/entities should return entities (requires trust_id param)"""
+        response = self.session.get(f"{BASE_URL}/api/entities?trust_id={TRUST_ID}")
         assert response.status_code == 200, f"Failed: {response.text}"
         
         data = response.json()
