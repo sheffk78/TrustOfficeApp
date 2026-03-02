@@ -57,7 +57,7 @@ async def call_claude(
         ClaudeClientError: If the API call fails
     """
     if not CLAUDE_API_KEY:
-        logger.error("CLAUDE_API_KEY environment variable is missing - cannot make AI API calls")
+        logger.error("Neither CLAUDE_API_KEY nor EMERGENT_LLM_KEY environment variable is set - cannot make AI API calls")
         raise ClaudeClientError("AI service not configured")
     
     try:
