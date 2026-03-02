@@ -248,12 +248,21 @@ export default function BeneficiariesPage() {
       return;
     }
     try {
-      const response = await fetchWithAuth('/trust-units/transfer', {
+      // Get the "from" holder name from the selected certificate
+      const fromCert = summary?.certificates?.find(c => c.certificate_id === transferForm.from_certificate_id);
+      if (!fromCert) {
+        toast.error('Invalid source certificate');
+        return;
+      }
+      
+      const response = await fetchWithAuth('/trust-units/transfers', {
         method: 'POST',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
-          ...transferForm,
-          units: parseFloat(transferForm.units)
+          from_holder: fromCert.holder_name,
+          to_holder: transferForm.to_holder_name,
+          units: parseFloat(transferForm.units),
+          reason: transferForm.reason || 'Transfer'
         })
       });
       if (response.ok) {
@@ -866,20 +875,26 @@ export default function BeneficiariesPage() {
                     const fromCert = summary?.certificates?.find(c => c.certificate_id === transferForm.from_certificate_id);
                     const fromHolderName = fromCert?.holder_name;
                     
-                    // Get unique active beneficiaries, excluding the "from" holder
-                    const uniqueHolders = [];
-                    const seenNames = new Set();
-                    
+                    // Aggregate units per holder, excluding the "from" holder
+                    const holderTotals = {};
                     summary?.certificates?.filter(c => c.status === 'active').forEach(cert => {
-                      if (!seenNames.has(cert.holder_name) && cert.holder_name !== fromHolderName) {
-                        seenNames.add(cert.holder_name);
-                        uniqueHolders.push(cert);
+                      if (cert.holder_name !== fromHolderName) {
+                        if (!holderTotals[cert.holder_name]) {
+                          holderTotals[cert.holder_name] = {
+                            holder_name: cert.holder_name,
+                            holder_identifier: cert.holder_identifier,
+                            total_units: 0,
+                            certificate_count: 0
+                          };
+                        }
+                        holderTotals[cert.holder_name].total_units += cert.units || 0;
+                        holderTotals[cert.holder_name].certificate_count += 1;
                       }
                     });
                     
-                    return uniqueHolders.map((cert) => (
-                      <SelectItem key={cert.holder_name} value={cert.holder_name}>
-                        {cert.holder_name}
+                    return Object.values(holderTotals).map((holder) => (
+                      <SelectItem key={holder.holder_name} value={holder.holder_name}>
+                        {holder.holder_name} - {holder.total_units} units
                       </SelectItem>
                     ));
                   })()}
