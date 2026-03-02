@@ -7,15 +7,49 @@ import secrets
 import logging
 import os
 import httpx
+import re
 
 from database import db
 from dependencies import get_current_user, hash_password, verify_password, create_jwt_token, JWT_EXPIRATION_HOURS
 from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, ProfileUpdate
 from email_service import email_service
+from security import InputSanitizer
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
+
+
+# ==================== INPUT VALIDATION HELPERS ====================
+
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Validate password meets security requirements.
+    Returns (is_valid, error_message)
+    """
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if len(password) > 128:
+        return False, "Password must be less than 128 characters"
+    if not re.search(r'[A-Za-z]', password):
+        return False, "Password must contain at least one letter"
+    if not re.search(r'\d', password):
+        return False, "Password must contain at least one number"
+    return True, ""
+
+
+def validate_email_format(email: str) -> bool:
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email)) and len(email) <= 254
+
+
+def sanitize_name(name: str) -> str:
+    """Sanitize user name input"""
+    # Remove HTML, limit length, strip whitespace
+    name = InputSanitizer.sanitize_html(name)
+    name = name.strip()[:100]
+    return name
 
 
 # ==================== REGISTRATION & LOGIN ====================
@@ -23,15 +57,32 @@ router = APIRouter(tags=["auth"])
 @router.post("/auth/register", response_model=UserResponse)
 async def register(user: UserCreate, background_tasks: BackgroundTasks):
     """Register a new user with email/password"""
-    existing = await db.users.find_one({"email": user.email}, {"_id": 0})
+    
+    # Validate email format
+    if not validate_email_format(user.email):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+    
+    # Sanitize and validate inputs
+    email = user.email.lower().strip()
+    name = sanitize_name(user.name)
+    
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required")
+    
+    # Validate password strength
+    is_valid, error_msg = validate_password_strength(user.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     user_doc = {
         "user_id": user_id,
-        "email": user.email,
-        "name": user.name,
+        "email": email,
+        "name": name,
         "password_hash": hash_password(user.password),
         "picture": None,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -70,14 +121,23 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
 @router.post("/auth/login")
 async def login(user: UserLogin, response: Response):
     """Login with email/password"""
-    user_doc = await db.users.find_one({"email": user.email}, {"_id": 0})
+    # Validate email format
+    if not validate_email_format(user.email):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    email = user.email.lower().strip()
+    
+    user_doc = await db.users.find_one({"email": email}, {"_id": 0})
     if not user_doc:
+        # Use generic message to prevent email enumeration
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if not user_doc.get("password_hash"):
         raise HTTPException(status_code=401, detail="Please use Google login")
     
     if not verify_password(user.password, user_doc["password_hash"]):
+        # Log failed login attempt (for security monitoring)
+        logger.warning(f"Failed login attempt for email: {email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     token = create_jwt_token(user_doc["user_id"], user_doc["email"])

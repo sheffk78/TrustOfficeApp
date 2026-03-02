@@ -64,6 +64,14 @@ from routers.demo import router as demo_router
 from routers.ai import router as ai_router
 from routers.guided_minutes import router as guided_minutes_router
 
+# Import security middleware
+from security import (
+    RateLimitMiddleware,
+    RateLimitConfig,
+    SecurityHeadersMiddleware,
+    InputSanitizer
+)
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -203,6 +211,13 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
 
 # ==================== MIDDLEWARE & ROUTER REGISTRATION ====================
 
+# Security headers middleware (OWASP recommendations)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Rate limiting middleware
+app.add_middleware(RateLimitMiddleware, config=RateLimitConfig())
+
+# Subscription enforcement middleware
 app.add_middleware(SubscriptionMiddleware)
 
 app.add_middleware(
