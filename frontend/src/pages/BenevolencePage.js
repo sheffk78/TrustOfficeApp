@@ -532,31 +532,40 @@ export default function BenevolencePage() {
             </div>
           </div>
 
-          {/* Summary Cards */}
-          {summary && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <div className="card-trust p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Grants</p>
-                <p className="font-serif text-2xl text-navy">{summary.total_count}</p>
-              </div>
-              <div className="card-trust p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Amount</p>
-                <p className="font-serif text-2xl text-navy">{formatCurrency(summary.total_amount)}</p>
-              </div>
-              <div className="card-trust p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">This Year</p>
-                <p className="font-serif text-2xl text-navy">
-                  {formatCurrency(summary.by_year?.[new Date().getFullYear().toString()]?.total || 0)}
-                </p>
-              </div>
-              <div className="card-trust p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Categories</p>
-                <p className="font-serif text-2xl text-navy">{Object.keys(summary.by_purpose || {}).length}</p>
-              </div>
-            </div>
-          )}
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+              <TabsTrigger value="grants" data-testid="tab-grants">Grants</TabsTrigger>
+              <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
+            </TabsList>
 
-          {/* View Toggle & Filters */}
+            {/* Grants Tab */}
+            <TabsContent value="grants">
+              {/* Summary Cards */}
+              {summary && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  <div className="card-trust p-4">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Grants</p>
+                    <p className="font-serif text-2xl text-navy">{summary.total_count}</p>
+                  </div>
+                  <div className="card-trust p-4">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Amount</p>
+                    <p className="font-serif text-2xl text-navy">{formatCurrency(summary.total_amount)}</p>
+                  </div>
+                  <div className="card-trust p-4">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">This Year</p>
+                    <p className="font-serif text-2xl text-navy">
+                      {formatCurrency(summary.by_year?.[new Date().getFullYear().toString()]?.total || 0)}
+                    </p>
+                  </div>
+                  <div className="card-trust p-4">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Categories</p>
+                    <p className="font-serif text-2xl text-navy">{Object.keys(summary.by_purpose || {}).length}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* View Toggle & Filters */}
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="flex gap-2">
               <Button
