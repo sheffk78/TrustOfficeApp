@@ -389,11 +389,11 @@ export default function BenevolencePage() {
       <main className="lg:pl-64 pt-16 lg:pt-0">
         <div className="p-4 lg:p-8">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
             <div>
-              <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">Benevolence Log</h1>
+              <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">Benevolence</h1>
               <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                {selectedTrust.name} • Charitable Assistance Records
+                {selectedTrust.name} • Charitable Assistance
               </p>
             </div>
             <div className="flex gap-3 mt-4 md:mt-0">
@@ -404,13 +404,6 @@ export default function BenevolencePage() {
               >
                 <Download className="w-4 h-4 mr-2" />
                 Export Report
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => navigate('/minutes/template/benevolence_approval')}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Create Minutes
               </Button>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
