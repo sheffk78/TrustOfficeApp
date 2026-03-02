@@ -307,7 +307,7 @@ export default function DistributionsPage() {
                 {selectedTrust?.name || 'Select a trust'}
               </p>
             </div>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
               <DialogTrigger asChild>
                 <Button className="btn-primary" data-testid="add-distribution-btn">
                   <Plus className="w-4 h-4 mr-2" />
