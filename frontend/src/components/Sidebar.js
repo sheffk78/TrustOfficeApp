@@ -36,7 +36,6 @@ const navItems = [
   { path: '/distributions', icon: DollarSign, label: 'Distributions', group: 'Money' },
   { path: '/compensation', icon: Wallet, label: 'Compensation', group: 'Money' },
   { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', group: 'Money', requiresBenevolence: true },
-  { path: '/benevolence/log', icon: HeartHandshake, label: 'Benevolence Log', group: 'Money' },
   { path: '/entities', icon: Building2, label: 'Entities', group: 'Structures' },
   { path: '/structure', icon: GitBranch, label: 'Hierarchy', group: 'Structures' },
   { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
