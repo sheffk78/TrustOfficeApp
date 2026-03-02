@@ -132,6 +132,59 @@ async def delete_schedule_a_item(item_id: str, user: dict = Depends(require_writ
         raise HTTPException(status_code=404, detail="Asset not found")
     return {"message": "Asset deleted"}
 
+
+class DisposeAssetRequest(BaseModel):
+    """Request model for disposing an asset without minutes"""
+    disposition_date: str
+    disposition_reason: str = "sale"  # sale, transfer, donation, destruction
+    disposition_value: Optional[float] = None
+    disposition_recipient: Optional[str] = None
+    disposition_notes: Optional[str] = None
+
+
+@router.post("/schedule-a/{item_id}/dispose")
+async def dispose_schedule_a_item(
+    item_id: str, 
+    request: DisposeAssetRequest,
+    user: dict = Depends(require_write_access)
+):
+    """
+    Mark a Schedule A item as disposed (without creating minutes).
+    This is for quick dispositions; for formal documentation, use the disposition_of_asset minutes template.
+    """
+    item = await db.schedule_a_items.find_one(
+        {"item_id": item_id, "user_id": user["user_id"]}, 
+        {"_id": 0}
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    if item.get("status") == "disposed":
+        raise HTTPException(status_code=400, detail="Asset is already disposed")
+    
+    # Build disposition notes
+    notes_parts = [f"Reason: {request.disposition_reason}"]
+    if request.disposition_recipient:
+        notes_parts.append(f"Recipient: {request.disposition_recipient}")
+    if request.disposition_value:
+        notes_parts.append(f"Value: ${request.disposition_value:,.2f}")
+    if request.disposition_notes:
+        notes_parts.append(request.disposition_notes)
+    
+    update_data = {
+        "status": "disposed",
+        "disposition_date": request.disposition_date,
+        "disposition_notes": ". ".join(notes_parts),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.schedule_a_items.update_one(
+        {"item_id": item_id},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Asset marked as disposed", "item_id": item_id}
+
 @router.get("/schedule-a/summary/{trust_id}")
 async def get_schedule_a_summary(trust_id: str, user: dict = Depends(get_current_user)):
     """Get Schedule A summary with totals by category"""
