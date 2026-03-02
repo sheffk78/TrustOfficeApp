@@ -282,7 +282,7 @@ class TestExpiredSubscriptionReadOnly:
             "due_date": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
             "description": "TEST_expired_subscription_task"
         }
-        response = expired_subscription_client.post(f"{BASE_URL}/api/governance-tasks", json=task_data)
+        response = expired_subscription_client.post(f"{BASE_URL}/api/tasks", json=task_data)
         
         assert response.status_code == 403, \
             f"Expected 403 for POST with expired subscription, got {response.status_code}: {response.text}"
@@ -314,7 +314,7 @@ class TestExpiredSubscriptionReadOnly:
         
         # Try to delete a task (DELETE operation) - should be blocked
         # Use a non-existent task ID to avoid actually deleting anything
-        response = expired_subscription_client.delete(f"{BASE_URL}/api/governance-tasks/task_nonexistent123")
+        response = expired_subscription_client.delete(f"{BASE_URL}/api/tasks/task_nonexistent123")
         
         # Should return 403 before checking if task exists
         assert response.status_code == 403, \
@@ -362,7 +362,7 @@ class TestExpiredSubscriptionReadOnly:
             "due_date": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
             "description": "TEST_error_message_task"
         }
-        response = expired_subscription_client.post(f"{BASE_URL}/api/governance-tasks", json=task_data)
+        response = expired_subscription_client.post(f"{BASE_URL}/api/tasks", json=task_data)
         
         assert response.status_code == 403
         
@@ -390,7 +390,7 @@ class TestExpiredSubscriptionReadOnly:
             "due_date": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
             "description": "TEST_error_fields_task"
         }
-        response = expired_subscription_client.post(f"{BASE_URL}/api/governance-tasks", json=task_data)
+        response = expired_subscription_client.post(f"{BASE_URL}/api/tasks", json=task_data)
         
         assert response.status_code == 403
         
