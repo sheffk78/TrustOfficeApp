@@ -6,7 +6,11 @@ from enum import Enum
 import uuid
 
 from database import db
-from dependencies import get_current_user, require_write_access, calculate_health_score, create_initial_governance_tasks
+from dependencies import (
+    get_current_user, require_write_access, calculate_health_score, 
+    create_initial_governance_tasks, check_feature_access, Feature,
+    PREMIUM_FEATURE_ERROR_MESSAGE, PREMIUM_FEATURE_ERROR_CODE
+)
 from models import TrustCreate, TrustUpdate, TrustResponse
 
 router = APIRouter(tags=["trusts"])
@@ -16,7 +20,23 @@ router = APIRouter(tags=["trusts"])
 
 @router.post("/trusts", response_model=TrustResponse)
 async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_access)):
-    """Create a new trust"""
+    """
+    Create a new trust.
+    
+    Feature Gate: MULTIPLE_TRUSTS
+    - Trial users can only have 1 trust
+    - Paid users (monthly/annual) can create unlimited trusts
+    """
+    # Check if user already has a trust - need MULTIPLE_TRUSTS feature for more
+    existing_count = await db.trusts.count_documents({"user_id": user["user_id"]})
+    if existing_count >= 1:
+        has_multiple_trusts = await check_feature_access(user["user_id"], Feature.MULTIPLE_TRUSTS)
+        if not has_multiple_trusts:
+            raise HTTPException(
+                status_code=PREMIUM_FEATURE_ERROR_CODE,
+                detail="Multiple trusts require a paid subscription. Trial accounts are limited to 1 trust."
+            )
+    
     trust_id = f"trust_{uuid.uuid4().hex[:12]}"
     trust_doc = {
         "trust_id": trust_id,
