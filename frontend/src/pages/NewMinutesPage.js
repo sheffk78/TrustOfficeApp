@@ -37,6 +37,7 @@ export default function NewMinutesPage() {
   const [aiDrafting, setAiDrafting] = useState(false);
   const [aiDraftModalOpen, setAiDraftModalOpen] = useState(false);
   const [aiDraft, setAiDraft] = useState(null);
+  const [aiError, setAiError] = useState(null); // Inline error state for AI
   
   const [formData, setFormData] = useState({
     entry_type: '',
