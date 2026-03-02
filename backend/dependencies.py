@@ -293,6 +293,36 @@ async def check_subscription_active(user: dict = Depends(get_current_user)) -> d
     return user
 
 
+async def require_write_access(user: dict = Depends(get_current_user)) -> dict:
+    """
+    Dependency for write operations (create, update, delete).
+    Returns user if subscription is active, raises 403 if read-only.
+    Use this for all POST, PUT, PATCH, DELETE endpoints that modify user data.
+    """
+    state = await get_subscription_state(user["user_id"])
+    
+    if state.is_read_only:
+        raise HTTPException(
+            status_code=READ_ONLY_ERROR_CODE,
+            detail=READ_ONLY_ERROR_MESSAGE,
+            headers={"X-Subscription-Status": state.status}
+        )
+    
+    return user
+
+
+async def get_user_with_subscription(user: dict = Depends(get_current_user)) -> dict:
+    """
+    Dependency that returns user with subscription state attached.
+    Allows read access regardless of subscription status.
+    """
+    state = await get_subscription_state(user["user_id"])
+    return {
+        **user,
+        "subscription_state": state.model_dump()
+    }
+
+
 def get_task_status(due_date: str, completed_at: Optional[str]) -> str:
     """Calculate task status based on due_date and completed_at"""
     if completed_at:
