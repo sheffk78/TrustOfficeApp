@@ -31,6 +31,15 @@ load_dotenv(ROOT_DIR / '.env')
 from email_service import email_service
 from background_tasks import background_runner, run_task_status_update, run_daily_reminders, run_health_snapshots
 
+# Import subscription state helper from dependencies
+from dependencies import (
+    get_subscription_state, 
+    SubscriptionState,
+    require_write_access,
+    READ_ONLY_ERROR_MESSAGE,
+    READ_ONLY_ERROR_CODE
+)
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -60,7 +69,7 @@ security = HTTPBearer(auto_error=False)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Paths that don't require active subscription
+# Paths that don't require active subscription (full access - both read and write)
 SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/auth/register",
     "/api/auth/login",
