@@ -2220,6 +2220,233 @@ async def list_unit_transfers(
     
     return [TrustUnitTransferResponse(**t) for t in transfers]
 
+def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_watermark: bool = False) -> bytes:
+    """Generate a professional PDF certificate for trust units"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=1*inch, bottomMargin=0.75*inch)
+    
+    # Custom styles matching TrustOffice design
+    styles = getSampleStyleSheet()
+    
+    # Navy color for headers
+    navy = colors.HexColor('#010079')
+    gold = colors.HexColor('#D5AD36')
+    
+    title_style = ParagraphStyle(
+        'CertTitle',
+        parent=styles['Heading1'],
+        fontName='Times-Bold',
+        fontSize=24,
+        spaceAfter=6,
+        textColor=navy,
+        alignment=1  # Center
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CertSubtitle',
+        parent=styles['Heading2'],
+        fontName='Times-Roman',
+        fontSize=14,
+        spaceBefore=4,
+        spaceAfter=20,
+        textColor=navy,
+        alignment=1
+    )
+    
+    heading_style = ParagraphStyle(
+        'CertHeading',
+        parent=styles['Heading2'],
+        fontName='Times-Bold',
+        fontSize=12,
+        spaceBefore=16,
+        spaceAfter=8,
+        textColor=navy
+    )
+    
+    body_style = ParagraphStyle(
+        'CertBody',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=11,
+        leading=16,
+        spaceAfter=8
+    )
+    
+    label_style = ParagraphStyle(
+        'CertLabel',
+        fontName='Courier',
+        fontSize=9,
+        textColor=colors.HexColor('#666666'),
+        spaceBefore=4
+    )
+    
+    mono_style = ParagraphStyle(
+        'CertMono',
+        fontName='Courier',
+        fontSize=10,
+        textColor=colors.HexColor('#333333')
+    )
+    
+    large_text_style = ParagraphStyle(
+        'CertLargeText',
+        fontName='Times-Bold',
+        fontSize=16,
+        textColor=navy,
+        alignment=1,
+        spaceBefore=12,
+        spaceAfter=12
+    )
+    
+    story = []
+    
+    # Certificate Header
+    story.append(Paragraph("CERTIFICATE OF BENEFICIAL INTEREST", title_style))
+    story.append(Paragraph(trust.get('name', 'Trust'), subtitle_style))
+    
+    # Certificate Number box
+    cert_number_data = [
+        [Paragraph("CERTIFICATE NUMBER", label_style)],
+        [Paragraph(cert.get('certificate_number', 'N/A'), ParagraphStyle('Big', fontName='Courier-Bold', fontSize=18, alignment=1))]
+    ]
+    cert_number_table = Table(cert_number_data, colWidths=[2.5*inch])
+    cert_number_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('BOX', (0, 0), (-1, -1), 1, navy),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(cert_number_table)
+    story.append(Spacer(1, 24))
+    
+    # Main certificate text
+    percentage = cert.get('percentage', 0)
+    units = cert.get('units', 0)
+    holder_name = cert.get('holder_name', 'Unknown')
+    issue_date = cert.get('issue_date', '')
+    if 'T' in issue_date:
+        issue_date = issue_date.split('T')[0]
+    
+    cert_text = f"""This certifies that <b>{holder_name}</b> is the registered holder of 
+    <b>{units} {settings.get('unit_label', 'Certificate Units')}</b>, representing 
+    <b>{percentage:.4f}%</b> of the total authorized beneficial interest in the above-named trust."""
+    
+    story.append(Paragraph(cert_text, body_style))
+    story.append(Spacer(1, 16))
+    
+    # Details table
+    details_data = [
+        [Paragraph("HOLDER NAME", label_style), Paragraph(holder_name, mono_style)],
+        [Paragraph("HOLDER IDENTIFIER", label_style), Paragraph(cert.get('holder_identifier', 'N/A') or 'N/A', mono_style)],
+        [Paragraph("UNITS HELD", label_style), Paragraph(str(units), mono_style)],
+        [Paragraph("PERCENTAGE", label_style), Paragraph(f"{percentage:.4f}%", mono_style)],
+        [Paragraph("ISSUE DATE", label_style), Paragraph(issue_date, mono_style)],
+        [Paragraph("STATUS", label_style), Paragraph(cert.get('status', 'active').upper(), mono_style)],
+    ]
+    
+    details_table = Table(details_data, colWidths=[2*inch, 4*inch])
+    details_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LINEBELOW', (0, 0), (-1, -2), 0.5, colors.HexColor('#DDDDDD')),
+    ]))
+    story.append(details_table)
+    story.append(Spacer(1, 24))
+    
+    # Trust information
+    story.append(Paragraph("TRUST INFORMATION", heading_style))
+    trust_data = [
+        [Paragraph("TRUST NAME", label_style), Paragraph(trust.get('name', 'N/A'), mono_style)],
+        [Paragraph("JURISDICTION", label_style), Paragraph(trust.get('jurisdiction', 'N/A') or 'N/A', mono_style)],
+        [Paragraph("TOTAL AUTHORIZED UNITS", label_style), Paragraph(str(settings.get('total_authorized_units', 100)), mono_style)],
+    ]
+    
+    trust_table = Table(trust_data, colWidths=[2*inch, 4*inch])
+    trust_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(trust_table)
+    story.append(Spacer(1, 36))
+    
+    # Signature blocks
+    story.append(Paragraph("TRUSTEE CERTIFICATION", heading_style))
+    story.append(Paragraph(
+        "The undersigned Trustee(s) hereby certify that this certificate has been duly issued in accordance with the terms of the trust instrument.",
+        body_style
+    ))
+    story.append(Spacer(1, 24))
+    
+    # Signature lines
+    sig_data = [
+        [Paragraph('_' * 40, body_style), Paragraph('_' * 40, body_style)],
+        [Paragraph('Trustee Signature', label_style), Paragraph('Date', label_style)],
+    ]
+    sig_table = Table(sig_data, colWidths=[3*inch, 3*inch])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(sig_table)
+    story.append(Spacer(1, 20))
+    
+    sig_data2 = [
+        [Paragraph('_' * 40, body_style), Paragraph('_' * 40, body_style)],
+        [Paragraph('Trustee Signature', label_style), Paragraph('Date', label_style)],
+    ]
+    sig_table2 = Table(sig_data2, colWidths=[3*inch, 3*inch])
+    sig_table2.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(sig_table2)
+    
+    # Footer with watermark
+    story.append(Spacer(1, 30))
+    if not hide_watermark:
+        story.append(Paragraph(
+            f"Generated by TrustOffice on {datetime.now(timezone.utc).strftime('%B %d, %Y at %H:%M UTC')}",
+            ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#999999'), alignment=1)
+        ))
+    
+    doc.build(story)
+    return buffer.getvalue()
+
+@api_router.get("/trust-units/certificates/{certificate_id}/pdf")
+async def get_certificate_pdf(certificate_id: str, user: dict = Depends(get_current_user)):
+    """Generate and return PDF for a unit certificate"""
+    cert = await db.trust_unit_certificates.find_one(
+        {"certificate_id": certificate_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    
+    trust = await db.trusts.find_one(
+        {"trust_id": cert["trust_id"], "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    settings = await get_or_create_units_settings(cert["trust_id"], user["user_id"])
+    
+    # Compute percentage
+    total_authorized = settings["total_authorized_units"]
+    cert["percentage"] = (cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+    
+    # Check if watermark should be shown
+    show_watermark = await should_show_watermark(user["user_id"])
+    
+    pdf_bytes = generate_certificate_pdf(cert, trust or {}, settings, hide_watermark=not show_watermark)
+    pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+    
+    return {
+        "pdf_base64": pdf_base64,
+        "filename": f"certificate_{cert.get('certificate_number', certificate_id)}.pdf"
+    }
+
 async def create_certificates_from_beneficiary_designation(minutes_id: str, user_id: str) -> List[dict]:
     """
     Helper function to create initial certificates from a 'Designation of Beneficiaries' minutes template.
