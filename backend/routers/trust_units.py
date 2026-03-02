@@ -513,177 +513,212 @@ async def list_unit_transfers(
 # ==================== CERTIFICATE PDF ====================
 
 def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_watermark: bool = False) -> bytes:
-    """Generate a professional PDF certificate for trust units"""
+    """Generate a professional landscape PDF certificate for trust units - stock certificate style"""
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.units import inch
+    import math
+    
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=1*inch, bottomMargin=0.75*inch)
+    page_width, page_height = landscape(letter)  # 11 x 8.5 inches
+    c = canvas.Canvas(buffer, pagesize=landscape(letter))
     
-    styles = getSampleStyleSheet()
+    # Colors
+    navy = HexColor('#010079')
+    gold = HexColor('#D5AD36')
+    light_grey = HexColor('#F0F0F0')
+    dark_grey = HexColor('#666666')
     
-    navy = colors.HexColor('#010079')
+    # Margins
+    margin = 0.5 * inch
     
-    title_style = ParagraphStyle(
-        'CertTitle',
-        parent=styles['Heading1'],
-        fontName='Times-Bold',
-        fontSize=24,
-        spaceAfter=6,
-        textColor=navy,
-        alignment=1
-    )
+    # === WATERMARK (Background) ===
+    if not hide_watermark:
+        c.saveState()
+        c.setFillColor(light_grey)
+        c.setFont('Helvetica-Bold', 60)
+        c.translate(page_width / 2, page_height / 2)
+        c.rotate(30)
+        c.drawCentredString(0, 0, trust.get('name', 'TRUST CERTIFICATE').upper())
+        c.restoreState()
     
-    subtitle_style = ParagraphStyle(
-        'CertSubtitle',
-        parent=styles['Heading2'],
-        fontName='Times-Roman',
-        fontSize=14,
-        spaceBefore=4,
-        spaceAfter=20,
-        textColor=navy,
-        alignment=1
-    )
+    # === DECORATIVE BORDER ===
+    # Outer Navy border (3pt)
+    c.setStrokeColor(navy)
+    c.setLineWidth(3)
+    c.rect(margin, margin, page_width - 2 * margin, page_height - 2 * margin, stroke=1, fill=0)
     
-    heading_style = ParagraphStyle(
-        'CertHeading',
-        parent=styles['Heading2'],
-        fontName='Times-Bold',
-        fontSize=12,
-        spaceBefore=16,
-        spaceAfter=8,
-        textColor=navy
-    )
+    # Inner Gold border (1pt) with 4pt gap
+    gap = 6
+    c.setStrokeColor(gold)
+    c.setLineWidth(1)
+    c.rect(margin + gap, margin + gap, page_width - 2 * margin - 2 * gap, page_height - 2 * margin - 2 * gap, stroke=1, fill=0)
     
-    body_style = ParagraphStyle(
-        'CertBody',
-        parent=styles['Normal'],
-        fontName='Times-Roman',
-        fontSize=11,
-        leading=16,
-        spaceAfter=8
-    )
-    
-    label_style = ParagraphStyle(
-        'CertLabel',
-        fontName='Courier',
-        fontSize=9,
-        textColor=colors.HexColor('#666666'),
-        spaceBefore=4
-    )
-    
-    mono_style = ParagraphStyle(
-        'CertMono',
-        fontName='Courier',
-        fontSize=10,
-        textColor=colors.HexColor('#333333')
-    )
-    
-    story = []
-    
-    story.append(Paragraph("CERTIFICATE OF BENEFICIAL INTEREST", title_style))
-    story.append(Paragraph(trust.get('name', 'Trust'), subtitle_style))
-    
-    cert_number_data = [
-        [Paragraph("CERTIFICATE NUMBER", label_style)],
-        [Paragraph(cert.get('certificate_number', 'N/A'), ParagraphStyle('Big', fontName='Courier-Bold', fontSize=18, alignment=1))]
+    # Corner ornaments - Gold filled squares at inner border corners
+    corner_size = 8
+    inner_margin = margin + gap
+    corners = [
+        (inner_margin - corner_size/2, inner_margin - corner_size/2),  # Bottom-left
+        (page_width - inner_margin - corner_size/2, inner_margin - corner_size/2),  # Bottom-right
+        (inner_margin - corner_size/2, page_height - inner_margin - corner_size/2),  # Top-left
+        (page_width - inner_margin - corner_size/2, page_height - inner_margin - corner_size/2),  # Top-right
     ]
-    cert_number_table = Table(cert_number_data, colWidths=[2.5*inch])
-    cert_number_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('BOX', (0, 0), (-1, -1), 1, navy),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    story.append(cert_number_table)
-    story.append(Spacer(1, 24))
+    c.setFillColor(gold)
+    for cx, cy in corners:
+        c.rect(cx, cy, corner_size, corner_size, stroke=0, fill=1)
     
-    percentage = cert.get('percentage', 0)
-    units = cert.get('units', 0)
+    # === CONTENT AREA ===
+    content_margin = margin + 30
+    center_x = page_width / 2
+    
+    # Certificate data
     holder_name = cert.get('holder_name', 'Unknown')
+    units = cert.get('units', 0)
+    percentage = cert.get('percentage', 0)
+    cert_number = cert.get('certificate_number', 'N/A')
     issue_date = cert.get('issue_date', '')
     if 'T' in issue_date:
         issue_date = issue_date.split('T')[0]
+    trust_name = trust.get('name', 'Trust')
+    total_units = settings.get('total_authorized_units', 100)
+    unit_label = settings.get('unit_label', 'Unit')
     
-    cert_text = f"""This certifies that <b>{holder_name}</b> is the registered holder of 
-    <b>{units} {settings.get('unit_label', 'Certificate Units')}</b>, representing 
-    <b>{percentage:.4f}%</b> of the total authorized beneficial interest in the above-named trust."""
+    # === HEADER ===
+    y_pos = page_height - content_margin - 20
     
-    story.append(Paragraph(cert_text, body_style))
-    story.append(Spacer(1, 16))
+    # Certificate Number (Top Right)
+    c.setFont('Courier-Bold', 12)
+    c.setFillColor(navy)
+    c.drawRightString(page_width - content_margin, y_pos + 10, f"No. {cert_number}")
     
-    details_data = [
-        [Paragraph("HOLDER NAME", label_style), Paragraph(holder_name, mono_style)],
-        [Paragraph("HOLDER IDENTIFIER", label_style), Paragraph(cert.get('holder_identifier', 'N/A') or 'N/A', mono_style)],
-        [Paragraph("UNITS HELD", label_style), Paragraph(str(units), mono_style)],
-        [Paragraph("PERCENTAGE", label_style), Paragraph(f"{percentage:.4f}%", mono_style)],
-        [Paragraph("ISSUE DATE", label_style), Paragraph(issue_date, mono_style)],
-        [Paragraph("STATUS", label_style), Paragraph(cert.get('status', 'active').upper(), mono_style)],
-    ]
+    # Units (Top Left)
+    c.drawString(content_margin, y_pos + 10, f"{units} {unit_label}{'s' if units != 1 else ''}")
     
-    details_table = Table(details_data, colWidths=[2*inch, 4*inch])
-    details_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LINEBELOW', (0, 0), (-1, -2), 0.5, colors.HexColor('#DDDDDD')),
-    ]))
-    story.append(details_table)
-    story.append(Spacer(1, 24))
+    # Title
+    c.setFont('Times-Bold', 32)
+    c.setFillColor(navy)
+    c.drawCentredString(center_x, y_pos - 20, "CERTIFICATE OF BENEFICIAL INTEREST")
     
-    story.append(Paragraph("TRUST INFORMATION", heading_style))
-    trust_data = [
-        [Paragraph("TRUST NAME", label_style), Paragraph(trust.get('name', 'N/A'), mono_style)],
-        [Paragraph("JURISDICTION", label_style), Paragraph(trust.get('jurisdiction', 'N/A') or 'N/A', mono_style)],
-        [Paragraph("TOTAL AUTHORIZED UNITS", label_style), Paragraph(str(settings.get('total_authorized_units', 100)), mono_style)],
-    ]
+    # Trust Name
+    y_pos -= 60
+    c.setFont('Times-Bold', 24)
+    c.drawCentredString(center_x, y_pos, trust_name.upper())
     
-    trust_table = Table(trust_data, colWidths=[2*inch, 4*inch])
-    trust_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    story.append(trust_table)
-    story.append(Spacer(1, 36))
+    # Decorative line under title
+    y_pos -= 15
+    c.setStrokeColor(gold)
+    c.setLineWidth(2)
+    line_width = 200
+    c.line(center_x - line_width, y_pos, center_x + line_width, y_pos)
     
-    story.append(Paragraph("TRUSTEE CERTIFICATION", heading_style))
-    story.append(Paragraph(
-        "The undersigned Trustee(s) hereby certify that this certificate has been duly issued in accordance with the terms of the trust instrument.",
-        body_style
-    ))
-    story.append(Spacer(1, 24))
+    # === MAIN BODY ===
+    y_pos -= 50
+    c.setFont('Times-Roman', 14)
+    c.setFillColor(HexColor('#000000'))
+    c.drawCentredString(center_x, y_pos, "This Certifies That")
     
-    sig_data = [
-        [Paragraph('_' * 40, body_style), Paragraph('_' * 40, body_style)],
-        [Paragraph('Trustee Signature', label_style), Paragraph('Date', label_style)],
-    ]
-    sig_table = Table(sig_data, colWidths=[3*inch, 3*inch])
-    sig_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    story.append(sig_table)
-    story.append(Spacer(1, 20))
+    # Holder Name (Centered, Prominent)
+    y_pos -= 45
+    c.setFont('Times-Bold', 28)
+    c.setFillColor(navy)
+    c.drawCentredString(center_x, y_pos, holder_name)
     
-    sig_data2 = [
-        [Paragraph('_' * 40, body_style), Paragraph('_' * 40, body_style)],
-        [Paragraph('Trustee Signature', label_style), Paragraph('Date', label_style)],
-    ]
-    sig_table2 = Table(sig_data2, colWidths=[3*inch, 3*inch])
-    sig_table2.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    story.append(sig_table2)
+    # Identifier line
+    holder_id = cert.get('holder_identifier', '')
+    if holder_id:
+        y_pos -= 20
+        c.setFont('Times-Italic', 12)
+        c.setFillColor(dark_grey)
+        c.drawCentredString(center_x, y_pos, holder_id)
     
-    story.append(Spacer(1, 30))
+    # Ownership statement
+    y_pos -= 40
+    c.setFont('Times-Roman', 14)
+    c.setFillColor(HexColor('#000000'))
+    c.drawCentredString(center_x, y_pos, "is the registered holder of")
+    
+    # Units display (prominent)
+    y_pos -= 35
+    c.setFont('Courier-Bold', 22)
+    c.setFillColor(navy)
+    c.drawCentredString(center_x, y_pos, f"{units} {unit_label}{'s' if units != 1 else ''}")
+    
+    # Percentage
+    y_pos -= 25
+    c.setFont('Times-Roman', 14)
+    c.setFillColor(HexColor('#000000'))
+    c.drawCentredString(center_x, y_pos, f"representing {percentage:.2f}% of the total authorized beneficial interest")
+    
+    y_pos -= 20
+    c.drawCentredString(center_x, y_pos, f"({units} of {total_units} total authorized units)")
+    
+    # === GOLD SEAL (Programmatic star polygon) ===
+    seal_x = page_width - content_margin - 60
+    seal_y = page_height / 2 - 20
+    seal_radius = 35
+    
+    # Draw star seal
+    c.setFillColor(gold)
+    c.setStrokeColor(HexColor('#B8940B'))  # Darker gold for outline
+    c.setLineWidth(1)
+    
+    # 12-point star
+    points = 12
+    inner_radius = seal_radius * 0.5
+    path = c.beginPath()
+    for i in range(points * 2):
+        angle = math.pi / 2 + (i * math.pi / points)
+        radius = seal_radius if i % 2 == 0 else inner_radius
+        x = seal_x + radius * math.cos(angle)
+        y = seal_y + radius * math.sin(angle)
+        if i == 0:
+            path.moveTo(x, y)
+        else:
+            path.lineTo(x, y)
+    path.close()
+    c.drawPath(path, stroke=1, fill=1)
+    
+    # Seal text
+    c.setFillColor(HexColor('#FFFFFF'))
+    c.setFont('Helvetica-Bold', 7)
+    c.drawCentredString(seal_x, seal_y + 3, "OFFICIAL")
+    c.drawCentredString(seal_x, seal_y - 6, "SEAL")
+    
+    # === BOTTOM SECTION ===
+    # Issue date
+    y_pos = content_margin + 120
+    c.setFont('Times-Roman', 11)
+    c.setFillColor(HexColor('#000000'))
+    c.drawCentredString(center_x, y_pos, f"Issued on {issue_date}")
+    
+    # Signature lines
+    y_pos -= 50
+    sig_width = 180
+    sig_gap = 100
+    left_sig_x = center_x - sig_gap - sig_width / 2
+    right_sig_x = center_x + sig_gap - sig_width / 2
+    
+    # Lines
+    c.setStrokeColor(HexColor('#000000'))
+    c.setLineWidth(0.5)
+    c.line(left_sig_x, y_pos, left_sig_x + sig_width, y_pos)
+    c.line(right_sig_x, y_pos, right_sig_x + sig_width, y_pos)
+    
+    # Labels
+    c.setFont('Helvetica', 9)
+    c.setFillColor(dark_grey)
+    c.drawCentredString(left_sig_x + sig_width / 2, y_pos - 12, "Trustee Signature")
+    c.drawCentredString(right_sig_x + sig_width / 2, y_pos - 12, "Date")
+    
+    # Footer
     if not hide_watermark:
-        story.append(Paragraph(
-            f"Generated by TrustOffice on {datetime.now(timezone.utc).strftime('%B %d, %Y at %H:%M UTC')}",
-            ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#999999'), alignment=1)
-        ))
+        c.setFont('Helvetica', 7)
+        c.setFillColor(HexColor('#999999'))
+        c.drawCentredString(center_x, content_margin + 15, 
+                          f"Generated by TrustOffice on {datetime.now(timezone.utc).strftime('%B %d, %Y at %H:%M UTC')}")
     
-    doc.build(story)
+    c.save()
     return buffer.getvalue()
 
 
