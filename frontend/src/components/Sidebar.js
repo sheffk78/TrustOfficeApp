@@ -18,7 +18,8 @@ import {
   Wallet,
   Package,
   Award,
-  Users
+  Users,
+  Sparkles
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/calendar', icon: Calendar, label: 'Calendar', group: 'Governance' },
   { path: '/minutes', icon: FileText, label: 'Minutes', group: 'Governance' },
+  { path: '/guided-minutes', icon: Sparkles, label: 'Guided Minutes', group: 'Governance', badge: 'beta' },
   { path: '/distributions', icon: DollarSign, label: 'Distributions', group: 'Money' },
   { path: '/compensation', icon: Wallet, label: 'Compensation', group: 'Money' },
   { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', group: 'Money', requiresBenevolence: true },
@@ -136,7 +138,8 @@ export const Sidebar = () => {
             .map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path || 
-              (item.path === '/minutes' && location.pathname.startsWith('/minutes'));
+              (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
+              (item.path === '/guided-minutes' && location.pathname === '/guided-minutes');
             
             return (
               <Link
@@ -144,10 +147,17 @@ export const Sidebar = () => {
                 to={item.path}
                 className={`sidebar-item ${isActive ? 'active' : ''}`}
                 onClick={() => setMobileOpen(false)}
-                data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
+                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
               >
                 <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <span className="flex items-center gap-2">
+                  {item.label}
+                  {item.badge && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
+                      {item.badge}
+                    </span>
+                  )}
+                </span>
               </Link>
             );
           })}

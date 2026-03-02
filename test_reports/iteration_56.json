@@ -1,0 +1,148 @@
+{
+  "summary": "Guided Minutes feature comprehensive testing complete. All 15 features verified working correctly - 4-step wizard flow for AI-assisted meeting minutes creation.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "Guided Minutes page loads at /guided-minutes route",
+    "Sidebar shows 'Guided Minutes' link with gold 'BETA' badge under Governance",
+    "Minutes page has 'Guided Minutes' button with beta badge linking to wizard",
+    "Trust context API returns trust name, jurisdiction, and trustees",
+    "Step 1: Meeting type selection works (Annual/Quarterly/General)",
+    "Step 1: Meeting date picker works with calendar popup",
+    "Step 1: Participants can be selected from known trustees (John Smith, Jane Smith)",
+    "Step 1: Custom participants can be added via input field",
+    "Step 2: Agenda items can be added/removed",
+    "Step 2: Key decisions can be added/removed",
+    "Step 2: Generate Draft with AI button calls backend and generates formal minutes",
+    "Step 3: AI draft is displayed in editable textarea with WHEREAS/RESOLVED format",
+    "Step 3: Draft title and body are editable",
+    "Step 3: Regenerate button works",
+    "Step 4: Save Minutes creates minutes_records entry (verified via API)",
+    "Step 4: Success screen shows 'Minutes Saved' confirmation",
+    "Step 4: View All Minutes and Create Another buttons work",
+    "Navigation: Back/Next buttons work correctly between steps",
+    "Stepper shows correct active step indicator"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_guided_minutes.py",
+    "/app/test_reports/pytest/guided_minutes_results.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "PASS: Backend router /api/guided-minutes properly implements all 3 endpoints (context, draft, save)",
+    "PASS: GuidedMinutesDraftRequest validates required fields (trust_id, minutes_type, meeting_date, participants)",
+    "PASS: AI integration with Claude generates professional WHEREAS/RESOLVED minutes format",
+    "PASS: Saved minutes integrate with existing minutes_records collection (source: 'guided_wizard')",
+    "PASS: Frontend stepper correctly tracks wizard progress with visual indicators",
+    "PASS: Form validation prevents proceeding without required fields",
+    "PASS: All interactive elements have data-testid attributes for testing",
+    "PASS: Beta badge styling uses gold/gold-20 theme colors"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_guided_minutes.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (10/10 pytest tests passed)",
+    "frontend": "100% (19/19 features verified)"
+  },
+
+  "test_credentials": {
+    "demo_user": "demo@trustoffice.com / demopassword"
+  },
+
+  "seed_data_creation": "Created test minutes record minutes_5216af3100b5 (annual meeting 2026-03-02)",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Guided Minutes feature fully tested. Backend tests in /app/backend/tests/test_guided_minutes.py. Key data-testids: guided-minutes-stepper, step-{1-4}-content, meeting-type-{annual|quarterly|general}, meeting-date-picker, participant-{name}, custom-participant-input, add-participant-btn, agenda-item-{n}, decision-item-{n}, add-agenda-btn, add-decision-btn, generate-draft-btn, draft-title, draft-body, regenerate-draft-btn, save-minutes-btn, view-minutes-btn, create-another-btn, back-to-minutes, prev-step-btn, next-step-btn. AI generation takes 10-15 seconds.",
+
+  "verified_features": {
+    "route": {
+      "path": "/guided-minutes",
+      "protected": true,
+      "subscription_gated": true,
+      "status": "PASS"
+    },
+    "sidebar_navigation": {
+      "data_testid": "nav-guided-minutes",
+      "badge": "gold 'BETA' badge",
+      "location": "Under Governance section",
+      "status": "PASS"
+    },
+    "minutes_page_button": {
+      "data_testid": "guided-minutes-link",
+      "text": "Guided Minutes BETA",
+      "status": "PASS"
+    },
+    "trust_context_api": {
+      "endpoint": "GET /api/guided-minutes/context",
+      "returns": ["trust_id", "trust_name", "jurisdiction", "trustees"],
+      "status": "PASS"
+    },
+    "step_1_meeting_setup": {
+      "meeting_types": ["Annual Meeting", "Quarterly Meeting", "General Meeting"],
+      "date_picker": "Calendar popup with date-fns formatting",
+      "participant_selection": "Known trustees + custom input",
+      "validation": "Requires meeting type + date + at least 1 participant",
+      "status": "PASS"
+    },
+    "step_2_agenda_decisions": {
+      "agenda_items": "Dynamic add/remove with [data-testid='agenda-item-{n}']",
+      "key_decisions": "Dynamic add/remove with [data-testid='decision-item-{n}']",
+      "additional_context": "Optional textarea",
+      "validation": "Requires at least 1 agenda item or decision",
+      "status": "PASS"
+    },
+    "step_3_ai_draft": {
+      "endpoint": "POST /api/guided-minutes/draft",
+      "ai_timeout": "60 seconds (Claude Sonnet)",
+      "format": "WHEREAS/RESOLVED professional minutes language",
+      "editable": true,
+      "regenerate_button": true,
+      "cautions": "AI-generated warnings displayed",
+      "status": "PASS"
+    },
+    "step_4_save": {
+      "endpoint": "POST /api/guided-minutes/save",
+      "creates": "minutes_records entry with source='guided_wizard'",
+      "success_screen": "'Minutes Saved' with green checkmark",
+      "buttons": ["View All Minutes", "Create Another"],
+      "status": "PASS"
+    },
+    "navigation": {
+      "back_button": "Returns to previous step",
+      "next_button": "Proceeds to next step when valid",
+      "stepper": "Visual indicators for active/completed steps",
+      "status": "PASS"
+    }
+  },
+
+  "api_test_results": {
+    "test_get_guided_minutes_context": "PASSED",
+    "test_get_guided_minutes_context_without_trust_id": "PASSED",
+    "test_create_guided_minutes_draft": "PASSED",
+    "test_create_guided_minutes_draft_annual": "PASSED",
+    "test_create_guided_minutes_draft_general": "PASSED",
+    "test_save_guided_minutes": "PASSED",
+    "test_context_invalid_trust_returns_404": "PASSED",
+    "test_draft_missing_required_fields": "PASSED",
+    "test_save_missing_required_fields": "PASSED",
+    "test_context_without_auth_returns_401": "PASSED"
+  }
+}

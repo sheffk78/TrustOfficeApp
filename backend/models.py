@@ -35,6 +35,12 @@ class MinutesType(str, Enum):
     compensation = "compensation"
     distribution = "distribution"
     solvency = "solvency"
+    general = "general"
+
+class GuidedMinutesType(str, Enum):
+    annual = "annual"
+    quarterly = "quarterly"
+    general = "general"
 
 class PurposeClassification(str, Enum):
     distribution = "distribution"
@@ -776,6 +782,47 @@ class CheckoutRequest(BaseModel):
 
 class PortalRequest(BaseModel):
     return_url: str
+
+
+# ==================== GUIDED MINUTES MODELS ====================
+
+class GuidedMinutesContext(BaseModel):
+    """Context data for the guided minutes wizard, pulled from trust/entity profile"""
+    trust_id: str
+    trust_name: str
+    jurisdiction: Optional[str] = None
+    trustees: List[str] = []
+    beneficiary_standard: Optional[str] = None
+    article_ref_distribution: Optional[str] = None
+    article_ref_compensation: Optional[str] = None
+    tax_status: Optional[str] = None
+
+class GuidedMinutesDraftRequest(BaseModel):
+    """Request model for guided minutes draft generation"""
+    trust_id: str
+    minutes_type: str = Field(..., description="Type: annual, quarterly, general")
+    meeting_date: str = Field(..., description="ISO date of the meeting")
+    participants: List[str] = Field(..., description="List of selected trustees/participants")
+    agenda_items: List[str] = Field(default_factory=list, description="Short bullet points of agenda topics")
+    key_decisions: List[str] = Field(default_factory=list, description="Short bullet points of decisions made")
+    additional_context: Optional[str] = Field(None, description="Optional freeform notes")
+
+class GuidedMinutesDraftResponse(BaseModel):
+    """Response model for AI-generated guided minutes draft"""
+    suggested_title: str = Field(..., description="Suggested title for the minutes")
+    draft_body: str = Field(..., description="The main minutes text body")
+    cautions: List[str] = Field(default_factory=list, description="Warnings or notes for the trustee")
+    minutes_type: str
+    meeting_date: str
+    participants_text: str
+
+class GuidedMinutesSaveRequest(BaseModel):
+    """Request model for saving guided minutes as a minutes_records entry"""
+    trust_id: str
+    minutes_type: str
+    meeting_date: str
+    participants_text: str
+    decisions_text: str
 
 
 # Fix forward reference

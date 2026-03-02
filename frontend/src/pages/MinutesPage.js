@@ -17,7 +17,8 @@ import {
   Users,
   ChevronRight,
   Eye,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -147,6 +148,19 @@ export default function MinutesPage() {
               </p>
             </div>
             <div className="flex gap-2">
+              <Link to="/guided-minutes">
+                <Button 
+                  variant="outline"
+                  className="border-gold/50 text-gold hover:bg-gold/10"
+                  data-testid="guided-minutes-link"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Guided Minutes
+                  <span className="ml-2 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20">
+                    beta
+                  </span>
+                </Button>
+              </Link>
               <Button 
                 onClick={handleRecordMinutes}
                 className="btn-primary"

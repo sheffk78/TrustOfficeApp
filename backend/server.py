@@ -62,6 +62,7 @@ from routers.categories import router as categories_router
 from routers.beneficiaries import router as beneficiaries_router
 from routers.demo import router as demo_router
 from routers.ai import router as ai_router
+from routers.guided_minutes import router as guided_minutes_router
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -233,6 +234,7 @@ app.include_router(categories_router, prefix="/api")
 app.include_router(beneficiaries_router, prefix="/api")
 app.include_router(demo_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
+app.include_router(guided_minutes_router, prefix="/api")
 
 
 # ==================== LIFECYCLE EVENTS ====================
