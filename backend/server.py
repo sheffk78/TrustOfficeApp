@@ -445,6 +445,11 @@ class DistributionCreate(BaseModel):
     purpose_classification: PurposeClassification
     authority_clause_ref: str = ""
     notes: str = ""
+    # Benevolence mode fields
+    is_benevolence: bool = False
+    benevolence_recipient_name: Optional[str] = None
+    benevolence_need_description: Optional[str] = None
+    benevolence_notes: Optional[str] = None
 
 class DistributionApprove(BaseModel):
     solvency_confirmed: bool
@@ -465,6 +470,24 @@ class DistributionResponse(BaseModel):
     approved_at: Optional[str] = None
     minutes_record_id: Optional[str] = None
     created_at: str
+    # Benevolence mode fields
+    is_benevolence: bool = False
+    benevolence_recipient_name: Optional[str] = None
+    benevolence_need_description: Optional[str] = None
+    benevolence_notes: Optional[str] = None
+
+class DistributionUpdate(BaseModel):
+    """Model for updating distribution fields"""
+    beneficiary_name: Optional[str] = None
+    amount: Optional[float] = None
+    date: Optional[str] = None
+    purpose_classification: Optional[PurposeClassification] = None
+    authority_clause_ref: Optional[str] = None
+    notes: Optional[str] = None
+    is_benevolence: Optional[bool] = None
+    benevolence_recipient_name: Optional[str] = None
+    benevolence_need_description: Optional[str] = None
+    benevolence_notes: Optional[str] = None
 
 # Compensation Models
 class CompensationPlanCreate(BaseModel):
