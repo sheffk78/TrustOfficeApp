@@ -152,6 +152,11 @@ const AppRouter = () => {
           <TrustUnitsPage />
         </SubscriptionProtectedRoute>
       } />
+      <Route path="/trust/beneficiaries" element={
+        <SubscriptionProtectedRoute>
+          <BeneficiaryDashboardPage />
+        </SubscriptionProtectedRoute>
+      } />
       <Route path="/benevolence" element={
         <SubscriptionProtectedRoute>
           <BenevolencePage />
