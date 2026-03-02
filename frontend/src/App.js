@@ -26,6 +26,7 @@ import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
 import PricingPage from "@/pages/PricingPage";
+import TrustUnitsPage from "@/pages/TrustUnitsPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
@@ -143,6 +144,11 @@ const AppRouter = () => {
       <Route path="/schedule-a" element={
         <SubscriptionProtectedRoute>
           <ScheduleAPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/units" element={
+        <SubscriptionProtectedRoute>
+          <TrustUnitsPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/benevolence" element={
