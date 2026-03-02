@@ -21,7 +21,34 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 
 ## Completed Features
 
-### Latest Updates (Mar 2, 2026) - P2 FEATURES COMPLETE ✅
+### Latest Updates (Mar 2, 2026) - BENEVOLENCE MODE FOR DISTRIBUTIONS ✅
+
+1. **Data Model Extensions**
+   - Added `is_benevolence` boolean field on distribution_records (default false)
+   - Added optional benevolence fields:
+     - `benevolence_recipient_name` (required when is_benevolence=true)
+     - `benevolence_need_description` (required when is_benevolence=true)
+     - `benevolence_notes` (optional)
+
+2. **API Endpoints**
+   - `POST /api/distributions` - validates benevolence fields when is_benevolence=true
+   - `PATCH /api/distributions/{id}` - new endpoint for updating distributions including benevolence fields
+   - `GET /api/benevolence-log` - returns:
+     - All distributions where is_benevolence=true
+     - Monthly aggregates (YYYY-MM format, amount, count)
+     - Yearly aggregates (year, amount, count)
+     - Total all-time amount and count
+     - Incomplete documentation count
+
+3. **Governance Health Integration**
+   - Distribution Documentation criterion now considers benevolence quality
+   - **Full points (20)**: All distributions logged AND all benevolence distributions have:
+     - recipient_name and need_description
+     - approval (approved_at) or minutes reference
+   - **Partial points (10-19)**: Some benevolence distributions missing documentation
+   - Criterion description shows: "X/Y benevolence distributions need documentation"
+
+### Previous Updates (Mar 2, 2026) - P2 FEATURES COMPLETE ✅
 
 1. **Dashboard Trust Selection Parameter**
    - `GET /api/dashboard` now accepts optional `trust_id` query param
