@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
 import { 
@@ -27,7 +27,10 @@ import {
   CheckCircle2,
   AlertCircle,
   MessageSquare,
-  ExternalLink
+  ExternalLink,
+  Database,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
