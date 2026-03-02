@@ -28,24 +28,34 @@ export const AuthProvider = ({ children }) => {
   const [selectedTrust, setSelectedTrust] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const authCheckComplete = useRef(false);
 
-  const loadSubscription = useCallback(async () => {
+  // Load the normalized subscription state from the new endpoint
+  const loadSubscriptionState = useCallback(async () => {
     try {
-      const response = await fetch(`${API}/subscription`, {
+      const response = await fetch(`${API}/subscription/state`, {
         credentials: 'include',
         headers: getAuthHeaders()
       });
       
       if (response.ok) {
-        const subData = await response.json();
-        setSubscription(subData);
-        setSubscriptionExpired(!subData.is_active);
+        const state = await response.json();
+        setSubscription(state);
+        setSubscriptionExpired(!state.is_active);
+        setIsReadOnly(state.is_read_only);
+        return state;
       }
     } catch (error) {
-      console.error('Failed to load subscription:', error);
+      console.error('Failed to load subscription state:', error);
     }
+    return null;
   }, []);
+
+  // Legacy method for backward compatibility
+  const loadSubscription = useCallback(async () => {
+    return loadSubscriptionState();
+  }, [loadSubscriptionState]);
 
   const checkAuth = useCallback(async () => {
     // Prevent duplicate auth checks
@@ -82,7 +92,7 @@ export const AuthProvider = ({ children }) => {
       
       // Load trusts and subscription after authentication
       await loadTrustsInternal();
-      await loadSubscription();
+      await loadSubscriptionState();
     } catch (error) {
       setUser(null);
       localStorage.removeItem('auth_token');
@@ -90,7 +100,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       authCheckComplete.current = true;
     }
-  }, [loadSubscription]);
+  }, [loadSubscriptionState]);
 
   // Internal function that doesn't depend on state
   const loadTrustsInternal = async (forceSelectNew = false) => {
