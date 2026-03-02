@@ -1,6 +1,10 @@
 """
 Claude Client - Wrapper for Anthropic Claude API calls
 Uses emergentintegrations library for Claude API integration
+
+IMPORTANT: The Claude API key must be provided via the CLAUDE_API_KEY environment
+variable. This app runs on Emergent, which provides this key automatically.
+If CLAUDE_API_KEY is not set, AI features will be unavailable.
 """
 import os
 import logging
@@ -9,14 +13,15 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 logger = logging.getLogger(__name__)
 
-# Get Claude API key from environment
-CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
+# Get Claude API key from environment - CLAUDE_API_KEY is the primary source
+CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY')
 
-# Model mappings - using the supported model names
-# For Sonnet: claude-sonnet-4-5-20250929 or claude-sonnet-4-5
-# For Haiku: claude-haiku-4-5 or claude-3-5-haiku-latest
-CLAUDE_SONNET = "claude-sonnet-4-5-20250929"
-CLAUDE_HAIKU = "claude-haiku-4-5"
+if not CLAUDE_API_KEY:
+    logger.error("CLAUDE_API_KEY environment variable is not set. AI features will be unavailable.")
+
+# Model IDs - using the exact model names required by the API
+CLAUDE_SONNET = "claude-3.5-sonnet"  # For complex drafting tasks
+CLAUDE_HAIKU = "claude-3.5-haiku"   # For quick suggestions
 
 
 class ClaudeClientError(Exception):
@@ -50,8 +55,8 @@ async def call_claude(
         ClaudeClientError: If the API call fails
     """
     if not CLAUDE_API_KEY:
-        logger.error("Claude API key not configured")
-        raise ClaudeClientError("AI service not configured. Please contact support.")
+        logger.error("CLAUDE_API_KEY environment variable is missing - cannot make AI API calls")
+        raise ClaudeClientError("AI service not configured")
     
     try:
         # Generate a unique session ID if not provided
