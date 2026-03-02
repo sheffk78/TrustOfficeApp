@@ -41,7 +41,21 @@ from dependencies import (
     Feature,
     check_feature_access,
     require_premium_feature,
-    get_user_features
+    get_user_features,
+    get_current_user,
+    hash_password,
+    verify_password,
+    create_jwt_token,
+    should_show_watermark,
+    check_subscription_active,
+    get_task_status,
+    get_quarter_start,
+    get_year_start,
+    calculate_health_score,
+    auto_update_onboarding,
+    create_initial_governance_tasks,
+    TRIAL_DAYS,
+    JWT_EXPIRATION_HOURS
 )
 
 # Import routers
