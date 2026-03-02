@@ -25,6 +25,7 @@ import CompensationPage from "@/pages/CompensationPage";
 import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
+import BenevolenceLogPage from "@/pages/BenevolenceLogPage";
 import PricingPage from "@/pages/PricingPage";
 import TrustUnitsPage from "@/pages/TrustUnitsPage";
 import BeneficiaryDashboardPage from "@/pages/BeneficiaryDashboardPage";
