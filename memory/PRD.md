@@ -14,25 +14,38 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 - **Email**: Postmark (12 templates)
 - **Background Jobs**: APScheduler
 
-### Backend Architecture (Refactored Mar 2, 2026)
+### Backend Architecture (Refactored Dec 30, 2025)
 The backend now has a modular structure for better maintainability:
 ```
 /app/backend/
-├── server.py           # Main FastAPI app with all endpoints (7538 lines)
+├── server.py           # Main FastAPI app (4526 lines, down from 7538)
 ├── database.py         # MongoDB connection singleton
-├── models.py           # All Pydantic models and enums (~700 lines)
-├── dependencies.py     # Shared auth, helpers, and middleware functions
-├── routers/            # Domain-specific router modules (for gradual migration)
-│   ├── auth.py         # Auth endpoints (ready for migration)
-│   ├── trusts.py       # Trust CRUD (ready for migration)
-│   ├── entities.py     # Entity management (ready for migration)
-│   ├── tasks.py        # Governance tasks (ready for migration)
-│   ├── units.py        # Trust certificate units (ready for migration)
-│   └── [others]        # Placeholder stubs for future migration
+├── models.py           # All Pydantic models and enums (~778 lines)
+├── dependencies.py     # Shared auth, helpers, feature gating functions
+├── routers/            # Domain-specific router modules
+│   ├── auth.py         # Auth endpoints (already extracted)
+│   ├── distributions.py # Distribution + benevolence endpoints (MIGRATED)
+│   ├── governance.py    # Governance health/history/insights (MIGRATED)
+│   ├── minutes.py       # Minutes CRUD + templates + PDF (MIGRATED)
+│   ├── schedule_a.py    # Schedule A assets CRUD + PDF export (MIGRATED Dec 30)
+│   ├── compensation.py  # Compensation plans + payments (MIGRATED Dec 30)
+│   ├── subscriptions.py # Stripe payments + webhooks (MIGRATED Dec 30)
+│   ├── trusts.py        # Trust CRUD (pending migration)
+│   ├── entities.py      # Entity management (pending migration)
+│   ├── tasks.py         # Governance tasks (pending migration)
+│   └── units.py         # Trust certificate units (pending migration)
 ├── email_service.py    # Postmark email integration
 ├── email_templates.py  # Email template content
 └── background_tasks.py # APScheduler background jobs
 ```
+
+**Router Migration Progress (Dec 30, 2025):**
+- distributions.py: 15,820 bytes - Full CRUD + benevolence log
+- governance.py: 21,826 bytes - Health scoring, history, insights
+- minutes.py: 54,851 bytes - Templates, CRUD, PDF generation
+- schedule_a.py: 16,796 bytes - Asset ledger CRUD + PDF export
+- compensation.py: 5,800 bytes - Plans + payments + YTD calculation
+- subscriptions.py: 21,000 bytes - Stripe checkout, portal, webhooks
 
 ### Design System (AnchorPoint)
 - Light: Navy #010079, Gold #D5AD36
