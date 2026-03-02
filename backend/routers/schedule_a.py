@@ -1,5 +1,6 @@
 # Schedule A router - handles trust asset ledger (Schedule A)
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
