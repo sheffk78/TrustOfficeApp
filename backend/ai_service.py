@@ -138,11 +138,14 @@ Respond with a JSON object containing:
             )
             
     except ClaudeClientError as e:
-        logger.error(f"Claude API error in minutes drafting: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Claude API error in minutes drafting: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse error in minutes drafting response: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)
     except Exception as e:
-        logger.error(f"Unexpected error in minutes drafting: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again.")
+        logger.error(f"Unexpected error in minutes drafting: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)
 
 
 # ==================== GOVERNANCE SUGGESTIONS ====================
