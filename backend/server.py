@@ -2654,19 +2654,7 @@ async def bootstrap_certificates_from_minutes(
         total_authorized = existing_settings["total_authorized_units"]
         allow_fractional = existing_settings.get("allow_fractional", False)
     
-    # Check current active units
-    current_active_units = await get_total_active_units(trust_id, user["user_id"])
-    
-    # Validate total won't exceed authorized
-    if current_active_units + total_requested_units > total_authorized:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot create certificates. Current active: {current_active_units}, "
-                   f"Requested: {total_requested_units}, Authorized: {total_authorized}. "
-                   f"Would exceed by {current_active_units + total_requested_units - total_authorized} units."
-        )
-    
-    # Check for existing certificates from this minutes record to avoid duplicates
+    # Check for existing certificates from this minutes record to avoid duplicates FIRST
     existing_from_minutes = await db.trust_unit_certificates.count_documents({
         "trust_id": trust_id,
         "user_id": user["user_id"],
@@ -2678,6 +2666,18 @@ async def bootstrap_certificates_from_minutes(
             status_code=400,
             detail=f"Certificates have already been created from this minutes record ({existing_from_minutes} found). "
                    "This operation can only be performed once per minutes record."
+        )
+    
+    # Check current active units
+    current_active_units = await get_total_active_units(trust_id, user["user_id"])
+    
+    # Validate total won't exceed authorized
+    if current_active_units + total_requested_units > total_authorized:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot create certificates. Current active: {current_active_units}, "
+                   f"Requested: {total_requested_units}, Authorized: {total_authorized}. "
+                   f"Would exceed by {current_active_units + total_requested_units - total_authorized} units."
         )
     
     # Create certificates for each beneficiary
