@@ -394,7 +394,7 @@ export default function BeneficiariesPage() {
               </TabsTrigger>
               <TabsTrigger value="transfers" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-transfers">
                 <ArrowRightLeft className="w-4 h-4 mr-2" />
-                Transfers
+                Transfer History
               </TabsTrigger>
             </TabsList>
 
