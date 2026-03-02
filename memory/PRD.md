@@ -58,6 +58,36 @@ The backend now has a modular structure for better maintainability:
 ## Completed Features
 
 
+
+### Latest Updates (Mar 2, 2026) - 10 NEW MINUTES TEMPLATES ✅
+
+**Session Summary:** Tested and fixed 10 new minutes templates to expand the template library for common governance tasks.
+
+**New Templates Added:**
+1. **Investment Policy Approval** - Adopt/amend/review investment policy with risk tolerance, asset allocation, restrictions
+2. **Loan Authorization** - Authorize loans to/from trust with amount, interest rate, term, purpose, collateral
+3. **Insurance Authorization** - Obtain/renew/modify insurance coverage for trust assets
+4. **Annual Review Meeting** - Annual review with fiscal year summary, accomplishments, priorities, governance review
+5. **Quarterly Review Meeting** - Quarterly financial review with balances, discussion items, action items
+6. **Trustee Compensation Approval** - Approve trustee fee arrangements with amount, basis, duties
+7. **Trustee Resignation/Removal** - Document trustee departure (resignation/removal/death/incapacity)
+8. **Beneficiary Request Denial** - Document and justify denial of beneficiary requests
+9. **HEMS Distribution** - Health/Education/Maintenance/Support distributions with standard compliance
+10. **Loan to Beneficiary** - Intra-family loans with AFR interest, term, repayment terms
+
+**Bug Fixed:**
+- Added all 10 new template types to `MinutesTemplateType` enum in `/app/backend/models.py`
+- Without this fix, POST /api/minutes-templates returned 422 validation errors for new templates
+
+**Files Updated:**
+- `/app/backend/models.py` - Added 10 new enum values to MinutesTemplateType
+- `/app/backend/routers/minutes.py` - Content generator functions (already implemented)
+- `/app/frontend/src/pages/MinutesTemplateFormPage.js` - Form state and fields (already implemented)
+- `/app/frontend/src/pages/MinutesTemplatesPage.js` - Template cards (already implemented)
+
+**Testing:** 100% pass rate - 12/12 backend tests + all frontend features verified (iteration_58)
+
+
 ### Latest Updates (Mar 2, 2026) - MINUTES ↔ MONEY INTEGRATION ✅
 
 **Session Summary:** Built bi-directional integration between Guided Minutes and Compensation/Distributions/Benevolence modules for proper governance workflows.
@@ -1031,7 +1061,7 @@ beneficiaries.py, demo.py
 - [ ] More entity types (LLCs)
 - [ ] Email retry queue for Postmark failures
 - [ ] User-facing feedback submission system
-- [ ] Expand library of available minutes templates
+- [x] Expand library of available minutes templates ✅ (Mar 2, 2026) - 10 new templates added (total: 20 templates)
 
 ## Notes
 - Postmark: Sandbox mode (verified domain only)
