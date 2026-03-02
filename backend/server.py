@@ -2230,7 +2230,6 @@ def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_water
     
     # Navy color for headers
     navy = colors.HexColor('#010079')
-    gold = colors.HexColor('#D5AD36')
     
     title_style = ParagraphStyle(
         'CertTitle',
@@ -2285,16 +2284,6 @@ def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_water
         fontName='Courier',
         fontSize=10,
         textColor=colors.HexColor('#333333')
-    )
-    
-    large_text_style = ParagraphStyle(
-        'CertLargeText',
-        fontName='Times-Bold',
-        fontSize=16,
-        textColor=navy,
-        alignment=1,
-        spaceBefore=12,
-        spaceAfter=12
     )
     
     story = []
