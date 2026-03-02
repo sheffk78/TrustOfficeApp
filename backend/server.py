@@ -1733,6 +1733,603 @@ async def delete_relationship(relationship_id: str, user: dict = Depends(get_cur
     
     return {"message": "Relationship deleted"}
 
+# ==================== TRUST UNITS ENDPOINTS ====================
+
+async def get_or_create_units_settings(trust_id: str, user_id: str) -> dict:
+    """Get or create default units settings for a trust"""
+    settings = await db.trust_units_settings.find_one(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0}
+    )
+    if not settings:
+        # Create default settings
+        settings = {
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "total_authorized_units": 100,
+            "unit_label": "Certificate Unit",
+            "allow_fractional": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": None
+        }
+        await db.trust_units_settings.insert_one(settings)
+    return settings
+
+async def get_total_active_units(trust_id: str, user_id: str, exclude_certificate_id: str = None) -> float:
+    """Calculate total units across all active certificates for a trust"""
+    query = {
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active"
+    }
+    if exclude_certificate_id:
+        query["certificate_id"] = {"$ne": exclude_certificate_id}
+    
+    certificates = await db.trust_unit_certificates.find(query, {"_id": 0, "units": 1}).to_list(1000)
+    return sum(cert.get("units", 0) for cert in certificates)
+
+async def get_next_certificate_number(trust_id: str, user_id: str) -> str:
+    """Get the next sequential certificate number for a trust"""
+    # Count existing certificates for this trust
+    count = await db.trust_unit_certificates.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    return f"CU-{str(count + 1).zfill(3)}"
+
+def validate_units(units: float, allow_fractional: bool) -> float:
+    """Validate and normalize unit value"""
+    if not allow_fractional:
+        if units != int(units):
+            raise HTTPException(
+                status_code=400, 
+                detail="Fractional units not allowed. Enable 'allow_fractional' in settings first."
+            )
+        return int(units)
+    return round(units, 4)
+
+@api_router.get("/trust-units/summary", response_model=TrustUnitsSummaryResponse)
+async def get_trust_units_summary(trust_id: str, user: dict = Depends(get_current_user)):
+    """Get complete units summary for a trust including settings, certificates, and aggregates"""
+    # Verify trust exists and belongs to user
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    # Get or create settings
+    settings = await get_or_create_units_settings(trust_id, user["user_id"])
+    
+    # Get all certificates
+    certificates_raw = await db.trust_unit_certificates.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).sort("certificate_number", 1).to_list(1000)
+    
+    total_authorized = settings["total_authorized_units"]
+    
+    # Compute percentage for each certificate
+    certificates = []
+    total_issued = 0
+    active_count = 0
+    
+    for cert in certificates_raw:
+        percentage = (cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+        cert_response = TrustUnitCertificateResponse(
+            **cert,
+            percentage=round(percentage, 4)
+        )
+        certificates.append(cert_response)
+        
+        if cert["status"] == "active":
+            total_issued += cert["units"]
+            active_count += 1
+    
+    return TrustUnitsSummaryResponse(
+        settings=TrustUnitsSettingsResponse(**settings),
+        certificates=certificates,
+        total_issued_units=total_issued,
+        remaining_units=total_authorized - total_issued,
+        active_certificate_count=active_count
+    )
+
+@api_router.patch("/trust-units/settings", response_model=TrustUnitsSettingsResponse)
+async def update_trust_units_settings(
+    trust_id: str, 
+    update: TrustUnitsSettingsUpdate, 
+    user: dict = Depends(get_current_user)
+):
+    """Update units settings for a trust"""
+    # Verify trust exists
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    # Get current settings
+    settings = await get_or_create_units_settings(trust_id, user["user_id"])
+    
+    # If reducing total_authorized_units, validate against active certificates
+    if update.total_authorized_units is not None:
+        current_active_units = await get_total_active_units(trust_id, user["user_id"])
+        if update.total_authorized_units < current_active_units:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot reduce total authorized units to {update.total_authorized_units}. "
+                       f"There are currently {current_active_units} active units issued."
+            )
+    
+    # Build update fields
+    update_fields = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if update.total_authorized_units is not None:
+        update_fields["total_authorized_units"] = update.total_authorized_units
+    if update.unit_label is not None:
+        update_fields["unit_label"] = update.unit_label
+    if update.allow_fractional is not None:
+        update_fields["allow_fractional"] = update.allow_fractional
+    
+    await db.trust_units_settings.update_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"$set": update_fields}
+    )
+    
+    updated = await db.trust_units_settings.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    return TrustUnitsSettingsResponse(**updated)
+
+@api_router.post("/trust-units/certificates", response_model=TrustUnitCertificateResponse)
+async def create_unit_certificate(
+    certificate: TrustUnitCertificateCreate, 
+    user: dict = Depends(get_current_user)
+):
+    """Issue a new unit certificate"""
+    # Verify trust exists
+    trust = await db.trusts.find_one({"trust_id": certificate.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    # Get settings
+    settings = await get_or_create_units_settings(certificate.trust_id, user["user_id"])
+    
+    # Validate units
+    units = validate_units(certificate.units, settings["allow_fractional"])
+    
+    if units <= 0:
+        raise HTTPException(status_code=400, detail="Units must be greater than 0")
+    
+    # Validate total units won't exceed authorized
+    current_active = await get_total_active_units(certificate.trust_id, user["user_id"])
+    total_authorized = settings["total_authorized_units"]
+    
+    if current_active + units > total_authorized:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot issue {units} units. Only {total_authorized - current_active} units remaining. "
+                   f"(Active: {current_active}, Authorized: {total_authorized})"
+        )
+    
+    # Generate certificate
+    certificate_id = f"cert_{uuid.uuid4().hex[:12]}"
+    certificate_number = await get_next_certificate_number(certificate.trust_id, user["user_id"])
+    
+    cert_doc = {
+        "certificate_id": certificate_id,
+        "trust_id": certificate.trust_id,
+        "user_id": user["user_id"],
+        "holder_name": certificate.holder_name,
+        "holder_identifier": certificate.holder_identifier,
+        "units": units,
+        "issue_date": certificate.issue_date,
+        "certificate_number": certificate_number,
+        "status": "active",
+        "replaced_by_certificate_id": None,
+        "notes": certificate.notes,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None
+    }
+    
+    await db.trust_unit_certificates.insert_one(cert_doc)
+    
+    # Record the transfer (issuance)
+    transfer_doc = {
+        "transfer_id": f"transfer_{uuid.uuid4().hex[:12]}",
+        "trust_id": certificate.trust_id,
+        "user_id": user["user_id"],
+        "from_holder": None,  # Initial issuance
+        "to_holder": certificate.holder_name,
+        "units": units,
+        "reason": "Initial certificate issuance",
+        "minutes_record_id": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.trust_unit_transfers.insert_one(transfer_doc)
+    
+    # Compute percentage
+    percentage = (units / total_authorized * 100) if total_authorized > 0 else 0
+    
+    return TrustUnitCertificateResponse(**cert_doc, percentage=round(percentage, 4))
+
+@api_router.patch("/trust-units/certificates/{certificate_id}", response_model=TrustUnitCertificateResponse)
+async def update_unit_certificate(
+    certificate_id: str,
+    update: TrustUnitCertificateUpdate,
+    user: dict = Depends(get_current_user)
+):
+    """Update a unit certificate"""
+    # Find existing certificate
+    cert = await db.trust_unit_certificates.find_one(
+        {"certificate_id": certificate_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    
+    # Get settings
+    settings = await get_or_create_units_settings(cert["trust_id"], user["user_id"])
+    
+    # Build update fields
+    update_fields = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if update.holder_name is not None:
+        update_fields["holder_name"] = update.holder_name
+    if update.holder_identifier is not None:
+        update_fields["holder_identifier"] = update.holder_identifier
+    if update.notes is not None:
+        update_fields["notes"] = update.notes
+    if update.status is not None:
+        update_fields["status"] = update.status.value
+    
+    # If updating units, validate
+    if update.units is not None:
+        units = validate_units(update.units, settings["allow_fractional"])
+        
+        if units <= 0:
+            raise HTTPException(status_code=400, detail="Units must be greater than 0")
+        
+        # Calculate new total (excluding this certificate's current units)
+        current_active_excluding_this = await get_total_active_units(
+            cert["trust_id"], 
+            user["user_id"], 
+            exclude_certificate_id=certificate_id
+        )
+        
+        # Only count new units if certificate will be active
+        new_status = update.status.value if update.status else cert["status"]
+        if new_status == "active":
+            total_authorized = settings["total_authorized_units"]
+            if current_active_excluding_this + units > total_authorized:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot update to {units} units. Would exceed authorized total. "
+                           f"(Other active: {current_active_excluding_this}, Authorized: {total_authorized})"
+                )
+        
+        update_fields["units"] = units
+    
+    await db.trust_unit_certificates.update_one(
+        {"certificate_id": certificate_id},
+        {"$set": update_fields}
+    )
+    
+    # Get updated certificate
+    updated_cert = await db.trust_unit_certificates.find_one(
+        {"certificate_id": certificate_id},
+        {"_id": 0}
+    )
+    
+    # Compute percentage
+    total_authorized = settings["total_authorized_units"]
+    percentage = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+    
+    return TrustUnitCertificateResponse(**updated_cert, percentage=round(percentage, 4))
+
+@api_router.get("/trust-units/certificates", response_model=List[TrustUnitCertificateResponse])
+async def list_unit_certificates(
+    trust_id: str,
+    status: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """List all certificates for a trust, optionally filtered by status"""
+    # Verify trust exists
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    # Get settings for percentage calculation
+    settings = await get_or_create_units_settings(trust_id, user["user_id"])
+    total_authorized = settings["total_authorized_units"]
+    
+    # Build query
+    query = {"trust_id": trust_id, "user_id": user["user_id"]}
+    if status:
+        query["status"] = status
+    
+    certificates = await db.trust_unit_certificates.find(query, {"_id": 0}).sort("certificate_number", 1).to_list(1000)
+    
+    # Add computed percentage
+    result = []
+    for cert in certificates:
+        percentage = (cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+        result.append(TrustUnitCertificateResponse(**cert, percentage=round(percentage, 4)))
+    
+    return result
+
+@api_router.post("/trust-units/transfers", response_model=TrustUnitTransferResponse)
+async def create_unit_transfer(
+    transfer: TrustUnitTransferCreate,
+    user: dict = Depends(get_current_user)
+):
+    """Record a unit transfer between holders (cancels old certificate, issues new one)"""
+    # Verify trust exists
+    trust = await db.trusts.find_one({"trust_id": transfer.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    # Get settings
+    settings = await get_or_create_units_settings(transfer.trust_id, user["user_id"])
+    
+    # Validate units
+    units = validate_units(transfer.units, settings["allow_fractional"])
+    
+    if units <= 0:
+        raise HTTPException(status_code=400, detail="Transfer units must be greater than 0")
+    
+    # If from_holder is specified, find and cancel/reduce their certificate
+    if transfer.from_holder:
+        from_cert = await db.trust_unit_certificates.find_one({
+            "trust_id": transfer.trust_id,
+            "user_id": user["user_id"],
+            "holder_name": transfer.from_holder,
+            "status": "active"
+        }, {"_id": 0})
+        
+        if not from_cert:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"No active certificate found for holder '{transfer.from_holder}'"
+            )
+        
+        if from_cert["units"] < units:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Holder '{transfer.from_holder}' only has {from_cert['units']} units. Cannot transfer {units}."
+            )
+        
+        # Cancel the old certificate
+        new_cert_id = f"cert_{uuid.uuid4().hex[:12]}"
+        await db.trust_unit_certificates.update_one(
+            {"certificate_id": from_cert["certificate_id"]},
+            {"$set": {
+                "status": "replaced",
+                "replaced_by_certificate_id": new_cert_id,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # If from_holder has remaining units, issue new certificate for remainder
+        remaining_units = from_cert["units"] - units
+        if remaining_units > 0:
+            remainder_cert_number = await get_next_certificate_number(transfer.trust_id, user["user_id"])
+            remainder_cert = {
+                "certificate_id": new_cert_id,
+                "trust_id": transfer.trust_id,
+                "user_id": user["user_id"],
+                "holder_name": transfer.from_holder,
+                "holder_identifier": from_cert.get("holder_identifier"),
+                "units": remaining_units,
+                "issue_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "certificate_number": remainder_cert_number,
+                "status": "active",
+                "replaced_by_certificate_id": None,
+                "notes": f"Remainder after transfer of {units} units to {transfer.to_holder}",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": None
+            }
+            await db.trust_unit_certificates.insert_one(remainder_cert)
+    
+    # Issue new certificate to to_holder (or add to existing)
+    existing_to_cert = await db.trust_unit_certificates.find_one({
+        "trust_id": transfer.trust_id,
+        "user_id": user["user_id"],
+        "holder_name": transfer.to_holder,
+        "status": "active"
+    }, {"_id": 0})
+    
+    if existing_to_cert:
+        # Add units to existing certificate (cancel old, issue new with combined)
+        combined_units = existing_to_cert["units"] + units
+        new_to_cert_id = f"cert_{uuid.uuid4().hex[:12]}"
+        
+        await db.trust_unit_certificates.update_one(
+            {"certificate_id": existing_to_cert["certificate_id"]},
+            {"$set": {
+                "status": "replaced",
+                "replaced_by_certificate_id": new_to_cert_id,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        new_cert_number = await get_next_certificate_number(transfer.trust_id, user["user_id"])
+        new_to_cert = {
+            "certificate_id": new_to_cert_id,
+            "trust_id": transfer.trust_id,
+            "user_id": user["user_id"],
+            "holder_name": transfer.to_holder,
+            "holder_identifier": existing_to_cert.get("holder_identifier"),
+            "units": combined_units,
+            "issue_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "certificate_number": new_cert_number,
+            "status": "active",
+            "replaced_by_certificate_id": None,
+            "notes": f"Combined certificate after receiving {units} units" + 
+                     (f" from {transfer.from_holder}" if transfer.from_holder else ""),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": None
+        }
+        await db.trust_unit_certificates.insert_one(new_to_cert)
+    else:
+        # Create new certificate for to_holder
+        new_cert_id = f"cert_{uuid.uuid4().hex[:12]}"
+        new_cert_number = await get_next_certificate_number(transfer.trust_id, user["user_id"])
+        
+        new_cert = {
+            "certificate_id": new_cert_id,
+            "trust_id": transfer.trust_id,
+            "user_id": user["user_id"],
+            "holder_name": transfer.to_holder,
+            "holder_identifier": None,
+            "units": units,
+            "issue_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "certificate_number": new_cert_number,
+            "status": "active",
+            "replaced_by_certificate_id": None,
+            "notes": f"Transfer" + (f" from {transfer.from_holder}" if transfer.from_holder else " (new issuance)"),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": None
+        }
+        await db.trust_unit_certificates.insert_one(new_cert)
+    
+    # Record the transfer
+    transfer_id = f"transfer_{uuid.uuid4().hex[:12]}"
+    transfer_doc = {
+        "transfer_id": transfer_id,
+        "trust_id": transfer.trust_id,
+        "user_id": user["user_id"],
+        "from_holder": transfer.from_holder,
+        "to_holder": transfer.to_holder,
+        "units": units,
+        "reason": transfer.reason,
+        "minutes_record_id": transfer.minutes_record_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.trust_unit_transfers.insert_one(transfer_doc)
+    
+    return TrustUnitTransferResponse(**transfer_doc)
+
+@api_router.get("/trust-units/transfers", response_model=List[TrustUnitTransferResponse])
+async def list_unit_transfers(
+    trust_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """List all transfers for a trust"""
+    transfers = await db.trust_unit_transfers.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+    
+    return [TrustUnitTransferResponse(**t) for t in transfers]
+
+async def create_certificates_from_beneficiary_designation(minutes_id: str, user_id: str) -> List[dict]:
+    """
+    Helper function to create initial certificates from a 'Designation of Beneficiaries' minutes template.
+    Can be called after a designation minutes is finalized.
+    
+    Returns list of created certificate IDs.
+    """
+    # Find the minutes template
+    minutes = await db.minutes_templates.find_one(
+        {"minutes_id": minutes_id, "user_id": user_id},
+        {"_id": 0}
+    )
+    
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+    
+    if minutes.get("template_type") != "designation_of_beneficiaries":
+        raise HTTPException(status_code=400, detail="Minutes is not a beneficiary designation template")
+    
+    template_data = minutes.get("template_data", {})
+    beneficiaries = template_data.get("beneficiaries", [])
+    total_units = template_data.get("total_units", 100)
+    trust_id = minutes["trust_id"]
+    
+    if not beneficiaries:
+        raise HTTPException(status_code=400, detail="No beneficiaries found in minutes template")
+    
+    # Get or create settings with total_units from the minutes
+    settings = await get_or_create_units_settings(trust_id, user_id)
+    
+    # Update total_authorized_units to match the designation
+    if settings["total_authorized_units"] != total_units:
+        await db.trust_units_settings.update_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"$set": {
+                "total_authorized_units": total_units,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+    
+    created_certificates = []
+    
+    for ben in beneficiaries:
+        name = ben.get("name", "").strip()
+        units = ben.get("units", 0)
+        
+        if not name or not units:
+            continue
+        
+        try:
+            units = float(units) if settings["allow_fractional"] else int(units)
+        except (ValueError, TypeError):
+            continue
+        
+        if units <= 0:
+            continue
+        
+        # Create certificate
+        certificate_id = f"cert_{uuid.uuid4().hex[:12]}"
+        certificate_number = await get_next_certificate_number(trust_id, user_id)
+        
+        cert_doc = {
+            "certificate_id": certificate_id,
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "holder_name": name,
+            "holder_identifier": None,
+            "units": units,
+            "issue_date": minutes.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+            "certificate_number": certificate_number,
+            "status": "active",
+            "replaced_by_certificate_id": None,
+            "notes": f"Created from beneficiary designation minutes ({minutes_id})",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": None
+        }
+        
+        await db.trust_unit_certificates.insert_one(cert_doc)
+        
+        # Record transfer
+        transfer_doc = {
+            "transfer_id": f"transfer_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "from_holder": None,
+            "to_holder": name,
+            "units": units,
+            "reason": f"Initial designation per minutes {minutes_id}",
+            "minutes_record_id": minutes_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.trust_unit_transfers.insert_one(transfer_doc)
+        
+        created_certificates.append(certificate_id)
+    
+    return created_certificates
+
+@api_router.post("/trust-units/create-from-minutes/{minutes_id}")
+async def create_certificates_from_minutes(
+    minutes_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Create certificates from a finalized beneficiary designation minutes template"""
+    created_ids = await create_certificates_from_beneficiary_designation(minutes_id, user["user_id"])
+    
+    return {
+        "message": f"Created {len(created_ids)} certificates from minutes designation",
+        "certificate_ids": created_ids
+    }
+
 # ==================== GOVERNANCE TASK ENDPOINTS ====================
 
 @api_router.post("/tasks", response_model=GovernanceTaskResponse)
