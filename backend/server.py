@@ -1052,20 +1052,56 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     if comp_aligned:
         total_score += 20
     
-    # 4. Distribution Documentation (+20)
+    # 4. Distribution Documentation (+20) - includes benevolence documentation quality
     dist_count = await db.distribution_records.count_documents({
         "trust_id": trust_id,
         "user_id": user_id
     })
-    dist_documented = dist_count > 0
+    
+    # Check benevolence documentation quality
+    benevolence_dists = await db.distribution_records.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "is_benevolence": True
+    }, {"_id": 0}).to_list(1000)
+    
+    benevolence_count = len(benevolence_dists)
+    incomplete_benevolence = 0
+    
+    for bd in benevolence_dists:
+        # Check for missing key fields
+        if not bd.get("benevolence_recipient_name") or not bd.get("benevolence_need_description"):
+            incomplete_benevolence += 1
+        # Check for missing approval/minutes
+        elif not bd.get("approved_at") and not bd.get("minutes_record_id"):
+            incomplete_benevolence += 1
+    
+    # Determine points based on documentation completeness
+    if dist_count == 0:
+        dist_documented = False
+        dist_points = 0
+        dist_description = "No distributions logged"
+    elif benevolence_count > 0 and incomplete_benevolence > 0:
+        # Has benevolence distributions but some incomplete
+        dist_documented = True  # Partially achieved
+        completeness_ratio = (benevolence_count - incomplete_benevolence) / benevolence_count
+        dist_points = int(20 * (0.5 + 0.5 * completeness_ratio))  # 10-20 points based on completeness
+        dist_description = f"Distributions logged; {incomplete_benevolence}/{benevolence_count} benevolence distributions need documentation"
+    else:
+        dist_documented = True
+        dist_points = 20
+        if benevolence_count > 0:
+            dist_description = f"All distributions documented ({benevolence_count} benevolence distributions fully documented)"
+        else:
+            dist_description = "Distributions logged"
+    
     criteria.append(HealthScoreCriterion(
         name="Distribution Documentation",
-        description="At least one distribution logged",
-        points=20 if dist_documented else 0,
+        description=dist_description,
+        points=dist_points,
         achieved=dist_documented
     ))
-    if dist_documented:
-        total_score += 20
+    total_score += dist_points
     
     # 5. Annual Review (+20)
     one_year_ago = (now - timedelta(days=365)).isoformat()
