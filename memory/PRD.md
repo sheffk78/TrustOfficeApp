@@ -30,6 +30,7 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
      - `PATCH /api/trust-units/settings?trust_id={id}` - Update unit settings
      - `POST /api/trust-units/certificates` - Issue new certificate
      - `PATCH /api/trust-units/certificates/{id}` - Update certificate
+     - `GET /api/trust-units/certificates/{id}/pdf` - Generate certificate PDF
      - `POST /api/trust-units/transfers` - Transfer units between holders
      - `GET /api/trust-units/transfers` - List all transfers
      - `POST /api/trust-units/create-from-minutes/{id}` - Create certificates from beneficiary designation minutes
@@ -37,15 +38,25 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
      - `trust_units_settings`: total_authorized_units, unit_label, allow_fractional
      - `trust_unit_certificates`: certificate_id, holder_name, units, percentage, certificate_number (CU-XXX), status
      - `trust_unit_transfers`: transfer records with from/to holders
-   - **Frontend Page** (`/units`):
-     - Summary cards: Total Authorized, Issued Units, Remaining, Active Certificates
-     - Certificates table with status badges (Active/Cancelled/Replaced)
-     - Issue Certificate dialog with validation
-     - Settings dialog for unit configuration
+   - **Frontend Page** (`/trust/units`):
+     - Settings card at top with editable fields and Save button
+     - Read-only summary: Total Issued, Remaining, Active Certificates
+     - Certificates table with columns: Certificate #, Holder, Units, Percentage, Status, Issue Date, Actions
+     - Filter dropdown: Active Only / All Certificates
+     - Issue Units button above table
+     - Row actions: Print (PDF preview), Edit, Reissue, Cancel
      - Transfer dialog for moving units between holders
+     - PDF preview modal with Download button
      - Navigation link in sidebar under "Structures" group
 
-2. **Validation Rules**:
+2. **Certificate PDF Generation**:
+   - Professional legal-style PDF with serif headings, mono labels
+   - Contains: Trust name, jurisdiction, certificate number, holder name/ID
+   - Shows: Units, percentage, issue date, status
+   - Includes: Trustee signature blocks (2 sets)
+   - Watermark based on subscription status
+
+3. **Validation Rules**:
    - Units cannot exceed total_authorized_units
    - Cannot reduce total_authorized_units below currently issued
    - Sequential certificate numbering (CU-001, CU-002, etc.)
