@@ -5223,6 +5223,60 @@ async def get_distributions(
     dists = await db.distribution_records.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
     return [DistributionResponse(**d) for d in dists]
 
+@api_router.patch("/distributions/{distribution_id}", response_model=DistributionResponse)
+async def update_distribution(
+    distribution_id: str, 
+    update: DistributionUpdate, 
+    user: dict = Depends(get_current_user)
+):
+    """Update a distribution record"""
+    dist = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not dist:
+        raise HTTPException(status_code=404, detail="Distribution not found")
+    
+    # Build update dict with only provided fields
+    update_data = {}
+    update_dict = update.model_dump(exclude_unset=True)
+    
+    for field, value in update_dict.items():
+        if field == "purpose_classification" and value is not None:
+            update_data[field] = value.value
+        else:
+            update_data[field] = value
+    
+    # Validate benevolence fields if is_benevolence is being set or already true
+    is_benevolence = update_data.get("is_benevolence", dist.get("is_benevolence", False))
+    if is_benevolence:
+        recipient = update_data.get("benevolence_recipient_name", dist.get("benevolence_recipient_name"))
+        need_desc = update_data.get("benevolence_need_description", dist.get("benevolence_need_description"))
+        
+        if not recipient or not str(recipient).strip():
+            raise HTTPException(
+                status_code=400, 
+                detail="Benevolence recipient name is required when is_benevolence is true"
+            )
+        if not need_desc or not str(need_desc).strip():
+            raise HTTPException(
+                status_code=400, 
+                detail="Benevolence need description is required when is_benevolence is true"
+            )
+    
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.distribution_records.update_one(
+            {"distribution_id": distribution_id},
+            {"$set": update_data}
+        )
+    
+    updated = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id},
+        {"_id": 0}
+    )
+    return DistributionResponse(**updated)
+
 @api_router.patch("/distributions/{distribution_id}/approve", response_model=DistributionResponse)
 async def approve_distribution(distribution_id: str, approval: DistributionApprove, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     dist = await db.distribution_records.find_one(
