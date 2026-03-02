@@ -1,6 +1,11 @@
 """
 AI Service - AI-powered features for TrustOffice
 Provides minutes drafting and governance suggestions using Claude
+
+Note: Requires CLAUDE_API_KEY environment variable to be set.
+This app runs on Emergent which provides the key automatically.
+- Minutes drafting uses claude-3.5-sonnet for complex document generation
+- Governance suggestions uses claude-3.5-haiku for quick recommendations
 """
 import json
 import logging
