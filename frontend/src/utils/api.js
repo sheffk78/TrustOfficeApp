@@ -77,21 +77,16 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
   }
   
   // Handle 403 Forbidden (read-only mode - blocks write operations)
+  // We check the X-Subscription-Status header to avoid consuming the body
   if (response.status === 403) {
-    // Parse response to check if it's a subscription read-only error
-    try {
-      const errorData = await response.clone().json();
-      if (errorData.is_read_only) {
-        window.dispatchEvent(new CustomEvent('subscription-readonly', {
-          detail: {
-            message: errorData.detail,
-            status: errorData.subscription_status,
-            trialDaysRemaining: errorData.trial_days_remaining
-          }
-        }));
-      }
-    } catch (e) {
-      // Not a JSON response, ignore
+    const subscriptionStatus = response.headers.get('X-Subscription-Status');
+    if (subscriptionStatus) {
+      // This is a subscription-related 403, dispatch event
+      window.dispatchEvent(new CustomEvent('subscription-readonly', {
+        detail: {
+          status: subscriptionStatus
+        }
+      }));
     }
   }
   
