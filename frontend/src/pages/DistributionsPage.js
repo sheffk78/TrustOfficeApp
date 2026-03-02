@@ -410,6 +410,57 @@ export default function DistributionsPage() {
                     </Select>
                   </div>
 
+                  {/* Benevolence Mode Toggle */}
+                  <div className="p-4 border border-gold/30 bg-gold/5">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <Label className="label-trust text-gold">Benevolence Distribution</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">Mark as charitable/benevolent distribution</p>
+                      </div>
+                      <Switch
+                        checked={formData.is_benevolence}
+                        onCheckedChange={(checked) => setFormData({ ...formData, is_benevolence: checked })}
+                        data-testid="benevolence-toggle"
+                      />
+                    </div>
+                    
+                    {formData.is_benevolence && (
+                      <div className="space-y-3 mt-4 pt-4 border-t border-gold/20">
+                        <div>
+                          <Label className="label-trust">Recipient Name *</Label>
+                          <Input
+                            value={formData.benevolence_recipient_name}
+                            onChange={(e) => setFormData({ ...formData, benevolence_recipient_name: e.target.value })}
+                            className="mt-1 input-trust"
+                            placeholder="Organization or individual receiving benevolence"
+                            data-testid="benevolence-recipient-input"
+                          />
+                        </div>
+                        <div>
+                          <Label className="label-trust">Need Description *</Label>
+                          <Textarea
+                            value={formData.benevolence_need_description}
+                            onChange={(e) => setFormData({ ...formData, benevolence_need_description: e.target.value })}
+                            className="mt-1 input-trust"
+                            placeholder="Describe the charitable purpose or need being addressed..."
+                            rows={2}
+                            data-testid="benevolence-need-input"
+                          />
+                        </div>
+                        <div>
+                          <Label className="label-trust">Benevolence Notes (Optional)</Label>
+                          <Input
+                            value={formData.benevolence_notes}
+                            onChange={(e) => setFormData({ ...formData, benevolence_notes: e.target.value })}
+                            className="mt-1 input-trust"
+                            placeholder="Additional charitable notes..."
+                            data-testid="benevolence-notes-input"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <Label className="label-trust">Notes</Label>
                     <Textarea
