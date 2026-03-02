@@ -1844,8 +1844,8 @@ async def update_trust_units_settings(
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
-    # Get current settings
-    settings = await get_or_create_units_settings(trust_id, user["user_id"])
+    # Ensure settings exist (creates default if not)
+    await get_or_create_units_settings(trust_id, user["user_id"])
     
     # If reducing total_authorized_units, validate against active certificates
     if update.total_authorized_units is not None:
