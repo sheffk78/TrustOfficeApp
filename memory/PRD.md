@@ -56,6 +56,35 @@ The backend now has a modular structure for better maintainability:
    - Better separation of concerns
    - Easier testing and maintenance
 
+### Latest Updates (Mar 2, 2026) - SUBSCRIPTION STATE MANAGEMENT ✅
+
+1. **Unified Subscription State Helper**
+   - New `get_subscription_state(user_id)` function returns normalized `SubscriptionState` object
+   - Returns: plan_type, status, trial_start_date, trial_end_date, trial_days_remaining
+   - Computed booleans: is_trial, is_active, is_read_only
+   - Single source of truth for subscription status across all modules
+
+2. **New Endpoint: GET /api/subscription/state**
+   - Returns complete SubscriptionState with all computed fields
+   - Frontend can use this for consistent subscription UI
+
+3. **Dashboard Integration**
+   - GET /api/dashboard now includes `subscription` field with:
+     - plan_type, status, is_trial, is_active, is_read_only, trial_days_remaining
+   - Frontend can show subscription status in dashboard
+
+4. **Read-Only Mode for Expired Subscriptions**
+   - SubscriptionMiddleware updated to allow read-only access:
+     - **GET requests**: Always allowed (users can view all their data)
+     - **POST/PUT/PATCH/DELETE**: Return 403 with clear error message
+   - Error response includes: detail, subscription_status, is_read_only, trial_days_remaining
+   - Write operations blocked consistently across: minutes, distributions, compensation, tasks, entities, Schedule A, trust units
+
+5. **Code Architecture**
+   - `dependencies.py`: SubscriptionState model, get_subscription_state(), require_write_access()
+   - `models.py`: SubscriptionState, DashboardSubscriptionState models
+   - `server.py`: SubscriptionMiddleware with read-only mode logic
+
 ### Previous Updates (Mar 2, 2026) - BENEVOLENCE MODE FOR DISTRIBUTIONS ✅
 
 1. **Data Model Extensions**
