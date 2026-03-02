@@ -59,7 +59,45 @@ The backend now has a modular structure for better maintainability:
 
 
 
-### Latest Updates (Mar 2, 2026) - 10 NEW MINUTES TEMPLATES ✅
+### Latest Updates (Mar 2, 2026) - ENHANCED PDF FORMATTING FOR LEGAL DOCUMENTS ✅
+
+**Session Summary:** Completely rewrote the PDF generation function to preserve formatting and create professional legal-style documents.
+
+**Problem Fixed:**
+- Previously, all paragraphs merged into one large block of text
+- Line breaks and paragraph structure were lost
+- WHEREAS/RESOLVED clauses not properly formatted
+- Document didn't look like a professional legal document
+
+**Solution Implemented:**
+- Complete rewrite of `generate_minutes_pdf()` function in `/app/backend/routers/minutes.py`
+- New `_parse_legal_document_text()` helper function that intelligently parses legal document content
+- Uses Times font family for professional legal appearance
+- Proper paragraph separation and spacing
+
+**New PDF Features:**
+1. **Document Header**: Decorative borders, centered trust name, subtitle
+2. **Meeting Details Table**: Clean layout with bold labels
+3. **TRUSTEES PRESENT Section**: Bullet-pointed list of participants
+4. **Formatted Body Content**:
+   - WHEREAS clauses: Bold keyword, proper indentation
+   - RESOLVED clauses: Bold keyword, proper indentation
+   - NOW THEREFORE: Bold lead-in
+   - Bullet points: Indented with bullets
+   - Nested bullets: Double-indented with circles
+   - Section headers: Bold, navy color
+   - Key-value pairs: Bold labels
+5. **Certification Section**: Legal certification language
+6. **Signature Blocks**: Multiple signature lines for trustees
+7. **Footer**: Confidentiality notice, generation timestamp
+
+**Files Updated:**
+- `/app/backend/routers/minutes.py` - Completely rewrote PDF generation (lines 116-350)
+
+**Testing:** PDF verified with 4-page output, proper section formatting, preserved line breaks and bullet points.
+
+
+### Previous Updates (Mar 2, 2026) - 10 NEW MINUTES TEMPLATES ✅
 
 **Session Summary:** Tested and fixed 10 new minutes templates to expand the template library for common governance tasks.
 

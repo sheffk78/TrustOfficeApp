@@ -114,104 +114,327 @@ async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_acc
     return {"message": "Minutes deleted"}
 
 def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = False) -> bytes:
-    """Generate a professional PDF for minutes record"""
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+    """Generate a professional legal-style PDF for minutes record with proper formatting"""
+    import re
     
-    # Custom styles
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter, 
+        topMargin=0.75*inch, 
+        bottomMargin=0.75*inch,
+        leftMargin=1*inch,
+        rightMargin=1*inch
+    )
+    
+    # Custom styles for legal document appearance
     styles = getSampleStyleSheet()
+    
+    # Document title - trust name
     title_style = ParagraphStyle(
         'TrustTitle',
         parent=styles['Heading1'],
-        fontSize=18,
-        spaceAfter=6,
+        fontName='Times-Bold',
+        fontSize=16,
+        alignment=1,  # Center
+        spaceAfter=4,
         textColor=colors.HexColor('#010079')
     )
-    heading_style = ParagraphStyle(
-        'TrustHeading',
+    
+    # Document subtitle
+    subtitle_style = ParagraphStyle(
+        'Subtitle',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=12,
+        alignment=1,  # Center
+        spaceAfter=20,
+        textColor=colors.HexColor('#333333')
+    )
+    
+    # Section headers (WHEREAS, RESOLVED, etc.)
+    section_header_style = ParagraphStyle(
+        'SectionHeader',
         parent=styles['Heading2'],
-        fontSize=14,
-        spaceBefore=12,
-        spaceAfter=6,
-        textColor=colors.HexColor('#010079')
+        fontName='Times-Bold',
+        fontSize=11,
+        spaceBefore=16,
+        spaceAfter=8,
+        textColor=colors.HexColor('#010079'),
+        borderWidth=0,
+        borderPadding=0,
+        borderColor=colors.HexColor('#010079'),
     )
+    
+    # WHEREAS clause style - indented, formal
+    whereas_style = ParagraphStyle(
+        'Whereas',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=11,
+        leading=15,
+        leftIndent=0.25*inch,
+        spaceBefore=6,
+        spaceAfter=6,
+        firstLineIndent=0,
+    )
+    
+    # RESOLVED clause style - bold lead-in
+    resolved_style = ParagraphStyle(
+        'Resolved',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=11,
+        leading=15,
+        leftIndent=0.25*inch,
+        spaceBefore=8,
+        spaceAfter=8,
+        firstLineIndent=0,
+    )
+    
+    # Regular body text
     body_style = ParagraphStyle(
         'TrustBody',
         parent=styles['Normal'],
+        fontName='Times-Roman',
         fontSize=11,
-        leading=14,
-        spaceAfter=8
+        leading=15,
+        spaceAfter=8,
+        alignment=4,  # Justify
     )
+    
+    # Bullet point style
+    bullet_style = ParagraphStyle(
+        'Bullet',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=11,
+        leading=15,
+        leftIndent=0.5*inch,
+        spaceBefore=4,
+        spaceAfter=4,
+        bulletIndent=0.25*inch,
+    )
+    
+    # Label style (for signature lines)
     label_style = ParagraphStyle(
         'TrustLabel',
         parent=styles['Normal'],
+        fontName='Times-Italic',
         fontSize=10,
         textColor=colors.HexColor('#666666')
     )
     
+    # Divider line style
+    divider_style = ParagraphStyle(
+        'Divider',
+        parent=styles['Normal'],
+        fontName='Times-Roman',
+        fontSize=8,
+        alignment=1,  # Center
+        spaceBefore=12,
+        spaceAfter=12,
+        textColor=colors.HexColor('#999999')
+    )
+    
     story = []
     
-    # Header
-    story.append(Paragraph(trust.get('name', 'Trust'), title_style))
-    story.append(Paragraph(f"Meeting Minutes - {minutes.get('minutes_type', 'General').replace('_', ' ').title()}", heading_style))
+    # ==== DOCUMENT HEADER ====
+    # Decorative top border
+    story.append(Paragraph("═" * 60, divider_style))
+    
+    # Trust name as main title
+    trust_name = trust.get('name', 'Trust')
+    story.append(Paragraph(trust_name.upper(), title_style))
+    
+    # Meeting type as subtitle
+    minutes_type = minutes.get('minutes_type', 'General').replace('_', ' ').title()
+    story.append(Paragraph(f"MINUTES OF {minutes_type.upper()} MEETING", subtitle_style))
+    
+    story.append(Paragraph("═" * 60, divider_style))
     story.append(Spacer(1, 12))
     
-    # Meeting details table
+    # ==== MEETING DETAILS TABLE ====
     meeting_date = minutes.get('meeting_date', 'N/A')
     if 'T' in meeting_date:
         meeting_date = meeting_date.split('T')[0]
     
     details_data = [
-        ['Meeting Date:', meeting_date],
-        ['Minutes Type:', minutes.get('minutes_type', 'General').replace('_', ' ').title()],
+        ['Date of Meeting:', meeting_date],
+        ['Type:', minutes_type],
         ['Trust:', trust.get('name', 'N/A')],
         ['Jurisdiction:', trust.get('jurisdiction', 'N/A')]
     ]
     
     details_table = Table(details_data, colWidths=[1.5*inch, 4.5*inch])
     details_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#666666')),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('FONTNAME', (0, 0), (0, -1), 'Times-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Times-Roman'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#333333')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     story.append(details_table)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 16))
     
-    # Participants
+    # ==== PARTICIPANTS PRESENT ====
     if minutes.get('participants_text'):
-        story.append(Paragraph('Participants Present', heading_style))
+        story.append(Paragraph("TRUSTEES PRESENT", section_header_style))
         participants = minutes.get('participants_text', '').split(',')
         for p in participants:
             if p.strip():
-                story.append(Paragraph(f"• {p.strip()}", body_style))
+                story.append(Paragraph(f"• {p.strip()}, Trustee", bullet_style))
         story.append(Spacer(1, 12))
     
-    # Decisions/Discussion
-    if minutes.get('decisions_text'):
-        story.append(Paragraph('Decisions & Discussion', heading_style))
-        story.append(Paragraph(minutes.get('decisions_text', ''), body_style))
-        story.append(Spacer(1, 12))
+    # ==== MINUTES BODY - WITH FORMATTING PRESERVATION ====
+    decisions_text = minutes.get('decisions_text', '')
+    if decisions_text:
+        story.append(Paragraph("─" * 50, divider_style))
+        story.append(Paragraph("MATTERS CONSIDERED AND RESOLUTIONS ADOPTED", section_header_style))
+        story.append(Spacer(1, 8))
+        
+        # Process the text to preserve formatting
+        story.extend(_parse_legal_document_text(decisions_text, styles, whereas_style, resolved_style, body_style, bullet_style, section_header_style))
     
-    # Footer
+    # ==== SIGNATURE BLOCK ====
     story.append(Spacer(1, 30))
-    story.append(Paragraph('_' * 50, body_style))
-    story.append(Paragraph('Trustee Signature', label_style))
-    story.append(Spacer(1, 20))
-    story.append(Paragraph('_' * 50, body_style))
-    story.append(Paragraph('Date', label_style))
+    story.append(Paragraph("─" * 50, divider_style))
+    story.append(Paragraph("CERTIFICATION", section_header_style))
+    story.append(Paragraph(
+        "The undersigned Trustee(s) hereby certify that the foregoing Minutes constitute a true, "
+        "accurate, and complete record of the meeting and that all decisions recorded herein were "
+        "made in good faith and in accordance with the Trust Indenture.",
+        body_style
+    ))
+    story.append(Spacer(1, 24))
     
-    # Generated timestamp (watermark)
+    # Signature lines
+    participants = minutes.get('participants_text', '').split(',') if minutes.get('participants_text') else ['Trustee']
+    for p in participants[:2]:  # Max 2 signature lines
+        if p.strip():
+            story.append(Spacer(1, 16))
+            story.append(Paragraph('_' * 40, body_style))
+            story.append(Paragraph(f'{p.strip()}, Trustee', label_style))
+            story.append(Paragraph('Date: _________________', label_style))
+    
+    # ==== FOOTER ====
     story.append(Spacer(1, 30))
+    story.append(Paragraph("═" * 60, divider_style))
     if not hide_watermark:
         story.append(Paragraph(
             f"Generated by TrustOffice on {datetime.now(timezone.utc).strftime('%B %d, %Y at %H:%M UTC')}",
-            ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#999999'))
+            ParagraphStyle('Footer', parent=styles['Normal'], fontName='Times-Italic', fontSize=8, alignment=1, textColor=colors.HexColor('#999999'))
         ))
+    story.append(Paragraph(
+        f"{trust_name} – Private Trust Minutes – Confidential",
+        ParagraphStyle('FooterNote', parent=styles['Normal'], fontName='Times-Italic', fontSize=8, alignment=1, textColor=colors.HexColor('#666666'))
+    ))
     
     doc.build(story)
     return buffer.getvalue()
+
+
+def _parse_legal_document_text(text: str, styles, whereas_style, resolved_style, body_style, bullet_style, section_header_style) -> list:
+    """
+    Parse legal document text and return a list of ReportLab flowables with proper formatting.
+    Handles WHEREAS clauses, RESOLVED clauses, section headers, bullet points, and regular paragraphs.
+    """
+    import re
+    
+    flowables = []
+    
+    # Split by double newlines first (paragraph breaks)
+    paragraphs = re.split(r'\n\s*\n', text)
+    
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+        
+        # Check for section dividers (═══ or ─── lines)
+        if re.match(r'^[═─]{10,}$', para):
+            flowables.append(Paragraph("─" * 40, ParagraphStyle(
+                'InlineDivider', parent=styles['Normal'], fontSize=8, alignment=1, 
+                spaceBefore=8, spaceAfter=8, textColor=colors.HexColor('#cccccc')
+            )))
+            continue
+        
+        # Check for all-caps section headers
+        if para.isupper() and len(para) < 80 and not para.startswith('WHEREAS') and not para.startswith('RESOLVED'):
+            flowables.append(Paragraph(para, section_header_style))
+            continue
+        
+        # Handle multi-line paragraphs - split by single newlines
+        lines = para.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Escape special characters for ReportLab
+            safe_line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            
+            # WHEREAS clauses
+            if line.upper().startswith('WHEREAS'):
+                # Bold the "WHEREAS" part
+                formatted = safe_line.replace('WHEREAS', '<b>WHEREAS</b>', 1)
+                flowables.append(Paragraph(formatted, whereas_style))
+            
+            # NOW THEREFORE or BE IT RESOLVED
+            elif 'NOW, THEREFORE' in line.upper() or 'NOW THEREFORE' in line.upper():
+                formatted = re.sub(r'(NOW,?\s*THEREFORE)', r'<b>\1</b>', safe_line, flags=re.IGNORECASE)
+                flowables.append(Paragraph(formatted, resolved_style))
+            
+            elif line.upper().startswith('BE IT RESOLVED') or line.upper().startswith('RESOLVED'):
+                formatted = re.sub(r'^(BE IT RESOLVED|RESOLVED)', r'<b>\1</b>', safe_line, flags=re.IGNORECASE)
+                flowables.append(Paragraph(formatted, resolved_style))
+            
+            elif line.upper().startswith('BE IT FURTHER RESOLVED'):
+                formatted = re.sub(r'^(BE IT FURTHER RESOLVED)', r'<b>\1</b>', safe_line, flags=re.IGNORECASE)
+                flowables.append(Paragraph(formatted, resolved_style))
+            
+            # Bullet points (• or -)
+            elif line.startswith('•') or line.startswith('-') or line.startswith('*'):
+                bullet_text = line[1:].strip()
+                safe_bullet = bullet_text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                flowables.append(Paragraph(f"• {safe_bullet}", bullet_style))
+            
+            # Indented bullet points (starting with spaces then bullet)
+            elif re.match(r'^\s+[•\-\*]', line):
+                bullet_text = re.sub(r'^\s+[•\-\*]\s*', '', line)
+                safe_bullet = bullet_text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                # Deeper indent for nested bullets
+                nested_bullet_style = ParagraphStyle(
+                    'NestedBullet', parent=bullet_style, leftIndent=0.75*inch
+                )
+                flowables.append(Paragraph(f"○ {safe_bullet}", nested_bullet_style))
+            
+            # Section dividers (═══ or ─── lines)
+            elif re.match(r'^[═─]{10,}$', line):
+                flowables.append(Paragraph("─" * 40, ParagraphStyle(
+                    'InlineDivider', parent=styles['Normal'], fontSize=8, alignment=1, 
+                    spaceBefore=8, spaceAfter=8, textColor=colors.HexColor('#cccccc')
+                )))
+            
+            # Key-value pairs (Label: Value)
+            elif ':' in line and line.index(':') < 30:
+                parts = line.split(':', 1)
+                if len(parts) == 2 and parts[0].strip():
+                    label = parts[0].strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                    value = parts[1].strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                    formatted = f"<b>{label}:</b> {value}"
+                    flowables.append(Paragraph(formatted, body_style))
+                else:
+                    flowables.append(Paragraph(safe_line, body_style))
+            
+            # Regular paragraph
+            else:
+                flowables.append(Paragraph(safe_line, body_style))
+    
+    return flowables
 
 @router.get("/minutes/{minutes_id}/pdf")
 async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user)):
