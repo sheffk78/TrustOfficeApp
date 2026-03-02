@@ -57,6 +57,11 @@ export default function SettingsPage() {
   const [userPrefs, setUserPrefs] = useState({ hide_watermark: false });
   const [userPrefsLoading, setUserPrefsLoading] = useState(false);
   
+  // Demo data management state
+  const [demoStatus, setDemoStatus] = useState(null);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [deleteDemoDialogOpen, setDeleteDemoDialogOpen] = useState(false);
+  
   const [trustData, setTrustData] = useState({
     name: selectedTrust?.name || '',
     role: selectedTrust?.role || 'Trustee',
