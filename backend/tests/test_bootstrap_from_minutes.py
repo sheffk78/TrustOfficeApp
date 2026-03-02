@@ -26,11 +26,12 @@ TEST_EMAIL = "demo@trustoffice.com"
 TEST_PASSWORD = "demopassword"
 TEST_TRUST_ID = "trust_b753cb8fe07f"
 
-# Non-designation minutes for wrong template type test
+# Non-designation minutes for wrong template type test (disposition_of_asset)
 NON_DESIGNATION_MINUTES_ID = "min_08c63adff72e"
 
 # Already bootstrapped minutes (should return duplicate error)
-ALREADY_BOOTSTRAPPED_MINUTES_ID = "min_46ededbcee34"
+# Using the minutes we bootstrapped in manual testing: min_34f729dfe9ec
+ALREADY_BOOTSTRAPPED_MINUTES_ID = "min_34f729dfe9ec"
 
 
 class TestBootstrapFromMinutesEndpoint:
