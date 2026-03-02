@@ -7395,18 +7395,49 @@ app.add_middleware(
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+# HTTP methods that modify data (write operations)
+WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+# Paths that should allow write access even in read-only mode (subscription management)
+WRITE_EXEMPT_PATHS = {
+    "/api/subscription/create-checkout",
+    "/api/subscription/verify-payment",
+    "/api/subscription/create-portal",
+    "/api/subscription/cancel",
+    "/api/subscription/reactivate",
+    "/api/subscription/upgrade",
+    "/api/stripe/webhook",
+    "/api/auth/register",
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/session",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+    "/api/auth/profile",  # Allow profile updates
+}
+
 class SubscriptionMiddleware(BaseHTTPMiddleware):
-    """Middleware to check subscription status for protected routes"""
+    """
+    Middleware to check subscription status for protected routes.
+    
+    Read-only mode behavior:
+    - GET requests: Always allowed (users can view all their data)
+    - POST/PUT/PATCH/DELETE requests: Blocked with 403 if subscription is inactive
+    
+    This ensures users can always access their data but cannot modify it without
+    an active subscription.
+    """
     
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
+        method = request.method
         
-        # Skip subscription check for exempt paths
+        # Skip subscription check for fully exempt paths
         if path in SUBSCRIPTION_EXEMPT_PATHS or not path.startswith("/api/"):
             return await call_next(request)
         
         # Skip for OPTIONS requests (CORS preflight)
-        if request.method == "OPTIONS":
+        if method == "OPTIONS":
             return await call_next(request)
         
         # Get auth token
@@ -7441,41 +7472,36 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
             # Can't determine user - let endpoint handle it
             return await call_next(request)
         
-        # Check subscription status
-        sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+        # Get subscription state using the unified helper
+        state = await get_subscription_state(user_id)
         
-        if sub:
-            if sub["status"] == "active":
-                return await call_next(request)
-            
-            if sub["status"] == "trialing" and sub.get("trial_end_date"):
-                trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
-                if trial_end.tzinfo is None:
-                    trial_end = trial_end.replace(tzinfo=timezone.utc)
-                
-                if trial_end >= datetime.now(timezone.utc):
-                    return await call_next(request)
-                
-                # Trial expired
-                return JSONResponse(
-                    status_code=402,
-                    content={
-                        "detail": "Trial expired. Please subscribe to continue using TrustOffice.",
-                        "subscription_status": "expired"
-                    }
-                )
-            
-            if sub["status"] in ["canceled", "expired"]:
-                return JSONResponse(
-                    status_code=402,
-                    content={
-                        "detail": "Subscription inactive. Please subscribe to continue.",
-                        "subscription_status": sub["status"]
-                    }
-                )
+        # If subscription is active, allow all operations
+        if state.is_active:
+            return await call_next(request)
         
-        # No subscription or valid trial
-        return await call_next(request)
+        # Subscription is not active - check if this is a read or write operation
+        is_write_operation = method in WRITE_METHODS
+        is_write_exempt = path in WRITE_EXEMPT_PATHS
+        
+        # Allow read operations (GET) even with expired subscription
+        if not is_write_operation:
+            return await call_next(request)
+        
+        # Allow certain write paths even in read-only mode
+        if is_write_exempt:
+            return await call_next(request)
+        
+        # Block write operations for inactive subscriptions
+        return JSONResponse(
+            status_code=READ_ONLY_ERROR_CODE,
+            content={
+                "detail": READ_ONLY_ERROR_MESSAGE,
+                "subscription_status": state.status,
+                "is_read_only": True,
+                "trial_days_remaining": state.trial_days_remaining
+            },
+            headers={"X-Subscription-Status": state.status}
+        )
 
 app.add_middleware(SubscriptionMiddleware)
 
