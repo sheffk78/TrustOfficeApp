@@ -209,8 +209,8 @@ async def get_ai_status(user: dict = Depends(get_current_user)):
             "governance_suggestions": ai_enabled
         },
         "models": {
-            "drafting": "claude-3.5-sonnet" if ai_enabled else None,
-            "suggestions": "claude-3.5-haiku" if ai_enabled else None
+            "drafting": "claude-sonnet-4-5" if ai_enabled else None,
+            "suggestions": "claude-haiku-4-5" if ai_enabled else None
         }
     }
 
