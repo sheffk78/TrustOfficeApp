@@ -1,0 +1,128 @@
+{
+  "summary": "Backend testing for major server.py cleanup - preferences router migration. All 20 new tests passed + 29 regression tests passed (49 total). Server.py reduced from 7538 to 1128 lines (85% reduction). Fixed missing import bug.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "PUT /api/user/preferences",
+        "issue": "hide_watermark allows 'trialing' status users to set true - behavior may be intentional since watermark display is handled separately by should_show_watermark()",
+        "priority": "LOW"
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "TestAuthEndpointsViaRouter::test_login_endpoint_works - PASS: Login works via auth router",
+    "TestAuthEndpointsViaRouter::test_me_endpoint_with_token - PASS: GET /me returns user profile",
+    "TestAuthEndpointsViaRouter::test_me_endpoint_without_token - PASS: 401 without auth",
+    "TestPreferencesRouter::test_get_notification_preferences - PASS: Returns all preference fields",
+    "TestPreferencesRouter::test_put_notification_preferences - PASS: Updates and persists preferences",
+    "TestPreferencesRouter::test_get_user_preferences - PASS: Returns user preferences",
+    "TestPreferencesRouter::test_put_user_preferences_hide_watermark - PASS: Works for trialing users",
+    "TestCoreFeatures::test_get_trusts_endpoint - PASS: Returns trusts list",
+    "TestCoreFeatures::test_get_entities_endpoint - PASS: Returns entities with trust_id param",
+    "TestCoreFeatures::test_get_tasks_endpoint - PASS: Returns tasks list",
+    "TestCoreFeatures::test_get_minutes_endpoint - PASS: Returns minutes list",
+    "TestCoreFeatures::test_get_distributions_endpoint - PASS: Returns distributions list",
+    "TestDashboardEndpoint::test_get_dashboard_endpoint - PASS: Returns dashboard data",
+    "TestFeatureGates::test_governance_history_gate - PASS: 402 for trial users",
+    "TestFeatureGates::test_trust_units_gate - PASS: 402 for trial users",
+    "TestFeatureGates::test_beneficiary_dashboard_gate - PASS: 402 for trial users",
+    "TestDependenciesImports::test_subscription_state_endpoint - PASS: Uses dependencies.py helper",
+    "TestDependenciesImports::test_subscription_features_endpoint - PASS: Uses dependencies.py helper",
+    "TestDependenciesImports::test_governance_health_score - PASS: Uses calculate_health_score from dependencies.py",
+    "TestModelsImports::test_categories_endpoint_returns_enums - PASS: Enums imported from models.py"
+  ],
+
+  "auth_router_verified": {
+    "POST /api/auth/login": "WORKING - Returns token and user",
+    "GET /api/auth/me": "WORKING - Returns current user profile"
+  },
+
+  "preferences_router_verified": {
+    "GET /api/notifications/preferences": "WORKING - Returns all notification preferences with defaults",
+    "PUT /api/notifications/preferences": "WORKING - Updates preferences with upsert",
+    "GET /api/user/preferences": "WORKING - Returns user preferences",
+    "PUT /api/user/preferences": "WORKING - Updates preferences (allows trialing for hide_watermark)"
+  },
+
+  "core_features_verified": [
+    "GET /api/trusts - Works with auth",
+    "GET /api/entities?trust_id= - Works with auth (requires trust_id param)",
+    "GET /api/tasks - Works with auth",
+    "GET /api/minutes - Works with auth",
+    "GET /api/distributions - Works with auth"
+  ],
+
+  "dashboard_verified": "GET /api/dashboard - Returns health_score, trust info, stats",
+
+  "feature_gates_verified": {
+    "GOVERNANCE_HISTORY": "402 for trial users - gate working",
+    "TRUST_UNITS": "402 for trial users - gate working",
+    "BENEFICIARY_DASHBOARD": "402 for trial users - gate working"
+  },
+
+  "bug_fixed": {
+    "description": "Missing import for get_or_create_units_settings in server.py",
+    "file": "/app/backend/server.py",
+    "line": 70,
+    "fix": "Added get_or_create_units_settings to import from routers.trust_units",
+    "impact": "Would have caused NameError for paid users accessing beneficiary dashboard"
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_preferences_router_cleanup.py",
+    "/app/test_reports/pytest/preferences_router_cleanup_results.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "Server.py now at 1128 lines (85% reduction from 7538) - major cleanup successful",
+    "Preferences router properly handles notification preferences and user preferences",
+    "All models/enums correctly imported from models.py",
+    "All helper functions correctly imported from dependencies.py",
+    "14 routers now migrated from server.py",
+    "Fixed missing get_or_create_units_settings import - would have caused runtime error for paid users"
+  ],
+
+  "cleanup_verification": {
+    "server_py_lines_before": 7538,
+    "server_py_lines_after": 1128,
+    "reduction_percentage": "85%",
+    "preferences_router_lines": 133,
+    "dependencies_py_lines": 751,
+    "models_py_lines": 777,
+    "total_routers_migrated": 14
+  },
+
+  "updated_files": [
+    "/app/backend/server.py (added missing import for get_or_create_units_settings)",
+    "/app/backend/tests/test_preferences_router_cleanup.py (new test file)"
+  ],
+
+  "success_rate": {
+    "backend": "100% (20/20 tests passed + 29 regression tests)",
+    "frontend": "N/A - backend only testing"
+  },
+
+  "test_credentials": {
+    "demo_user": "demo@trustoffice.com",
+    "demo_password": "demopassword",
+    "trust_id": "trust_b753cb8fe07f"
+  },
+
+  "seed_data_creation": "None - used existing demo data",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Major server.py cleanup verified. 14 routers migrated. Preferences router (notifications, user preferences) tested and working. Auth router tested. Feature gates working. Fixed missing import for get_or_create_units_settings. Test file at /app/backend/tests/test_preferences_router_cleanup.py."
+}
