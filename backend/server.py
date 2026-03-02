@@ -489,6 +489,27 @@ class DistributionUpdate(BaseModel):
     benevolence_need_description: Optional[str] = None
     benevolence_notes: Optional[str] = None
 
+# Benevolence Log Models
+class BenevolenceMonthlyAggregate(BaseModel):
+    month: str  # YYYY-MM format
+    total_amount: float
+    count: int
+
+class BenevolenceYearlyAggregate(BaseModel):
+    year: int
+    total_amount: float
+    count: int
+
+class BenevolenceLogResponse(BaseModel):
+    trust_id: str
+    trust_name: str
+    distributions: List[DistributionResponse]
+    monthly_aggregates: List[BenevolenceMonthlyAggregate]
+    yearly_aggregates: List[BenevolenceYearlyAggregate]
+    total_all_time: float
+    total_count: int
+    incomplete_documentation_count: int  # Benevolence distributions missing key fields
+
 # Compensation Models
 class CompensationPlanCreate(BaseModel):
     trust_id: str
