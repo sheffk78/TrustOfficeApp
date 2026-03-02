@@ -155,7 +155,7 @@ class TestBootstrapFromMinutesEndpoint:
             json=minutes_payload
         )
         
-        if create_response.status_code != 201:
+        if create_response.status_code not in [200, 201]:
             pytest.skip(f"Could not create test minutes: {create_response.status_code} - {create_response.text}")
         
         new_minutes = create_response.json()
