@@ -50,6 +50,7 @@ from routers.governance import router as governance_router
 from routers.minutes import router as minutes_router
 from routers.schedule_a import router as schedule_a_router
 from routers.compensation import router as compensation_router
+from routers.subscriptions import router as subscriptions_router
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -4933,6 +4934,7 @@ app.include_router(governance_router, prefix="/api")
 app.include_router(minutes_router, prefix="/api")
 app.include_router(schedule_a_router, prefix="/api")
 app.include_router(compensation_router, prefix="/api")
+app.include_router(subscriptions_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
