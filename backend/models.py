@@ -723,6 +723,32 @@ class BeneficiaryDashboardResponse(BaseModel):
 
 # ==================== SUBSCRIPTION MODELS ====================
 
+class SubscriptionState(BaseModel):
+    """Normalized subscription state object for consistent access across modules"""
+    user_id: str
+    subscription_id: Optional[str] = None
+    plan_type: str  # "trial", "monthly", "annual"
+    status: str  # "trialing", "active", "past_due", "canceled", "expired"
+    trial_start_date: Optional[str] = None
+    trial_end_date: Optional[str] = None
+    trial_days_remaining: Optional[int] = None
+    is_trial: bool = False
+    is_active: bool = False
+    is_read_only: bool = True
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    current_period_end: Optional[str] = None
+    cancel_at_period_end: Optional[bool] = None
+
+class DashboardSubscriptionState(BaseModel):
+    """Subscription state for dashboard - subset of full SubscriptionState"""
+    plan_type: str
+    status: str
+    is_trial: bool
+    is_active: bool
+    is_read_only: bool
+    trial_days_remaining: Optional[int] = None
+
 class SubscriptionResponse(BaseModel):
     subscription_id: str
     user_id: str
