@@ -80,7 +80,7 @@ async def call_claude(
         raise
     except Exception as e:
         logger.error(f"Claude API error: {str(e)}")
-        raise ClaudeClientError(f"AI service temporarily unavailable. Please try again later.")
+        raise ClaudeClientError("AI service temporarily unavailable. Please try again later.")
 
 
 async def call_claude_sonnet(
