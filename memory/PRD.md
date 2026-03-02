@@ -18,43 +18,37 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
 The backend now has a modular structure for better maintainability:
 ```
 /app/backend/
-├── server.py           # Main FastAPI app (2342 lines, down from 7538 - 69% reduction)
+├── server.py           # Main FastAPI app (1128 lines, down from 7538 - 85% reduction)
 ├── database.py         # MongoDB connection singleton
-├── models.py           # All Pydantic models and enums (~778 lines)
+├── models.py           # All Pydantic models and enums (777 lines)
 ├── dependencies.py     # Shared auth, helpers, feature gating, health score (751 lines)
-├── routers/            # Domain-specific router modules (13 migrated)
-│   ├── auth.py          # Auth, register, login, profile, OAuth (MIGRATED Dec 30)
-│   ├── distributions.py # Distribution endpoints (MIGRATED)
-│   ├── governance.py    # Governance health/history/insights (MIGRATED)
-│   ├── minutes.py       # Minutes CRUD + templates + PDF (MIGRATED)
-│   ├── schedule_a.py    # Schedule A assets CRUD + PDF (MIGRATED)
-│   ├── compensation.py  # Compensation plans + payments (MIGRATED)
-│   ├── subscriptions.py # Stripe payments + webhooks (MIGRATED)
-│   ├── benevolence.py   # Benevolence CRUD + PDF (MIGRATED)
-│   ├── exports.py       # CSV exports (premium feature) (MIGRATED)
-│   ├── trust_units.py   # Trust units certificates + transfers (MIGRATED)
-│   ├── trusts.py        # Trust CRUD (MIGRATED)
-│   ├── entities.py      # Entity + relationship management (MIGRATED)
-│   └── tasks.py         # Governance tasks (MIGRATED)
+├── routers/            # Domain-specific router modules (14 migrated)
+│   ├── auth.py          # Auth, register, login, profile, OAuth (356 lines)
+│   ├── preferences.py   # Notification + user preferences (133 lines)
+│   ├── distributions.py # Distribution endpoints
+│   ├── governance.py    # Governance health/history/insights
+│   ├── minutes.py       # Minutes CRUD + templates + PDF
+│   ├── schedule_a.py    # Schedule A assets CRUD + PDF
+│   ├── compensation.py  # Compensation plans + payments
+│   ├── subscriptions.py # Stripe payments + webhooks
+│   ├── benevolence.py   # Benevolence CRUD + PDF
+│   ├── exports.py       # CSV exports (premium feature)
+│   ├── trust_units.py   # Trust units certificates + transfers
+│   ├── trusts.py        # Trust CRUD
+│   ├── entities.py      # Entity + relationship management
+│   └── tasks.py         # Governance tasks
 ├── email_service.py    # Postmark email integration
 ├── email_templates.py  # Email template content
 └── background_tasks.py # APScheduler background jobs
 ```
 
-**Router Migration Progress (Dec 30, 2025):**
-- auth.py: 356 lines - Registration, login, profile, password reset, OAuth
-- distributions.py: 15,820 bytes - Full CRUD + benevolence log
-- governance.py: 21,826 bytes - Health scoring, history, insights
-- minutes.py: 54,851 bytes - Templates, CRUD, PDF generation
-- schedule_a.py: 16,796 bytes - Asset ledger CRUD + PDF export
-- compensation.py: 5,800 bytes - Plans + payments + YTD calculation
-- subscriptions.py: 21,000 bytes - Stripe checkout, portal, webhooks
-- benevolence.py: 510 lines - Benevolence CRUD + summary + PDF export
-- exports.py: 167 lines - CSV exports (minutes, distributions, compensation, tasks)
-- trust_units.py: 994 lines - Certificates, transfers, PDF, bootstrap-from-minutes
-- trusts.py: 101 lines - Trust CRUD with governance score
-- entities.py: 144 lines - Entities + relationships CRUD
-- tasks.py: 98 lines - Task management with completion tracking
+**Migration Statistics (Dec 30, 2025):**
+- Original server.py: 7538 lines
+- Final server.py: 1128 lines
+- **Total reduction: 85% (6410 lines moved)**
+- 14 routers created with clear domain separation
+- All enums/models centralized in models.py
+- All helper functions centralized in dependencies.py
 
 ### Design System (AnchorPoint)
 - Light: Navy #010079, Gold #D5AD36
