@@ -75,7 +75,74 @@ export default function SettingsPage() {
   useEffect(() => {
     loadNotificationPreferences();
     loadUserPreferences();
+    loadDemoStatus();
   }, []);
+
+  const loadDemoStatus = async () => {
+    try {
+      const response = await fetchWithAuth('/demo/status');
+      if (response.ok) {
+        const data = await response.json();
+        setDemoStatus(data);
+      }
+    } catch (error) {
+      console.error('Failed to load demo status:', error);
+    }
+  };
+
+  const handleSeedDemoData = async () => {
+    setDemoLoading(true);
+    try {
+      const response = await fetchWithAuth('/demo/seed', { method: 'POST' });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.seeded) {
+          toast.success('Demo data created successfully!', {
+            description: 'Your account now has sample trusts and data to explore all features.'
+          });
+          await loadDemoStatus();
+          await loadTrusts();
+          // Reload the page to show new data
+          window.location.reload();
+        } else {
+          toast.info('You already have data', {
+            description: 'Delete existing data first to seed demo data.'
+          });
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to seed demo data');
+      }
+    } catch (error) {
+      toast.error('Failed to seed demo data');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
+  const handleDeleteDemoData = async () => {
+    setDemoLoading(true);
+    try {
+      const response = await fetchWithAuth('/demo/data', { method: 'DELETE' });
+      if (response.ok) {
+        const data = await response.json();
+        toast.success('All data deleted', {
+          description: `Removed ${data.deleted_counts?.trusts || 0} trusts and associated records.`
+        });
+        setDeleteDemoDialogOpen(false);
+        await loadDemoStatus();
+        await loadTrusts();
+        setSelectedTrust(null);
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to delete data');
+      }
+    } catch (error) {
+      toast.error('Failed to delete data');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   const loadNotificationPreferences = async () => {
     try {
