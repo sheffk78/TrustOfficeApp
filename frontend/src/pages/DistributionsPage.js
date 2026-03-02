@@ -300,6 +300,10 @@ export default function DistributionsPage() {
     <div className="main-layout" data-testid="distributions-page">
       <Sidebar />
       <main className="main-content">
+        {/* Subscription Banners */}
+        <TrialBanner location="distributions" />
+        <ReadOnlyBanner />
+        
         <div className="page-container">
           {/* Page Header */}
           <div className="flex items-start justify-between mb-8">
