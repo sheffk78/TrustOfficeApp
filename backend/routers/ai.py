@@ -110,7 +110,7 @@ async def get_governance_suggestions(
     from routers.governance import calculate_health_score
     
     health_data = await calculate_health_score(trust_id, user_id)
-    health_score = health_data["health_score"]
+    health_score = health_data["total_score"]  # Using total_score from governance router
     
     # Build criteria list
     criteria = []
