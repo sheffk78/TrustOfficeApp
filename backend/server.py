@@ -129,15 +129,15 @@ from models import (
     TrustUnitsSettingsCreate, TrustUnitsSettingsUpdate, TrustUnitsSettingsResponse,
     TrustUnitCertificateCreate, TrustUnitCertificateUpdate, TrustUnitCertificateResponse,
     TrustUnitTransferCreate, TrustUnitTransferResponse, TrustUnitsSummaryResponse,
-    MinutesRecordCreate, MinutesResponse, MinutesTemplateCreate, MinutesTemplateResponse,
-    DistributionRecordCreate, DistributionRecordUpdate, DistributionRecordResponse,
+    MinutesCreate, MinutesResponse, MinutesTemplateCreate, MinutesTemplateResponse,
+    DistributionCreate, DistributionUpdate, DistributionResponse,
     ScheduleAItemCreate, ScheduleAItemUpdate, ScheduleAItemResponse,
     BenevolenceRecordCreate, BenevolenceRecordUpdate, BenevolenceRecordResponse,
     CompensationPlanCreate, CompensationPlanResponse,
     CompensationPaymentCreate, CompensationPaymentResponse,
     SubscriptionResponse, CheckoutRequest, PortalRequest,
     HealthScoreResponse, HealthScoreCriterion,
-    BeneficiaryDashboardResponse, BeneficiaryHolding
+    BeneficiaryDashboardResponse, BeneficiaryAllocation
 )
 
 
