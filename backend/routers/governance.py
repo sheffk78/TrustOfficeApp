@@ -431,7 +431,21 @@ async def get_governance_health(trust_id: str, user: dict = Depends(get_current_
 
 @router.get("/governance/{trust_id}/history")
 async def get_governance_history(trust_id: str, days: int = 30, user: dict = Depends(get_current_user)):
-    """Get historical health score snapshots for charting"""
+    """
+    Get historical health score snapshots for charting.
+    
+    Feature Gate: GOVERNANCE_HISTORY
+    - Trial users cannot access governance history
+    - Paid users can view historical scores and trends
+    """
+    # Check feature access
+    has_history_access = await check_feature_access(user["user_id"], Feature.GOVERNANCE_HISTORY)
+    if not has_history_access:
+        raise HTTPException(
+            status_code=PREMIUM_FEATURE_ERROR_CODE,
+            detail="Governance history requires a paid subscription. Upgrade to view historical scores and trends."
+        )
+    
     trust = await db.trusts.find_one(
         {"trust_id": trust_id, "user_id": user["user_id"]},
         {"_id": 0}
