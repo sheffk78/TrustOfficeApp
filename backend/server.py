@@ -54,6 +54,9 @@ from routers.subscriptions import router as subscriptions_router
 from routers.benevolence import router as benevolence_router
 from routers.exports import router as exports_router
 from routers.trust_units import router as trust_units_router
+from routers.trusts import router as trusts_router
+from routers.entities import router as entities_router
+from routers.tasks import router as tasks_router
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -2709,6 +2712,9 @@ app.include_router(subscriptions_router, prefix="/api")
 app.include_router(benevolence_router, prefix="/api")
 app.include_router(exports_router, prefix="/api")
 app.include_router(trust_units_router, prefix="/api")
+app.include_router(trusts_router, prefix="/api")
+app.include_router(entities_router, prefix="/api")
+app.include_router(tasks_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
