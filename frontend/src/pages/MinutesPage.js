@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
+import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
+import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
