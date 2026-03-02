@@ -133,7 +133,7 @@ export const Sidebar = () => {
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 py-4">
+        <nav className="flex-1 py-4 overflow-y-auto">
           {navItems
             .filter(item => !item.requiresBenevolence || selectedTrust?.benevolence_enabled)
             .map((item) => {
