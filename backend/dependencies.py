@@ -50,6 +50,118 @@ PREMIUM_FEATURE_ERROR_MESSAGE = "This feature requires a paid subscription. Plea
 PREMIUM_FEATURE_ERROR_CODE = 402
 
 
+# ==================== SUBSCRIPTION STATE ====================
+
+class SubscriptionState(BaseModel):
+    """Normalized subscription state object for consistent access across modules"""
+    user_id: str
+    subscription_id: Optional[str] = None
+    plan_type: str  # "trial", "monthly", "annual"
+    status: str  # "trialing", "active", "past_due", "canceled", "expired"
+    trial_start_date: Optional[str] = None
+    trial_end_date: Optional[str] = None
+    trial_days_remaining: Optional[int] = None
+    is_trial: bool = False
+    is_active: bool = False
+    is_read_only: bool = True  # Default to read-only for safety
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    current_period_end: Optional[str] = None
+    cancel_at_period_end: Optional[bool] = None
+
+
+async def get_subscription_state(user_id: str) -> SubscriptionState:
+    """
+    Get normalized subscription state for a user.
+    Returns a consistent SubscriptionState object with all computed fields.
+    This is the single source of truth for subscription status across all modules.
+    """
+    now = datetime.now(timezone.utc)
+    
+    sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+    
+    # If no subscription exists, create a trial
+    if not sub:
+        sub = {
+            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+            "user_id": user_id,
+            "plan_type": "trial",
+            "status": "trialing",
+            "trial_start_date": now.isoformat(),
+            "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
+            "stripe_customer_id": None,
+            "stripe_subscription_id": None,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        }
+        await db.subscriptions.insert_one(sub)
+    
+    # Initialize state with base values
+    state = SubscriptionState(
+        user_id=user_id,
+        subscription_id=sub.get("subscription_id"),
+        plan_type=sub.get("plan_type", "trial"),
+        status=sub.get("status", "trialing"),
+        trial_start_date=sub.get("trial_start_date"),
+        trial_end_date=sub.get("trial_end_date"),
+        stripe_customer_id=sub.get("stripe_customer_id"),
+        stripe_subscription_id=sub.get("stripe_subscription_id"),
+        current_period_end=sub.get("current_period_end"),
+        cancel_at_period_end=sub.get("cancel_at_period_end"),
+    )
+    
+    # Determine active status based on subscription type
+    if sub["status"] == "active":
+        # Active paid subscription
+        state.is_active = True
+        state.is_read_only = False
+        state.is_trial = False
+        state.trial_days_remaining = None
+        
+    elif sub["status"] == "trialing" and sub.get("trial_end_date"):
+        # Trial subscription - check if still valid
+        try:
+            trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
+            if trial_end.tzinfo is None:
+                trial_end = trial_end.replace(tzinfo=timezone.utc)
+            
+            days_remaining = (trial_end - now).days
+            state.trial_days_remaining = max(0, days_remaining)
+            state.is_trial = True
+            
+            if trial_end >= now:
+                # Trial is still active
+                state.is_active = True
+                state.is_read_only = False
+            else:
+                # Trial expired
+                state.status = "expired"
+                state.is_active = False
+                state.is_read_only = True
+                
+        except (ValueError, TypeError, AttributeError):
+            # Invalid date - treat as expired
+            state.status = "expired"
+            state.is_active = False
+            state.is_read_only = True
+            state.trial_days_remaining = 0
+            
+    elif sub["status"] in ["canceled", "expired", "past_due"]:
+        # Inactive subscription
+        state.is_active = False
+        state.is_read_only = True
+        state.is_trial = False
+        
+    else:
+        # Unknown status - default to read-only for safety
+        state.is_active = False
+        state.is_read_only = True
+    
+    return state
+
+
+
+
 # ==================== FEATURE GATING ====================
 
 class Feature:
@@ -187,116 +299,6 @@ async def get_user_features(user_id: str) -> dict:
             Feature.ADVANCED_TEMPLATES: Feature.ADVANCED_TEMPLATES in plan_features,
         }
     }
-
-
-# ==================== SUBSCRIPTION STATE ====================
-
-class SubscriptionState(BaseModel):
-    """Normalized subscription state object for consistent access across modules"""
-    user_id: str
-    subscription_id: Optional[str] = None
-    plan_type: str  # "trial", "monthly", "annual"
-    status: str  # "trialing", "active", "past_due", "canceled", "expired"
-    trial_start_date: Optional[str] = None
-    trial_end_date: Optional[str] = None
-    trial_days_remaining: Optional[int] = None
-    is_trial: bool = False
-    is_active: bool = False
-    is_read_only: bool = True  # Default to read-only for safety
-    stripe_customer_id: Optional[str] = None
-    stripe_subscription_id: Optional[str] = None
-    current_period_end: Optional[str] = None
-    cancel_at_period_end: Optional[bool] = None
-
-
-async def get_subscription_state(user_id: str) -> SubscriptionState:
-    """
-    Get normalized subscription state for a user.
-    Returns a consistent SubscriptionState object with all computed fields.
-    This is the single source of truth for subscription status across all modules.
-    """
-    now = datetime.now(timezone.utc)
-    
-    sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
-    
-    # If no subscription exists, create a trial
-    if not sub:
-        sub = {
-            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
-            "user_id": user_id,
-            "plan_type": "trial",
-            "status": "trialing",
-            "trial_start_date": now.isoformat(),
-            "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
-            "stripe_customer_id": None,
-            "stripe_subscription_id": None,
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
-        }
-        await db.subscriptions.insert_one(sub)
-    
-    # Initialize state with base values
-    state = SubscriptionState(
-        user_id=user_id,
-        subscription_id=sub.get("subscription_id"),
-        plan_type=sub.get("plan_type", "trial"),
-        status=sub.get("status", "trialing"),
-        trial_start_date=sub.get("trial_start_date"),
-        trial_end_date=sub.get("trial_end_date"),
-        stripe_customer_id=sub.get("stripe_customer_id"),
-        stripe_subscription_id=sub.get("stripe_subscription_id"),
-        current_period_end=sub.get("current_period_end"),
-        cancel_at_period_end=sub.get("cancel_at_period_end"),
-    )
-    
-    # Determine active status based on subscription type
-    if sub["status"] == "active":
-        # Active paid subscription
-        state.is_active = True
-        state.is_read_only = False
-        state.is_trial = False
-        state.trial_days_remaining = None
-        
-    elif sub["status"] == "trialing" and sub.get("trial_end_date"):
-        # Trial subscription - check if still valid
-        try:
-            trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
-            if trial_end.tzinfo is None:
-                trial_end = trial_end.replace(tzinfo=timezone.utc)
-            
-            days_remaining = (trial_end - now).days
-            state.trial_days_remaining = max(0, days_remaining)
-            state.is_trial = True
-            
-            if trial_end >= now:
-                # Trial is still active
-                state.is_active = True
-                state.is_read_only = False
-            else:
-                # Trial expired
-                state.status = "expired"
-                state.is_active = False
-                state.is_read_only = True
-                
-        except (ValueError, TypeError, AttributeError):
-            # Invalid date - treat as expired
-            state.status = "expired"
-            state.is_active = False
-            state.is_read_only = True
-            state.trial_days_remaining = 0
-            
-    elif sub["status"] in ["canceled", "expired", "past_due"]:
-        # Inactive subscription
-        state.is_active = False
-        state.is_read_only = True
-        state.is_trial = False
-        
-    else:
-        # Unknown status - default to read-only for safety
-        state.is_active = False
-        state.is_read_only = True
-    
-    return state
 
 
 async def get_subscription_state_for_user(user: dict = Depends("get_current_user")) -> SubscriptionState:
