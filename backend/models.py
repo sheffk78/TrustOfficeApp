@@ -396,6 +396,9 @@ class MinutesResponse(BaseModel):
     participants_text: str
     decisions_text: str
     created_at: str
+    other_attendees_text: Optional[str] = None
+    source: Optional[str] = None
+    updated_at: Optional[str] = None
 
 class MinutesResolution(BaseModel):
     title: str

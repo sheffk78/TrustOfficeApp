@@ -234,7 +234,11 @@ export default function MinutesPage() {
                 const details = entry.details || entry.decisions_text || '';
                 const entryDate = entry.date || entry.meeting_date;
                 const entryType = entry.entry_type || entry.minutes_type || 'meeting';
-                const participantCount = entry.participants?.length || (entry.participants_text ? entry.participants_text.split(',').length : 0);
+                
+                // Count both trustees and other attendees
+                const trusteeCount = entry.participants?.length || (entry.participants_text ? entry.participants_text.split(',').filter(p => p.trim()).length : 0);
+                const otherCount = entry.other_attendees_text ? entry.other_attendees_text.split(',').filter(p => p.trim()).length : 0;
+                const totalParticipants = trusteeCount + otherCount;
                 
                 return (
                 <div 
@@ -282,7 +286,7 @@ export default function MinutesPage() {
                         </div>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Users className="w-4 h-4" />
-                          <span className="font-mono text-xs">{participantCount} participants</span>
+                          <span className="font-mono text-xs">{totalParticipants} participant{totalParticipants !== 1 ? 's' : ''}</span>
                         </div>
                         <span className="badge-trust">
                           {getEntryTypeLabel(entryType)}

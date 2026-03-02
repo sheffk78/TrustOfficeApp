@@ -1,5 +1,5 @@
 # Minutes router - handles minutes records and templates
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -105,6 +105,32 @@ async def get_minutes_by_id(minutes_id: str, user: dict = Depends(get_current_us
     if not minutes:
         raise HTTPException(status_code=404, detail="Minutes not found")
     return MinutesResponse(**minutes)
+
+
+@router.put("/minutes/{minutes_id}")
+async def update_minutes(minutes_id: str, request: Request, user: dict = Depends(require_write_access)):
+    """Update minutes content, participants, or other attendees"""
+    data = await request.json()
+    
+    # Only allow updating specific fields
+    allowed_fields = ['decisions_text', 'participants_text', 'other_attendees_text']
+    update_data = {k: v for k, v in data.items() if k in allowed_fields}
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+    
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.minutes_records.update_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Minutes not found")
+    
+    return {"message": "Minutes updated", "updated_fields": list(update_data.keys())}
+
 
 @router.delete("/minutes/{minutes_id}")
 async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_access)):

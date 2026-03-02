@@ -4,48 +4,52 @@ The user wants to build a responsive, desktop-first trust governance workspace c
 **PRODUCT REQUIREMENTS:**
 - **Core Functionality:** Authentication, Trust Dashboard, Minutes & Decisions, Distributions & Expenses, Governance Health, Entities, Hierarchy, Compensation, and Settings.
 - **Recent User Requests (this session):**
-    1.  **Combine Entities & Hierarchy:** Merge the separate 'Entities' and 'Hierarchy' pages into a single 'Structures' section with tabs to simplify navigation. (Completed)
-    2.  **Fix PDF Previews:** Identify why PDF previews fail, implement a robust viewer that works across browsers, and provide a graceful fallback with download/open options when preview is not possible. (Completed)
-    3.  **Add Guided Minutes Wizard:** Create a new, parallel AI-assisted flow for creating minutes that feels like an interview, using a multi-step wizard to gather structured input and automatically pull in trust context. (Completed)
-    4.  **Integrate Minutes with Financial Modules:** Create a bi-directional link between Minutes and the Compensation, Distributions, and Benevolence modules. This should support both creating financial records from an approved minute (Minutes → Money) and documenting a past financial transaction in minutes (Money → Minutes). (Completed)
-    5.  **Expand Minutes Template Library:** Add a significant number of new, specific templates for common governance tasks. (In Progress)
+    1.  **Fix Guided Minutes PDF Formatting:** The AI-generated PDF was merging all paragraphs. The user wanted it formatted to look like a professional legal document. (Completed)
+    2.  **Fix Guided Minutes Participant Titling:** Non-trustee attendees were being incorrectly labeled as Trustee in the final PDF. (Completed)
+    3.  **Improve Compensation Clarity:** The process for assigning compensation to a specific trustee was unclear. (Completed)
+    4.  **Fix Trust Units Bugs & Combine Pages:** The demo data for trust units was incorrect (showing >100% allocation), and the input field required unnecessary decimal places. The user also requested combining the Beneficiaries and Trust Units pages. (Completed)
+    5.  **Implement Security Best Practices:** The user requested a security audit and implementation of rate limiting, input validation, and secure API key handling. (Completed)
+    6.  **Fix Authentication Bugs:** The user reported being unable to log in with the admin account and getting Not authenticated errors after Google login. (Completed)
+    7.  **Fix Blank Minutes Page:** Clicking on a specific minute from the list resulted in a blank screen. (In Progress)
+    8.  **Fix Participant Count:** The participants column in the minutes list was only counting trustees, not all attendees. (In Progress)
+    9.  **Implement Remaining Templates:** The user requested the implementation of the remaining minutes templates from an approved list. (Completed)
 
 **User's preferred language**: English
 
 **what currently exists?**
-The application is a mature full-stack solution (React/FastAPI/MongoDB). In this session, several major features were completed. The 'Entities' and 'Hierarchy' pages were successfully merged into a unified 'Structures' page. A robust, reusable  was built to handle PDF previews gracefully, fixing a long-standing issue with browser security policies. A major new feature, Guided Minutes, was introduced as an AI-powered wizard to simplify minutes creation. This was followed by a deep, bi-directional integration between the new Guided Minutes feature and all financial modules (Compensation, Distributions, Benevolence), allowing for better governance tracking. The agent is currently in the middle of expanding the minutes template library.
+The application is a mature full-stack solution (React/FastAPI/MongoDB). In this session, the agent performed a major security overhaul, implementing rate limiting, OWASP security headers, and robust input validation/sanitization. The agent also fixed numerous bugs related to PDF formatting, participant titling in minutes, compensation UX, and trust unit data/inputs. The Beneficiaries and Trust Units pages were successfully merged into a single tabbed interface. A large batch of new minutes templates was also implemented and tested. Most recently, the agent created a new page and backend endpoint to allow users to view and edit existing minutes, addressing a bug where clicking a minute led to a blank screen.
 
 **Last working item**:
-    - Last item agent was working: Implementing the first 10 of a newly requested series of minutes templates. The agent completed the backend logic for PDF generation and the frontend forms for data entry.
+    - Last item agent was working: The agent just finished creating a new page () and a corresponding backend endpoint () to allow users to view and edit the details of a specific minutes record. This was done to fix a bug where clicking a minute entry on the main list led to a blank page. A fix for an incorrect participant count on the same page was also implemented.
     - Status: IN PROGRESS
     - Agent Testing Done: N
-    - Which testing method agent to use? Frontend testing agent. The agent needs to verify that the forms for each of the 10 new templates render correctly and that submitting them generates a valid, well-formatted PDF document.
+    - Which testing method agent to use? both. The agent needs to verify that:
+        1. Clicking a minute on the  page correctly navigates to .
+        2. The  fetches and displays the correct minute data.
+        3. The text area is editable, and the Save Changes button successfully calls the new  endpoint to update the record.
+        4. The participant count on the main  list now correctly includes both trustees and other attendees.
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - None.
+  - **Issue 1: Test the new Minutes Detail/Edit page (P0)**
+     - **Description**: The code for viewing and editing a minute has been created but not tested. The participant count fix also needs verification.
+     - **Status**: IN PROGRESS
+     - **Is recurring issue?**: N
+     - **Should Test frontend/backend/both after fix?**: Both
+     - **Next debug checklist**:
+        - Navigate to the  page.
+        - Create a test minute with both trustees and other attendees.
+        - Verify the Participants column shows the total count.
+        - Click on the newly created minute row.
+        - Confirm the app navigates to  and the page is not blank.
+        - Verify the minute's text content is displayed in the editable text area.
+        - Modify the text and click Save Changes.
+        - Refresh the page and confirm the changes were persisted.
 
 **In progress Task List**:
-  - **Task 1: Test and Finalize New Minutes Templates (P0)**
-     - **Description**: The agent has implemented the code for the first 10 new minutes templates but has not yet tested the functionality end-to-end. The next step is to ensure they work as expected.
-     - **Where to resume**:
-        1. Navigate to the  page.
-        2. Systematically test each of the 10 new templates. For each one:
-            - Select the template from the dropdown.
-            - Verify the correct input form is displayed.
-            - Fill in the form with sample data.
-            - Click Generate PDF and confirm a PDF is created without errors.
-            - Visually inspect the generated PDF for correct formatting and content.
-        3. A comprehensive test should be run using the  to automate this verification.
-     - **What will be achieved with this?**: A richer, more useful template library for users, covering a wider range of common governance tasks.
-     - **Status**: IN PROGRESS
-     - **Should Test frontend/backend/both after fix?**: Both
-     - **Blocked on something**: No.
+  - None.
 
 **Upcoming and Future Tasks**
-Upcoming Tasks:
--   **Implement Remaining Minutes Templates (P1):** The user approved a large list of new templates, and only the first 10 have been implemented. The next task is to implement the remaining templates from that list.
-
 Future Tasks:
 -   Add date range filters to the Minutes page.
 -   Allow for the creation of more entity types (e.g., LLCs).
@@ -53,25 +57,29 @@ Future Tasks:
 -   Add a user-facing feedback submission system.
 
 **Completed work in this session**
-- **Structures Page Combination:**
-  - Merged  and  into a single, tabbed .
-  - Updated application routing () and navigation ().
-  - Removed the old, redundant page files.
+- **Security Overhaul:**
+  - Implemented comprehensive security features.
+  - **Added :** Contains new middleware for rate limiting (sliding window), input sanitization (XSS/injection), and setting OWASP-recommended security headers (CSP, HSTS, etc.).
+  - **Enhanced Input Validation:** Strengthened password policies and added validation to auth routes in .
 
-- **PDF Preview Enhancement:**
-  - Created a reusable .
-  - The component uses a Blob URL for reliable rendering and includes a graceful fallback UI (with Open in New Tab and Download options) when inline preview is blocked by browser security.
-  - Integrated the new modal into  and .
+- **Authentication Flow Fixes:**
+  - **Fixed Google OAuth:** Corrected an issue where a JWT token wasn't returned and stored after Google login, leading to Not authenticated errors.
+  - **Clarified Admin Login:** Verified the admin login was working and the user's issue was related to a non-existent route.
 
-- **Guided Minutes AI Wizard:**
-  - Built a new feature at  with a multi-step wizard UI ().
-  - Added a new backend router () with endpoints to fetch trust context and generate AI drafts.
-  - The wizard gathers structured input (meeting type, participants, agenda) and uses an AI service to generate a formal minutes document.
+- **Trust Units & Beneficiaries Overhaul:**
+  - **Fixed Demo Data:** Corrected incorrect unit allocations for the admin user's trust.
+  - **Fixed Form Input:** Removed strict decimal requirements on the unit issuance form ().
+  - **Combined Pages:** Merged the Trust Units and Beneficiaries pages into a single  with tabs for Overview, Certificates, and Transfers, and updated  and .
 
-- **Minutes ↔ Money Integration:**
-  - Implemented a Minutes → Money flow within the Guided Minutes wizard, allowing users to create financial records (Compensation, Distributions, etc.) directly from an approved minute.
-  - Implemented a Money → Minutes flow on the financial module pages (, etc.), allowing users to link existing transactions to minutes or create new retroactive minutes.
-  - Created a reusable  for searching and linking existing minutes.
+- **Guided Minutes & PDF Improvements:**
+  - **Fixed PDF Formatting:** Updated  to correctly parse and style AI-generated text, preserving paragraphs and adding legal document styling.
+  - **Fixed Participant Titling:** Modified  and the backend to differentiate between Trustees and Other Attendees, ensuring only trustees are titled as such in the final PDF.
+
+- **Compensation Module UX Improvement:**
+  - Updated  to add a Recipient Trustee dropdown to the payment form and clarified UI text for better usability. The backend was updated to store the .
+
+- **Expanded Minutes Templates:**
+  - Implemented and successfully tested 10 new minutes templates, from Trust Amendment to Conflict of Interest Disclosure, expanding the template library.
 
 **Earlier issues found/mentioned but not fixed**
    - None.
@@ -83,84 +91,78 @@ Future Tasks:
 
 
 **Key Technical Concepts**
-- **Blob URLs for PDF Preview:** Using  to create temporary, browser-friendly URLs for embedding PDFs, which is more reliable than base64 data URIs.
-- **Graceful Fallback UI:** Detecting iframe load failures (due to environment security) and displaying a user-friendly alternative UI with clear action buttons.
-- **AI-Powered Wizard:** Building a multi-step form that collects structured data and uses it to prompt an LLM for a complex document generation task.
-- **Bi-Directional Data Linking:** Implementing UI and API logic to connect two different data models (Minutes and financial records) from either direction, improving data integrity and user workflow.
-- **Dynamic Form Generation:** Extending a system where frontend forms are dynamically rendered based on a selected template type.
+- **Security Middleware (FastAPI):** Implementation of custom middleware for rate limiting, input sanitization, and adding security headers.
+- **Input Validation & Sanitization:** Using Pydantic for data validation and custom logic to prevent XSS and injection attacks.
+- **OWASP Best Practices:** Applying security headers (CSP, HSTS, X-Frame-Options), rate limiting, and secure password/token handling.
+- **Advanced PDF Generation (ReportLab):** Parsing text with line breaks and using custom styles to generate professionally formatted legal documents.
+- **Component Composition (React):** Combining multiple pages (, ) into a single, tabbed component () for a unified UX.
 
 **key DB schema**
-  - A  field (ObjectId, nullable) has been added to the schemas for , , and  to create a direct link to a minutes entry.
+  - : Added  (String, nullable) to store non-trustee participants.
+  - : Added  (String) to link a payment to a specific trustee.
 
 **changes in tech stack**
   - None.
 
 **All files of reference**
-- **Current Task (Templates):**
-    - 
-    - 
-- **Recently Completed/Modified:**
-    - 
-    - 
-    - 
-    - 
-    - 
-    - 
-    - 
-    - 
-    - 
-    - 
+- **Last Working Item:**
+  -  (New)
+  -  (Updated)
+  -  (Updated)
+  -  (Updated)
+- **Security:**
+  -  (New)
+  -  (Updated)
+  -  (Updated)
+- **Feature/Bug Fixes:**
+  -  (New)
+  -  (Updated)
+  -  (Updated)
+  -  (Updated)
+  -  (Updated)
 
 **Areas that need refactoring**:
-- None.
+- The old  and  files still exist but are no longer used in routing. They should be deleted to avoid confusion.
 
 **key api endpoints**
-- **Guided Minutes:**
-    - 
-    - 
-    - 
-    - 
-- **Financial Record Linking:**
-    - 
-    - 
-    - 
-- **Templates:**
-    -  (Updated to include 10 new templates)
+-  (NEW): Updates the text content of an existing minutes record.
+- Security-related endpoints like  and  now have enhanced validation and rate limiting.
 
 **Critical Info for New Agent**
-- Your immediate priority is to thoroughly test the 10 new minutes templates implemented at the end of the last session. Follow the test plan under In progress Task List.
-- The user is highly focused on improving governance workflows. Features that connect different parts of the application (like the Minutes ↔ Money integration) are well-received.
-- The codebase now contains several powerful reusable components (, ). Familiarize yourself with them to avoid re-implementing similar functionality.
+- Your immediate priority is to test the newly created **Minutes Detail/Edit page**. Verify that clicking a minute opens the page, data loads, edits can be saved via the new  endpoint, and the participant count on the main list is correct.
+- The application has undergone a significant security hardening. Be aware of the new rate limits on API endpoints (, , etc.) during testing.
+- The user has been frustrated with the Trust Units data and form inputs in the past. Although fixed, be extra cautious if making any changes in the  component.
+- The old  and  should be deleted as they have been replaced by the new .
 
 **documents and test reports created in this job**
 -  (Continuously updated)
-- Multiple test reports in , with the latest being  and .
+- Multiple test reports in , with the latest being , , and .
 
 **Last 10 User Messages and any pending HUMAN messages**
-1. **User:** Approved the plan to expand the minutes template library.
-2. **User:** Please do the first 10 (referring to the list of new templates).
-3. **Agent:** Started implementation of the 10 templates.
-4. **User:** The Minutes ↔ Money feature has been implemented. Is there anything else?
-5. **Agent:** Showed screenshots confirming the Money → Minutes flow is complete and working.
-6. **User:** Expand minutes templates library
-7. **Agent:** Proposed a detailed plan for a large number of new templates, categorized by function.
-8. **User:** approve (approving the plan for the Minutes ↔ Money integration).
-9. **Agent:** Proposed a detailed, multi-step plan to implement the full bi-directional Minutes ↔ Money integration.
-10. **User:** Please refine the integration between Guided Minutes and the Compensation / Distributions / Benevolence modules... (Detailed feature request for Minutes ↔ Money).
+1.  **User**: Requested marketing content for the new features to pass to a website builder. (Agent provided)
+2.  **User**: Requested a deployment health check. (Agent ran and passed)
+3.  **User**: Asked detailed security questions about API keys, input validation, auth, and rate limiting.
+4.  **Agent**: Acknowledged and began a comprehensive security audit and implementation.
+5.  **User**: Reported issues with admin login and Not authenticated errors after Google login.
+6.  **Agent**: Investigated and fixed the auth flow issues.
+7.  **User**: Reported a recurring issue with incorrect Trust Unit demo data (400 units) and a form input that required decimals. Expressed frustration.
+8.  **Agent**: Apologized, investigated, and fixed both the bad demo data and the form input's  attribute.
+9.  **User**: Reported that clicking on a minute leads to a blank screen and that non-trustee participants are not counted in the list.
+10. **Agent**: Acknowledged and began creating a new detail/edit page and fixing the participant count logic. (This is the current state).
 
 **Project Health Check:**
 - **Broken:** None
 - **Mocked:** Postmark integration for transactional emails remains in sandbox mode.
 
 **3rd Party Integrations**
-- **Anthropic Claude:** (Text Generation) Integrated via  library, uses Emergent LLM Key.
+- **Anthropic Claude:** (Text Generation) Integrated via , uses Emergent LLM Key.
 - **Google Auth:** Emergent-managed Google social login.
 - **Stripe:** (Payments) Integrated with user-provided API keys.
 - **Postmark:** (Email) Integrated for transactional emails (sandbox mode).
-- **Google Analytics (GA4):** Base tracking snippet and page view tracking implemented.
+- **Google Analytics (GA4):** Base tracking snippet implemented.
 
 **Testing status**
-  - Testing agent used after significant changes: YES. The testing agent was used successfully after every major feature completion in this session (Structures, PDF Preview, Guided Minutes, Minutes↔Money).
+  - Testing agent used after significant changes: YES. The testing agent was used to verify new templates, the compensation fix, and the combined beneficiaries page.
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
   - Known regressions: None
@@ -170,4 +172,5 @@ Future Tasks:
 - **Full-Access Admin:**  / 
 
 **What agent forgot to execute**
-- The agent has not yet tested the 10 newly implemented minutes templates. This is the primary pending item and should be the immediate next step.</analysis>
+- The agent did not test the final implementation of the  and the corresponding backend endpoint.
+- The agent did not delete the old, now-unused page components (, ) after creating the combined .</analysis>

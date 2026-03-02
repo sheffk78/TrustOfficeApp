@@ -9,6 +9,7 @@ import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import AuthCallback from "@/pages/AuthCallback";
 import DashboardPage from "@/pages/DashboardPage";
 import MinutesPage from "@/pages/MinutesPage";
+import MinutesDetailPage from "@/pages/MinutesDetailPage";
 import NewMinutesPage from "@/pages/NewMinutesPage";
 import MinutesTemplatesPage from "@/pages/MinutesTemplatesPage";
 import MinutesTemplateFormPage from "@/pages/MinutesTemplateFormPage";
@@ -26,7 +27,6 @@ import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
 import PricingPage from "@/pages/PricingPage";
-import TrustUnitsPage from "@/pages/TrustUnitsPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -126,6 +126,11 @@ const AppRouter = () => {
       <Route path="/minutes" element={
         <SubscriptionProtectedRoute>
           <MinutesPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/minutes/:minutesId" element={
+        <SubscriptionProtectedRoute>
+          <MinutesDetailPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/minutes/new" element={

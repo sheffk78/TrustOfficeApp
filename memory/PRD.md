@@ -3,6 +3,32 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
+## Latest Update (Mar 2, 2026) - MINUTES DETAIL/EDIT PAGE & BUG FIXES ✅
+
+**Session Summary:** Fixed critical bugs with the Minutes Detail page and participant count display.
+
+**Fixes Completed:**
+1. **Backend `Request` Import Bug** - Fixed missing `Request` import in `minutes.py` that was crashing the backend
+2. **MinutesResponse Model Update** - Added `other_attendees_text`, `source`, and `updated_at` fields to the response model
+3. **Participant Count Display** - Minutes list now correctly shows total participants (trustees + other attendees)
+4. **Minutes Detail Page** - Fully functional view/edit page at `/minutes/:id` with:
+   - Meeting info display (date, type, created timestamp)
+   - Participants section showing trustees and other attendees separately
+   - Editable content textarea
+   - Save Changes functionality via PUT endpoint
+   - View PDF button
+5. **Code Cleanup** - Deleted unused legacy files:
+   - `TrustUnitsPage.js` (replaced by BeneficiariesPage)
+   - `BeneficiaryDashboardPage.js` (replaced by BeneficiariesPage)
+   - Removed unused import from App.js
+
+**Files Modified:**
+- `/app/backend/routers/minutes.py` - Added `Request` import
+- `/app/backend/models.py` - Updated `MinutesResponse` model
+- `/app/frontend/src/App.js` - Removed unused import
+
+**Testing:** All endpoints tested via curl and screenshot automation - navigation, data loading, editing, and saving all working correctly.
+
 ## Architecture
 
 ### Tech Stack

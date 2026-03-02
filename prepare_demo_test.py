@@ -3,7 +3,7 @@
 import requests
 import json
 
-BACKEND_URL = "https://trust-templates-test.preview.emergentagent.com"
+BACKEND_URL = "https://trustoffice-preview-1.preview.emergentagent.com"
 API_URL = f"{BACKEND_URL}/api"
 
 def test_demo_user_and_seed():
