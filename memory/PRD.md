@@ -33,7 +33,7 @@ Build TrustOffice - a trust governance workspace for individual/family trustees.
      - `GET /api/trust-units/certificates/{id}/pdf` - Generate certificate PDF
      - `POST /api/trust-units/transfers` - Transfer units between holders
      - `GET /api/trust-units/transfers` - List all transfers
-     - `POST /api/trust-units/create-from-minutes/{id}` - Create certificates from beneficiary designation minutes
+     - `POST /api/trust-units/bootstrap-from-minutes/{minutes_id}` - Bootstrap certificates from beneficiary designation minutes (admin operation)
    - **Database Collections**:
      - `trust_units_settings`: total_authorized_units, unit_label, allow_fractional
      - `trust_unit_certificates`: certificate_id, holder_name, units, percentage, certificate_number (CU-XXX), status
