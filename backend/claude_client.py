@@ -12,9 +12,11 @@ logger = logging.getLogger(__name__)
 # Get Claude API key from environment
 CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
 
-# Model mappings
+# Model mappings - using the supported model names
+# For Sonnet: claude-sonnet-4-5-20250929 or claude-sonnet-4-5
+# For Haiku: claude-haiku-4-5 or claude-3-5-haiku-latest
 CLAUDE_SONNET = "claude-sonnet-4-5-20250929"
-CLAUDE_HAIKU = "claude-3-5-haiku-20241022"
+CLAUDE_HAIKU = "claude-haiku-4-5"
 
 
 class ClaudeClientError(Exception):
