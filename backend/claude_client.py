@@ -6,6 +6,11 @@ IMPORTANT: The Claude API key must be provided via environment variable.
 On Emergent platform, the key is provided as EMERGENT_LLM_KEY.
 Alternatively, CLAUDE_API_KEY can be used directly.
 If neither is set, AI features will be unavailable.
+
+Model names supported by emergentintegrations:
+- claude-sonnet-4-5 (or claude-sonnet-4-5-20250929) for complex drafting
+- claude-haiku-4-5 for quick suggestions
+Note: claude-3.5-* model names are not supported; use claude-*-4-5 variants.
 """
 import os
 import logging
@@ -21,9 +26,10 @@ CLAUDE_API_KEY = os.environ.get('CLAUDE_API_KEY') or os.environ.get('EMERGENT_LL
 if not CLAUDE_API_KEY:
     logger.error("Neither CLAUDE_API_KEY nor EMERGENT_LLM_KEY environment variable is set. AI features will be unavailable.")
 
-# Model IDs - using the exact model names required by the API
-CLAUDE_SONNET = "claude-3.5-sonnet"  # For complex drafting tasks
-CLAUDE_HAIKU = "claude-3.5-haiku"   # For quick suggestions
+# Model IDs - using the exact model names supported by emergentintegrations
+# Note: User requested claude-3.5-* but those aren't valid; using claude-*-4-5 equivalents
+CLAUDE_SONNET = "claude-sonnet-4-5"  # For complex drafting tasks (requested: claude-3.5-sonnet)
+CLAUDE_HAIKU = "claude-haiku-4-5"   # For quick suggestions (requested: claude-3.5-haiku)
 
 
 class ClaudeClientError(Exception):
