@@ -117,8 +117,8 @@ class TestBootstrapFromMinutesEndpoint:
         remaining_units = summary.get("remaining_units", 0)
         
         # Skip if not enough remaining units
-        if remaining_units < 10:
-            pytest.skip(f"Not enough remaining units ({remaining_units}). Need at least 10 units.")
+        if remaining_units < 6:
+            pytest.skip(f"Not enough remaining units ({remaining_units}). Need at least 6 units.")
         
         # Step 1: Create a fresh designation_of_beneficiaries minutes with units fitting remaining
         unique_suffix = uuid.uuid4().hex[:6]
