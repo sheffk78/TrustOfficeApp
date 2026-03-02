@@ -26,7 +26,9 @@ import {
   Landmark,
   PlusCircle,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  Bot
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
