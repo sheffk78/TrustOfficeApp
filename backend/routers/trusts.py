@@ -44,6 +44,10 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
         "name": trust.name,
         "trust_type": trust.trust_type.value,
         "jurisdiction": trust.jurisdiction,
+        "role": trust.role or "Trustee",
+        "start_date": trust.start_date,
+        "trustees": trust.trustees,
+        "authority_clause": trust.authority_clause,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     

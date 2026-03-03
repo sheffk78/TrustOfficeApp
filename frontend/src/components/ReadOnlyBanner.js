@@ -8,10 +8,19 @@ import { Button } from '@/components/ui/button';
  * Displays at the top of pages to inform users they can view but not modify data
  */
 export const ReadOnlyBanner = () => {
-  const { isReadOnly, subscription, subscriptionExpired } = useAuth();
+  const { isReadOnly, subscription, subscriptionExpired, loading } = useAuth();
+  
+  // Don't show while loading auth state to prevent flickering
+  if (loading) return null;
+  
+  // Don't show if subscription hasn't been loaded yet
+  if (!subscription) return null;
   
   // Don't show if not in read-only mode
   if (!isReadOnly && !subscriptionExpired) return null;
+  
+  // Don't show for active trials
+  if (subscription?.is_trial && subscription?.is_active) return null;
   
   const trialExpired = subscription?.status === 'expired' && subscription?.is_trial;
   const subCanceled = subscription?.status === 'canceled';

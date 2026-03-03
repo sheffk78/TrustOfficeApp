@@ -63,24 +63,36 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     if quarterly_achieved:
         total_score += 20
     
-    # 2. Task Compliance (+20)
+    # 2. Task Compliance (+20) - Only count if there are tasks to track
+    total_tasks = await db.governance_tasks.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
     overdue_tasks = await db.governance_tasks.count_documents({
         "trust_id": trust_id,
         "user_id": user_id,
         "completed_at": None,
         "due_date": {"$lt": now.isoformat()}
     })
-    task_compliance = overdue_tasks == 0
+    
+    # Only give points if there are actual tasks being tracked
+    if total_tasks > 0:
+        task_compliance = overdue_tasks == 0
+        task_points = 20 if task_compliance else max(0, 20 - (overdue_tasks * 5))
+    else:
+        task_compliance = None  # No data
+        task_points = 0
+    
     criteria.append(HealthScoreCriterion(
         name="Task Compliance",
-        description="No overdue governance tasks",
-        points=20 if task_compliance else 0,
-        achieved=task_compliance
+        description="No overdue governance tasks" if total_tasks > 0 else "No governance tasks tracked yet",
+        points=task_points,
+        achieved=task_compliance if task_compliance is not None else False,
+        no_data=total_tasks == 0
     ))
-    if task_compliance:
-        total_score += 20
+    total_score += task_points
     
-    # 3. Compensation Alignment (+20)
+    # 3. Compensation Alignment (+20) - Only count if there's a compensation plan
     year_start = get_year_start(now)
     comp_plan = await db.compensation_plans.find_one(
         {"trust_id": trust_id, "user_id": user_id},
@@ -96,17 +108,19 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         ytd_total = sum(p.get("amount", 0) for p in ytd_payments)
         approved_amount = comp_plan.get("annual_approved_amount") or comp_plan.get("annual_fee") or comp_plan.get("annual_amount", 0)
         comp_aligned = ytd_total <= approved_amount
+        comp_points = 20 if comp_aligned else 0
     else:
-        comp_aligned = True
+        comp_aligned = None  # No data
+        comp_points = 0
     
     criteria.append(HealthScoreCriterion(
         name="Compensation Alignment",
-        description="YTD compensation within approved plan",
-        points=20 if comp_aligned else 0,
-        achieved=comp_aligned
+        description="YTD compensation within approved plan" if comp_plan else "No compensation plan set up yet",
+        points=comp_points,
+        achieved=comp_aligned if comp_aligned is not None else False,
+        no_data=comp_plan is None
     ))
-    if comp_aligned:
-        total_score += 20
+    total_score += comp_points
     
     # 4. Distribution Documentation (+20) - includes benevolence documentation quality
     dist_count = await db.distribution_records.count_documents({

@@ -69,7 +69,10 @@ export default function SettingsPage() {
     name: '',
     trust_type: 'family',
     jurisdiction: '',
-    role: 'Trustee'
+    role: 'Trustee',
+    start_date: '',
+    trustees: '',
+    authority_clause: ''
   });
   const [createTrustLoading, setCreateTrustLoading] = useState(false);
   
@@ -355,13 +358,17 @@ export default function SettingsPage() {
 
     setCreateTrustLoading(true);
     try {
+      // Create the trust
       const response = await fetchWithAuth('/trusts', {
         method: 'POST',
         body: JSON.stringify({
           name: newTrustData.name.trim(),
           trust_type: newTrustData.trust_type,
           jurisdiction: newTrustData.jurisdiction.trim(),
-          role: newTrustData.role
+          role: newTrustData.role,
+          start_date: newTrustData.start_date || null,
+          trustees: newTrustData.trustees.trim() || null,
+          authority_clause: newTrustData.authority_clause.trim() || null
         })
       });
 
@@ -371,9 +378,29 @@ export default function SettingsPage() {
       }
 
       const createdTrust = await response.json();
+      
+      // Auto-create the trust as an entity in the Entities section
+      try {
+        await fetchWithAuth('/entities', {
+          method: 'POST',
+          body: JSON.stringify({
+            trust_id: createdTrust.trust_id,
+            name: newTrustData.name.trim(),
+            entity_type: 'trust',
+            jurisdiction: newTrustData.jurisdiction.trim(),
+            formation_date: newTrustData.start_date || new Date().toISOString().split('T')[0],
+            status: 'active',
+            ein: '',
+            notes: newTrustData.trustees ? `Trustees: ${newTrustData.trustees}` : ''
+          })
+        });
+      } catch (entityError) {
+        console.log('Entity creation optional, continuing...');
+      }
+      
       toast.success('Trust created successfully!');
       setCreateTrustOpen(false);
-      setNewTrustData({ name: '', trust_type: 'family', jurisdiction: '', role: 'Trustee' });
+      setNewTrustData({ name: '', trust_type: 'family', jurisdiction: '', role: 'Trustee', start_date: '', trustees: '', authority_clause: '' });
       await loadTrusts();
       setSelectedTrust(createdTrust);
     } catch (error) {
@@ -722,26 +749,6 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Support & Feedback Section */}
-          <div className="card-trust mb-8" data-testid="support-section">
-            <div className="flex items-center gap-2 mb-4">
-              <MessageSquare className="w-5 h-5 text-navy" />
-              <h2 className="font-serif text-xl text-navy">Support & Feedback</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Have questions, need help, or want to share feedback? Our support team is here to assist you.
-            </p>
-            <Button
-              onClick={() => window.open('https://trustoffice.app/support', '_blank')}
-              className="btn-secondary"
-              data-testid="go-to-support-btn"
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Contact Support
-              <ExternalLink className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-
           {/* Demo Data Management Section */}
           <div className="card-trust mb-8" data-testid="demo-data-section">
             <div className="flex items-center gap-2 mb-4">
@@ -967,6 +974,39 @@ export default function SettingsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label className="label-trust">Trust Start Date</Label>
+                    <Input
+                      type="date"
+                      value={newTrustData.start_date}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, start_date: e.target.value })}
+                      className="mt-1 input-trust"
+                      data-testid="new-trust-start-date"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Date the trust was established</p>
+                  </div>
+                  <div>
+                    <Label className="label-trust">Trustees</Label>
+                    <Input
+                      value={newTrustData.trustees}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, trustees: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="e.g., John Smith, Jane Smith"
+                      data-testid="new-trust-trustees"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Comma-separated list of trustees</p>
+                  </div>
+                  <div>
+                    <Label className="label-trust">Authority Clause (from DOT)</Label>
+                    <Textarea
+                      value={newTrustData.authority_clause}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, authority_clause: e.target.value })}
+                      className="mt-1 input-trust min-h-[80px]"
+                      placeholder="Paste the authority/powers clause from your Declaration of Trust..."
+                      data-testid="new-trust-authority"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">This will be referenced in minutes and other documents</p>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setCreateTrustOpen(false)}>
@@ -1146,6 +1186,26 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+
+          {/* Support & Feedback Section */}
+          <div className="card-trust mb-8" data-testid="support-section">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="w-5 h-5 text-navy" />
+              <h2 className="font-serif text-xl text-navy">Support & Feedback</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Have questions, need help, or want to share feedback? Our support team is here to assist you.
+            </p>
+            <Button
+              onClick={() => window.open('https://trustoffice.app/support', '_blank')}
+              className="btn-secondary"
+              data-testid="go-to-support-btn"
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Contact Support
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
 
           {/* Notification Settings */}
           <div className="card-trust">

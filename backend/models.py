@@ -193,6 +193,10 @@ class TrustCreate(BaseModel):
     name: str
     trust_type: TrustType = TrustType.family
     jurisdiction: str = ""
+    role: Optional[str] = "Trustee"
+    start_date: Optional[str] = None
+    trustees: Optional[str] = None  # Comma-separated list
+    authority_clause: Optional[str] = None
 
 class TrustUpdate(BaseModel):
     name: Optional[str] = None
@@ -200,6 +204,9 @@ class TrustUpdate(BaseModel):
     jurisdiction: Optional[str] = None
     benevolence_enabled: Optional[bool] = None
     tax_status: Optional[str] = None
+    start_date: Optional[str] = None
+    trustees: Optional[str] = None
+    authority_clause: Optional[str] = None
 
 class TrustResponse(BaseModel):
     trust_id: str
@@ -211,7 +218,10 @@ class TrustResponse(BaseModel):
     tax_status: Optional[str] = "private"
     created_at: str
     governance_score: int = 0
-    trustees: Optional[List[str]] = []
+    trustees: Optional[str] = None  # Now string instead of List
+    start_date: Optional[str] = None
+    authority_clause: Optional[str] = None
+    role: Optional[str] = "Trustee"
 
 
 # ==================== ENTITY MODELS ====================
@@ -691,6 +701,7 @@ class HealthScoreCriterion(BaseModel):
     points: int
     max_points: int = 20
     achieved: bool
+    no_data: bool = False  # True when there's nothing to measure yet
 
 class HealthScoreResponse(BaseModel):
     trust_id: str
