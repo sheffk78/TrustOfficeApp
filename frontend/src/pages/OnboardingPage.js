@@ -22,7 +22,8 @@ import {
   ClipboardList,
   HeartHandshake,
   FolderTree,
-  PieChart
+  PieChart,
+  Trash2
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -377,146 +378,152 @@ export default function OnboardingPage() {
 
             <div className="card-trust corner-mark mb-6">
               <h1 className="font-serif text-3xl text-navy mb-2">Choose How to Start</h1>
-              <p className="text-muted-foreground mb-8">
-                You can create your own trust or explore with sample data first.
+              <p className="text-muted-foreground mb-6">
+                We recommend starting with demo data to see all features in action.
               </p>
 
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
-                {/* Create Trust Option */}
-                <div className="border border-navy/20 p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-navy/10 flex items-center justify-center">
-                      <Building2 className="w-6 h-6 text-navy" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-xl text-navy">Create Your Trust</h3>
-                      <p className="text-xs text-muted-foreground">Start fresh with your own data</p>
-                    </div>
+              {/* DEMO OPTION - FEATURED */}
+              <div className="border-2 border-gold bg-gold/5 p-6 mb-6 relative">
+                <div className="absolute -top-3 left-6">
+                  <span className="bg-gold text-navy text-xs font-bold px-3 py-1 uppercase tracking-wider">
+                    Recommended
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-3 mb-4 mt-2">
+                  <div className="w-14 h-14 bg-gold/30 flex items-center justify-center">
+                    <Sparkles className="w-7 h-7 text-gold" />
                   </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="label-trust">Trust Name *</Label>
-                      <Input
-                        type="text"
-                        value={trustData.name}
-                        onChange={(e) => setTrustData({ ...trustData, name: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="e.g., Smith Family Trust"
-                        data-testid="trust-name-input"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="label-trust">Type</Label>
-                        <Select 
-                          value={trustData.trust_type} 
-                          onValueChange={(v) => setTrustData({ ...trustData, trust_type: v })}
-                        >
-                          <SelectTrigger className="mt-1 input-trust">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="family">Family Trust</SelectItem>
-                            <SelectItem value="charitable">Charitable</SelectItem>
-                            <SelectItem value="business">Business Trust</SelectItem>
-                            <SelectItem value="ecclesiastical">Ecclesiastical</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="label-trust">Your Role</Label>
-                        <Select 
-                          value={trustData.role} 
-                          onValueChange={(v) => setTrustData({ ...trustData, role: v })}
-                        >
-                          <SelectTrigger className="mt-1 input-trust">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Trustee">Trustee</SelectItem>
-                            <SelectItem value="Co-Trustee">Co-Trustee</SelectItem>
-                            <SelectItem value="Successor Trustee">Successor</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="label-trust">Jurisdiction</Label>
-                      <Input
-                        type="text"
-                        value={trustData.jurisdiction}
-                        onChange={(e) => setTrustData({ ...trustData, jurisdiction: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="e.g., Delaware, Nevada"
-                        data-testid="jurisdiction-input"
-                      />
-                    </div>
-
-                    <Button
-                      onClick={handleCreateTrust}
-                      className="w-full btn-primary h-11"
-                      disabled={loading || !trustData.name.trim()}
-                      data-testid="create-trust-btn"
-                    >
-                      {loading ? 'Creating...' : 'Create Trust'}
-                    </Button>
+                  <div>
+                    <h3 className="font-serif text-2xl text-navy">Explore with Demo Data</h3>
+                    <p className="text-sm text-muted-foreground">See everything TrustOffice can do with realistic sample data</p>
                   </div>
                 </div>
 
-                {/* Demo Data Option */}
-                <div className="border border-gold/30 bg-gold/5 p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-gold/20 flex items-center justify-center">
-                      <Sparkles className="w-6 h-6 text-gold" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-xl text-navy">Explore with Demo</h3>
-                      <p className="text-xs text-muted-foreground">See the app with sample data</p>
-                    </div>
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div className="space-y-2">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">What's Included:</p>
+                    <ul className="space-y-1.5">
+                      <li className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                        <span>2 fully-populated sample trusts</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                        <span>12+ meeting minutes with templates</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                        <span>Schedule A with 11 assets</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                        <span>Distributions, beneficiaries & more</span>
+                      </li>
+                    </ul>
                   </div>
-
-                  <div className="space-y-4">
-                    <div className="text-sm text-muted-foreground space-y-2">
-                      <p className="font-medium text-navy">Demo includes:</p>
-                      <ul className="space-y-1 ml-4">
-                        <li className="flex items-center gap-2">
-                          <CheckCircle2 className="w-3 h-3 text-success" />
-                          <span>2 sample trusts with full data</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle2 className="w-3 h-3 text-success" />
-                          <span>Meeting minutes & templates</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle2 className="w-3 h-3 text-success" />
-                          <span>Assets, distributions & more</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle2 className="w-3 h-3 text-success" />
-                          <span>Beneficiaries with unit certificates</span>
-                        </li>
-                      </ul>
+                  
+                  <div className="bg-white border border-gold/30 p-4">
+                    <div className="flex items-start gap-3">
+                      <Trash2 className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-navy text-sm mb-1">Easy to Remove Later</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Demo data is clearly marked and can be deleted with one click in Settings. 
+                          Any trusts you create yourself are completely separate and won't be affected.
+                        </p>
+                      </div>
                     </div>
-
-                    <div className="bg-white/50 border border-gold/20 p-3">
-                      <p className="text-xs text-muted-foreground">
-                        <strong className="text-navy">Easy to remove:</strong> Demo data can be deleted anytime in Settings without affecting any trusts you create.
-                      </p>
-                    </div>
-
-                    <Button
-                      onClick={handleSeedDemo}
-                      className="w-full btn-gold h-11"
-                      disabled={loading}
-                      data-testid="load-demo-btn"
-                    >
-                      {loading ? 'Loading...' : 'Load Demo Data'}
-                    </Button>
                   </div>
                 </div>
+
+                <Button
+                  onClick={handleSeedDemo}
+                  className="w-full btn-gold h-12 text-base"
+                  disabled={loading}
+                  data-testid="load-demo-btn"
+                >
+                  {loading ? (
+                    <>Loading Demo Data...</>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5 mr-2" />
+                      Start with Demo Data
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* DIVIDER */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex-1 h-px bg-navy/10"></div>
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Or</span>
+                <div className="flex-1 h-px bg-navy/10"></div>
+              </div>
+
+              {/* CREATE TRUST OPTION - SECONDARY */}
+              <div className="border border-navy/20 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-navy/10 flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-navy" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-lg text-navy">Create Your Own Trust</h3>
+                    <p className="text-xs text-muted-foreground">Start fresh without sample data</p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-4 gap-3 mb-4">
+                  <div className="md:col-span-2">
+                    <Label className="label-trust text-xs">Trust Name *</Label>
+                    <Input
+                      type="text"
+                      value={trustData.name}
+                      onChange={(e) => setTrustData({ ...trustData, name: e.target.value })}
+                      className="mt-1 input-trust h-9 text-sm"
+                      placeholder="e.g., Smith Family Trust"
+                      data-testid="trust-name-input"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust text-xs">Type</Label>
+                    <Select 
+                      value={trustData.trust_type} 
+                      onValueChange={(v) => setTrustData({ ...trustData, trust_type: v })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="family">Family</SelectItem>
+                        <SelectItem value="charitable">Charitable</SelectItem>
+                        <SelectItem value="business">Business</SelectItem>
+                        <SelectItem value="ecclesiastical">Ecclesiastical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="label-trust text-xs">Jurisdiction</Label>
+                    <Input
+                      type="text"
+                      value={trustData.jurisdiction}
+                      onChange={(e) => setTrustData({ ...trustData, jurisdiction: e.target.value })}
+                      className="mt-1 input-trust h-9 text-sm"
+                      placeholder="e.g., Delaware"
+                      data-testid="jurisdiction-input"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleCreateTrust}
+                  variant="outline"
+                  className="w-full h-10"
+                  disabled={loading || !trustData.name.trim()}
+                  data-testid="create-trust-btn"
+                >
+                  {loading ? 'Creating...' : 'Create Empty Trust'}
+                </Button>
               </div>
             </div>
           </div>
