@@ -50,14 +50,15 @@ const useGA4PageTracking = () => {
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, trusts, trustsLoading } = useAuth();
   const location = useLocation();
 
   // If user was passed via navigation state (e.g., from AuthCallback), use it
   const hasUserFromState = location.state?.user;
 
-  // Show loading spinner while auth is being verified
-  if (loading) {
+  // Show loading spinner while auth is being verified (but not for trusts on onboarding)
+  const isOnboarding = location.pathname.includes('/onboarding');
+  if (loading || (!isOnboarding && trustsLoading)) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
@@ -71,6 +72,12 @@ const ProtectedRoute = ({ children }) => {
   // After loading is complete, check if user is authenticated
   if (!user && !hasUserFromState) {
     return <Navigate to="/" replace />;
+  }
+
+  // Redirect new users (no trusts) to onboarding, except if already on onboarding
+  // Only redirect if we've finished loading trusts
+  if (user && !trustsLoading && trusts && trusts.length === 0 && !isOnboarding) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return children;

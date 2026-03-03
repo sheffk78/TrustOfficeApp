@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
   // If no token, we know immediately user is not authenticated
   const [loading, setLoading] = useState(hasStoredToken());
   const [trusts, setTrusts] = useState([]);
+  const [trustsLoading, setTrustsLoading] = useState(true);
   const [selectedTrust, setSelectedTrust] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
@@ -104,6 +105,7 @@ export const AuthProvider = ({ children }) => {
 
   // Internal function that doesn't depend on state
   const loadTrustsInternal = async (forceSelectNew = false) => {
+    setTrustsLoading(true);
     try {
       const response = await fetch(`${API}/trusts`, {
         credentials: 'include',
@@ -125,6 +127,8 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Failed to load trusts:', error);
+    } finally {
+      setTrustsLoading(false);
     }
   };
 
@@ -307,6 +311,7 @@ export const AuthProvider = ({ children }) => {
     setLoading,
     trusts,
     setTrusts,
+    trustsLoading,
     selectedTrust,
     setSelectedTrust: selectTrust,
     subscription,
