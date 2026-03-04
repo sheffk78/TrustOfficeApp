@@ -1,5 +1,5 @@
 """
-AI Service - AI-powered features for TrustOffice
+AI Service - AI-powered features for TrustOffice App
 Provides minutes drafting and governance suggestions using Claude
 
 Note: Requires CLAUDE_API_KEY or EMERGENT_LLM_KEY environment variable.
