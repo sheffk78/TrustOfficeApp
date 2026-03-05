@@ -63,6 +63,7 @@ from routers.beneficiaries import router as beneficiaries_router
 from routers.demo import router as demo_router
 from routers.ai import router as ai_router
 from routers.guided_minutes import router as guided_minutes_router
+from routers.referrals import router as referrals_router
 
 # Import security middleware
 from security import (
@@ -250,6 +251,7 @@ app.include_router(beneficiaries_router, prefix="/api")
 app.include_router(demo_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(guided_minutes_router, prefix="/api")
+app.include_router(referrals_router, prefix="/api")
 
 
 # ==================== LIFECYCLE EVENTS ====================
@@ -311,6 +313,12 @@ async def startup_event():
         # Audit logs
         await db.audit_logs.create_index([("user_id", 1), ("timestamp", -1)])
         await db.audit_logs.create_index("audit_id", unique=True)
+        
+        # Referral indexes
+        await db.referral_codes.create_index("user_id", unique=True)
+        await db.referral_codes.create_index("code", unique=True)
+        await db.referral_tracking.create_index("referrer_user_id")
+        await db.referral_tracking.create_index("referee_user_id", unique=True)
         
         logger.info("Database indexes created/verified successfully")
     except Exception as e:

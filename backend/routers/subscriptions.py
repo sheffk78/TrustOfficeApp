@@ -215,8 +215,19 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
             "allow_promotion_codes": True  # Always allow entering promo codes
         }
         
-        # If a specific promotion code is provided, try to apply it
-        if checkout.promotion_code:
+        # Check for referral discount first (50% off for referred users)
+        try:
+            from routers.referrals import apply_referral_discount_to_checkout, mark_referee_discount_applied
+            referral_coupon = await apply_referral_discount_to_checkout(user["user_id"])
+            if referral_coupon:
+                checkout_params["discounts"] = [{"coupon": referral_coupon}]
+                await mark_referee_discount_applied(user["user_id"])
+                logger.info(f"Applied referral discount for user {user['user_id']}")
+        except Exception as e:
+            logger.error(f"Failed to check/apply referral discount: {e}")
+        
+        # If no referral discount and a specific promotion code is provided, try to apply it
+        if "discounts" not in checkout_params and checkout.promotion_code:
             try:
                 # Look up the promotion code in Stripe
                 promo_codes = stripe.PromotionCode.list(code=checkout.promotion_code, active=True, limit=1)
@@ -489,6 +500,15 @@ async def stripe_webhook(request: Request):
                 {"session_id": session["id"]},
                 {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
             )
+            
+            # Process referral conversion - apply reward to referrer
+            try:
+                from routers.referrals import process_referral_conversion
+                referral_result = await process_referral_conversion(user_id)
+                if referral_result:
+                    logger.info(f"Referral conversion processed for user {user_id}: {referral_result}")
+            except Exception as e:
+                logger.error(f"Failed to process referral conversion: {e}")
             
             # Send activation email
             user = await db.users.find_one({"user_id": user_id}, {"_id": 0})

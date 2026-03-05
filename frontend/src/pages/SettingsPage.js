@@ -32,7 +32,11 @@ import {
   Database,
   RefreshCw,
   Sparkles,
-  Plus
+  Plus,
+  Gift,
+  Users,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
@@ -77,6 +81,12 @@ export default function SettingsPage() {
   });
   const [createTrustLoading, setCreateTrustLoading] = useState(false);
   
+  // Referral state
+  const [referralData, setReferralData] = useState(null);
+  const [referralStats, setReferralStats] = useState(null);
+  const [referralLoading, setReferralLoading] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  
   const [trustData, setTrustData] = useState({
     name: selectedTrust?.name || '',
     role: selectedTrust?.role || 'Trustee',
@@ -91,7 +101,48 @@ export default function SettingsPage() {
     loadNotificationPreferences();
     loadUserPreferences();
     loadDemoStatus();
+    loadReferralData();
   }, []);
+
+  const loadReferralData = async () => {
+    setReferralLoading(true);
+    try {
+      // Load referral code and stats in parallel
+      const [codeRes, statsRes] = await Promise.all([
+        fetchWithAuth('/referrals/my-code'),
+        fetchWithAuth('/referrals/stats')
+      ]);
+      
+      if (codeRes.ok) {
+        const codeData = await codeRes.json();
+        setReferralData(codeData);
+      }
+      
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setReferralStats(statsData);
+      }
+    } catch (error) {
+      console.error('Failed to load referral data:', error);
+    } finally {
+      setReferralLoading(false);
+    }
+  };
+
+  const copyReferralLink = async () => {
+    if (!referralData?.referral_link) return;
+    
+    try {
+      await navigator.clipboard.writeText(referralData.referral_link);
+      setLinkCopied(true);
+      toast.success('Referral link copied!', {
+        description: 'Share this link with friends to earn rewards.'
+      });
+      setTimeout(() => setLinkCopied(false), 3000);
+    } catch (error) {
+      toast.error('Failed to copy link');
+    }
+  };
 
   const loadDemoStatus = async () => {
     try {
@@ -519,6 +570,122 @@ export default function SettingsPage() {
               Manage Subscription
               <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
+          </div>
+
+          {/* Refer a Friend Section */}
+          <div className="card-trust corner-mark mb-8" data-testid="referral-section">
+            <div className="flex items-center gap-2 mb-4">
+              <Gift className="w-5 h-5 text-gold" />
+              <h2 className="font-serif text-xl text-navy">Refer a Friend</h2>
+              <span className="bg-gold/20 text-gold px-2 py-0.5 text-xs font-medium rounded">
+                50% OFF
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Share TrustOffice with friends and you both save! When your friend subscribes, 
+              you both get <span className="font-semibold text-navy">50% off</span> your next payment.
+            </p>
+            
+            {referralLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-navy" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Referral Link */}
+                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
+                    Your Referral Link
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={referralData?.referral_link || ''}
+                      readOnly
+                      className="font-mono text-sm bg-white dark:bg-slate-800"
+                      data-testid="referral-link-input"
+                    />
+                    <Button
+                      onClick={copyReferralLink}
+                      variant="outline"
+                      className="shrink-0"
+                      data-testid="copy-referral-link-btn"
+                    >
+                      {linkCopied ? (
+                        <Check className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {referralData?.referral_code && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Or share your code: <span className="font-mono font-semibold text-navy">{referralData.referral_code}</span>
+                    </p>
+                  )}
+                </div>
+                
+                {/* Referral Stats */}
+                {referralStats && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                      <p className="text-2xl font-bold text-navy">{referralStats.total_referred || 0}</p>
+                      <p className="text-xs text-muted-foreground">Friends Invited</p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                      <p className="text-2xl font-bold text-green-700 dark:text-green-400">{referralStats.successful_conversions || 0}</p>
+                      <p className="text-xs text-muted-foreground">Subscribed</p>
+                    </div>
+                    <div className="text-center p-3 bg-gold/10 rounded-lg">
+                      <p className="text-2xl font-bold text-gold">{referralStats.rewards_earned || 0}</p>
+                      <p className="text-xs text-muted-foreground">Rewards Earned</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Recent Referrals */}
+                {referralStats?.referrals && referralStats.referrals.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-navy mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Recent Referrals
+                    </h3>
+                    <div className="space-y-2">
+                      {referralStats.referrals.slice(0, 5).map((ref, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                          <div>
+                            <p className="font-medium">{ref.name}</p>
+                            <p className="text-xs text-muted-foreground">{ref.email}</p>
+                          </div>
+                          <div className="text-right">
+                            {ref.status === 'converted' ? (
+                              <span className="inline-flex items-center gap-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Subscribed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded">
+                                <Clock className="w-3 h-3" />
+                                Pending
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* How it works */}
+                <div className="bg-navy/5 dark:bg-navy/20 p-4 rounded-lg mt-4">
+                  <h3 className="text-sm font-medium text-navy mb-2">How it works</h3>
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Share your unique referral link with friends</li>
+                    <li>They sign up and get 50% off their first payment</li>
+                    <li>When they subscribe, you get 50% off your next payment</li>
+                  </ol>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notification Preferences Section */}

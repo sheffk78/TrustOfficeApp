@@ -137,6 +137,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str
+    referral_code: Optional[str] = None  # Optional referral code from friend
 
 class UserLogin(BaseModel):
     email: EmailStr

@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, Gift } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -42,6 +42,7 @@ const xhrPost = (url, data) => {
 
 export default function SignUpPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { setUser } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -49,6 +50,33 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Referral code from URL params (e.g., /signup?ref=ABCD1234)
+  const [referralCode, setReferralCode] = useState('');
+  const [referralInfo, setReferralInfo] = useState(null);
+  
+  // Check for referral code on mount
+  useEffect(() => {
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      setReferralCode(refCode.toUpperCase());
+      validateReferralCode(refCode);
+    }
+  }, [searchParams]);
+  
+  const validateReferralCode = async (code) => {
+    try {
+      const response = await fetch(`${API_URL}/api/referrals/validate/${code}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.valid) {
+          setReferralInfo(data);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to validate referral code:', error);
+    }
+  };
 
   const handleSignUp = async (e) => {
     e.preventDefault();
@@ -78,11 +106,12 @@ export default function SignUpPage() {
     setLoading(true);
     
     try {
-      // Step 1: Register using XMLHttpRequest
+      // Step 1: Register using XMLHttpRequest (include referral code if present)
       await xhrPost(`${API_URL}/api/auth/register`, {
         email: trimmedEmail,
         password: password,
-        name: trimmedName
+        name: trimmedName,
+        referral_code: referralCode || null
       });
       
       // Step 2: Login using XMLHttpRequest
@@ -148,6 +177,20 @@ export default function SignUpPage() {
 
           {/* Sign up card with corner marks */}
           <div className="card-trust corner-mark relative">
+            {/* Referral banner */}
+            {referralInfo && (
+              <div className="bg-gradient-to-r from-gold/20 to-amber-100 dark:from-gold/30 dark:to-amber-900/30 -mx-6 -mt-6 px-6 py-4 mb-6 border-b border-gold/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <Gift className="w-5 h-5 text-gold" />
+                  <span className="font-medium text-navy">You've been referred!</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {referralInfo.referrer_name} invited you to TrustOffice. 
+                  Get <span className="font-semibold text-gold">{referralInfo.discount_percent}% off</span> your first payment!
+                </p>
+              </div>
+            )}
+            
             <h1 className="font-serif text-3xl text-navy mb-2">Create Account</h1>
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-8">
               Start managing your trusts

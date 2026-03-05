@@ -102,6 +102,19 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
         "updated_at": datetime.now(timezone.utc).isoformat()
     })
     
+    # Track referral if code provided
+    if user.referral_code:
+        try:
+            from routers.referrals import track_referral
+            await track_referral(
+                referee_user_id=user_id,
+                referral_code=user.referral_code
+            )
+            logger.info(f"Tracked referral for new user {user_id} with code {user.referral_code}")
+        except Exception as e:
+            logger.error(f"Failed to track referral: {e}")
+            # Don't fail registration if referral tracking fails
+    
     # Send welcome email in background
     background_tasks.add_task(
         email_service.send_welcome_email,
