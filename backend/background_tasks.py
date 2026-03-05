@@ -205,27 +205,40 @@ class BackgroundTaskRunner:
                         task_due = task.get("due_date", "")[:10]
                         task_type = task.get("task_type", "")
                         description = task.get("description", "")
+                        task_id = task.get("task_id")
                         
                         # Check if overdue
                         if task_due < today.isoformat():
-                            try:
-                                due_date_obj = datetime.fromisoformat(task_due).date()
-                                days_overdue = (today - due_date_obj).days
-                            except ValueError:
-                                days_overdue = 1
+                            # Only send overdue notification ONCE - check if we already notified
+                            overdue_notified_at = task.get("overdue_notified_at")
                             
-                            try:
-                                await email_service.send_task_overdue(
-                                    to_email=user_email,
-                                    user_name=user_name,
-                                    trust_name=trust_name,
-                                    task_type=task_type,
-                                    due_date=task_due,
-                                    days_overdue=days_overdue
-                                )
-                                emails_sent += 1
-                            except Exception as e:
-                                logger.error(f"Failed to send overdue email: {e}")
+                            if not overdue_notified_at:
+                                # First time this task is overdue - send notification
+                                try:
+                                    due_date_obj = datetime.fromisoformat(task_due).date()
+                                    days_overdue = (today - due_date_obj).days
+                                except ValueError:
+                                    days_overdue = 1
+                                
+                                try:
+                                    await email_service.send_task_overdue(
+                                        to_email=user_email,
+                                        user_name=user_name,
+                                        trust_name=trust_name,
+                                        task_type=task_type,
+                                        due_date=task_due,
+                                        days_overdue=days_overdue
+                                    )
+                                    emails_sent += 1
+                                    
+                                    # Mark this task as having been notified
+                                    await self.db.governance_tasks.update_one(
+                                        {"task_id": task_id},
+                                        {"$set": {"overdue_notified_at": now.isoformat()}}
+                                    )
+                                    logger.info(f"Sent one-time overdue notification for task {task_id}")
+                                except Exception as e:
+                                    logger.error(f"Failed to send overdue email: {e}")
                             
                         # Check if upcoming (within 7 days)
                         elif task_due <= upcoming_cutoff:

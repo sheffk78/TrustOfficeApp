@@ -597,8 +597,8 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-normal">Overdue Task Alerts</Label>
-                      <p className="text-xs text-muted-foreground">Receive alerts when tasks become overdue</p>
+                      <Label className="text-sm font-normal">Overdue Task Alert</Label>
+                      <p className="text-xs text-muted-foreground">One-time notification when a task becomes past due</p>
                     </div>
                     <Switch
                       checked={notificationPrefs.task_overdue}
