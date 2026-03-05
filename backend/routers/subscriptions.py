@@ -215,6 +215,11 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
             "allow_promotion_codes": True  # Always allow entering promo codes
         }
         
+        # Pass Rewardful referral ID as client_reference_id for affiliate tracking
+        if checkout.referral_id:
+            checkout_params["client_reference_id"] = checkout.referral_id
+            logger.info(f"Added Rewardful referral ID: {checkout.referral_id}")
+        
         # Check for referral discount first (50% off for referred users)
         try:
             from routers.referrals import apply_referral_discount_to_checkout, mark_referee_discount_applied

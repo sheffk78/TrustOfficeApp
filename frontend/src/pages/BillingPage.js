@@ -105,13 +105,20 @@ export default function BillingPage() {
     setProcessing(true);
     try {
       const currentUrl = window.location.origin;
+      const checkoutData = {
+        plan_type: planId,
+        success_url: `${currentUrl}/settings/billing?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${currentUrl}/settings/billing`
+      };
+      
+      // Add Rewardful referral ID for affiliate tracking
+      if (typeof window !== 'undefined' && window.Rewardful && window.Rewardful.referral) {
+        checkoutData.referral_id = window.Rewardful.referral;
+      }
+      
       const response = await fetchWithAuth('/subscription/create-checkout', {
         method: 'POST',
-        body: JSON.stringify({
-          plan_type: planId,
-          success_url: `${currentUrl}/settings/billing?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${currentUrl}/settings/billing`
-        })
+        body: JSON.stringify(checkoutData)
       });
       
       if (response.ok) {

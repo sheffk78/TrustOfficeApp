@@ -818,6 +818,7 @@ class CheckoutRequest(BaseModel):
     success_url: str
     cancel_url: str
     promotion_code: Optional[str] = None
+    referral_id: Optional[str] = None  # Rewardful affiliate referral ID
 
 class PortalRequest(BaseModel):
     return_url: str

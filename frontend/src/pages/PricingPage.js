@@ -99,6 +99,11 @@ export default function PricingPage() {
         checkoutData.promotion_code = couponCode;
       }
       
+      // Add Rewardful referral ID for affiliate tracking
+      if (typeof window !== 'undefined' && window.Rewardful && window.Rewardful.referral) {
+        checkoutData.referral_id = window.Rewardful.referral;
+      }
+      
       const result = await xhrPost(
         `${API_URL}/api/subscription/create-checkout`,
         checkoutData,
