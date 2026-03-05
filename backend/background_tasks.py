@@ -240,20 +240,31 @@ class BackgroundTaskRunner:
                                 except Exception as e:
                                     logger.error(f"Failed to send overdue email: {e}")
                             
-                        # Check if upcoming (within 7 days)
+                        # Check if upcoming (within 7 days) - send reminder only ONCE
                         elif task_due <= upcoming_cutoff:
-                            try:
-                                await email_service.send_task_reminder(
-                                    to_email=user_email,
-                                    user_name=user_name,
-                                    trust_name=trust_name,
-                                    task_type=task_type,
-                                    due_date=task_due,
-                                    description=description
-                                )
-                                emails_sent += 1
-                            except Exception as e:
-                                logger.error(f"Failed to send reminder email: {e}")
+                            # Only send reminder ONCE - check if we already sent one
+                            reminder_sent_at = task.get("reminder_sent_at")
+                            
+                            if not reminder_sent_at:
+                                try:
+                                    await email_service.send_task_reminder(
+                                        to_email=user_email,
+                                        user_name=user_name,
+                                        trust_name=trust_name,
+                                        task_type=task_type,
+                                        due_date=task_due,
+                                        description=description
+                                    )
+                                    emails_sent += 1
+                                    
+                                    # Mark this task as having received a reminder
+                                    await self.db.governance_tasks.update_one(
+                                        {"task_id": task_id},
+                                        {"$set": {"reminder_sent_at": now.isoformat()}}
+                                    )
+                                    logger.info(f"Sent one-time reminder for task {task_id}")
+                                except Exception as e:
+                                    logger.error(f"Failed to send reminder email: {e}")
             
             logger.info(f"Daily reminders complete: {emails_sent} emails sent")
             return emails_sent

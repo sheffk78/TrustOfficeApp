@@ -585,8 +585,8 @@ export default function SettingsPage() {
                 <div className="space-y-3 pl-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-normal">Task Reminders</Label>
-                      <p className="text-xs text-muted-foreground">Receive reminders for upcoming governance tasks</p>
+                      <Label className="text-sm font-normal">Task Reminder</Label>
+                      <p className="text-xs text-muted-foreground">One-time reminder when a task is due within 7 days</p>
                     </div>
                     <Switch
                       checked={notificationPrefs.task_reminders}
