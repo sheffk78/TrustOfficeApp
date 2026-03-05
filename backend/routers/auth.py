@@ -1,5 +1,6 @@
 # Auth router - handles authentication, registration, password reset, and OAuth
 from fastapi import APIRouter, HTTPException, Depends, Response, Request, BackgroundTasks
+from fastapi.responses import RedirectResponse
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import uuid
@@ -8,6 +9,7 @@ import logging
 import os
 import httpx
 import re
+import urllib.parse
 
 from database import db
 from dependencies import get_current_user, hash_password, verify_password, create_jwt_token, JWT_EXPIRATION_HOURS
@@ -18,6 +20,14 @@ from security import InputSanitizer
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
+
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI')
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 # ==================== INPUT VALIDATION HELPERS ====================
@@ -431,3 +441,217 @@ async def logout(request: Request, response: Response):
     
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out"}
+
+
+
+# ==================== CUSTOM GOOGLE OAUTH ====================
+
+@router.get("/auth/google/login")
+async def google_login(request: Request):
+    """
+    Initiate Google OAuth flow.
+    Redirects user to Google's consent screen with TrustOffice branding.
+    """
+    if not GOOGLE_CLIENT_ID or not GOOGLE_REDIRECT_URI:
+        raise HTTPException(status_code=500, detail="Google OAuth not configured")
+    
+    # Get the redirect URL from query params (where to go after successful auth)
+    redirect_after = request.query_params.get("redirect", "/onboarding")
+    
+    # Generate state token for CSRF protection
+    state = secrets.token_urlsafe(32)
+    
+    # Store state with redirect info (expires in 10 minutes)
+    await db.oauth_states.update_one(
+        {"state": state},
+        {"$set": {
+            "state": state,
+            "redirect_after": redirect_after,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Build Google OAuth URL
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "offline",
+        "prompt": "select_account"
+    }
+    
+    auth_url = f"{GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
+    
+    return RedirectResponse(url=auth_url)
+
+
+@router.get("/auth/google/callback")
+async def google_callback(request: Request, response: Response, code: str = None, state: str = None, error: str = None):
+    """
+    Handle Google OAuth callback.
+    Exchanges authorization code for tokens, fetches user info, and creates/updates user.
+    """
+    frontend_url = os.environ.get('FRONTEND_URL', '')
+    
+    # Handle OAuth errors
+    if error:
+        logger.error(f"Google OAuth error: {error}")
+        return RedirectResponse(url=f"{frontend_url}/login?error=oauth_failed")
+    
+    if not code or not state:
+        return RedirectResponse(url=f"{frontend_url}/login?error=missing_params")
+    
+    # Verify state token
+    state_record = await db.oauth_states.find_one({"state": state}, {"_id": 0})
+    if not state_record:
+        logger.warning(f"Invalid OAuth state: {state}")
+        return RedirectResponse(url=f"{frontend_url}/login?error=invalid_state")
+    
+    # Check if state expired
+    expires_at = datetime.fromisoformat(state_record["expires_at"].replace('Z', '+00:00'))
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < datetime.now(timezone.utc):
+        await db.oauth_states.delete_one({"state": state})
+        return RedirectResponse(url=f"{frontend_url}/login?error=state_expired")
+    
+    redirect_after = state_record.get("redirect_after", "/onboarding")
+    
+    # Delete used state
+    await db.oauth_states.delete_one({"state": state})
+    
+    try:
+        # Exchange code for tokens
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "code": code,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": GOOGLE_REDIRECT_URI
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+            
+            if token_response.status_code != 200:
+                logger.error(f"Token exchange failed: {token_response.text}")
+                return RedirectResponse(url=f"{frontend_url}/login?error=token_exchange_failed")
+            
+            tokens = token_response.json()
+            access_token = tokens.get("access_token")
+            
+            if not access_token:
+                return RedirectResponse(url=f"{frontend_url}/login?error=no_access_token")
+            
+            # Fetch user info from Google
+            userinfo_response = await client.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            
+            if userinfo_response.status_code != 200:
+                logger.error(f"Failed to fetch user info: {userinfo_response.text}")
+                return RedirectResponse(url=f"{frontend_url}/login?error=userinfo_failed")
+            
+            google_user = userinfo_response.json()
+        
+        email = google_user.get("email")
+        if not email:
+            return RedirectResponse(url=f"{frontend_url}/login?error=no_email")
+        
+        # Check if user exists
+        existing_user = await db.users.find_one({"email": email}, {"_id": 0})
+        
+        if existing_user:
+            user_id = existing_user["user_id"]
+            # Update user with latest Google info
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "name": google_user.get("name", existing_user.get("name")),
+                    "picture": google_user.get("picture", existing_user.get("picture")),
+                    "google_id": google_user.get("id"),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        else:
+            # Create new user
+            user_id = f"user_{uuid.uuid4().hex[:12]}"
+            user_doc = {
+                "user_id": user_id,
+                "email": email,
+                "name": google_user.get("name", "User"),
+                "picture": google_user.get("picture"),
+                "google_id": google_user.get("id"),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.users.insert_one(user_doc)
+            
+            # Initialize onboarding state for new users
+            await db.user_onboarding.insert_one({
+                "user_id": user_id,
+                "entities_confirmed": False,
+                "calendar_set": False,
+                "minutes_generated": False,
+                "distribution_logged": False,
+                "checklist_dismissed": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            })
+            
+            # Send welcome email
+            try:
+                await email_service.send_welcome_email(
+                    to_email=email,
+                    user_name=google_user.get("name", "User")
+                )
+            except Exception as e:
+                logger.error(f"Failed to send welcome email: {e}")
+        
+        # Generate JWT token
+        jwt_token = create_jwt_token(user_id, email)
+        
+        # Create session
+        session_token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        
+        await db.user_sessions.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "user_id": user_id,
+                "session_token": session_token,
+                "expires_at": expires_at.isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+        
+        # Set session cookie
+        response = RedirectResponse(url=f"{frontend_url}/auth/callback?token={jwt_token}&redirect={urllib.parse.quote(redirect_after)}")
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=True,
+            samesite="none",
+            max_age=7 * 24 * 3600,
+            path="/"
+        )
+        
+        logger.info(f"Google OAuth successful for user {user_id} ({email})")
+        
+        return response
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP error during Google OAuth: {e}")
+        return RedirectResponse(url=f"{frontend_url}/login?error=network_error")
+    except Exception as e:
+        logger.error(f"Unexpected error during Google OAuth: {e}")
+        return RedirectResponse(url=f"{frontend_url}/login?error=unexpected_error")

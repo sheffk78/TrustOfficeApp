@@ -116,6 +116,8 @@ const AppRouter = () => {
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/auth/google/callback" element={<AuthCallback />} />
       <Route path="/onboarding" element={
         <ProtectedRoute>
           <OnboardingPage />

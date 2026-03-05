@@ -139,9 +139,9 @@ export default function SignUpPage() {
   };
 
   const handleGoogleSignUp = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + '/onboarding';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    // Use TrustOffice's own Google OAuth (branded consent screen)
+    const redirectAfter = '/onboarding';
+    window.location.href = `${API_URL}/api/auth/google/login?redirect=${encodeURIComponent(redirectAfter)}`;
   };
 
   return (
