@@ -3,7 +3,37 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Dec 2025) - TRIAL BANNER VERIFICATION ✅
+## Latest Update (Mar 5, 2026) - REFER A FRIEND FEATURE ✅
+
+**Session Summary:** Implemented a custom "Refer a Friend" system with 50% discounts for both referrer and referee.
+
+**Feature Completed:**
+1. **Referral Code Generation** - Unique codes per user (e.g., DEMO6VGY) based on name + random chars
+2. **Referral Link** - Shareable links like `/register?ref=CODE`
+3. **Tracking System** - Tracks when new users sign up with referral codes
+4. **Discount Application** - 50% off for referred users on first payment via Stripe coupon
+5. **Referrer Rewards** - 50% off next payment when their referral subscribes
+6. **Settings UI** - "Refer a Friend" section with link, code, stats, and "How it works"
+7. **Signup Banner** - Shows "You've been referred!" banner with referrer name and discount info
+
+**Backend Endpoints:**
+- `GET /api/referrals/my-code` - Get/create user's referral code and link
+- `GET /api/referrals/stats` - Get referral statistics (invited, converted, rewards)
+- `GET /api/referrals/validate/{code}` - Validate code (public endpoint)
+
+**Files Created/Updated:**
+- `/app/backend/routers/referrals.py` (NEW - 325 lines)
+- `/app/backend/routers/auth.py` - Registration tracks referral codes
+- `/app/backend/routers/subscriptions.py` - Checkout applies referral discounts
+- `/app/frontend/src/pages/SignUpPage.js` - Referral banner UI
+- `/app/frontend/src/pages/SettingsPage.js` - Refer a Friend section
+- `/app/backend/models.py` - UserCreate model with referral_code field
+
+**Testing:** 100% pass rate (iteration_63) - 8 backend tests + all UI features verified
+
+---
+
+## Previous Update (Dec 2025) - TRIAL BANNER VERIFICATION ✅
 
 **Session Summary:** Verified TrialBanner component displays consistently across all pages for new trial users.
 
