@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { TrialBanner } from '@/components/TrialBanner';
 import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -344,6 +345,7 @@ export default function BenevolencePage() {
       <div className="main-layout" data-testid="benevolence-page">
         <Sidebar />
         <main className="main-content dot-grid">
+        <TrialBanner location="benevolence" />
           <div className="page-container">
             <div className="card-trust p-8 text-center">
               <HeartHandshake className="w-12 h-12 text-navy/30 mx-auto mb-4" />

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { TrialBanner } from '@/components/TrialBanner';
 import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -272,6 +273,7 @@ export default function CompensationPage() {
     <div className="main-layout" data-testid="compensation-page">
       <Sidebar />
       <main className="main-content dot-grid">
+        <TrialBanner location="compensation" />
         <div className="page-container">
           {/* Page Header */}
           <div className="page-header flex items-center justify-between">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -184,6 +185,7 @@ export default function ExpensesPage() {
     <div className="main-layout" data-testid="expenses-page">
       <Sidebar />
       <main className="main-content">
+        <TrialBanner location="expenses" />
         <div className="page-container">
           {/* Page Header */}
           <div className="flex items-start justify-between mb-8">

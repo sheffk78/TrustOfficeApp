@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
@@ -111,6 +112,7 @@ export default function EntityDetailPage() {
       <div className="main-layout" data-testid="entity-detail-page">
         <Sidebar />
         <main className="main-content dot-grid">
+        <TrialBanner location="entity_detail" />
           <div className="page-container">
             <div className="skeleton h-8 w-48 mb-4"></div>
             <div className="card-trust">

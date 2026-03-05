@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -414,6 +415,7 @@ export default function SettingsPage() {
     <div className="main-layout" data-testid="settings-page">
       <Sidebar />
       <main className="main-content">
+        <TrialBanner location="settings" />
         <div className="page-container max-w-3xl">
           {/* Page Header */}
           <div className="page-header">

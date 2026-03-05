@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -362,6 +363,7 @@ export default function BeneficiariesPage() {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <main className="lg:pl-64 pt-16 lg:pt-0">
+        <TrialBanner location="beneficiaries" />
         <div className="p-4 lg:p-8">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
