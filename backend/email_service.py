@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 POSTMARK_SERVER_TOKEN = os.environ.get('POSTMARK_SERVER_TOKEN', '')
 FROM_EMAIL = os.environ.get('POSTMARK_FROM_EMAIL', 'no-reply@contact.trustoffice.app')
 FROM_NAME = os.environ.get('POSTMARK_FROM_NAME', 'TrustOffice')
-APP_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://trustoffice.app').rstrip('/api').rstrip('/')
+APP_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
 
 
 class EmailService:
