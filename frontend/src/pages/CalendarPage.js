@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -298,6 +299,7 @@ export default function CalendarPage() {
           )}
         </div>
       </main>
+      <MobileBottomNav />
 
       {/* Create Task Modal */}
       {showModal && (

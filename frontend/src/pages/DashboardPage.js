@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
@@ -792,6 +793,7 @@ export default function DashboardPage() {
           )}
         </div>
       </main>
+      <MobileBottomNav />
     </div>
   );
 }

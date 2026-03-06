@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -355,6 +356,7 @@ export default function BeneficiariesPage() {
             </div>
           </div>
         </main>
+      <MobileBottomNav />
       </div>
     );
   }
@@ -726,6 +728,7 @@ export default function BeneficiariesPage() {
           </Tabs>
         </div>
       </main>
+      <MobileBottomNav />
 
       {/* ========== MODALS ========== */}
       

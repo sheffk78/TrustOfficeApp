@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { TrialBanner } from '@/components/TrialBanner';
 import { PDFPreviewModal } from '@/components/PDFPreviewModal';
@@ -300,6 +301,7 @@ export default function MinutesPage() {
           )}
         </div>
       </main>
+      <MobileBottomNav />
 
       {/* PDF Preview Modal */}
       <PDFPreviewModal

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { TrialBanner } from '@/components/TrialBanner';
 import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
 import { Button } from '@/components/ui/button';
@@ -594,6 +595,7 @@ export default function CompensationPage() {
           )}
         </div>
       </main>
+      <MobileBottomNav />
 
       {/* Plan Modal (Create/Edit) */}
       <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>

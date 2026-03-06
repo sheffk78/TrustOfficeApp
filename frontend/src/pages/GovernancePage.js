@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { TrialBanner } from '@/components/TrialBanner';
 import { fetchWithAuth } from '@/utils/api';
 import { 
@@ -403,6 +404,7 @@ export default function GovernancePage() {
           )}
         </div>
       </main>
+      <MobileBottomNav />
     </div>
   );
 }

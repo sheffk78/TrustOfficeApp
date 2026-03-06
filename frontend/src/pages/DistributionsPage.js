@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { TrialBanner } from '@/components/TrialBanner';
 import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
@@ -691,6 +692,7 @@ export default function DistributionsPage() {
           )}
         </div>
       </main>
+      <MobileBottomNav />
 
       {/* Approval Modal with Solvency & Recusal Checks */}
       {approvalModal && (
