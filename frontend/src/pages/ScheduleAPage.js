@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { TrialBanner } from '@/components/TrialBanner';
 import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { Button } from '@/components/ui/button';
@@ -681,6 +682,7 @@ export default function ScheduleAPage() {
           )}
         </div>
       </main>
+      <MobileBottomNav />
 
       {/* Dispose Asset Dialog */}
       <Dialog open={disposeDialogOpen} onOpenChange={setDisposeDialogOpen}>

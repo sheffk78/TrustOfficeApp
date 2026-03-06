@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
@@ -161,6 +162,7 @@ export default function MinutesTemplatesPage() {
           </div>
         </div>
       </main>
+      <MobileBottomNav />
     </div>
   );
 }

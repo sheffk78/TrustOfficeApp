@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -335,6 +336,7 @@ export default function MinutesDetailPage() {
           </div>
         </div>
       </main>
+      <MobileBottomNav />
 
       {/* PDF Preview Modal */}
       <PDFPreviewModal

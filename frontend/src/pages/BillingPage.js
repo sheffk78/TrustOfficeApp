@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { 
@@ -573,6 +574,7 @@ export default function BillingPage() {
           )}
         </div>
       </main>
+      <MobileBottomNav />
     </div>
   );
 }
