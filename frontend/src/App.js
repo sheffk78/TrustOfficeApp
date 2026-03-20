@@ -28,6 +28,7 @@ import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
 import PricingPage from "@/pages/PricingPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
+import AffiliatePage from "@/pages/AffiliatePage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
@@ -114,6 +115,7 @@ const AppRouter = () => {
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/register" element={<SignUpPage />} />
       <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/affiliate" element={<AffiliatePage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
