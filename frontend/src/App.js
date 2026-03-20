@@ -56,6 +56,10 @@ const ProtectedRoute = ({ children }) => {
 
   // If user was passed via navigation state (e.g., from AuthCallback), use it
   const hasUserFromState = location.state?.user;
+  
+  // Check if we're on a callback path - don't redirect yet
+  const isCallback = location.pathname.includes('/auth/callback') || 
+                     location.pathname.includes('/auth/google/callback');
 
   // Show loading spinner while auth is being verified (but not for trusts on onboarding)
   const isOnboarding = location.pathname.includes('/onboarding');
@@ -71,7 +75,9 @@ const ProtectedRoute = ({ children }) => {
   }
 
   // After loading is complete, check if user is authenticated
-  if (!user && !hasUserFromState) {
+  // Also check if we have a token - user might be set on next render
+  const hasToken = localStorage.getItem('auth_token') !== null;
+  if (!user && !hasUserFromState && !isCallback && !hasToken) {
     return <Navigate to="/" replace />;
   }
 

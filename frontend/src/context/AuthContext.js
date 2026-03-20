@@ -59,14 +59,11 @@ export const AuthProvider = ({ children }) => {
   }, [loadSubscriptionState]);
 
   const checkAuth = useCallback(async () => {
-    // Prevent duplicate auth checks
-    if (authCheckComplete.current) {
-      return;
-    }
-    
-    // CRITICAL: If returning from OAuth callback, skip the /me check.
-    // AuthCallback will exchange the session_id and establish the session first.
-    if (window.location.hash?.includes('session_id=')) {
+    // CRITICAL: If returning from OAuth callback path, skip the /me check.
+    // AuthCallback will handle the token and establish the session.
+    if (window.location.hash?.includes('session_id=') || 
+        window.location.pathname === '/auth/callback' ||
+        window.location.pathname === '/auth/google/callback') {
       setLoading(false);
       return;
     }
@@ -75,6 +72,11 @@ export const AuthProvider = ({ children }) => {
     if (!hasStoredToken()) {
       setLoading(false);
       authCheckComplete.current = true;
+      return;
+    }
+    
+    // Prevent duplicate auth checks - but allow if we have a token and no user
+    if (authCheckComplete.current && user) {
       return;
     }
 

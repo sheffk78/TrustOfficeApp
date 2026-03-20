@@ -17,8 +17,10 @@ export default function AuthCallback() {
     const processAuth = async () => {
       // Check for custom Google OAuth callback (token in query params)
       const token = searchParams.get('token');
-      const redirect = searchParams.get('redirect') || '/onboarding';
+      const redirect = searchParams.get('redirect') || '/dashboard';
       const error = searchParams.get('error');
+      
+      console.log('[AuthCallback] Processing:', { hasToken: !!token, redirect, error });
       
       // Handle OAuth errors
       if (error) {
@@ -46,6 +48,7 @@ export default function AuthCallback() {
           
           // Store the token
           localStorage.setItem('auth_token', token);
+          console.log('[AuthCallback] Token stored, fetching user...');
           
           // Fetch user data
           const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/me`, {
@@ -54,20 +57,29 @@ export default function AuthCallback() {
             }
           });
           
+          console.log('[AuthCallback] /auth/me status:', response.status);
+          
           if (response.ok) {
             const userData = await response.json();
+            console.log('[AuthCallback] User loaded:', userData.email);
             setUser(userData);
             
             // Load trusts and subscription state
             await Promise.all([loadTrusts(), loadSubscriptionState()]);
             
             toast.success('Welcome!');
-            navigate(redirect, { replace: true });
+            
+            console.log('[AuthCallback] Redirecting to:', redirect);
+            // Use window.location for a full page navigation to ensure clean state
+            window.location.href = redirect;
+            return;
           } else {
+            const errorText = await response.text();
+            console.error('[AuthCallback] /auth/me error:', errorText);
             throw new Error('Failed to fetch user data');
           }
         } catch (err) {
-          console.error('Auth callback error:', err);
+          console.error('[AuthCallback] Error:', err);
           toast.error('Authentication failed');
           localStorage.removeItem('auth_token');
           navigate('/login', { replace: true });
