@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
@@ -53,6 +53,7 @@ const useGA4PageTracking = () => {
 const ProtectedRoute = ({ children }) => {
   const { user, loading, trusts, trustsLoading } = useAuth();
   const location = useLocation();
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   // If user was passed via navigation state (e.g., from AuthCallback), use it
   const hasUserFromState = location.state?.user;
@@ -61,9 +62,22 @@ const ProtectedRoute = ({ children }) => {
   const isCallback = location.pathname.includes('/auth/callback') || 
                      location.pathname.includes('/auth/google/callback');
 
+  // Timeout to prevent infinite loading - after 10 seconds, proceed anyway
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading || trustsLoading) {
+        console.warn('[ProtectedRoute] Loading timeout reached, proceeding anyway');
+        setLoadingTimeout(true);
+      }
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [loading, trustsLoading]);
+
   // Show loading spinner while auth is being verified (but not for trusts on onboarding)
   const isOnboarding = location.pathname.includes('/onboarding');
-  if (loading || (!isOnboarding && trustsLoading)) {
+  const shouldShowLoading = (loading || (!isOnboarding && trustsLoading)) && !loadingTimeout;
+  
+  if (shouldShowLoading) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">

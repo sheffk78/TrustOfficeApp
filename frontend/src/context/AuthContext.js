@@ -34,6 +34,7 @@ export const AuthProvider = ({ children }) => {
 
   // Load the normalized subscription state from the new endpoint
   const loadSubscriptionState = useCallback(async () => {
+    console.log('[AuthContext] loadSubscriptionState called');
     try {
       const response = await fetch(`${API}/subscription/state`, {
         credentials: 'include',
@@ -42,13 +43,24 @@ export const AuthProvider = ({ children }) => {
       
       if (response.ok) {
         const state = await response.json();
+        console.log('[AuthContext] Subscription state loaded:', state.status, 'is_active:', state.is_active);
         setSubscription(state);
         setSubscriptionExpired(!state.is_active);
         setIsReadOnly(state.is_read_only);
         return state;
+      } else {
+        console.error('[AuthContext] Subscription API returned:', response.status);
+        // Set default state on error so the app doesn't hang
+        setSubscription({ is_active: false, is_read_only: true });
+        setSubscriptionExpired(true);
+        setIsReadOnly(true);
       }
     } catch (error) {
-      console.error('Failed to load subscription state:', error);
+      console.error('[AuthContext] Failed to load subscription state:', error);
+      // Set default state on error so the app doesn't hang
+      setSubscription({ is_active: false, is_read_only: true });
+      setSubscriptionExpired(true);
+      setIsReadOnly(true);
     }
     return null;
   }, []);
@@ -59,17 +71,25 @@ export const AuthProvider = ({ children }) => {
   }, [loadSubscriptionState]);
 
   const checkAuth = useCallback(async () => {
+    console.log('[AuthContext] checkAuth called', { 
+      pathname: window.location.pathname,
+      hasToken: hasStoredToken(),
+      authCheckComplete: authCheckComplete.current
+    });
+    
     // CRITICAL: If returning from OAuth callback path, skip the /me check.
     // AuthCallback will handle the token and establish the session.
     if (window.location.hash?.includes('session_id=') || 
         window.location.pathname === '/auth/callback' ||
         window.location.pathname === '/auth/google/callback') {
+      console.log('[AuthContext] On callback path, skipping auth check');
       setLoading(false);
       return;
     }
 
     // If no token exists, no need to call the API
     if (!hasStoredToken()) {
+      console.log('[AuthContext] No token, setting loading false');
       setLoading(false);
       authCheckComplete.current = true;
       return;
@@ -77,10 +97,12 @@ export const AuthProvider = ({ children }) => {
     
     // Prevent duplicate auth checks - but allow if we have a token and no user
     if (authCheckComplete.current && user) {
+      console.log('[AuthContext] Auth already complete with user');
       return;
     }
 
     try {
+      console.log('[AuthContext] Fetching /auth/me');
       const response = await fetch(`${API}/auth/me`, {
         credentials: 'include',
         headers: getAuthHeaders()
@@ -91,22 +113,29 @@ export const AuthProvider = ({ children }) => {
       }
       
       const userData = await response.json();
+      console.log('[AuthContext] User data received:', userData.email);
       setUser(userData);
       
       // Load trusts and subscription after authentication
+      console.log('[AuthContext] Loading trusts...');
       await loadTrustsInternal();
+      console.log('[AuthContext] Loading subscription...');
       await loadSubscriptionState();
+      console.log('[AuthContext] All data loaded');
     } catch (error) {
+      console.error('[AuthContext] Auth check failed:', error);
       setUser(null);
       localStorage.removeItem('auth_token');
     } finally {
       setLoading(false);
       authCheckComplete.current = true;
+      console.log('[AuthContext] Auth check complete, loading=false');
     }
   }, [loadSubscriptionState]);
 
   // Internal function that doesn't depend on state
   const loadTrustsInternal = async (forceSelectNew = false) => {
+    console.log('[AuthContext] loadTrustsInternal called');
     setTrustsLoading(true);
     try {
       const response = await fetch(`${API}/trusts`, {
@@ -116,6 +145,7 @@ export const AuthProvider = ({ children }) => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('[AuthContext] Trusts loaded:', data.length);
         setTrusts(data);
         
         // Select first trust if none selected, or if forced
@@ -126,11 +156,14 @@ export const AuthProvider = ({ children }) => {
             setSelectedTrust(storedTrust || data[0]);
           }
         }
+      } else {
+        console.error('[AuthContext] Trusts API returned:', response.status);
       }
     } catch (error) {
-      console.error('Failed to load trusts:', error);
+      console.error('[AuthContext] Failed to load trusts:', error);
     } finally {
       setTrustsLoading(false);
+      console.log('[AuthContext] trustsLoading set to false');
     }
   };
 
