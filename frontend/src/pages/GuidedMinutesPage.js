@@ -61,7 +61,7 @@ const DISTRIBUTION_PURPOSES = [
 export default function GuidedMinutesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [contextLoading, setContextLoading] = useState(true);
@@ -76,6 +76,14 @@ export default function GuidedMinutesPage() {
   const [otherAttendees, setOtherAttendees] = useState([]); // Guests, advisors, etc.
   const [customParticipant, setCustomParticipant] = useState('');
   const [customParticipantRole, setCustomParticipantRole] = useState('trustee'); // trustee or attendee
+
+  // Redirect read-only users
+  useEffect(() => {
+    if (isReadOnly) {
+      toast.error('Your trial has expired. Subscribe to create new minutes.');
+      navigate('/minutes');
+    }
+  }, [isReadOnly, navigate]);
   
   // Step 2: Agenda and decisions
   const [agendaItems, setAgendaItems] = useState(['']);

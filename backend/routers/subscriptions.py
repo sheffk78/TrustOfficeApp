@@ -531,6 +531,14 @@ async def stripe_webhook(request: Request):
                         amount=amount,
                         next_billing_date=next_billing
                     )
+                    
+                    # Send admin notification about new purchase
+                    await email_service.send_admin_new_purchase_notification(
+                        customer_email=user["email"],
+                        customer_name=user.get("name", ""),
+                        plan_type=plan_type,
+                        amount=amount
+                    )
                 except Exception as e:
                     logger.error(f"Failed to send activation email: {e}")
     

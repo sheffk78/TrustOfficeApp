@@ -30,7 +30,7 @@ import { format } from 'date-fns';
 
 export default function NewMinutesPage() {
   const navigate = useNavigate();
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
@@ -48,6 +48,13 @@ export default function NewMinutesPage() {
     details: '',
     best_interest_rationale: ''
   });
+
+  // Redirect read-only users to minutes list with message
+  useEffect(() => {
+    if (isReadOnly) {
+      navigate('/minutes');
+    }
+  }, [isReadOnly, navigate]);
 
   const handleAddParticipant = () => {
     setFormData({

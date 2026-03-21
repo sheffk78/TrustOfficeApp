@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
@@ -87,7 +88,8 @@ const OwnershipPieChart = ({ beneficiaries, totalAuthorized }) => {
 
 // ========== MAIN PAGE COMPONENT ==========
 export default function BeneficiariesPage() {
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
+  const { showUpgradeModal } = useUpgradeModal();
   const [activeTab, setActiveTab] = useState('overview');
   
   // Overview data
@@ -179,6 +181,48 @@ export default function BeneficiariesPage() {
     } catch {
       return dateStr;
     }
+  };
+
+  // Read-only guards for write actions
+  const handleOpenCertificateModal = (editing = null) => {
+    if (isReadOnly) {
+      showUpgradeModal('issue certificates', 'button_click', 'beneficiaries_page');
+      return;
+    }
+    if (editing) {
+      setEditingCertificate(editing);
+      setCertificateForm({
+        holder_name: editing.holder_name,
+        holder_identifier: editing.holder_identifier || '',
+        units: editing.units.toString(),
+        issue_date: editing.issue_date?.split('T')[0] || format(new Date(), 'yyyy-MM-dd'),
+        notes: editing.notes || ''
+      });
+    }
+    setShowCertificateModal(true);
+  };
+
+  const handleOpenTransferModal = (fromCert) => {
+    if (isReadOnly) {
+      showUpgradeModal('transfer certificates', 'button_click', 'beneficiaries_page');
+      return;
+    }
+    setTransferForm({
+      from_certificate_id: fromCert.certificate_id,
+      to_holder_name: '',
+      to_holder_identifier: '',
+      units: '',
+      reason: ''
+    });
+    setShowTransferModal(true);
+  };
+
+  const handleOpenSettingsModal = () => {
+    if (isReadOnly) {
+      showUpgradeModal('modify trust settings', 'button_click', 'beneficiaries_page');
+      return;
+    }
+    setShowSettingsModal(true);
   };
 
   const handleSaveSettings = async () => {
@@ -477,7 +521,7 @@ export default function BeneficiariesPage() {
                         <div className="text-center py-8 text-muted-foreground">
                           <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
                           <p>No certificates issued yet</p>
-                          <Button className="btn-primary mt-4" onClick={() => { setActiveTab('certificates'); setShowCertificateModal(true); }}>
+                          <Button className="btn-primary mt-4" onClick={() => { setActiveTab('certificates'); handleOpenCertificateModal(); }}>
                             <Plus className="w-4 h-4 mr-2" /> Issue First Certificate
                           </Button>
                         </div>
@@ -583,11 +627,11 @@ export default function BeneficiariesPage() {
                   </div>
                   
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setShowTransferModal(true)} disabled={!summary?.certificates?.filter(c => c.status === 'active').length} data-testid="transfer-btn">
+                    <Button variant="outline" onClick={() => handleOpenTransferModal(summary?.certificates?.find(c => c.status === 'active'))} disabled={!summary?.certificates?.filter(c => c.status === 'active').length} data-testid="transfer-btn">
                       <ArrowRightLeft className="w-4 h-4 mr-2" />
                       Transfer
                     </Button>
-                    <Button className="btn-primary" onClick={() => { resetCertificateForm(); setShowCertificateModal(true); }} data-testid="issue-units-btn">
+                    <Button className="btn-primary" onClick={() => { resetCertificateForm(); handleOpenCertificateModal(); }} data-testid="issue-units-btn">
                       <Plus className="w-4 h-4 mr-2" />
                       Issue Units
                     </Button>
@@ -612,7 +656,7 @@ export default function BeneficiariesPage() {
                   <div className="p-8 text-center">
                     <Award className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
                     <p className="text-muted-foreground mb-4">No certificates found</p>
-                    <Button className="btn-primary" onClick={() => { resetCertificateForm(); setShowCertificateModal(true); }}>
+                    <Button className="btn-primary" onClick={() => { resetCertificateForm(); handleOpenCertificateModal(); }}>
                       <Plus className="w-4 h-4 mr-2" /> Issue First Certificate
                     </Button>
                   </div>

@@ -552,6 +552,300 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Create New Trust Section */}
+          <div className="card-trust mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-navy" />
+                <h2 className="font-serif text-xl text-navy">Create New Trust</h2>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add another trust or organization to your account. Each trust has its own minutes, assets, distributions, and governance tracking.
+            </p>
+            <Dialog open={createTrustOpen} onOpenChange={setCreateTrustOpen}>
+              <DialogTrigger asChild>
+                <Button className="btn-primary" data-testid="create-trust-btn">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New Trust
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="font-serif text-xl text-navy">Create New Trust</DialogTitle>
+                  <DialogDescription>
+                    Set up a new trust entity. You can add more details after creation.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div>
+                    <Label className="label-trust">Trust Name *</Label>
+                    <Input
+                      value={newTrustData.name}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, name: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="e.g., Smith Family Trust"
+                      data-testid="new-trust-name"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust">Trust Type</Label>
+                    <Select 
+                      value={newTrustData.trust_type} 
+                      onValueChange={(v) => setNewTrustData({ ...newTrustData, trust_type: v })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="family">Family Trust</SelectItem>
+                        <SelectItem value="charitable">Charitable Trust</SelectItem>
+                        <SelectItem value="business">Business Trust</SelectItem>
+                        <SelectItem value="ecclesiastical">Ecclesiastical Trust</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="label-trust">Jurisdiction *</Label>
+                    <Input
+                      value={newTrustData.jurisdiction}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, jurisdiction: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="e.g., Delaware, Nevada, Wyoming"
+                      data-testid="new-trust-jurisdiction"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust">Your Role</Label>
+                    <Select 
+                      value={newTrustData.role} 
+                      onValueChange={(v) => setNewTrustData({ ...newTrustData, role: v })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Trustee">Trustee</SelectItem>
+                        <SelectItem value="Co-Trustee">Co-Trustee</SelectItem>
+                        <SelectItem value="Successor Trustee">Successor Trustee</SelectItem>
+                        <SelectItem value="Trust Protector">Trust Protector</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="label-trust">Trust Start Date</Label>
+                    <Input
+                      type="date"
+                      value={newTrustData.start_date}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, start_date: e.target.value })}
+                      className="mt-1 input-trust"
+                      data-testid="new-trust-start-date"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Date the trust was established</p>
+                  </div>
+                  <div>
+                    <Label className="label-trust">Trustees</Label>
+                    <Input
+                      value={newTrustData.trustees}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, trustees: e.target.value })}
+                      className="mt-1 input-trust"
+                      placeholder="e.g., John Smith, Jane Smith"
+                      data-testid="new-trust-trustees"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Comma-separated list of trustees</p>
+                  </div>
+                  <div>
+                    <Label className="label-trust">Authority Clause (from DOT)</Label>
+                    <Textarea
+                      value={newTrustData.authority_clause}
+                      onChange={(e) => setNewTrustData({ ...newTrustData, authority_clause: e.target.value })}
+                      className="mt-1 input-trust min-h-[80px]"
+                      placeholder="Paste the authority/powers clause from your Declaration of Trust..."
+                      data-testid="new-trust-authority"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">This will be referenced in minutes and other documents</p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setCreateTrustOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="btn-primary" 
+                    onClick={handleCreateTrust}
+                    disabled={createTrustLoading}
+                    data-testid="confirm-create-trust-btn"
+                  >
+                    {createTrustLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4 mr-2" />
+                    )}
+                    Create Trust
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Trust Settings */}
+          {selectedTrust && (
+            <div className="card-trust mb-8">
+              <div className="flex items-center gap-2 mb-6">
+                <Building2 className="w-5 h-5 text-navy" />
+                <h2 className="font-serif text-xl text-navy">Trust Settings</h2>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <Label className="label-trust">Trust Name</Label>
+                  <Input
+                    value={trustData.name}
+                    onChange={(e) => setTrustData({ ...trustData, name: e.target.value })}
+                    className="mt-1 input-trust"
+                    data-testid="settings-trust-name"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="label-trust">Your Role</Label>
+                    <Select 
+                      value={trustData.role} 
+                      onValueChange={(value) => setTrustData({ ...trustData, role: value })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust" data-testid="settings-role-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Trustee">Trustee</SelectItem>
+                        <SelectItem value="Co-Trustee">Co-Trustee</SelectItem>
+                        <SelectItem value="Successor Trustee">Successor Trustee</SelectItem>
+                        <SelectItem value="Trust Protector">Trust Protector</SelectItem>
+                        <SelectItem value="Beneficiary">Beneficiary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="label-trust">Review Cadence</Label>
+                    <Select 
+                      value={trustData.review_cadence} 
+                      onValueChange={(value) => setTrustData({ ...trustData, review_cadence: value })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust" data-testid="settings-cadence-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                        <SelectItem value="annual">Annual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="label-trust">Description</Label>
+                  <Textarea
+                    value={trustData.description}
+                    onChange={(e) => setTrustData({ ...trustData, description: e.target.value })}
+                    className="mt-1 input-trust min-h-[100px]"
+                    placeholder="Brief description of the trust's purpose..."
+                    data-testid="settings-trust-description"
+                  />
+                </div>
+
+                {/* Benevolence Mode Section */}
+                <div className="p-4 border border-navy/10 bg-navy/5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <HeartHandshake className="w-5 h-5 text-navy mt-0.5" />
+                      <div>
+                        <h3 className="font-medium text-navy">Benevolence Mode</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Enable charitable assistance tracking for 501/508-type trusts. 
+                          This adds a dedicated benevolence log and specialized minutes templates.
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={trustData.benevolence_enabled}
+                      onCheckedChange={(checked) => setTrustData({ ...trustData, benevolence_enabled: checked })}
+                      data-testid="benevolence-toggle"
+                    />
+                  </div>
+                  {trustData.benevolence_enabled && (
+                    <div className="mt-4 pl-8">
+                      <Label className="label-trust">Tax Status</Label>
+                      <Select 
+                        value={trustData.tax_status} 
+                        onValueChange={(value) => setTrustData({ ...trustData, tax_status: value })}
+                      >
+                        <SelectTrigger className="mt-1 input-trust max-w-xs" data-testid="tax-status-select">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="501c3">501(c)(3) Organization</SelectItem>
+                          <SelectItem value="508">508 Church/Religious Org</SelectItem>
+                          <SelectItem value="private">Private Foundation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-navy/10">
+                  <Button
+                    onClick={handleUpdateTrust}
+                    disabled={loading}
+                    className="btn-primary"
+                    data-testid="save-trust-settings"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {loading ? 'Saving...' : 'Save Changes'}
+                  </Button>
+
+                  <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" className="text-error hover:bg-error/10">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Trust
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle className="font-serif text-2xl text-navy">Delete Trust?</DialogTitle>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <p className="text-muted-foreground">
+                          Are you sure you want to delete <strong>{selectedTrust.name}</strong>? 
+                          This will permanently remove all minutes, distributions, and expenses associated with this trust.
+                        </p>
+                        <p className="mt-4 text-sm text-error font-medium">
+                          This action cannot be undone.
+                        </p>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleDeleteTrust}
+                          disabled={loading}
+                          className="bg-error hover:bg-error/90 text-white"
+                          data-testid="confirm-delete-trust"
+                        >
+                          {loading ? 'Deleting...' : 'Delete Trust'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Billing Section */}
           <div className="card-trust mb-8">
             <div className="flex items-center gap-2 mb-4">
@@ -1060,300 +1354,6 @@ export default function SettingsPage() {
               </p>
             )}
           </div>
-
-          {/* Create New Trust Section */}
-          <div className="card-trust mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Plus className="w-5 h-5 text-navy" />
-                <h2 className="font-serif text-xl text-navy">Create New Trust</h2>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Add another trust or organization to your account. Each trust has its own minutes, assets, distributions, and governance tracking.
-            </p>
-            <Dialog open={createTrustOpen} onOpenChange={setCreateTrustOpen}>
-              <DialogTrigger asChild>
-                <Button className="btn-primary" data-testid="create-trust-btn">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create New Trust
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="font-serif text-xl text-navy">Create New Trust</DialogTitle>
-                  <DialogDescription>
-                    Set up a new trust entity. You can add more details after creation.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div>
-                    <Label className="label-trust">Trust Name *</Label>
-                    <Input
-                      value={newTrustData.name}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, name: e.target.value })}
-                      className="mt-1 input-trust"
-                      placeholder="e.g., Smith Family Trust"
-                      data-testid="new-trust-name"
-                    />
-                  </div>
-                  <div>
-                    <Label className="label-trust">Trust Type</Label>
-                    <Select 
-                      value={newTrustData.trust_type} 
-                      onValueChange={(v) => setNewTrustData({ ...newTrustData, trust_type: v })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="family">Family Trust</SelectItem>
-                        <SelectItem value="charitable">Charitable Trust</SelectItem>
-                        <SelectItem value="business">Business Trust</SelectItem>
-                        <SelectItem value="ecclesiastical">Ecclesiastical Trust</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Jurisdiction *</Label>
-                    <Input
-                      value={newTrustData.jurisdiction}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, jurisdiction: e.target.value })}
-                      className="mt-1 input-trust"
-                      placeholder="e.g., Delaware, Nevada, Wyoming"
-                      data-testid="new-trust-jurisdiction"
-                    />
-                  </div>
-                  <div>
-                    <Label className="label-trust">Your Role</Label>
-                    <Select 
-                      value={newTrustData.role} 
-                      onValueChange={(v) => setNewTrustData({ ...newTrustData, role: v })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Trustee">Trustee</SelectItem>
-                        <SelectItem value="Co-Trustee">Co-Trustee</SelectItem>
-                        <SelectItem value="Successor Trustee">Successor Trustee</SelectItem>
-                        <SelectItem value="Trust Protector">Trust Protector</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Trust Start Date</Label>
-                    <Input
-                      type="date"
-                      value={newTrustData.start_date}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, start_date: e.target.value })}
-                      className="mt-1 input-trust"
-                      data-testid="new-trust-start-date"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Date the trust was established</p>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Trustees</Label>
-                    <Input
-                      value={newTrustData.trustees}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, trustees: e.target.value })}
-                      className="mt-1 input-trust"
-                      placeholder="e.g., John Smith, Jane Smith"
-                      data-testid="new-trust-trustees"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Comma-separated list of trustees</p>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Authority Clause (from DOT)</Label>
-                    <Textarea
-                      value={newTrustData.authority_clause}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, authority_clause: e.target.value })}
-                      className="mt-1 input-trust min-h-[80px]"
-                      placeholder="Paste the authority/powers clause from your Declaration of Trust..."
-                      data-testid="new-trust-authority"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">This will be referenced in minutes and other documents</p>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCreateTrustOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    className="btn-primary" 
-                    onClick={handleCreateTrust}
-                    disabled={createTrustLoading}
-                    data-testid="confirm-create-trust-btn"
-                  >
-                    {createTrustLoading ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Plus className="w-4 h-4 mr-2" />
-                    )}
-                    Create Trust
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Trust Settings */}
-          {selectedTrust && (
-            <div className="card-trust mb-8">
-              <div className="flex items-center gap-2 mb-6">
-                <Building2 className="w-5 h-5 text-navy" />
-                <h2 className="font-serif text-xl text-navy">Trust Settings</h2>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <Label className="label-trust">Trust Name</Label>
-                  <Input
-                    value={trustData.name}
-                    onChange={(e) => setTrustData({ ...trustData, name: e.target.value })}
-                    className="mt-1 input-trust"
-                    data-testid="settings-trust-name"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="label-trust">Your Role</Label>
-                    <Select 
-                      value={trustData.role} 
-                      onValueChange={(value) => setTrustData({ ...trustData, role: value })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust" data-testid="settings-role-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Trustee">Trustee</SelectItem>
-                        <SelectItem value="Co-Trustee">Co-Trustee</SelectItem>
-                        <SelectItem value="Successor Trustee">Successor Trustee</SelectItem>
-                        <SelectItem value="Trust Protector">Trust Protector</SelectItem>
-                        <SelectItem value="Beneficiary">Beneficiary</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Review Cadence</Label>
-                    <Select 
-                      value={trustData.review_cadence} 
-                      onValueChange={(value) => setTrustData({ ...trustData, review_cadence: value })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust" data-testid="settings-cadence-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="annual">Annual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="label-trust">Description</Label>
-                  <Textarea
-                    value={trustData.description}
-                    onChange={(e) => setTrustData({ ...trustData, description: e.target.value })}
-                    className="mt-1 input-trust min-h-[100px]"
-                    placeholder="Brief description of the trust's purpose..."
-                    data-testid="settings-trust-description"
-                  />
-                </div>
-
-                {/* Benevolence Mode Section */}
-                <div className="p-4 border border-navy/10 bg-navy/5">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <HeartHandshake className="w-5 h-5 text-navy mt-0.5" />
-                      <div>
-                        <h3 className="font-medium text-navy">Benevolence Mode</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Enable charitable assistance tracking for 501/508-type trusts. 
-                          This adds a dedicated benevolence log and specialized minutes templates.
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={trustData.benevolence_enabled}
-                      onCheckedChange={(checked) => setTrustData({ ...trustData, benevolence_enabled: checked })}
-                      data-testid="benevolence-toggle"
-                    />
-                  </div>
-                  {trustData.benevolence_enabled && (
-                    <div className="mt-4 pl-8">
-                      <Label className="label-trust">Tax Status</Label>
-                      <Select 
-                        value={trustData.tax_status} 
-                        onValueChange={(value) => setTrustData({ ...trustData, tax_status: value })}
-                      >
-                        <SelectTrigger className="mt-1 input-trust max-w-xs" data-testid="tax-status-select">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="501c3">501(c)(3) Organization</SelectItem>
-                          <SelectItem value="508">508 Church/Religious Org</SelectItem>
-                          <SelectItem value="private">Private Foundation</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-navy/10">
-                  <Button
-                    onClick={handleUpdateTrust}
-                    disabled={loading}
-                    className="btn-primary"
-                    data-testid="save-trust-settings"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {loading ? 'Saving...' : 'Save Changes'}
-                  </Button>
-
-                  <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" className="text-error hover:bg-error/10">
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete Trust
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle className="font-serif text-2xl text-navy">Delete Trust?</DialogTitle>
-                      </DialogHeader>
-                      <div className="py-4">
-                        <p className="text-muted-foreground">
-                          Are you sure you want to delete <strong>{selectedTrust.name}</strong>? 
-                          This will permanently remove all minutes, distributions, and expenses associated with this trust.
-                        </p>
-                        <p className="mt-4 text-sm text-error font-medium">
-                          This action cannot be undone.
-                        </p>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button 
-                          onClick={handleDeleteTrust}
-                          disabled={loading}
-                          className="bg-error hover:bg-error/90 text-white"
-                          data-testid="confirm-delete-trust"
-                        >
-                          {loading ? 'Deleting...' : 'Delete Trust'}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Support & Feedback Section */}
           <div className="card-trust mb-8" data-testid="support-section">

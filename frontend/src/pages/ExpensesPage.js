@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,8 @@ import {
 import { format, parseISO } from 'date-fns';
 
 export default function ExpensesPage() {
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
+  const { showUpgradeModal } = useUpgradeModal();
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -194,7 +196,13 @@ export default function ExpensesPage() {
                 {selectedTrust?.name || 'Select a trust'}
               </p>
             </div>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
+              if (open && isReadOnly) {
+                showUpgradeModal('add expenses', 'button_click', 'expenses_page');
+                return;
+              }
+              setDialogOpen(open);
+            }}>
               <DialogTrigger asChild>
                 <Button className="btn-primary" data-testid="add-expense-btn">
                   <Plus className="w-4 h-4 mr-2" />

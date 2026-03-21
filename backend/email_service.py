@@ -441,6 +441,61 @@ class EmailService:
             metadata={"email_type": "subscription_upgraded", "new_plan": new_plan}
         )
     
+    async def send_admin_new_purchase_notification(
+        self,
+        customer_email: str,
+        customer_name: str,
+        plan_type: str,
+        amount: str
+    ) -> Dict[str, Any]:
+        """Send notification to admin when there's a new subscription purchase"""
+        admin_email = "contact@trustoffice.app"
+        
+        subject = f"New TrustOffice Subscription: {plan_type.title()} Plan"
+        
+        html_body = f"""
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #010079;">New Subscription Purchase</h2>
+            <p>A new customer has subscribed to TrustOffice!</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">Customer Email:</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{customer_email}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">Customer Name:</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{customer_name or 'Not provided'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">Plan:</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{plan_type.title()}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">Amount:</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${amount}</td>
+                </tr>
+            </table>
+        </div>
+        """
+        
+        text_body = f"""
+New TrustOffice Subscription Purchase
+
+Customer Email: {customer_email}
+Customer Name: {customer_name or 'Not provided'}
+Plan: {plan_type.title()}
+Amount: ${amount}
+        """
+        
+        return await self.send_email(
+            to_email=admin_email,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            tag="admin_notification",
+            metadata={"email_type": "new_purchase", "plan_type": plan_type}
+        )
+    
     def get_available_templates(self) -> List[str]:
         """Get list of available template names"""
         return list(TEMPLATES.keys())

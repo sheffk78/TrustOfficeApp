@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -129,6 +129,15 @@ export default function MinutesPage() {
     navigate('/minutes/templates');
   };
 
+  // Handle guided minutes with read-only check
+  const handleGuidedMinutes = () => {
+    if (isReadOnly) {
+      showUpgradeModal('use AI-assisted minutes', 'button_click', 'minutes_page');
+      return;
+    }
+    navigate('/guided-minutes');
+  };
+
   return (
     <div className="main-layout" data-testid="minutes-page">
       <Sidebar />
@@ -145,22 +154,21 @@ export default function MinutesPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Link to="/guided-minutes">
-                <Button 
-                  variant="outline"
-                  className="border-gold/50 text-gold hover:bg-gold/10"
-                  data-testid="guided-minutes-link"
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Guided Minutes
-                  <span className="ml-2 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20">
-                    beta
-                  </span>
-                </Button>
-              </Link>
+              <Button 
+                onClick={handleGuidedMinutes}
+                variant="outline"
+                className={`border-gold/50 text-gold hover:bg-gold/10 ${isReadOnly ? 'opacity-60' : ''}`}
+                data-testid="guided-minutes-link"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Guided Minutes
+                <span className="ml-2 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20">
+                  beta
+                </span>
+              </Button>
               <Button 
                 onClick={handleRecordMinutes}
-                className="btn-primary"
+                className={`btn-primary ${isReadOnly ? 'opacity-60' : ''}`}
                 data-testid="record-minutes-btn"
               >
                 <Plus className="w-4 h-4 mr-2" />
