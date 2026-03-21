@@ -21,6 +21,7 @@ TRIAL_DAYS = 14
 # Forever free accounts - these emails get unlimited access without payment
 FOREVER_FREE_EMAILS = {
     "admin@wingpointtrusts.com",
+    "contact@trustoffice.app",
 }
 
 security = HTTPBearer(auto_error=False)
@@ -83,10 +84,11 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
     """
     now = datetime.now(timezone.utc)
     
-    # Check if user has a forever free account
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1})
+    # Check if user has a forever free account or is an admin
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "is_admin": 1})
     user_email = user.get("email", "").lower() if user else ""
-    is_forever_free = user_email in FOREVER_FREE_EMAILS
+    is_admin = user.get("is_admin", False) if user else False
+    is_forever_free = user_email in FOREVER_FREE_EMAILS or is_admin
     
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
     

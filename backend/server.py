@@ -64,6 +64,7 @@ from routers.demo import router as demo_router
 from routers.ai import router as ai_router
 from routers.guided_minutes import router as guided_minutes_router
 from routers.referrals import router as referrals_router
+from routers.admin import router as admin_router
 
 # Import security middleware
 from security import (
@@ -252,6 +253,7 @@ app.include_router(demo_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(guided_minutes_router, prefix="/api")
 app.include_router(referrals_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 
 # ==================== LIFECYCLE EVENTS ====================
@@ -328,9 +330,71 @@ async def startup_event():
         await db.ai_suggestion_cache.create_index([("user_id", 1), ("trust_id", 1)], unique=True)
         await db.ai_suggestion_cache.create_index("cached_at")  # For cache expiry queries
         
+        # Admin user index
+        await db.users.create_index("is_admin", sparse=True)
+        
         logger.info("Database indexes created/verified successfully")
+        
+        # Ensure primary admin account exists
+        await ensure_primary_admin()
+        
     except Exception as e:
         logger.error(f"Failed to create indexes: {e}")
+
+
+async def ensure_primary_admin():
+    """Ensure the primary admin account (contact@trustoffice.app) exists."""
+    import uuid
+    from datetime import datetime, timezone
+    
+    primary_admin_email = "contact@trustoffice.app"
+    
+    existing = await db.users.find_one({"email": primary_admin_email}, {"_id": 0})
+    
+    if existing:
+        # Ensure admin flag is set
+        if not existing.get("is_admin"):
+            await db.users.update_one(
+                {"email": primary_admin_email},
+                {"$set": {"is_admin": True}}
+            )
+            logger.info(f"Updated {primary_admin_email} to admin status")
+    else:
+        # Create admin account (OAuth-only, no password)
+        now = datetime.now(timezone.utc)
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        
+        await db.users.insert_one({
+            "user_id": user_id,
+            "email": primary_admin_email,
+            "name": "TrustOffice Admin",
+            "is_admin": True,
+            "created_at": now.isoformat()
+        })
+        
+        # Create forever_free subscription
+        await db.subscriptions.insert_one({
+            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+            "user_id": user_id,
+            "plan_type": "forever_free",
+            "status": "active",
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        })
+        
+        # Initialize onboarding
+        await db.user_onboarding.insert_one({
+            "user_id": user_id,
+            "entities_confirmed": False,
+            "calendar_set": False,
+            "minutes_generated": False,
+            "distribution_logged": False,
+            "checklist_dismissed": False,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        })
+        
+        logger.info(f"Created primary admin account: {primary_admin_email}")
 
 
 @app.on_event("shutdown")

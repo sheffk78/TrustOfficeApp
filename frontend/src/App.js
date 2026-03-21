@@ -29,6 +29,7 @@ import BenevolencePage from "@/pages/BenevolencePage";
 import PricingPage from "@/pages/PricingPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
+import AdminPage from "@/pages/AdminPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
@@ -248,6 +249,12 @@ const AppRouter = () => {
       <Route path="/settings/billing" element={
         <ProtectedRoute>
           <BillingPage />
+        </ProtectedRoute>
+      } />
+      {/* Admin panel - only accessible to admins */}
+      <Route path="/admin" element={
+        <ProtectedRoute>
+          <AdminPage />
         </ProtectedRoute>
       } />
     </Routes>
