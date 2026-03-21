@@ -154,7 +154,14 @@ async def list_customers(
         ]
     
     if is_admin is not None:
-        query["is_admin"] = is_admin
+        if is_admin:
+            query["is_admin"] = True
+        else:
+            # Users without is_admin field or with is_admin=false
+            query["$or"] = query.get("$or", [])
+            if not query["$or"]:
+                del query["$or"]
+            query["is_admin"] = {"$ne": True}
     
     # Get total count
     total = await db.users.count_documents(query)
