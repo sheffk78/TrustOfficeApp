@@ -63,6 +63,9 @@ const ProtectedRoute = ({ children }) => {
   const isCallback = location.pathname.includes('/auth/callback') || 
                      location.pathname.includes('/auth/google/callback');
 
+  // Check if user is admin - admins skip onboarding
+  const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
+
   // Timeout to prevent infinite loading - after 10 seconds, proceed anyway
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -96,9 +99,13 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/" replace />;
   }
 
-  // Redirect new users (no trusts) to onboarding, except if already on onboarding
-  // Only redirect if we've finished loading trusts
-  if (user && !trustsLoading && trusts && trusts.length === 0 && !isOnboarding) {
+  // Redirect new users (no trusts) to onboarding, except:
+  // - Already on onboarding
+  // - User is admin
+  // - Still loading trusts
+  // - User has explicit "skip onboarding" in localStorage (set when clicking read-only mode)
+  const skipOnboarding = localStorage.getItem('skip_onboarding') === 'true';
+  if (user && !trustsLoading && trusts && trusts.length === 0 && !isOnboarding && !isAdmin && !skipOnboarding) {
     return <Navigate to="/onboarding" replace />;
   }
 

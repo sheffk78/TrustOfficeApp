@@ -320,7 +320,10 @@ export default function OnboardingPage() {
                   </p>
                   <Button
                     variant="outline"
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => {
+                      localStorage.setItem('skip_onboarding', 'true');
+                      navigate('/dashboard');
+                    }}
                     className="w-full"
                     data-testid="view-readonly-btn"
                   >

@@ -88,7 +88,12 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "is_admin": 1})
     user_email = user.get("email", "").lower() if user else ""
     is_admin = user.get("is_admin", False) if user else False
-    is_forever_free = user_email in FOREVER_FREE_EMAILS or is_admin
+    
+    # Primary admin always gets access
+    PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
+    is_primary_admin = user_email == PRIMARY_ADMIN_EMAIL
+    
+    is_forever_free = user_email in FOREVER_FREE_EMAILS or is_admin or is_primary_admin
     
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
     

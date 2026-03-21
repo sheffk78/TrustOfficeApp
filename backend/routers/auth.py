@@ -165,18 +165,24 @@ async def login(user: UserLogin, response: Response):
     
     # Auto-grant admin status for primary admin email
     PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
-    if email == PRIMARY_ADMIN_EMAIL and not user_doc.get("is_admin"):
-        await db.users.update_one(
-            {"user_id": user_doc["user_id"]},
-            {"$set": {"is_admin": True}}
-        )
-        # Also ensure they have forever_free subscription
+    if email == PRIMARY_ADMIN_EMAIL:
+        # Always ensure admin status and forever_free subscription
+        if not user_doc.get("is_admin"):
+            await db.users.update_one(
+                {"user_id": user_doc["user_id"]},
+                {"$set": {"is_admin": True}}
+            )
+        # Always ensure forever_free active subscription
         await db.subscriptions.update_one(
             {"user_id": user_doc["user_id"]},
-            {"$set": {"plan_type": "forever_free", "status": "active"}},
+            {"$set": {
+                "plan_type": "forever_free", 
+                "status": "active",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }},
             upsert=True
         )
-        logger.info(f"Auto-granted admin status to {email} on login")
+        logger.info(f"Ensured admin status and subscription for {email}")
     
     token = create_jwt_token(user_doc["user_id"], user_doc["email"])
     
