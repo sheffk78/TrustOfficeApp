@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { fetchWithAuth } from '@/utils/api';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -19,7 +20,8 @@ import {
   Package,
   Award,
   Users,
-  Sparkles
+  Sparkles,
+  Crown
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -49,6 +51,25 @@ export const Sidebar = () => {
   const navigate = useNavigate();
   const { user, trusts, selectedTrust, setSelectedTrust, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const response = await fetchWithAuth('/api/admin/stats');
+        if (response.ok) {
+          setIsAdmin(true);
+        }
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+    
+    if (user) {
+      checkAdminStatus();
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -160,6 +181,24 @@ export const Sidebar = () => {
               </Link>
             );
           })}
+          
+          {/* Admin link - only visible to admins */}
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className={`sidebar-item ${location.pathname === '/admin' ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+              data-testid="nav-admin"
+            >
+              <Crown className="w-5 h-5" />
+              <span className="flex items-center gap-2">
+                Admin
+                <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
+                  staff
+                </span>
+              </span>
+            </Link>
+          )}
         </nav>
 
         {/* User section */}
