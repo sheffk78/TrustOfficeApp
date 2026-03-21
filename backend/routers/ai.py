@@ -4,6 +4,13 @@ Provides minutes drafting and governance suggestions using Claude
 
 Note: Claude API key must be provided via CLAUDE_API_KEY or EMERGENT_LLM_KEY environment variable.
 
+=== COST PROTECTION LAYERS (applied in order) ===
+1. Input Size Validation: Max 10,000 chars for minutes-draft (400 if exceeded)
+2. Hourly Rate Limits (in-memory): 10/hr minutes-draft, 20/hr governance-suggestions (429)
+3. Daily Caps (MongoDB ai_usage_tracking): 30/day minutes-draft, 50/day governance-suggestions (429)
+4. Monthly Budget Kill-Switch: $0.03/Sonnet, $0.002/Haiku vs AI_MONTHLY_BUDGET_CENTS (503)
+5. Caching: governance-suggestions cached 1hr per user+trust in ai_suggestion_cache
+
 === MANUAL TESTING INSTRUCTIONS ===
 To test minutes drafting:
   curl -X POST {BASE_URL}/api/ai/minutes-draft \
@@ -19,6 +26,10 @@ To test governance suggestions:
     -H "Authorization: Bearer {TOKEN}" \
     -H "Content-Type: application/json" \
     -d '{}'
+
+To test admin usage endpoint (admin only - jeff@socialize.video):
+  curl -X GET {BASE_URL}/api/ai/usage \
+    -H "Authorization: Bearer {ADMIN_TOKEN}"
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
@@ -26,6 +37,7 @@ from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 import logging
 import asyncio
+import os
 
 from dependencies import get_current_user, require_write_access
 from database import db
@@ -44,7 +56,33 @@ from claude_client import ping_claude, CLAUDE_API_KEY, CLAUDE_SONNET, CLAUDE_HAI
 router = APIRouter(prefix="/ai", tags=["ai"])
 logger = logging.getLogger(__name__)
 
-# ==================== RATE LIMITING ====================
+# ==================== CONFIGURATION ====================
+
+# Cost estimates per call (in cents)
+COST_PER_CALL_CENTS = {
+    "minutes-draft": 3.0,      # $0.03 for Sonnet
+    "governance-suggestions": 0.2  # $0.002 for Haiku
+}
+
+# Daily caps per user (stored in MongoDB)
+DAILY_CAPS = {
+    "minutes-draft": 30,
+    "governance-suggestions": 50
+}
+
+# Input size limit for minutes-draft (total chars across all fields)
+MAX_INPUT_CHARS_MINUTES_DRAFT = 10000
+
+# Monthly budget default (can be overridden by AI_MONTHLY_BUDGET_CENTS env var)
+DEFAULT_MONTHLY_BUDGET_CENTS = 5000
+
+# Cache TTL for governance suggestions (1 hour)
+CACHE_TTL_SECONDS = 3600
+
+# Admin email for usage endpoint
+ADMIN_EMAIL = "jeff@socialize.video"
+
+# ==================== HOURLY RATE LIMITING (EXISTING - DO NOT MODIFY) ====================
 # Simple in-memory rate limiter per user
 # Format: { user_id: { endpoint: [(timestamp, ...)] } }
 _rate_limit_store: dict = defaultdict(lambda: defaultdict(list))
@@ -87,6 +125,163 @@ async def check_rate_limit(user_id: str, endpoint: str) -> bool:
     return True
 
 
+# ==================== NEW: DAILY CAP LIMITING (MongoDB) ====================
+
+async def check_daily_cap(user_id: str, endpoint: str) -> bool:
+    """
+    Check if user has exceeded daily cap for the given endpoint.
+    Uses MongoDB ai_usage_tracking collection for persistence.
+    Returns True if within limit, raises HTTPException (429) if exceeded.
+    """
+    cap = DAILY_CAPS.get(endpoint, 100)
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Find or create today's usage record for this user+endpoint
+    usage = await db.ai_usage_tracking.find_one({
+        "user_id": user_id,
+        "endpoint": endpoint,
+        "date": today_start.isoformat()
+    })
+    
+    current_count = usage.get("count", 0) if usage else 0
+    
+    if current_count >= cap:
+        logger.warning(f"Daily cap exceeded for user {user_id} on {endpoint}: {current_count}/{cap}")
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily AI limit reached. You've used {current_count}/{cap} requests today. Resets at midnight UTC."
+        )
+    
+    return True
+
+
+async def record_daily_usage(user_id: str, endpoint: str, cost_cents: float):
+    """
+    Record a usage event in ai_usage_tracking.
+    Increments count and adds to estimated_cost for today.
+    """
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    await db.ai_usage_tracking.update_one(
+        {
+            "user_id": user_id,
+            "endpoint": endpoint,
+            "date": today_start.isoformat()
+        },
+        {
+            "$inc": {"count": 1, "estimated_cost_cents": cost_cents},
+            "$set": {"last_request_at": now.isoformat()}
+        },
+        upsert=True
+    )
+
+
+# ==================== NEW: MONTHLY BUDGET KILL-SWITCH ====================
+
+async def check_monthly_budget() -> bool:
+    """
+    Check if the global monthly budget has been exceeded.
+    Sums estimated_cost_cents from ai_usage_tracking for current month.
+    Returns True if within budget, raises HTTPException (503) if exceeded.
+    """
+    budget_cents = int(os.environ.get("AI_MONTHLY_BUDGET_CENTS", DEFAULT_MONTHLY_BUDGET_CENTS))
+    
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Aggregate total cost for current month
+    pipeline = [
+        {"$match": {"date": {"$gte": month_start.isoformat()}}},
+        {"$group": {"_id": None, "total_cost": {"$sum": "$estimated_cost_cents"}}}
+    ]
+    
+    result = await db.ai_usage_tracking.aggregate(pipeline).to_list(1)
+    total_cost = result[0]["total_cost"] if result else 0
+    
+    if total_cost >= budget_cents:
+        logger.error(f"Monthly AI budget exceeded: {total_cost}/{budget_cents} cents")
+        raise HTTPException(
+            status_code=503,
+            detail="AI service temporarily unavailable due to high demand. Please try again later."
+        )
+    
+    return True
+
+
+# ==================== NEW: INPUT SIZE VALIDATION ====================
+
+def validate_input_size(request: MinutesDraftRequest) -> int:
+    """
+    Calculate total input size for minutes-draft request.
+    Returns total character count.
+    Raises HTTPException (400) if exceeds MAX_INPUT_CHARS_MINUTES_DRAFT.
+    """
+    total_chars = 0
+    total_chars += len(request.minutes_type or "")
+    total_chars += len(request.meeting_date or "")
+    total_chars += sum(len(p) for p in request.participants) if request.participants else 0
+    total_chars += sum(len(d) for d in request.decisions_outline) if request.decisions_outline else 0
+    total_chars += len(request.trust_name or "")
+    total_chars += len(request.jurisdiction or "")
+    total_chars += len(request.beneficiary_standard or "")
+    total_chars += len(request.additional_context or "")
+    
+    if total_chars > MAX_INPUT_CHARS_MINUTES_DRAFT:
+        logger.warning(f"Input size exceeded: {total_chars} chars (max {MAX_INPUT_CHARS_MINUTES_DRAFT})")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Input too large. Total content is {total_chars} characters (maximum {MAX_INPUT_CHARS_MINUTES_DRAFT}). Please reduce the content size."
+        )
+    
+    return total_chars
+
+
+# ==================== NEW: CACHING FOR GOVERNANCE SUGGESTIONS ====================
+
+async def get_cached_suggestions(user_id: str, trust_id: str) -> Optional[dict]:
+    """
+    Check ai_suggestion_cache for a valid cached response.
+    Returns cached response dict if found and not expired, None otherwise.
+    """
+    now = datetime.now(timezone.utc)
+    cache_cutoff = (now - timedelta(seconds=CACHE_TTL_SECONDS)).isoformat()
+    
+    cached = await db.ai_suggestion_cache.find_one({
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "cached_at": {"$gte": cache_cutoff}
+    })
+    
+    if cached:
+        logger.info(f"Cache hit for governance-suggestions user={user_id} trust={trust_id}")
+        return cached.get("response")
+    
+    return None
+
+
+async def set_cached_suggestions(user_id: str, trust_id: str, response: dict):
+    """
+    Store governance suggestions response in cache.
+    Replaces any existing cache for this user+trust.
+    """
+    now = datetime.now(timezone.utc)
+    
+    await db.ai_suggestion_cache.update_one(
+        {"user_id": user_id, "trust_id": trust_id},
+        {
+            "$set": {
+                "response": response,
+                "cached_at": now.isoformat()
+            }
+        },
+        upsert=True
+    )
+
+
+# ==================== LOGGING ====================
+
 def log_ai_call(user_id: str, trust_id: str, endpoint: str, model: str, input_length: int):
     """
     Log a concise entry for each AI call.
@@ -114,12 +309,26 @@ async def create_minutes_draft(
     The draft is returned for review and editing - it should not
     be used as-is without trustee review.
     
-    Rate limit: 10 requests per user per hour.
+    Protection layers (in order):
+    1. Input size validation (max 10,000 chars) - 400 if exceeded
+    2. Hourly rate limit (10/hour) - 429 if exceeded
+    3. Daily cap (30/day) - 429 if exceeded
+    4. Monthly budget check - 503 if exceeded
     """
     user_id = user["user_id"]
+    endpoint = "minutes-draft"
     
-    # Check rate limit
-    await check_rate_limit(user_id, "minutes-draft")
+    # 1. INPUT SIZE VALIDATION (new)
+    input_length = validate_input_size(request)
+    
+    # 2. CHECK HOURLY RATE LIMIT (existing)
+    await check_rate_limit(user_id, endpoint)
+    
+    # 3. CHECK DAILY CAP (new)
+    await check_daily_cap(user_id, endpoint)
+    
+    # 4. CHECK MONTHLY BUDGET (new)
+    await check_monthly_budget()
     
     # Get trust info if not provided
     trust_id = "unknown"
@@ -134,17 +343,15 @@ async def create_minutes_draft(
             if not request.jurisdiction:
                 request.jurisdiction = trust.get("jurisdiction")
     
-    # Calculate approximate input length (for logging, not content)
-    input_length = len(request.minutes_type) + len(request.meeting_date) + \
-                   sum(len(p) for p in request.participants) + \
-                   sum(len(d) for d in request.decisions_outline) + \
-                   len(request.trust_name or "") + len(request.additional_context or "")
-    
     # Log the AI call (no sensitive content)
-    log_ai_call(user_id, trust_id, "minutes-draft", CLAUDE_SONNET, input_length)
+    log_ai_call(user_id, trust_id, endpoint, CLAUDE_SONNET, input_length)
     
     try:
         response = await draft_minutes_from_structured_input(request)
+        
+        # Record usage after successful call
+        await record_daily_usage(user_id, endpoint, COST_PER_CALL_CENTS[endpoint])
+        
         return response
     except HTTPException:
         raise
@@ -169,12 +376,14 @@ async def get_governance_suggestions(
     
     If trust_id is not provided, uses the user's most recent trust.
     
-    Rate limit: 20 requests per user per hour.
+    Protection layers (in order):
+    1. Hourly rate limit (20/hour) - 429 if exceeded
+    2. Daily cap (50/day) - 429 if exceeded
+    3. Monthly budget check - 503 if exceeded
+    4. Cache check (1hr TTL) - returns cached if available
     """
     user_id = user["user_id"]
-    
-    # Check rate limit
-    await check_rate_limit(user_id, "governance-suggestions")
+    endpoint = "governance-suggestions"
     
     # Get trust
     if trust_id:
@@ -195,6 +404,20 @@ async def get_governance_suggestions(
     
     trust_id = trust["trust_id"]
     trust_name = trust.get("name", "Trust")
+    
+    # CHECK CACHE FIRST (before any rate limits)
+    cached = await get_cached_suggestions(user_id, trust_id)
+    if cached:
+        return GovernanceSuggestionsResponse(**cached)
+    
+    # 1. CHECK HOURLY RATE LIMIT (existing)
+    await check_rate_limit(user_id, endpoint)
+    
+    # 2. CHECK DAILY CAP (new)
+    await check_daily_cap(user_id, endpoint)
+    
+    # 3. CHECK MONTHLY BUDGET (new)
+    await check_monthly_budget()
     
     # Calculate governance health score
     from routers.governance import calculate_health_score
@@ -269,7 +492,7 @@ async def get_governance_suggestions(
                    sum(len(a.label) for a in recent_activity)
     
     # Log the AI call (no sensitive content)
-    log_ai_call(user_id, trust_id, "governance-suggestions", CLAUDE_HAIKU, input_length)
+    log_ai_call(user_id, trust_id, endpoint, CLAUDE_HAIKU, input_length)
     
     # Build request
     suggestions_request = GovernanceSuggestionsRequest(
@@ -281,6 +504,13 @@ async def get_governance_suggestions(
     
     try:
         response = await generate_governance_suggestions(suggestions_request)
+        
+        # Record usage after successful call
+        await record_daily_usage(user_id, endpoint, COST_PER_CALL_CENTS[endpoint])
+        
+        # Cache the response
+        await set_cached_suggestions(user_id, trust_id, response.model_dump())
+        
         return response
     except HTTPException:
         raise
@@ -290,6 +520,115 @@ async def get_governance_suggestions(
             status_code=500,
             detail="AI assistant is currently unavailable. Please try again later."
         )
+
+
+@router.get("/usage")
+async def get_ai_usage(user: dict = Depends(get_current_user)):
+    """
+    Admin-only endpoint to view AI usage statistics.
+    Returns current month and last month stats.
+    
+    Restricted to: jeff@socialize.video
+    """
+    # Verify admin access
+    user_email = user.get("email", "")
+    if user_email != ADMIN_EMAIL:
+        raise HTTPException(status_code=403, detail="Access denied. Admin only.")
+    
+    now = datetime.now(timezone.utc)
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Calculate last month start
+    if current_month_start.month == 1:
+        last_month_start = current_month_start.replace(year=current_month_start.year - 1, month=12)
+    else:
+        last_month_start = current_month_start.replace(month=current_month_start.month - 1)
+    
+    budget_cents = int(os.environ.get("AI_MONTHLY_BUDGET_CENTS", DEFAULT_MONTHLY_BUDGET_CENTS))
+    
+    # Aggregate current month stats
+    current_month_pipeline = [
+        {"$match": {"date": {"$gte": current_month_start.isoformat()}}},
+        {"$group": {
+            "_id": "$endpoint",
+            "total_requests": {"$sum": "$count"},
+            "total_cost_cents": {"$sum": "$estimated_cost_cents"},
+            "unique_users": {"$addToSet": "$user_id"}
+        }}
+    ]
+    
+    # Aggregate last month stats
+    last_month_pipeline = [
+        {"$match": {
+            "date": {
+                "$gte": last_month_start.isoformat(),
+                "$lt": current_month_start.isoformat()
+            }
+        }},
+        {"$group": {
+            "_id": "$endpoint",
+            "total_requests": {"$sum": "$count"},
+            "total_cost_cents": {"$sum": "$estimated_cost_cents"},
+            "unique_users": {"$addToSet": "$user_id"}
+        }}
+    ]
+    
+    current_month_results = await db.ai_usage_tracking.aggregate(current_month_pipeline).to_list(10)
+    last_month_results = await db.ai_usage_tracking.aggregate(last_month_pipeline).to_list(10)
+    
+    def format_results(results):
+        stats = {}
+        total_cost = 0
+        total_requests = 0
+        for r in results:
+            endpoint = r["_id"]
+            stats[endpoint] = {
+                "requests": r["total_requests"],
+                "cost_cents": round(r["total_cost_cents"], 2),
+                "unique_users": len(r["unique_users"])
+            }
+            total_cost += r["total_cost_cents"]
+            total_requests += r["total_requests"]
+        return {
+            "by_endpoint": stats,
+            "total_requests": total_requests,
+            "total_cost_cents": round(total_cost, 2),
+            "total_cost_dollars": round(total_cost / 100, 2)
+        }
+    
+    current_stats = format_results(current_month_results)
+    last_stats = format_results(last_month_results)
+    
+    # Calculate budget status
+    budget_used_percent = (current_stats["total_cost_cents"] / budget_cents * 100) if budget_cents > 0 else 0
+    days_elapsed = now.day
+    days_in_month = 30  # Approximate
+    projected_monthly_cost = (current_stats["total_cost_cents"] / days_elapsed * days_in_month) if days_elapsed > 0 else 0
+    
+    return {
+        "budget": {
+            "monthly_budget_cents": budget_cents,
+            "monthly_budget_dollars": round(budget_cents / 100, 2),
+            "current_month_used_cents": current_stats["total_cost_cents"],
+            "current_month_used_percent": round(budget_used_percent, 1),
+            "projected_monthly_cost_cents": round(projected_monthly_cost, 2),
+            "on_track": projected_monthly_cost <= budget_cents
+        },
+        "current_month": {
+            "period": current_month_start.strftime("%Y-%m"),
+            **current_stats
+        },
+        "last_month": {
+            "period": last_month_start.strftime("%Y-%m"),
+            **last_stats
+        },
+        "rate_limits": {
+            "hourly": RATE_LIMITS,
+            "daily": DAILY_CAPS
+        },
+        "cost_per_call_cents": COST_PER_CALL_CENTS,
+        "cache_ttl_seconds": CACHE_TTL_SECONDS
+    }
 
 
 @router.get("/status")
@@ -309,7 +648,8 @@ async def get_ai_status(user: dict = Depends(get_current_user)):
             "drafting": CLAUDE_SONNET if ai_enabled else None,
             "suggestions": CLAUDE_HAIKU if ai_enabled else None
         },
-        "rate_limits": RATE_LIMITS if ai_enabled else None
+        "rate_limits": RATE_LIMITS if ai_enabled else None,
+        "daily_caps": DAILY_CAPS if ai_enabled else None
     }
 
 

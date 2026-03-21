@@ -320,6 +320,14 @@ async def startup_event():
         await db.referral_tracking.create_index("referrer_user_id")
         await db.referral_tracking.create_index("referee_user_id", unique=True)
         
+        # AI usage tracking indexes (for cost protection)
+        await db.ai_usage_tracking.create_index([("user_id", 1), ("endpoint", 1), ("date", 1)], unique=True)
+        await db.ai_usage_tracking.create_index("date")  # For monthly aggregation queries
+        
+        # AI suggestion cache indexes (1hr TTL)
+        await db.ai_suggestion_cache.create_index([("user_id", 1), ("trust_id", 1)], unique=True)
+        await db.ai_suggestion_cache.create_index("cached_at")  # For cache expiry queries
+        
         logger.info("Database indexes created/verified successfully")
     except Exception as e:
         logger.error(f"Failed to create indexes: {e}")
