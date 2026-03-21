@@ -199,8 +199,8 @@ export default function PricingPage() {
           </div>
 
           {/* Annual Plan */}
-          <div className="card-trust corner-mark p-8 border-2 border-gold relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gold text-white px-4 py-1 text-xs font-medium uppercase tracking-wider">
+          <div className="card-trust corner-mark p-8 border-2 border-gold relative overflow-visible mt-4">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
               Best Value
             </div>
             
