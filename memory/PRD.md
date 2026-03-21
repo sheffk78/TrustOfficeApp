@@ -3,7 +3,38 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Mar 21, 2026) - AI API COST PROTECTIONS ✅
+## Latest Update (Mar 21, 2026) - TRIAL EXPIRED UX + ADMIN NOTIFICATIONS ✅
+
+**Session Summary:** Implemented three enhancements:
+
+1. **Trial Expired UX Improvements**
+   - Blocked write actions (Record Minutes, Add Distribution, Add Expense, Issue Certificates, Transfer) for users with expired trials
+   - Users see upgrade modal with clear "Subscribe to continue" messaging
+   - Read-only access preserved: viewing existing records, downloading PDFs, exporting CSVs
+
+2. **Admin Purchase Notifications**
+   - New email sent to `contact@trustoffice.app` on every subscription purchase
+   - Includes: customer email, name, plan type, amount
+
+3. **Settings Page Reordering**
+   - "Create New Trust" and "Trust Settings" moved directly under Profile
+   - New order: Profile → Create New Trust → Trust Settings → Billing → Refer a Friend → ...
+
+**Files Modified:**
+- `/app/frontend/src/pages/SettingsPage.js` - Reordered sections
+- `/app/frontend/src/pages/MinutesPage.js` - Added handleGuidedMinutes with read-only check
+- `/app/frontend/src/pages/ExpensesPage.js` - Added isReadOnly check
+- `/app/frontend/src/pages/BeneficiariesPage.js` - Added handleOpenCertificateModal, handleOpenTransferModal
+- `/app/frontend/src/pages/NewMinutesPage.js` - Added redirect for read-only users
+- `/app/frontend/src/pages/GuidedMinutesPage.js` - Added redirect for read-only users
+- `/app/backend/email_service.py` - Added send_admin_new_purchase_notification method
+- `/app/backend/routers/subscriptions.py` - Added admin notification call in webhook
+
+**Testing:** 100% pass rate (iteration_65) - 11/11 tests
+
+---
+
+## Previous Update (Mar 21, 2026) - AI API COST PROTECTIONS ✅
 
 **Session Summary:** Implemented robust AI API cost protection without modifying existing hourly rate limiters.
 
