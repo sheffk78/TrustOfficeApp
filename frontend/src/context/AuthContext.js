@@ -33,8 +33,26 @@ export const AuthProvider = ({ children }) => {
   const authCheckComplete = useRef(false);
 
   // Load the normalized subscription state from the new endpoint
-  const loadSubscriptionState = useCallback(async () => {
-    console.log('[AuthContext] loadSubscriptionState called');
+  const loadSubscriptionState = useCallback(async (userEmail = null) => {
+    console.log('[AuthContext] loadSubscriptionState called, userEmail:', userEmail);
+    
+    // ADMIN OVERRIDE: If user is primary admin, always grant full access
+    const PRIMARY_ADMIN_EMAIL = 'contact@trustoffice.app';
+    if (userEmail?.toLowerCase() === PRIMARY_ADMIN_EMAIL) {
+      console.log('[AuthContext] Admin detected, granting full access');
+      const adminState = {
+        is_active: true,
+        is_read_only: false,
+        status: 'active',
+        plan_type: 'forever_free',
+        is_trial: false
+      };
+      setSubscription(adminState);
+      setSubscriptionExpired(false);
+      setIsReadOnly(false);
+      return adminState;
+    }
+    
     try {
       const response = await fetch(`${API}/subscription/state`, {
         credentials: 'include',
@@ -120,7 +138,7 @@ export const AuthProvider = ({ children }) => {
       console.log('[AuthContext] Loading trusts...');
       await loadTrustsInternal();
       console.log('[AuthContext] Loading subscription...');
-      await loadSubscriptionState();
+      await loadSubscriptionState(userData.email);
       console.log('[AuthContext] All data loaded');
     } catch (error) {
       console.error('[AuthContext] Auth check failed:', error);
@@ -311,15 +329,19 @@ export const AuthProvider = ({ children }) => {
   // Listen for subscription expired events from API calls
   useEffect(() => {
     const handleSubscriptionExpired = () => {
+      // Don't mark admin as expired
+      if (user?.email?.toLowerCase() === 'contact@trustoffice.app') return;
       setSubscriptionExpired(true);
       setIsReadOnly(true);
-      loadSubscriptionState();
+      loadSubscriptionState(user?.email);
     };
     
     const handleSubscriptionReadOnly = (event) => {
+      // Don't mark admin as read-only
+      if (user?.email?.toLowerCase() === 'contact@trustoffice.app') return;
       setIsReadOnly(true);
       // Optionally refresh subscription state
-      loadSubscriptionState();
+      loadSubscriptionState(user?.email);
     };
     
     window.addEventListener('subscription-expired', handleSubscriptionExpired);
@@ -329,7 +351,7 @@ export const AuthProvider = ({ children }) => {
       window.removeEventListener('subscription-expired', handleSubscriptionExpired);
       window.removeEventListener('subscription-readonly', handleSubscriptionReadOnly);
     };
-  }, [loadSubscriptionState]);
+  }, [loadSubscriptionState, user?.email]);
 
   // Wrapper to persist trust selection
   const selectTrust = useCallback((trust) => {
