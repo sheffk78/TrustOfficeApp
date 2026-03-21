@@ -3,7 +3,35 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Mar 5, 2026) - REFER A FRIEND FEATURE ✅
+## Latest Update (Mar 21, 2026) - AI API COST PROTECTIONS ✅
+
+**Session Summary:** Implemented robust AI API cost protection without modifying existing hourly rate limiters.
+
+**Features Completed:**
+1. **Daily Caps (MongoDB)** - 30 requests/day for `minutes-draft`, 50/day for `governance-suggestions`
+   - Returns 429 with clear message when exceeded
+   - Tracked in `ai_usage_tracking` collection per user per endpoint per day
+2. **Input Size Validation** - Max 10,000 characters for `minutes-draft` input
+   - Returns 400 with exact char count in error message
+3. **Monthly Budget Kill-Switch** - Tracks estimated cost ($0.03/Sonnet, $0.002/Haiku)
+   - `AI_MONTHLY_BUDGET_CENTS` env var (default 5000 = $50)
+   - Returns 503 when budget exceeded
+4. **Admin Usage Endpoint** - `GET /api/ai/usage` restricted to `jeff@socialize.video`
+   - Shows current month + last month stats, budget status, projections
+5. **Governance Suggestions Cache** - 1-hour TTL cache per user+trust
+   - ~17ms cache hit vs ~3-5 second AI call (200x faster)
+   - Stored in `ai_suggestion_cache` collection
+
+**Files Created/Updated:**
+- `/app/backend/routers/ai.py` - Complete rewrite with new protections layered on existing hourly limiters
+- `/app/backend/.env` - Added `AI_MONTHLY_BUDGET_CENTS=5000`
+- `/app/backend/server.py` - Added indexes for `ai_usage_tracking` and `ai_suggestion_cache`
+
+**Testing:** 100% pass rate (iteration_64) - 10/10 backend tests
+
+---
+
+## Previous Update (Mar 5, 2026) - REFER A FRIEND FEATURE ✅
 
 **Session Summary:** Implemented a custom "Refer a Friend" system with 50% discounts for both referrer and referee.
 
