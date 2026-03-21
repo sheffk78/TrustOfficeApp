@@ -142,6 +142,22 @@ async def get_subscription_state_endpoint(user: dict = Depends(get_current_user)
         - is_read_only: boolean (determines if write operations are blocked)
         - trial_days_remaining: int or null
     """
+    # Failsafe: Check if user is primary admin by email
+    PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
+    user_email = user.get("email", "").lower()
+    is_primary_admin = user_email == PRIMARY_ADMIN_EMAIL
+    
+    if is_primary_admin:
+        # Ensure admin has forever_free subscription in database
+        await db.subscriptions.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {
+                "plan_type": "forever_free",
+                "status": "active"
+            }},
+            upsert=True
+        )
+    
     state = await get_subscription_state(user["user_id"])
     return state.model_dump()
 

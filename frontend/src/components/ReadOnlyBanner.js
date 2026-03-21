@@ -27,7 +27,7 @@ export const ReadOnlyBanner = () => {
   
   return (
     <div 
-      className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-3"
+      className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-3 lg:ml-64"
       data-testid="read-only-banner"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
