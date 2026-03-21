@@ -134,7 +134,7 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
 async def list_customers(
     search: Optional[str] = Query(None, description="Search by email or name"),
     status: Optional[str] = Query(None, description="Filter by subscription status"),
-    is_admin: Optional[bool] = Query(None, description="Filter by admin status"),
+    is_admin_filter: Optional[bool] = Query(None, alias="is_admin", description="Filter by admin status"),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_order: str = Query("desc", description="Sort order: asc or desc"),
     page: int = Query(1, ge=1),
@@ -153,25 +153,24 @@ async def list_customers(
             {"name": {"$regex": search, "$options": "i"}}
         ]
     
-    if is_admin is not None:
-        if is_admin:
+    if is_admin_filter is not None:
+        if is_admin_filter:
             query["is_admin"] = True
         else:
-            # Users without is_admin field or with is_admin=false
-            query["$or"] = query.get("$or", [])
-            if not query["$or"]:
-                del query["$or"]
             query["is_admin"] = {"$ne": True}
     
     # Get total count
     total = await db.users.count_documents(query)
+    logger.info(f"Admin list_customers: query={query}, total={total}")
     
-    # Build sort
+    # Build sort - handle missing created_at field
     sort_dir = -1 if sort_order == "desc" else 1
     
     # Get users
     skip = (page - 1) * limit
     users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort(sort_by, sort_dir).skip(skip).limit(limit).to_list(limit)
+    
+    logger.info(f"Admin list_customers: fetched {len(users)} users")
     
     # Enrich with subscription data
     customers = []
@@ -182,9 +181,12 @@ async def list_customers(
         # Get trust count
         trust_count = await db.trusts.count_documents({"user_id": user["user_id"]})
         
-        # Filter by status if specified
+        # Determine subscription status
         sub_status = sub.get("status", "none") if sub else "none"
-        if status and sub_status != status:
+        sub_plan = sub.get("plan_type", "none") if sub else "none"
+        
+        # Filter by status if specified (do this filtering here)
+        if status and status != "all" and sub_status != status:
             continue
         
         customers.append(CustomerListItem(
@@ -194,7 +196,7 @@ async def list_customers(
             is_admin=user.get("is_admin", False),
             created_at=user.get("created_at", ""),
             subscription_status=sub_status,
-            subscription_plan=sub.get("plan_type", "none") if sub else "none",
+            subscription_plan=sub_plan,
             trust_count=trust_count,
             last_login=user.get("last_login")
         ).model_dump())
