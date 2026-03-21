@@ -645,6 +645,8 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
     admin_count = await db.users.count_documents({"is_admin": True})
     new_users_30d = await db.users.count_documents({"created_at": {"$gte": thirty_days_ago}})
     
+    logger.info(f"Admin stats: total_users={total_users}, admin_count={admin_count}")
+    
     # Subscription counts
     active_subscriptions = await db.subscriptions.count_documents({"status": "active"})
     trial_users = await db.subscriptions.count_documents({"status": "trialing"})
@@ -672,6 +674,43 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
         new_users_30d=new_users_30d,
         revenue_estimate_monthly=round(revenue_estimate, 2)
     )
+
+
+@router.get("/debug/db-check")
+async def debug_db_check(admin: dict = Depends(require_admin)):
+    """
+    Debug endpoint to check database connectivity and counts.
+    """
+    try:
+        # Get raw counts
+        user_count = await db.users.count_documents({})
+        sub_count = await db.subscriptions.count_documents({})
+        trust_count = await db.trusts.count_documents({})
+        
+        # Get sample users (just emails)
+        sample_users = await db.users.find({}, {"_id": 0, "email": 1, "is_admin": 1}).limit(10).to_list(10)
+        
+        # Get collection names
+        collections = await db.list_collection_names()
+        
+        return {
+            "status": "ok",
+            "database": db.name,
+            "collections": collections,
+            "counts": {
+                "users": user_count,
+                "subscriptions": sub_count,
+                "trusts": trust_count
+            },
+            "sample_users": [u.get("email") for u in sample_users],
+            "admin_requesting": admin.get("email")
+        }
+    except Exception as e:
+        logger.error(f"DB check failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 # ==================== ADMIN USER MANAGEMENT ====================
