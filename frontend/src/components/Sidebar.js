@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { fetchWithAuth } from '@/utils/api';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -51,25 +50,9 @@ export const Sidebar = () => {
   const navigate = useNavigate();
   const { user, trusts, selectedTrust, setSelectedTrust, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Check if user is admin
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      try {
-        const response = await fetchWithAuth('/api/admin/stats');
-        if (response.ok) {
-          setIsAdmin(true);
-        }
-      } catch {
-        setIsAdmin(false);
-      }
-    };
-    
-    if (user) {
-      checkAdminStatus();
-    }
-  }, [user]);
+  
+  // Check if user is admin - use user.is_admin from auth context, or check email as fallback
+  const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
 
   const handleLogout = async () => {
     await logout();

@@ -70,13 +70,35 @@ export default function AdminPage() {
   // Admin list
   const [admins, setAdmins] = useState([]);
   
-  // Check if user is admin
+  // Check if user is admin - first check from user object, then verify with API
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckDone, setAdminCheckDone] = useState(false);
+  
+  // Quick check from user email
+  const isPrimaryAdmin = user?.email?.toLowerCase() === 'contact@trustoffice.app';
 
-  // Check admin status
+  // Check admin status via API
   useEffect(() => {
     const checkAdmin = async () => {
+      // If user has is_admin flag or is primary admin, grant access immediately
+      if (user?.is_admin || isPrimaryAdmin) {
+        setIsAdmin(true);
+        // Still fetch stats
+        try {
+          const response = await fetchWithAuth('/api/admin/stats');
+          if (response.ok) {
+            const data = await response.json();
+            setStats(data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch admin stats:', error);
+        }
+        setAdminCheckDone(true);
+        setLoading(false);
+        return;
+      }
+      
+      // Otherwise check via API
       try {
         const response = await fetchWithAuth('/api/admin/stats');
         if (response.ok) {

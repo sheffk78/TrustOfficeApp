@@ -149,6 +149,7 @@ class UserResponse(BaseModel):
     name: str
     picture: Optional[str] = None
     created_at: str
+    is_admin: bool = False
 
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None

@@ -163,6 +163,21 @@ async def login(user: UserLogin, response: Response):
         logger.warning(f"Failed login attempt for email: {email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
+    # Auto-grant admin status for primary admin email
+    PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
+    if email == PRIMARY_ADMIN_EMAIL and not user_doc.get("is_admin"):
+        await db.users.update_one(
+            {"user_id": user_doc["user_id"]},
+            {"$set": {"is_admin": True}}
+        )
+        # Also ensure they have forever_free subscription
+        await db.subscriptions.update_one(
+            {"user_id": user_doc["user_id"]},
+            {"$set": {"plan_type": "forever_free", "status": "active"}},
+            upsert=True
+        )
+        logger.info(f"Auto-granted admin status to {email} on login")
+    
     token = create_jwt_token(user_doc["user_id"], user_doc["email"])
     
     response.set_cookie(
@@ -181,7 +196,8 @@ async def login(user: UserLogin, response: Response):
             "user_id": user_doc["user_id"],
             "email": user_doc["email"],
             "name": user_doc["name"],
-            "picture": user_doc.get("picture")
+            "picture": user_doc.get("picture"),
+            "is_admin": user_doc.get("is_admin", False) or email == PRIMARY_ADMIN_EMAIL
         }
     }
 
@@ -391,12 +407,16 @@ async def exchange_session(request: Request, response: Response):
 @router.get("/auth/me", response_model=UserResponse)
 async def get_me(user: dict = Depends(get_current_user)):
     """Get current user profile"""
+    PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
+    is_admin = user.get("is_admin", False) or user.get("email", "").lower() == PRIMARY_ADMIN_EMAIL
+    
     return UserResponse(
         user_id=user["user_id"],
         email=user["email"],
         name=user["name"],
         picture=user.get("picture"),
-        created_at=user.get("created_at", "")
+        created_at=user.get("created_at", ""),
+        is_admin=is_admin
     )
 
 
