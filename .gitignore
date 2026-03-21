@@ -127,3 +127,7 @@ frontend/node_modules/.cache/default-development/18.pack
 frontend/node_modules/.cache/default-development/21.pack
 frontend/node_modules/.cache/default-development/22.pack
 frontend/node_modules/.cache/default-development/19.pack
+-e 
+# Environment files
+*.env
+*.env.*

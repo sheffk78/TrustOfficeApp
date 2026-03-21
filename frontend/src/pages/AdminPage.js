@@ -85,7 +85,7 @@ export default function AdminPage() {
         setIsAdmin(true);
         // Still fetch stats
         try {
-          const response = await fetchWithAuth('/api/admin/stats');
+          const response = await fetchWithAuth('/admin/stats');
           if (response.ok) {
             const data = await response.json();
             setStats(data);
@@ -100,7 +100,7 @@ export default function AdminPage() {
       
       // Otherwise check via API
       try {
-        const response = await fetchWithAuth('/api/admin/stats');
+        const response = await fetchWithAuth('/admin/stats');
         if (response.ok) {
           setIsAdmin(true);
           const data = await response.json();
@@ -123,7 +123,7 @@ export default function AdminPage() {
     if (!isAdmin) return;
     
     try {
-      let url = `/api/admin/customers?page=${customerPage}&limit=20`;
+      let url = `/admin/customers?page=${customerPage}&limit=20`;
       if (customerSearch) url += `&search=${encodeURIComponent(customerSearch)}`;
       if (statusFilter !== 'all') url += `&status=${statusFilter}`;
       
@@ -156,7 +156,7 @@ export default function AdminPage() {
   // Fetch customer detail
   const fetchCustomerDetail = async (userId) => {
     try {
-      const response = await fetchWithAuth(`/api/admin/customers/${userId}`);
+      const response = await fetchWithAuth(`/admin/customers/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setCustomerDetail(data);
@@ -170,7 +170,7 @@ export default function AdminPage() {
   const fetchReferrals = async () => {
     setReferralsLoading(true);
     try {
-      const response = await fetchWithAuth('/api/admin/referrals');
+      const response = await fetchWithAuth('/admin/referrals');
       if (response.ok) {
         const data = await response.json();
         setReferrals(data.referrals);
@@ -184,7 +184,7 @@ export default function AdminPage() {
   // Fetch admins
   const fetchAdmins = async () => {
     try {
-      const response = await fetchWithAuth('/api/admin/admins');
+      const response = await fetchWithAuth('/admin/admins');
       if (response.ok) {
         const data = await response.json();
         setAdmins(data.admins);
@@ -206,7 +206,7 @@ export default function AdminPage() {
   // Actions
   const handleMakeAdmin = async (userId) => {
     try {
-      const response = await fetchWithAuth(`/api/admin/customers/${userId}/make-admin`, {
+      const response = await fetchWithAuth(`/admin/customers/${userId}/make-admin`, {
         method: 'POST',
         body: JSON.stringify({ reason: 'Promoted via admin panel' })
       });
@@ -228,7 +228,7 @@ export default function AdminPage() {
 
   const handleRemoveAdmin = async (userId) => {
     try {
-      const response = await fetchWithAuth(`/api/admin/customers/${userId}/remove-admin`, {
+      const response = await fetchWithAuth(`/admin/customers/${userId}/remove-admin`, {
         method: 'POST',
         body: JSON.stringify({ reason: 'Removed via admin panel' })
       });
@@ -253,7 +253,7 @@ export default function AdminPage() {
     if (!selectedCustomer) return;
     
     try {
-      const response = await fetchWithAuth(`/api/admin/customers/${selectedCustomer.user_id}/grant-access`, {
+      const response = await fetchWithAuth(`/admin/customers/${selectedCustomer.user_id}/grant-access`, {
         method: 'POST',
         body: JSON.stringify(grantAccessForm)
       });
@@ -278,7 +278,7 @@ export default function AdminPage() {
     if (!selectedCustomer) return;
     
     try {
-      const response = await fetchWithAuth(`/api/admin/customers/${selectedCustomer.user_id}?confirm=true`, {
+      const response = await fetchWithAuth(`/admin/customers/${selectedCustomer.user_id}?confirm=true`, {
         method: 'DELETE'
       });
       
@@ -299,7 +299,7 @@ export default function AdminPage() {
 
   const handleCreateAdmin = async () => {
     try {
-      const response = await fetchWithAuth('/api/admin/create-admin', {
+      const response = await fetchWithAuth('/admin/create-admin', {
         method: 'POST',
         body: JSON.stringify(createAdminForm)
       });
@@ -322,7 +322,7 @@ export default function AdminPage() {
 
   const handleFixReferral = async () => {
     try {
-      const response = await fetchWithAuth('/api/admin/referrals/fix', {
+      const response = await fetchWithAuth('/admin/referrals/fix', {
         method: 'POST',
         body: JSON.stringify(fixReferralForm)
       });
