@@ -65,6 +65,9 @@ const ProtectedRoute = ({ children }) => {
 
   // Check if user is admin - admins skip onboarding
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
+  
+  // Check for stored token
+  const hasToken = localStorage.getItem('auth_token') !== null;
 
   // Timeout to prevent infinite loading - after 10 seconds, proceed anyway
   useEffect(() => {
@@ -92,10 +95,9 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  // After loading is complete, check if user is authenticated
-  // Also check if we have a token - user might be set on next render
-  const hasToken = localStorage.getItem('auth_token') !== null;
-  if (!user && !hasUserFromState && !isCallback && !hasToken) {
+  // After loading timeout, if we still have a token, don't redirect - let user see the page
+  // Only redirect to login if there's genuinely no token
+  if (!hasToken && !user && !hasUserFromState && !isCallback) {
     return <Navigate to="/" replace />;
   }
 
@@ -104,6 +106,7 @@ const ProtectedRoute = ({ children }) => {
   // - User is admin
   // - Still loading trusts
   // - User has explicit "skip onboarding" in localStorage (set when clicking read-only mode)
+  // - User has a token but user data hasn't loaded yet (loading timeout scenario)
   const skipOnboarding = localStorage.getItem('skip_onboarding') === 'true';
   if (user && !trustsLoading && trusts && trusts.length === 0 && !isOnboarding && !isAdmin && !skipOnboarding) {
     return <Navigate to="/onboarding" replace />;
