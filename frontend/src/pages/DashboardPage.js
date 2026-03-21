@@ -6,8 +6,6 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
-import { TrialBanner } from '@/components/TrialBanner';
-import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { 
   FileText, 
   DollarSign, 
@@ -330,8 +328,6 @@ export default function DashboardPage() {
       <Sidebar />
       <main className="main-content dot-grid">
         {/* Subscription Banners */}
-        <TrialBanner location="dashboard" />
-        <ReadOnlyBanner />
         
         <div className="page-container">
           {/* Page Header */}

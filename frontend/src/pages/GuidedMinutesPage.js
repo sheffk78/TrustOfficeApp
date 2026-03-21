@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1018,7 +1017,6 @@ export default function GuidedMinutesPage() {
       <>
         <Sidebar />
         <main className="flex-1 ml-0 md:ml-64 min-h-screen bg-background">
-        <TrialBanner location="guided_minutes" />
           <div className="flex items-center justify-center min-h-screen">
             <Loader2 className="w-8 h-8 animate-spin text-navy dark:text-gold" />
           </div>

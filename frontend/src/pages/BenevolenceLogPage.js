@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -152,7 +151,6 @@ export default function BenevolenceLogPage() {
       <div className="min-h-screen bg-background">
         <Sidebar />
         <main className="lg:pl-64 pt-16 lg:pt-0">
-          <TrialBanner location="benevolence_log" />
           <div className="p-8">
             <div className="card-trust p-8 text-center">
               <p className="text-muted-foreground">Select a trust to view benevolence log</p>

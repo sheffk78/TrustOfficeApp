@@ -4,8 +4,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
-import { TrialBanner } from '@/components/TrialBanner';
 import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -329,8 +327,6 @@ export default function DistributionsPage() {
       <Sidebar />
       <main className="main-content">
         {/* Subscription Banners */}
-        <TrialBanner location="distributions" />
-        <ReadOnlyBanner />
         
         <div className="page-container">
           {/* Page Header */}

@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -136,7 +135,6 @@ export default function MinutesDetailPage() {
       <div className="min-h-screen bg-background">
         <Sidebar />
         <main className="lg:pl-64 pt-16 lg:pt-0">
-          <TrialBanner location="minutes_detail" />
           <div className="p-8 flex items-center justify-center">
             <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin"></div>
           </div>

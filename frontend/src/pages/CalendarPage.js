@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
@@ -171,7 +170,6 @@ export default function CalendarPage() {
     <div className="main-layout" data-testid="calendar-page">
       <Sidebar />
       <main className="main-content dot-grid">
-        <TrialBanner location="calendar" />
         <div className="page-container">
           {/* Page Header */}
           <div className="page-header flex items-center justify-between">

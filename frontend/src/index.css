@@ -237,6 +237,11 @@
     border-radius: 0 !important;
 }
 
+/* Card that allows overflow for badges */
+.card-trust.overflow-visible {
+    overflow: visible !important;
+}
+
 .dark .card-trust {
     @apply bg-slate-800 border-slate-600/30;
 }

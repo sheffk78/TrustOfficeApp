@@ -4,8 +4,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
-import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -355,8 +353,6 @@ export default function ScheduleAPage() {
     <div className="min-h-screen bg-background" data-testid="schedule-a-page">
       <Sidebar />
       <main className="lg:pl-64 pt-16 lg:pt-0">
-        <TrialBanner location="schedule_a" />
-        <ReadOnlyBanner />
         
         <div className="p-4 lg:p-8">
           {/* Header */}

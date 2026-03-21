@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Shield,
@@ -134,7 +133,6 @@ export default function GovernancePage() {
     <div className="main-layout" data-testid="governance-page">
       <Sidebar />
       <main className="main-content dot-grid">
-        <TrialBanner location="governance" />
         <div className="page-container">
           {/* Page Header */}
           <div className="page-header flex items-center justify-between">

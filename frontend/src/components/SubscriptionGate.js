@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
+import { TrialBanner } from '@/components/TrialBanner';
 import { 
   AlertTriangle, 
   CreditCard,
@@ -13,7 +14,7 @@ import {
  * SubscriptionGate - Wraps protected content
  * 
  * NEW BEHAVIOR (Read-Only Mode):
- * - If subscription is active: Show content normally
+ * - If subscription is active (including trial): Show content with TrialBanner (if trial)
  * - If subscription is expired/inactive: Show content with ReadOnlyBanner
  *   Users can VIEW all data but cannot CREATE/UPDATE/DELETE
  * 
@@ -27,12 +28,20 @@ export const SubscriptionGate = ({ children }) => {
     return children;
   }
 
-  // If subscription is active, show content without banner
+  // Check if it's an active trial
+  const isActiveTrial = subscription?.is_trial && subscription?.is_active;
+
+  // If subscription is active, show content with TrialBanner if applicable
   if (!subscriptionExpired && !isReadOnly) {
-    return children;
+    return (
+      <div className="flex flex-col min-h-screen">
+        {isActiveTrial && <TrialBanner location="page" />}
+        {children}
+      </div>
+    );
   }
 
-  // Subscription expired or read-only - show content with banner
+  // Subscription expired or read-only - show content with ReadOnlyBanner
   // Users can still view all their data
   return (
     <div className="flex flex-col min-h-screen">

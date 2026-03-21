@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -282,7 +281,6 @@ export default function StructuresPage() {
     <div className="main-layout" data-testid="structures-page">
       <Sidebar />
       <main className="main-content dot-grid">
-        <TrialBanner location="structures" />
         <div className="page-container">
           {/* Page Header */}
           <div className="page-header flex items-center justify-between mb-6">

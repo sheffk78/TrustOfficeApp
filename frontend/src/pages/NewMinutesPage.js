@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -213,7 +212,6 @@ export default function NewMinutesPage() {
       <div className="main-layout" data-testid="new-minutes-page">
         <Sidebar />
         <main className="main-content">
-        <TrialBanner location="new_minutes" />
           <div className="page-container">
             <div className="card-trust p-8 text-center">
               <p className="text-muted-foreground">Select a trust to create minutes</p>

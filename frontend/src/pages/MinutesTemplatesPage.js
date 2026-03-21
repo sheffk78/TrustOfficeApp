@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { TrialBanner } from '@/components/TrialBanner';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
@@ -83,7 +82,6 @@ export default function MinutesTemplatesPage() {
       <div className="min-h-screen bg-background">
         <Sidebar />
         <main className="lg:pl-64 pt-16 lg:pt-0">
-          <TrialBanner location="minutes_templates" />
           <div className="p-8">
             <div className="card-trust p-8 text-center">
               <p className="text-muted-foreground">Select a trust to create minutes</p>
