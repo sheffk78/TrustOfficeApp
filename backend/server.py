@@ -345,22 +345,30 @@ async def startup_event():
 async def ensure_primary_admin():
     """Ensure the primary admin account (contact@trustoffice.app) exists."""
     import uuid
+    import bcrypt
     from datetime import datetime, timezone
     
     primary_admin_email = "contact@trustoffice.app"
+    default_password = "TrustAdmin2026!"
     
     existing = await db.users.find_one({"email": primary_admin_email}, {"_id": 0})
     
     if existing:
-        # Ensure admin flag is set
+        # Ensure admin flag is set and password exists
+        updates = {}
         if not existing.get("is_admin"):
+            updates["is_admin"] = True
+        if not existing.get("password_hash"):
+            updates["password_hash"] = bcrypt.hashpw(default_password.encode(), bcrypt.gensalt()).decode()
+        
+        if updates:
             await db.users.update_one(
                 {"email": primary_admin_email},
-                {"$set": {"is_admin": True}}
+                {"$set": updates}
             )
-            logger.info(f"Updated {primary_admin_email} to admin status")
+            logger.info(f"Updated {primary_admin_email} with admin status and/or password")
     else:
-        # Create admin account (OAuth-only, no password)
+        # Create admin account with password
         now = datetime.now(timezone.utc)
         user_id = f"user_{uuid.uuid4().hex[:12]}"
         
@@ -368,6 +376,7 @@ async def ensure_primary_admin():
             "user_id": user_id,
             "email": primary_admin_email,
             "name": "TrustOffice Admin",
+            "password_hash": bcrypt.hashpw(default_password.encode(), bcrypt.gensalt()).decode(),
             "is_admin": True,
             "created_at": now.isoformat()
         })
@@ -382,14 +391,14 @@ async def ensure_primary_admin():
             "updated_at": now.isoformat()
         })
         
-        # Initialize onboarding
+        # Initialize onboarding (mark as complete for admin)
         await db.user_onboarding.insert_one({
             "user_id": user_id,
-            "entities_confirmed": False,
-            "calendar_set": False,
-            "minutes_generated": False,
-            "distribution_logged": False,
-            "checklist_dismissed": False,
+            "entities_confirmed": True,
+            "calendar_set": True,
+            "minutes_generated": True,
+            "distribution_logged": True,
+            "checklist_dismissed": True,
             "created_at": now.isoformat(),
             "updated_at": now.isoformat()
         })
