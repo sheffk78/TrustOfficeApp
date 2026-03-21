@@ -114,7 +114,7 @@ export const FullSubscriptionGate = ({ children }) => {
           {/* CTA Buttons */}
           <div className="flex flex-col gap-3">
             <Button
-              onClick={() => navigate('/settings/billing')}
+              onClick={() => navigate('/pricing')}
               className="btn-primary w-full"
               data-testid="subscribe-cta-btn"
             >

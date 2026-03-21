@@ -23,7 +23,9 @@ import {
   HeartHandshake,
   FolderTree,
   PieChart,
-  Trash2
+  Trash2,
+  CreditCard,
+  Clock
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -112,7 +114,7 @@ const QUICK_START_TASKS = [
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
-  const { user, trusts, loadTrusts, setSelectedTrust } = useAuth();
+  const { user, trusts, loadTrusts, setSelectedTrust, subscription, subscriptionExpired, loading: authLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [checkingTrusts, setCheckingTrusts] = useState(true);
@@ -128,6 +130,11 @@ export default function OnboardingPage() {
   });
 
   const getToken = () => localStorage.getItem('auth_token');
+  
+  // Check if trial has expired
+  const isTrialExpired = subscription?.status === 'expired' || 
+    (subscription?.is_trial === false && subscription?.is_active === false) ||
+    (subscriptionExpired && !subscription?.is_active);
 
   // Check if user already has trusts - redirect to dashboard if so
   useEffect(() => {
@@ -245,8 +252,88 @@ export default function OnboardingPage() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-8 pb-16">
         
-        {/* STEP 1: Welcome */}
-        {step === 1 && (
+        {/* EXPIRED TRIAL - Show upgrade options */}
+        {isTrialExpired && step === 1 && (
+          <div className="mt-8">
+            <div className="card-trust corner-mark mb-8">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-8 h-8 text-amber-600" />
+                </div>
+                <h1 className="font-serif text-4xl text-navy mb-3">
+                  Your Trial Has Ended
+                </h1>
+                <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+                  Your 14-day free trial has expired. Subscribe now to continue using TrustOffice and manage your trusts professionally.
+                </p>
+              </div>
+
+              {/* What you get */}
+              <div className="bg-navy/5 border border-navy/10 p-6 mb-8">
+                <p className="font-medium text-navy mb-4">What you get with TrustOffice:</p>
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                    <span>Unlimited trusts & entities</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                    <span>AI-powered minutes generation</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                    <span>Governance health tracking</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                    <span>PDF generation & exports</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                    <span>Distribution management</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                    <span>Beneficiary tracking</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col gap-4">
+                <Button
+                  onClick={() => navigate('/pricing')}
+                  className="btn-primary w-full py-6 text-lg"
+                  data-testid="subscribe-now-cta"
+                >
+                  <CreditCard className="w-5 h-5 mr-2" />
+                  Subscribe Now - Starting at $79/month
+                </Button>
+                
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-2">Save 17% with annual billing</p>
+                </div>
+
+                <div className="border-t border-border pt-4 mt-2">
+                  <p className="text-xs text-muted-foreground text-center mb-3">
+                    Your data is safe. You can view everything in read-only mode.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/dashboard')}
+                    className="w-full"
+                    data-testid="view-readonly-btn"
+                  >
+                    Continue in Read-Only Mode
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* STEP 1: Welcome (for active trial users) */}
+        {step === 1 && !isTrialExpired && (
           <div className="mt-8">
             <div className="card-trust corner-mark mb-8">
               <div className="text-center mb-8">
@@ -267,6 +354,17 @@ export default function OnboardingPage() {
                     <p className="font-medium text-navy">14-Day Free Trial Active</p>
                     <p className="text-sm text-muted-foreground">Full access to all features. No credit card required.</p>
                   </div>
+                </div>
+                <div className="flex items-center justify-between pt-3 border-t border-navy/10">
+                  <p className="text-sm text-muted-foreground">Ready to commit?</p>
+                  <Button
+                    variant="link"
+                    onClick={() => navigate('/pricing')}
+                    className="text-navy font-medium p-0 h-auto"
+                    data-testid="subscribe-link"
+                  >
+                    Subscribe Now →
+                  </Button>
                 </div>
               </div>
 

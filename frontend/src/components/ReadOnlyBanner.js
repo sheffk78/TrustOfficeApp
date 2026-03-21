@@ -48,7 +48,7 @@ export const ReadOnlyBanner = () => {
             </p>
           </div>
         </div>
-        <Link to="/settings?tab=subscription">
+        <Link to="/pricing">
           <Button 
             size="sm" 
             className="bg-amber-600 hover:bg-amber-700 text-white"
