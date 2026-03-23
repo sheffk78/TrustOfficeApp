@@ -17,14 +17,21 @@ import {
  * - If subscription is active (including trial): Show content with TrialBanner (if trial)
  * - If subscription is expired/inactive: Show content with ReadOnlyBanner
  *   Users can VIEW all data but cannot CREATE/UPDATE/DELETE
+ * - Admins always get full access with no banners
  * 
  * Use on pages that require subscription awareness (NOT on settings/billing pages)
  */
 export const SubscriptionGate = ({ children }) => {
-  const { subscription, subscriptionExpired, isReadOnly, loading } = useAuth();
+  const { user, subscription, subscriptionExpired, isReadOnly, loading } = useAuth();
 
   // Don't block while loading
   if (loading) {
+    return children;
+  }
+
+  // ADMIN BYPASS: Primary admin always gets full access with no banners
+  const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
+  if (isAdmin) {
     return children;
   }
 
@@ -54,13 +61,20 @@ export const SubscriptionGate = ({ children }) => {
 /**
  * FullSubscriptionGate - Hard paywall for features that absolutely require subscription
  * Use this sparingly - only for premium features that shouldn't be accessible at all
+ * Admins always bypass this gate
  */
 export const FullSubscriptionGate = ({ children }) => {
   const navigate = useNavigate();
-  const { subscription, subscriptionExpired, loading } = useAuth();
+  const { user, subscription, subscriptionExpired, loading } = useAuth();
 
   // Don't block while loading
   if (loading) {
+    return children;
+  }
+
+  // ADMIN BYPASS: Primary admin always gets full access
+  const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
+  if (isAdmin) {
     return children;
   }
 

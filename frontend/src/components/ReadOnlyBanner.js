@@ -6,12 +6,17 @@ import { Button } from '@/components/ui/button';
 /**
  * ReadOnlyBanner - Shows when subscription is expired and user is in read-only mode
  * Displays at the top of pages to inform users they can view but not modify data
+ * Admins never see this banner
  */
 export const ReadOnlyBanner = () => {
-  const { isReadOnly, subscription, subscriptionExpired, loading } = useAuth();
+  const { user, isReadOnly, subscription, subscriptionExpired, loading } = useAuth();
   
   // Don't show while loading auth state to prevent flickering
   if (loading) return null;
+  
+  // ADMIN BYPASS: Never show banner for admins
+  const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
+  if (isAdmin) return null;
   
   // Don't show if subscription hasn't been loaded yet
   if (!subscription) return null;
