@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -34,11 +35,13 @@ import {
   XCircle,
   RefreshCw,
   Eye,
-  CheckSquare
+  CheckSquare,
+  LogIn
 } from 'lucide-react';
 
 export default function AdminPage() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, setUser, loadTrusts, loadSubscriptionState } = useAuth();
   const [activeTab, setActiveTab] = useState('customers');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
@@ -60,6 +63,8 @@ export default function AdminPage() {
   const [showCreateAdminDialog, setShowCreateAdminDialog] = useState(false);
   const [showFixReferralDialog, setShowFixReferralDialog] = useState(false);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [showImpersonateDialog, setShowImpersonateDialog] = useState(false);
+  const [impersonateLoading, setImpersonateLoading] = useState(false);
   
   // Multi-select state
   const [selectedCustomerIds, setSelectedCustomerIds] = useState(new Set());
@@ -410,6 +415,61 @@ export default function AdminPage() {
     }
   };
 
+  // Impersonation handler
+  const handleImpersonate = async () => {
+    if (!selectedCustomer) return;
+    
+    setImpersonateLoading(true);
+    try {
+      const response = await fetchWithAuth(`/admin/impersonate/${selectedCustomer.user_id}`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Store admin's current token and user data for later restoration
+        const adminToken = localStorage.getItem('auth_token');
+        sessionStorage.setItem('admin_token', adminToken);
+        sessionStorage.setItem('admin_user_data', JSON.stringify(user));
+        
+        // Store impersonation metadata for the banner
+        sessionStorage.setItem('impersonation_data', JSON.stringify({
+          email: data.user.email,
+          name: data.user.name,
+          userId: data.user.user_id,
+          adminEmail: user.email,
+          startTime: new Date().toISOString()
+        }));
+        
+        // Set the new token for the impersonated user
+        localStorage.setItem('auth_token', data.token);
+        
+        // Update user in context
+        setUser(data.user);
+        
+        // Reload trusts and subscription for the impersonated user
+        await loadTrusts();
+        await loadSubscriptionState(data.user.email);
+        
+        toast.success(`Now viewing as ${data.user.email}`);
+        setShowImpersonateDialog(false);
+        
+        // Navigate to dashboard
+        navigate('/dashboard');
+        
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Failed to impersonate user');
+      }
+    } catch (error) {
+      console.error('Impersonation error:', error);
+      toast.error('Failed to impersonate user');
+    } finally {
+      setImpersonateLoading(false);
+    }
+  };
+
   // Status badge helper
   const getStatusBadge = (status) => {
     const styles = {
@@ -660,6 +720,20 @@ export default function AdminPage() {
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
+                              {!customer.is_admin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedCustomer(customer);
+                                    setShowImpersonateDialog(true);
+                                  }}
+                                  title="Login as this user"
+                                  className="text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                                >
+                                  <LogIn className="w-4 h-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -875,6 +949,21 @@ export default function AdminPage() {
                   
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2 pt-4 border-t border-navy/10 dark:border-white/10">
+                    {!customerDetail.is_admin && (
+                      <Button
+                        size="sm"
+                        className="bg-orange-500 hover:bg-orange-600 text-white"
+                        onClick={() => {
+                          setSelectedCustomer(customerDetail);
+                          setCustomerDetail(null);
+                          setShowImpersonateDialog(true);
+                        }}
+                      >
+                        <LogIn className="w-4 h-4 mr-2" />
+                        Login as User
+                      </Button>
+                    )}
+                    
                     <Button
                       variant="outline"
                       size="sm"
@@ -1190,6 +1279,77 @@ export default function AdminPage() {
                     <>
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete Forever
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Impersonate User Confirmation Dialog */}
+          <Dialog open={showImpersonateDialog} onOpenChange={setShowImpersonateDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif text-xl text-orange-600 flex items-center gap-2">
+                  <LogIn className="w-5 h-5" />
+                  Login as User
+                </DialogTitle>
+                <DialogDescription>
+                  You will be able to see and interact with the app exactly as this user sees it.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="py-4">
+                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-orange-800 dark:text-orange-200 mb-2">
+                    <strong>You are about to view as:</strong>
+                  </p>
+                  <p className="font-medium text-navy dark:text-white">
+                    {selectedCustomer?.name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedCustomer?.email}
+                  </p>
+                </div>
+                
+                <ul className="text-sm text-muted-foreground space-y-2">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    You'll see their dashboard, trusts, and all data
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    An orange banner will remind you that you're impersonating
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    Click "Exit Impersonation" to return to admin
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    This action is logged for audit purposes
+                  </li>
+                </ul>
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowImpersonateDialog(false)} disabled={impersonateLoading}>
+                  Cancel
+                </Button>
+                <Button 
+                  className="bg-orange-500 hover:bg-orange-600 text-white" 
+                  onClick={handleImpersonate}
+                  disabled={impersonateLoading}
+                >
+                  {impersonateLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Switching...
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="w-4 h-4 mr-2" />
+                      Login as User
                     </>
                   )}
                 </Button>

@@ -621,6 +621,111 @@ async def bulk_delete_customers(
     }
 
 
+# ==================== IMPERSONATION ====================
+
+from dependencies import create_jwt_token
+
+@router.post("/impersonate/{user_id}")
+async def impersonate_user(
+    user_id: str,
+    admin: dict = Depends(require_admin)
+):
+    """
+    Generate a token to impersonate a user.
+    Admin can see exactly what the user sees.
+    
+    Returns a JWT token for the target user.
+    The frontend should store the admin's original token to allow "exit impersonation".
+    """
+    # Get target user
+    target_user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Don't allow impersonating other admins
+    if target_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Cannot impersonate admin accounts")
+    
+    # Don't allow impersonating primary admin
+    if target_user.get("email", "").lower() == "contact@trustoffice.app":
+        raise HTTPException(status_code=403, detail="Cannot impersonate primary admin")
+    
+    # Generate token for target user
+    impersonation_token = create_jwt_token(target_user["user_id"], target_user["email"])
+    
+    # Log the impersonation action
+    await db.admin_audit_log.insert_one({
+        "audit_id": f"audit_{uuid.uuid4().hex[:12]}",
+        "action": "impersonate_user",
+        "admin_user_id": admin["user_id"],
+        "admin_email": admin["email"],
+        "target_user_id": target_user["user_id"],
+        "target_email": target_user["email"],
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+    
+    logger.info(f"Admin {admin['email']} started impersonating user {target_user['email']}")
+    
+    return {
+        "token": impersonation_token,
+        "user": {
+            "user_id": target_user["user_id"],
+            "email": target_user["email"],
+            "name": target_user.get("name", ""),
+            "picture": target_user.get("picture")
+        },
+        "message": f"Now impersonating {target_user['email']}"
+    }
+
+
+@router.post("/impersonation/log-exit")
+async def log_impersonation_exit(
+    admin: dict = Depends(require_admin)
+):
+    """
+    Log when admin exits impersonation mode.
+    This is called when the admin clicks "Exit Impersonation".
+    """
+    await db.admin_audit_log.insert_one({
+        "audit_id": f"audit_{uuid.uuid4().hex[:12]}",
+        "action": "exit_impersonation",
+        "admin_user_id": admin["user_id"],
+        "admin_email": admin["email"],
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+    
+    logger.info(f"Admin {admin['email']} exited impersonation mode")
+    
+    return {"message": "Impersonation session ended"}
+
+
+@router.get("/impersonation/audit-log")
+async def get_impersonation_audit_log(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    admin: dict = Depends(require_admin)
+):
+    """
+    Get audit log of all impersonation actions.
+    """
+    skip = (page - 1) * limit
+    
+    total = await db.admin_audit_log.count_documents({"action": {"$in": ["impersonate_user", "exit_impersonation"]}})
+    
+    logs = await db.admin_audit_log.find(
+        {"action": {"$in": ["impersonate_user", "exit_impersonation"]}},
+        {"_id": 0}
+    ).sort("timestamp", -1).skip(skip).limit(limit).to_list(length=limit)
+    
+    return {
+        "logs": logs,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit
+    }
+
+
 # ==================== REFERRAL MANAGEMENT ====================
 
 @router.get("/referrals")

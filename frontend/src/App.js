@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
@@ -277,6 +278,7 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <UpgradeModalProvider>
+            <ImpersonationBanner />
             <AppRouter />
             <Toaster position="top-right" />
           </UpgradeModalProvider>
