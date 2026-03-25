@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -87,6 +87,7 @@ const INSIGHT_ICONS = {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, selectedTrust, trusts, loadTrusts, seedDemoData } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -96,6 +97,19 @@ export default function DashboardPage() {
   const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
   const [aiSuggestionsError, setAiSuggestionsError] = useState(false);
   const [aiSuggestionsFallback, setAiSuggestionsFallback] = useState(false); // True when using static fallback
+
+  // Show welcome toast after successful purchase
+  useEffect(() => {
+    if (searchParams.get('welcome') === 'true') {
+      toast.success('Welcome to TrustOffice!', {
+        description: 'Your subscription is now active. Let\'s get your trust organized.',
+        duration: 6000
+      });
+      // Remove the query param to prevent showing again on refresh
+      searchParams.delete('welcome');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (selectedTrust) {
