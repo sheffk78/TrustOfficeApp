@@ -514,6 +514,113 @@ async def delete_customer(
     }
 
 
+class BulkDeleteRequest(BaseModel):
+    user_ids: List[str]
+
+
+@router.post("/customers/bulk-delete")
+async def bulk_delete_customers(
+    request: BulkDeleteRequest,
+    admin: dict = Depends(require_admin)
+):
+    """
+    Permanently delete multiple customers and all their data.
+    Skips admins and the primary admin account.
+    """
+    if not request.user_ids:
+        raise HTTPException(status_code=400, detail="No user IDs provided")
+    
+    if len(request.user_ids) > 100:
+        raise HTTPException(status_code=400, detail="Cannot delete more than 100 accounts at once")
+    
+    # Filter out protected accounts
+    protected_emails = {"contact@trustoffice.app"}
+    users_to_delete = []
+    skipped = []
+    
+    for user_id in request.user_ids:
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "is_admin": 1})
+        if not user:
+            skipped.append({"user_id": user_id, "reason": "not found"})
+            continue
+        
+        # Skip primary admin
+        if user.get("email", "").lower() in protected_emails:
+            skipped.append({"user_id": user_id, "email": user["email"], "reason": "protected account"})
+            continue
+        
+        # Skip admins
+        if user.get("is_admin"):
+            skipped.append({"user_id": user_id, "email": user["email"], "reason": "admin account"})
+            continue
+        
+        # Skip self-deletion
+        if user_id == admin["user_id"]:
+            skipped.append({"user_id": user_id, "email": user["email"], "reason": "cannot delete self"})
+            continue
+        
+        users_to_delete.append({"user_id": user_id, "email": user["email"]})
+    
+    if not users_to_delete:
+        raise HTTPException(status_code=400, detail="No deletable accounts found")
+    
+    # Collections to clean for each user
+    collections_to_clean = [
+        "trusts",
+        "entities",
+        "entity_relationships",
+        "minutes_records",
+        "minutes_templates",
+        "distribution_records",
+        "compensation_plans",
+        "compensation_payments",
+        "governance_tasks",
+        "schedule_a_items",
+        "trust_units_settings",
+        "trust_unit_certificates",
+        "trust_unit_transfers",
+        "benevolence_records",
+        "health_score_snapshots",
+        "user_onboarding",
+        "user_preferences",
+        "notification_preferences",
+        "subscriptions",
+        "user_sessions",
+        "password_resets",
+        "referral_codes",
+        "ai_usage_tracking",
+        "ai_suggestion_cache"
+    ]
+    
+    deleted_count = 0
+    deleted_emails = []
+    
+    for user_data in users_to_delete:
+        user_id = user_data["user_id"]
+        
+        # Delete all user data from collections
+        for collection in collections_to_clean:
+            await db[collection].delete_many({"user_id": user_id})
+        
+        # Clean up referral tracking
+        await db.referral_tracking.delete_many({"referee_user_id": user_id})
+        
+        # Delete the user
+        await db.users.delete_one({"user_id": user_id})
+        
+        deleted_count += 1
+        deleted_emails.append(user_data["email"])
+    
+    logger.info(f"Admin {admin['email']} bulk deleted {deleted_count} users: {deleted_emails}")
+    
+    return {
+        "message": f"Successfully deleted {deleted_count} account(s)",
+        "deleted_count": deleted_count,
+        "deleted_emails": deleted_emails,
+        "skipped": skipped if skipped else None
+    }
+
+
 # ==================== REFERRAL MANAGEMENT ====================
 
 @router.get("/referrals")

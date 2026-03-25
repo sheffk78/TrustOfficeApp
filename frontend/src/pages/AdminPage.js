@@ -5,6 +5,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,7 +33,8 @@ import {
   CheckCircle,
   XCircle,
   RefreshCw,
-  Eye
+  Eye,
+  CheckSquare
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -57,6 +59,11 @@ export default function AdminPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCreateAdminDialog, setShowCreateAdminDialog] = useState(false);
   const [showFixReferralDialog, setShowFixReferralDialog] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  
+  // Multi-select state
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
   
   // Form states
   const [grantAccessForm, setGrantAccessForm] = useState({ plan_type: 'trial', days: 14 });
@@ -342,6 +349,67 @@ export default function AdminPage() {
     }
   };
 
+  // Multi-select handlers
+  const toggleSelectCustomer = (customerId) => {
+    setSelectedCustomerIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(customerId)) {
+        newSet.delete(customerId);
+      } else {
+        newSet.add(customerId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCustomerIds.size === customers.filter(c => !c.is_admin && c.email !== 'contact@trustoffice.app').length) {
+      setSelectedCustomerIds(new Set());
+    } else {
+      // Select all non-admin customers
+      const selectableIds = customers
+        .filter(c => !c.is_admin && c.email !== 'contact@trustoffice.app')
+        .map(c => c.user_id);
+      setSelectedCustomerIds(new Set(selectableIds));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedCustomerIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCustomerIds.size === 0) return;
+    
+    setBulkActionLoading(true);
+    try {
+      const response = await fetchWithAuth('/admin/customers/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify({ user_ids: Array.from(selectedCustomerIds) })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(`Successfully deleted ${data.deleted_count} account(s)`);
+        setShowBulkDeleteDialog(false);
+        setSelectedCustomerIds(new Set());
+        fetchCustomers();
+        // Refresh stats
+        const statsResponse = await fetchWithAuth('/admin/stats');
+        if (statsResponse.ok) {
+          setStats(await statsResponse.json());
+        }
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to delete accounts');
+      }
+    } catch (error) {
+      toast.error('Failed to delete accounts');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   // Status badge helper
   const getStatusBadge = (status) => {
     const styles = {
@@ -487,11 +555,45 @@ export default function AdminPage() {
                   </Button>
                 </div>
 
+                {/* Bulk Action Bar */}
+                {selectedCustomerIds.size > 0 && (
+                  <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded-lg border border-navy/10 dark:border-white/10">
+                    <div className="flex items-center gap-3">
+                      <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
+                      <span className="font-medium text-navy dark:text-white">
+                        {selectedCustomerIds.size} account{selectedCustomerIds.size !== 1 ? 's' : ''} selected
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={clearSelection}>
+                        Clear
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        onClick={() => setShowBulkDeleteDialog(true)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Selected
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Customer List */}
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-navy/10 dark:border-white/10">
+                        <th className="w-12 py-3 px-4">
+                          <Checkbox
+                            checked={customers.filter(c => !c.is_admin && c.email !== 'contact@trustoffice.app').length > 0 && 
+                                     selectedCustomerIds.size === customers.filter(c => !c.is_admin && c.email !== 'contact@trustoffice.app').length}
+                            onCheckedChange={toggleSelectAll}
+                            aria-label="Select all"
+                          />
+                        </th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Plan</th>
@@ -501,8 +603,26 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {customers.map((customer) => (
-                        <tr key={customer.user_id} className="border-b border-navy/5 dark:border-white/5 hover:bg-navy/5 dark:hover:bg-white/5">
+                      {customers.map((customer) => {
+                        const isSelectable = !customer.is_admin && customer.email !== 'contact@trustoffice.app';
+                        const isSelected = selectedCustomerIds.has(customer.user_id);
+                        
+                        return (
+                        <tr 
+                          key={customer.user_id} 
+                          className={`border-b border-navy/5 dark:border-white/5 hover:bg-navy/5 dark:hover:bg-white/5 ${isSelected ? 'bg-navy/10 dark:bg-white/10' : ''}`}
+                        >
+                          <td className="py-3 px-4">
+                            {isSelectable ? (
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleSelectCustomer(customer.user_id)}
+                                aria-label={`Select ${customer.name}`}
+                              />
+                            ) : (
+                              <div className="w-4 h-4" /> 
+                            )}
+                          </td>
                           <td className="py-3 px-4">
                             <div>
                               <p className="font-medium text-navy dark:text-white flex items-center gap-2">
@@ -553,7 +673,8 @@ export default function AdminPage() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1016,6 +1137,61 @@ export default function AdminPage() {
                   disabled={!fixReferralForm.referrer_email || !fixReferralForm.referee_email}
                 >
                   Apply Fix
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Bulk Delete Confirmation Dialog */}
+          <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif text-xl text-red-600 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  Delete {selectedCustomerIds.size} Account{selectedCustomerIds.size !== 1 ? 's' : ''}
+                </DialogTitle>
+                <DialogDescription>
+                  This will permanently delete the selected accounts and ALL their data including trusts, minutes, distributions, and settings.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="py-4">
+                <p className="text-red-500 font-medium mb-3">This action cannot be undone!</p>
+                <div className="max-h-40 overflow-y-auto bg-muted/50 rounded-lg p-3">
+                  <p className="text-sm text-muted-foreground mb-2">Accounts to be deleted:</p>
+                  <ul className="text-sm space-y-1">
+                    {customers
+                      .filter(c => selectedCustomerIds.has(c.user_id))
+                      .map(c => (
+                        <li key={c.user_id} className="text-navy dark:text-white">
+                          • {c.email}
+                        </li>
+                      ))
+                    }
+                  </ul>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)} disabled={bulkActionLoading}>
+                  Cancel
+                </Button>
+                <Button 
+                  className="bg-red-600 hover:bg-red-700 text-white" 
+                  onClick={handleBulkDelete}
+                  disabled={bulkActionLoading}
+                >
+                  {bulkActionLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Forever
+                    </>
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
