@@ -108,7 +108,7 @@ export default function BillingPage() {
       const currentUrl = window.location.origin;
       const checkoutData = {
         plan_type: planId,
-        success_url: `${currentUrl}/settings/billing?session_id={CHECKOUT_SESSION_ID}`,
+        success_url: `${currentUrl}/dashboard?welcome=true`,
         cancel_url: `${currentUrl}/settings/billing`
       };
       

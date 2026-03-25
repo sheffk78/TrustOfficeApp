@@ -90,7 +90,7 @@ export default function PricingPage() {
       
       const checkoutData = {
         plan_type: planType,
-        success_url: `${baseUrl}/settings/billing?session_id={CHECKOUT_SESSION_ID}&success=true`,
+        success_url: `${baseUrl}/dashboard?welcome=true`,
         cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`
       };
       
