@@ -65,7 +65,6 @@ class AdminActionRequest(BaseModel):
 
 
 class GrantAccessRequest(BaseModel):
-    user_id: str
     plan_type: str = "annual"  # trial, monthly, annual, forever_free
     days: Optional[int] = None  # For trial extension
 
