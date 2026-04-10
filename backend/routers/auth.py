@@ -16,6 +16,7 @@ from dependencies import get_current_user, hash_password, verify_password, creat
 from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, ProfileUpdate
 from email_service import email_service
 from security import InputSanitizer
+from mailercloud_service import add_to_trial_list
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,13 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
         email_service.send_welcome_email,
         to_email=user.email,
         user_name=user.name
+    )
+    
+    # Add to Mailercloud trial list in background
+    background_tasks.add_task(
+        add_to_trial_list,
+        email=user.email,
+        name=user.name
     )
     
     return UserResponse(
@@ -367,6 +375,15 @@ async def exchange_session(request: Request, response: Response):
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
         })
+        
+        # Add new Google OAuth user to Mailercloud trial list
+        try:
+            await add_to_trial_list(
+                email=email,
+                name=session_data.get("name", "")
+            )
+        except Exception as e:
+            logger.error(f"Failed to add Google OAuth user to Mailercloud trial list: {e}")
     
     session_token = session_data.get("session_token")
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
@@ -640,6 +657,15 @@ async def google_callback(request: Request, response: Response, code: str = None
                 )
             except Exception as e:
                 logger.error(f"Failed to send welcome email: {e}")
+            
+            # Add new Google OAuth user to Mailercloud trial list
+            try:
+                await add_to_trial_list(
+                    email=email,
+                    name=google_user.get("name", "")
+                )
+            except Exception as e:
+                logger.error(f"Failed to add Google OAuth user to Mailercloud trial list: {e}")
         
         # Generate JWT token
         jwt_token = create_jwt_token(user_id, email)

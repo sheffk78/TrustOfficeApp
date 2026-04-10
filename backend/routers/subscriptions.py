@@ -5,7 +5,6 @@ from typing import Optional
 import uuid
 import logging
 import os
-import httpx
 
 import stripe
 
@@ -32,51 +31,7 @@ STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID')
 STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
 
 # Mailercloud Config
-MAILERCLOUD_API_KEY = os.environ.get('MAILERCLOUD_API_KEY')
-MAILERCLOUD_PAID_LIST_ID = os.environ.get('MAILERCLOUD_PAID_LIST_ID', 'fySyKK')
-
-
-# ==================== MAILERCLOUD INTEGRATION ====================
-
-async def add_contact_to_mailercloud_paid_list(email: str, name: str = None):
-    """
-    Add a contact to the Mailercloud 'TrustOffice Active Members' list
-    when they complete a purchase.
-    """
-    if not MAILERCLOUD_API_KEY:
-        logger.warning("Mailercloud API key not configured, skipping list update")
-        return None
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://cloudapi.mailercloud.com/v1/contacts",
-                headers={
-                    "Authorization": MAILERCLOUD_API_KEY,
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "email": email,
-                    "name": name or "",
-                    "list_id": MAILERCLOUD_PAID_LIST_ID
-                },
-                timeout=10.0
-            )
-            
-            if response.status_code in [200, 201]:
-                logger.info(f"Successfully added {email} to Mailercloud paid list")
-                return {"success": True, "email": email}
-            elif response.status_code == 409:
-                # Contact already exists in this list
-                logger.info(f"Contact {email} already exists in Mailercloud paid list")
-                return {"success": True, "email": email, "note": "already_exists"}
-            else:
-                logger.error(f"Failed to add {email} to Mailercloud: {response.status_code} - {response.text}")
-                return {"success": False, "error": response.text}
-                
-    except Exception as e:
-        logger.error(f"Mailercloud API error for {email}: {str(e)}")
-        return {"success": False, "error": str(e)}
+from mailercloud_service import add_to_paid_list
 
 
 # ==================== HELPER FUNCTIONS ====================
@@ -609,7 +564,7 @@ async def stripe_webhook(request: Request):
             # Add to Mailercloud paid members list
             if user:
                 try:
-                    mailercloud_result = await add_contact_to_mailercloud_paid_list(
+                    mailercloud_result = await add_to_paid_list(
                         email=user["email"],
                         name=user.get("name", "")
                     )
