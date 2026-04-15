@@ -31,6 +31,7 @@ import PricingPage from "@/pages/PricingPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
+import ContactPage from "@/pages/ContactPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
@@ -148,6 +149,7 @@ const AppRouter = () => {
       <Route path="/register" element={<SignUpPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/affiliate" element={<AffiliatePage />} />
+      <Route path="/contact" element={<ContactPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
