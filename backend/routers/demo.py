@@ -25,10 +25,12 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     """
     Seed comprehensive demo data for new users.
     Creates 2 sample trusts with rich data showcasing all features.
+    Only seeds if no demo data exists (allows seeding alongside user's own trusts).
     """
-    existing = await db.trusts.count_documents({"user_id": user["user_id"]})
-    if existing > 0:
-        return {"message": "User already has trusts", "seeded": False}
+    # Check if demo data already exists (not all trusts, just demo trusts)
+    existing_demo = await db.trusts.count_documents({"user_id": user["user_id"], "is_demo": True})
+    if existing_demo > 0:
+        return {"message": "Demo data already exists", "seeded": False}
     
     now = datetime.now(timezone.utc)
     
