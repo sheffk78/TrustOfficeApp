@@ -250,7 +250,25 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         except Exception as e:
             logger.error(f"Failed to check/apply referral discount: {e}")
         
-        # If no referral discount and a specific promotion code is provided, try to apply it
+        # If no referral discount and a direct coupon is provided, apply it
+        if "discounts" not in checkout_params and checkout.coupon:
+            try:
+                # Verify the coupon exists and is valid
+                coupon = stripe.Coupon.retrieve(checkout.coupon)
+                if coupon and coupon.valid:
+                    checkout_params["discounts"] = [{"coupon": checkout.coupon}]
+                    # Remove allow_promotion_codes when applying a coupon directly
+                    checkout_params.pop("allow_promotion_codes", None)
+                    logger.info(f"Applied coupon: {checkout.coupon}")
+                else:
+                    logger.warning(f"Coupon {checkout.coupon} is not valid")
+            except stripe.InvalidRequestError as coupon_error:
+                logger.warning(f"Coupon {checkout.coupon} not found: {coupon_error}")
+                # Continue without the coupon - user can still enter codes manually
+            except stripe.StripeError as coupon_error:
+                logger.warning(f"Could not apply coupon {checkout.coupon}: {coupon_error}")
+        
+        # If no referral discount/coupon and a specific promotion code is provided, try to apply it
         if "discounts" not in checkout_params and checkout.promotion_code:
             try:
                 # Look up the promotion code in Stripe

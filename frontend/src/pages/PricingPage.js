@@ -59,15 +59,21 @@ export default function PricingPage() {
   const [loading, setLoading] = useState(null);
   const [couponApplied, setCouponApplied] = useState(false);
   
-  // Get coupon from URL if present
-  const couponCode = searchParams.get('coupon') || searchParams.get('promo');
+  // Get coupon from URL if present, or from sessionStorage (from signup flow)
+  const urlCoupon = searchParams.get('coupon') || searchParams.get('promo');
+  const storedCoupon = typeof window !== 'undefined' ? sessionStorage.getItem('pending_coupon') : null;
+  const couponCode = urlCoupon || storedCoupon;
   
   useEffect(() => {
     if (couponCode) {
       setCouponApplied(true);
       toast.success(`Coupon "${couponCode}" will be applied at checkout`);
+      // Clear stored coupon after displaying
+      if (storedCoupon) {
+        sessionStorage.removeItem('pending_coupon');
+      }
     }
-  }, [couponCode]);
+  }, [couponCode, storedCoupon]);
 
   const handleCheckout = async (planType) => {
     // If not logged in, redirect to signup first
@@ -94,9 +100,9 @@ export default function PricingPage() {
         cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`
       };
       
-      // Add coupon if present
+      // Add coupon if present (use coupon field for direct Stripe coupons like TRUST49)
       if (couponCode) {
-        checkoutData.promotion_code = couponCode;
+        checkoutData.coupon = couponCode.toUpperCase();
       }
       
       // Add Rewardful referral ID for affiliate tracking

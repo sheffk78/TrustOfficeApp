@@ -819,6 +819,7 @@ class CheckoutRequest(BaseModel):
     success_url: str
     cancel_url: str
     promotion_code: Optional[str] = None
+    coupon: Optional[str] = None  # Direct Stripe coupon ID (e.g., TRUST49)
     referral_id: Optional[str] = None  # Rewardful affiliate referral ID
 
 class PortalRequest(BaseModel):

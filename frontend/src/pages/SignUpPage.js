@@ -55,12 +55,33 @@ export default function SignUpPage() {
   const [referralCode, setReferralCode] = useState('');
   const [referralInfo, setReferralInfo] = useState(null);
   
-  // Check for referral code on mount
+  // Coupon code from URL params (e.g., /signup?coupon=TRUST49)
+  const [couponCode, setCouponCode] = useState('');
+  const [couponInfo, setCouponInfo] = useState(null);
+  
+  // Check for referral code and coupon on mount
   useEffect(() => {
     const refCode = searchParams.get('ref');
     if (refCode) {
       setReferralCode(refCode.toUpperCase());
       validateReferralCode(refCode);
+    }
+    
+    // Check for coupon parameter
+    const coupon = searchParams.get('coupon');
+    if (coupon) {
+      const couponUpper = coupon.toUpperCase();
+      setCouponCode(couponUpper);
+      
+      // Set coupon info for known coupons
+      if (couponUpper === 'TRUST49') {
+        setCouponInfo({
+          code: 'TRUST49',
+          description: '$49/month for your first 3 months',
+          regularPrice: '$79/month',
+          savings: '$30 off per month'
+        });
+      }
     }
   }, [searchParams]);
   
@@ -128,6 +149,11 @@ export default function SignUpPage() {
         setUser(loginData.user);
       }
       
+      // Store coupon code for use after onboarding
+      if (couponCode) {
+        sessionStorage.setItem('pending_coupon', couponCode);
+      }
+      
       toast.success('Account created successfully');
       navigate('/onboarding');
     } catch (error) {
@@ -177,6 +203,21 @@ export default function SignUpPage() {
 
           {/* Sign up card with corner marks */}
           <div className="card-trust corner-mark relative">
+            {/* Coupon banner */}
+            {couponInfo && !referralInfo && (
+              <div className="bg-gradient-to-r from-green-500/20 to-emerald-100 dark:from-green-500/30 dark:to-emerald-900/30 -mx-6 -mt-6 px-6 py-4 mb-6 border-b border-green-500/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl">🎉</span>
+                  <span className="font-medium text-navy dark:text-white">Special Offer Applied!</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-green-600 dark:text-green-400">{couponInfo.description}</span>
+                  {' '}(regularly {couponInfo.regularPrice}). 
+                  <span className="text-navy dark:text-white"> Applied at checkout.</span>
+                </p>
+              </div>
+            )}
+            
             {/* Referral banner */}
             {referralInfo && (
               <div className="bg-gradient-to-r from-gold/20 to-amber-100 dark:from-gold/30 dark:to-amber-900/30 -mx-6 -mt-6 px-6 py-4 mb-6 border-b border-gold/30">
