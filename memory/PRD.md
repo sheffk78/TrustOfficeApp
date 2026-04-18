@@ -3,7 +3,19 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Mar 21, 2026) - ADMIN PANEL ✅
+## Latest Update (Apr 18, 2026) - FAVICON FIX ✅
+
+**Session Summary:** Replaced favicon with the correct compact Trust Office emblem logo (the T-in-circle icon with gold accent, matching the sidebar logo).
+
+**File Modified:**
+- `/app/frontend/public/favicon.svg` - Replaced with compact logo from sidebar/mobile login
+
+**Also Fixed:**
+- Reset `REACT_APP_BACKEND_URL` to empty string (recurring preview environment issue)
+
+---
+
+## Previous Update (Mar 21, 2026) - ADMIN PANEL ✅
 
 **Session Summary:** Created comprehensive backend admin panel for customer management.
 
