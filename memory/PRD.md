@@ -3,7 +3,22 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Apr 18, 2026) - PHASE 2 SPEC INTEGRATION COMPLETE ✅
+## Latest Update (Apr 18, 2026) - DATE RANGE FILTERS ON MINUTES PAGE ✅
+
+**Session Summary:** Added date range filters (From/To) to the Minutes & Decisions page.
+
+**Backend:**
+- `GET /api/minutes` — added `date_from` and `date_to` optional query parameters for filtering by meeting_date range
+
+**Frontend:**
+- `/app/frontend/src/pages/MinutesPage.js` — Added From/To date picker buttons using Popover + Calendar components
+- "Clear" button appears when dates are active
+- Dates trigger automatic reload of minutes list
+- Filters work alongside existing search and type filters
+
+---
+
+## Previous Update (Apr 18, 2026) - PHASE 2 SPEC INTEGRATION COMPLETE ✅
 
 **Session Summary:** Implemented the remaining 3 integration items from the Phase 2 spec.
 

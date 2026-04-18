@@ -7,6 +7,8 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Plus, 
@@ -45,6 +47,10 @@ export default function MinutesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [dateFrom, setDateFrom] = useState(null);
+  const [dateTo, setDateTo] = useState(null);
+  const [dateFromOpen, setDateFromOpen] = useState(false);
+  const [dateToOpen, setDateToOpen] = useState(false);
   const [pdfPreview, setPdfPreview] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -54,7 +60,7 @@ export default function MinutesPage() {
     if (selectedTrust) {
       loadMinutes(debouncedSearch);
     }
-  }, [selectedTrust, debouncedSearch]);
+  }, [selectedTrust, debouncedSearch, dateFrom, dateTo]);
 
   const loadMinutes = async (search = '') => {
     if (!selectedTrust) return;
@@ -64,6 +70,12 @@ export default function MinutesPage() {
       let url = `/minutes?trust_id=${selectedTrust.trust_id}`;
       if (search) {
         url += `&search=${encodeURIComponent(search)}`;
+      }
+      if (dateFrom) {
+        url += `&date_from=${format(dateFrom, 'yyyy-MM-dd')}`;
+      }
+      if (dateTo) {
+        url += `&date_to=${format(dateTo, 'yyyy-MM-dd')}`;
       }
       const response = await fetchWithAuth(url);
       if (response.ok) {
@@ -190,8 +202,42 @@ export default function MinutesPage() {
                   data-testid="search-minutes"
                 />
               </div>
-              <div className="flex gap-2">
-                {['all', 'meeting', 'decision', 'distribution_approval'].map((type) => (
+              <div className="flex gap-2 items-center flex-wrap">
+                <Popover open={dateFromOpen} onOpenChange={setDateFromOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="font-mono text-xs h-9" data-testid="date-from-btn">
+                      <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                      {dateFrom ? format(dateFrom, 'MMM d, yyyy') : 'From'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker mode="single" selected={dateFrom}
+                      onSelect={d => { setDateFrom(d); setDateFromOpen(false); }} />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground text-xs">—</span>
+                <Popover open={dateToOpen} onOpenChange={setDateToOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="font-mono text-xs h-9" data-testid="date-to-btn">
+                      <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                      {dateTo ? format(dateTo, 'MMM d, yyyy') : 'To'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker mode="single" selected={dateTo}
+                      onSelect={d => { setDateTo(d); setDateToOpen(false); }} />
+                  </PopoverContent>
+                </Popover>
+                {(dateFrom || dateTo) && (
+                  <Button variant="ghost" size="sm" className="h-9 px-2 text-xs text-muted-foreground"
+                    onClick={() => { setDateFrom(null); setDateTo(null); }} data-testid="clear-dates-btn">
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              {['all', 'meeting', 'decision', 'distribution_approval'].map((type) => (
                   <button
                     key={type}
                     onClick={() => setFilterType(type)}
@@ -206,7 +252,6 @@ export default function MinutesPage() {
                   </button>
                 ))}
               </div>
-            </div>
           </div>
 
           {/* Minutes List */}

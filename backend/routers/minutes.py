@@ -76,6 +76,8 @@ async def get_minutes(
     trust_id: Optional[str] = None, 
     search: Optional[str] = None,
     minutes_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     user: dict = Depends(get_current_user)
 ):
     """Get minutes with optional search and filters"""
@@ -84,6 +86,13 @@ async def get_minutes(
         query["trust_id"] = trust_id
     if minutes_type:
         query["minutes_type"] = minutes_type
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            date_query["$gte"] = date_from
+        if date_to:
+            date_query["$lte"] = date_to
+        query["meeting_date"] = date_query
     
     # Add text search across participants and decisions
     if search:
