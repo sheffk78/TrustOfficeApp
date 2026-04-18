@@ -26,7 +26,8 @@ import {
   ShieldAlert,
   ArrowUpRight,
   ArrowDownLeft,
-  AlertTriangle
+  AlertTriangle,
+  FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,6 +58,7 @@ export default function StructuresPage() {
   const [loading, setLoading] = useState(true);
   const [separationData, setSeparationData] = useState(null);
   const [sepLoading, setSepLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   
   // Modal states
   const [showEntityModal, setShowEntityModal] = useState(false);
@@ -116,6 +118,29 @@ export default function StructuresPage() {
   useEffect(() => {
     if (activeTab === 'separation' && selectedTrust) loadSeparationData();
   }, [activeTab, selectedTrust, loadSeparationData]);
+
+  const handleDownloadAuditReport = async () => {
+    if (!selectedTrust) return;
+    setDownloading(true);
+    try {
+      const res = await fetchWithAuth(`/exports/audit-defense/${selectedTrust.trust_id}?days=365`);
+      if (!res.ok) throw new Error('Failed to generate report');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit_defense_${selectedTrust.trust_id}_${new Date().toISOString().slice(0,10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Audit Defense Report downloaded');
+    } catch (e) {
+      toast.error(e.message || 'Failed to generate report');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // Tab change handler - updates URL
   const handleTabChange = (value) => {
@@ -350,6 +375,16 @@ export default function StructuresPage() {
                   data-testid="add-relationship-btn"
                 >
                   <Plus className="w-4 h-4 mr-2" /> Add Relationship
+                </Button>
+              ) : activeTab === 'separation' ? (
+                <Button
+                  onClick={handleDownloadAuditReport}
+                  className="btn-primary"
+                  disabled={downloading || !separationData}
+                  data-testid="generate-audit-report-btn"
+                >
+                  {downloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
+                  {downloading ? 'Generating...' : 'Audit Defense Report'}
                 </Button>
               ) : null}
             </div>
