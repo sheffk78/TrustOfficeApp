@@ -3,7 +3,30 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Apr 18, 2026) - PHASE 2C: ENTITY SEPARATION DASHBOARD ✅
+## Latest Update (Apr 18, 2026) - PHASE 2D: AUDIT DEFENSE EXPORT ✅
+
+**Session Summary:** Built one-click court-ready PDF export proving structural separation was maintained.
+
+**Backend (New):**
+- `/app/backend/routers/audit_defense.py` — `GET /api/exports/audit-defense/{trust_id}?days=365`
+- Generates professional 5-page PDF using reportlab with TrustOffice branding:
+  1. **Entity Structure** — all entities with types, EINs, governing law, relationships
+  2. **Transaction Summary by Entity** — inflows, outflows, net flow, classification breakdown per entity
+  3. **Inter-Entity Transfer Log** — all transfers between entities with dates, amounts, memos
+  4. **Separation Alerts & Resolutions** — active + resolved alerts with full audit trail
+  5. **Linked Governance Actions** — minutes records, distribution authorizations, compensation payments
+  6. **Governance Health Score History** — score snapshots over time
+  7. **Confidentiality footer** — legal-ready certification text with timestamp
+
+**Frontend (Enhanced):**
+- "Audit Defense Report" button on Separation tab header (StructuresPage)
+- Downloads PDF with loading state + success toast
+
+**Testing:** 26/26 backend (100%), 100% frontend
+
+---
+
+## Previous Update (Apr 18, 2026) - PHASE 2C: ENTITY SEPARATION DASHBOARD ✅
 
 **Session Summary:** Upgraded the Structures page from a static org chart into a live separation intelligence dashboard.
 
