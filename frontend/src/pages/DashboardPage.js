@@ -6,6 +6,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import confetti from 'canvas-confetti';
 import { 
   FileText, 
   DollarSign, 
@@ -98,13 +99,36 @@ export default function DashboardPage() {
   const [aiSuggestionsError, setAiSuggestionsError] = useState(false);
   const [aiSuggestionsFallback, setAiSuggestionsFallback] = useState(false); // True when using static fallback
 
-  // Show welcome toast after successful purchase
+  // Show welcome toast + confetti after successful purchase
   useEffect(() => {
     if (searchParams.get('welcome') === 'true') {
       toast.success('Welcome to TrustOffice!', {
         description: 'Your subscription is now active. Let\'s get your trust organized.',
         duration: 6000
       });
+
+      // Subtle confetti burst
+      const end = Date.now() + 1500;
+      const colors = ['#010079', '#d5ad36', '#ffffff'];
+      const frame = () => {
+        confetti({
+          particleCount: 2,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.7 },
+          colors,
+        });
+        confetti({
+          particleCount: 2,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.7 },
+          colors,
+        });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      };
+      frame();
+
       // Remove the query param to prevent showing again on refresh
       searchParams.delete('welcome');
       setSearchParams(searchParams, { replace: true });
