@@ -33,20 +33,58 @@ def get_year_start(dt: datetime) -> datetime:
     return datetime(dt.year, 1, 1, tzinfo=timezone.utc)
 
 
+async def ensure_transaction_review_task(trust_id: str, user_id: str):
+    """Ensure a monthly transaction classification review task exists for the current month"""
+    now = datetime.now(timezone.utc)
+    # Check for an existing transaction_review task due this month
+    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc).isoformat()
+    if now.month == 12:
+        next_month = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc).isoformat()
+    else:
+        next_month = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc).isoformat()
+
+    existing = await db.governance_tasks.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "task_type": "transaction_review",
+        "due_date": {"$gte": month_start, "$lt": next_month}
+    })
+
+    if not existing:
+        # Only create if this trust has transactions
+        txn_count = await db.transactions.count_documents({"trust_id": trust_id, "user_id": user_id})
+        if txn_count > 0:
+            # Due on the last day of the month
+            if now.month == 12:
+                due = datetime(now.year, 12, 31, tzinfo=timezone.utc)
+            else:
+                due = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+
+            await db.governance_tasks.insert_one({
+                "task_id": f"task_{uuid.uuid4().hex[:12]}",
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "task_type": "transaction_review",
+                "due_date": due.isoformat(),
+                "description": "Monthly Transaction Classification Review — classify any untagged imported transactions and review separation alerts",
+                "status": "pending",
+                "completed_at": None,
+                "created_at": now.isoformat()
+            })
+
+
 async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     """
-    Calculate governance health score using 5 criteria (20 points each):
-    1. Quarterly Minutes - minutes generated this quarter
-    2. Task Compliance - no overdue tasks
-    3. Compensation Alignment - YTD ≤ approved annual
-    4. Distribution Documentation - at least 1 distribution logged
-    5. Annual Review - annual_review task completed in last 12 months
+    Calculate governance health score using 7 criteria:
     """
+    # Ensure monthly transaction review task exists for this trust
+    await ensure_transaction_review_task(trust_id, user_id)
+    
     now = datetime.now(timezone.utc)
     criteria = []
     total_score = 0
     
-    # 1. Quarterly Minutes (+20)
+    # 1. Quarterly Minutes (+15)
     quarter_start = get_quarter_start(now)
     quarterly_minutes = await db.minutes_records.count_documents({
         "trust_id": trust_id,
@@ -54,16 +92,16 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         "created_at": {"$gte": quarter_start.isoformat()}
     })
     quarterly_achieved = quarterly_minutes > 0
+    q_points = 15 if quarterly_achieved else 0
     criteria.append(HealthScoreCriterion(
         name="Quarterly Minutes",
         description="Minutes generated this quarter",
-        points=20 if quarterly_achieved else 0,
+        points=q_points,
         achieved=quarterly_achieved
     ))
-    if quarterly_achieved:
-        total_score += 20
+    total_score += q_points
     
-    # 2. Task Compliance (+20) - Only count if there are tasks to track
+    # 2. Task Compliance (+15)
     total_tasks = await db.governance_tasks.count_documents({
         "trust_id": trust_id,
         "user_id": user_id
@@ -75,12 +113,11 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         "due_date": {"$lt": now.isoformat()}
     })
     
-    # Only give points if there are actual tasks being tracked
     if total_tasks > 0:
         task_compliance = overdue_tasks == 0
-        task_points = 20 if task_compliance else max(0, 20 - (overdue_tasks * 5))
+        task_points = 15 if task_compliance else max(0, 15 - (overdue_tasks * 4))
     else:
-        task_compliance = None  # No data
+        task_compliance = None
         task_points = 0
     
     criteria.append(HealthScoreCriterion(
@@ -92,7 +129,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += task_points
     
-    # 3. Compensation Alignment (+20) - Only count if there's a compensation plan
+    # 3. Compensation Alignment (+15)
     year_start = get_year_start(now)
     comp_plan = await db.compensation_plans.find_one(
         {"trust_id": trust_id, "user_id": user_id},
@@ -108,9 +145,9 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         ytd_total = sum(p.get("amount", 0) for p in ytd_payments)
         approved_amount = comp_plan.get("annual_approved_amount") or comp_plan.get("annual_fee") or comp_plan.get("annual_amount", 0)
         comp_aligned = ytd_total <= approved_amount
-        comp_points = 20 if comp_aligned else 0
+        comp_points = 15 if comp_aligned else 0
     else:
-        comp_aligned = None  # No data
+        comp_aligned = None
         comp_points = 0
     
     criteria.append(HealthScoreCriterion(
@@ -122,7 +159,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += comp_points
     
-    # 4. Distribution Documentation (+20) - includes benevolence documentation quality
+    # 4. Distribution Documentation (+15)
     dist_count = await db.distribution_records.count_documents({
         "trust_id": trust_id,
         "user_id": user_id
@@ -150,11 +187,11 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     elif benevolence_count > 0 and incomplete_benevolence > 0:
         dist_documented = True
         completeness_ratio = (benevolence_count - incomplete_benevolence) / benevolence_count
-        dist_points = int(20 * (0.5 + 0.5 * completeness_ratio))
+        dist_points = int(15 * (0.5 + 0.5 * completeness_ratio))
         dist_description = f"Distributions logged; {incomplete_benevolence}/{benevolence_count} benevolence distributions need documentation"
     else:
         dist_documented = True
-        dist_points = 20
+        dist_points = 15
         if benevolence_count > 0:
             dist_description = f"All distributions documented ({benevolence_count} benevolence distributions fully documented)"
         else:
@@ -168,7 +205,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += dist_points
     
-    # 5. Annual Review (+20)
+    # 5. Annual Review (+10)
     one_year_ago = (now - timedelta(days=365)).isoformat()
     annual_review = await db.governance_tasks.find_one({
         "trust_id": trust_id,
@@ -177,14 +214,86 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         "completed_at": {"$gte": one_year_ago}
     }, {"_id": 0})
     annual_done = annual_review is not None
+    annual_points = 10 if annual_done else 0
     criteria.append(HealthScoreCriterion(
         name="Annual Review",
         description="Annual review completed in last 12 months",
-        points=20 if annual_done else 0,
+        points=annual_points,
         achieved=annual_done
     ))
-    if annual_done:
-        total_score += 20
+    total_score += annual_points
+    
+    # 6. Transaction Classification (+15) - % of transactions not classified as "Other"
+    total_txns = await db.transactions.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    if total_txns > 0:
+        other_txns = await db.transactions.count_documents({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "governance_classification": "Other"
+        })
+        classified_pct = ((total_txns - other_txns) / total_txns) * 100
+        if classified_pct >= 90:
+            txn_points = 15
+        elif classified_pct >= 70:
+            txn_points = 10
+        elif classified_pct >= 50:
+            txn_points = 5
+        else:
+            txn_points = 0
+        txn_achieved = classified_pct >= 90
+        txn_desc = f"{classified_pct:.0f}% of transactions properly classified"
+    else:
+        txn_points = 0
+        txn_achieved = False
+        txn_desc = "No transactions logged yet"
+    
+    criteria.append(HealthScoreCriterion(
+        name="Transaction Classification",
+        description=txn_desc,
+        points=txn_points,
+        achieved=txn_achieved,
+        no_data=total_txns == 0
+    ))
+    total_score += txn_points
+    
+    # 7. Separation Alert Health (+15) - no unresolved red alerts
+    red_alerts = await db.separation_alerts.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active",
+        "severity": "red"
+    })
+    yellow_alerts = await db.separation_alerts.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active",
+        "severity": "yellow"
+    })
+    
+    if red_alerts == 0 and yellow_alerts == 0:
+        alert_points = 15
+        alert_achieved = True
+        alert_desc = "No active separation alerts"
+    elif red_alerts == 0:
+        alert_points = max(0, 15 - (yellow_alerts * 2))
+        alert_achieved = yellow_alerts <= 2
+        alert_desc = f"{yellow_alerts} yellow alert(s) — needs attention"
+    else:
+        alert_points = 0
+        alert_achieved = False
+        alert_desc = f"{red_alerts} red alert(s) — immediate risk"
+    
+    criteria.append(HealthScoreCriterion(
+        name="Separation Alert Health",
+        description=alert_desc,
+        points=alert_points,
+        achieved=alert_achieved,
+        no_data=total_txns == 0
+    ))
+    total_score += alert_points
     
     # Determine color
     if total_score >= 80:

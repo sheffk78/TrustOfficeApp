@@ -51,7 +51,8 @@ async def get_tasks(trust_id: Optional[str] = None, user: dict = Depends(get_cur
     result = []
     for t in tasks:
         status = get_task_status(t["due_date"], t.get("completed_at"))
-        result.append(GovernanceTaskResponse(**t, status=status))
+        t_copy = {k: v for k, v in t.items() if k != "status"}
+        result.append(GovernanceTaskResponse(**t_copy, status=status))
     
     return result
 

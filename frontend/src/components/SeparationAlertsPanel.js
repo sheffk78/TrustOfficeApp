@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
 import {
   AlertTriangle, ShieldAlert, CheckCircle2, Loader2, ScanSearch,
-  Filter, History, ChevronDown
+  Filter, History, ChevronDown, FileText
 } from 'lucide-react';
 
 const severityConfig = {
@@ -128,6 +128,17 @@ export function SeparationAlertsPanel({ entityId = null, compact = false }) {
       toast.error('Failed to load history');
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const handleGenerateMinutes = async (alertId) => {
+    try {
+      const res = await fetchWithAuth(`/alerts/${alertId}/generate-resolution`, { method: 'POST' });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Failed');
+      const data = await res.json();
+      toast.success('Resolution minutes generated', { description: `Minutes ID: ${data.minutes_id}` });
+    } catch (e) {
+      toast.error(e.message);
     }
   };
 
@@ -265,8 +276,12 @@ export function SeparationAlertsPanel({ entityId = null, compact = false }) {
                       </span>
                     </div>
                     {a.status === 'resolved' && (
-                      <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-                        <span className="font-medium">Resolution:</span> {a.resolution_type?.replace(/_/g, ' ')} — {a.resolution_note}
+                      <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between">
+                        <span><span className="font-medium">Resolution:</span> {a.resolution_type?.replace(/_/g, ' ')} — {a.resolution_note}</span>
+                        <Button variant="ghost" size="sm" className="text-[10px] h-6 px-2 ml-2 flex-shrink-0"
+                          onClick={() => handleGenerateMinutes(a.alert_id)} data-testid={`gen-minutes-${a.alert_id}`}>
+                          <FileText className="w-3 h-3 mr-1" /> Minutes
+                        </Button>
                       </div>
                     )}
                   </div>

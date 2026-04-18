@@ -27,6 +27,7 @@ class TaskType(str, Enum):
     compensation_review = "compensation_review"
     distribution_review = "distribution_review"
     insurance_compliance = "insurance_compliance"
+    transaction_review = "transaction_review"
     custom = "custom"
 
 class MinutesType(str, Enum):

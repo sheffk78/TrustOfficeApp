@@ -165,3 +165,87 @@ async def get_alert_history(
             a["entity_name"] = entity_map.get(a.get("entity_id"), "")
 
     return [AlertResponse(**a) for a in alerts]
+
+
+
+@router.post("/alerts/{alert_id}/generate-resolution")
+async def generate_resolution_minutes(alert_id: str, user: dict = Depends(require_write_access)):
+    """Generate trustee minutes documenting the review and resolution of a separation alert"""
+    alert = await db.separation_alerts.find_one(
+        {"alert_id": alert_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    if alert["status"] != "resolved":
+        raise HTTPException(status_code=400, detail="Alert must be resolved before generating a resolution")
+
+    # Get entity info
+    entity = await db.entities.find_one({"entity_id": alert.get("entity_id")}, {"_id": 0})
+    entity_name = entity.get("name", "Unknown Entity") if entity else "Unknown Entity"
+
+    # Get trust info
+    trust = await db.trusts.find_one({"trust_id": alert["trust_id"]}, {"_id": 0})
+    trust_name = trust.get("name", "Trust") if trust else "Trust"
+
+    now = datetime.now(timezone.utc)
+    user_name = user.get("name", "Trustee")
+
+    resolution_type_labels = {
+        "classified": "Reclassified Transaction",
+        "linked": "Linked to Governance Action",
+        "documented": "Supporting Documentation Provided",
+        "reviewed_no_issue": "Reviewed and Determined No Issue"
+    }
+    resolution_label = resolution_type_labels.get(alert.get("resolution_type", ""), alert.get("resolution_type", ""))
+
+    # Build minutes text
+    participants = user_name
+    decisions_text = (
+        f"SEPARATION REVIEW RESOLUTION\n\n"
+        f"Trust: {trust_name}\n"
+        f"Entity: {entity_name}\n"
+        f"Alert Type: {alert.get('title', '')}\n"
+        f"Alert Description: {alert.get('description', '')}\n"
+        f"Severity: {alert.get('severity', '').upper()}\n\n"
+        f"RESOLUTION:\n"
+        f"Action Taken: {resolution_label}\n"
+        f"Trustee Note: {alert.get('resolution_note', '')}\n\n"
+        f"The trustee has reviewed the flagged transaction and determined the appropriate "
+        f"course of action as documented above. This resolution is recorded as part of the "
+        f"trust's structural separation governance trail."
+    )
+
+    minutes_id = f"min_{uuid.uuid4().hex[:12]}"
+    minutes_doc = {
+        "minutes_id": minutes_id,
+        "trust_id": alert["trust_id"],
+        "user_id": user["user_id"],
+        "minutes_type": "general",
+        "meeting_date": now.strftime("%Y-%m-%d"),
+        "participants_text": participants,
+        "decisions_text": decisions_text,
+        "distribution_id": None,
+        "compensation_payment_id": None,
+        "created_at": now.isoformat()
+    }
+
+    await db.minutes_records.insert_one(minutes_doc)
+
+    # Log in alert audit trail
+    await db.alert_audit_log.insert_one({
+        "audit_id": f"alert_audit_{uuid.uuid4().hex[:12]}",
+        "alert_id": alert_id,
+        "user_id": user["user_id"],
+        "action": "resolution_minutes_generated",
+        "minutes_id": minutes_id,
+        "timestamp": now.isoformat()
+    })
+
+    return {
+        "message": "Resolution minutes generated",
+        "minutes_id": minutes_id,
+        "minutes_type": "general",
+        "meeting_date": now.strftime("%Y-%m-%d")
+    }
