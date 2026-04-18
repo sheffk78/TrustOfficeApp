@@ -139,7 +139,7 @@ export default function GovernancePage() {
             <div>
               <h1 className="page-title">Governance Health</h1>
               <p className="page-subtitle">
-                {selectedTrust?.name || 'Select a trust'} • 5-Criteria Assessment
+                {selectedTrust?.name || 'Select a trust'} • 7-Criteria Assessment
               </p>
             </div>
             <Button 
@@ -197,7 +197,7 @@ export default function GovernancePage() {
 
                     {/* Criteria List */}
                     <div className="flex-1 w-full">
-                      <h3 className="font-serif text-lg text-navy mb-4">5-Criteria Assessment</h3>
+                      <h3 className="font-serif text-lg text-navy mb-4">7-Criteria Assessment</h3>
                       <div className="space-y-3">
                         {governance?.criteria?.map((criterion, index) => (
                           <div 

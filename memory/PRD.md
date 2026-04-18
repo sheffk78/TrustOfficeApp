@@ -3,7 +3,33 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Apr 18, 2026) - PHASE 2D: AUDIT DEFENSE EXPORT ✅
+## Latest Update (Apr 18, 2026) - PHASE 2 SPEC INTEGRATION COMPLETE ✅
+
+**Session Summary:** Implemented the remaining 3 integration items from the Phase 2 spec.
+
+**1. Governance Health Score Integration:**
+- Restructured from 5×20 to 7 criteria (15+15+15+15+10+15+15 = 100):
+  - Quarterly Minutes (15pts), Task Compliance (15pts), Compensation Alignment (15pts), Distribution Documentation (15pts), Annual Review (10pts)
+  - **NEW: Transaction Classification (15pts)** — awards points based on % of transactions not classified as "Other" (≥90% = 15pts, 70-89% = 10pts, etc.)
+  - **NEW: Separation Alert Health (15pts)** — 15pts if no active alerts, 0pts if any red alerts
+- Updated Governance Health page text from "5-Criteria" to "7-Criteria"
+
+**2. Governance Calendar Integration:**
+- Added `transaction_review` task type to TaskType enum
+- Auto-creates monthly "Monthly Transaction Classification Review" task when health score is calculated (if trust has transactions)
+- Task due on last day of current month, appears in Calendar
+
+**3. Minutes Generator Integration:**
+- `POST /api/alerts/{id}/generate-resolution` — generates trustee minutes documenting alert review
+- Minutes include alert details, severity, resolution type, trustee note, and legal boilerplate
+- "Minutes" button in Alert History dialog for all resolved alerts
+- Validates: only resolved alerts can generate minutes
+
+**Testing:** 14/14 backend (100%), 100% frontend
+
+---
+
+## Previous Update (Apr 18, 2026) - PHASE 2D: AUDIT DEFENSE EXPORT ✅
 
 **Session Summary:** Built one-click court-ready PDF export proving structural separation was maintained.
 
