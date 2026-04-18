@@ -3,7 +3,33 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Apr 18, 2026) - PHASE 2B: COMMINGLING DETECTION ENGINE ✅
+## Latest Update (Apr 18, 2026) - PHASE 2C: ENTITY SEPARATION DASHBOARD ✅
+
+**Session Summary:** Upgraded the Structures page from a static org chart into a live separation intelligence dashboard.
+
+**Backend (New endpoint):**
+- `GET /api/transactions/separation-dashboard?trust_id=X&days=90` — Comprehensive dashboard data combining entities, transaction volumes, alert counts, inter-entity transfer flows, and relationships in a single response.
+
+**Frontend (Enhanced):**
+- `/app/frontend/src/pages/StructuresPage.js` — New "Separation" tab (3rd tab) with:
+  - Overview stats cards (entities, transactions, active alerts, net flow)
+  - Per-entity cards with inflows/outflows/txn count + red/yellow/green alert badges
+  - Clickable entity cards → navigate to entity detail
+  - Inter-entity transfer flows table (From → To with amounts)
+  - Embedded SeparationAlertsPanel at bottom
+  - Tab badge showing active alert count
+
+- `/app/frontend/src/pages/EntityDetailPage.js` — Enhanced with:
+  - Entity-scoped Separation Alerts panel (only shows alerts for that entity)
+  - Recent Transactions table (last 10 transactions for that entity)
+  - "View All" button linking to full Transaction Ledger
+
+**Regression:** Original Entities and Hierarchy tabs work correctly (verified)
+**Testing:** 16/16 backend (100%), 100% frontend
+
+---
+
+## Previous Update (Apr 18, 2026) - PHASE 2B: COMMINGLING DETECTION ENGINE ✅
 
 **Session Summary:** Built the Commingling Detection Engine — rule-based alert system that detects separation risk patterns in trust transactions and provides an immutable resolution workflow.
 
