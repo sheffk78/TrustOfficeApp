@@ -3,7 +3,38 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Apr 18, 2026) - FAVICON FIX ✅
+## Latest Update (Apr 18, 2026) - PHASE 2A: TRANSACTION LEDGER ✅
+
+**Session Summary:** Built the Transaction Ledger — the foundation data layer for Phase 2: Structural Separation & Commingling Monitoring. This gives trustees a single place to log, classify, and monitor all money movement across their trust/entity structure as a governance evidence layer.
+
+**Backend (New):**
+- `/app/backend/routers/transactions.py` — Full CRUD + CSV import + bulk classify + summary analytics
+- `/app/backend/models.py` — GovernanceClassification enum, TransactionCreate/Update/Response, CsvImportRequest, BulkClassifyRequest models
+- Collections: `transactions` (per-entity scoped), `transaction_audit_log` (immutable)
+- 7 endpoints: POST/GET/PATCH/DELETE transactions, POST import, POST bulk-classify, GET summary
+
+**Frontend (New):**
+- `/app/frontend/src/pages/TransactionLedgerPage.js` — Full page with:
+  - Transaction table with governance classification badges (color-coded)
+  - Add Transaction dialog (entity, date, amount, direction, accounts, classification, memo)
+  - CSV Import wizard (upload → column mapping → preview → import)
+  - Bulk-select and bulk-classify flow
+  - Filters: entity, classification type, direction
+  - Summary cards: total inflows, outflows, net flow
+  - Search across memo, accounts, entity names
+
+**Sidebar:** "Transactions" nav item added under "Money" group
+**Route:** `/transactions` (subscription-protected)
+**Testing:** 100% backend (23/23), 95% frontend — all core flows working
+
+**Also in this session:**
+- Added Google Ads tag (`AW-18025732865`) to index.html
+- Added post-purchase confetti animation (canvas-confetti, brand colors)
+- Replaced favicon with compact Trust Office emblem
+
+---
+
+## Previous Update (Apr 18, 2026) - FAVICON FIX ✅
 
 **Session Summary:** Replaced favicon with the correct compact Trust Office emblem logo (the T-in-circle icon with gold accent, matching the sidebar logo).
 
