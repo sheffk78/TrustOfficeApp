@@ -32,6 +32,7 @@ import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
 import ContactPage from "@/pages/ContactPage";
+import TransactionLedgerPage from "@/pages/TransactionLedgerPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
@@ -233,6 +234,11 @@ const AppRouter = () => {
       <Route path="/expenses" element={
         <SubscriptionProtectedRoute>
           <ExpensesPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/transactions" element={
+        <SubscriptionProtectedRoute>
+          <TransactionLedgerPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/structures" element={

@@ -912,5 +912,99 @@ class MinutesSearchResult(BaseModel):
     created_at: str
 
 
+# ==================== TRANSACTION LEDGER MODELS ====================
+
+class TransactionDirection(str, Enum):
+    inflow = "inflow"
+    outflow = "outflow"
+
+class GovernanceClassification(str, Enum):
+    distribution = "Distribution"
+    compensation = "Compensation"
+    inter_entity_transfer = "Inter-Entity Transfer"
+    operational_expense = "Operational Expense"
+    capital_contribution = "Capital Contribution"
+    tax_payment = "Tax Payment"
+    other = "Other"
+
+class TransactionCreate(BaseModel):
+    trust_id: str
+    entity_id: str
+    date: str
+    amount: float
+    direction: TransactionDirection
+    source_account: str = ""
+    destination_account: str = ""
+    governance_classification: GovernanceClassification
+    purpose_memo: str = ""
+    other_note: str = ""  # Required when classification is "Other"
+    linked_distribution_id: Optional[str] = None
+    linked_compensation_payment_id: Optional[str] = None
+    document_name: Optional[str] = None
+
+class TransactionUpdate(BaseModel):
+    date: Optional[str] = None
+    amount: Optional[float] = None
+    direction: Optional[TransactionDirection] = None
+    source_account: Optional[str] = None
+    destination_account: Optional[str] = None
+    governance_classification: Optional[GovernanceClassification] = None
+    purpose_memo: Optional[str] = None
+    other_note: Optional[str] = None
+    linked_distribution_id: Optional[str] = None
+    linked_compensation_payment_id: Optional[str] = None
+    document_name: Optional[str] = None
+
+class TransactionResponse(BaseModel):
+    transaction_id: str
+    trust_id: str
+    entity_id: str
+    entity_name: Optional[str] = None
+    date: str
+    amount: float
+    direction: str
+    source_account: str
+    destination_account: str
+    governance_classification: str
+    purpose_memo: str
+    other_note: str
+    linked_distribution_id: Optional[str] = None
+    linked_compensation_payment_id: Optional[str] = None
+    document_name: Optional[str] = None
+    import_batch_id: Optional[str] = None
+    created_at: str
+    updated_at: Optional[str] = None
+
+class TransactionSummary(BaseModel):
+    entity_id: str
+    entity_name: str
+    total_inflows: float
+    total_outflows: float
+    net_flow: float
+    transaction_count: int
+    unclassified_count: int
+    by_classification: dict
+
+class CsvImportRow(BaseModel):
+    date: str
+    amount: float
+    direction: TransactionDirection
+    description: str = ""
+    governance_classification: Optional[GovernanceClassification] = None
+    purpose_memo: str = ""
+
+class CsvImportRequest(BaseModel):
+    trust_id: str
+    entity_id: str
+    rows: List[CsvImportRow]
+
+class BulkClassifyRequest(BaseModel):
+    transaction_ids: List[str]
+    governance_classification: GovernanceClassification
+    purpose_memo: str = ""
+    other_note: str = ""
+
+
+
 # Fix forward reference
 DashboardResponse.model_rebuild()

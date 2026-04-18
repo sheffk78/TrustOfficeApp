@@ -67,6 +67,7 @@ from routers.referrals import router as referrals_router
 from routers.admin import router as admin_router
 from routers.contact import router as contact_router
 from routers.admin_api import router as admin_api_router
+from routers.transactions import router as transactions_router
 
 # Import security middleware
 from security import (
@@ -258,6 +259,7 @@ app.include_router(referrals_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(contact_router, prefix="/api")
 app.include_router(admin_api_router, prefix="/api")
+app.include_router(transactions_router, prefix="/api")
 
 
 # ==================== LIFECYCLE EVENTS ====================
@@ -336,6 +338,13 @@ async def startup_event():
         
         # Admin user index
         await db.users.create_index("is_admin", sparse=True)
+        
+        # Transaction ledger indexes
+        await db.transactions.create_index([("trust_id", 1), ("user_id", 1), ("date", -1)])
+        await db.transactions.create_index([("entity_id", 1), ("user_id", 1)])
+        await db.transactions.create_index("transaction_id", unique=True)
+        await db.transaction_audit_log.create_index("transaction_id")
+        await db.transaction_audit_log.create_index("audit_id", unique=True)
         
         logger.info("Database indexes created/verified successfully")
         
