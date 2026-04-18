@@ -357,3 +357,122 @@ async def get_transaction_summary(trust_id: str, days: int = 90, user: dict = De
         })
 
     return summaries
+
+
+
+@router.get("/transactions/separation-dashboard")
+async def get_separation_dashboard(trust_id: str, days: int = 90, user: dict = Depends(get_current_user)):
+    """Get full separation dashboard data: entities + transactions + alerts + inter-entity flows"""
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    # Parallel data fetch
+    entities = await db.entities.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).to_list(100)
+
+    txns = await db.transactions.find(
+        {"trust_id": trust_id, "user_id": user["user_id"], "date": {"$gte": cutoff}},
+        {"_id": 0}
+    ).to_list(10000)
+
+    active_alerts = await db.separation_alerts.find(
+        {"trust_id": trust_id, "user_id": user["user_id"], "status": "active"},
+        {"_id": 0}
+    ).to_list(1000)
+
+    relationships = await db.entity_relationships.find(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    ).to_list(100)
+
+    entity_map = {e["entity_id"]: e for e in entities}
+
+    # Build per-entity separation data
+    entity_dashboards = []
+    for entity in entities:
+        eid = entity["entity_id"]
+        entity_txns = [t for t in txns if t["entity_id"] == eid]
+        entity_alerts = [a for a in active_alerts if a.get("entity_id") == eid]
+
+        total_in = sum(t["amount"] for t in entity_txns if t.get("direction") == "inflow")
+        total_out = sum(t["amount"] for t in entity_txns if t.get("direction") == "outflow")
+
+        red_alerts = sum(1 for a in entity_alerts if a.get("severity") == "red")
+        yellow_alerts = sum(1 for a in entity_alerts if a.get("severity") == "yellow")
+
+        entity_dashboards.append({
+            "entity_id": eid,
+            "name": entity.get("name", ""),
+            "entity_type": entity.get("entity_type", ""),
+            "total_inflows": round(total_in, 2),
+            "total_outflows": round(total_out, 2),
+            "net_flow": round(total_in - total_out, 2),
+            "transaction_count": len(entity_txns),
+            "red_alerts": red_alerts,
+            "yellow_alerts": yellow_alerts,
+            "total_alerts": red_alerts + yellow_alerts,
+        })
+
+    # Build inter-entity transfer flows
+    inter_entity_flows = []
+    inter_entity_txns = [t for t in txns if t.get("governance_classification") == "Inter-Entity Transfer"]
+
+    # Group by source entity → destination (approximated by entity_id + destination_account)
+    flow_map = {}
+    for t in inter_entity_txns:
+        src = t["entity_id"]
+        dest_name = t.get("destination_account", "").strip()
+        # Try to find dest entity by name match
+        dest_eid = None
+        for e in entities:
+            if e["name"].lower() == dest_name.lower() or e.get("legal_name", "").lower() == dest_name.lower():
+                dest_eid = e["entity_id"]
+                break
+
+        if dest_eid and dest_eid != src:
+            key = f"{src}|{dest_eid}"
+            flow_map.setdefault(key, {"source_id": src, "dest_id": dest_eid, "total": 0, "count": 0})
+            flow_map[key]["total"] += t["amount"]
+            flow_map[key]["count"] += 1
+
+    for flow in flow_map.values():
+        src_name = entity_map.get(flow["source_id"], {}).get("name", "")
+        dest_name = entity_map.get(flow["dest_id"], {}).get("name", "")
+        inter_entity_flows.append({
+            "source_entity_id": flow["source_id"],
+            "source_entity_name": src_name,
+            "dest_entity_id": flow["dest_id"],
+            "dest_entity_name": dest_name,
+            "total_amount": round(flow["total"], 2),
+            "transaction_count": flow["count"]
+        })
+
+    # Summary totals
+    total_red = sum(1 for a in active_alerts if a.get("severity") == "red")
+    total_yellow = sum(1 for a in active_alerts if a.get("severity") == "yellow")
+
+    return {
+        "trust_id": trust_id,
+        "period_days": days,
+        "entities": entity_dashboards,
+        "inter_entity_flows": inter_entity_flows,
+        "relationships": [{
+            "relationship_id": r.get("relationship_id"),
+            "parent_entity_id": r.get("parent_entity_id"),
+            "child_entity_id": r.get("child_entity_id"),
+            "relationship_type": r.get("relationship_type"),
+            "ownership_percentage": r.get("ownership_percentage"),
+        } for r in relationships],
+        "alert_summary": {
+            "total_active": total_red + total_yellow,
+            "red_count": total_red,
+            "yellow_count": total_yellow,
+        },
+        "transaction_summary": {
+            "total_transactions": len(txns),
+            "total_inflows": round(sum(t["amount"] for t in txns if t.get("direction") == "inflow"), 2),
+            "total_outflows": round(sum(t["amount"] for t in txns if t.get("direction") == "outflow"), 2),
+        }
+    }

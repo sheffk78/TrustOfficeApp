@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchWithAuth } from '@/utils/api';
+import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
 import { 
   Building2, 
   Plus, 
@@ -21,7 +22,11 @@ import {
   ArrowRight,
   Trash2,
   X,
-  Loader2
+  Loader2,
+  ShieldAlert,
+  ArrowUpRight,
+  ArrowDownLeft,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -50,6 +55,8 @@ export default function StructuresPage() {
   const [entities, setEntities] = useState([]);
   const [relationships, setRelationships] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [separationData, setSeparationData] = useState(null);
+  const [sepLoading, setSepLoading] = useState(false);
   
   // Modal states
   const [showEntityModal, setShowEntityModal] = useState(false);
@@ -95,6 +102,20 @@ export default function StructuresPage() {
       loadData();
     }
   }, [selectedTrust, loadData]);
+
+  // Load separation dashboard data when tab is active
+  const loadSeparationData = useCallback(async () => {
+    if (!selectedTrust) return;
+    setSepLoading(true);
+    try {
+      const res = await fetchWithAuth(`/transactions/separation-dashboard?trust_id=${selectedTrust.trust_id}&days=90`);
+      if (res.ok) setSeparationData(await res.json());
+    } catch { /* ignore */ } finally { setSepLoading(false); }
+  }, [selectedTrust]);
+
+  useEffect(() => {
+    if (activeTab === 'separation' && selectedTrust) loadSeparationData();
+  }, [activeTab, selectedTrust, loadSeparationData]);
 
   // Tab change handler - updates URL
   const handleTabChange = (value) => {
@@ -295,12 +316,20 @@ export default function StructuresPage() {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <div className="flex items-center justify-between mb-6">
-              <TabsList className="grid w-full max-w-xs grid-cols-2">
+              <TabsList className="grid w-full max-w-md grid-cols-3">
                 <TabsTrigger value="entities" data-testid="tab-entities">
                   <Building2 className="w-4 h-4 mr-2" /> Entities
                 </TabsTrigger>
                 <TabsTrigger value="hierarchy" data-testid="tab-hierarchy">
                   <GitBranch className="w-4 h-4 mr-2" /> Hierarchy
+                </TabsTrigger>
+                <TabsTrigger value="separation" data-testid="tab-separation" className="relative">
+                  <ShieldAlert className="w-4 h-4 mr-2" /> Separation
+                  {separationData?.alert_summary?.total_active > 0 && (
+                    <span className="ml-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                      {separationData.alert_summary.total_active}
+                    </span>
+                  )}
                 </TabsTrigger>
               </TabsList>
               
@@ -313,7 +342,7 @@ export default function StructuresPage() {
                 >
                   <Plus className="w-4 h-4 mr-2" /> New Entity
                 </Button>
-              ) : (
+              ) : activeTab === 'hierarchy' ? (
                 <Button 
                   onClick={() => setShowRelationshipModal(true)} 
                   className="btn-primary"
@@ -322,7 +351,7 @@ export default function StructuresPage() {
                 >
                   <Plus className="w-4 h-4 mr-2" /> Add Relationship
                 </Button>
-              )}
+              ) : null}
             </div>
 
             {/* Entities Tab */}
@@ -499,6 +528,155 @@ export default function StructuresPage() {
                         })}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Separation Dashboard Tab */}
+            <TabsContent value="separation">
+              {sepLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : !separationData || separationData.entities.length === 0 ? (
+                <div className="card-trust text-center py-12" data-testid="separation-empty-state">
+                  <ShieldAlert className="w-12 h-12 text-navy/30 mx-auto mb-4" />
+                  <h3 className="font-serif text-xl text-navy mb-2">No Separation Data</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Add entities and log transactions to see separation intelligence
+                  </p>
+                  <Button onClick={() => navigate('/transactions')} className="btn-secondary">
+                    Go to Transaction Ledger
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Overview Stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="rounded-lg border border-border bg-card p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Entities</p>
+                      <p className="text-2xl font-semibold text-foreground">{separationData.entities.length}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-card p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Transactions (90d)</p>
+                      <p className="text-2xl font-semibold text-foreground">{separationData.transaction_summary.total_transactions}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-card p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Active Alerts</p>
+                      <p className={`text-2xl font-semibold ${separationData.alert_summary.total_active > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                        {separationData.alert_summary.total_active}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-card p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net Flow (90d)</p>
+                      <p className={`text-2xl font-semibold ${(separationData.transaction_summary.total_inflows - separationData.transaction_summary.total_outflows) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        ${(separationData.transaction_summary.total_inflows - separationData.transaction_summary.total_outflows).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Entity Cards with Separation Data */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">Entity Separation Status</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {separationData.entities.map(ent => (
+                        <div
+                          key={ent.entity_id}
+                          onClick={() => navigate(`/entities/${ent.entity_id}`)}
+                          className="rounded-lg border border-border bg-card p-4 hover:border-navy/40 cursor-pointer transition-all group"
+                          data-testid={`sep-entity-card-${ent.entity_id}`}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 flex items-center justify-center ${getEntityColor(ent.entity_type)}`}>
+                                {getEntityIcon(ent.entity_type)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground group-hover:text-navy transition-colors">{ent.name}</p>
+                                <p className="font-mono text-[10px] text-muted-foreground uppercase">{ent.entity_type}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {ent.red_alerts > 0 && (
+                                <span className="w-6 h-6 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center" title={`${ent.red_alerts} red alert(s)`}>
+                                  {ent.red_alerts}
+                                </span>
+                              )}
+                              {ent.yellow_alerts > 0 && (
+                                <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center" title={`${ent.yellow_alerts} yellow alert(s)`}>
+                                  {ent.yellow_alerts}
+                                </span>
+                              )}
+                              {ent.total_alerts === 0 && (
+                                <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center" title="No alerts">
+                                  ✓
+                                </span>
+                              )}
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </div>
+
+                          {/* Transaction volume bars */}
+                          <div className="grid grid-cols-3 gap-3 text-center">
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Inflows</p>
+                              <p className="text-sm font-semibold text-emerald-600">
+                                ${ent.total_inflows.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Outflows</p>
+                              <p className="text-sm font-semibold text-red-500">
+                                ${ent.total_outflows.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Txns</p>
+                              <p className="text-sm font-semibold text-foreground">{ent.transaction_count}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Inter-Entity Transfer Flows */}
+                  {separationData.inter_entity_flows.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">Inter-Entity Transfer Flows</h3>
+                      <div className="rounded-lg border border-border bg-card overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border bg-muted/50">
+                              <th className="p-3 text-left font-medium text-muted-foreground">From</th>
+                              <th className="p-3 text-center font-medium text-muted-foreground w-16"></th>
+                              <th className="p-3 text-left font-medium text-muted-foreground">To</th>
+                              <th className="p-3 text-right font-medium text-muted-foreground">Total (90d)</th>
+                              <th className="p-3 text-right font-medium text-muted-foreground">Count</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {separationData.inter_entity_flows.map((flow, i) => (
+                              <tr key={i} className="border-b border-border/50">
+                                <td className="p-3 font-medium text-foreground">{flow.source_entity_name}</td>
+                                <td className="p-3 text-center"><ArrowRight className="w-4 h-4 text-muted-foreground mx-auto" /></td>
+                                <td className="p-3 font-medium text-foreground">{flow.dest_entity_name}</td>
+                                <td className="p-3 text-right font-semibold text-foreground">
+                                  ${flow.total_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="p-3 text-right text-muted-foreground">{flow.transaction_count}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Alerts Panel */}
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <SeparationAlertsPanel />
                   </div>
                 </div>
               )}

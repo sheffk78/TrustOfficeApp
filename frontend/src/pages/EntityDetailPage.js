@@ -6,15 +6,21 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
+import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
 import { 
   ArrowLeft, 
   Save,
   Trash2,
   Landmark,
   Building2,
-  Building
+  Building,
+  ArrowUpRight,
+  ArrowDownLeft,
+  FileSpreadsheet,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { format, parseISO } from 'date-fns';
 
 export default function EntityDetailPage() {
   const { entityId } = useParams();
@@ -24,12 +30,24 @@ export default function EntityDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({});
+  const [entityTxns, setEntityTxns] = useState([]);
+  const [txnLoading, setTxnLoading] = useState(false);
 
   useEffect(() => {
     if (entityId) {
       loadEntity();
+      loadEntityTransactions();
     }
   }, [entityId]);
+
+  const loadEntityTransactions = async () => {
+    if (!selectedTrust || !entityId) return;
+    setTxnLoading(true);
+    try {
+      const res = await fetchWithAuth(`/transactions?trust_id=${selectedTrust.trust_id}&entity_id=${entityId}&limit=20`);
+      if (res.ok) setEntityTxns(await res.json());
+    } catch { /* ignore */ } finally { setTxnLoading(false); }
+  };
 
   const loadEntity = async () => {
     setLoading(true);
@@ -329,6 +347,73 @@ export default function EntityDetailPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Separation Intelligence Section */}
+          <div className="mt-8 space-y-6">
+            {/* Entity Alerts */}
+            <div className="card-trust">
+              <SeparationAlertsPanel entityId={entityId} compact />
+            </div>
+
+            {/* Recent Transactions for this entity */}
+            <div className="card-trust">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-serif text-lg text-navy">Recent Transactions</h2>
+                <Button variant="outline" size="sm" onClick={() => navigate('/transactions')} data-testid="view-all-txns-btn">
+                  View All
+                </Button>
+              </div>
+              {txnLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+              ) : entityTxns.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileSpreadsheet className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No transactions for this entity</p>
+                  <Button variant="link" size="sm" onClick={() => navigate('/transactions')} className="mt-1">
+                    Record a transaction
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-navy/10">
+                        <th className="py-2 text-left text-xs uppercase tracking-wider text-muted-foreground">Date</th>
+                        <th className="py-2 text-right text-xs uppercase tracking-wider text-muted-foreground">Amount</th>
+                        <th className="py-2 text-left text-xs uppercase tracking-wider text-muted-foreground">Classification</th>
+                        <th className="py-2 text-left text-xs uppercase tracking-wider text-muted-foreground">Memo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {entityTxns.slice(0, 10).map(t => (
+                        <tr key={t.transaction_id} className="border-b border-navy/5">
+                          <td className="py-2 text-foreground whitespace-nowrap">
+                            {(() => { try { return format(parseISO(t.date), 'MMM d, yyyy'); } catch { return t.date; } })()}
+                          </td>
+                          <td className="py-2 text-right font-medium whitespace-nowrap">
+                            <span className={t.direction === 'inflow' ? 'text-emerald-600' : 'text-red-500'}>
+                              {t.direction === 'inflow' ? '+' : '-'}${t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </span>
+                          </td>
+                          <td className="py-2">
+                            <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-navy/5 text-navy">
+                              {t.governance_classification}
+                            </span>
+                          </td>
+                          <td className="py-2 text-muted-foreground text-xs max-w-[200px] truncate">{t.purpose_memo}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {entityTxns.length > 10 && (
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      Showing 10 of {entityTxns.length} transactions
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>
