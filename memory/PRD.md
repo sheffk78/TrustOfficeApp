@@ -3,7 +3,42 @@
 ## Original Problem Statement
 Build TrustOffice - a trust governance workspace for individual/family trustees. Core jobs: Record trustee minutes and decisions, track distributions and expenses, maintain activity timeline per trust/entity, surface governance health status.
 
-## Latest Update (Apr 18, 2026) - PHASE 2A: TRANSACTION LEDGER ✅
+## Latest Update (Apr 18, 2026) - PHASE 2B: COMMINGLING DETECTION ENGINE ✅
+
+**Session Summary:** Built the Commingling Detection Engine — rule-based alert system that detects separation risk patterns in trust transactions and provides an immutable resolution workflow.
+
+**Backend (New):**
+- `/app/backend/alert_detection.py` — Rule engine with 7 detection rules:
+  1. Trust paying personal obligation (RED) — outflow to personal account not classified as Distribution/Compensation
+  2. Personal vendor paid by trust (RED) — operational expense to known personal vendor
+  3. Large unexplained transfer (YELLOW) — >$5k "Other" with no memo or document
+  4. Round-number recurring payments (YELLOW) — 3+ same-amount transfers not tied to Compensation
+  5. Same-day cross-entity reversals (YELLOW) — money moving A→B and B→A same day
+  6. Unclassified transaction aging (YELLOW) — "Other" with no memo for 7+ days
+  7. Unlinked governance action (YELLOW) — Distribution/Compensation without linked authorization
+- `/app/backend/routers/alerts.py` — 5 endpoints: GET alerts, GET counts, POST resolve, POST scan, GET history
+- Auto-detection fires on transaction create/update; auto-resolution when issues are fixed
+- Collections: `separation_alerts`, `alert_audit_log`, `personal_vendors` (all immutable audit trail)
+
+**Frontend (New):**
+- `/app/frontend/src/components/SeparationAlertsPanel.js` — Reusable panel with:
+  - Red/yellow severity badges with counts
+  - Alert cards with severity colors, titles, descriptions, entity names
+  - Resolve dialog (type + required note → immutable audit record)
+  - Scan button for on-demand pattern detection
+  - History dialog showing full audit trail (active + resolved)
+  - AlertCountBadge component for dashboard/sidebar integration
+
+**Integration:**
+- Alerts panel embedded in Transaction Ledger page
+- Auto-fires on POST/PATCH /api/transactions
+- Auto-resolves when underlying issues are fixed (e.g., governance action linked)
+
+**Testing:** 19/19 backend (100%), 100% frontend
+
+---
+
+## Previous Update (Apr 18, 2026) - PHASE 2A: TRANSACTION LEDGER ✅
 
 **Session Summary:** Built the Transaction Ledger — the foundation data layer for Phase 2: Structural Separation & Commingling Monitoring. This gives trustees a single place to log, classify, and monitor all money movement across their trust/entity structure as a governance evidence layer.
 
