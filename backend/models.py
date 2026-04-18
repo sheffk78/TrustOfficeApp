@@ -1006,5 +1006,54 @@ class BulkClassifyRequest(BaseModel):
 
 
 
+# ==================== SEPARATION ALERT MODELS ====================
+
+class AlertSeverity(str, Enum):
+    red = "red"
+    yellow = "yellow"
+
+class AlertType(str, Enum):
+    personal_vendor = "personal_vendor"
+    trust_paying_personal = "trust_paying_personal"
+    large_unexplained = "large_unexplained"
+    round_number_recurring = "round_number_recurring"
+    same_day_reversal = "same_day_reversal"
+    unclassified_aging = "unclassified_aging"
+    unlinked_governance = "unlinked_governance"
+
+class AlertStatus(str, Enum):
+    active = "active"
+    resolved = "resolved"
+
+class AlertResponse(BaseModel):
+    alert_id: str
+    trust_id: str
+    entity_id: Optional[str] = None
+    entity_name: Optional[str] = None
+    transaction_id: Optional[str] = None
+    alert_type: str
+    severity: str
+    title: str
+    description: str
+    status: str
+    resolution_type: Optional[str] = None
+    resolution_note: Optional[str] = None
+    resolved_at: Optional[str] = None
+    created_at: str
+
+class AlertResolveRequest(BaseModel):
+    resolution_type: str  # "classified", "linked", "documented", "reviewed_no_issue"
+    resolution_note: str  # Required — explains why this is not an issue
+
+class AlertCountResponse(BaseModel):
+    trust_id: str
+    total_active: int
+    red_count: int
+    yellow_count: int
+    by_entity: dict
+    by_type: dict
+
+
+
 # Fix forward reference
 DashboardResponse.model_rebuild()

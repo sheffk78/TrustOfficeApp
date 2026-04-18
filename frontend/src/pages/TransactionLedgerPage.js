@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
+import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
 import {
   Plus, Search, Calendar as CalendarIcon, ArrowUpRight, ArrowDownLeft,
   FileSpreadsheet, Tag, Trash2, Filter, X, Upload, ChevronDown,
@@ -351,6 +352,11 @@ export default function TransactionLedgerPage() {
               ${(totalInflows - totalOutflows).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
           </div>
+        </div>
+
+        {/* Separation Alerts Panel */}
+        <div className="mb-6 rounded-lg border border-border bg-card p-4">
+          <SeparationAlertsPanel />
         </div>
 
         {/* Filters & Search */}

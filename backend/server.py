@@ -68,6 +68,7 @@ from routers.admin import router as admin_router
 from routers.contact import router as contact_router
 from routers.admin_api import router as admin_api_router
 from routers.transactions import router as transactions_router
+from routers.alerts import router as alerts_router
 
 # Import security middleware
 from security import (
@@ -260,6 +261,7 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(contact_router, prefix="/api")
 app.include_router(admin_api_router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
+app.include_router(alerts_router, prefix="/api")
 
 
 # ==================== LIFECYCLE EVENTS ====================
@@ -345,6 +347,14 @@ async def startup_event():
         await db.transactions.create_index("transaction_id", unique=True)
         await db.transaction_audit_log.create_index("transaction_id")
         await db.transaction_audit_log.create_index("audit_id", unique=True)
+        
+        # Separation alerts indexes
+        await db.separation_alerts.create_index([("trust_id", 1), ("user_id", 1), ("status", 1)])
+        await db.separation_alerts.create_index([("transaction_id", 1), ("alert_type", 1)])
+        await db.separation_alerts.create_index("alert_id", unique=True)
+        await db.alert_audit_log.create_index("alert_id")
+        await db.alert_audit_log.create_index("audit_id", unique=True)
+        await db.personal_vendors.create_index("user_id")
         
         logger.info("Database indexes created/verified successfully")
         

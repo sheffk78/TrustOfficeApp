@@ -11,6 +11,7 @@ from models import (
     TransactionSummary, CsvImportRequest, BulkClassifyRequest,
     GovernanceClassification
 )
+from alert_detection import check_transaction_alerts, auto_resolve_alert_if_fixed
 
 router = APIRouter(tags=["transactions"])
 
@@ -74,6 +75,13 @@ async def create_transaction(txn: TransactionCreate, user: dict = Depends(requir
     })
 
     txn_doc["entity_name"] = entity.get("name", "")
+
+    # Run alert detection on new transaction
+    try:
+        await check_transaction_alerts(txn_doc)
+    except Exception:
+        pass  # Don't fail the create if alerting errors
+
     return TransactionResponse(**txn_doc)
 
 
@@ -164,6 +172,14 @@ async def update_transaction(transaction_id: str, updates: TransactionUpdate, us
     updated = await db.transactions.find_one({"transaction_id": transaction_id}, {"_id": 0})
     entity = await db.entities.find_one({"entity_id": updated["entity_id"]}, {"_id": 0, "name": 1})
     updated["entity_name"] = entity.get("name", "") if entity else ""
+
+    # Check if update resolves existing alerts or triggers new ones
+    try:
+        await auto_resolve_alert_if_fixed(updated)
+        await check_transaction_alerts(updated)
+    except Exception:
+        pass
+
     return TransactionResponse(**updated)
 
 
