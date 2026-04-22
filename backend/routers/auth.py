@@ -327,19 +327,9 @@ async def exchange_session(request: Request, response: Response):
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
     
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(
-                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": session_id}
-            )
-            if resp.status_code != 200:
-                raise HTTPException(status_code=401, detail="Invalid session")
-            
-            session_data = resp.json()
-        except httpx.RequestError as e:
-            logger.error(f"Error fetching session data: {e}")
-            raise HTTPException(status_code=500, detail="Auth service unavailable")
+    # TODO: Implement proper Google OAuth session exchange for Railway
+    # The Emergent auth endpoint is no longer available
+    raise HTTPException(status_code=501, detail="OAuth session exchange not yet configured on this platform")
     
     email = session_data.get("email")
     existing_user = await db.users.find_one({"email": email}, {"_id": 0})
