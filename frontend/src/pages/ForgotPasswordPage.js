@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Mail, ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
 
-const API = process.env.REACT_APP_BACKEND_URL;
+const API = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');

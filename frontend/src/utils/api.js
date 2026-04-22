@@ -1,4 +1,4 @@
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 export const API = `${BACKEND_URL}/api`;
 
 // Helper to get auth headers including localStorage token as fallback

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Mail, Lock, Eye, EyeOff, User, Gift } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
 // Use XMLHttpRequest for maximum mobile compatibility
 const xhrPost = (url, data) => {

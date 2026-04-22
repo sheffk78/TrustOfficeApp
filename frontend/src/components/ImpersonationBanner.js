@@ -55,7 +55,7 @@ export const ImpersonationBanner = () => {
 
       // Log the exit action (using admin token)
       try {
-        await fetch(`${process.env.REACT_APP_BACKEND_URL || ''}/api/admin/impersonation/log-exit`, {
+        await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app'}/api/admin/impersonation/log-exit`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

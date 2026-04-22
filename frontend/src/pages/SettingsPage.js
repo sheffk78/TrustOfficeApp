@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
-const API_BASE = process.env.REACT_APP_BACKEND_URL;
+const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
 export default function SettingsPage() {
   const navigate = useNavigate();

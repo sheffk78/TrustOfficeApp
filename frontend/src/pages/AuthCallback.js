@@ -51,7 +51,7 @@ export default function AuthCallback() {
           console.log('[AuthCallback] Token stored, fetching user...');
           
           // Fetch user data
-          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/me`, {
+          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app'}/api/auth/me`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }

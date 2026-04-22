@@ -28,7 +28,7 @@ import {
   Clock
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
 // Use XMLHttpRequest for maximum mobile compatibility
 const xhrRequest = (method, url, data = null, token = null) => {
