@@ -220,7 +220,7 @@ export default function OnboardingPage() {
       <div className="bg-navy text-white py-4 px-8">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <img 
-            src="https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/5h7i559r_Trust%20Office%20Logo%20%281%29.svg"
+            src="/assets/trustoffice-logo.svg"
             alt="TrustOffice"
             className="h-8 brightness-0 invert"
           />

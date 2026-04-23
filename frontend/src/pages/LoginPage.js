@@ -99,7 +99,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 login-texture relative">
         <div className="absolute inset-0 login-overlay flex flex-col justify-center items-center p-12">
           <img 
-            src="https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/eqrftij2_Trust%20Office%20-%20Vertical.svg"
+            src="/assets/trustoffice-logo-vertical.svg"
             alt="TrustOffice"
             className="w-48 mb-8 brightness-0 invert"
           />
@@ -118,7 +118,7 @@ export default function LoginPage() {
           {/* Mobile logo */}
           <div className="lg:hidden mb-12 text-center">
             <img 
-              src="https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/5h7i559r_Trust%20Office%20Logo%20%281%29.svg"
+              src="/assets/trustoffice-logo.svg"
               alt="TrustOffice"
               className="h-12 mx-auto dark:brightness-0 dark:invert"
             />

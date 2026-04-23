@@ -96,7 +96,7 @@ export const Sidebar = () => {
         <div className="p-6 border-b border-white/10">
           <Link to="/dashboard" className="block">
             <img 
-              src="https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/5h7i559r_Trust%20Office%20Logo%20%281%29.svg"
+              src="/assets/trustoffice-logo.svg"
               alt="TrustOffice"
               className="h-8 brightness-0 invert cursor-pointer hover:opacity-80 transition-opacity"
               data-testid="logo-home-link"
