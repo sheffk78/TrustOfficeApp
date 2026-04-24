@@ -139,10 +139,10 @@ export default function DashboardPage() {
     if (selectedTrust) {
       loadDashboardData();
       loadAiSuggestions();
-    } else if (trusts.length === 0) {
+    } else if (!trustsLoading && trusts.length === 0) {
       setLoading(false);
     }
-  }, [selectedTrust]);
+  }, [selectedTrust, trusts, trustsLoading]);
 
   const loadDashboardData = async () => {
     if (!selectedTrust) return;

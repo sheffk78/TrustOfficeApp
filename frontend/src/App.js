@@ -33,6 +33,7 @@ import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
 import ContactPage from "@/pages/ContactPage";
 import TransactionLedgerPage from "@/pages/TransactionLedgerPage";
+import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
@@ -51,6 +52,12 @@ const useGA4PageTracking = () => {
       });
     }
   }, [location]);
+};
+
+// External redirect component — navigates to URLs outside the SPA
+const ExternalRedirect = ({ url }) => {
+  window.location.href = url;
+  return null;
 };
 
 // Protected Route component
@@ -83,9 +90,14 @@ const ProtectedRoute = ({ children }) => {
     return () => clearTimeout(timer);
   }, [loading, trustsLoading]);
 
-  // Show loading spinner while auth is being verified (but not for trusts on onboarding)
+  // EARLY EXIT: If no token and not on callback, redirect immediately — no spinner
+  if (!hasToken && !user && !isCallback) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Show loading spinner while auth is being verified (only if we have a token to validate)
   const isOnboarding = location.pathname.includes('/onboarding');
-  const shouldShowLoading = (loading || (!isOnboarding && trustsLoading)) && !loadingTimeout;
+  const shouldShowLoading = hasToken && (loading || (!isOnboarding && trustsLoading)) && !loadingTimeout;
   
   if (shouldShowLoading) {
     return (
@@ -96,12 +108,6 @@ const ProtectedRoute = ({ children }) => {
         </div>
       </div>
     );
-  }
-
-  // After loading timeout, if we still have a token, don't redirect - let user see the page
-  // Only redirect to login if there's genuinely no token
-  if (!hasToken && !user && !hasUserFromState && !isCallback) {
-    return <Navigate to="/" replace />;
   }
 
   // Redirect new users (no trusts) to onboarding, except:
@@ -276,6 +282,13 @@ const AppRouter = () => {
           <AdminPage />
         </ProtectedRoute>
       } />
+      {/* Missing route redirects */}
+      <Route path="/help" element={<ExternalRedirect url="https://trustoffice.app/support" />} />
+      <Route path="/about" element={<Navigate to="/pricing" replace />} />
+      <Route path="/privacy-policy" element={<ExternalRedirect url="https://trustoffice.app/privacy-policy" />} />
+      <Route path="/terms-of-service" element={<ExternalRedirect url="https://trustoffice.app/terms-of-service" />} />
+      {/* 404 catch-all */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 };

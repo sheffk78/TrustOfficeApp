@@ -254,8 +254,8 @@ export default function PricingPage() {
         <p>&copy; {new Date().getFullYear()} TrustOffice. All rights reserved.</p>
         <div className="mt-2 space-x-4">
           <a href="https://trustoffice.app/support" className="hover:text-navy">Support</a>
-          <a href="https://trustoffice.app/privacy" className="hover:text-navy">Privacy</a>
-          <a href="https://trustoffice.app/terms" className="hover:text-navy">Terms</a>
+          <Link to="/privacy-policy" className="hover:text-navy">Privacy</Link>
+          <Link to="/terms-of-service" className="hover:text-navy">Terms</Link>
         </div>
       </footer>
     </div>
