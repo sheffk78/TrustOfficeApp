@@ -131,12 +131,16 @@ export default function OnboardingPage() {
 
   const getToken = () => localStorage.getItem('auth_token');
   
-  // Check if trial has expired
-  const isTrialExpired = subscription?.status === 'expired' || 
-    (subscription?.is_trial === false && subscription?.is_active === false) ||
-    (subscriptionExpired && !subscription?.is_active);
+  // Check if trial has expired — only evaluate when subscription data is available
+  const isTrialExpired = subscription && (subscription.status === 'expired' ||
+    (subscription.is_trial === false && subscription.is_active === false) ||
+    (subscriptionExpired && !subscription.is_active));
+
+  // Check if subscription is inactive (paid but canceled/lapsed — different from trial expired)
+  const isSubscriptionInactive = subscription && !subscription.is_active && subscription.is_trial === false;
 
   // Check if user already has trusts - redirect to dashboard if so
+  // But NOT if trial expired — show expired-trial screen instead
   useEffect(() => {
     const checkExistingTrusts = async () => {
       try {
@@ -151,10 +155,12 @@ export default function OnboardingPage() {
   }, []);
 
   useEffect(() => {
-    if (!checkingTrusts && trusts && trusts.length > 0) {
+    // Only redirect to dashboard if user has trusts AND subscription is active
+    // If trial expired, show the expired-trial screen instead
+    if (!checkingTrusts && trusts && trusts.length > 0 && !isTrialExpired) {
       navigate('/dashboard', { replace: true });
     }
-  }, [checkingTrusts, trusts, navigate]);
+  }, [checkingTrusts, trusts, navigate, isTrialExpired]);
 
   if (checkingTrusts) {
     return (

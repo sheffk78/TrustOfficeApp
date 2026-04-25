@@ -24,15 +24,28 @@ import {
 export const SubscriptionGate = ({ children }) => {
   const { user, subscription, subscriptionExpired, isReadOnly, loading } = useAuth();
 
-  // Don't block while loading
+  // Don't block while loading - show loading spinner instead
   if (loading) {
-    return children;
+    return (
+      <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto"></div>
+      </div>
+    );
   }
 
   // ADMIN BYPASS: Primary admin always gets full access with no banners
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
   if (isAdmin) {
     return children;
+  }
+
+  // Wait for subscription to load before deciding — prevents flash of wrong state
+  if (!subscription) {
+    return (
+      <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto"></div>
+      </div>
+    );
   }
 
   // Check if it's an active trial
@@ -65,11 +78,15 @@ export const SubscriptionGate = ({ children }) => {
  */
 export const FullSubscriptionGate = ({ children }) => {
   const navigate = useNavigate();
-  const { user, subscription, subscriptionExpired, loading } = useAuth();
+  const { user, subscription, subscriptionExpired, isReadOnly, loading } = useAuth();
 
-  // Don't block while loading
-  if (loading) {
-    return children;
+  // Don't block while loading - show loading spinner instead
+  if (loading || !subscription) {
+    return (
+      <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto"></div>
+      </div>
+    );
   }
 
   // ADMIN BYPASS: Primary admin always gets full access
@@ -78,8 +95,8 @@ export const FullSubscriptionGate = ({ children }) => {
     return children;
   }
 
-  // If subscription is active or still in trial, show content
-  if (!subscriptionExpired) {
+  // If subscription is active (not expired, not read-only), show content
+  if (!subscriptionExpired && !isReadOnly) {
     return children;
   }
 

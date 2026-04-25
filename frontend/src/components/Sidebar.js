@@ -144,7 +144,9 @@ export const Sidebar = () => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path || 
               (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
-              (item.path === '/guided-minutes' && location.pathname === '/guided-minutes');
+              (item.path === '/guided-minutes' && location.pathname === '/guided-minutes') ||
+              (item.path === '/structures' && location.pathname.startsWith('/structures')) ||
+              (item.path === '/structures' && location.pathname.startsWith('/entities'));
             
             return (
               <Link

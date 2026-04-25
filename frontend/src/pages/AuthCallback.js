@@ -64,14 +64,14 @@ export default function AuthCallback() {
             console.log('[AuthCallback] User loaded:', userData.email);
             setUser(userData);
             
-            // Load trusts and subscription state
-            await Promise.all([loadTrusts(), loadSubscriptionState()]);
+            // Load trusts and subscription state (pass email for admin override)
+            await Promise.all([loadTrusts(), loadSubscriptionState(userData.email)]);
             
             toast.success('Welcome!');
             
             console.log('[AuthCallback] Redirecting to:', redirect);
-            // Use window.location for a full page navigation to ensure clean state
-            window.location.href = redirect;
+            // Use navigate for SPA routing (no full page reload)
+            navigate(redirect, { replace: true });
             return;
           } else {
             const errorText = await response.text();
@@ -82,6 +82,7 @@ export default function AuthCallback() {
           console.error('[AuthCallback] Error:', err);
           toast.error('Authentication failed');
           localStorage.removeItem('auth_token');
+          hasProcessed.current = false; // Allow retry if user goes back
           navigate('/login', { replace: true });
         } finally {
           setLoading(false);
@@ -118,6 +119,7 @@ export default function AuthCallback() {
       } catch (error) {
         console.error('Auth callback error:', error);
         toast.error('Authentication failed');
+        hasProcessed.current = false; // Allow retry if user goes back
         navigate('/', { replace: true });
       } finally {
         setLoading(false);

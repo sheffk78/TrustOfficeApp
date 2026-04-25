@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
+import re
 
 from database import db
 from dependencies import get_current_user, require_write_access, auto_update_onboarding
@@ -108,7 +109,7 @@ async def get_distributions(
     
     # Add text search across beneficiary name and notes
     if search:
-        search_term = search.strip()
+        search_term = re.escape(search.strip())
         query["$or"] = [
             {"beneficiary_name": {"$regex": search_term, "$options": "i"}},
             {"notes": {"$regex": search_term, "$options": "i"}},

@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
+import re
 from typing import Optional, List
 import os
 import logging
@@ -321,9 +322,11 @@ async def list_users(
     
     # Build user query
     if search:
+        # Escape regex metacharacters to prevent NoSQL injection / ReDoS
+        escaped_search = re.escape(search)
         query["$or"] = [
-            {"email": {"$regex": search, "$options": "i"}},
-            {"name": {"$regex": search, "$options": "i"}}
+            {"email": {"$regex": escaped_search, "$options": "i"}},
+            {"name": {"$regex": escaped_search, "$options": "i"}}
         ]
     
     if created_after:

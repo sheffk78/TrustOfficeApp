@@ -295,6 +295,14 @@ async def reset_password(request: PasswordResetConfirm):
     # Invalidate all sessions for this user
     await db.user_sessions.delete_many({"user_id": reset_record["user_id"]})
     
+    # Revoke all existing JWT tokens for this user
+    await db.jwt_revocations.insert_one({
+        "user_id": reset_record["user_id"],
+        "jti": "all",  # Special marker: revoke ALL tokens for this user
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()  # Auto-cleanup after max token lifetime
+    })
+    
     return {"message": "Password has been reset successfully. Please log in with your new password."}
 
 
@@ -327,92 +335,10 @@ async def exchange_session(request: Request, response: Response):
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
     
-    # TODO: Implement proper Google OAuth session exchange for Railway
-    # The Emergent auth endpoint is no longer available
+    # This endpoint is not currently in use. Google OAuth callback handles
+    # session exchange directly via /auth/google/callback. The session-based
+    # flow (Emergent) is no longer available on Railway.
     raise HTTPException(status_code=501, detail="OAuth session exchange not yet configured on this platform")
-    
-    email = session_data.get("email")
-    existing_user = await db.users.find_one({"email": email}, {"_id": 0})
-    
-    if existing_user:
-        user_id = existing_user["user_id"]
-        await db.users.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "name": session_data.get("name", existing_user.get("name")),
-                "picture": session_data.get("picture", existing_user.get("picture"))
-            }}
-        )
-    else:
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        user_doc = {
-            "user_id": user_id,
-            "email": email,
-            "name": session_data.get("name", "User"),
-            "picture": session_data.get("picture"),
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.users.insert_one(user_doc)
-        
-        # Initialize onboarding
-        await db.user_onboarding.insert_one({
-            "user_id": user_id,
-            "entities_confirmed": False,
-            "calendar_set": False,
-            "minutes_generated": False,
-            "distribution_logged": False,
-            "checklist_dismissed": False,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        })
-        
-        # Add new Google OAuth user to Mailercloud trial list
-        try:
-            await add_to_trial_list(
-                email=email,
-                name=session_data.get("name", "")
-            )
-        except Exception as e:
-            logger.error(f"Failed to add Google OAuth user to Mailercloud trial list: {e}")
-    
-    session_token = session_data.get("session_token")
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    
-    await db.user_sessions.update_one(
-        {"user_id": user_id},
-        {"$set": {
-            "user_id": user_id,
-            "session_token": session_token,
-            "expires_at": expires_at.isoformat(),
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }},
-        upsert=True
-    )
-    
-    response.set_cookie(
-        key="session_token",
-        value=session_token,
-        httponly=True,
-        secure=True,
-        samesite="none",
-        max_age=7 * 24 * 3600,
-        path="/"
-    )
-    
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    
-    # Generate JWT token for localStorage-based auth (same as login)
-    jwt_token = create_jwt_token(user["user_id"], user["email"])
-    
-    return {
-        "token": jwt_token,
-        "user": {
-            "user_id": user["user_id"],
-            "email": user["email"],
-            "name": user["name"],
-            "picture": user.get("picture")
-        }
-    }
 
 
 # ==================== USER PROFILE ====================

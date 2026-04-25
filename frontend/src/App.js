@@ -38,6 +38,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // GA4 page view tracking for SPA navigation
 const useGA4PageTracking = () => {
@@ -108,6 +109,17 @@ const ProtectedRoute = ({ children }) => {
         </div>
       </div>
     );
+  }
+
+  // Redirect if user is null after loading completes (token was present but invalid)
+  if (!loading && !loadingTimeout && !user && hasToken) {
+    localStorage.removeItem('auth_token');
+    return <Navigate to="/" replace />;
+  }
+
+  // Redirect if no user and no token
+  if (!loading && !user && !hasToken) {
+    return <Navigate to="/" replace />;
   }
 
   // Redirect new users (no trusts) to onboarding, except:
@@ -299,8 +311,10 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <UpgradeModalProvider>
-            <ImpersonationBanner />
-            <AppRouter />
+            <ErrorBoundary>
+              <ImpersonationBanner />
+              <AppRouter />
+            </ErrorBoundary>
             <Toaster position="top-right" />
           </UpgradeModalProvider>
         </AuthProvider>

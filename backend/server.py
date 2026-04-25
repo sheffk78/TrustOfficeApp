@@ -79,13 +79,22 @@ from security import (
     InputSanitizer
 )
 
-# MongoDB connection
+# MongoDB connection with pool configuration
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(
+    mongo_url,
+    maxPoolSize=20,
+    minPoolSize=5,
+    maxIdleTimeMS=30000,
+    serverSelectionTimeoutMS=5000,
+    connectTimeoutMS=5000,
+)
 db = client[os.environ['DB_NAME']]
 
 # JWT Config
-JWT_SECRET = os.environ.get('JWT_SECRET', 'trustoffice_secret_key_change_in_production')
+JWT_SECRET = os.environ.get('JWT_SECRET')
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is required. Set it in Railway env vars.")
 JWT_ALGORITHM = "HS256"
 
 # Configure logging
@@ -217,6 +226,8 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
 
 
 # ==================== MIDDLEWARE & ROUTER REGISTRATION ====================
+# NOTE: In FastAPI/Starlette, middleware is LIFO — the LAST added executes FIRST.
+# CORS must be outermost (added last) so it handles preflight before other middleware.
 
 # Security headers middleware (OWASP recommendations)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -227,10 +238,11 @@ app.add_middleware(RateLimitMiddleware, config=RateLimitConfig())
 # Subscription enforcement middleware
 app.add_middleware(SubscriptionMiddleware)
 
+# CORS middleware — added LAST so it executes FIRST (outermost)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=os.environ.get('CORS_ORIGINS', '').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -264,6 +276,18 @@ app.include_router(admin_api_router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
 app.include_router(audit_defense_router, prefix="/api")
+
+
+# ==================== HEALTH CHECK ====================
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and load balancers"""
+    try:
+        await db.command("ping")
+        return {"status": "ok", "service": "trustoffice-api", "db": "connected"}
+    except Exception as e:
+        return {"status": "degraded", "service": "trustoffice-api", "db": f"error: {str(e)[:100]}"}
 
 
 # ==================== LIFECYCLE EVENTS ====================
@@ -332,6 +356,15 @@ async def startup_event():
         await db.referral_tracking.create_index("referrer_user_id")
         await db.referral_tracking.create_index("referee_user_id", unique=True)
         
+        # JWT revocation indexes (auto-cleanup via TTL)
+        await db.jwt_revocations.create_index("jti")
+        await db.jwt_revocations.create_index("user_id")
+        await db.jwt_revocations.create_index("expires_at", expireAfterSeconds=0)  # Auto-delete expired revocations
+        
+        # Admin audit log with TTL (90 days)
+        await db.admin_audit_log.create_index([("user_id", 1), ("timestamp", -1)])
+        await db.admin_audit_log.create_index("timestamp", expireAfterSeconds=7776000)  # 90 days
+        
         # AI usage tracking indexes (for cost protection)
         await db.ai_usage_tracking.create_index([("user_id", 1), ("endpoint", 1), ("date", 1)], unique=True)
         await db.ai_usage_tracking.create_index("date")  # For monthly aggregation queries
@@ -374,7 +407,10 @@ async def ensure_primary_admin():
     from datetime import datetime, timezone
     
     primary_admin_email = "contact@trustoffice.app"
-    default_password = "TrustAdmin2026!"
+    default_password = os.environ.get('ADMIN_DEFAULT_PASSWORD')
+    if not default_password:
+        logger.error("ADMIN_DEFAULT_PASSWORD not set — cannot ensure admin account")
+        return
     
     existing = await db.users.find_one({"email": primary_admin_email}, {"_id": 0})
     

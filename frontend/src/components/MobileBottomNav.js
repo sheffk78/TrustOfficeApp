@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, Settings, Shield } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Shield, Building2 } from 'lucide-react';
 
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Home' },
   { path: '/minutes', icon: FileText, label: 'Minutes' },
+  { path: '/structures', icon: Building2, label: 'Structures' },
   { path: '/governance', icon: Shield, label: 'Health' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];

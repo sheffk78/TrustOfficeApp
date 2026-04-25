@@ -57,7 +57,7 @@ async def get_schedule_a_items(
     trust_id: str, 
     category: Optional[str] = None, 
     status: Optional[str] = "active",  # Default to active only, use "all" for all assets
-    user: dict = Depends(require_write_access)
+    user: dict = Depends(get_current_user)
 ):
     """Get all Schedule A items for a trust. Use status='all' to include disposed assets."""
     query = {"trust_id": trust_id, "user_id": user["user_id"]}

@@ -6,6 +6,7 @@ from typing import List, Optional
 import uuid
 import io
 import base64
+import re
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -96,7 +97,7 @@ async def get_minutes(
     
     # Add text search across participants and decisions
     if search:
-        search_term = search.strip()
+        search_term = re.escape(search.strip())
         query["$or"] = [
             {"participants_text": {"$regex": search_term, "$options": "i"}},
             {"decisions_text": {"$regex": search_term, "$options": "i"}}

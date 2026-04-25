@@ -89,7 +89,7 @@ const INSIGHT_ICONS = {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, selectedTrust, trusts, loadTrusts, seedDemoData } = useAuth();
+  const { user, selectedTrust, trusts, trustsLoading, loadTrusts, seedDemoData } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   
@@ -138,11 +138,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (selectedTrust) {
       loadDashboardData();
-      loadAiSuggestions();
-    } else if (!trustsLoading && trusts.length === 0) {
+    } else if (!trustsLoading && (trusts?.length ?? 0) === 0) {
       setLoading(false);
     }
-  }, [selectedTrust, trusts, trustsLoading]);
+  }, [selectedTrust, trustsLoading]);
 
   const loadDashboardData = async () => {
     if (!selectedTrust) return;
@@ -157,6 +156,9 @@ export default function DashboardPage() {
       } else {
         console.error('Failed to load dashboard');
       }
+      
+      // Load AI suggestions after dashboard data is loaded
+      await loadAiSuggestions();
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -332,7 +334,7 @@ export default function DashboardPage() {
   const onboarding = dashboard?.onboarding_state;
 
   // Empty state - no trusts
-  if (!loading && trusts.length === 0) {
+  if (!loading && (trusts?.length ?? 0) === 0) {
     return (
       <div className="main-layout" data-testid="dashboard-page">
         <Sidebar />

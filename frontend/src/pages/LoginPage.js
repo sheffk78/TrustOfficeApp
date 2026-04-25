@@ -76,10 +76,13 @@ export default function LoginPage() {
       }
       
       // Load trusts and subscription state after successful authentication
-      await Promise.all([loadTrusts(), loadSubscriptionState()]);
+      await Promise.all([
+        loadTrusts(),
+        loadSubscriptionState(data.user?.email || data.user?.name)
+      ]);
       
       toast.success('Welcome back');
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       toast.error(error.message || 'Login failed');
     } finally {

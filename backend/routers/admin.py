@@ -18,6 +18,7 @@ FEATURES:
 """
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List
+import re
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, EmailStr
 import uuid
@@ -147,9 +148,11 @@ async def list_customers(
     query = {}
     
     if search:
+        # Escape regex metacharacters to prevent NoSQL injection / ReDoS
+        escaped_search = re.escape(search)
         query["$or"] = [
-            {"email": {"$regex": search, "$options": "i"}},
-            {"name": {"$regex": search, "$options": "i"}}
+            {"email": {"$regex": escaped_search, "$options": "i"}},
+            {"name": {"$regex": escaped_search, "$options": "i"}}
         ]
     
     if is_admin_filter is not None:
