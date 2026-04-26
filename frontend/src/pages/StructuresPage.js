@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchWithAuth } from '@/utils/api';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
+import { StructuralMap } from '@/components/StructuralMap';
 import { 
   Building2, 
   Plus, 
@@ -482,7 +483,16 @@ export default function StructuresPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-6">
+                  {/* Structural Map Visualization */}
+                  <div className="card-trust">
+                    <h2 className="font-serif text-lg text-navy mb-4 flex items-center gap-2">
+                      <GitBranch className="w-5 h-5" /> Structural Map
+                    </h2>
+                    <StructuralMap entities={entities} relationships={relationships} />
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Hierarchy Tree */}
                   <div className="card-trust">
                     <h2 className="font-serif text-lg text-navy mb-4 flex items-center gap-2">
@@ -563,6 +573,7 @@ export default function StructuresPage() {
                         })}
                       </div>
                     )}
+                  </div>
                   </div>
                 </div>
               )}
