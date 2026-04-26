@@ -25,6 +25,7 @@ import CalendarPage from "@/pages/CalendarPage";
 import EntityDetailPage from "@/pages/EntityDetailPage";
 import StructuresPage from "@/pages/StructuresPage";
 import AuthorityPage from "@/pages/AuthorityPage";
+import AuditTrailPage from "@/pages/AuditTrailPage";
 import CompensationPage from "@/pages/CompensationPage";
 import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
@@ -282,6 +283,11 @@ const AppRouter = () => {
       <Route path="/authority" element={
         <SubscriptionProtectedRoute>
           <AuthorityPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/audit-trail" element={
+        <SubscriptionProtectedRoute>
+          <AuditTrailPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/governance" element={
