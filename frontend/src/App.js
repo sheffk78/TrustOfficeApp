@@ -15,6 +15,7 @@ import NewMinutesPage from "@/pages/NewMinutesPage";
 import MinutesTemplatesPage from "@/pages/MinutesTemplatesPage";
 import MinutesTemplateFormPage from "@/pages/MinutesTemplateFormPage";
 import GuidedMinutesPage from "@/pages/GuidedMinutesPage";
+import RetroactiveMinutesPage from "@/pages/RetroactiveMinutesPage";
 import DistributionsPage from "@/pages/DistributionsPage";
 import ExpensesPage from "@/pages/ExpensesPage";
 import GovernancePage from "@/pages/GovernancePage";
@@ -212,6 +213,11 @@ const AppRouter = () => {
       <Route path="/minutes/template/:templateType" element={
         <SubscriptionProtectedRoute>
           <MinutesTemplateFormPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/retroactive-minutes" element={
+        <SubscriptionProtectedRoute>
+          <RetroactiveMinutesPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/guided-minutes" element={

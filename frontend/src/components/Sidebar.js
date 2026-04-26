@@ -36,6 +36,7 @@ const navItems = [
   { path: '/calendar', icon: Calendar, label: 'Calendar', group: 'Governance' },
   { path: '/minutes', icon: FileText, label: 'Minutes', group: 'Governance' },
   { path: '/guided-minutes', icon: Sparkles, label: 'Guided Minutes', group: 'Governance', badge: 'beta' },
+  { path: '/retroactive-minutes', icon: Clock, label: 'Retro Minutes', group: 'Governance', badge: 'new' },
   { path: '/distributions', icon: DollarSign, label: 'Distributions', group: 'Money' },
   { path: '/compensation', icon: Wallet, label: 'Compensation', group: 'Money' },
   { path: '/transactions', icon: ArrowUpDown, label: 'Transactions', group: 'Money' },
