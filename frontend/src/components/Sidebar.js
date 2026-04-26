@@ -44,6 +44,7 @@ const navItems = [
   { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
   { path: '/beneficiaries', icon: Users, label: 'Beneficiaries', group: 'Structures' },
   { path: '/governance', icon: Shield, label: 'Governance Health' },
+  { path: '/authority', icon: Shield, label: 'Authority', group: 'Structures' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

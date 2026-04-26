@@ -23,6 +23,7 @@ import OnboardingPage from "@/pages/OnboardingPage";
 import CalendarPage from "@/pages/CalendarPage";
 import EntityDetailPage from "@/pages/EntityDetailPage";
 import StructuresPage from "@/pages/StructuresPage";
+import AuthorityPage from "@/pages/AuthorityPage";
 import CompensationPage from "@/pages/CompensationPage";
 import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
@@ -270,6 +271,11 @@ const AppRouter = () => {
       <Route path="/entities/:entityId" element={
         <SubscriptionProtectedRoute>
           <EntityDetailPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/authority" element={
+        <SubscriptionProtectedRoute>
+          <AuthorityPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/governance" element={
