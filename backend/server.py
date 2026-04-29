@@ -287,7 +287,11 @@ async def health_check():
         await db.command("ping")
         return {"status": "ok", "service": "trustoffice-api", "db": "connected"}
     except Exception as e:
-        return {"status": "degraded", "service": "trustoffice-api", "db": f"error: {str(e)[:100]}"}
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "service": "trustoffice-api", "db": f"error: {str(e)[:100]}"}
+        )
 
 
 # ==================== LIFECYCLE EVENTS ====================
@@ -295,11 +299,14 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """Start background task runner and create indexes on app startup"""
+    startup_errors = []
+    
     try:
         await background_runner.start()
         logger.info("Background task runner started successfully")
     except Exception as e:
         logger.error(f"Failed to start background runner: {e}")
+        startup_errors.append(f"background_runner: {e}")
     
     # Create database indexes for performance
     try:
@@ -398,6 +405,10 @@ async def startup_event():
         
     except Exception as e:
         logger.error(f"Failed to create indexes: {e}")
+        startup_errors.append(f"indexes: {e}")
+    
+    if startup_errors:
+        logger.warning(f"App started with {len(startup_errors)} errors: {startup_errors}")
 
 
 async def ensure_primary_admin():
