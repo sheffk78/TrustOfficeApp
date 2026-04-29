@@ -28,6 +28,9 @@ import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
 import PricingPage from "@/pages/PricingPage";
+import AuthorityPage from "@/pages/AuthorityPage";
+import RetroactiveMinutesPage from "@/pages/RetroactiveMinutesPage";
+import AuditTrailPage from "@/pages/AuditTrailPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
@@ -244,6 +247,21 @@ const AppRouter = () => {
       <Route path="/structures" element={
         <SubscriptionProtectedRoute>
           <StructuresPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/authority" element={
+        <SubscriptionProtectedRoute>
+          <AuthorityPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/retroactive-minutes" element={
+        <SubscriptionProtectedRoute>
+          <RetroactiveMinutesPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/audit-trail" element={
+        <SubscriptionProtectedRoute>
+          <AuditTrailPage />
         </SubscriptionProtectedRoute>
       } />
       {/* Redirect old routes to new unified Structures page */}
