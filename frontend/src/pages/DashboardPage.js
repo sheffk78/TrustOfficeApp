@@ -6,7 +6,6 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
-import confetti from 'canvas-confetti';
 import { 
   FileText, 
   DollarSign, 
@@ -89,7 +88,7 @@ const INSIGHT_ICONS = {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, selectedTrust, trusts, trustsLoading, loadTrusts, seedDemoData } = useAuth();
+  const { user, selectedTrust, trusts, loadTrusts, seedDemoData } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   
@@ -99,36 +98,13 @@ export default function DashboardPage() {
   const [aiSuggestionsError, setAiSuggestionsError] = useState(false);
   const [aiSuggestionsFallback, setAiSuggestionsFallback] = useState(false); // True when using static fallback
 
-  // Show welcome toast + confetti after successful purchase
+  // Show welcome toast after successful purchase
   useEffect(() => {
     if (searchParams.get('welcome') === 'true') {
       toast.success('Welcome to TrustOffice!', {
         description: 'Your subscription is now active. Let\'s get your trust organized.',
         duration: 6000
       });
-
-      // Subtle confetti burst
-      const end = Date.now() + 1500;
-      const colors = ['#010079', '#d5ad36', '#ffffff'];
-      const frame = () => {
-        confetti({
-          particleCount: 2,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0, y: 0.7 },
-          colors,
-        });
-        confetti({
-          particleCount: 2,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1, y: 0.7 },
-          colors,
-        });
-        if (Date.now() < end) requestAnimationFrame(frame);
-      };
-      frame();
-
       // Remove the query param to prevent showing again on refresh
       searchParams.delete('welcome');
       setSearchParams(searchParams, { replace: true });
@@ -136,12 +112,14 @@ export default function DashboardPage() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
+    if (trustsLoading) return;
     if (selectedTrust) {
       loadDashboardData();
-    } else if (!trustsLoading && (trusts?.length ?? 0) === 0) {
+      loadAiSuggestions();
+    } else if (trusts.length === 0) {
       setLoading(false);
     }
-  }, [selectedTrust, trustsLoading]);
+  }, [selectedTrust, trusts, trustsLoading]);
 
   const loadDashboardData = async () => {
     if (!selectedTrust) return;
@@ -156,9 +134,6 @@ export default function DashboardPage() {
       } else {
         console.error('Failed to load dashboard');
       }
-      
-      // Load AI suggestions after dashboard data is loaded
-      await loadAiSuggestions();
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -334,7 +309,7 @@ export default function DashboardPage() {
   const onboarding = dashboard?.onboarding_state;
 
   // Empty state - no trusts
-  if (!loading && (trusts?.length ?? 0) === 0) {
+  if (!loading && trusts.length === 0) {
     return (
       <div className="main-layout" data-testid="dashboard-page">
         <Sidebar />

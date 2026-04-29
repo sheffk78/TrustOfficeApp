@@ -102,6 +102,7 @@ export const AuthProvider = ({ children }) => {
         window.location.pathname === '/auth/google/callback') {
       console.log('[AuthContext] On callback path, skipping auth check');
       setLoading(false);
+      setTrustsLoading(false);
       return;
     }
 
@@ -109,6 +110,7 @@ export const AuthProvider = ({ children }) => {
     if (!hasStoredToken()) {
       console.log('[AuthContext] No token, setting loading false');
       setLoading(false);
+      setTrustsLoading(false);
       authCheckComplete.current = true;
       return;
     }

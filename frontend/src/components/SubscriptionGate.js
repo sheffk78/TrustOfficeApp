@@ -124,7 +124,7 @@ export const FullSubscriptionGate = ({ children }) => {
           {/* Message */}
           <p className="text-muted-foreground mb-6">
             {isTrialExpired 
-              ? 'Your 14-day free trial has expired. Subscribe now to continue managing your trusts with TrustOffice.'
+              ? 'Subscribe now to continue managing your trusts with TrustOffice.'
               : 'Your subscription is inactive. Please subscribe to continue using TrustOffice.'}
           </p>
 

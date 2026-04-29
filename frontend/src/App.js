@@ -15,7 +15,6 @@ import NewMinutesPage from "@/pages/NewMinutesPage";
 import MinutesTemplatesPage from "@/pages/MinutesTemplatesPage";
 import MinutesTemplateFormPage from "@/pages/MinutesTemplateFormPage";
 import GuidedMinutesPage from "@/pages/GuidedMinutesPage";
-import RetroactiveMinutesPage from "@/pages/RetroactiveMinutesPage";
 import DistributionsPage from "@/pages/DistributionsPage";
 import ExpensesPage from "@/pages/ExpensesPage";
 import GovernancePage from "@/pages/GovernancePage";
@@ -24,8 +23,6 @@ import OnboardingPage from "@/pages/OnboardingPage";
 import CalendarPage from "@/pages/CalendarPage";
 import EntityDetailPage from "@/pages/EntityDetailPage";
 import StructuresPage from "@/pages/StructuresPage";
-import AuthorityPage from "@/pages/AuthorityPage";
-import AuditTrailPage from "@/pages/AuditTrailPage";
 import CompensationPage from "@/pages/CompensationPage";
 import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
@@ -34,14 +31,11 @@ import PricingPage from "@/pages/PricingPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
-import ContactPage from "@/pages/ContactPage";
-import TransactionLedgerPage from "@/pages/TransactionLedgerPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
-import ErrorBoundary from "@/components/ErrorBoundary";
 
 // GA4 page view tracking for SPA navigation
 const useGA4PageTracking = () => {
@@ -56,12 +50,6 @@ const useGA4PageTracking = () => {
       });
     }
   }, [location]);
-};
-
-// External redirect component — navigates to URLs outside the SPA
-const ExternalRedirect = ({ url }) => {
-  window.location.href = url;
-  return null;
 };
 
 // Protected Route component
@@ -83,6 +71,11 @@ const ProtectedRoute = ({ children }) => {
   // Check for stored token
   const hasToken = localStorage.getItem('auth_token') !== null;
 
+  // IMMEDIATE redirect: no token, no user, not loading — go to login
+  if (!hasToken && !user && !loading) {
+    return <Navigate to="/" replace />;
+  }
+
   // Timeout to prevent infinite loading - after 10 seconds, proceed anyway
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -94,14 +87,9 @@ const ProtectedRoute = ({ children }) => {
     return () => clearTimeout(timer);
   }, [loading, trustsLoading]);
 
-  // EARLY EXIT: If no token and not on callback, redirect immediately — no spinner
-  if (!hasToken && !user && !isCallback) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Show loading spinner while auth is being verified (only if we have a token to validate)
+  // Show loading spinner while auth is being verified (but not for trusts on onboarding)
   const isOnboarding = location.pathname.includes('/onboarding');
-  const shouldShowLoading = hasToken && (loading || (!isOnboarding && trustsLoading)) && !loadingTimeout;
+  const shouldShowLoading = (loading || (!isOnboarding && trustsLoading)) && !loadingTimeout;
   
   if (shouldShowLoading) {
     return (
@@ -114,14 +102,9 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  // Redirect if user is null after loading completes (token was present but invalid)
-  if (!loading && !loadingTimeout && !user && hasToken) {
-    localStorage.removeItem('auth_token');
-    return <Navigate to="/" replace />;
-  }
-
-  // Redirect if no user and no token
-  if (!loading && !user && !hasToken) {
+  // After loading timeout, if we still have a token, don't redirect - let user see the page
+  // Only redirect to login if there's genuinely no token
+  if (!hasToken && !user && !hasUserFromState && !isCallback) {
     return <Navigate to="/" replace />;
   }
 
@@ -171,7 +154,8 @@ const AppRouter = () => {
       <Route path="/register" element={<SignUpPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/affiliate" element={<AffiliatePage />} />
-      <Route path="/contact" element={<ContactPage />} />
+      <Route path="/help" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/about" element={<Navigate to="/" replace />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
@@ -216,11 +200,6 @@ const AppRouter = () => {
           <MinutesTemplateFormPage />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/retroactive-minutes" element={
-        <SubscriptionProtectedRoute>
-          <RetroactiveMinutesPage />
-        </SubscriptionProtectedRoute>
-      } />
       <Route path="/guided-minutes" element={
         <SubscriptionProtectedRoute>
           <GuidedMinutesPage />
@@ -262,11 +241,6 @@ const AppRouter = () => {
           <ExpensesPage />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/transactions" element={
-        <SubscriptionProtectedRoute>
-          <TransactionLedgerPage />
-        </SubscriptionProtectedRoute>
-      } />
       <Route path="/structures" element={
         <SubscriptionProtectedRoute>
           <StructuresPage />
@@ -278,16 +252,6 @@ const AppRouter = () => {
       <Route path="/entities/:entityId" element={
         <SubscriptionProtectedRoute>
           <EntityDetailPage />
-        </SubscriptionProtectedRoute>
-      } />
-      <Route path="/authority" element={
-        <SubscriptionProtectedRoute>
-          <AuthorityPage />
-        </SubscriptionProtectedRoute>
-      } />
-      <Route path="/audit-trail" element={
-        <SubscriptionProtectedRoute>
-          <AuditTrailPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/governance" element={
@@ -312,12 +276,8 @@ const AppRouter = () => {
           <AdminPage />
         </ProtectedRoute>
       } />
-      {/* Missing route redirects */}
-      <Route path="/help" element={<ExternalRedirect url="https://trustoffice.app/support" />} />
-      <Route path="/about" element={<Navigate to="/pricing" replace />} />
-      <Route path="/privacy-policy" element={<ExternalRedirect url="https://trustoffice.app/privacy-policy" />} />
-      <Route path="/terms-of-service" element={<ExternalRedirect url="https://trustoffice.app/terms-of-service" />} />
-      {/* 404 catch-all */}
+
+      {/* Catch-all 404 route - must be last */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
@@ -329,10 +289,8 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <UpgradeModalProvider>
-            <ErrorBoundary>
-              <ImpersonationBanner />
-              <AppRouter />
-            </ErrorBoundary>
+            <ImpersonationBanner />
+            <AppRouter />
             <Toaster position="top-right" />
           </UpgradeModalProvider>
         </AuthProvider>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Check, ArrowRight } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 // Use XMLHttpRequest for maximum compatibility
 const xhrPost = (url, data, token = null) => {
@@ -59,21 +59,15 @@ export default function PricingPage() {
   const [loading, setLoading] = useState(null);
   const [couponApplied, setCouponApplied] = useState(false);
   
-  // Get coupon from URL if present, or from sessionStorage (from signup flow)
-  const urlCoupon = searchParams.get('coupon') || searchParams.get('promo');
-  const storedCoupon = typeof window !== 'undefined' ? sessionStorage.getItem('pending_coupon') : null;
-  const couponCode = urlCoupon || storedCoupon;
+  // Get coupon from URL if present
+  const couponCode = searchParams.get('coupon') || searchParams.get('promo');
   
   useEffect(() => {
     if (couponCode) {
       setCouponApplied(true);
       toast.success(`Coupon "${couponCode}" will be applied at checkout`);
-      // Clear stored coupon after displaying
-      if (storedCoupon) {
-        sessionStorage.removeItem('pending_coupon');
-      }
     }
-  }, [couponCode, storedCoupon]);
+  }, [couponCode]);
 
   const handleCheckout = async (planType) => {
     // If not logged in, redirect to signup first
@@ -100,9 +94,9 @@ export default function PricingPage() {
         cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`
       };
       
-      // Add coupon if present (use coupon field for direct Stripe coupons like TRUST49)
+      // Add coupon if present
       if (couponCode) {
-        checkoutData.coupon = couponCode.toUpperCase();
+        checkoutData.promotion_code = couponCode;
       }
       
       // Add Rewardful referral ID for affiliate tracking
@@ -136,7 +130,7 @@ export default function PricingPage() {
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <Link to="/" className="flex items-center gap-3">
             <img 
-              src="/assets/trustoffice-logo.svg"
+              src="https://customer-assets.emergentagent.com/job_98ad4c89-4a05-4aed-ab1d-a934650bd7f4/artifacts/5h7i559r_Trust%20Office%20Logo%20%281%29.svg"
               alt="TrustOffice"
               className="h-8 brightness-0 invert"
             />
@@ -244,8 +238,7 @@ export default function PricingPage() {
 
         {/* Trial Note */}
         <p className="text-center text-sm text-muted-foreground mt-8 max-w-xl mx-auto">
-          Start with a 14-day free trial. No credit card required to try. 
-          Subscribe anytime during or after your trial.
+          Subscribe to start — $79/month or $790/year. The trust pays for governance tools the same way it pays for legal counsel.
         </p>
       </section>
 
@@ -254,8 +247,8 @@ export default function PricingPage() {
         <p>&copy; {new Date().getFullYear()} TrustOffice. All rights reserved.</p>
         <div className="mt-2 space-x-4">
           <a href="https://trustoffice.app/support" className="hover:text-navy">Support</a>
-          <Link to="/privacy-policy" className="hover:text-navy">Privacy</Link>
-          <Link to="/terms-of-service" className="hover:text-navy">Terms</Link>
+          <a href="https://trustoffice.app/privacy-policy/" className="hover:text-navy">Privacy</a>
+          <a href="https://trustoffice.app/terms-of-service/" className="hover:text-navy">Terms</a>
         </div>
       </footer>
     </div>

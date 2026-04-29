@@ -270,7 +270,7 @@ export default function OnboardingPage() {
                   Your Trial Has Ended
                 </h1>
                 <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                  Your 14-day free trial has expired. Subscribe now to continue using TrustOffice and manage your trusts professionally.
+                  Subscribe now to continue using TrustOffice and manage your trusts professionally.
                 </p>
               </div>
 

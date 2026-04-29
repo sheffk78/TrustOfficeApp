@@ -369,7 +369,7 @@ export default function BillingPage() {
                       <Clock className="w-5 h-5 text-navy flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="font-medium text-navy">
-                          Your free trial ends on {formatDate(subscription.trial_end_date)}
+                          Your access period ends on {formatDate(subscription.trial_end_date)}
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
                           {subscription.days_remaining} days remaining. Subscribe now to ensure uninterrupted access.
