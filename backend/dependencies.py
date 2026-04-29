@@ -18,7 +18,7 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
-TRIAL_DAYS = 14
+TRIAL_DAYS = 14  # Legacy — existing trial users still have this period. New signups go straight to paid.
 
 # Forever free accounts - these emails get unlimited access without payment
 FOREVER_FREE_EMAILS = {
@@ -117,17 +117,19 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
                 "notes": "Forever free account - admin@wingpointtrusts.com"
             }
         else:
+            # New users start as read-only until they subscribe (no free trial)
             sub = {
                 "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
                 "user_id": user_id,
-                "plan_type": "trial",
-                "status": "trialing",
-                "trial_start_date": now.isoformat(),
-                "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
+                "plan_type": "none",
+                "status": "expired",
+                "trial_start_date": None,
+                "trial_end_date": None,
                 "stripe_customer_id": None,
                 "stripe_subscription_id": None,
                 "created_at": now.isoformat(),
-                "updated_at": now.isoformat()
+                "updated_at": now.isoformat(),
+                "notes": "New signup — subscribe to activate"
             }
         await db.subscriptions.insert_one(sub)
     
@@ -244,7 +246,10 @@ PLAN_FEATURES = {
         Feature.DISTRIBUTIONS_BASIC,
         Feature.GOVERNANCE_BASIC,
         Feature.SINGLE_TRUST,
-        # Trial gets limited features with watermark
+        # Trial gets limited features with watermark (legacy — existing trial users)
+    },
+    "none": {
+        # No features until they subscribe
     },
     "monthly": {
         # All core features
@@ -304,7 +309,7 @@ async def check_feature_access(user_id: str, feature: str) -> bool:
     
     # If subscription is not active, no premium features
     if not state.is_active:
-        return feature in PLAN_FEATURES.get("trial", set())
+        return False
     
     plan_features = PLAN_FEATURES.get(state.plan_type, set())
     return feature in plan_features
@@ -501,17 +506,19 @@ async def check_subscription_active(user: dict = Depends(get_current_user)) -> d
         sub = {
             "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
             "user_id": user["user_id"],
-            "plan_type": "trial",
-            "status": "trialing",
-            "trial_start_date": now.isoformat(),
-            "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
+            "plan_type": "none",
+            "status": "expired",
+            "trial_start_date": None,
+            "trial_end_date": None,
             "stripe_customer_id": None,
             "stripe_subscription_id": None,
             "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
+            "updated_at": now.isoformat(),
+            "notes": "New signup — subscribe to activate"
         }
         await db.subscriptions.insert_one(sub)
-        return user
+        # No active subscription — will be caught below
+    
     
     if sub["status"] == "active":
         return user

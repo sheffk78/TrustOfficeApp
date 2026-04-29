@@ -43,10 +43,10 @@ export const ReadOnlyBanner = () => {
           <div>
             <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
               {trialExpired 
-                ? 'Your trial has expired' 
+                ? 'Your trial period has ended' 
                 : subCanceled 
                   ? 'Your subscription has been canceled'
-                  : 'Subscription inactive'}
+                  : 'Subscribe to activate'}
             </p>
             <p className="text-xs text-amber-600 dark:text-amber-400">
               You can view all your data, but creating or editing is disabled until you subscribe.

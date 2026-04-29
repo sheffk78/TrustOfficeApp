@@ -45,14 +45,15 @@ async def get_or_create_subscription(user_id: str) -> dict:
         sub = {
             "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
             "user_id": user_id,
-            "plan_type": "trial",
-            "status": "trialing",
-            "trial_start_date": now.isoformat(),
-            "trial_end_date": (now + timedelta(days=TRIAL_DAYS)).isoformat(),
+            "plan_type": "none",
+            "status": "expired",
+            "trial_start_date": None,
+            "trial_end_date": None,
             "stripe_customer_id": None,
             "stripe_subscription_id": None,
             "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
+            "updated_at": now.isoformat(),
+            "notes": "New signup — subscribe to activate"
         }
         await db.subscriptions.insert_one(sub)
     

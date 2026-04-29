@@ -133,12 +133,7 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
         user_name=user.name
     )
     
-    # Add to Mailercloud trial list in background
-    background_tasks.add_task(
-        add_to_trial_list,
-        email=user.email,
-        name=user.name
-    )
+    # Note: No longer adding to Mailercloud trial list — trial model removed
     
     return UserResponse(
         user_id=user_id,
@@ -574,14 +569,8 @@ async def google_callback(request: Request, response: Response, code: str = None
             except Exception as e:
                 logger.error(f"Failed to send welcome email: {e}")
             
-            # Add new Google OAuth user to Mailercloud trial list
-            try:
-                await add_to_trial_list(
-                    email=email,
-                    name=google_user.get("name", "")
-                )
-            except Exception as e:
-                logger.error(f"Failed to add Google OAuth user to Mailercloud trial list: {e}")
+            # Note: No longer adding Google OAuth user to Mailercloud trial list — trial model removed
+            # add_to_trial_list call removed
         
         # Generate JWT token
         jwt_token = create_jwt_token(user_id, email)
