@@ -273,13 +273,16 @@ async def get_summary_stats(
         {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}}
     ]
     revenue_result = await db.payment_transactions.aggregate(revenue_pipeline).to_list(length=1)
-    total_revenue = revenue_result[0]["total"] if revenue_result else 0
+    raw_total = revenue_result[0]["total"] if revenue_result else 0
     total_transactions = revenue_result[0]["count"] if revenue_result else 0
+    # Amount field stores dollars, convert to cents for consistent formatting
+    total_revenue = int(raw_total * 100) if raw_total else 0
     
     # Also calculate MRR from active subscriptions (for gifted/manual subs without payment_transactions)
+    # Check both plan_type and plan fields since schema may vary
     sub_pipeline = [
-        {"$match": {"status": "active", "plan_type": {"$in": ["monthly", "annual"]}}},
-        {"$group": {"_id": "$plan_type", "count": {"$sum": 1}}}
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": {"$ifNull": ["$plan_type", {"$ifNull": ["$plan", "monthly"]}]}, "count": {"$sum": 1}}}
     ]
     sub_result = await db.subscriptions.aggregate(sub_pipeline).to_list(length=None)
     # Monthly: $79/mo = 7900 cents; Annual: $790/yr ≈ 6583 cents/mo
