@@ -264,12 +264,26 @@ async def get_summary_stats(
     
     # Revenue stats from payment transactions
     revenue_pipeline = [
-        {"$match": {"status": "succeeded"}},
+        {"$match": {"$or": [
+            {"payment_status": "paid"},
+            {"payment_status": "succeeded"},
+            {"status": "succeeded"},
+            {"status": "paid"}
+        ]}},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}}
     ]
     revenue_result = await db.payment_transactions.aggregate(revenue_pipeline).to_list(length=1)
     total_revenue = revenue_result[0]["total"] if revenue_result else 0
     total_transactions = revenue_result[0]["count"] if revenue_result else 0
+    
+    # Also calculate MRR from active subscriptions (for gifted/manual subs without payment_transactions)
+    sub_pipeline = [
+        {"$match": {"status": "active", "plan_type": {"$in": ["monthly", "annual"]}}},
+        {"$group": {"_id": "$plan_type", "count": {"$sum": 1}}}
+    ]
+    sub_result = await db.subscriptions.aggregate(sub_pipeline).to_list(length=None)
+    # Monthly: $79/mo = 7900 cents; Annual: $790/yr ≈ 6583 cents/mo
+    monthly_mrr = sum(s["count"] * 7900 for s in sub_result if s["_id"] == "monthly") + sum(s["count"] * 6583 for s in sub_result if s["_id"] == "annual")
     
     await log_api_action(
         action="get_summary_stats",
@@ -296,7 +310,9 @@ async def get_summary_stats(
         "revenue": {
             "total_cents": total_revenue,
             "total_formatted": f"${total_revenue / 100:,.2f}",
-            "transaction_count": total_transactions
+            "transaction_count": total_transactions,
+            "mrr_cents": monthly_mrr,
+            "mrr_formatted": f"${monthly_mrr / 100:,.2f}"
         },
         "generated_at": datetime.now(timezone.utc).isoformat()
     }
