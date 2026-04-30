@@ -1,20 +1,8 @@
 """
 AI Service - AI-powered features for TrustOffice
-Provides minutes drafting and governance suggestions using Claude
+Provides minutes drafting and governance suggestions.
 
-Note: Requires CLAUDE_API_KEY or EMERGENT_LLM_KEY environment variable.
-This app runs on Emergent which provides the key automatically.
-- Minutes drafting uses claude-sonnet-4-5 for complex document generation
-- Governance suggestions uses claude-haiku-4-5 for quick recommendations
-
-=== MANUAL TESTING ===
-To test minutes drafting, send POST to /api/ai/minutes-draft with body:
-  {"minutes_type":"quarterly","meeting_date":"2026-01-15","participants":["Trustee Name"],
-   "decisions_outline":["Reviewed assets","Approved distribution"],"trust_name":"Family Trust"}
-Then verify the draft appears in the Minutes UI.
-
-To test governance suggestions, load the Dashboard with some existing minutes/tasks
-and confirm suggestions populate the AI Recommendations card.
+Uses the unified ai_client which defaults to OpenRouter (Gemini) with Claude fallback.
 """
 import json
 import logging
@@ -22,7 +10,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from fastapi import HTTPException
 
-from claude_client import call_claude_sonnet, call_claude_haiku, ClaudeClientError
+from ai_client import ai_draft, ai_suggest, AIClientError
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +64,7 @@ The JSON must have exactly these keys:
 
 async def draft_minutes_from_structured_input(req: MinutesDraftRequest) -> MinutesDraftResponse:
     """
-    Generate a draft of meeting minutes using Claude Sonnet.
+    Generate a draft of meeting minutes using AI (OpenRouter/Gemini with Claude fallback).
     
     Takes structured input about a trust meeting and generates
     professional minutes with WHEREAS/RESOLVED language.
@@ -112,7 +100,7 @@ Respond with a JSON object containing:
 - "cautions": any warnings or items the trustee should review"""
 
     try:
-        response = await call_claude_sonnet(
+        response = await ai_draft(
             system_prompt=MINUTES_DRAFTING_SYSTEM_PROMPT,
             user_content=user_content,
             max_tokens=1200,
@@ -139,7 +127,7 @@ Respond with a JSON object containing:
                 cautions=data.get("cautions", [])
             )
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Claude response as JSON: {e}")
+            logger.error(f"Failed to parse AI response as JSON: {e}")
             logger.debug(f"Raw response: {response[:500]}")
             # Return the raw response as draft_body if JSON parsing fails
             return MinutesDraftResponse(
@@ -148,14 +136,11 @@ Respond with a JSON object containing:
                 cautions=["AI response was not in expected format. Please review and edit carefully."]
             )
             
-    except ClaudeClientError as e:
-        logger.error(f"Claude API error in minutes drafting: {type(e).__name__}")
-        raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error in minutes drafting response: {type(e).__name__}")
+    except AIClientError as e:
+        logger.error(f"AI backend error in minutes drafting: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)
     except Exception as e:
-        logger.error(f"Unexpected error in minutes drafting: {type(e).__name__}")
+        logger.error(f"Unexpected error in minutes drafting: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)
 
 
@@ -232,7 +217,7 @@ The JSON must have exactly this structure:
 
 async def generate_governance_suggestions(req: GovernanceSuggestionsRequest) -> GovernanceSuggestionsResponse:
     """
-    Generate governance improvement suggestions using Claude Haiku.
+    Generate governance improvement suggestions using AI (OpenRouter/Gemini with Claude fallback).
     
     Analyzes the current governance health score and criteria to
     provide actionable recommendations for trustees.
@@ -275,7 +260,7 @@ Each suggestion should:
 Respond with JSON containing a "suggestions" array."""
 
     try:
-        response = await call_claude_haiku(
+        response = await ai_suggest(
             system_prompt=GOVERNANCE_SUGGESTIONS_SYSTEM_PROMPT,
             user_content=user_content,
             max_tokens=400,
@@ -308,7 +293,7 @@ Respond with JSON containing a "suggestions" array."""
             return GovernanceSuggestionsResponse(suggestions=suggestions)
             
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Claude response as JSON: {e}")
+            logger.error(f"Failed to parse AI response as JSON: {e}")
             logger.debug(f"Raw response: {response[:500]}")
             # Return a fallback suggestion
             return GovernanceSuggestionsResponse(suggestions=[
@@ -320,12 +305,9 @@ Respond with JSON containing a "suggestions" array."""
                 )
             ])
             
-    except ClaudeClientError as e:
-        logger.error(f"Claude API error in governance suggestions: {type(e).__name__}")
-        raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error in governance suggestions response: {type(e).__name__}")
+    except AIClientError as e:
+        logger.error(f"AI backend error in governance suggestions: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)
     except Exception as e:
-        logger.error(f"Unexpected error in governance suggestions: {type(e).__name__}")
+        logger.error(f"Unexpected error in governance suggestions: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=AI_UNAVAILABLE_MESSAGE)

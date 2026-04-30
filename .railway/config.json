@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "/Users/socializerender/Projects/TrustOfficeApp": {
+      "projectPath": "/Users/socializerender/Projects/TrustOfficeApp",
+      "name": "TrustOffice",
+      "project": "53386002-f1ff-4462-8162-b063b5d0a8e8",
+      "environment": "698913eb-7b9f-424b-bdb3-2aa6c11c1357",
+      "environmentName": "production",
+      "service": "c361cdd3-fd37-4f19-b5f0-95a0df01c931"
+    }
+  }
+}

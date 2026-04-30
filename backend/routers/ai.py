@@ -51,17 +51,19 @@ from ai_service import (
     draft_minutes_from_structured_input,
     generate_governance_suggestions
 )
-from claude_client import ping_claude, CLAUDE_API_KEY, CLAUDE_SONNET, CLAUDE_HAIKU
+from ai_client import ai_health_check as ai_backend_status, AI_PRIMARY_MODEL, AI_FALLBACK_MODEL, AI_ENABLED
+from claude_client import ping_claude
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 logger = logging.getLogger(__name__)
 
 # ==================== CONFIGURATION ====================
 
-# Cost estimates per call (in cents)
+# Cost estimates per call (in cents) — for budget tracking only
+# Ollama is essentially free; Claude is the fallback cost
 COST_PER_CALL_CENTS = {
-    "minutes-draft": 3.0,      # $0.03 for Sonnet
-    "governance-suggestions": 0.2  # $0.002 for Haiku
+    "minutes-draft": 0.5,        # essentially free via Ollama
+    "governance-suggestions": 0.1  # ditto
 }
 
 # Daily caps per user (stored in MongoDB)
@@ -303,8 +305,9 @@ async def create_minutes_draft(
     """
     Generate an AI-drafted meeting minutes document.
     
-    Uses Claude Sonnet to create professional minutes with
+    Uses Gemini (via OpenRouter) to create professional minutes with
     WHEREAS/RESOLVED structure based on the provided input.
+    Falls back to Claude if OpenRouter is unavailable.
     
     The draft is returned for review and editing - it should not
     be used as-is without trustee review.
@@ -344,7 +347,7 @@ async def create_minutes_draft(
                 request.jurisdiction = trust.get("jurisdiction")
     
     # Log the AI call (no sensitive content)
-    log_ai_call(user_id, trust_id, endpoint, CLAUDE_SONNET, input_length)
+    log_ai_call(user_id, trust_id, endpoint, AI_PRIMARY_MODEL, input_length)
     
     try:
         response = await draft_minutes_from_structured_input(request)
@@ -492,7 +495,7 @@ async def get_governance_suggestions(
                    sum(len(a.label) for a in recent_activity)
     
     # Log the AI call (no sensitive content)
-    log_ai_call(user_id, trust_id, endpoint, CLAUDE_HAIKU, input_length)
+    log_ai_call(user_id, trust_id, endpoint, AI_FALLBACK_MODEL, input_length)
     
     # Build request
     suggestions_request = GovernanceSuggestionsRequest(
@@ -636,20 +639,18 @@ async def get_ai_status(user: dict = Depends(get_current_user)):
     """
     Check if AI services are configured and available.
     """
-    ai_enabled = bool(CLAUDE_API_KEY)
-    
     return {
-        "ai_enabled": ai_enabled,
+        "ai_enabled": AI_ENABLED,
         "features": {
-            "minutes_drafting": ai_enabled,
-            "governance_suggestions": ai_enabled
+            "minutes_drafting": AI_ENABLED,
+            "governance_suggestions": AI_ENABLED
         },
         "models": {
-            "drafting": CLAUDE_SONNET if ai_enabled else None,
-            "suggestions": CLAUDE_HAIKU if ai_enabled else None
+            "drafting": AI_PRIMARY_MODEL if AI_ENABLED else None,
+            "suggestions": AI_FALLBACK_MODEL if AI_ENABLED else None
         },
-        "rate_limits": RATE_LIMITS if ai_enabled else None,
-        "daily_caps": DAILY_CAPS if ai_enabled else None
+        "rate_limits": RATE_LIMITS if AI_ENABLED else None,
+        "daily_caps": DAILY_CAPS if AI_ENABLED else None
     }
 
 
@@ -658,22 +659,14 @@ async def ai_health_check(user: dict = Depends(get_current_user)):
     """
     Health check endpoint for AI service.
     
-    Performs a simple ping to Claude Haiku to verify the service is operational.
-    Returns { "ok": true } on success, { "ok": false, "error": "..." } on failure.
-    
-    This endpoint is for internal testing only - no Claude error details are exposed.
+    Reports status of both Ollama (primary) and Claude (fallback) backends.
     """
-    if not CLAUDE_API_KEY:
-        logger.error("AI health check failed: API key not configured")
-        return {"ok": False, "error": "AI service not configured"}
-    
     try:
-        is_healthy = await ping_claude()
-        if is_healthy:
-            return {"ok": True}
-        else:
-            logger.warning("AI health check: ping succeeded but response unexpected")
-            return {"ok": False, "error": "AI service responded unexpectedly"}
+        status = await ai_backend_status()
+        return {
+            "ok": status.get("ollama", {}).get("available", False) or status.get("claude", {}).get("available", False),
+            "providers": status
+        }
     except Exception as e:
-        logger.error(f"AI health check failed: {type(e).__name__}")
-        return {"ok": False, "error": "AI service unavailable"}
+        logger.error(f"AI health check failed: {type(e).__name__}: {e}")
+        return {"ok": False, "error": "AI backend status unavailable"}
