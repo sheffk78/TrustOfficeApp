@@ -61,12 +61,22 @@ const ProtectedRoute = ({ children }) => {
   const location = useLocation();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
+  // Timeout to prevent infinite loading - after 10 seconds, proceed anyway
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading || trustsLoading) {
+        console.warn('[ProtectedRoute] Loading timeout reached, proceeding anyway');
+        setLoadingTimeout(true);
+      }
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [loading, trustsLoading]);
+
   // If user was passed via navigation state (e.g., from AuthCallback), use it
   const hasUserFromState = location.state?.user;
-  
-  // Check if we're on a callback path - don't redirect yet
-  const isCallback = location.pathname.includes('/auth/callback') || 
-                     location.pathname.includes('/auth/google/callback');
+
+  // Check if this is an OAuth callback route
+  const isCallback = location.pathname === '/auth/callback' || location.pathname === '/auth/google/callback';
 
   // Check if user is admin - admins skip onboarding
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
@@ -78,17 +88,6 @@ const ProtectedRoute = ({ children }) => {
   if (!hasToken && !user && !loading) {
     return <Navigate to="/" replace />;
   }
-
-  // Timeout to prevent infinite loading - after 10 seconds, proceed anyway
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (loading || trustsLoading) {
-        console.warn('[ProtectedRoute] Loading timeout reached, proceeding anyway');
-        setLoadingTimeout(true);
-      }
-    }, 10000);
-    return () => clearTimeout(timer);
-  }, [loading, trustsLoading]);
 
   // Show loading spinner while auth is being verified (but not for trusts on onboarding)
   const isOnboarding = location.pathname.includes('/onboarding');
