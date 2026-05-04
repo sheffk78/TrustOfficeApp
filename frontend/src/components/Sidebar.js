@@ -21,7 +21,8 @@ import {
   Users,
   Sparkles,
   Crown,
-  ArrowUpDown
+  ArrowUpDown,
+  Clock
 } from 'lucide-react';
 import {
   DropdownMenu,
