@@ -18,5 +18,8 @@ RUN chmod -R 755 /usr/share/nginx/html && \
     find /usr/share/nginx/html -type f -exec chmod 644 {} \;
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
-CMD sed -i "s/listen 80/listen ${PORT:-80}/" /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
+EXPOSE 80
+CMD ["/start.sh"]
