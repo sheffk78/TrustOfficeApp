@@ -45,7 +45,10 @@ export default function CalendarPage() {
   }, [selectedTrust]);
 
   const loadTasks = async () => {
-    if (!selectedTrust) return;
+    if (!selectedTrust) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetchWithAuth(`/tasks?trust_id=${selectedTrust.trust_id}`);

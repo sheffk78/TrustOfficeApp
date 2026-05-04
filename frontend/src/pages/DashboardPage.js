@@ -123,7 +123,10 @@ export default function DashboardPage() {
   }, [selectedTrust, trusts, trustsLoading]);
 
   const loadDashboardData = async () => {
-    if (!selectedTrust) return;
+    if (!selectedTrust) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {

@@ -67,7 +67,10 @@ export default function ExpensesPage() {
   };
 
   const loadExpenses = async () => {
-    if (!selectedTrust) return;
+    if (!selectedTrust) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {

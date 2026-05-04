@@ -54,7 +54,7 @@ READ_ONLY_ERROR_MESSAGE = "Your subscription is inactive. Please subscribe to cr
 READ_ONLY_ERROR_CODE = 403
 
 # Premium feature error message
-PREMIUM_FEATURE_ERROR_MESSAGE = "This feature requires a paid subscription. Please upgrade from trial to access."
+PREMIUM_FEATURE_ERROR_MESSAGE = "This feature requires a paid subscription. Please subscribe or renew to access."
 PREMIUM_FEATURE_ERROR_CODE = 402
 
 

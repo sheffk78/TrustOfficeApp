@@ -110,7 +110,10 @@ export default function DistributionsPage() {
   };
 
   const loadDistributions = async (search = '') => {
-    if (!selectedTrust) return;
+    if (!selectedTrust) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {

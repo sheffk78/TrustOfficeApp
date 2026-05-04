@@ -63,7 +63,10 @@ export default function MinutesPage() {
   }, [selectedTrust, debouncedSearch, dateFrom, dateTo]);
 
   const loadMinutes = async (search = '') => {
-    if (!selectedTrust) return;
+    if (!selectedTrust) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {

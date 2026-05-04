@@ -314,7 +314,7 @@ export default function SettingsPage() {
   const handleExport = async (type) => {
     setExportLoading(type);
     try {
-      const token = localStorage.getItem('token') || document.cookie.split('; ').find(row => row.startsWith('session_token='))?.split('=')[1];
+      const token = localStorage.getItem('auth_token') || document.cookie.split('; ').find(row => row.startsWith('session_token='))?.split('=')[1];
       const trustParam = selectedTrust ? `?trust_id=${selectedTrust.trust_id}` : '';
       
       const response = await fetch(`${API_BASE}/api/export/${type}${trustParam}`, {

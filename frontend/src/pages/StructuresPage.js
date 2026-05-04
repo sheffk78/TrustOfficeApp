@@ -83,7 +83,10 @@ export default function StructuresPage() {
 
   // Load data
   const loadData = useCallback(async () => {
-    if (!selectedTrust) return;
+    if (!selectedTrust) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [entitiesRes, relsRes] = await Promise.all([

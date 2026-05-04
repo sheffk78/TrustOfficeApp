@@ -34,7 +34,10 @@ export default function GovernancePage() {
   }, [selectedTrust]);
 
   const loadGovernanceData = async () => {
-    if (!selectedTrust) return;
+    if (!selectedTrust) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     try {

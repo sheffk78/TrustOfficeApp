@@ -76,7 +76,10 @@ export default function CompensationPage() {
   }, [selectedTrust]);
 
   const loadData = async () => {
-    if (!selectedTrust) return;
+    if (!selectedTrust) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [plansRes, paymentsRes, ytdRes, contextRes] = await Promise.all([
