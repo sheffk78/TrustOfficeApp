@@ -88,7 +88,7 @@ const INSIGHT_ICONS = {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, selectedTrust, trusts, loadTrusts, seedDemoData } = useAuth();
+  const { user, selectedTrust, trusts, trustsLoading, loadTrusts, seedDemoData } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   
