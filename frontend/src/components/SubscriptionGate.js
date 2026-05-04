@@ -138,7 +138,7 @@ export const FullSubscriptionGate = ({ children }) => {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Governance health tracking
+                Defensibility tracking
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />

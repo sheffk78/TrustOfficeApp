@@ -92,7 +92,7 @@ const FEATURES = [
   },
   {
     icon: Shield,
-    title: 'Governance Health',
+    title: 'Defensibility Score',
     description: 'Monitor your trust administration with a governance score. Get alerts for overdue reviews and compliance tasks.',
     color: 'navy'
   },
@@ -288,7 +288,7 @@ export default function OnboardingPage() {
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
-                    <span>Governance health tracking</span>
+                    <span>Defensibility tracking</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
@@ -741,7 +741,7 @@ export default function OnboardingPage() {
                     <PieChart className="w-5 h-5 text-navy" />
                     <div>
                       <p className="text-sm font-medium text-navy">Dashboard</p>
-                      <p className="text-xs text-muted-foreground">See governance health score</p>
+                      <p className="text-xs text-muted-foreground">See defensibility score</p>
                     </div>
                   </button>
                   <button

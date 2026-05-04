@@ -45,7 +45,7 @@ const navItems = [
   { path: '/structures', icon: Building2, label: 'Structures', group: 'Structures' },
   { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
   { path: '/beneficiaries', icon: Users, label: 'Beneficiaries', group: 'Structures' },
-  { path: '/governance', icon: Shield, label: 'Governance Health' },
+  { path: '/governance', icon: Shield, label: 'Defensibility Score' },
   { path: '/authority', icon: Shield, label: 'Authority', group: 'Structures' },
   { path: '/audit-trail', icon: FileText, label: 'Audit Trail', group: 'Structures' },
   { path: '/settings', icon: Settings, label: 'Settings' },

@@ -5,6 +5,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Shield,
+  ArrowUpDown,
   Calendar,
   FileText,
   DollarSign,
@@ -14,6 +15,7 @@ import {
   TrendingUp,
   TrendingDown,
   AlertCircle,
+  Info,
   RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -137,7 +139,7 @@ export default function GovernancePage() {
           {/* Page Header */}
           <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="page-title">Governance Health</h1>
+              <h1 className="page-title">Defensibility Score</h1>
               <p className="page-subtitle">
                 {selectedTrust?.name || 'Select a trust'} • 7-Criteria Assessment
               </p>
@@ -151,6 +153,16 @@ export default function GovernancePage() {
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
+          </div>
+
+          {/* Rename Notice Banner */}
+          <div className="mb-6 p-3 bg-navy/5 border border-navy/20 rounded flex items-start gap-3" data-testid="rename-notice">
+            <Info className="w-4 h-4 text-navy flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-navy">
+                We renamed <strong>Governance Health</strong> to <strong>Defensibility Score</strong>. Same score, clearer name — it tracks how well your records would hold up if anyone ever asked.
+              </p>
+            </div>
           </div>
 
           {loading ? (
@@ -322,7 +334,7 @@ export default function GovernancePage() {
               <div className="card-trust">
                 <h3 className="font-serif text-xl text-navy mb-6">How Scoring Works</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="p-4 border border-navy/10">
                     <div className="flex items-center gap-2 mb-2">
                       <FileText className="w-5 h-5 text-navy" />
@@ -331,7 +343,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Generate meeting minutes each quarter
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -340,9 +352,9 @@ export default function GovernancePage() {
                       <h4 className="font-medium text-sm">Task Compliance</h4>
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Complete tasks before due dates
+                      Complete governance tasks before due dates
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -353,7 +365,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Stay within approved plan amounts
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -362,9 +374,9 @@ export default function GovernancePage() {
                       <h4 className="font-medium text-sm">Distributions</h4>
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Log and approve distributions
+                      Log and fully document distributions
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -375,7 +387,29 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Complete annual trust review
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">10 points</span>
+                  </div>
+
+                  <div className="p-4 border border-navy/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ArrowUpDown className="w-5 h-5 text-navy" />
+                      <h4 className="font-medium text-sm">Transaction Classification</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Properly classify ≥90% of trust transactions
+                    </p>
+                    <span className="badge-trust">15 points</span>
+                  </div>
+
+                  <div className="p-4 border border-navy/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="w-5 h-5 text-navy" />
+                      <h4 className="font-medium text-sm">Separation Alert Health</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Resolve personal/trust separation alerts promptly
+                    </p>
+                    <span className="badge-trust">15 points</span>
                   </div>
                 </div>
 

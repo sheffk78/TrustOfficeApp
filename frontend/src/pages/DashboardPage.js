@@ -27,6 +27,7 @@ import {
   Sparkles,
   ChevronRight,
   Loader2,
+  Info,
   Bot
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -353,6 +354,16 @@ export default function DashboardPage() {
             </p>
           </div>
 
+          {/* Rename Notice Banner */}
+          <div className="mb-6 p-3 bg-navy/5 border border-navy/20 rounded flex items-start gap-3" data-testid="rename-notice">
+            <Info className="w-4 h-4 text-navy flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-navy">
+                We renamed <strong>Governance Health</strong> to <strong>Defensibility Score</strong>. Same score, clearer name — it tracks how well your records would hold up if anyone ever asked.
+              </p>
+            </div>
+          </div>
+
           {loading ? (
             <div className="card-grid">
               {[1, 2, 3].map((i) => (
@@ -600,11 +611,11 @@ export default function DashboardPage() {
 
               {/* Top Row - Governance Score & Quick Actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                {/* Governance Health Score */}
+                {/* Defensibility Score */}
                 <div className="lg:col-span-2 card-trust corner-mark">
                   <div className="flex items-start justify-between mb-6">
                     <div>
-                      <p className="label-trust mb-1">Governance Health</p>
+                      <p className="label-trust mb-1">Defensibility Score</p>
                       <h2 className="font-serif text-2xl text-navy">{dashboard?.trust_name || selectedTrust?.name}</h2>
                     </div>
                     <Link 

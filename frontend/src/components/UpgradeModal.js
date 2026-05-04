@@ -45,7 +45,7 @@ export const UpgradeModal = ({
   const features = [
     'Unlimited minutes and distributions',
     'Schedule A asset tracking',
-    'Governance health monitoring',
+    'Defensibility monitoring',
     'PDF exports and reports',
     'Trust certificate management',
     'Priority email support'

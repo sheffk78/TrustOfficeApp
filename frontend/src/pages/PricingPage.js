@@ -47,7 +47,7 @@ const features = [
   'Schedule A asset tracking',
   'Distribution management',
   'PDF export with watermark control',
-  'Governance health scoring',
+  'Defensibility scoring',
   'Email notifications',
   'Benevolence mode for charitable trusts'
 ];

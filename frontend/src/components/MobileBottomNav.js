@@ -5,7 +5,7 @@ const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Home' },
   { path: '/minutes', icon: FileText, label: 'Minutes' },
   { path: '/structures', icon: Building2, label: 'Structures' },
-  { path: '/governance', icon: Shield, label: 'Health' },
+  { path: '/governance', icon: Shield, label: 'Score' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

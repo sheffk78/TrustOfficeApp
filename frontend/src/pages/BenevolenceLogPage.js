@@ -277,7 +277,7 @@ export default function BenevolenceLogPage() {
                     <p className="font-medium text-warning">Incomplete Documentation</p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {data.incomplete_documentation_count} benevolence distribution{data.incomplete_documentation_count !== 1 ? 's' : ''} need 
-                      approval or minutes documentation. Complete documentation improves your governance health score.
+                      approval or minutes documentation. Complete documentation improves your defensibility score.
                     </p>
                   </div>
                 </div>
