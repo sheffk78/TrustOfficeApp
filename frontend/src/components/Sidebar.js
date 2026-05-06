@@ -23,6 +23,7 @@ import {
   Sparkles,
   Crown,
   ArrowUpDown,
+  TrendingUp,
   Clock
 } from 'lucide-react';
 import {
@@ -42,6 +43,7 @@ const navItems = [
   { path: '/distributions', icon: DollarSign, label: 'Distributions', group: 'Money' },
   { path: '/compensation', icon: Wallet, label: 'Compensation', group: 'Money' },
   { path: '/transactions', icon: ArrowUpDown, label: 'Transactions', group: 'Money' },
+  { path: '/investments', icon: TrendingUp, label: 'Investments', group: 'Money' },
   { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', group: 'Money', requiresBenevolence: true },
   { path: '/structures', icon: Building2, label: 'Structures', group: 'Structures' },
   { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
