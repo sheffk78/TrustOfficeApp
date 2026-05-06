@@ -200,6 +200,11 @@ class TrustCreate(BaseModel):
     start_date: Optional[str] = None
     trustees: Optional[str] = None  # Comma-separated list
     authority_clause: Optional[str] = None
+    ein: Optional[str] = None
+    state_code: Optional[str] = None
+    tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
+    tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
+    is_fiscal_year: Optional[bool] = None
 
 class TrustUpdate(BaseModel):
     name: Optional[str] = None
@@ -210,6 +215,11 @@ class TrustUpdate(BaseModel):
     start_date: Optional[str] = None
     trustees: Optional[str] = None
     authority_clause: Optional[str] = None
+    ein: Optional[str] = None
+    state_code: Optional[str] = None
+    tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
+    tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
+    is_fiscal_year: Optional[bool] = None
 
 class TrustResponse(BaseModel):
     trust_id: str
@@ -221,10 +231,16 @@ class TrustResponse(BaseModel):
     tax_status: Optional[str] = "private"
     created_at: str
     governance_score: int = 0
-    trustees: Optional[str] = None  # Now string instead of List
+    trustees: Optional[str] = None
     start_date: Optional[str] = None
     authority_clause: Optional[str] = None
     role: Optional[str] = "Trustee"
+    # Additional fields for tax and state compliance
+    ein: Optional[str] = None
+    state_code: Optional[str] = None
+    tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
+    tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
+    is_fiscal_year: Optional[bool] = None
 
 
 # ==================== ENTITY MODELS ====================
@@ -1064,6 +1080,111 @@ class AlertCountResponse(BaseModel):
     yellow_count: int
     by_entity: dict
     by_type: dict
+
+
+
+# ==================== TAX CALENDAR MODELS ====================
+
+class TaxDeadlineType(str, Enum):
+    federal_1041 = "federal_1041"
+    federal_1041_extension = "federal_1041_extension"
+    k1_beneficiaries = "k1_beneficiaries"
+    estimated_q1 = "estimated_q1"
+    estimated_q2 = "estimated_q2"
+    estimated_q3 = "estimated_q3"
+    estimated_q4 = "estimated_q4"
+    state_fiduciary = "state_fiduciary"
+    state_fiduciary_extension = "state_fiduciary_extension"
+
+class FilingStatus(str, Enum):
+    pending = "pending"
+    filed = "filed"
+    extended = "extended"
+    not_required = "not_required"
+
+class TaxCalendarEntryCreate(BaseModel):
+    tax_year: int
+    deadline_type: TaxDeadlineType
+    due_date: str
+    description: Optional[str] = None
+    notes: Optional[str] = None
+
+class TaxCalendarEntryUpdate(BaseModel):
+    due_date: Optional[str] = None
+    filing_status: Optional[FilingStatus] = None
+    filed_date: Optional[str] = None
+    notes: Optional[str] = None
+    accountant_engaged: Optional[bool] = None
+
+class TaxCalendarEntryResponse(BaseModel):
+    entry_id: str
+    trust_id: str
+    tax_year: int
+    deadline_type: str
+    due_date: str
+    filing_status: str = "pending"
+    filed_date: Optional[str] = None
+    description: Optional[str] = None
+    notes: Optional[str] = None
+    accountant_engaged: bool = False
+    days_remaining: Optional[int] = None
+    is_overdue: bool = False
+    created_at: str
+    updated_at: Optional[str] = None
+
+class TaxCalendarSummaryResponse(BaseModel):
+    trust_id: str
+    tax_year: int
+    total_entries: int
+    filed_count: int
+    pending_count: int
+    overdue_count: int
+    entries: List[TaxCalendarEntryResponse]
+
+class TrustTaxProfile(BaseModel):
+    """Trust profile fields for tax management"""
+    ein: Optional[str] = None
+    state_code: Optional[str] = None
+    tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
+    tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
+    is_fiscal_year: Optional[bool] = None
+
+
+# ==================== STATE COMPLIANCE MODELS ====================
+
+class StateComplianceProfile(BaseModel):
+    """Static seed data — state compliance rules"""
+    state_code: str
+    state_name: str
+    utc_adopted: Optional[str] = None
+    utc_adoption_date: Optional[str] = None
+    notice_required: bool = False
+    notice_timing_days: Optional[int] = None
+    accounting_frequency: Optional[str] = None
+    trustee_removal_standard: Optional[str] = None
+    spendthrift_default: bool = True
+
+class TrustStateCompliance(BaseModel):
+    """Per-trust state compliance tracking"""
+    trust_id: str
+    state_code: str
+    notice_last_sent: Optional[str] = None
+    notice_next_due: Optional[str] = None
+    accounting_last_sent: Optional[str] = None
+    accounting_next_due: Optional[str] = None
+    compliance_items: dict = {}
+    compliance_score: int = Field(100, ge=0, le=100)
+    alert_active: bool = False
+    alert_reason: Optional[str] = None
+    created_at: str
+    updated_at: Optional[str] = None
+
+class TrustStateComplianceUpdate(BaseModel):
+    notice_last_sent: Optional[str] = None
+    notice_next_due: Optional[str] = None
+    accounting_last_sent: Optional[str] = None
+    accounting_next_due: Optional[str] = None
+    compliance_items: Optional[dict] = None
 
 
 

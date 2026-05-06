@@ -34,6 +34,7 @@ import AuditTrailPage from "@/pages/AuditTrailPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
+import TaxCalendarPage from "@/pages/TaxCalendarPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -274,6 +275,11 @@ const AppRouter = () => {
       <Route path="/governance" element={
         <SubscriptionProtectedRoute>
           <GovernancePage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/tax-calendar" element={
+        <SubscriptionProtectedRoute>
+          <TaxCalendarPage />
         </SubscriptionProtectedRoute>
       } />
       {/* Settings and Billing are accessible without active subscription */}

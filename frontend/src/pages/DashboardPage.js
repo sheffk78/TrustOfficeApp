@@ -28,7 +28,9 @@ import {
   ChevronRight,
   Loader2,
   Info,
-  Bot
+  Bot,
+  CalendarDays,
+  Clock
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -93,6 +95,10 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   
+  // Tax Calendar dashboard state
+  const [taxDeadlines, setTaxDeadlines] = useState([]);
+  const [taxDeadlinesLoading, setTaxDeadlinesLoading] = useState(false);
+  
   // AI Suggestions state
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
@@ -117,6 +123,7 @@ export default function DashboardPage() {
     if (selectedTrust) {
       loadDashboardData();
       loadAiSuggestions();
+      loadTaxDeadlines();
     } else if (trusts.length === 0) {
       setLoading(false);
     }
@@ -142,6 +149,23 @@ export default function DashboardPage() {
       console.error('Failed to load dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load upcoming tax deadlines for dashboard widget
+  const loadTaxDeadlines = async () => {
+    if (!selectedTrust) return;
+    setTaxDeadlinesLoading(true);
+    try {
+      const response = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/tax-calendar/upcoming?days=90`);
+      if (response.ok) {
+        const data = await response.json();
+        setTaxDeadlines(data.upcoming || []);
+      }
+    } catch (error) {
+      console.error('Failed to load tax deadlines:', error);
+    } finally {
+      setTaxDeadlinesLoading(false);
     }
   };
 
@@ -645,6 +669,81 @@ export default function DashboardPage() {
                   }
                 </p>
               </div>
+
+              {/* Tax Calendar Widget */}
+              {selectedTrust && (
+                <div className="mb-8 card-trust corner-mark">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-navy/20 to-navy/10 flex items-center justify-center">
+                        <CalendarDays className="w-5 h-5 text-navy" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-lg text-navy">Tax Calendar</h3>
+                        <p className="text-sm text-muted-foreground">Upcoming filing deadlines</p>
+                      </div>
+                    </div>
+                    <Link 
+                      to="/tax-calendar" 
+                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                    >
+                      View All <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+
+                  {taxDeadlinesLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-navy mr-2" />
+                      <span className="text-sm text-muted-foreground">Loading deadlines...</span>
+                    </div>
+                  ) : taxDeadlines.length === 0 ? (
+                    <div className="p-6 bg-navy/5 border border-navy/10 text-center rounded">
+                      <p className="text-sm text-muted-foreground mb-3">No tax calendar generated yet.</p>
+                      <Link to="/tax-calendar">
+                        <Button size="sm" className="btn-secondary">
+                          <CalendarDays className="w-4 h-4 mr-2" />
+                          Set Up Tax Calendar
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {taxDeadlines.slice(0, 5).map((d) => {
+                        const overdue = d.is_overdue && d.filing_status === 'pending';
+                        return (
+                          <div key={d.entry_id} className={`flex items-center justify-between p-3 border ${overdue ? 'border-red-200 bg-red-50/50' : 'border-navy/10'} rounded`}>
+                            <div className="flex items-center gap-3">
+                              <div className="flex flex-col items-center min-w-[48px]">
+                                <div className="text-[10px] font-medium text-neutral-500 uppercase">{format(parseISO(d.due_date), 'MMM')}</div>
+                                <div className={`text-lg font-bold ${overdue ? 'text-red-600' : 'text-navy'}`}>{format(parseISO(d.due_date), 'd')}</div>
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm text-navy">{d.description}</p>
+                                {overdue ? (
+                                  <p className="text-xs text-red-600">Overdue by {Math.abs(d.days_remaining)} days</p>
+                                ) : d.days_remaining <= 30 ? (
+                                  <p className="text-xs text-amber-600">Due in {d.days_remaining} days</p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">Due {format(parseISO(d.due_date), 'MMMM d, yyyy')}</p>
+                                )}
+                              </div>
+                            </div>
+                            <span className={`font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded ${
+                              d.filing_status === 'filed' || d.filing_status === 'not_required' 
+                                ? 'bg-emerald-100 text-emerald-700' 
+                                : overdue 
+                                  ? 'bg-red-100 text-red-700' 
+                                  : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {d.filing_status === 'filed' ? 'Filed' : d.filing_status === 'not_required' ? 'N/A' : overdue ? 'Overdue' : 'Pending'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Top Row - Governance Score & Quick Actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
