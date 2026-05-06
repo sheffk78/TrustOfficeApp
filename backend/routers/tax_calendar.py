@@ -1,8 +1,9 @@
 # Tax Calendar router — Federal tax deadlines for trusts (calendar + fiscal year aware)
 from fastapi import APIRouter, HTTPException, Depends
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional
 import uuid
+import calendar
 
 from database import db
 from dependencies import get_current_user
@@ -15,8 +16,19 @@ router = APIRouter(tags=["tax_calendar"])
 
 
 # ==================== DEADLINE RULES ====================
+# Calendar year and Fiscal year use different offset strategies:
+#
 # Calendar year: fixed month/day
-# Fiscal year: offset in months from year-end, plus a fixed day
+# Fiscal year: offsets from year-end (for 1041/K1/extension) or from FY start (for estimated)
+#
+# IRS rules:
+#   1041:   3.5 months after year-end  → approx +4 months, day 15
+#   Ext:    6 months from original due  → +10 months, day 15
+#   K-1:    same as 1041              → +4 months, day 15
+#   Est Q1: 15th of 4th month  of FY  → FY start + 3 months, day 15
+#   Est Q2: 15th of 6th month  of FY  → FY start + 5 months, day 15
+#   Est Q3: 15th of 9th month  of FY  → FY start + 8 months, day 15
+#   Est Q4: 15th of 12th month of FY  → FY start + 11 months, day 15
 
 CALENDAR_RULES = [
     {"deadline_type": "federal_1041",          "month": 4,  "day": 15, "desc": "Form 1041 — Estate and Trust Income Tax Return"},
@@ -28,31 +40,46 @@ CALENDAR_RULES = [
     {"deadline_type": "estimated_q4",          "month": 1,  "day": 15, "desc": "Q4 Estimated tax payment (due following year)"},
 ]
 
-# Fiscal year: (months_after_year_end, day_of_month, description)
-# For a June 30 year-end: +4 months = October 15 for 1041
 FISCAL_RULES = [
+    # Non-estimated: offset in months from year-end
     {"deadline_type": "federal_1041",          "months_after": 4,  "day": 15, "desc": "Form 1041 — Estate and Trust Income Tax Return"},
     {"deadline_type": "federal_1041_extension","months_after": 10, "day": 15, "desc": "Form 1041 — Extended filing deadline"},
     {"deadline_type": "k1_beneficiaries",      "months_after": 4,  "day": 15, "desc": "Schedule K-1 — Beneficiary income allocations"},
-    # Estimated taxes are calendar-based regardless of fiscal year
-    {"deadline_type": "estimated_q1",          "month": 4,  "day": 15, "desc": "Q1 Estimated tax payment"},
-    {"deadline_type": "estimated_q2",          "month": 6,  "day": 15, "desc": "Q2 Estimated tax payment"},
-    {"deadline_type": "estimated_q3",          "month": 9,  "day": 15, "desc": "Q3 Estimated tax payment"},
-    {"deadline_type": "estimated_q4",          "month": 1,  "day": 15, "desc": "Q4 Estimated tax payment (due following year)"},
+    # Estimated taxes: fiscal month offsets from FY start
+    {"deadline_type": "estimated_q1",          "fy_month_offset": 3,  "day": 15, "desc": "Q1 Estimated tax payment"},
+    {"deadline_type": "estimated_q2",          "fy_month_offset": 5,  "day": 15, "desc": "Q2 Estimated tax payment"},
+    {"deadline_type": "estimated_q3",          "fy_month_offset": 8,  "day": 15, "desc": "Q3 Estimated tax payment"},
+    {"deadline_type": "estimated_q4",          "fy_month_offset": 11, "day": 15, "desc": "Q4 Estimated tax payment"},
 ]
 
 
-def _fiscal_due_date(year_end: date, months_after: int, day: int) -> date:
-    """Compute deadline: year_end + N months, then set to specified day."""
-    m = year_end.month + months_after
-    y = year_end.year
+def _clamp_day(year: int, month: int, day: int) -> int:
+    """Clamp day to the last valid day of the month (handles Feb, leap years)."""
+    last = calendar.monthrange(year, month)[1]
+    return min(day, last)
+
+
+def _fy_start(tax_year: int, fy_month: int, fy_day: int) -> date:
+    """First day of the fiscal year that ends in `tax_year`."""
+    # Year-end date (clamp day for leap year edge cases)
+    effective_day = _clamp_day(tax_year, fy_month, fy_day)
+    year_end = date(tax_year, fy_month, effective_day)
+    # FY starts the day after the PREVIOUS year-end
+    prev_year_end = year_end.replace(year=tax_year - 1)
+    return prev_year_end + timedelta(days=1)
+
+
+def _month_delta(base: date, months: int) -> date:
+    """Add/subtract months from a date, clamping to last day if needed."""
+    m = base.month + months
+    y = base.year
     while m > 12:
         m -= 12
         y += 1
-    # Clamp to valid day for that month
-    import calendar
-    last_day = calendar.monthrange(y, m)[1]
-    d = min(day, last_day)
+    while m < 1:
+        m += 12
+        y -= 1
+    d = _clamp_day(y, m, base.day)
     return date(y, m, d)
 
 
@@ -70,20 +97,22 @@ def _generate_entries(trust: dict, tax_year: int) -> list:
     
     is_fiscal = trust.get("is_fiscal_year") is True
     fy_month = trust.get("tax_year_end_month")
-    fy_day = trust.get("tax_year_end_day")
+    fy_day_raw = trust.get("tax_year_end_day")
     
-    if is_fiscal and fy_month and fy_day:
-        # Fiscal year: year_end is in the tax_year (e.g., June 30, 2026 for tax year 2026)
-        import calendar
-        last_day = calendar.monthrange(tax_year, fy_month)[1]
-        year_end = date(tax_year, fy_month, min(fy_day, last_day))
+    if is_fiscal and fy_month and fy_day_raw:
+        fy_day = _clamp_day(tax_year, fy_month, fy_day_raw)
+        year_end = date(tax_year, fy_month, fy_day)
+        fy_start = _fy_start(tax_year, fy_month, fy_day)
         
         for rule in FISCAL_RULES:
-            if "months_after" in rule:
-                due = _fiscal_due_date(year_end, rule["months_after"], rule["day"])
+            if "fy_month_offset" in rule:
+                # Estimated taxes: offset from fiscal year start
+                due = _month_delta(fy_start, rule["fy_month_offset"])
+                due = due.replace(day=_clamp_day(due.year, due.month, rule["day"]))
             else:
-                # Calendar-based estimated taxes
-                due = _calendar_due_date(tax_year, rule["month"], rule["day"])
+                # 1041, extension, K-1: offset from year-end
+                due = _month_delta(year_end, rule["months_after"])
+                due = due.replace(day=_clamp_day(due.year, due.month, rule["day"]))
             
             entries.append({
                 "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
@@ -122,19 +151,16 @@ def _generate_entries(trust: dict, tax_year: int) -> list:
 
 
 def _calendar_due_date(tax_year: int, month: int, day: int) -> date:
-    """Build ISO date string. Q4 estimated is in Jan of following year."""
+    """Calendar-year due date. Q4 estimated is in Jan of following year."""
     if month == 1 and day == 15:
-        due = date(tax_year + 1, month, day)
-    else:
-        due = date(tax_year, month, day)
-    return due
+        return date(tax_year + 1, month, day)
+    return date(tax_year, month, day)
 
 
 # ==================== API ENDPOINTS ====================
 
 @router.post("/trusts/{trust_id}/tax-calendar/generate")
 async def generate_tax_calendar(trust_id: str, request: dict, user: dict = Depends(get_current_user)):
-    """Auto-generate federal tax calendar entries for a tax year."""
     tax_year = request.get("tax_year")
     if not tax_year:
         raise HTTPException(status_code=400, detail="tax_year is required")
@@ -158,7 +184,6 @@ async def generate_tax_calendar(trust_id: str, request: dict, user: dict = Depen
 
 @router.get("/trusts/{trust_id}/tax-calendar", response_model=TaxCalendarSummaryResponse)
 async def get_tax_calendar(trust_id: str, tax_year: Optional[int] = None, user: dict = Depends(get_current_user)):
-    """Get tax calendar for a trust. If no tax_year, uses the current year."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
@@ -195,7 +220,6 @@ async def get_tax_calendar(trust_id: str, tax_year: Optional[int] = None, user: 
 
 @router.get("/trusts/{trust_id}/tax-calendar/upcoming")
 async def get_upcoming_deadlines(trust_id: str, days: int = 90, user: dict = Depends(get_current_user)):
-    """Get upcoming tax deadlines within N days."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
@@ -217,7 +241,6 @@ async def get_upcoming_deadlines(trust_id: str, days: int = 90, user: dict = Dep
 
 @router.patch("/tax-calendar/{entry_id}")
 async def update_tax_entry(entry_id: str, update: TaxCalendarEntryUpdate, user: dict = Depends(get_current_user)):
-    """Update a tax calendar entry — mark filed, add notes, etc."""
     entry = await db.tax_calendar.find_one({"entry_id": entry_id}, {"_id": 0})
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")

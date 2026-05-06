@@ -126,5 +126,12 @@ async def delete_trust(trust_id: str, user: dict = Depends(require_write_access)
     await db.compensation_plans.delete_many({"trust_id": trust_id})
     await db.compensation_payments.delete_many({"trust_id": trust_id})
     await db.health_score_snapshots.delete_many({"trust_id": trust_id})
+    await db.tax_calendar.delete_many({"trust_id": trust_id})
+    await db.trust_state_compliance.delete_many({"trust_id": trust_id})
+    await db.investments.delete_many({"trust_id": trust_id})
+    await db.transactions.delete_many({"trust_id": trust_id})
+    await db.communications.delete_many({"trust_id": trust_id})
+    await db.vault_documents.delete_many({"trust_id": trust_id})
+    await db.alerts.delete_many({"trust_id": trust_id})
     
     return {"message": "Trust deleted"}

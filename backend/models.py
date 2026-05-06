@@ -1,7 +1,9 @@
 # Shared Pydantic models and enums for TrustOffice API
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, model_validator
 from typing import List, Optional, Literal
 from enum import Enum
+import calendar
+import re
 
 
 # ==================== ENUMS ====================
@@ -198,13 +200,36 @@ class TrustCreate(BaseModel):
     jurisdiction: str = ""
     role: Optional[str] = "Trustee"
     start_date: Optional[str] = None
-    trustees: Optional[str] = None  # Comma-separated list
+    trustees: Optional[str] = None
     authority_clause: Optional[str] = None
     ein: Optional[str] = None
     state_code: Optional[str] = None
     tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
     tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
     is_fiscal_year: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def validate_tax_fields(self):
+        # Coerce state_code to uppercase if present
+        if self.state_code is not None:
+            self.state_code = self.state_code.upper()
+        # Validate EIN format
+        if self.ein is not None and self.ein:
+            cleaned = self.ein.replace("-", "")
+            if not re.match(r"^\d{9}$", cleaned):
+                raise ValueError("EIN must be 9 digits (format: XX-XXXXXXX)")
+            self.ein = f"{cleaned[:2]}-{cleaned[2:]}"
+        # Validate month/day coherence
+        if self.tax_year_end_month is not None and self.tax_year_end_day is not None:
+            max_day = calendar.monthrange(2024, self.tax_year_end_month)[1]
+            if self.tax_year_end_day > max_day:
+                raise ValueError(f"Invalid day {self.tax_year_end_day} for month {self.tax_year_end_month} (max {max_day})")
+        # Require month/day when fiscal year is set
+        if self.is_fiscal_year is True:
+            if self.tax_year_end_month is None or self.tax_year_end_day is None:
+                raise ValueError("tax_year_end_month and tax_year_end_day are required for fiscal year trusts")
+        return self
+
 
 class TrustUpdate(BaseModel):
     name: Optional[str] = None
@@ -220,6 +245,25 @@ class TrustUpdate(BaseModel):
     tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
     tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
     is_fiscal_year: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def validate_tax_fields(self):
+        if self.state_code is not None:
+            self.state_code = self.state_code.upper()
+        if self.ein is not None and self.ein:
+            cleaned = self.ein.replace("-", "")
+            if not re.match(r"^\d{9}$", cleaned):
+                raise ValueError("EIN must be 9 digits (format: XX-XXXXXXX)")
+            self.ein = f"{cleaned[:2]}-{cleaned[2:]}"
+        if self.tax_year_end_month is not None and self.tax_year_end_day is not None:
+            max_day = calendar.monthrange(2024, self.tax_year_end_month)[1]
+            if self.tax_year_end_day > max_day:
+                raise ValueError(f"Invalid day {self.tax_year_end_day} for month {self.tax_year_end_month} (max {max_day})")
+        if self.is_fiscal_year is True:
+            if self.tax_year_end_month is None or self.tax_year_end_day is None:
+                raise ValueError("tax_year_end_month and tax_year_end_day are required for fiscal year trusts")
+        return self
+
 
 class TrustResponse(BaseModel):
     trust_id: str
