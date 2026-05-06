@@ -19,6 +19,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { format, parseISO, subDays } from 'date-fns';
 
 export default function GovernancePage() {
@@ -435,11 +436,132 @@ export default function GovernancePage() {
                   </div>
                 </div>
               </div>
+              {/* Hidden Insights — Manually Restore */}
+              <div className="card-trust mt-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-serif text-xl text-navy">Hidden Recommendations</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Insights you've dismissed. Restore them to bring them back.
+                    </p>
+                  </div>
+                </div>
+                <HiddenInsightsPanel trustId={selectedTrust?.trust_id} />
+              </div>
             </>
           )}
         </div>
       </main>
       <MobileBottomNav />
+    </div>
+  );
+}
+
+// Sub-component: Hidden Insights Panel (self-contained)
+function HiddenInsightsPanel({ trustId }) {
+  const [dismissed, setDismissed] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (trustId) loadDismissed();
+  }, [trustId]);
+
+  const loadDismissed = async () => {
+    setLoading(true);
+    try {
+      const response = await fetchWithAuth(`/insights/dismissed?trust_id=${trustId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDismissed(data.dismissed_insights || []);
+      }
+    } catch (error) {
+      console.error('Failed to load dismissed insights:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const restoreInsight = async (criterionName) => {
+    try {
+      const response = await fetchWithAuth('/insights/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trust_id: trustId, criterion_name: criterionName })
+      });
+      if (response.ok) {
+        toast.success(`${criterionName} restored`);
+        setDismissed(prev => prev.filter(d => d.criterion_name !== criterionName));
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to restore');
+      }
+    } catch (error) {
+      console.error('Failed to restore insight:', error);
+      toast.error('Failed to restore recommendation');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <RefreshCw className="w-5 h-5 animate-spin text-gold mr-2" />
+        <span className="text-sm text-muted-foreground">Loading hidden recommendations...</span>
+      </div>
+    );
+  }
+
+  if (dismissed.length === 0) {
+    return (
+      <div className="p-4 bg-success/10 border border-success/20 text-center">
+        <p className="text-sm text-success">
+          No hidden recommendations. Everything is visible.
+        </p>
+      </div>
+    );
+  }
+
+  const INSIGHT_ICONS = {
+    'Quarterly Minutes': FileText,
+    'Task Compliance': Calendar,
+    'Compensation Alignment': Wallet,
+    'Distribution Documentation': DollarSign,
+    'Annual Review': TrendingUp
+  };
+
+  return (
+    <div className="space-y-3">
+      {dismissed.map((item, index) => {
+        const Icon = INSIGHT_ICONS[item.criterion_name] || Shield;
+        return (
+          <div
+            key={index}
+            className="flex items-center justify-between p-4 border border-navy/10 bg-navy/5"
+            data-testid={`hidden-insight-${index}`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-navy/10 flex items-center justify-center">
+                <Icon className="w-4 h-4 text-navy" />
+              </div>
+              <div>
+                <p className="font-medium text-sm text-navy">{item.criterion_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  Dismissed {format(parseISO(item.dismissed_at), 'MMM d, yyyy')}
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => restoreInsight(item.criterion_name)}
+              size="sm"
+              variant="outline"
+              className="btn-secondary"
+              data-testid={`restore-insight-${index}`}
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Restore
+            </Button>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -296,6 +296,16 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += alert_points
     
+    # Auto-clear dismissals for criteria that are now achieved
+    # (Natural restore when user completes the action)
+    achieved_names = [c.name for c in criteria if c.achieved]
+    if achieved_names:
+        await db.dismissed_insights.delete_many({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "criterion_name": {"$in": achieved_names}
+        })
+    
     # Determine color
     if total_score >= 80:
         color = HealthColor.green
