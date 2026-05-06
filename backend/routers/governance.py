@@ -13,7 +13,8 @@ from dependencies import (
 from models import (
     HealthScoreResponse, HealthScoreCriterion, HealthColor,
     OnboardingState, GovernanceInsight, DashboardStats,
-    DashboardResponse, DashboardSubscriptionState
+    DashboardResponse, DashboardSubscriptionState,
+    DismissedInsightCreate, DismissedInsightResponse
 )
 
 router = APIRouter(tags=["governance"])
@@ -715,7 +716,15 @@ async def get_dashboard(
     
     stats = await get_dashboard_stats(trust_id, user_id)
     
+    # Filter out dismissed insights for this trust
+    dismissed = await db.dismissed_insights.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "criterion_name": 1}
+    ).to_list(1000)
+    dismissed_names = {d["criterion_name"] for d in dismissed}
+    
     governance_insights = generate_governance_insights(health_data["criteria"])
+    governance_insights = [i for i in governance_insights if i.criterion_name not in dismissed_names]
     
     sub_state = await get_subscription_state(user_id)
     subscription = DashboardSubscriptionState(
@@ -737,3 +746,100 @@ async def get_dashboard(
         governance_insights=governance_insights,
         subscription=subscription
     )
+
+
+# ==================== DISMISS INSIGHT ENDPOINT ====================
+
+@router.post("/insights/dismiss")
+async def dismiss_insight(
+    req: DismissedInsightCreate,
+    user: dict = Depends(get_current_user)
+):
+    """Dismiss a governance insight so it no longer appears on the dashboard"""
+    trust_id = req.trust_id
+    criterion_name = req.criterion_name
+    user_id = user["user_id"]
+    
+    # Verify trust ownership
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    dismiss_id = f"dismiss_{uuid.uuid4().hex[:12]}"
+    
+    # Upsert dismissal (idempotent)
+    await db.dismissed_insights.update_one(
+        {"trust_id": trust_id, "criterion_name": criterion_name, "user_id": user_id},
+        {
+            "$setOnInsert": {
+                "dismiss_id": dismiss_id,
+                "user_id": user_id,
+                "trust_id": trust_id,
+                "criterion_name": criterion_name,
+                "dismissed_at": now
+            }
+        },
+        upsert=True
+    )
+    
+    return {
+        "message": f"Insight '{criterion_name}' dismissed",
+        "criterion_name": criterion_name,
+        "dismissed": True
+    }
+
+
+@router.get("/insights/dismissed")
+async def get_dismissed_insights(
+    trust_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get list of dismissed insights for a trust"""
+    user_id = user["user_id"]
+    
+    if trust_id:
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"_id": 0}
+        )
+        if not trust:
+            raise HTTPException(status_code=404, detail="Trust not found")
+    
+    query = {"user_id": user_id}
+    if trust_id:
+        query["trust_id"] = trust_id
+    
+    dismissed = await db.dismissed_insights.find(
+        query,
+        {"_id": 0}
+    ).to_list(1000)
+    
+    return {"dismissed_insights": dismissed}
+
+
+@router.post("/insights/restore")
+async def restore_insight(
+    req: DismissedInsightCreate,
+    user: dict = Depends(get_current_user)
+):
+    """Restore a previously dismissed governance insight"""
+    trust_id = req.trust_id
+    criterion_name = req.criterion_name
+    user_id = user["user_id"]
+    
+    result = await db.dismissed_insights.delete_one(
+        {"trust_id": trust_id, "criterion_name": criterion_name, "user_id": user_id}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Dismissed insight not found")
+    
+    return {
+        "message": f"Insight '{criterion_name}' restored",
+        "criterion_name": criterion_name,
+        "restored": True
+    }

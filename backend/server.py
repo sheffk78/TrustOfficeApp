@@ -345,6 +345,10 @@ async def startup_event():
         await db.health_score_snapshots.create_index([("trust_id", 1), ("calculated_at", -1)])
         await db.health_score_snapshots.create_index("snapshot_id", unique=True)
         
+        # Dismissed insights indexes
+        await db.dismissed_insights.create_index([("trust_id", 1), ("user_id", 1)])
+        await db.dismissed_insights.create_index([("trust_id", 1), ("criterion_name", 1)], unique=True)
+        
         # Session indexes with TTL
         await db.user_sessions.create_index("session_token", unique=True)
         await db.user_sessions.create_index("user_id")

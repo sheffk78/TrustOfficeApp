@@ -1,0 +1,70 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 0; }
+  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+  .header { background-color: #010079; padding: 30px; text-align: center; }
+  .header h1 { color: #D5AD36; margin: 0; font-size: 24px; }
+  .header p { color: #ffffff; margin: 10px 0 0 0; font-size: 14px; }
+  .content { padding: 30px; background-color: #ffffff; }
+  .content h2 { color: #010079; margin-top: 0; }
+  .button { display: inline-block; background-color: #010079; color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: bold; margin: 20px 0; }
+  .button:hover { background-color: #0100a0; }
+  .footer { background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666; }
+  .task-card { background-color: #f9f9f9; border-left: 4px solid #D5AD36; padding: 15px; margin: 15px 0; }
+  .task-card h3 { margin: 0 0 10px 0; color: #010079; }
+  .task-card p { margin: 5px 0; }
+  .alert { background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin: 15px 0; }
+  .success { background-color: #d4edda; border: 1px solid #28a745; padding: 15px; margin: 15px 0; }
+  .label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+  .value { font-size: 16px; color: #010079; font-weight: bold; }
+</style>
+
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>TrustOffice</h1>
+      <p>Trust Governance Workspace</p>
+    </div>
+    <div class="content">
+      
+            <h2>Subscription Canceled</h2>
+            <p>Hi {{user_name}},</p>
+            <p>We're sorry to see you go. Your TrustOffice subscription has been set to cancel.</p>
+            
+            <div class="alert">
+              <strong>Access Until:</strong> {{access_until}}<br>
+              You'll retain full access to TrustOffice until this date.
+            </div>
+            
+            <h3>What happens next:</h3>
+            <ul>
+              <li>Your data will be safely retained for 90 days after cancellation</li>
+              <li>You can resubscribe at any time to regain access</li>
+              <li>Download your data before your access expires</li>
+            </ul>
+            
+            <p><strong>Changed your mind?</strong> You can reactivate your subscription at any time before {{access_until}}.</p>
+            
+            <p style="text-align: center;">
+              <a href="https://app.trustoffice.app/settings/billing" class="button">Manage Subscription</a>
+            </p>
+            
+            <p>We'd love to hear your feedback. Reply to this email to let us know how we can improve.</p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        
+    </div>
+    <div class="footer">
+      <p>© 2026 TrustOffice. All rights reserved.</p>
+      <p>This is an automated message from your trust governance system.</p>
+    </div>
+  </div>
+</body>
+</html>
