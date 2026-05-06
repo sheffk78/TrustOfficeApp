@@ -25,6 +25,7 @@ import {
   ArrowUpDown,
   TrendingUp,
   MessageSquare,
+  FolderOpen,
   Clock
 } from 'lucide-react';
 import {
@@ -50,6 +51,7 @@ const navItems = [
   { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
   { path: '/beneficiaries', icon: Users, label: 'Beneficiaries', group: 'Structures' },
   { path: '/communications', icon: MessageSquare, label: 'Communications', group: 'Structures' },  
+  { path: '/vault', icon: FolderOpen, label: 'Vault', group: 'Structures' },
   { path: '/governance', icon: Shield, label: 'Defensibility Score' },
   { path: '/tax-calendar', icon: CalendarDays, label: 'Tax Calendar', group: 'Governance' },
   { path: '/state-compliance', icon: Shield, label: 'State Compliance', group: 'Structures' },

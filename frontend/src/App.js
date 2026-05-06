@@ -38,6 +38,7 @@ import TaxCalendarPage from "@/pages/TaxCalendarPage";
 import StateCompliancePage from "@/pages/StateCompliancePage";
 import InvestmentsPage from "@/pages/InvestmentsPage";
 import CommunicationsPage from "@/pages/CommunicationsPage";
+import VaultPage from "@/pages/VaultPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -298,6 +299,11 @@ const AppRouter = () => {
       <Route path="/communications" element={
         <SubscriptionProtectedRoute>
           <CommunicationsPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/vault" element={
+        <SubscriptionProtectedRoute>
+          <VaultPage />
         </SubscriptionProtectedRoute>
       } />
       {/* Settings and Billing are accessible without active subscription */}
