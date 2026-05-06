@@ -71,6 +71,7 @@ from routers.transactions import router as transactions_router
 from routers.alerts import router as alerts_router
 from routers.audit_defense import router as audit_defense_router
 from routers.tax_calendar import router as tax_calendar_router
+from routers.state_compliance import router as state_compliance_router
 
 # Import security middleware
 from security import (
@@ -278,6 +279,7 @@ app.include_router(transactions_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
 app.include_router(audit_defense_router, prefix="/api")
 app.include_router(tax_calendar_router, prefix="/api")
+app.include_router(state_compliance_router, prefix="/api")
 
 
 # ==================== HEALTH CHECK ====================
