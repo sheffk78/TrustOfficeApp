@@ -143,7 +143,7 @@ export default function GovernancePage() {
           {/* Page Header */}
           <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="page-title">Defensibility Score</h1>
+              <h1 className="page-title">Trust Health</h1>
               <p className="page-subtitle">
                 {selectedTrust?.name || 'Select a trust'} • 7-Criteria Assessment
               </p>

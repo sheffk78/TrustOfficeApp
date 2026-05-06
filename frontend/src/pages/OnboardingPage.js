@@ -93,7 +93,7 @@ const FEATURES = [
   },
   {
     icon: Shield,
-    title: 'Defensibility Score',
+    title: 'Trust Health',
     description: 'Monitor your trust administration with a governance score. Get alerts for overdue reviews and compliance tasks.',
     color: 'navy'
   },
@@ -130,8 +130,8 @@ export default function OnboardingPage() {
     description: '',
     ein: '',
     state_code: '',
-    tax_year_end_month: '',
-    tax_year_end_day: '',
+    tax_year_end_month: '12',
+    tax_year_end_day: '31',
     is_fiscal_year: false
   });
 
@@ -616,16 +616,68 @@ export default function OnboardingPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="label-trust text-xs">State (2-letter code)</Label>
-                    <Input
-                      type="text"
-                      value={trustData.state_code}
-                      onChange={(e) => setTrustData({ ...trustData, state_code: e.target.value.toUpperCase() })}
-                      className="mt-1 input-trust h-9 text-sm"
-                      placeholder="DE, CA, TX..."
-                      maxLength={2}
-                      data-testid="state-code-input"
-                    />
+                    <Label className="label-trust text-xs">State</Label>
+                    <Select 
+                      value={trustData.state_code} 
+                      onValueChange={(v) => setTrustData({ ...trustData, state_code: v })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust h-9 text-sm" data-testid="state-code-select">
+                        <SelectValue placeholder="Select state..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        <SelectItem value="AL">Alabama</SelectItem>
+                        <SelectItem value="AK">Alaska</SelectItem>
+                        <SelectItem value="AZ">Arizona</SelectItem>
+                        <SelectItem value="AR">Arkansas</SelectItem>
+                        <SelectItem value="CA">California</SelectItem>
+                        <SelectItem value="CO">Colorado</SelectItem>
+                        <SelectItem value="CT">Connecticut</SelectItem>
+                        <SelectItem value="DE">Delaware</SelectItem>
+                        <SelectItem value="FL">Florida</SelectItem>
+                        <SelectItem value="GA">Georgia</SelectItem>
+                        <SelectItem value="HI">Hawaii</SelectItem>
+                        <SelectItem value="ID">Idaho</SelectItem>
+                        <SelectItem value="IL">Illinois</SelectItem>
+                        <SelectItem value="IN">Indiana</SelectItem>
+                        <SelectItem value="IA">Iowa</SelectItem>
+                        <SelectItem value="KS">Kansas</SelectItem>
+                        <SelectItem value="KY">Kentucky</SelectItem>
+                        <SelectItem value="LA">Louisiana</SelectItem>
+                        <SelectItem value="ME">Maine</SelectItem>
+                        <SelectItem value="MD">Maryland</SelectItem>
+                        <SelectItem value="MA">Massachusetts</SelectItem>
+                        <SelectItem value="MI">Michigan</SelectItem>
+                        <SelectItem value="MN">Minnesota</SelectItem>
+                        <SelectItem value="MS">Mississippi</SelectItem>
+                        <SelectItem value="MO">Missouri</SelectItem>
+                        <SelectItem value="MT">Montana</SelectItem>
+                        <SelectItem value="NE">Nebraska</SelectItem>
+                        <SelectItem value="NV">Nevada</SelectItem>
+                        <SelectItem value="NH">New Hampshire</SelectItem>
+                        <SelectItem value="NJ">New Jersey</SelectItem>
+                        <SelectItem value="NM">New Mexico</SelectItem>
+                        <SelectItem value="NY">New York</SelectItem>
+                        <SelectItem value="NC">North Carolina</SelectItem>
+                        <SelectItem value="ND">North Dakota</SelectItem>
+                        <SelectItem value="OH">Ohio</SelectItem>
+                        <SelectItem value="OK">Oklahoma</SelectItem>
+                        <SelectItem value="OR">Oregon</SelectItem>
+                        <SelectItem value="PA">Pennsylvania</SelectItem>
+                        <SelectItem value="RI">Rhode Island</SelectItem>
+                        <SelectItem value="SC">South Carolina</SelectItem>
+                        <SelectItem value="SD">South Dakota</SelectItem>
+                        <SelectItem value="TN">Tennessee</SelectItem>
+                        <SelectItem value="TX">Texas</SelectItem>
+                        <SelectItem value="UT">Utah</SelectItem>
+                        <SelectItem value="VT">Vermont</SelectItem>
+                        <SelectItem value="VA">Virginia</SelectItem>
+                        <SelectItem value="WA">Washington</SelectItem>
+                        <SelectItem value="WV">West Virginia</SelectItem>
+                        <SelectItem value="WI">Wisconsin</SelectItem>
+                        <SelectItem value="WY">Wyoming</SelectItem>
+                        <SelectItem value="DC">District of Columbia</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

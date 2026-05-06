@@ -173,9 +173,14 @@ export default function TaxCalendarPage() {
                 value={year}
                 onChange={e => setYear(Number(e.target.value))}
                 className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+                aria-label="Tax year"
               >
                 {[year - 1, year, year + 1].map(y => (
-                  <option key={y} value={y}>{y}</option>
+                  <option key={y} value={y}>
+                    {trustProfile.isFiscalYear
+                      ? `FY ${y} (ends ${trustProfile.taxYearEndMonth}/${trustProfile.taxYearEndDay})`
+                      : `Calendar Year ${y}`}
+                  </option>
                 ))}
               </select>
               {summary?.total_entries === 0 ? (

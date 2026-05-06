@@ -54,18 +54,20 @@ const NAV_GROUPS = [
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
     { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', requiresBenevolence: true },
   ]},
-  { key: 'trust', icon: Layers, label: 'Trust', items: [
+  { key: 'structure', icon: Building2, label: 'Structure', items: [
     { path: '/structures', icon: Building2, label: 'Structures' },
     { path: '/schedule-a', icon: Package, label: 'Schedule A' },
     { path: '/beneficiaries', icon: Users, label: 'Beneficiaries' },
     { path: '/communications', icon: MessageSquare, label: 'Communications' },
     { path: '/vault', icon: FolderOpen, label: 'Vault' },
+  ]},
+  { key: 'compliance', icon: Shield, label: 'Compliance', items: [
     { path: '/risk', icon: Activity, label: 'Risk Dashboard' },
     { path: '/state-compliance', icon: Shield, label: 'State Compliance' },
     { path: '/authority', icon: Shield, label: 'Authority' },
     { path: '/audit-trail', icon: FileText, label: 'Audit Trail' },
   ]},
-  { key: 'score', icon: Shield, label: 'Defensibility Score', items: [] },
+  { key: 'score', icon: Shield, label: 'Trust Health', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
 
@@ -222,6 +224,7 @@ export const Sidebar = () => {
                   onClick={() => toggleGroup(group.key)}
                   className={`sidebar-item w-full justify-between ${hasActiveChild ? 'text-gold' : ''}`}
                   data-testid={`nav-group-${group.key}`}
+                  aria-expanded={isExpanded}
                 >
                   <div className="flex items-center gap-3">
                     <GroupIcon className="w-5 h-5" />

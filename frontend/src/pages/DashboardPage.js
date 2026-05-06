@@ -410,7 +410,7 @@ export default function DashboardPage() {
             <Info className="w-4 h-4 text-navy flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm text-navy">
-                We renamed <strong>Governance Health</strong> to <strong>Defensibility Score</strong>. Same score, clearer name — it tracks how well your records would hold up if anyone ever asked.
+                We renamed <strong>Governance Health</strong> to <strong>Trust Health</strong>. Same score, clearer name — it tracks how well your records would hold up if anyone ever asked.
               </p>
             </div>
           </div>
@@ -751,7 +751,7 @@ export default function DashboardPage() {
                 <div className="lg:col-span-2 card-trust corner-mark">
                   <div className="flex items-start justify-between mb-6">
                     <div>
-                      <p className="label-trust mb-1">Defensibility Score</p>
+                      <p className="label-trust mb-1">Trust Health</p>
                       <h2 className="font-serif text-2xl text-navy">{dashboard?.trust_name || selectedTrust?.name}</h2>
                     </div>
                     <Link 
