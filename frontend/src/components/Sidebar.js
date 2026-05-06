@@ -27,7 +27,9 @@ import {
   MessageSquare,
   FolderOpen,
   Clock,
-  Activity
+  Activity,
+  ChevronRight,
+  Layers
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -37,29 +39,38 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { HeartHandshake } from 'lucide-react';
 
-const navItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/calendar', icon: Calendar, label: 'Calendar', group: 'Governance' },
-  { path: '/minutes', icon: FileText, label: 'Minutes', group: 'Governance' },
-  { path: '/guided-minutes', icon: Sparkles, label: 'Guided Minutes', group: 'Governance', badge: 'beta' },
-  { path: '/retroactive-minutes', icon: Clock, label: 'Retro Minutes', group: 'Governance', badge: 'new' },
-  { path: '/distributions', icon: DollarSign, label: 'Distributions', group: 'Money' },
-  { path: '/compensation', icon: Wallet, label: 'Compensation', group: 'Money' },
-  { path: '/investments', icon: TrendingUp, label: 'Investments', group: 'Money' },
-  { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', group: 'Money', requiresBenevolence: true },
-  { path: '/structures', icon: Building2, label: 'Structures', group: 'Structures' },
-  { path: '/schedule-a', icon: Package, label: 'Schedule A', group: 'Structures' },
-  { path: '/beneficiaries', icon: Users, label: 'Beneficiaries', group: 'Structures' },
-  { path: '/communications', icon: MessageSquare, label: 'Communications', group: 'Structures' },  
-  { path: '/vault', icon: FolderOpen, label: 'Vault', group: 'Structures' },
-  { path: '/risk', icon: Activity, label: 'Risk Dashboard', group: 'Structures' },
-  { path: '/governance', icon: Shield, label: 'Defensibility Score' },
-  { path: '/tax-calendar', icon: CalendarDays, label: 'Tax Calendar', group: 'Governance' },
-  { path: '/state-compliance', icon: Shield, label: 'State Compliance', group: 'Structures' },
-  { path: '/authority', icon: Shield, label: 'Authority', group: 'Structures' },
-  { path: '/audit-trail', icon: FileText, label: 'Audit Trail', group: 'Structures' },
-  { path: '/settings', icon: Settings, label: 'Settings' },
+const NAV_GROUPS = [
+  { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', items: [] },
+  { key: 'governance', icon: FileText, label: 'Governance', items: [
+    { path: '/calendar', icon: Calendar, label: 'Calendar' },
+    { path: '/minutes', icon: FileText, label: 'Minutes' },
+    { path: '/guided-minutes', icon: Sparkles, label: 'Guided Minutes', badge: 'beta' },
+    { path: '/retroactive-minutes', icon: Clock, label: 'Retro Minutes', badge: 'new' },
+    { path: '/tax-calendar', icon: CalendarDays, label: 'Tax Calendar' },
+  ]},
+  { key: 'money', icon: DollarSign, label: 'Money', items: [
+    { path: '/distributions', icon: DollarSign, label: 'Distributions' },
+    { path: '/compensation', icon: Wallet, label: 'Compensation' },
+    { path: '/investments', icon: TrendingUp, label: 'Investments' },
+    { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', requiresBenevolence: true },
+  ]},
+  { key: 'trust', icon: Layers, label: 'Trust', items: [
+    { path: '/structures', icon: Building2, label: 'Structures' },
+    { path: '/schedule-a', icon: Package, label: 'Schedule A' },
+    { path: '/beneficiaries', icon: Users, label: 'Beneficiaries' },
+    { path: '/communications', icon: MessageSquare, label: 'Communications' },
+    { path: '/vault', icon: FolderOpen, label: 'Vault' },
+    { path: '/risk', icon: Activity, label: 'Risk Dashboard' },
+    { path: '/state-compliance', icon: Shield, label: 'State Compliance' },
+    { path: '/authority', icon: Shield, label: 'Authority' },
+    { path: '/audit-trail', icon: FileText, label: 'Audit Trail' },
+  ]},
+  { key: 'score', icon: Shield, label: 'Defensibility Score', items: [] },
+  { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
+
+// Flat list for easy lookup
+const ALL_ITEMS = NAV_GROUPS.flatMap(g => g.items);
 
 export const Sidebar = () => {
   const location = useLocation();
@@ -67,7 +78,26 @@ export const Sidebar = () => {
   const { user, trusts, selectedTrust, setSelectedTrust, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   
-  // Check if user is admin - use user.is_admin from auth context, or check email as fallback
+  // Determine which group should be expanded based on current route
+  const activeGroup = NAV_GROUPS.find(g => 
+    g.items.some(item => 
+      location.pathname === item.path || 
+      (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
+      (item.path === '/structures' && location.pathname.startsWith('/structures')) ||
+      (item.path === '/structures' && location.pathname.startsWith('/entities'))
+    )
+  )?.key || null;
+  
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const initial = {};
+    if (activeGroup) initial[activeGroup] = true;
+    return initial;
+  });
+
+  const toggleGroup = (key) => {
+    setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+  
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
 
   const handleLogout = async () => {
@@ -152,34 +182,90 @@ export const Sidebar = () => {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 overflow-y-auto">
-          {navItems
-            .filter(item => !item.requiresBenevolence || selectedTrust?.benevolence_enabled)
-            .map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path || 
-              (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
-              (item.path === '/guided-minutes' && location.pathname === '/guided-minutes') ||
-              (item.path === '/structures' && location.pathname.startsWith('/structures')) ||
-              (item.path === '/structures' && location.pathname.startsWith('/entities'));
+          {NAV_GROUPS.map((group) => {
+            const GroupIcon = group.icon;
+            const isExpanded = expandedGroups[group.key];
+            
+            // Single-item groups (Dashboard, Score, Settings) render directly
+            if (group.items.length === 0) {
+              const path = group.key === 'dashboard' ? '/dashboard' 
+                : group.key === 'score' ? '/governance' 
+                : '/settings';
+              const isActive = location.pathname === path;
+              
+              return (
+                <Link
+                  key={group.key}
+                  to={path}
+                  className={`sidebar-item ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                  data-testid={`nav-${group.key}`}
+                >
+                  <GroupIcon className="w-5 h-5" />
+                  <span>{group.label}</span>
+                </Link>
+              );
+            }
+            
+            // Grouped items with accordion
+            const hasActiveChild = group.items.some(item => {
+              if (item.requiresBenevolence && !selectedTrust?.benevolence_enabled) return false;
+              return location.pathname === item.path || 
+                (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
+                (item.path === '/structures' && location.pathname.startsWith('/structures')) ||
+                (item.path === '/structures' && location.pathname.startsWith('/entities'));
+            });
             
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`sidebar-item ${isActive ? 'active' : ''}`}
-                onClick={() => setMobileOpen(false)}
-                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="flex items-center gap-2">
-                  {item.label}
-                  {item.badge && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
-                      {item.badge}
-                    </span>
-                  )}
-                </span>
-              </Link>
+              <div key={group.key} className="mb-1">
+                <button
+                  onClick={() => toggleGroup(group.key)}
+                  className={`sidebar-item w-full justify-between ${hasActiveChild ? 'text-gold' : ''}`}
+                  data-testid={`nav-group-${group.key}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <GroupIcon className="w-5 h-5" />
+                    <span>{group.label}</span>
+                  </div>
+                  <ChevronRight 
+                    className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+                  />
+                </button>
+                
+                {isExpanded && (
+                  <div className="ml-4 border-l border-white/10">
+                    {group.items
+                      .filter(item => !item.requiresBenevolence || selectedTrust?.benevolence_enabled)
+                      .map((item) => {
+                        const ItemIcon = item.icon;
+                        const isActive = location.pathname === item.path || 
+                          (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
+                          (item.path === '/structures' && location.pathname.startsWith('/structures')) ||
+                          (item.path === '/structures' && location.pathname.startsWith('/entities'));
+                        
+                        return (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`sidebar-item pl-6 py-2 ${isActive ? 'active' : ''}`}
+                            onClick={() => setMobileOpen(false)}
+                            data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            <ItemIcon className="w-4 h-4" />
+                            <span className="flex items-center gap-2">
+                              {item.label}
+                              {item.badge && (
+                                <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
             );
           })}
           
