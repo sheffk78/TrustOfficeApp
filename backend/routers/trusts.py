@@ -48,6 +48,11 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
         "start_date": trust.start_date,
         "trustees": trust.trustees,
         "authority_clause": trust.authority_clause,
+        "ein": trust.ein,
+        "state_code": trust.state_code,
+        "tax_year_end_month": trust.tax_year_end_month,
+        "tax_year_end_day": trust.tax_year_end_day,
+        "is_fiscal_year": trust.is_fiscal_year,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     

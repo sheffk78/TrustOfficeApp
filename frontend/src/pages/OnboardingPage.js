@@ -27,6 +27,7 @@ import {
   CreditCard,
   Clock
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -126,7 +127,12 @@ export default function OnboardingPage() {
     jurisdiction: '',
     role: 'Trustee',
     review_cadence: 'quarterly',
-    description: ''
+    description: '',
+    ein: '',
+    state_code: '',
+    tax_year_end_month: '',
+    tax_year_end_day: '',
+    is_fiscal_year: false
   });
 
   const getToken = () => localStorage.getItem('auth_token');
@@ -610,15 +616,76 @@ export default function OnboardingPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="label-trust text-xs">Jurisdiction</Label>
+                    <Label className="label-trust text-xs">State (2-letter code)</Label>
                     <Input
                       type="text"
-                      value={trustData.jurisdiction}
-                      onChange={(e) => setTrustData({ ...trustData, jurisdiction: e.target.value })}
+                      value={trustData.state_code}
+                      onChange={(e) => setTrustData({ ...trustData, state_code: e.target.value.toUpperCase() })}
                       className="mt-1 input-trust h-9 text-sm"
-                      placeholder="e.g., Delaware"
-                      data-testid="jurisdiction-input"
+                      placeholder="DE, CA, TX..."
+                      maxLength={2}
+                      data-testid="state-code-input"
                     />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-4 gap-3 mb-4">
+                  <div>
+                    <Label className="label-trust text-xs">EIN (optional)</Label>
+                    <Input
+                      type="text"
+                      value={trustData.ein}
+                      onChange={(e) => setTrustData({ ...trustData, ein: e.target.value })}
+                      className="mt-1 input-trust h-9 text-sm"
+                      placeholder="XX-XXXXXXX"
+                      data-testid="ein-input"
+                    />
+                  </div>
+                  <div>
+                    <Label className="label-trust text-xs">Tax Year End — Month</Label>
+                    <Select 
+                      value={trustData.tax_year_end_month} 
+                      onValueChange={(v) => setTrustData({ ...trustData, tax_year_end_month: v })}
+                    >
+                      <SelectTrigger className="mt-1 input-trust h-9 text-sm">
+                        <SelectValue placeholder="Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="12">December (Calendar)</SelectItem>
+                        <SelectItem value="1">January</SelectItem>
+                        <SelectItem value="2">February</SelectItem>
+                        <SelectItem value="3">March</SelectItem>
+                        <SelectItem value="4">April</SelectItem>
+                        <SelectItem value="5">May</SelectItem>
+                        <SelectItem value="6">June</SelectItem>
+                        <SelectItem value="7">July</SelectItem>
+                        <SelectItem value="8">August</SelectItem>
+                        <SelectItem value="9">September</SelectItem>
+                        <SelectItem value="10">October</SelectItem>
+                        <SelectItem value="11">November</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="label-trust text-xs">Day</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={trustData.tax_year_end_day}
+                      onChange={(e) => setTrustData({ ...trustData, tax_year_end_day: e.target.value })}
+                      className="mt-1 input-trust h-9 text-sm"
+                      placeholder="31"
+                      data-testid="tax-day-input"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-5">
+                    <Switch
+                      checked={trustData.is_fiscal_year}
+                      onCheckedChange={(checked) => setTrustData({ ...trustData, is_fiscal_year: checked })}
+                      data-testid="fiscal-year-toggle"
+                    />
+                    <Label className="label-trust text-xs cursor-pointer">Fiscal Year</Label>
                   </div>
                 </div>
 
