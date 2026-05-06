@@ -67,8 +67,8 @@ export default function CommunicationsPage() {
       if (search) params.append('search', search);
 
       const [commRes, sumRes] = await Promise.all([
-        fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/communications?${params.toString()}`),
-        fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/communications/summary`),
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/communications?${params.toString()}`),
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/communications/summary`),
       ]);
       const cData = await commRes.json();
       if (commRes.ok) setCommunications(cData.communications || []);
@@ -84,7 +84,7 @@ export default function CommunicationsPage() {
 
   const createCommunication = async () => {
     try {
-      const res = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/communications`, {
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/communications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -102,7 +102,7 @@ export default function CommunicationsPage() {
 
   const completeAction = async (id) => {
     try {
-      await fetchWithAuth(`/api/communications/${id}`, {
+      await fetchWithAuth(`/communications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action_completed: true }),

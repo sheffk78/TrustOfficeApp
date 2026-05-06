@@ -60,8 +60,8 @@ export default function InvestmentsPage() {
     setLoading(true);
     try {
       const [invRes, sumRes] = await Promise.all([
-        fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/investments`),
-        fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/investments/summary`),
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/investments`),
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/investments/summary`),
       ]);
       const invData = await invRes.json();
       if (invRes.ok) {
@@ -86,7 +86,7 @@ export default function InvestmentsPage() {
 
   const createInvestment = async () => {
     try {
-      const res = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/investments`, {
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/investments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -109,7 +109,7 @@ export default function InvestmentsPage() {
 
   const deleteInvestment = async (id) => {
     try {
-      const res = await fetchWithAuth(`/api/investments/${id}`, {
+      const res = await fetchWithAuth(`/investments/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: false }),

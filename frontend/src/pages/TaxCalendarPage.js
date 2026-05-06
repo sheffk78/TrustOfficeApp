@@ -62,7 +62,7 @@ export default function TaxCalendarPage() {
   const loadCalendar = async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/tax-calendar?tax_year=${year}`);
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/tax-calendar?tax_year=${year}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to load tax calendar');
       setEntries(data.entries || []);
@@ -83,7 +83,7 @@ export default function TaxCalendarPage() {
 
   const generateCalendar = async () => {
     try {
-      const res = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/tax-calendar/generate`, {
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/tax-calendar/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tax_year: year }),
@@ -106,7 +106,7 @@ export default function TaxCalendarPage() {
 
   const markFiled = async (entryId) => {
     try {
-      const res = await fetchWithAuth(`/api/tax-calendar/${entryId}`, {
+      const res = await fetchWithAuth(`/tax-calendar/${entryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filing_status: 'filed' }),

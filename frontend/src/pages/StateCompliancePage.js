@@ -41,8 +41,8 @@ export default function StateCompliancePage() {
     setLoading(true);
     try {
       const [complianceRes, reqRes] = await Promise.all([
-        fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/state-compliance`),
-        fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/state-compliance/requirements`),
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance`),
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance/requirements`),
       ]);
       const cData = await complianceRes.json();
       if (!complianceRes.ok) throw new Error(cData.detail || 'Failed to load');

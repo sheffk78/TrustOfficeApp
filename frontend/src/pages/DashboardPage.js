@@ -157,7 +157,7 @@ export default function DashboardPage() {
     if (!selectedTrust) return;
     setTaxDeadlinesLoading(true);
     try {
-      const response = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/tax-calendar/upcoming?days=90`);
+      const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/tax-calendar/upcoming?days=90`);
       if (response.ok) {
         const data = await response.json();
         setTaxDeadlines(data.upcoming || []);

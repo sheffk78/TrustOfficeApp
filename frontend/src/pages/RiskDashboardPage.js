@@ -1,68 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import {
   Shield, AlertTriangle, AlertOctagon, AlertCircle,
-  CheckCircle2, ArrowUpRight, TrendingDown, Activity,
-  FileText, CalendarDays, MessageSquare, FolderOpen,
-  TrendingUp, MapPin, Clock
+  CheckCircle2, ArrowUpRight, Activity
 } from 'lucide-react';
 
-const MODULE_ICONS = {
-  tax_calendar: CalendarDays,
-  state_compliance: MapPin,
-  communications: MessageSquare,
-  vault: FolderOpen,
-  investments: TrendingUp,
-  alerts: AlertOctagon,
-};
-
-const MODULE_LABELS = {
-  tax_calendar: 'Tax Calendar',
-  state_compliance: 'State Compliance',
-  communications: 'Communications',
-  vault: 'Document Vault',
-  investments: 'Investments',
-  alerts: 'Separation Alerts',
-};
-
 const SEVERITY_STYLES = {
-  high: {
-    border: 'border-red-200',
-    bg: 'bg-red-50',
-    text: 'text-red-800',
-    icon: 'text-red-600',
-    badge: 'bg-red-100 text-red-700',
-    label: 'High',
-  },
-  medium: {
-    border: 'border-amber-200',
-    bg: 'bg-amber-50',
-    text: 'text-amber-800',
-    icon: 'text-amber-600',
-    badge: 'bg-amber-100 text-amber-700',
-    label: 'Medium',
-  },
-  low: {
-    border: 'border-slate-200',
-    bg: 'bg-slate-50',
-    text: 'text-slate-700',
-    icon: 'text-slate-500',
-    badge: 'bg-slate-100 text-slate-600',
-    label: 'Low',
-  },
+  high: { border: 'border-red-200', bg: 'bg-red-50', text: 'text-red-800', icon: 'text-red-600', badge: 'bg-red-100 text-red-700', label: 'High' },
+  medium: { border: 'border-amber-200', bg: 'bg-amber-50', text: 'text-amber-800', icon: 'text-amber-600', badge: 'bg-amber-100 text-amber-700', label: 'Medium' },
+  low: { border: 'border-slate-200', bg: 'bg-slate-50', text: 'text-slate-700', icon: 'text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Low' },
 };
 
 export default function RiskDashboardPage() {
   const { selectedTrust } = useAuth();
-  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterSeverity, setFilterSeverity] = useState('');
@@ -75,7 +32,7 @@ export default function RiskDashboardPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/risk-dashboard`);
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/risk-dashboard`);
       const d = await res.json();
       if (!res.ok) throw new Error(d.detail || 'Failed');
       setData(d);
@@ -94,8 +51,8 @@ export default function RiskDashboardPage() {
     return risks;
   };
 
-  const assessmentColor = (assessment) => {
-    switch (assessment) {
+  const getColor = (a) => {
+    switch (a) {
       case 'critical': return 'text-red-700';
       case 'elevated': return 'text-amber-700';
       case 'caution': return 'text-slate-700';
@@ -104,8 +61,8 @@ export default function RiskDashboardPage() {
     }
   };
 
-  const assessmentBg = (assessment) => {
-    switch (assessment) {
+  const getBg = (a) => {
+    switch (a) {
       case 'critical': return 'bg-red-100 border-red-200';
       case 'elevated': return 'bg-amber-100 border-amber-200';
       case 'caution': return 'bg-slate-100 border-slate-200';
@@ -131,6 +88,9 @@ export default function RiskDashboardPage() {
       </div>
     );
   }
+
+  const assessment = data?.assessment || 'healthy';
+  const label = data?.assessment_label || 'Low Risk';
 
   return (
     <div className="min-h-screen bg-subtle-bg">
@@ -158,19 +118,19 @@ export default function RiskDashboardPage() {
             </div>
           ) : (
             <>
-              {/* Overall Assessment Banner */}
-              <Card className={`mb-6 border ${assessmentBg(data?.assessment)}`}>
+              {/* Overall Assessment */}
+              <Card className={"mb-6 border " + getBg(assessment)}>
                 <CardContent className="p-5 flex items-center gap-4">
-                  {data?.assessment === 'healthy' ? (
-                    <CheckCircle2 className={`w-10 h-10 ${assessmentColor(data.assessment)}`} />
+                  {assessment === 'healthy' ? (
+                    <CheckCircle2 className="w-10 h-10 text-emerald-600" />
                   ) : (
-                    <AlertTriangle className={`w-10 h-10 ${assessmentColor(data?.assessment)}`} />
+                    <AlertTriangle className="w-10 h-10 text-amber-600" />
                   )}
                   <div>
-                    <p className={`text-xs font-mono uppercase tracking-wider ${assessmentColor(data?.assessment)}`}>Overall Risk Assessment</p>
-                    <p className={`text-xl font-bold ${assessmentColor(data?.assessment)}`>{data?.assessment_label}</p>
+                    <p className={"text-xs font-mono uppercase tracking-wider " + getColor(assessment)}>Overall Risk Assessment</p>
+                    <p className={"text-xl font-bold " + getColor(assessment)}>{label}</p>
                     <p className="text-sm opacity-80">
-                      {data?.risk_count} item(s) across {data ? Object.keys(data.by_module).length : 0} module(s)
+                      {data?.risk_count || 0} item(s) across {data ? Object.keys(data.by_module).length : 0} module(s)
                     </p>
                   </div>
                 </CardContent>
@@ -195,16 +155,12 @@ export default function RiskDashboardPage() {
                     <p className="text-2xl font-bold text-slate-500">{data.low_count}</p>
                     <p className="text-[10px] text-neutral-500 uppercase">Low</p>
                   </CardContent></Card>
-                  {Object.entries(data.by_module).map(([mod, entries]) => {
-                    const Icon = MODULE_ICONS[mod] || Activity;
-                    return (
-                      <Card key={mod}><CardContent className="p-3 text-center cursor-pointer hover:bg-navy/5" onClick={() => setFilterModule(filterModule === mod ? '' : mod)}>
-                        <Icon className="w-4 h-4 text-navy mx-auto mb-1"/>
-                        <p className="text-lg font-bold text-navy">{entries.length}</p>
-                        <p className="text-[10px] text-neutral-500">{MODULE_LABELS[mod] || mod}</p>
-                      </CardContent></Card>
-                    );
-                  })}
+                  {Object.entries(data.by_module).map(([mod, entries]) => (
+                    <Card key={mod}><CardContent className="p-3 text-center cursor-pointer hover:bg-navy/5" onClick={() => setFilterModule(filterModule === mod ? '' : mod)}>
+                      <p className="text-lg font-bold text-navy">{entries.length}</p>
+                      <p className="text-[10px] text-neutral-500">{mod}</p>
+                    </CardContent></Card>
+                  ))}
                 </div>
               )}
 
@@ -214,28 +170,19 @@ export default function RiskDashboardPage() {
                   <button
                     key={sev}
                     onClick={() => setFilterSeverity(filterSeverity === sev ? '' : sev)}
-                    className={`px-3 py-1.5 text-xs font-mono uppercase rounded border transition-colors ${
-                      filterSeverity === sev
-                        ? SEVERITY_STYLES[sev].badge
-                        : 'border-neutral-200 text-neutral-500 hover:border-neutral-400'
-                    }`}
+                    className={"px-3 py-1.5 text-xs font-mono uppercase rounded border transition-colors " + (filterSeverity === sev ? SEVERITY_STYLES[sev].badge : 'border-neutral-200 text-neutral-500 hover:border-neutral-400')}
                   >
                     {sev}
                   </button>
                 ))}
                 {(filterSeverity || filterModule) && (
-                  <button
-                    onClick={() => { setFilterSeverity(''); setFilterModule(''); }}
-                    className="px-3 py-1.5 text-xs text-neutral-500 hover:text-navy"
-                  >
-                    Clear
-                  </button>
+                  <button onClick={() => { setFilterSeverity(''); setFilterModule(''); }} className="px-3 py-1.5 text-xs text-neutral-500 hover:text-navy">Clear</button>
                 )}
               </div>
 
               {/* Risk List */}
               <div className="space-y-3">
-                {filteredRisks().length === 0 && data?.risk_count === 0 ? (
+                {filteredRisks().length === 0 && (data?.risk_count || 0) === 0 ? (
                   <div className="bg-emerald-50 border border-emerald-200 p-12 text-center rounded-lg">
                     <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-3"/>
                     <p className="text-lg font-semibold text-emerald-800">All Clear</p>
@@ -248,14 +195,14 @@ export default function RiskDashboardPage() {
                     const style = SEVERITY_STYLES[r.severity] || SEVERITY_STYLES.low;
                     const Icon = r.severity === 'high' ? AlertOctagon : r.severity === 'medium' ? AlertTriangle : AlertCircle;
                     return (
-                      <div key={i} className={`flex items-start gap-3 bg-white border ${style.border} rounded-lg p-4`}>
-                        <div className={`w-9 h-9 flex items-center justify-center flex-shrink-0 rounded ${style.bg}`}>
-                          <Icon className={`w-4 h-4 ${style.icon}`} />
+                      <div key={i} className={"flex items-start gap-3 bg-white border rounded-lg p-4 " + style.border}>
+                        <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + style.bg}>
+                          <Icon className={"w-4 h-4 " + style.icon} />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-semibold text-navy text-sm">{r.title}</h3>
-                            <span className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${style.badge}`}>
+                            <span className={"font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded " + style.badge}>
                               {style.label}
                             </span>
                           </div>
@@ -264,7 +211,7 @@ export default function RiskDashboardPage() {
                             <p className="text-xs text-neutral-500">Action: {r.action}</p>
                             <Link to={r.deeplink} className="text-xs text-navy hover:text-gold flex items-center gap-1">
                               <ArrowUpRight className="w-3 h-3" />
-                              Go to {MODULE_LABELS[r.module] || r.module}
+                              Go to {r.module}
                             </Link>
                           </div>
                         </div>

@@ -72,8 +72,8 @@ export default function VaultPage() {
       if (search) params.append('search', search);
 
       const [docRes, sumRes] = await Promise.all([
-        fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/vault/documents?${params.toString()}`),
-        fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/vault/summary`),
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/vault/documents?${params.toString()}`),
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/vault/summary`),
       ]);
       const dData = await docRes.json();
       if (docRes.ok) {
@@ -91,7 +91,7 @@ export default function VaultPage() {
 
   const addDocument = async () => {
     try {
-      const res = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/vault/documents`, {
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/vault/documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -112,7 +112,7 @@ export default function VaultPage() {
 
   const deleteDocument = async (id) => {
     try {
-      const res = await fetchWithAuth(`/api/vault/documents/${id}`, { method: 'DELETE' });
+      const res = await fetchWithAuth(`/vault/documents/${id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Document removed');
         loadData();
