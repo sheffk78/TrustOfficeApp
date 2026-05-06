@@ -1,0 +1,283 @@
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
+import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { fetchWithAuth } from '@/utils/api';
+import { toast } from 'sonner';
+import {
+  Shield, AlertTriangle, AlertOctagon, AlertCircle,
+  CheckCircle2, ArrowUpRight, TrendingDown, Activity,
+  FileText, CalendarDays, MessageSquare, FolderOpen,
+  TrendingUp, MapPin, Clock
+} from 'lucide-react';
+
+const MODULE_ICONS = {
+  tax_calendar: CalendarDays,
+  state_compliance: MapPin,
+  communications: MessageSquare,
+  vault: FolderOpen,
+  investments: TrendingUp,
+  alerts: AlertOctagon,
+};
+
+const MODULE_LABELS = {
+  tax_calendar: 'Tax Calendar',
+  state_compliance: 'State Compliance',
+  communications: 'Communications',
+  vault: 'Document Vault',
+  investments: 'Investments',
+  alerts: 'Separation Alerts',
+};
+
+const SEVERITY_STYLES = {
+  high: {
+    border: 'border-red-200',
+    bg: 'bg-red-50',
+    text: 'text-red-800',
+    icon: 'text-red-600',
+    badge: 'bg-red-100 text-red-700',
+    label: 'High',
+  },
+  medium: {
+    border: 'border-amber-200',
+    bg: 'bg-amber-50',
+    text: 'text-amber-800',
+    icon: 'text-amber-600',
+    badge: 'bg-amber-100 text-amber-700',
+    label: 'Medium',
+  },
+  low: {
+    border: 'border-slate-200',
+    bg: 'bg-slate-50',
+    text: 'text-slate-700',
+    icon: 'text-slate-500',
+    badge: 'bg-slate-100 text-slate-600',
+    label: 'Low',
+  },
+};
+
+export default function RiskDashboardPage() {
+  const { selectedTrust } = useAuth();
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [filterSeverity, setFilterSeverity] = useState('');
+  const [filterModule, setFilterModule] = useState('');
+
+  useEffect(() => {
+    if (selectedTrust) loadData();
+  }, [selectedTrust]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth(`/api/trusts/${selectedTrust.trust_id}/risk-dashboard`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.detail || 'Failed');
+      setData(d);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredRisks = () => {
+    if (!data) return [];
+    let risks = data.risks || [];
+    if (filterSeverity) risks = risks.filter(r => r.severity === filterSeverity);
+    if (filterModule) risks = risks.filter(r => r.module === filterModule);
+    return risks;
+  };
+
+  const assessmentColor = (assessment) => {
+    switch (assessment) {
+      case 'critical': return 'text-red-700';
+      case 'elevated': return 'text-amber-700';
+      case 'caution': return 'text-slate-700';
+      case 'healthy': return 'text-emerald-700';
+      default: return 'text-slate-700';
+    }
+  };
+
+  const assessmentBg = (assessment) => {
+    switch (assessment) {
+      case 'critical': return 'bg-red-100 border-red-200';
+      case 'elevated': return 'bg-amber-100 border-amber-200';
+      case 'caution': return 'bg-slate-100 border-slate-200';
+      case 'healthy': return 'bg-emerald-100 border-emerald-200';
+      default: return 'bg-slate-100 border-slate-200';
+    }
+  };
+
+  if (!selectedTrust) {
+    return (
+      <div className="min-h-screen bg-subtle-bg">
+        <Sidebar />
+        <div className="md:pl-64 pb-20 md:pb-0">
+          <div className="pt-16 md:pt-8 ml-4 mr-4">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+              <Shield className="w-12 h-12 text-slate-400 mb-3"/>
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+              <p className="text-sm text-neutral-600">Choose a trust to view the Risk Dashboard.</p>
+            </div>
+          </div>
+        </div>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-subtle-bg">
+      <Sidebar />
+      <div className="md:pl-64 pb-20 md:pb-0">
+        <div className="pt-16 md:pt-8 ml-4 mr-4">
+
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
+                <Shield className="w-6 h-6 text-navy"/>
+                Risk Dashboard
+              </h1>
+              <p className="text-sm text-neutral-600 mt-1">Complete exposure analysis for <span className="font-semibold">{selectedTrust.name}</span></p>
+            </div>
+            <Button variant="outline" onClick={loadData} disabled={loading}>
+              <Activity className="w-4 h-4 mr-2"/>
+              Refresh
+            </Button>
+          </div>
+
+          {loading ? (
+            <div className="space-y-3">
+              {[1,2,3].map(i => <div key={i} className="h-16 bg-white border border-neutral-200 rounded-lg animate-pulse"/>)}
+            </div>
+          ) : (
+            <>
+              {/* Overall Assessment Banner */}
+              <Card className={`mb-6 border ${assessmentBg(data?.assessment)}`}>
+                <CardContent className="p-5 flex items-center gap-4">
+                  {data?.assessment === 'healthy' ? (
+                    <CheckCircle2 className={`w-10 h-10 ${assessmentColor(data.assessment)}`} />
+                  ) : (
+                    <AlertTriangle className={`w-10 h-10 ${assessmentColor(data?.assessment)}`} />
+                  )}
+                  <div>
+                    <p className={`text-xs font-mono uppercase tracking-wider ${assessmentColor(data?.assessment)}`}>Overall Risk Assessment</p>
+                    <p className={`text-xl font-bold ${assessmentColor(data?.assessment)}`>{data?.assessment_label}</p>
+                    <p className="text-sm opacity-80">
+                      {data?.risk_count} item(s) across {data ? Object.keys(data.by_module).length : 0} module(s)
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Summary Cards */}
+              {data && (
+                <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+                  <Card><CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-navy">{data.risk_count}</p>
+                    <p className="text-[10px] text-neutral-500 uppercase">Total Risks</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-red-600">{data.high_count}</p>
+                    <p className="text-[10px] text-neutral-500 uppercase">High</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-amber-600">{data.medium_count}</p>
+                    <p className="text-[10px] text-neutral-500 uppercase">Medium</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-slate-500">{data.low_count}</p>
+                    <p className="text-[10px] text-neutral-500 uppercase">Low</p>
+                  </CardContent></Card>
+                  {Object.entries(data.by_module).map(([mod, entries]) => {
+                    const Icon = MODULE_ICONS[mod] || Activity;
+                    return (
+                      <Card key={mod}><CardContent className="p-3 text-center cursor-pointer hover:bg-navy/5" onClick={() => setFilterModule(filterModule === mod ? '' : mod)}>
+                        <Icon className="w-4 h-4 text-navy mx-auto mb-1"/>
+                        <p className="text-lg font-bold text-navy">{entries.length}</p>
+                        <p className="text-[10px] text-neutral-500">{MODULE_LABELS[mod] || mod}</p>
+                      </CardContent></Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Filters */}
+              <div className="flex gap-2 mb-4">
+                {['high', 'medium', 'low'].map((sev) => (
+                  <button
+                    key={sev}
+                    onClick={() => setFilterSeverity(filterSeverity === sev ? '' : sev)}
+                    className={`px-3 py-1.5 text-xs font-mono uppercase rounded border transition-colors ${
+                      filterSeverity === sev
+                        ? SEVERITY_STYLES[sev].badge
+                        : 'border-neutral-200 text-neutral-500 hover:border-neutral-400'
+                    }`}
+                  >
+                    {sev}
+                  </button>
+                ))}
+                {(filterSeverity || filterModule) && (
+                  <button
+                    onClick={() => { setFilterSeverity(''); setFilterModule(''); }}
+                    className="px-3 py-1.5 text-xs text-neutral-500 hover:text-navy"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Risk List */}
+              <div className="space-y-3">
+                {filteredRisks().length === 0 && data?.risk_count === 0 ? (
+                  <div className="bg-emerald-50 border border-emerald-200 p-12 text-center rounded-lg">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-3"/>
+                    <p className="text-lg font-semibold text-emerald-800">All Clear</p>
+                    <p className="text-sm text-emerald-700">No risk items detected. Your trust governance is in good shape.</p>
+                  </div>
+                ) : filteredRisks().length === 0 ? (
+                  <p className="text-center text-sm text-neutral-500 py-8">No items match the selected filters.</p>
+                ) : (
+                  filteredRisks().map((r, i) => {
+                    const style = SEVERITY_STYLES[r.severity] || SEVERITY_STYLES.low;
+                    const Icon = r.severity === 'high' ? AlertOctagon : r.severity === 'medium' ? AlertTriangle : AlertCircle;
+                    return (
+                      <div key={i} className={`flex items-start gap-3 bg-white border ${style.border} rounded-lg p-4`}>
+                        <div className={`w-9 h-9 flex items-center justify-center flex-shrink-0 rounded ${style.bg}`}>
+                          <Icon className={`w-4 h-4 ${style.icon}`} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-navy text-sm">{r.title}</h3>
+                            <span className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${style.badge}`}>
+                              {style.label}
+                            </span>
+                          </div>
+                          <p className="text-sm text-neutral-600 mb-2">{r.detail}</p>
+                          <div className="flex items-center gap-3">
+                            <p className="text-xs text-neutral-500">Action: {r.action}</p>
+                            <Link to={r.deeplink} className="text-xs text-navy hover:text-gold flex items-center gap-1">
+                              <ArrowUpRight className="w-3 h-3" />
+                              Go to {MODULE_LABELS[r.module] || r.module}
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      <MobileBottomNav />
+    </div>
+  );
+}

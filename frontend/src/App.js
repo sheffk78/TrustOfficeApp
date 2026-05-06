@@ -39,6 +39,7 @@ import StateCompliancePage from "@/pages/StateCompliancePage";
 import InvestmentsPage from "@/pages/InvestmentsPage";
 import CommunicationsPage from "@/pages/CommunicationsPage";
 import VaultPage from "@/pages/VaultPage";
+import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -304,6 +305,11 @@ const AppRouter = () => {
       <Route path="/vault" element={
         <SubscriptionProtectedRoute>
           <VaultPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/risk" element={
+        <SubscriptionProtectedRoute>
+          <RiskDashboardPage />
         </SubscriptionProtectedRoute>
       } />
       {/* Settings and Billing are accessible without active subscription */}

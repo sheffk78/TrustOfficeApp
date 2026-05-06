@@ -75,6 +75,7 @@ from routers.state_compliance import router as state_compliance_router
 from routers.investments import router as investments_router
 from routers.communications import router as communications_router
 from routers.vault import router as vault_router
+from routers.risk_dashboard import router as risk_dashboard_router
 
 # Import security middleware
 from security import (
@@ -286,6 +287,7 @@ app.include_router(state_compliance_router, prefix="/api")
 app.include_router(investments_router, prefix="/api")
 app.include_router(communications_router, prefix="/api")
 app.include_router(vault_router, prefix="/api")
+app.include_router(risk_dashboard_router, prefix="/api")
 
 
 # ==================== HEALTH CHECK ====================

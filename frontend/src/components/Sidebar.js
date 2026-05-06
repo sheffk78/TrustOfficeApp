@@ -52,6 +52,7 @@ const navItems = [
   { path: '/beneficiaries', icon: Users, label: 'Beneficiaries', group: 'Structures' },
   { path: '/communications', icon: MessageSquare, label: 'Communications', group: 'Structures' },  
   { path: '/vault', icon: FolderOpen, label: 'Vault', group: 'Structures' },
+  { path: '/risk', icon: Activity, label: 'Risk Dashboard', group: 'Structures' },
   { path: '/governance', icon: Shield, label: 'Defensibility Score' },
   { path: '/tax-calendar', icon: CalendarDays, label: 'Tax Calendar', group: 'Governance' },
   { path: '/state-compliance', icon: Shield, label: 'State Compliance', group: 'Structures' },
