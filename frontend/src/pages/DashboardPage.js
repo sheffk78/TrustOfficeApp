@@ -231,6 +231,30 @@ export default function DashboardPage() {
     }
   };
 
+  const dismissInsight = async (criterionName) => {
+    if (!selectedTrust) return;
+    try {
+      const response = await fetchWithAuth('/insights/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          criterion_name: criterionName
+        })
+      });
+      if (response.ok) {
+        toast.success('Recommendation dismissed');
+        await loadDashboardData();
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to dismiss');
+      }
+    } catch (error) {
+      console.error('Failed to dismiss insight:', error);
+      toast.error('Failed to dismiss recommendation');
+    }
+  };
+
   const handleCreateDemo = async () => {
     setLoading(true);
     try {
@@ -476,14 +500,14 @@ export default function DashboardPage() {
                       return (
                         <div 
                           key={index}
-                          className={`flex items-center justify-between p-4 border transition-all hover:shadow-sm ${
+                          className={`relative flex items-center justify-between p-4 border transition-all hover:shadow-sm ${
                             isError ? 'border-error/30 bg-error/5 hover:border-error/50' :
                             isWarning ? 'border-warning/30 bg-warning/5 hover:border-warning/50' :
                             'border-navy/20 bg-navy/5 hover:border-navy/30'
                           }`}
                           data-testid={`insight-${index}`}
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-4 flex-1">
                             <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${
                               isError ? 'bg-error/20 text-error' :
                               isWarning ? 'bg-warning/20 text-warning' :
@@ -491,7 +515,7 @@ export default function DashboardPage() {
                             }`}>
                               <InsightIcon className="w-5 h-5" />
                             </div>
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
                                 <h4 className="font-medium text-navy">{insight.title}</h4>
                                 <span className={`px-2 py-0.5 text-xs font-mono ${
@@ -505,19 +529,29 @@ export default function DashboardPage() {
                               <p className="text-sm text-muted-foreground">{insight.description}</p>
                             </div>
                           </div>
-                          <Button 
-                            onClick={() => navigate(insight.action_path)}
-                            size="sm"
-                            className={`flex-shrink-0 ${
-                              isError ? 'bg-error hover:bg-error/90 text-white' :
-                              isWarning ? 'bg-warning hover:bg-warning/90 text-white' :
-                              'btn-primary'
-                            }`}
-                            data-testid={`insight-action-${index}`}
-                          >
-                            {insight.action_label}
-                            <ChevronRight className="w-4 h-4 ml-1" />
-                          </Button>
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                            <button
+                              onClick={() => dismissInsight(insight.criterion_name)}
+                              className="text-muted-foreground hover:text-error transition-colors p-1"
+                              title="Dismiss this recommendation"
+                              data-testid={`insight-dismiss-${index}`}
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                            <Button 
+                              onClick={() => navigate(insight.action_path)}
+                              size="sm"
+                              className={`${
+                                isError ? 'bg-error hover:bg-error/90 text-white' :
+                                isWarning ? 'bg-warning hover:bg-warning/90 text-white' :
+                                'btn-primary'
+                              }`}
+                              data-testid={`insight-action-${index}`}
+                            >
+                              {insight.action_label}
+                              <ChevronRight className="w-4 h-4 ml-1" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}

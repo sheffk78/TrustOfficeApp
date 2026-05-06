@@ -726,6 +726,17 @@ class GovernanceInsight(BaseModel):
     action_label: str
     points: int = 20
 
+class DismissedInsightCreate(BaseModel):
+    trust_id: str
+    criterion_name: str
+
+class DismissedInsightResponse(BaseModel):
+    dismiss_id: str
+    user_id: str
+    trust_id: str
+    criterion_name: str
+    dismissed_at: str
+
 class DashboardStats(BaseModel):
     total_decisions: int
     pending_reviews: int
