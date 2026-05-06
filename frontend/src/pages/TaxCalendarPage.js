@@ -161,7 +161,11 @@ export default function TaxCalendarPage() {
                 Tax Calendar
               </h1>
               <p className="text-sm text-neutral-600 mt-1">
-                Federal deadlines for <span className="font-semibold">{selectedTrust.name}</span>
+                {trustProfile.isFiscalYear
+                  ? `Fiscal year ending ${trustProfile.taxYearEndMonth}/${trustProfile.taxYearEndDay} · `
+                  : 'Calendar year · '}
+                {trustProfile.stateCode && `${trustProfile.stateCode} · `}
+                Federal tax deadlines for <span className="font-semibold">{selectedTrust.name}</span>
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -209,10 +213,16 @@ export default function TaxCalendarPage() {
           <Card className="mb-6 border border-neutral-200">
             <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="text-sm text-neutral-600">
-                {trustProfile.ein
-                  ? <>EIN: <b>{trustProfile.ein}</b> · Tax year ends: <b>{trustProfile.taxYearEndMonth}/{trustProfile.taxYearEndDay}</b></>
-                  : <>Set your trust EIN and tax year end in <b>Settings → Trust Profile</b> for accurate deadlines.</>
-                }
+                {trustProfile.ein && trustProfile.taxYearEndMonth ? (
+                  <>
+                    EIN: <b>{trustProfile.ein}</b> · {' '}
+                    {trustProfile.isFiscalYear ? 'Fiscal year ends' : 'Tax year ends'}: {' '}
+                    <b>{trustProfile.taxYearEndMonth}/{trustProfile.taxYearEndDay}</b>
+                    {trustProfile.isFiscalYear && <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Fiscal</span>}
+                  </>
+                ) : (
+                  <>Set your trust EIN and tax year end in <b>Settings → Trust Profile</b> for accurate deadlines.</>
+                )}
               </div>
             </CardContent>
           </Card>
