@@ -26,7 +26,8 @@ import {
   TrendingUp,
   MessageSquare,
   FolderOpen,
-  Clock
+  Clock,
+  Activity
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -44,7 +45,6 @@ const navItems = [
   { path: '/retroactive-minutes', icon: Clock, label: 'Retro Minutes', group: 'Governance', badge: 'new' },
   { path: '/distributions', icon: DollarSign, label: 'Distributions', group: 'Money' },
   { path: '/compensation', icon: Wallet, label: 'Compensation', group: 'Money' },
-  { path: '/transactions', icon: ArrowUpDown, label: 'Transactions', group: 'Money' },
   { path: '/investments', icon: TrendingUp, label: 'Investments', group: 'Money' },
   { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', group: 'Money', requiresBenevolence: true },
   { path: '/structures', icon: Building2, label: 'Structures', group: 'Structures' },
