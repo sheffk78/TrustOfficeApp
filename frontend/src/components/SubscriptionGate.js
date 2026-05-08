@@ -13,8 +13,8 @@ import {
 /**
  * SubscriptionGate - Wraps protected content
  * 
- * NEW BEHAVIOR (Read-Only Mode):
- * - If subscription is active (including trial): Show content with TrialBanner (if trial)
+ * BEHAVIOR (Read-Only Mode):
+ * - If subscription is active (including free tier): Show content with TrialBanner (if free tier)
  * - If subscription is expired/inactive: Show content with ReadOnlyBanner
  *   Users can VIEW all data but cannot CREATE/UPDATE/DELETE
  * - Admins always get full access with no banners
@@ -48,14 +48,14 @@ export const SubscriptionGate = ({ children }) => {
     );
   }
 
-  // Check if it's an active trial
-  const isActiveTrial = subscription?.is_trial && subscription?.is_active;
+  // Check if it's an active free-tier user
+  const isActiveFreeTier = subscription?.is_trial && subscription?.is_active;
 
   // If subscription is active, show content with TrialBanner if applicable
   if (!subscriptionExpired && !isReadOnly) {
     return (
       <div className="flex flex-col min-h-screen">
-        {isActiveTrial && <TrialBanner location="page" />}
+        {isActiveFreeTier && <TrialBanner location="page" />}
         {children}
       </div>
     );
@@ -101,7 +101,7 @@ export const FullSubscriptionGate = ({ children }) => {
   }
 
   // Subscription expired - show paywall
-  const isTrialExpired = subscription?.status === 'trialing' || subscription?.status === 'expired';
+  const isAccessExpired = subscription?.status === 'trialing' || subscription?.status === 'expired';
 
   return (
     <div className="min-h-screen bg-subtle-bg flex items-center justify-center p-4">
@@ -109,7 +109,7 @@ export const FullSubscriptionGate = ({ children }) => {
         <div className="card-trust corner-mark text-center" data-testid="subscription-paywall">
           {/* Icon */}
           <div className="w-16 h-16 mx-auto mb-6 bg-warning/10 flex items-center justify-center">
-            {isTrialExpired ? (
+            {isAccessExpired ? (
               <Clock className="w-8 h-8 text-warning" />
             ) : (
               <AlertTriangle className="w-8 h-8 text-warning" />
@@ -118,12 +118,12 @@ export const FullSubscriptionGate = ({ children }) => {
 
           {/* Title */}
           <h1 className="font-serif text-2xl text-navy mb-2">
-            {isTrialExpired ? 'Your Trial Has Ended' : 'Subscription Required'}
+            {isAccessExpired ? 'Free Access Has Ended' : 'Subscription Required'}
           </h1>
 
           {/* Message */}
           <p className="text-muted-foreground mb-6">
-            {isTrialExpired 
+            {isAccessExpired 
               ? 'Subscribe now to continue managing your trusts with TrustOffice.'
               : 'Your subscription is inactive. Please subscribe to continue using TrustOffice.'}
           </p>

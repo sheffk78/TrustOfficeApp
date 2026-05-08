@@ -260,10 +260,10 @@ export default function BillingPage() {
         );
       case 'trialing':
         return (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-navy/10 text-navy border border-navy/20">
-            <Clock className="w-4 h-4" />
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
+            <Check className="w-4 h-4" />
             <span className="font-mono text-xs uppercase">
-              Trial - {subscription.days_remaining} days left
+              Free Access
             </span>
           </div>
         );
@@ -271,7 +271,7 @@ export default function BillingPage() {
         return (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-error/10 text-error border border-error/20">
             <AlertTriangle className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase">Trial Expired</span>
+            <span className="font-mono text-xs uppercase">Access Expired</span>
           </div>
         );
       case 'past_due':
@@ -332,9 +332,10 @@ export default function BillingPage() {
                   <div>
                     <p className="label-trust mb-2">Current Plan</p>
                     <h2 className="font-serif text-2xl text-navy capitalize">
-                      {subscription?.plan_type === 'trial' ? 'Free Trial' : 
+                      {subscription?.plan_type === 'trial' ? 'Free Plan' : 
                        subscription?.plan_type === 'monthly' ? 'Monthly Plan' :
                        subscription?.plan_type === 'annual' ? 'Annual Plan' : 
+                       subscription?.plan_type === 'forever_free' ? 'Free Plan' :
                        subscription?.plan_type || 'Unknown'}
                     </h2>
                   </div>
@@ -362,30 +363,30 @@ export default function BillingPage() {
                   </div>
                 )}
 
-                {/* Trial Info */}
+                {/* Free Access Info */}
                 {subscription?.status === 'trialing' && (
-                  <div className="p-4 bg-navy/5 border border-navy/10 mb-6">
+                  <div className="p-4 bg-success/5 border border-success/10 mb-6">
                     <div className="flex items-start gap-3">
-                      <Clock className="w-5 h-5 text-navy flex-shrink-0 mt-0.5" />
+                      <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="font-medium text-navy">
-                          Your access period ends on {formatDate(subscription.trial_end_date)}
+                          Free access — all features included
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {subscription.days_remaining} days remaining. Subscribe now to ensure uninterrupted access.
+                          Individual trustees get full access at no cost. Subscribe for team and institutional features.
                         </p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Expired Trial Warning */}
+                {/* Expired Access Warning */}
                 {subscription?.status === 'expired' && (
                   <div className="p-4 bg-error/10 border border-error/20 mb-6">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-medium text-error">Your trial has expired</p>
+                        <p className="font-medium text-error">Your free access has ended</p>
                         <p className="text-sm text-error/80 mt-1">
                           Subscribe now to continue using TrustOffice. Your data is safe and will be available once you subscribe.
                         </p>

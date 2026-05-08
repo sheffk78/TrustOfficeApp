@@ -24,10 +24,10 @@ export const ReadOnlyBanner = () => {
   // Don't show if not in read-only mode
   if (!isReadOnly && !subscriptionExpired) return null;
   
-  // Don't show for active trials
+  // Don't show for active free-tier users
   if (subscription?.is_trial && subscription?.is_active) return null;
   
-  const trialExpired = subscription?.status === 'expired' && subscription?.is_trial;
+  const trialExpired = subscription?.status === 'expired';
   const subCanceled = subscription?.status === 'canceled';
   
   return (
@@ -43,10 +43,10 @@ export const ReadOnlyBanner = () => {
           <div>
             <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
               {trialExpired 
-                ? 'Your trial period has ended' 
+                ? 'Your free access has ended' 
                 : subCanceled 
                   ? 'Your subscription has been canceled'
-                  : 'Subscribe to activate'}
+                  : 'Access inactive'}
             </p>
             <p className="text-xs text-amber-600 dark:text-amber-400">
               You can view all your data, but creating or editing is disabled until you subscribe.

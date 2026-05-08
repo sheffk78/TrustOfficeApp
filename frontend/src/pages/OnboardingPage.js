@@ -49,7 +49,11 @@ const xhrRequest = (method, url, data = null, token = null) => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve(response);
           } else {
-            reject(new Error(response.detail || `Request failed`));
+            const detail = response.detail;
+            const msg = typeof detail === 'string'
+              ? detail
+              : (detail?.message || detail?.msg || JSON.stringify(detail) || 'Request failed');
+            reject(new Error(msg));
           }
         } catch (e) {
           reject(new Error('Invalid server response'));
@@ -137,16 +141,14 @@ export default function OnboardingPage() {
 
   const getToken = () => localStorage.getItem('auth_token');
   
-  // Check if trial has expired — only evaluate when subscription data is available
-  const isTrialExpired = subscription && (subscription.status === 'expired' ||
-    (subscription.is_trial === false && subscription.is_active === false) ||
-    (subscriptionExpired && !subscription.is_active));
+  // Check if subscription is inactive — only evaluate when subscription data is available
+  const isSubscriptionExpired = subscription && !subscription.is_active;
 
-  // Check if subscription is inactive (paid but canceled/lapsed — different from trial expired)
+  // Check if subscription is inactive (paid but canceled/lapsed)
   const isSubscriptionInactive = subscription && !subscription.is_active && subscription.is_trial === false;
 
   // Check if user already has trusts - redirect to dashboard if so
-  // But NOT if trial expired — show expired-trial screen instead
+  // But NOT if subscription expired — show upgrade screen instead
   useEffect(() => {
     const checkExistingTrusts = async () => {
       try {
@@ -162,11 +164,11 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     // Only redirect to dashboard if user has trusts AND subscription is active
-    // If trial expired, show the expired-trial screen instead
-    if (!checkingTrusts && trusts && trusts.length > 0 && !isTrialExpired) {
+    // If subscription expired, show the upgrade screen instead
+    if (!checkingTrusts && trusts && trusts.length > 0 && !isSubscriptionExpired) {
       navigate('/dashboard', { replace: true });
     }
-  }, [checkingTrusts, trusts, navigate, isTrialExpired]);
+  }, [checkingTrusts, trusts, navigate, isSubscriptionExpired]);
 
   if (checkingTrusts) {
     return (
@@ -264,8 +266,8 @@ export default function OnboardingPage() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-8 pb-16">
         
-        {/* EXPIRED TRIAL - Show upgrade options */}
-        {isTrialExpired && step === 1 && (
+        {/* EXPIRED SUBSCRIPTION - Show upgrade options */}
+        {isSubscriptionExpired && step === 1 && (
           <div className="mt-8">
             <div className="card-trust corner-mark mb-8">
               <div className="text-center mb-8">
@@ -273,7 +275,7 @@ export default function OnboardingPage() {
                   <Clock className="w-8 h-8 text-amber-600" />
                 </div>
                 <h1 className="font-serif text-4xl text-navy mb-3">
-                  Your Trial Has Ended
+                  Your Free Access Has Ended
                 </h1>
                 <p className="text-lg text-muted-foreground max-w-xl mx-auto">
                   Subscribe now to continue using TrustOffice and manage your trusts professionally.
@@ -347,8 +349,8 @@ export default function OnboardingPage() {
           </div>
         )}
         
-        {/* STEP 1: Welcome (for active trial users) */}
-        {step === 1 && !isTrialExpired && (
+        {/* STEP 1: Welcome (for active users) */}
+        {step === 1 && !isSubscriptionExpired && (
           <div className="mt-8">
             <div className="card-trust corner-mark mb-8">
               <div className="text-center mb-8">
@@ -366,20 +368,9 @@ export default function OnboardingPage() {
                     <CheckCircle2 className="w-5 h-5 text-success" />
                   </div>
                   <div>
-                    <p className="font-medium text-navy">14-Day Free Trial Active</p>
-                    <p className="text-sm text-muted-foreground">Full access to all features. No credit card required.</p>
+                    <p className="font-medium text-navy">Free Access Active</p>
+                    <p className="text-sm text-muted-foreground">Full access to all features for individual trustees.</p>
                   </div>
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t border-navy/10">
-                  <p className="text-sm text-muted-foreground">Ready to commit?</p>
-                  <Button
-                    variant="link"
-                    onClick={() => navigate('/pricing')}
-                    className="text-navy font-medium p-0 h-auto"
-                    data-testid="subscribe-link"
-                  >
-                    Subscribe Now →
-                  </Button>
                 </div>
               </div>
 
@@ -616,15 +607,15 @@ export default function OnboardingPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="label-trust text-xs">State</Label>
-                    <Select 
-                      value={trustData.state_code} 
-                      onValueChange={(v) => setTrustData({ ...trustData, state_code: v })}
+                    <Label className="label-trust text-xs">Jurisdiction</Label>
+                    <Select
+                      value={trustData.jurisdiction}
+                      onValueChange={(v) => setTrustData({ ...trustData, jurisdiction: v })}
                     >
-                      <SelectTrigger className="mt-1 input-trust h-9 text-sm" data-testid="state-code-select">
-                        <SelectValue placeholder="Select state..." />
+                      <SelectTrigger className="mt-1 input-trust h-9 text-sm" data-testid="jurisdiction-input">
+                        <SelectValue placeholder="Select state" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-72">
+                      <SelectContent>
                         <SelectItem value="AL">Alabama</SelectItem>
                         <SelectItem value="AK">Alaska</SelectItem>
                         <SelectItem value="AZ">Arizona</SelectItem>
@@ -633,65 +624,8 @@ export default function OnboardingPage() {
                         <SelectItem value="CO">Colorado</SelectItem>
                         <SelectItem value="CT">Connecticut</SelectItem>
                         <SelectItem value="DE">Delaware</SelectItem>
-                        <SelectItem value="FL">Florida</SelectItem>
-                        <SelectItem value="GA">Georgia</SelectItem>
-                        <SelectItem value="HI">Hawaii</SelectItem>
-                        <SelectItem value="ID">Idaho</SelectItem>
-                        <SelectItem value="IL">Illinois</SelectItem>
-                        <SelectItem value="IN">Indiana</SelectItem>
-                        <SelectItem value="IA">Iowa</SelectItem>
-                        <SelectItem value="KS">Kansas</SelectItem>
-                        <SelectItem value="KY">Kentucky</SelectItem>
-                        <SelectItem value="LA">Louisiana</SelectItem>
-                        <SelectItem value="ME">Maine</SelectItem>
-                        <SelectItem value="MD">Maryland</SelectItem>
-                        <SelectItem value="MA">Massachusetts</SelectItem>
-                        <SelectItem value="MI">Michigan</SelectItem>
-                        <SelectItem value="MN">Minnesota</SelectItem>
-                        <SelectItem value="MS">Mississippi</SelectItem>
-                        <SelectItem value="MO">Missouri</SelectItem>
-                        <SelectItem value="MT">Montana</SelectItem>
-                        <SelectItem value="NE">Nebraska</SelectItem>
-                        <SelectItem value="NV">Nevada</SelectItem>
-                        <SelectItem value="NH">New Hampshire</SelectItem>
-                        <SelectItem value="NJ">New Jersey</SelectItem>
-                        <SelectItem value="NM">New Mexico</SelectItem>
-                        <SelectItem value="NY">New York</SelectItem>
-                        <SelectItem value="NC">North Carolina</SelectItem>
-                        <SelectItem value="ND">North Dakota</SelectItem>
-                        <SelectItem value="OH">Ohio</SelectItem>
-                        <SelectItem value="OK">Oklahoma</SelectItem>
-                        <SelectItem value="OR">Oregon</SelectItem>
-                        <SelectItem value="PA">Pennsylvania</SelectItem>
-                        <SelectItem value="RI">Rhode Island</SelectItem>
-                        <SelectItem value="SC">South Carolina</SelectItem>
-                        <SelectItem value="SD">South Dakota</SelectItem>
-                        <SelectItem value="TN">Tennessee</SelectItem>
-                        <SelectItem value="TX">Texas</SelectItem>
-                        <SelectItem value="UT">Utah</SelectItem>
-                        <SelectItem value="VT">Vermont</SelectItem>
-                        <SelectItem value="VA">Virginia</SelectItem>
-                        <SelectItem value="WA">Washington</SelectItem>
-                        <SelectItem value="WV">West Virginia</SelectItem>
-                        <SelectItem value="WI">Wisconsin</SelectItem>
-                        <SelectItem value="WY">Wyoming</SelectItem>
-                        <SelectItem value="DC">District of Columbia</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-4 gap-3 mb-4">
-                  <div>
-                    <Label className="label-trust text-xs">EIN (optional)</Label>
-                    <Input
-                      type="text"
-                      value={trustData.ein}
-                      onChange={(e) => setTrustData({ ...trustData, ein: e.target.value })}
-                      className="mt-1 input-trust h-9 text-sm"
-                      placeholder="XX-XXXXXXX"
-                      data-testid="ein-input"
-                    />
                   </div>
                   <div>
                     <Label className="label-trust text-xs">Tax Year End — Month</Label>

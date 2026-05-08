@@ -80,7 +80,7 @@ export default function GuidedMinutesPage() {
   // Redirect read-only users
   useEffect(() => {
     if (isReadOnly) {
-      toast.error('Your trial has expired. Subscribe to create new minutes.');
+      toast.error('Your free access has ended. Subscribe to create new minutes.');
       navigate('/minutes');
     }
   }, [isReadOnly, navigate]);

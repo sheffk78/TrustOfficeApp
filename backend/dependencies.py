@@ -99,42 +99,29 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
     
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
     
-    # If no subscription exists, create one (trial for normal users, active for forever free)
+    # If no subscription exists, create one (forever_free for all individual trustees)
     if not sub:
-        if is_forever_free:
-            # Forever free account - give them a permanent active subscription
-            sub = {
-                "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
-                "user_id": user_id,
-                "plan_type": "forever_free",
-                "status": "active",
-                "trial_start_date": None,
-                "trial_end_date": None,
-                "stripe_customer_id": None,
-                "stripe_subscription_id": None,
-                "created_at": now.isoformat(),
-                "updated_at": now.isoformat(),
-                "notes": "Forever free account - admin@wingpointtrusts.com"
-            }
-        else:
-            # New users start as read-only until they subscribe (no free trial)
-            sub = {
-                "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
-                "user_id": user_id,
-                "plan_type": "none",
-                "status": "expired",
-                "trial_start_date": None,
-                "trial_end_date": None,
-                "stripe_customer_id": None,
-                "stripe_subscription_id": None,
-                "created_at": now.isoformat(),
-                "updated_at": now.isoformat(),
-                "notes": "New signup — subscribe to activate"
-            }
+# All new users get forever_free — individual trustees are free
+        sub = {
+            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+            "user_id": user_id,
+            "plan_type": "forever_free",
+            "status": "active",
+            "trial_start_date": None,
+            "trial_end_date": None,
+            "stripe_customer_id": None,
+            "stripe_subscription_id": None,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+            "notes": "Free individual trustee account"
+        }
         await db.subscriptions.insert_one(sub)
     
     # For forever free accounts, always return active status regardless of stored status
-    if is_forever_free:
+    # Also upgrade legacy trial accounts to forever_free
+    effective_plan_type = "forever_free" if sub.get("plan_type") in ("trial", "forever_free") else sub.get("plan_type", "trial")
+    
+    if effective_plan_type == "forever_free":
         return SubscriptionState(
             user_id=user_id,
             subscription_id=sub.get("subscription_id"),
