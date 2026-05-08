@@ -1,6 +1,7 @@
 # Tax Calendar router — Federal tax deadlines for trusts (calendar + fiscal year aware)
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone, date
+from typing import Optional
 import uuid
 
 from database import db
