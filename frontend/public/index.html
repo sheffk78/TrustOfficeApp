@@ -65,23 +65,25 @@
         <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicon.svg" />
         <link rel="apple-touch-icon" href="%PUBLIC_URL%/favicon.svg" />
         
-        <!-- Google Analytics 4 (GA4) - Measurement ID: G-MT6FBPRE60 -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-MT6FBPRE60"></script>
+        <!-- Google Tag -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=GT-KTTQHRTR"></script>
         <script>
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
+            gtag('config', 'GT-KTTQHRTR');
             gtag('config', 'G-MT6FBPRE60', {
                 // SPA-friendly configuration
                 send_page_view: true
             });
             gtag('config', 'AW-955235972');
+            gtag('config', 'AW-18025732865');
 
             window.trackCtaClick = function(ctaName) {
                 gtag('event', 'cta_click', {
                     'event_category': 'engagement',
                     'event_label': ctaName,
-                    'send_to': ['G-MT6FBPRE60', 'AW-955235972']
+                    'send_to': ['GT-KTTQHRTR', 'G-MT6FBPRE60', 'AW-955235972', 'AW-18025732865']
                 });
             };
         </script>
