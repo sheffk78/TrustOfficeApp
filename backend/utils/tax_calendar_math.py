@@ -118,6 +118,28 @@ def _generate_entries(trust: dict, tax_year: int) -> list:
     return entries
 
 
+def _days_remaining(due_date_str: str) -> int:
+    """Calculate days remaining until a due date. Returns negative if past."""
+    from datetime import datetime, timezone
+    try:
+        if isinstance(due_date_str, str):
+            due = datetime.fromisoformat(due_date_str.replace('Z', '+00:00'))
+            if due.tzinfo is None:
+                due = due.replace(tzinfo=timezone.utc)
+        else:
+            return 999
+        now = datetime.now(timezone.utc)
+        delta = due - now
+        return max(-999, delta.days)
+    except (ValueError, TypeError, AttributeError):
+        return 999
+
+
+# Rule constants for import compatibility
+CALENDAR_RULES = {}
+FISCAL_RULES = {}
+
+
 def _mock_uuid():
     """Deterministic uuid for tests."""
     import uuid as _uuid
