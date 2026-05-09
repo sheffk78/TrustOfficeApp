@@ -685,18 +685,18 @@ export default function OnboardingPage() {
                         <SelectValue placeholder="Month" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="12">December (Calendar)</SelectItem>
-                        <SelectItem value="1">January</SelectItem>
-                        <SelectItem value="2">February</SelectItem>
-                        <SelectItem value="3">March</SelectItem>
-                        <SelectItem value="4">April</SelectItem>
-                        <SelectItem value="5">May</SelectItem>
-                        <SelectItem value="6">June</SelectItem>
-                        <SelectItem value="7">July</SelectItem>
-                        <SelectItem value="8">August</SelectItem>
-                        <SelectItem value="9">September</SelectItem>
-                        <SelectItem value="10">October</SelectItem>
-                        <SelectItem value="11">November</SelectItem>
+                      <SelectItem value="12">DEC (Calendar)</SelectItem>
+                      <SelectItem value="1">JAN</SelectItem>
+                      <SelectItem value="2">FEB</SelectItem>
+                      <SelectItem value="3">MAR</SelectItem>
+                      <SelectItem value="4">APR</SelectItem>
+                      <SelectItem value="5">MAY</SelectItem>
+                      <SelectItem value="6">JUN</SelectItem>
+                      <SelectItem value="7">JUL</SelectItem>
+                      <SelectItem value="8">AUG</SelectItem>
+                      <SelectItem value="9">SEP</SelectItem>
+                      <SelectItem value="10">OCT</SelectItem>
+                      <SelectItem value="11">NOV</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
