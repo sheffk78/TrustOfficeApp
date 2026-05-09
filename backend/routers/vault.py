@@ -17,6 +17,7 @@ DOC_CATEGORIES = {
     "minutes": "Minutes of Meetings",
     "tax_return": "Tax Return (Form 1041)",
     "k1": "Schedule K-1",
+    "ein_letter": "EIN Confirmation Letter (CP575)",
     "financial_statement": "Financial Statement / Accounting",
     "appraisal": "Asset Appraisal / Valuation",
     "notice": "Beneficiary Notice / Communication",

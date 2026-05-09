@@ -343,16 +343,16 @@ export default function DashboardPage() {
       },
       { 
         id: 'trust_doc', 
-        label: 'Upload Trust Document',
-        description: 'Your signed, notarized Declaration of Trust. Don\'t have it handy? You can add it later from your Vault.',
+        label: 'Add Trust Document to Vault',
+        description: 'Your signed, notarized Declaration of Trust. Link it from Google Drive, Dropbox, or wherever you store it.',
         done: onboarding.trust_doc_uploaded,
         icon: FileUp,
         action: '/vault'
       },
       { 
         id: 'ein_doc', 
-        label: 'Upload EIN Letter',
-        description: 'The IRS confirmation letter for your EIN. Skip if you don\'t have it yet.',
+        label: 'Add EIN Letter to Vault',
+        description: 'The IRS confirmation letter (CP575) for your EIN. Skip if you don\'t have it yet.',
         done: onboarding.ein_doc_uploaded,
         icon: Upload,
         action: '/vault'

@@ -38,18 +38,27 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
             )
     
     trust_id = f"trust_{uuid.uuid4().hex[:12]}"
+    
+    # Auto-sync jurisdiction and state_code (both should be 2-letter state codes)
+    jurisdiction = trust.jurisdiction
+    state_code = trust.state_code
+    if jurisdiction and len(jurisdiction) == 2 and jurisdiction.isalpha() and not state_code:
+        state_code = jurisdiction.upper()
+    if state_code and not jurisdiction:
+        jurisdiction = state_code.upper()
+    
     trust_doc = {
         "trust_id": trust_id,
         "user_id": user["user_id"],
         "name": trust.name,
         "trust_type": trust.trust_type.value,
-        "jurisdiction": trust.jurisdiction,
+        "jurisdiction": jurisdiction,
         "role": trust.role or "Trustee",
         "start_date": trust.start_date,
         "trustees": trust.trustees,
         "authority_clause": trust.authority_clause,
         "ein": trust.ein,
-        "state_code": trust.state_code,
+        "state_code": state_code,
         "tax_year_end_month": trust.tax_year_end_month,
         "tax_year_end_day": trust.tax_year_end_day,
         "is_fiscal_year": trust.tax_year_end_month is not None and trust.tax_year_end_day is not None and (trust.tax_year_end_month != 12 or trust.tax_year_end_day != 31),
@@ -102,6 +111,16 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
         raise HTTPException(status_code=404, detail="Trust not found")
     
     update_data = {k: v.value if isinstance(v, Enum) else v for k, v in update.model_dump().items() if v is not None}
+    
+    # Auto-sync jurisdiction and state_code
+    if "jurisdiction" in update_data and "state_code" not in update_data:
+        j = update_data["jurisdiction"]
+        if j and len(j) == 2 and j.isalpha():
+            update_data["state_code"] = j.upper()
+    if "state_code" in update_data and "jurisdiction" not in update_data:
+        s = update_data["state_code"]
+        if s:
+            update_data["jurisdiction"] = s.upper()
     
     # Auto-compute is_fiscal_year from tax year end date
     month = update_data.get("tax_year_end_month", trust.get("tax_year_end_month"))

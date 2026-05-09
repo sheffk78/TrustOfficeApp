@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import {
   FolderOpen, Plus, FileText, Calendar, Link as LinkIcon,
   Search, AlertTriangle, CheckCircle2, ExternalLink,
-  Trash2, Tag, Shield
+  Trash2, Tag, Shield, FileCheck
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -24,6 +24,7 @@ const CATEGORY_ICONS = {
   minutes: FileText,
   tax_return: FileText,
   k1: FileText,
+  ein_letter: FileCheck,
   financial_statement: FileText,
   appraisal: FileText,
   notice: AlertTriangle,
