@@ -36,7 +36,8 @@ import {
   Gift,
   Users,
   Copy,
-  Check
+  Check,
+  DollarSign
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 

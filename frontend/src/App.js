@@ -43,6 +43,7 @@ import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
 
@@ -342,9 +343,11 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <UpgradeModalProvider>
-            <ImpersonationBanner />
-            <AppRouter />
-            <Toaster position="top-right" />
+            <ErrorBoundary>
+              <ImpersonationBanner />
+              <AppRouter />
+              <Toaster position="top-right" />
+            </ErrorBoundary>
           </UpgradeModalProvider>
         </AuthProvider>
       </ThemeProvider>
