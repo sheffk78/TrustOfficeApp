@@ -361,11 +361,17 @@ export default function SettingsPage() {
       return;
     }
 
+    // Auto-compute is_fiscal_year from the date
+    const month = Number(trustData.tax_year_end_month);
+    const day = Number(trustData.tax_year_end_day);
+    const computedFiscalYear = (month && day) ? !(month === 12 && day === 31) : false;
+
     setLoading(true);
     try {
+      const payload = { ...trustData, is_fiscal_year: computedFiscalYear };
       const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}`, {
         method: 'PUT',
-        body: JSON.stringify(trustData)
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -435,7 +441,9 @@ export default function SettingsPage() {
           state_code: newTrustData.state_code.trim().toUpperCase() || null,
           tax_year_end_month: newTrustData.tax_year_end_month ? parseInt(newTrustData.tax_year_end_month) : null,
           tax_year_end_day: newTrustData.tax_year_end_day ? parseInt(newTrustData.tax_year_end_day) : null,
-          is_fiscal_year: newTrustData.is_fiscal_year
+          is_fiscal_year: newTrustData.tax_year_end_month && newTrustData.tax_year_end_day
+            ? !(Number(newTrustData.tax_year_end_month) === 12 && Number(newTrustData.tax_year_end_day) === 31)
+            : false
         })
       });
 
@@ -769,7 +777,7 @@ export default function SettingsPage() {
                             <SelectValue placeholder="Month" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="12">December</SelectItem>
+                            <SelectItem value="12">December (Calendar)</SelectItem>
                             <SelectItem value="1">January</SelectItem>
                             <SelectItem value="2">February</SelectItem>
                             <SelectItem value="3">March</SelectItem>
@@ -798,14 +806,12 @@ export default function SettingsPage() {
                         />
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-3">
-                      <Switch
-                        checked={newTrustData.is_fiscal_year}
-                        onCheckedChange={(checked) => setNewTrustData({ ...newTrustData, is_fiscal_year: checked })}
-                        data-testid="new-trust-fiscal"
-                      />
-                      <Label className="label-trust cursor-pointer">Fiscal Year</Label>
-                    </div>
+                    {newTrustData.tax_year_end_month && newTrustData.tax_year_end_day && 
+                     !(Number(newTrustData.tax_year_end_month) === 12 && Number(newTrustData.tax_year_end_day) === 31) && (
+                      <p className="text-xs text-muted-foreground mt-3">
+                        Fiscal year — tax deadlines will be calculated from this date.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
@@ -1063,14 +1069,12 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 mt-4">
-                    <Switch
-                      checked={trustData.is_fiscal_year}
-                      onCheckedChange={(checked) => setTrustData({ ...trustData, is_fiscal_year: checked })}
-                      data-testid="settings-fiscal-toggle"
-                    />
-                    <Label className="label-trust cursor-pointer">This trust uses a fiscal year (not calendar year)</Label>
-                  </div>
+                  {trustData.tax_year_end_month && trustData.tax_year_end_day && 
+                   !(Number(trustData.tax_year_end_month) === 12 && Number(trustData.tax_year_end_day) === 31) && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Fiscal year — tax deadlines are calculated from this date.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-navy/10">

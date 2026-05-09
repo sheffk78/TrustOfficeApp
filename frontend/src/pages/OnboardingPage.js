@@ -27,7 +27,6 @@ import {
   CreditCard,
   Clock
 } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -184,10 +183,16 @@ export default function OnboardingPage() {
       return;
     }
 
+    // Auto-compute is_fiscal_year from the date
+    const month = Number(trustData.tax_year_end_month);
+    const day = Number(trustData.tax_year_end_day);
+    const computedFiscalYear = (month !== 12 || day !== 31);
+
     setLoading(true);
 
     try {
-      const newTrust = await xhrRequest('POST', `${API_URL}/api/trusts`, trustData, getToken());
+      const payload = { ...trustData, is_fiscal_year: computedFiscalYear };
+      const newTrust = await xhrRequest('POST', `${API_URL}/api/trusts`, payload, getToken());
       
       setSelectedTrust(newTrust);
       await loadTrusts();
@@ -708,14 +713,12 @@ export default function OnboardingPage() {
                       data-testid="tax-day-input"
                     />
                   </div>
-                  <div className="flex items-center gap-3 pt-5">
-                    <Switch
-                      checked={trustData.is_fiscal_year}
-                      onCheckedChange={(checked) => setTrustData({ ...trustData, is_fiscal_year: checked })}
-                      data-testid="fiscal-year-toggle"
-                    />
-                    <Label className="label-trust text-xs cursor-pointer">Fiscal Year</Label>
-                  </div>
+                  {trustData.tax_year_end_month && trustData.tax_year_end_day && 
+                   !(Number(trustData.tax_year_end_month) === 12 && Number(trustData.tax_year_end_day) === 31) && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Fiscal year — tax deadlines will be calculated from this date.
+                    </p>
+                  )}
                 </div>
 
                 <Button

@@ -52,7 +52,7 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
         "state_code": trust.state_code,
         "tax_year_end_month": trust.tax_year_end_month,
         "tax_year_end_day": trust.tax_year_end_day,
-        "is_fiscal_year": trust.is_fiscal_year,
+        "is_fiscal_year": trust.tax_year_end_month is not None and trust.tax_year_end_day is not None and (trust.tax_year_end_month != 12 or trust.tax_year_end_day != 31),
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -102,6 +102,13 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
         raise HTTPException(status_code=404, detail="Trust not found")
     
     update_data = {k: v.value if isinstance(v, Enum) else v for k, v in update.model_dump().items() if v is not None}
+    
+    # Auto-compute is_fiscal_year from tax year end date
+    month = update_data.get("tax_year_end_month", trust.get("tax_year_end_month"))
+    day = update_data.get("tax_year_end_day", trust.get("tax_year_end_day"))
+    if month is not None and day is not None:
+        update_data["is_fiscal_year"] = (month != 12 or day != 31)
+    
     if update_data:
         await db.trusts.update_one({"trust_id": trust_id}, {"$set": update_data})
     
