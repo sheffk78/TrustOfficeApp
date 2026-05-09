@@ -1,16 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, Settings, Shield, DollarSign, Wallet, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, FilePen, Settings, HeartPulse, Coins, Wallet, TrendingUp } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 const mainNav = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Home' },
-  { path: '/minutes', icon: FileText, label: 'Minutes' },
-  { path: '/distributions', icon: DollarSign, label: 'Money', subMenu: [
-    { path: '/distributions', icon: DollarSign, label: 'Distributions' },
+  { path: '/minutes', icon: FilePen, label: 'Minutes' },
+  { path: '/distributions', icon: Coins, label: 'Money', subMenu: [
+    { path: '/distributions', icon: Coins, label: 'Distributions' },
     { path: '/compensation', icon: Wallet, label: 'Compensation' },
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
   ]},
-  { path: '/governance', icon: Shield, label: 'Trust Health' },
+  { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

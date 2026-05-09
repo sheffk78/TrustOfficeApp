@@ -4,10 +4,10 @@ import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   LayoutDashboard, 
-  FileText, 
-  DollarSign, 
+  FilePen, 
+  Coins, 
   Receipt, 
-  Shield, 
+  Scale, 
   Settings,
   LogOut,
   Menu,
@@ -15,7 +15,7 @@ import {
   ChevronDown,
   Calendar,
   CalendarDays,
-  Building2,
+  Network,
   Wallet,
   Package,
   Award,
@@ -29,7 +29,13 @@ import {
   Clock,
   Activity,
   ChevronRight,
-  Layers
+  Layers,
+  Send,
+  MapPin,
+  Gavel,
+  HeartPulse,
+  ClipboardList,
+  BookOpen
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -41,33 +47,33 @@ import { HeartHandshake } from 'lucide-react';
 
 const NAV_GROUPS = [
   { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', items: [] },
-  { key: 'governance', icon: FileText, label: 'Governance', items: [
+  { key: 'governance', icon: BookOpen, label: 'Governance', items: [
     { path: '/calendar', icon: Calendar, label: 'Calendar' },
-    { path: '/minutes', icon: FileText, label: 'Minutes' },
+    { path: '/minutes', icon: FilePen, label: 'Minutes' },
     { path: '/guided-minutes', icon: Sparkles, label: 'Guided Minutes', badge: 'beta' },
     { path: '/retroactive-minutes', icon: Clock, label: 'Retro Minutes', badge: 'new' },
     { path: '/tax-calendar', icon: CalendarDays, label: 'Tax Calendar' },
   ]},
-  { key: 'money', icon: DollarSign, label: 'Money', items: [
-    { path: '/distributions', icon: DollarSign, label: 'Distributions' },
+  { key: 'money', icon: Coins, label: 'Money', items: [
+    { path: '/distributions', icon: Send, label: 'Distributions' },
     { path: '/compensation', icon: Wallet, label: 'Compensation' },
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
     { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', requiresBenevolence: true },
   ]},
-  { key: 'structure', icon: Building2, label: 'Structure', items: [
-    { path: '/structures', icon: Building2, label: 'Structures' },
+  { key: 'structure', icon: Network, label: 'Structure', items: [
+    { path: '/structures', icon: Layers, label: 'Structures' },
     { path: '/schedule-a', icon: Package, label: 'Schedule A' },
     { path: '/beneficiaries', icon: Users, label: 'Beneficiaries' },
     { path: '/communications', icon: MessageSquare, label: 'Communications' },
     { path: '/vault', icon: FolderOpen, label: 'Vault' },
   ]},
-  { key: 'compliance', icon: Shield, label: 'Compliance', items: [
+  { key: 'compliance', icon: Scale, label: 'Compliance', items: [
     { path: '/risk', icon: Activity, label: 'Risk Dashboard' },
-    { path: '/state-compliance', icon: Shield, label: 'State Compliance' },
-    { path: '/authority', icon: Shield, label: 'Authority' },
-    { path: '/audit-trail', icon: FileText, label: 'Audit Trail' },
+    { path: '/state-compliance', icon: MapPin, label: 'State Compliance' },
+    { path: '/authority', icon: Gavel, label: 'Authority' },
+    { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
   ]},
-  { key: 'score', icon: Shield, label: 'Trust Health', items: [] },
+  { key: 'score', icon: HeartPulse, label: 'Trust Health', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
 

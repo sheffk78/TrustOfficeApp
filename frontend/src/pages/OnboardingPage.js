@@ -15,7 +15,7 @@ import {
   FileText, 
   DollarSign, 
   Users, 
-  Shield, 
+  HeartPulse, 
   Calendar,
   CheckCircle2,
   LayoutDashboard,
@@ -96,7 +96,7 @@ const FEATURES = [
     color: 'navy'
   },
   {
-    icon: Shield,
+    icon: HeartPulse,
     title: 'Trust Health',
     description: 'Monitor your trust administration with a governance score. Get alerts for overdue reviews and compliance tasks.',
     color: 'navy'
@@ -114,7 +114,7 @@ const QUICK_START_TASKS = [
   { label: 'Record your first meeting minutes', path: '/guided-minutes', icon: FileText },
   { label: 'Add assets to Schedule A', path: '/schedule-a', icon: ClipboardList },
   { label: 'Set up beneficiaries', path: '/beneficiaries', icon: Users },
-  { label: 'Review governance tasks', path: '/governance', icon: Shield }
+  { label: 'Review governance tasks', path: '/governance', icon: HeartPulse }
 ];
 
 export default function OnboardingPage() {
