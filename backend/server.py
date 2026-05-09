@@ -482,10 +482,14 @@ async def ensure_primary_admin():
         # Initialize onboarding (mark as complete for admin)
         await db.user_onboarding.insert_one({
             "user_id": user_id,
-            "entities_confirmed": True,
-            "calendar_set": True,
-            "minutes_generated": True,
-            "distribution_logged": True,
+                    "formation_date_added": True,
+                    "ein_entered": True,
+                    "trust_doc_uploaded": True,
+                    "ein_doc_uploaded": True,
+                    "beneficiaries_added": True,
+                    "assets_added": True,
+                    "minutes_generated": True,
+                    "calendar_set": True,
             "checklist_dismissed": True,
             "created_at": now.isoformat(),
             "updated_at": now.isoformat()

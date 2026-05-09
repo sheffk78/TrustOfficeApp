@@ -104,10 +104,14 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
     # Initialize onboarding state
     await db.user_onboarding.insert_one({
         "user_id": user_id,
-        "entities_confirmed": False,
-        "calendar_set": False,
+        "formation_date_added": False,
+        "ein_entered": False,
+        "trust_doc_uploaded": False,
+        "ein_doc_uploaded": False,
+        "beneficiaries_added": False,
+        "assets_added": False,
         "minutes_generated": False,
-        "distribution_logged": False,
+        "calendar_set": False,
         "checklist_dismissed": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -551,10 +555,14 @@ async def google_callback(request: Request, response: Response, code: str = None
             # Initialize onboarding state for new users
             await db.user_onboarding.insert_one({
                 "user_id": user_id,
-                "entities_confirmed": False,
-                "calendar_set": False,
+                "formation_date_added": False,
+                "ein_entered": False,
+                "trust_doc_uploaded": False,
+                "ein_doc_uploaded": False,
+                "beneficiaries_added": False,
+                "assets_added": False,
                 "minutes_generated": False,
-                "distribution_logged": False,
+                "calendar_set": False,
                 "checklist_dismissed": False,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()

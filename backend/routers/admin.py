@@ -998,10 +998,14 @@ async def create_admin_user(
     # Initialize onboarding
     await db.user_onboarding.insert_one({
         "user_id": user_id,
-        "entities_confirmed": False,
-        "calendar_set": False,
+        "formation_date_added": False,
+        "ein_entered": False,
+        "trust_doc_uploaded": False,
+        "ein_doc_uploaded": False,
+        "beneficiaries_added": False,
+        "assets_added": False,
         "minutes_generated": False,
-        "distribution_logged": False,
+        "calendar_set": False,
         "checklist_dismissed": False,
         "created_at": now.isoformat(),
         "updated_at": now.isoformat()

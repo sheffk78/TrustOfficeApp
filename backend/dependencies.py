@@ -595,10 +595,42 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
     """Auto-update onboarding state based on user actions"""
     updates = {}
     
+    # Check trust profile completion
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+    if trust:
+        if trust.get("start_date"):
+            updates["formation_date_added"] = True
+        if trust.get("ein"):
+            updates["ein_entered"] = True
+    
+    # Check document uploads in vault
+    trust_doc_count = await db.vault_documents.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "category": {"$in": ["trust_document", "declaration_of_trust"]}
+    })
+    if trust_doc_count > 0:
+        updates["trust_doc_uploaded"] = True
+    
+    ein_doc_count = await db.vault_documents.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "category": {"$in": ["ein_letter", "irs_notice"]}
+    })
+    if ein_doc_count > 0:
+        updates["ein_doc_uploaded"] = True
+    
+    # Check beneficiaries
+    beneficiary_count = await db.beneficiaries.count_documents({"trust_id": trust_id, "user_id": user_id})
+    if beneficiary_count > 0:
+        updates["beneficiaries_added"] = True
+    
+    # Check assets (via entities)
     entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
     if entity_count > 0:
-        updates["entities_confirmed"] = True
+        updates["assets_added"] = True
     
+    # Check governance tasks (calendar)
     task_count = await db.governance_tasks.count_documents({
         "trust_id": trust_id, 
         "user_id": user_id,
@@ -607,14 +639,10 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
     if task_count > 0:
         updates["calendar_set"] = True
     
+    # Check minutes
     minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
     if minutes_count > 0:
         updates["minutes_generated"] = True
-    
-    dist_count = await db.distribution_records.count_documents({"trust_id": trust_id, "user_id": user_id})
-    comp_count = await db.compensation_payments.count_documents({"trust_id": trust_id, "user_id": user_id})
-    if dist_count > 0 or comp_count > 0:
-        updates["distribution_logged"] = True
     
     if updates:
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()

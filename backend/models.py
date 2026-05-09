@@ -818,10 +818,16 @@ class DashboardResponse(BaseModel):
 
 class OnboardingState(BaseModel):
     user_id: str
-    entities_confirmed: bool = False
-    calendar_set: bool = False
+    # Profile completion steps
+    formation_date_added: bool = False
+    ein_entered: bool = False
+    trust_doc_uploaded: bool = False
+    ein_doc_uploaded: bool = False
+    # Trust setup steps
+    beneficiaries_added: bool = False
+    assets_added: bool = False
     minutes_generated: bool = False
-    distribution_logged: bool = False
+    calendar_set: bool = False
     checklist_dismissed: bool = False
 
 

@@ -8,7 +8,7 @@ import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { 
   FileText, 
-  DollarSign, 
+  DollarSign,
   Receipt,
   Calendar,
   ArrowRight,
@@ -30,7 +30,14 @@ import {
   Info,
   Bot,
   CalendarDays,
-  Clock
+  Clock,
+  CalendarCheck,
+  FileCheck,
+  FileUp,
+  Upload,
+  Users,
+  ClipboardList,
+  HeartPulse
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -315,41 +322,81 @@ export default function DashboardPage() {
   // Calculate onboarding progress from dashboard data
   const getOnboardingProgress = () => {
     const onboarding = dashboard?.onboarding_state;
-    if (!onboarding) return { completed: 0, total: 4, steps: [] };
+    if (!onboarding) return { completed: 0, total: 8, profileSteps: [], setupSteps: [] };
     
-    const steps = [
+    const profileSteps = [
       { 
-        id: 'entities', 
-        label: 'Confirm Entities', 
-        done: onboarding.entities_confirmed,
-        icon: Building2,
-        action: '/entities'
+        id: 'formation_date', 
+        label: 'Add Formation Date',
+        description: 'The IRS uses this to calculate your filing deadlines.',
+        done: onboarding.formation_date_added,
+        icon: CalendarCheck,
+        action: '/settings'
       },
       { 
-        id: 'calendar', 
-        label: 'Set Up Calendar', 
-        done: onboarding.calendar_set,
-        icon: Calendar,
-        action: '/calendar'
+        id: 'ein', 
+        label: 'Enter Your EIN',
+        description: 'Every trust needs an EIN for tax filing. Don\'t have one yet? Skip this for now.',
+        done: onboarding.ein_entered,
+        icon: FileCheck,
+        action: '/settings'
       },
       { 
-        id: 'minutes', 
-        label: 'Generate Minutes', 
-        done: onboarding.minutes_generated,
-        icon: FileText,
-        action: '/minutes/new'
+        id: 'trust_doc', 
+        label: 'Upload Trust Document',
+        description: 'Your signed, notarized Declaration of Trust. Don\'t have it handy? You can add it later from your Vault.',
+        done: onboarding.trust_doc_uploaded,
+        icon: FileUp,
+        action: '/vault'
       },
       { 
-        id: 'distribution', 
-        label: 'Log Distribution', 
-        done: onboarding.distribution_logged,
-        icon: DollarSign,
-        action: '/distributions'
+        id: 'ein_doc', 
+        label: 'Upload EIN Letter',
+        description: 'The IRS confirmation letter for your EIN. Skip if you don\'t have it yet.',
+        done: onboarding.ein_doc_uploaded,
+        icon: Upload,
+        action: '/vault'
       }
     ];
     
-    const completed = steps.filter(s => s.done).length;
-    return { completed, total: steps.length, steps };
+    const setupSteps = [
+      { 
+        id: 'beneficiaries', 
+        label: 'Set Up Beneficiaries',
+        description: 'Every distribution requires a named beneficiary. This is step one before you can record anything else.',
+        done: onboarding.beneficiaries_added,
+        icon: Users,
+        action: '/beneficiaries'
+      },
+      { 
+        id: 'assets', 
+        label: 'Add Your Trust\'s Assets',
+        description: 'Real estate, bank accounts, investments — the IRS expects a complete inventory of what the trust holds.',
+        done: onboarding.assets_added,
+        icon: Package,
+        action: '/structures'
+      },
+      { 
+        id: 'minutes', 
+        label: 'Record Your First Trustee Meeting',
+        description: 'Trustees are legally required to document decisions. This is your proof you\'re doing the job.',
+        done: onboarding.minutes_generated,
+        icon: ClipboardList,
+        action: '/minutes/new'
+      },
+      { 
+        id: 'calendar', 
+        label: 'Check Your Tax Calendar',
+        description: 'Your trust has hard filing deadlines. We\'ve calculated yours based on your setup. Miss one and the IRS notices.',
+        done: onboarding.calendar_set,
+        icon: Calendar,
+        action: '/calendar'
+      }
+    ];
+    
+    const allSteps = [...profileSteps, ...setupSteps];
+    const completed = allSteps.filter(s => s.done).length;
+    return { completed, total: allSteps.length, profileSteps, setupSteps, steps: allSteps };
   };
 
   // Get insights from dashboard API (single source of truth)
@@ -450,35 +497,80 @@ export default function DashboardPage() {
                     </button>
                   </div>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {onboardingProgress.steps.map(step => {
-                      const Icon = step.icon;
-                      return (
-                        <button
-                          key={step.id}
-                          onClick={() => !step.done && navigate(step.action)}
-                          disabled={step.done}
-                          className={`p-3 border text-left transition-colors ${
-                            step.done 
-                              ? 'border-success/30 bg-success/5 cursor-default' 
-                              : 'border-navy/20 hover:border-navy/40 cursor-pointer'
-                          }`}
-                          data-testid={`onboarding-step-${step.id}`}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            {step.done ? (
-                              <CheckCircle2 className="w-4 h-4 text-success" />
-                            ) : (
-                              <Circle className="w-4 h-4 text-muted-foreground" />
-                            )}
-                            <Icon className={`w-4 h-4 ${step.done ? 'text-success' : 'text-navy'}`} />
-                          </div>
-                          <span className={`font-mono text-xs ${step.done ? 'text-success line-through' : 'text-navy'}`}>
-                            {step.label}
-                          </span>
-                        </button>
-                      );
-                    })}
+                  {/* Profile Completion Section */}
+                  <div className="mb-4">
+                    <h4 className="font-mono text-xs uppercase tracking-widest text-navy/60 mb-2">Complete Your Trust Profile</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {onboardingProgress.profileSteps.map(step => {
+                        const Icon = step.icon;
+                        return (
+                          <button
+                            key={step.id}
+                            onClick={() => !step.done && navigate(step.action)}
+                            disabled={step.done}
+                            className={`p-4 border text-left transition-colors ${
+                              step.done 
+                                ? 'border-success/30 bg-success/5 cursor-default' 
+                                : 'border-navy/20 hover:border-navy/40 cursor-pointer'
+                            }`}
+                            data-testid={`onboarding-step-${step.id}`}
+                          >
+                            <div className="flex items-center gap-2 mb-1.5">
+                              {step.done ? (
+                                <CheckCircle2 className="w-4 h-4 text-success" />
+                              ) : (
+                                <Circle className="w-4 h-4 text-muted-foreground" />
+                              )}
+                              <Icon className={`w-4 h-4 ${step.done ? 'text-success' : 'text-navy'}`} />
+                              <span className={`font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy'}`}>
+                                {step.label}
+                              </span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${step.done ? 'text-success/60' : 'text-muted-foreground'}`}>
+                              {step.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Trust Setup Section */}
+                  <div>
+                    <h4 className="font-mono text-xs uppercase tracking-widest text-navy/60 mb-2">Get Your Trust Running</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {onboardingProgress.setupSteps.map(step => {
+                        const Icon = step.icon;
+                        return (
+                          <button
+                            key={step.id}
+                            onClick={() => !step.done && navigate(step.action)}
+                            disabled={step.done}
+                            className={`p-4 border text-left transition-colors ${
+                              step.done 
+                                ? 'border-success/30 bg-success/5 cursor-default' 
+                                : 'border-navy/20 hover:border-navy/40 cursor-pointer'
+                            }`}
+                            data-testid={`onboarding-step-${step.id}`}
+                          >
+                            <div className="flex items-center gap-2 mb-1.5">
+                              {step.done ? (
+                                <CheckCircle2 className="w-4 h-4 text-success" />
+                              ) : (
+                                <Circle className="w-4 h-4 text-muted-foreground" />
+                              )}
+                              <Icon className={`w-4 h-4 ${step.done ? 'text-success' : 'text-navy'}`} />
+                              <span className={`font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy'}`}>
+                                {step.label}
+                              </span>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${step.done ? 'text-success/60' : 'text-muted-foreground'}`}>
+                              {step.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

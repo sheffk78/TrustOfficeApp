@@ -450,10 +450,14 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
     if not existing:
         existing = {
             "user_id": user_id,
-            "entities_confirmed": False,
-            "calendar_set": False,
+            "formation_date_added": False,
+            "ein_entered": False,
+            "trust_doc_uploaded": False,
+            "ein_doc_uploaded": False,
+            "beneficiaries_added": False,
+            "assets_added": False,
             "minutes_generated": False,
-            "distribution_logged": False,
+            "calendar_set": False,
             "checklist_dismissed": False
         }
         await db.user_onboarding.insert_one(existing)
@@ -462,10 +466,42 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
     if trust_id:
         updates = {}
         
-        entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
-        if entity_count > 0 and not existing.get("entities_confirmed"):
-            updates["entities_confirmed"] = True
+        # Check trust profile completion
+        trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+        if trust:
+            if trust.get("start_date") and not existing.get("formation_date_added"):
+                updates["formation_date_added"] = True
+            if trust.get("ein") and not existing.get("ein_entered"):
+                updates["ein_entered"] = True
         
+        # Check document uploads in vault
+        trust_doc_count = await db.vault_documents.count_documents({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "category": {"$in": ["trust_document", "declaration_of_trust"]}
+        })
+        if trust_doc_count > 0 and not existing.get("trust_doc_uploaded"):
+            updates["trust_doc_uploaded"] = True
+        
+        ein_doc_count = await db.vault_documents.count_documents({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "category": {"$in": ["ein_letter", "irs_notice"]}
+        })
+        if ein_doc_count > 0 and not existing.get("ein_doc_uploaded"):
+            updates["ein_doc_uploaded"] = True
+        
+        # Check beneficiaries
+        beneficiary_count = await db.beneficiaries.count_documents({"trust_id": trust_id, "user_id": user_id})
+        if beneficiary_count > 0 and not existing.get("beneficiaries_added"):
+            updates["beneficiaries_added"] = True
+        
+        # Check assets (via entities)
+        entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
+        if entity_count > 0 and not existing.get("assets_added"):
+            updates["assets_added"] = True
+        
+        # Check governance tasks (calendar)
         task_count = await db.governance_tasks.count_documents({
             "trust_id": trust_id, 
             "user_id": user_id,
@@ -474,14 +510,10 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
         if task_count > 0 and not existing.get("calendar_set"):
             updates["calendar_set"] = True
         
+        # Check minutes
         minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
         if minutes_count > 0 and not existing.get("minutes_generated"):
             updates["minutes_generated"] = True
-        
-        dist_count = await db.distribution_records.count_documents({"trust_id": trust_id, "user_id": user_id})
-        comp_count = await db.compensation_payments.count_documents({"trust_id": trust_id, "user_id": user_id})
-        if (dist_count > 0 or comp_count > 0) and not existing.get("distribution_logged"):
-            updates["distribution_logged"] = True
         
         if updates:
             updates["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -627,7 +659,7 @@ async def get_onboarding(user: dict = Depends(get_current_user)):
 @router.patch("/onboarding")
 async def update_onboarding(updates: dict, user: dict = Depends(get_current_user)):
     """Update onboarding state"""
-    allowed_fields = ["entities_confirmed", "calendar_set", "minutes_generated", "distribution_logged", "checklist_dismissed"]
+    allowed_fields = ["formation_date_added", "ein_entered", "trust_doc_uploaded", "ein_doc_uploaded", "beneficiaries_added", "assets_added", "minutes_generated", "calendar_set", "checklist_dismissed"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
