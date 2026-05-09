@@ -687,6 +687,21 @@ async def dismiss_onboarding(user: dict = Depends(get_current_user)):
     return {"message": "Onboarding dismissed"}
 
 
+@router.delete("/onboarding/dismiss")
+async def undismiss_onboarding(user: dict = Depends(get_current_user)):
+    """Re-show onboarding checklist (undo dismiss)"""
+    await db.user_onboarding.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "checklist_dismissed": False,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    return {"message": "Onboarding checklist re-enabled"}
+
+
 # ==================== ACTIVITY ENDPOINT ====================
 
 @router.get("/activity")

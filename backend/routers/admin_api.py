@@ -674,3 +674,61 @@ async def get_audit_log(
         "limit": limit,
         "skip": skip
     }
+
+
+@router.post("/users/{user_id}/reset-onboarding")
+async def reset_user_onboarding(
+    user_id: str,
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Reset a user's onboarding checklist so it reappears on the dashboard.
+    Sets checklist_dismissed to False and resets all step flags to False
+    so auto-detection can re-evaluate based on actual data.
+    """
+    # Verify user exists
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Reset onboarding state — auto-detection will re-mark completed steps
+    result = await db.user_onboarding.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "formation_date_added": False,
+            "ein_entered": False,
+            "trust_doc_uploaded": False,
+            "ein_doc_uploaded": False,
+            "beneficiaries_added": False,
+            "assets_added": False,
+            "minutes_generated": False,
+            "calendar_set": False,
+            "checklist_dismissed": False,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # If no onboarding record exists yet, create one
+    if result.matched_count == 0:
+        await db.user_onboarding.insert_one({
+            "user_id": user_id,
+            "formation_date_added": False,
+            "ein_entered": False,
+            "trust_doc_uploaded": False,
+            "ein_doc_uploaded": False,
+            "beneficiaries_added": False,
+            "assets_added": False,
+            "minutes_generated": False,
+            "calendar_set": False,
+            "checklist_dismissed": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        })
+    
+    await log_api_action("reset_onboarding", {"user_id": user_id}, user_id=user_id)
+    
+    return {
+        "message": "Onboarding checklist reset successfully",
+        "user_id": user_id,
+        "note": "Auto-detection will re-mark completed steps on next dashboard load"
+    }

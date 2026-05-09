@@ -575,6 +575,23 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* Re-show Getting Started if checklist was dismissed but not fully complete */}
+              {onboarding && onboarding.checklist_dismissed && onboardingProgress.completed < onboardingProgress.total && (
+                <div className="mb-6">
+                  <button
+                    onClick={async () => {
+                      await fetchWithAuth('/onboarding/dismiss', { method: 'DELETE' });
+                      // Refresh dashboard to re-fetch onboarding state
+                      window.location.reload();
+                    }}
+                    className="text-sm text-navy/60 hover:text-navy font-mono flex items-center gap-1.5"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Show Getting Started ({onboardingProgress.completed}/{onboardingProgress.total} complete)
+                  </button>
+                </div>
+              )}
+
               {/* What's Next Card - Using governance_insights from /api/dashboard */}
               {insights.length > 0 && (
                 <div className="mb-8 card-trust corner-mark" data-testid="whats-next-card">
