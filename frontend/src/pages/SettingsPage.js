@@ -108,6 +108,26 @@ export default function SettingsPage() {
     is_fiscal_year: selectedTrust?.is_fiscal_year || false
   });
 
+  // Re-sync trustData when selectedTrust changes (e.g., after initial load)
+  useEffect(() => {
+    if (selectedTrust) {
+      setTrustData({
+        name: selectedTrust.name || '',
+        role: selectedTrust.role || 'Trustee',
+        review_cadence: selectedTrust.review_cadence || 'quarterly',
+        description: selectedTrust.description || '',
+        benevolence_enabled: selectedTrust.benevolence_enabled || false,
+        tax_status: selectedTrust.tax_status || 'private',
+        ein: selectedTrust.ein || '',
+        state_code: selectedTrust.state_code || '',
+        start_date: selectedTrust.start_date || '',
+        tax_year_end_month: selectedTrust.tax_year_end_month?.toString() || '',
+        tax_year_end_day: selectedTrust.tax_year_end_day?.toString() || '',
+        is_fiscal_year: selectedTrust.is_fiscal_year || false
+      });
+    }
+  }, [selectedTrust?.trust_id]);
+
   // Load notification preferences on mount
   useEffect(() => {
     loadNotificationPreferences();
