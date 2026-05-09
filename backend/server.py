@@ -43,6 +43,7 @@ from dependencies import (
 
 # Import all routers
 from routers.distributions import router as distributions_router
+from migrations.onboarding_fields import OnboardingMigration
 from routers.governance import router as governance_router
 from routers.minutes import router as minutes_router
 from routers.schedule_a import router as schedule_a_router
@@ -418,6 +419,15 @@ async def startup_event():
         
         # Ensure primary admin account exists
         await ensure_primary_admin()
+        
+        # Migrate onboarding state: rename old fields to new fields
+        try:
+            migrator = OnboardingMigration()
+            migrated = await migrator.migrate_onboarding_fields()
+            if migrated > 0:
+                logger.info(f"Migrated {migrated} onboarding records to new field names")
+        except Exception as e:
+            logger.warning(f"Onboarding migration failed (non-fatal): {e}")
         
     except Exception as e:
         logger.error(f"Failed to create indexes: {e}")

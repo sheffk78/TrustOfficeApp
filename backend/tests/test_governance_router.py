@@ -241,10 +241,14 @@ class TestDashboard:
         onboarding = data.get("onboarding_state", {})
         
         assert "user_id" in onboarding, "onboarding_state missing user_id"
-        assert "entities_confirmed" in onboarding, "onboarding_state missing entities_confirmed"
+        assert "formation_date_added" in onboarding, "onboarding_state missing formation_date_added"
+        assert "ein_entered" in onboarding, "onboarding_state missing ein_entered"
+        assert "trust_doc_uploaded" in onboarding, "onboarding_state missing trust_doc_uploaded"
+        assert "ein_doc_uploaded" in onboarding, "onboarding_state missing ein_doc_uploaded"
+        assert "beneficiaries_added" in onboarding, "onboarding_state missing beneficiaries_added"
+        assert "assets_added" in onboarding, "onboarding_state missing assets_added"
         assert "calendar_set" in onboarding, "onboarding_state missing calendar_set"
         assert "minutes_generated" in onboarding, "onboarding_state missing minutes_generated"
-        assert "distribution_logged" in onboarding, "onboarding_state missing distribution_logged"
         assert "checklist_dismissed" in onboarding, "onboarding_state missing checklist_dismissed"
         
         print(f"✓ Dashboard onboarding_state structure is valid")
@@ -301,17 +305,25 @@ class TestOnboarding:
         data = response.json()
         
         assert "user_id" in data, "Missing user_id"
-        assert "entities_confirmed" in data, "Missing entities_confirmed"
+        assert "formation_date_added" in data, "Missing formation_date_added"
+        assert "ein_entered" in data, "Missing ein_entered"
+        assert "trust_doc_uploaded" in data, "Missing trust_doc_uploaded"
+        assert "ein_doc_uploaded" in data, "Missing ein_doc_uploaded"
+        assert "beneficiaries_added" in data, "Missing beneficiaries_added"
+        assert "assets_added" in data, "Missing assets_added"
         assert "calendar_set" in data, "Missing calendar_set"
         assert "minutes_generated" in data, "Missing minutes_generated"
-        assert "distribution_logged" in data, "Missing distribution_logged"
         assert "checklist_dismissed" in data, "Missing checklist_dismissed"
         
         # Check types
-        assert isinstance(data.get("entities_confirmed"), bool)
+        assert isinstance(data.get("formation_date_added"), bool)
+        assert isinstance(data.get("ein_entered"), bool)
+        assert isinstance(data.get("trust_doc_uploaded"), bool)
+        assert isinstance(data.get("ein_doc_uploaded"), bool)
+        assert isinstance(data.get("beneficiaries_added"), bool)
+        assert isinstance(data.get("assets_added"), bool)
         assert isinstance(data.get("calendar_set"), bool)
         assert isinstance(data.get("minutes_generated"), bool)
-        assert isinstance(data.get("distribution_logged"), bool)
         assert isinstance(data.get("checklist_dismissed"), bool)
         
         print(f"✓ Onboarding response has all required fields with correct types")
@@ -324,7 +336,7 @@ class TestOnboarding:
         current_state = get_response.json()
         
         # Try to update (toggle a value)
-        update_payload = {"entities_confirmed": not current_state.get("entities_confirmed", False)}
+        update_payload = {"formation_date_added": not current_state.get("formation_date_added", False)}
         response = auth_session.patch(f"{BASE_URL}/api/onboarding", json=update_payload)
         
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
@@ -334,7 +346,7 @@ class TestOnboarding:
         assert "message" in data, "Response should have message"
         
         # Restore original state
-        auth_session.patch(f"{BASE_URL}/api/onboarding", json={"entities_confirmed": current_state.get("entities_confirmed", False)})
+        auth_session.patch(f"{BASE_URL}/api/onboarding", json={"formation_date_added": current_state.get("formation_date_added", False)})
         
         print(f"✓ PATCH /api/onboarding works correctly")
     

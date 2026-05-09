@@ -120,10 +120,14 @@ class TestUnifiedDashboard:
         
         # Verify all 5 boolean fields exist
         required_fields = [
-            "entities_confirmed",
+                    "formation_date_added",
+                    "ein_entered",
+                    "trust_doc_uploaded",
+                    "ein_doc_uploaded",
+                    "beneficiaries_added",
+                    "assets_added",
             "calendar_set", 
             "minutes_generated",
-            "distribution_logged",
             "checklist_dismissed"
         ]
         
@@ -283,10 +287,14 @@ class TestExistingEndpointsStillWork:
         
         # Verify structure
         assert "user_id" in data, "Missing user_id"
-        assert "entities_confirmed" in data, "Missing entities_confirmed"
+        assert "formation_date_added" in data, "Missing formation_date_added"
+        assert "ein_entered" in data, "Missing ein_entered"
+        assert "trust_doc_uploaded" in data, "Missing trust_doc_uploaded"
+        assert "ein_doc_uploaded" in data, "Missing ein_doc_uploaded"
+        assert "beneficiaries_added" in data, "Missing beneficiaries_added"
+        assert "assets_added" in data, "Missing assets_added"
         assert "calendar_set" in data, "Missing calendar_set"
         assert "minutes_generated" in data, "Missing minutes_generated"
-        assert "distribution_logged" in data, "Missing distribution_logged"
         assert "checklist_dismissed" in data, "Missing checklist_dismissed"
         
         print(f"GET /api/onboarding working: {data}")
@@ -465,7 +473,7 @@ class TestDashboardDataConsistency:
         onboarding_data = onboarding_response.json()
         
         # Compare fields
-        for field in ["entities_confirmed", "calendar_set", "minutes_generated", "distribution_logged", "checklist_dismissed"]:
+        for field in ["formation_date_added", "ein_entered", "trust_doc_uploaded", "ein_doc_uploaded", "beneficiaries_added", "assets_added", "calendar_set", "minutes_generated", "checklist_dismissed"]:
             assert dashboard_onboarding[field] == onboarding_data[field], f"{field} mismatch"
         
         print("Dashboard onboarding_state matches /api/onboarding")

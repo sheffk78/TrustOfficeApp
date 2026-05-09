@@ -640,11 +640,12 @@ class TestOnboarding:
         
         data = response.json()
         assert "user_id" in data
-        assert "entities_confirmed" in data
+        assert "formation_date_added" in data
+        assert "ein_entered" in data
         assert "calendar_set" in data
         assert "minutes_generated" in data
         
-        print(f"Onboarding state: entities={data['entities_confirmed']}, calendar={data['calendar_set']}")
+        print(f"Onboarding state: formation_date={data['formation_date_added']}, calendar={data['calendar_set']}")
 
 
 class TestGovernanceHealthScore:
