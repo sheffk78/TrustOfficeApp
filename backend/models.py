@@ -10,6 +10,9 @@ import re
 
 class TrustType(str, Enum):
     family = "family"
+    charitable = "charitable"
+    business = "business"
+    ecclesiastical = "ecclesiastical"
     institutional = "institutional"
 
 class EntityType(str, Enum):
