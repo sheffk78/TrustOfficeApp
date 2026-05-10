@@ -9,6 +9,7 @@ import base64
 
 from database import db
 from dependencies import get_current_user
+from routers.compensation import auto_update_onboarding
 
 router = APIRouter(tags=["vault"])
 
@@ -61,6 +62,7 @@ async def add_document(trust_id: str, doc: dict, user: dict = Depends(get_curren
     record = {
         "doc_id": f"doc_{uuid.uuid4().hex[:12]}",
         "trust_id": trust_id,
+        "user_id": user["user_id"],
         "title": doc["title"],
         "category": doc.get("category", "other"),
         "category_label": DOC_CATEGORIES.get(doc.get("category", "other"), "Other"),
@@ -78,6 +80,7 @@ async def add_document(trust_id: str, doc: dict, user: dict = Depends(get_curren
         "updated_at": now,
     }
     await db.vault_documents.insert_one(record)
+    await auto_update_onboarding(user["user_id"], trust_id)
     return {"doc_id": record["doc_id"], "message": "Document added to vault"}
 
 
@@ -135,6 +138,7 @@ async def upload_document(
     record = {
         "doc_id": doc_id,
         "trust_id": trust_id,
+        "user_id": user["user_id"],
         "title": title,
         "category": category,
         "category_label": DOC_CATEGORIES.get(category, "Other"),
@@ -156,6 +160,9 @@ async def upload_document(
     }
 
     await db.vault_documents.insert_one(record)
+
+    # Update onboarding checklist
+    await auto_update_onboarding(user["user_id"], trust_id)
 
     # Return without file_content in the response
     response = {k: v for k, v in record.items() if k != "file_content"}

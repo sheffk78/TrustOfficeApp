@@ -80,7 +80,7 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
     trust_doc_count = await db.vault_documents.count_documents({
         "trust_id": trust_id,
         "user_id": user_id,
-        "category": {"$in": ["trust_document", "declaration_of_trust"]}
+        "category": {"$in": ["trust_instrument", "trust_document", "declaration_of_trust"]}
     })
     if trust_doc_count > 0:
         updates["trust_doc_uploaded"] = True

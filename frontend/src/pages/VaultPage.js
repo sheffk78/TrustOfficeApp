@@ -36,6 +36,25 @@ const CATEGORY_ICONS = {
   other: FileText,
 };
 
+const DOC_CATEGORIES = {
+  trust_instrument: "Trust Instrument / Governing Document",
+  amendment: "Trust Amendment / Restatement",
+  schedule_a: "Schedule A (Assets)",
+  minutes: "Minutes of Meetings",
+  tax_return: "Tax Return (Form 1041)",
+  k1: "Schedule K-1",
+  ein_letter: "EIN Confirmation Letter (CP575)",
+  financial_statement: "Financial Statement / Accounting",
+  appraisal: "Asset Appraisal / Valuation",
+  notice: "Beneficiary Notice / Communication",
+  insurance: "Insurance Policy / Rider",
+  deed: "Deed / Property Document",
+  bank_statement: "Bank / Investment Statement",
+  legal_opinion: "Legal Opinion / Attorney Letter",
+  court_order: "Court Order / Judgment",
+  other: "Other",
+};
+
 function Gavel(props) { return <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 13l6-6"/><circle cx="8" cy="8" r="6"/><path d="M4 20l6-6"/></svg>; }
 
 const ACCEPTED_TYPES = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.tiff,.tif,.doc,.docx,.xls,.xlsx,.txt';
@@ -259,7 +278,7 @@ export default function VaultPage() {
     );
   }
 
-  const categories = summary?.categories || {};
+  const categories = summary?.categories || DOC_CATEGORIES;
 
   return (
     <div className="min-h-screen bg-subtle-bg">
