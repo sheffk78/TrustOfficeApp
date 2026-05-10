@@ -514,7 +514,13 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
 def generate_template_document(trust: dict, template_type: str, template_data: dict) -> str:
     """Generate the full text minutes document from template"""
     trust_name = trust.get("name", "[Trust Name]")
-    trustees = trust.get("trustees", [])
+    trustees_raw = trust.get("trustees") or trust.get("trustee_names") or ""
+    if isinstance(trustees_raw, str):
+        trustees = [t.strip() for t in trustees_raw.split(",") if t.strip()] if trustees_raw else []
+    elif isinstance(trustees_raw, list):
+        trustees = trustees_raw
+    else:
+        trustees = []
     trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
     
     # Get data from template_data with defaults
@@ -681,7 +687,13 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     actions based on standard first-meeting minutes for private trusts.
     """
     trust_name = trust.get("name", "[Trust Name]")
-    trustees = trust.get("trustees", [])
+    trustees_raw = trust.get("trustees") or trust.get("trustee_names") or ""
+    if isinstance(trustees_raw, str):
+        trustees = [t.strip() for t in trustees_raw.split(",") if t.strip()] if trustees_raw else []
+    elif isinstance(trustees_raw, list):
+        trustees = trustees_raw
+    else:
+        trustees = []
     trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
     jurisdiction = trust.get("jurisdiction") or trust.get("state_code") or "[State]"
     start_date = trust.get("start_date", "[Date of Trust Indenture]")
