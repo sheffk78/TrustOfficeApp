@@ -35,7 +35,8 @@ import {
   Gavel,
   HeartPulse,
   ClipboardList,
-  BookOpen
+  BookOpen,
+  NotebookTabs
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -72,6 +73,7 @@ const NAV_GROUPS = [
     { path: '/state-compliance', icon: MapPin, label: 'State Compliance' },
     { path: '/authority', icon: Gavel, label: 'Authority' },
     { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
+    { path: '/binder', icon: NotebookTabs, label: 'Binder Tools' },
   ]},
   { key: 'score', icon: HeartPulse, label: 'Trust Health', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
