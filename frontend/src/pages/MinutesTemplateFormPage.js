@@ -573,15 +573,20 @@ export default function MinutesTemplateFormPage() {
           bank_name: formData.bank_name || '',
           initial_deposit: formData.initial_deposit || '',
           meeting_location: formData.meeting_location || '',
+          meeting_time: formData.meeting_time || '',
           principal_place: formData.principal_place || formData.meeting_location || '',
           fiscal_year_end: formData.fiscal_year_end || 'December 31',
           compensation_type: formData.compensation_type || 'none',
           compensation_amount: formData.compensation_amount || '',
           accept_trusteeship: formData.accept_trusteeship !== false,
+          acknowledge_fiduciary_duties: formData.acknowledge_fiduciary_duties !== false,
           authorize_ein: formData.authorize_ein !== false,
           accept_initial_property: formData.accept_initial_property !== false,
           authorize_insurance: formData.authorize_insurance !== false,
+          authorize_professional_services: formData.authorize_professional_services !== false,
           designate_record_keeper: formData.designate_record_keeper !== false,
+          adopt_governance_standards: formData.adopt_governance_standards !== false,
+          ratify_prior_actions: formData.ratify_prior_actions !== false,
         };
       case 'distribution_to_beneficiaries':
         return {
@@ -2855,6 +2860,15 @@ export default function MinutesTemplateFormPage() {
                         />
                       </div>
                       <div>
+                        <Label className="label-trust">Meeting Time</Label>
+                        <Input
+                          value={formData.meeting_time || ''}
+                          onChange={(e) => setFormData({ ...formData, meeting_time: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="e.g., 10:00 AM"
+                        />
+                      </div>
+                      <div>
                         <Label className="label-trust">Principal Place of Administration</Label>
                         <Input
                           value={formData.principal_place || ''}
@@ -2922,11 +2936,15 @@ export default function MinutesTemplateFormPage() {
                     </p>
                     <div className="space-y-3">
                       {[
-                        { key: 'accept_trusteeship', label: 'Accept Trusteeship', desc: 'Formally accept appointment as trustee' },
-                        { key: 'authorize_ein', label: 'EIN Authorization', desc: 'Confirm or authorize obtaining the trust EIN' },
-                        { key: 'accept_initial_property', label: 'Accept Initial Trust Property', desc: 'Accept the initial corpus from the Settlor' },
+                        { key: 'accept_trusteeship', label: 'Adoption of Trust & Accept Trusteeship', desc: 'Acknowledge the Declaration of Trust and accept your role as Trustee' },
+                        { key: 'acknowledge_fiduciary_duties', label: 'Fiduciary Duties Acknowledgment', desc: 'Formally acknowledge duties of Loyalty, Prudence, Impartiality, Obedience, Recordkeeping, and Confidentiality' },
+                        { key: 'authorize_ein', label: 'EIN Confirmation / Authorization', desc: 'Confirm your EIN or authorize obtaining one' },
+                        { key: 'accept_initial_property', label: 'Accept Initial Trust Property', desc: 'Acknowledge authority to accept the initial corpus from the Settlor' },
                         { key: 'authorize_insurance', label: 'Insurance Authorization', desc: 'Authorize trustee liability and property insurance' },
+                        { key: 'authorize_professional_services', label: 'Professional Services Authorization', desc: 'Authorize retaining attorneys, accountants, and tax advisors' },
                         { key: 'designate_record_keeper', label: 'Designate Record Keeper', desc: 'Assign responsibility for maintaining trust records' },
+                        { key: 'adopt_governance_standards', label: 'Governance Standards', desc: 'Adopt regular meetings, minutes requirements, resolution standards, annual review' },
+                        { key: 'ratify_prior_actions', label: 'Ratification of Prior Actions', desc: 'Ratify all actions taken during trust formation' },
                       ].map(item => (
                         <label key={item.key} className="flex items-start gap-3 cursor-pointer">
                           <input

@@ -678,9 +678,7 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     """Generate content for the initial organizational trustee meeting.
     
     This is the first meeting of the trust. It covers one-time organizational 
-    actions: accepting trusteeship, establishing principal place of administration,
-    authorizing bank accounts, confirming EIN, accepting initial trust property,
-    setting fiscal year, and establishing trustee compensation terms.
+    actions based on standard first-meeting minutes for private trusts.
     """
     trust_name = trust.get("name", "[Trust Name]")
     trustees = trust.get("trustees", [])
@@ -688,9 +686,16 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     jurisdiction = trust.get("jurisdiction") or trust.get("state_code") or "[State]"
     start_date = trust.get("start_date", "[Date of Trust Indenture]")
     ein = trust.get("ein", "")
+    trust_address = ""
+    if trust.get("address_line1"):
+        trust_address = trust.get("address_line1", "")
+        if trust.get("address_line2"):
+            trust_address += f"\n{trust['address_line2']}"
+        trust_address += f"\n{trust.get('address_city', '[City]')}, {trust.get('address_state', '[State]')} {trust.get('address_zip', '[Zip]')}"
     
     # Data from template form
     meeting_location = data.get("meeting_location", "[City, State]")
+    meeting_time = data.get("meeting_time", "")
     principal_place = data.get("principal_place", meeting_location)
     bank_name = data.get("bank_name", "[Bank Name]")
     initial_deposit = data.get("initial_deposit", "")
@@ -702,89 +707,211 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     accept_initial_property = data.get("accept_initial_property", True)
     authorize_insurance = data.get("authorize_insurance", True)
     designate_record_keeper = data.get("designate_record_keeper", True)
+    acknowledge_fiduciary_duties = data.get("acknowledge_fiduciary_duties", True)
+    adopt_governance_standards = data.get("adopt_governance_standards", True)
+    authorize_professional_services = data.get("authorize_professional_services", True)
+    ratify_prior_actions = data.get("ratify_prior_actions", True)
     
-    content = """
+    meeting_date = data.get("meeting_date", "[Date]")
+    
+    content = f"""FIRST ORGANIZATIONAL MEETING MINUTES
+{trust_name}
+
+Trust Formation Date: {start_date}
+Date: {meeting_date}"""
+    if meeting_time:
+        content += f"\nTime: {meeting_time}"
+    content += f"\nLocation: {meeting_location}"
+
+    content += f"""
+
 ═══════════════════════════════════════════════════════════════════════════════
 
-RESOLUTION 1: ACCEPTANCE OF TRUSTEESHIP
-
-WHEREAS, the Trustee(s) have been named in the Trust Instrument as the initial 
-Trustee(s) of the Trust; and
-
-WHEREAS, each Trustee is willing and desirous of accepting the responsibilities 
-and duties of Trustee;
+TRUSTEES PRESENT
 
 """
+    for trustee in trustee_names:
+        content += f"{trustee}, Trustee\n"
 
-    if accept_trusteeship:
-        for trustee in trustee_names:
-            content += f"BE IT RESOLVED, that {trustee} hereby accepts the appointment as Trustee of the {trust_name} and agrees to serve in such capacity subject to the terms and conditions set forth in the Trust Instrument.\n\n"
-    
     content += f"""
 ═══════════════════════════════════════════════════════════════════════════════
 
-RESOLUTION 2: ESTABLISHMENT OF PRINCIPAL PLACE OF ADMINISTRATION
+CALL TO ORDER
 
-WHEREAS, the Trust Instrument provides for the establishment of a principal 
-place of administration for the Trust; and
+{trustee_names[0]}, acting as presiding Trustee, called the organizational 
+meeting of {trust_name} to order.
 
-WHEREAS, it is in the best interest of the Trust to formally establish the 
-principal place of administration;
-
-BE IT RESOLVED, that the principal place of administration of the {trust_name} 
-shall be {principal_place}, {jurisdiction};
-
-FURTHER RESOLVED, that the Trustee(s) may change the principal place of 
-administration from time to time as circumstances require, in accordance with 
-the terms of the Trust Instrument.
+The presiding Trustee confirmed that this meeting constitutes the first formal 
+meeting of the Board of Trustees following the execution of the Declaration of 
+Trust on {start_date}.
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-RESOLUTION 3: AUTHORIZATION TO OPEN BANK ACCOUNTS
+QUORUM
 
-WHEREAS, the Trust requires a banking relationship to hold trust funds and 
-conduct trust business; and
-
-WHEREAS, it is necessary and proper for the Trustee(s) to establish one or more 
-bank or financial institution accounts in the name of the Trust;
-
-BE IT RESOLVED, that the Trustee(s) are authorized and directed to open one or 
-more bank accounts at {bank_name}{" and such other financial institutions as the Trustee(s) may deem appropriate" if not bank_name or bank_name == "[Bank Name]" else ""} in the name of the {trust_name};
+The presiding Trustee confirmed that all appointed Trustees are present, and a 
+quorum exists for the transaction of business.
 
 """
-    
-    if initial_deposit:
-        content += f"FURTHER RESOLVED, that the Trustee(s) shall deposit the initial trust corpus of {initial_deposit} into the trust bank account.\n\n"
+
+    # RESOLUTION 1: Acceptance of Trusteeship + Adoption of Declaration
+    if accept_trusteeship:
+        content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 1: ADOPTION OF DECLARATION OF TRUST AND ACCEPTANCE OF TRUSTEESHIP
+
+WHEREAS, the Declaration of Trust for {trust_name} was duly executed on 
+{start_date} by {"; ".join(trustee_names)} as Trustee(s);
+
+BE IT RESOLVED, that the Trustees hereby acknowledge receipt of the Declaration 
+of Trust, accept their appointment as Trustees, and agree to hold and administer 
+the Trust estate in accordance with the terms, conditions, and fiduciary duties 
+set forth in said Declaration.
+
+"""
+        for trustee in trustee_names:
+            content += f"BE IT FURTHER RESOLVED, that {trustee} hereby accepts the appointment as Trustee of the {trust_name} and agrees to serve in such capacity subject to the terms and conditions set forth in the Trust Instrument.\n\n"
+        content += "VOTE: Unanimous approval.\n\n"
+
+    # RESOLUTION 2: Fiduciary Duties Acknowledgment
+    if acknowledge_fiduciary_duties:
+        content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 2: ACKNOWLEDGMENT OF FIDUCIARY DUTIES
+
+WHEREAS, the Trustees understand that they hold the Trust property in a 
+fiduciary capacity and not in any personal capacity;
+
+BE IT RESOLVED, that the Trustees acknowledge and accept the following fiduciary 
+duties as binding upon them:
+
+  Duty of Loyalty — To act solely in the interest of the Trust and its 
+  Beneficiaries, avoiding all conflicts of interest and self-dealing.
+
+  Duty of Prudence — To manage Trust assets with the care, skill, and caution 
+  that a reasonable person would exercise, seeking professional guidance when 
+  necessary.
+
+  Duty of Impartiality — To balance the interests of all Beneficiaries fairly 
+  and in accordance with the Trust instrument.
+
+  Duty of Obedience — To follow the written terms of the Declaration of Trust 
+  and act only within the powers granted therein.
+
+  Duty of Recordkeeping — To maintain complete, accurate, and organized records 
+  of all Trust meetings, decisions, transactions, and assets.
+
+  Duty of Confidentiality — To preserve the privacy of all Trust records, 
+  minutes, and internal deliberations, disclosing information only when required 
+  by law or authorized by the Board.
+
+VOTE: Unanimous acknowledgment.
+
+"""
+
+    # RESOLUTION 3: Principal Place of Administration
+    content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 3: ESTABLISHMENT OF PRINCIPAL PLACE OF ADMINISTRATION
+
+WHEREAS, the Declaration of Trust designates the principal place of 
+administration and elected situs of this Trust;
+
+BE IT RESOLVED, that the Trustees confirm the principal place of administration 
+of {trust_name} to be:
+{principal_place}"""
+
+    if trust_address:
+        content += f"\n{trust_address}"
+
+    content += f"""
+
+All official Trust records, minutes, resolutions, and correspondence shall be 
+maintained at this location or in such secure location as the Trustees may 
+designate by subsequent resolution.
+
+VOTE: Unanimous approval.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 4: AUTHORIZATION TO OPEN BANK ACCOUNTS
+
+WHEREAS, the Trustees determine that it is necessary and prudent to establish 
+one or more financial accounts in the name of the Trust for the proper 
+administration of Trust assets;
+
+BE IT RESOLVED, that the Trustees are hereby authorized to open and maintain 
+bank accounts, brokerage accounts, or other financial accounts in the name of 
+{trust_name}, and to execute all documents, agreements, and certifications 
+required by financial institutions for such purpose.
+
+BE IT FURTHER RESOLVED, that the Trustee(s) are authorized and directed to 
+open one or more bank accounts"""
+
+    if bank_name and bank_name != "[Bank Name]":
+        content += f" at {bank_name}"
     else:
-        content += "FURTHER RESOLVED, that the Trustee(s) shall deposit all initial trust property into the trust bank account.\n\n"
+        content += " at such financial institution(s) as the Trustee(s) may deem appropriate"
+
+    content += f" in the name of the {trust_name};\n\n"
+
+    if initial_deposit:
+        content += f"BE IT FURTHER RESOLVED, that the Trustee(s) shall deposit the initial trust corpus of {initial_deposit} into the trust bank account.\n\n"
     
-    content += f"""BE IT FURTHER RESOLVED, that any Trustee acting alone is authorized to:
+    content += f"""BE IT FURTHER RESOLVED, that {trustee_names[0]}, as Trustee, is authorized to sign 
+on behalf of the Trust, and to present this resolution, the Declaration of 
+Trust, a Certification of Trust, and the Trust's EIN documentation to any bank 
+or financial institution as proof of authority.
+
+BE IT FURTHER RESOLVED, that any Trustee acting alone is authorized to:
   (a) Execute any and all documents necessary to open and maintain such accounts;
   (b) Make deposits to and withdrawals from such accounts;
   (c) Endorse checks and other negotiable instruments payable to the Trust;
   (d) Apply for and obtain debit cards, checks, and other banking instruments.
 
+VOTE: Unanimous approval.
+
 ═══════════════════════════════════════════════════════════════════════════════
 
-RESOLUTION 4: EMPLOYER IDENTIFICATION NUMBER
+RESOLUTION 5: EMPLOYER IDENTIFICATION NUMBER
 
 """
     
-    if ein and authorize_ein:
-        content += f"""WHEREAS, the Trust has obtained Employer Identification Number {ein} from the Internal Revenue Service;
+    if ein:
+        content += f"""WHEREAS, the Trustees have obtained an Employer Identification Number (EIN) 
+from the Internal Revenue Service for the purpose of opening bank accounts and 
+conducting Trust business;
 
-BE IT RESOLVED, that the EIN {ein} is hereby confirmed as the official tax identification number for the {trust_name}, and the Trustee(s) are authorized to use this EIN for all tax filing and banking purposes.\n\n"""
-    elif authorize_ein:
-        content += f"""WHEREAS, the Trust requires an Employer Identification Number (EIN) for tax filing and banking purposes;
+BE IT RESOLVED, that the Trustees accept and adopt the following EIN for 
+{trust_name}:
 
-BE IT RESOLVED, that the Trustee(s) are authorized and directed to apply for and obtain an EIN from the Internal Revenue Service for the {trust_name};
+  EIN: {ein}
 
-FURTHER RESOLVED, that once obtained, the EIN shall be used for all tax filing and banking purposes related to the Trust.\n\n"""
-    
-    content += f"""
-═══════════════════════════════════════════════════════════════════════════════
+This EIN shall be used for all Trust banking, financial, and reporting purposes 
+as deemed necessary by the Trustees.
 
-RESOLUTION 5: ACCEPTANCE OF INITIAL TRUST PROPERTY
+VOTE: Unanimous approval.
+
+"""
+    else:
+        content += f"""WHEREAS, the Trust requires an Employer Identification Number (EIN) for 
+tax filing and banking purposes;
+
+BE IT RESOLVED, that the Trustee(s) are authorized and directed to apply for 
+and obtain an EIN from the Internal Revenue Service for the {trust_name};
+
+FURTHER RESOLVED, that once obtained, the EIN shall be used for all tax filing 
+and banking purposes related to the Trust.
+
+VOTE: Unanimous approval.
+
+"""
+
+    # RESOLUTION 6: Acceptance of Initial Trust Property
+    if accept_initial_property:
+        content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 6: ACCEPTANCE OF INITIAL TRUST PROPERTY
 
 WHEREAS, the Settlor has conveyed or will convey property to the Trustee(s) as 
 the initial trust corpus; and
@@ -792,27 +919,48 @@ the initial trust corpus; and
 WHEREAS, the Trustee(s) are willing to accept such property in accordance with 
 the terms of the Trust Instrument;
 
+BE IT RESOLVED, that the Trustees acknowledge their authority to accept real 
+property, personal property, financial assets, business interests, and any other 
+lawful property conveyed to the Trust by the Settlor, provided such acceptance 
+is consistent with the Trust's stated purpose and in the best interest of the 
+Beneficiaries.
+
+BE IT FURTHER RESOLVED, that any property accepted into the Trust shall be 
+recorded on Schedule A or in a separate Trust ledger, and acceptance shall be 
+memorialized by resolution at the time of conveyance.
+
+VOTE: Unanimous approval.
+
 """
-    
-    if accept_initial_property:
-        content += f"BE IT RESOLVED, that the Trustee(s) hereby accept the initial trust property conveyed by the Settlor, as described in Schedule A of the Trust Instrument, to be held and administered in accordance with the terms of the {trust_name}.\n\n"
-    
+
+    # RESOLUTION 7: Fiscal Year
+    content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 7: ESTABLISHMENT OF FISCAL YEAR
+
+WHEREAS, the Trustees desire to establish a fiscal year for accounting and 
+record-keeping purposes;
+
+BE IT RESOLVED, that the fiscal year of {trust_name} shall """
+
+    if fiscal_year_end == "December 31":
+        content += f"be the calendar year, beginning January 1 and ending December 31."
+    else:
+        content += f"end on {fiscal_year_end}."
+
     content += f"""
-═══════════════════════════════════════════════════════════════════════════════
 
-RESOLUTION 6: FISCAL YEAR DESIGNATION
+The Trustees may, by subsequent resolution, change the fiscal year if deemed 
+prudent for tax or administrative purposes.
 
-WHEREAS, the Trust must designate a fiscal year for tax reporting purposes;
+VOTE: Unanimous approval.
 
-BE IT RESOLVED, that the fiscal year of the {trust_name} shall end on {fiscal_year_end};
+"""
 
-FURTHER RESOLVED, that the Trustee(s) are authorized to file any necessary tax 
-elections with the Internal Revenue Service to establish or confirm the 
-Trust's fiscal year.
+    # RESOLUTION 8: Trustee Compensation
+    content += f"""═══════════════════════════════════════════════════════════════════════════════
 
-═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 7: TRUSTEE COMPENSATION
+RESOLUTION 8: TRUSTEE COMPENSATION
 
 """
     
@@ -821,72 +969,191 @@ RESOLUTION 7: TRUSTEE COMPENSATION
 
 BE IT RESOLVED, that the initial Trustee(s) shall serve without compensation at 
 this time, reserving the right to establish reasonable compensation in the 
-future as permitted by the Trust Instrument.\n\n"""
+future as permitted by the Trust Instrument.
+
+VOTE: Unanimous approval.
+
+"""
     elif compensation_type == "fixed":
         content += f"""WHEREAS, the Trust Instrument permits reasonable compensation for Trustee services;
 
-BE IT RESOLVED, that the initial Trustee(s) shall receive annual compensation of {compensation_amount or "[Amount]"} for services rendered to the Trust, payable in accordance with the terms of the Trust Instrument.\n\n"""
+BE IT RESOLVED, that the initial Trustee(s) shall receive annual compensation 
+of {compensation_amount or "[Amount]"} for services rendered to the Trust, 
+payable in accordance with the terms of the Trust Instrument.
+
+VOTE: Unanimous approval.
+
+"""
     elif compensation_type == "percentage":
         content += f"""WHEREAS, the Trust Instrument permits reasonable compensation for Trustee services;
 
-BE IT RESOLVED, that the initial Trustee(s) shall receive compensation equal to {compensation_amount or "[Percentage]"}% of the trust corpus value, computed annually in accordance with the terms of the Trust Instrument.\n\n"""
-    
-    if authorize_insurance:
-        content += f"""
-═══════════════════════════════════════════════════════════════════════════════
+BE IT RESOLVED, that the initial Trustee(s) shall receive compensation equal to 
+{compensation_amount or "[Percentage]"}% of the trust corpus value, computed 
+annually in accordance with the terms of the Trust Instrument.
 
-RESOLUTION 8: AUTHORIZATION OF INSURANCE
+VOTE: Unanimous approval.
+
+"""
+
+    # RESOLUTION 9: Governance Standards
+    if adopt_governance_standards:
+        content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 9: ADOPTION OF GOVERNANCE STANDARDS
+
+WHEREAS, the Trustees desire to establish clear governance standards and 
+practices for the ongoing administration of the Trust;
+
+BE IT RESOLVED, that the Trustees adopt the following governance practices:
+
+  Regular Meetings — The Trustees shall meet not less than two (2) times per 
+  year, and preferably quarterly, to review Trust finances, approve expenditures, 
+  accept new assets, and address Trust business.
+
+  Meeting Minutes — All meetings of the Trustees shall be memorialized in 
+  written minutes, which shall include the date, location, Trustees present, 
+  agenda items, resolutions passed, and votes recorded. Minutes shall be signed 
+  by all Trustees present.
+
+  Resolutions — All significant decisions, including the acceptance of property, 
+  approval of expenditures, authorization of contracts, and appointment of 
+  agents, shall be documented by formal written resolution and filed in the 
+  Trust's compliance records.
+
+  Annual Review — The Trustees shall conduct an annual review of Trust 
+  operations, compliance with fiduciary duties, financial condition, and any 
+  required tax or regulatory filings.
+
+VOTE: Unanimous approval.
+
+"""
+
+    # RESOLUTION 10: Insurance
+    if authorize_insurance:
+        content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 10: AUTHORIZATION OF INSURANCE
 
 WHEREAS, it is prudent and in the best interest of the Trust to maintain 
 appropriate insurance coverage;
 
 BE IT RESOLVED, that the Trustee(s) are authorized to obtain and maintain the 
-following insurance on behalf of the {trust_name}:
+following insurance on behalf of {trust_name}:
   (a) Trustee liability (errors and omissions) insurance;
   (b) Property insurance for trust real and personal property; and
   (c) Such other insurance as the Trustee(s) may deem appropriate.
 
-═══════════════════════════════════════════════════════════════════════════════
+VOTE: Unanimous approval.
 
 """
-    
+
+    # RESOLUTION 11: Professional Services
+    if authorize_professional_services:
+        content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 11: AUTHORIZATION FOR LEGAL AND PROFESSIONAL SERVICES
+
+WHEREAS, the Trustees may from time to time require the assistance of attorneys, 
+accountants, tax advisors, or other professional service providers for the proper 
+administration of the Trust;
+
+BE IT RESOLVED, that the Trustees are authorized to retain and compensate 
+qualified professionals as deemed necessary for the protection, administration, 
+and tax compliance of the Trust, and to execute engagement agreements and pay 
+reasonable fees for such services from Trust assets.
+
+All professional fees shall be reviewed and approved by the Trustees and 
+recorded in the Trust's financial ledgers.
+
+VOTE: Unanimous approval.
+
+"""
+
+    # RESOLUTION 12: Designation of Record Keeper
     if designate_record_keeper:
-        content += f"""RESOLUTION 9: DESIGNATION OF RECORD KEEPER
+        content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 12: DESIGNATION OF RECORD KEEPER
 
 WHEREAS, the Trust Instrument requires that adequate records be kept of all 
 trust proceedings;
 
-BE IT RESOLVED, that {trustee_names[0] if trustee_names else "[Trustee Name]"} is hereby designated as the Record Keeper of the {trust_name}, responsible for maintaining all trust records, minutes, and documents at the principal place of administration;
+BE IT RESOLVED, that {trustee_names[0] if trustee_names else "[Trustee Name]"} 
+is hereby designated as the Record Keeper of {trust_name}, responsible for 
+maintaining all trust records, minutes, and documents at the principal place of 
+administration.
 
-FURTHER RESOLVED, that all trust records shall be kept in a secure and accessible manner, and shall be available for review by any Trustee or beneficiary as required by law.
+FURTHER RESOLVED, that all trust records shall be kept in a secure and accessible 
+manner, and shall be available for review by any Trustee or beneficiary as 
+required by law.
+
+VOTE: Unanimous approval.
+
+"""
+
+    # RESOLUTION 13: Certification of Trust Authority
+    content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 13: EXECUTION OF CERTIFICATIONS AND TRUST DOCUMENTS
+
+WHEREAS, banks, financial institutions, title companies, and government agencies 
+may require evidence of the Trust's existence and the Trustees' authority to act 
+on behalf of the Trust;
+
+BE IT RESOLVED, that the Trustees are authorized to execute, deliver, and present 
+Certifications of Trust, affidavits, and other summary documents evidencing the 
+Trust's existence, the identity of the Trustees, and the authority of the 
+Trustees to transact business, open accounts, hold title to property, and 
+otherwise administer the Trust.
+
+The Trustees may execute such certifications in the name of the Trust without 
+disclosing the full text of the Declaration of Trust, in order to preserve the 
+privacy of the Trust's internal provisions.
+
+VOTE: Unanimous approval.
+
+"""
+
+    # RESOLUTION 14: Ratification
+    if ratify_prior_actions:
+        content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 14: RATIFICATION OF PRIOR ACTIONS
+
+BE IT RESOLVED, that all actions taken by the Settlor and the Trustees in 
+connection with the formation, execution, and initial administration of 
+{trust_name} are hereby ratified, confirmed, and approved as valid and binding 
+acts of the Trust.
+
+VOTE: Unanimous approval.
+
+"""
+
+    # ADJOURNMENT AND ATTESTATION
+    content += f"""═══════════════════════════════════════════════════════════════════════════════
+
+ADJOURNMENT
+
+There being no further business to come before the meeting, the presiding 
+Trustee declared the meeting adjourned.
 
 ═══════════════════════════════════════════════════════════════════════════════
 
+ATTESTATION
+
+The undersigned Trustees certify that the foregoing minutes constitute a true 
+and accurate record of the organizational meeting of {trust_name} held on 
+{meeting_date}.
+
 """
-    
-    content += f"""ADJOURNMENT
 
-There being no further business to come before the meeting, on motion duly made 
-and seconded, the meeting was adjourned.
-
+    for trustee in trustee_names:
+        content += f"""
 ________________________________________
-{trustee_names[0] if trustee_names else "[Trustee Name]"}, Trustee
+{trustee}, Trustee
+Date: {meeting_date}"""
 
-Date: {data.get("meeting_date", "[Date]")}
-
-CERTIFICATE
-
-I, {trustee_names[0] if trustee_names else "[Trustee Name]"}, the duly elected and acting 
-Trustee of the {trust_name}, do hereby certify that the above and foregoing is a 
-true and correct copy of the minutes of the initial meeting of the Trustee(s) 
-held on {data.get("meeting_date", "[Date]")}.
-
-________________________________________
-{trustee_names[0] if trustee_names else "[Trustee Name]"}, Trustee
-
-Date: {data.get("meeting_date", "[Date]")}
-"""
-    
+    content += "\n"
     return content
 
 def generate_general_meeting_content(data: dict) -> str:
@@ -3150,9 +3417,8 @@ async def get_template_options(trust_id: Optional[str] = None, user: dict = Depe
         {
             "type": "initial_trustee_meeting",
             "name": "Initial Trustee Meeting",
-            "description": "The first organizational meeting — accept trusteeship, open bank accounts, establish the trust's foundation",
+            "description": "Your trust's first organizational meeting — accept trusteeship, open bank accounts, confirm EIN, set fiscal year, adopt governance standards, and more",
             "icon": "gavel",
-            "category": "basic",
             "priority": True
         },
         {
