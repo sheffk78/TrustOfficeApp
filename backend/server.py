@@ -173,6 +173,12 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         method = request.method
         
+        # Skip middleware for multipart upload endpoints — BaseHTTPMiddleware
+        # buffers the entire request body, which breaks file uploads.
+        # Auth on these endpoints is still enforced by the route's own Depends(get_current_user).
+        if "/vault/upload" in path:
+            return await call_next(request)
+        
         # Skip subscription check for fully exempt paths
         if path in SUBSCRIPTION_EXEMPT_PATHS or not path.startswith("/api/"):
             return await call_next(request)

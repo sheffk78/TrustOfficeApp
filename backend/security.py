@@ -149,8 +149,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return self.config.DEFAULT_LIMITS["default"]
     
     async def dispatch(self, request: Request, call_next) -> Response:
-        # Skip rate limiting for health checks
-        if request.url.path in ["/health", "/api/health"]:
+        # Skip rate limiting for health checks and file uploads
+        # (BaseHTTPMiddleware buffers request body, which breaks file uploads)
+        if request.url.path in ["/health", "/api/health"] or "/vault/upload" in request.url.path:
             return await call_next(request)
         
         # Skip for OPTIONS requests (CORS preflight)
@@ -339,6 +340,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
     
     async def dispatch(self, request: Request, call_next) -> Response:
+        # Skip security headers + body buffering for file uploads
+        # BaseHTTPMiddleware buffers the request body, breaking multipart uploads
+        if "/vault/upload" in request.url.path:
+            return await call_next(request)
+        
         response = await call_next(request)
         
         # Prevent clickjacking
