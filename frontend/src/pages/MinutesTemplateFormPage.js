@@ -23,6 +23,7 @@ import {
 import { format } from 'date-fns';
 
 const TEMPLATE_TITLES = {
+  'initial_trustee_meeting': 'Initial Trustee Meeting',
   'general_meeting': 'General Meeting Minutes',
   'distribution_to_beneficiaries': 'Distribution to Beneficiaries',
   'acceptance_of_property': 'Accept Property into Trust',
@@ -566,6 +567,22 @@ export default function MinutesTemplateFormPage() {
     };
 
     switch (templateType) {
+      case 'initial_trustee_meeting':
+        return {
+          ...baseData,
+          bank_name: formData.bank_name || '',
+          initial_deposit: formData.initial_deposit || '',
+          meeting_location: formData.meeting_location || '',
+          principal_place: formData.principal_place || formData.meeting_location || '',
+          fiscal_year_end: formData.fiscal_year_end || 'December 31',
+          compensation_type: formData.compensation_type || 'none',
+          compensation_amount: formData.compensation_amount || '',
+          accept_trusteeship: formData.accept_trusteeship !== false,
+          authorize_ein: formData.authorize_ein !== false,
+          accept_initial_property: formData.accept_initial_property !== false,
+          authorize_insurance: formData.authorize_insurance !== false,
+          designate_record_keeper: formData.designate_record_keeper !== false,
+        };
       case 'distribution_to_beneficiaries':
         return {
           ...baseData,
@@ -2802,6 +2819,132 @@ export default function MinutesTemplateFormPage() {
                 </div>
               )}
 
+              {templateType === 'initial_trustee_meeting' && (
+                <div className="space-y-6">
+                  <div className="card-trust corner-mark p-6">
+                    <h2 className="font-serif text-xl text-navy mb-4">Initial Meeting Details</h2>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      This is your trust's first organizational meeting. It covers one-time actions — accepting trusteeship, opening bank accounts, confirming your EIN, and establishing the trust's foundation.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="label-trust">Bank Name</Label>
+                        <Input
+                          value={formData.bank_name || ''}
+                          onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="e.g., Chase, Wells Fargo"
+                        />
+                      </div>
+                      <div>
+                        <Label className="label-trust">Initial Deposit Amount</Label>
+                        <Input
+                          value={formData.initial_deposit || ''}
+                          onChange={(e) => setFormData({ ...formData, initial_deposit: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="e.g., $10,000"
+                        />
+                      </div>
+                      <div>
+                        <Label className="label-trust">Meeting Location</Label>
+                        <Input
+                          value={formData.meeting_location || ''}
+                          onChange={(e) => setFormData({ ...formData, meeting_location: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="e.g., Portland, Oregon"
+                        />
+                      </div>
+                      <div>
+                        <Label className="label-trust">Principal Place of Administration</Label>
+                        <Input
+                          value={formData.principal_place || ''}
+                          onChange={(e) => setFormData({ ...formData, principal_place: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="Defaults to meeting location if blank"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="card-trust corner-mark p-6">
+                    <h2 className="font-serif text-xl text-navy mb-4">Fiscal Year</h2>
+                    <div>
+                      <Label className="label-trust">Fiscal Year End</Label>
+                      <select
+                        value={formData.fiscal_year_end || 'December 31'}
+                        onChange={(e) => setFormData({ ...formData, fiscal_year_end: e.target.value })}
+                        className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm input-trust"
+                      >
+                        <option value="December 31">December 31 (Calendar Year)</option>
+                        <option value="March 31">March 31</option>
+                        <option value="June 30">June 30</option>
+                        <option value="September 30">September 30</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground mt-1">Most trusts use a calendar year (Dec 31). Consult your tax advisor before choosing a different fiscal year.</p>
+                    </div>
+                  </div>
+
+                  <div className="card-trust corner-mark p-6">
+                    <h2 className="font-serif text-xl text-navy mb-4">Trustee Compensation</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="label-trust">Compensation Type</Label>
+                        <select
+                          value={formData.compensation_type || 'none'}
+                          onChange={(e) => setFormData({ ...formData, compensation_type: e.target.value })}
+                          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm input-trust"
+                        >
+                          <option value="none">No Compensation</option>
+                          <option value="fixed">Fixed Annual Amount</option>
+                          <option value="percentage">Percentage of Corpus</option>
+                        </select>
+                      </div>
+                      {formData.compensation_type && formData.compensation_type !== 'none' && (
+                        <div>
+                          <Label className="label-trust">
+                            {formData.compensation_type === 'fixed' ? 'Annual Amount' : 'Percentage (%)'}
+                          </Label>
+                          <Input
+                            value={formData.compensation_amount || ''}
+                            onChange={(e) => setFormData({ ...formData, compensation_amount: e.target.value })}
+                            className="mt-1 input-trust"
+                            placeholder={formData.compensation_type === 'fixed' ? 'e.g., $5,000' : 'e.g., 1'}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="card-trust corner-mark p-6">
+                    <h2 className="font-serif text-xl text-navy mb-4">Include Resolutions</h2>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Select which resolutions to include. All are recommended for a new trust's first meeting.
+                    </p>
+                    <div className="space-y-3">
+                      {[
+                        { key: 'accept_trusteeship', label: 'Accept Trusteeship', desc: 'Formally accept appointment as trustee' },
+                        { key: 'authorize_ein', label: 'EIN Authorization', desc: 'Confirm or authorize obtaining the trust EIN' },
+                        { key: 'accept_initial_property', label: 'Accept Initial Trust Property', desc: 'Accept the initial corpus from the Settlor' },
+                        { key: 'authorize_insurance', label: 'Insurance Authorization', desc: 'Authorize trustee liability and property insurance' },
+                        { key: 'designate_record_keeper', label: 'Designate Record Keeper', desc: 'Assign responsibility for maintaining trust records' },
+                      ].map(item => (
+                        <label key={item.key} className="flex items-start gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData[item.key] !== false}
+                            onChange={(e) => setFormData({ ...formData, [item.key]: e.target.checked })}
+                            className="mt-1 rounded border-border"
+                          />
+                          <div>
+                            <div className="font-medium text-navy">{item.label}</div>
+                            <div className="text-sm text-muted-foreground">{item.desc}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               {templateType === 'general_meeting' && (
                 <div className="card-trust corner-mark p-6">
                   <div className="flex items-center justify-between mb-4">

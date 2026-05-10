@@ -19,7 +19,8 @@ import {
   MapPin,
   ChevronRight,
   ArrowLeft,
-  HeartHandshake
+  HeartHandshake,
+  Gavel
 } from 'lucide-react';
 
 const ICONS = {
@@ -33,7 +34,8 @@ const ICONS = {
   'users-round': UsersRound,
   'landmark': Landmark,
   'map-pin': MapPin,
-  'heart-handshake': HeartHandshake
+  'heart-handshake': HeartHandshake,
+  'gavel': Gavel
 };
 
 export default function MinutesTemplatesPage() {
@@ -126,15 +128,20 @@ export default function MinutesTemplatesPage() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.map(template => {
+              {templates.sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0)).map(template => {
                 const IconComponent = ICONS[template.icon] || FileText;
                 return (
                   <button
                     key={template.type}
                     onClick={() => handleSelectTemplate(template.type)}
-                    className="card-trust p-6 text-left hover:border-gold transition-colors group"
+                    className="card-trust p-6 text-left hover:border-gold transition-colors group relative"
                     data-testid={`template-${template.type}`}
                   >
+                    {template.priority && (
+                      <span className="absolute top-3 right-3 bg-gold/10 text-gold border border-gold/30 text-xs font-medium px-2 py-1 rounded-full">
+                        Start Here
+                      </span>
+                    )}
                     <div className="flex items-start justify-between">
                       <div className="w-12 h-12 bg-navy/10 flex items-center justify-center mb-4 group-hover:bg-gold/20 transition-colors">
                         <IconComponent className="w-6 h-6 text-navy" />

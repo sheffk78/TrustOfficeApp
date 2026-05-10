@@ -370,19 +370,19 @@ export default function DashboardPage() {
       },
       { 
         id: 'assets', 
-        label: 'Add Your Trust\'s Assets',
-        description: 'Real estate, bank accounts, investments — the IRS expects a complete inventory of what the trust holds.',
+        label: 'Open a Trust Bank Account',
+        description: 'The most important first step — a trust needs its own bank account before anything else. We\'ll help you set it up.',
         done: onboarding.assets_added,
         icon: Package,
         action: '/structures'
       },
       { 
         id: 'minutes', 
-        label: 'Record Your First Trustee Meeting',
-        description: 'Trustees are legally required to document decisions. This is your proof you\'re doing the job.',
+        label: 'Hold Your First Trustee Meeting',
+        description: 'Trustees are legally required to document decisions. Your first meeting covers accepting trusteeship, opening bank accounts, and setting up the trust.',
         done: onboarding.minutes_generated,
         icon: ClipboardList,
-        action: '/minutes/new'
+        action: '/minutes/new?type=initial_trustee_meeting'
       },
       { 
         id: 'calendar', 

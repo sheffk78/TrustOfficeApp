@@ -570,6 +570,8 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
     # Generate template-specific content
     if template_type == "general_meeting":
         doc += generate_general_meeting_content(template_data)
+    elif template_type == "initial_trustee_meeting":
+        doc += generate_initial_trustee_meeting_content(trust, template_data)
     elif template_type == "distribution_to_beneficiaries":
         doc += generate_distribution_content(template_data)
     elif template_type == "acceptance_of_property":
@@ -671,6 +673,221 @@ END OF TRUST MINUTES
 """
     
     return doc
+
+def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
+    """Generate content for the initial organizational trustee meeting.
+    
+    This is the first meeting of the trust. It covers one-time organizational 
+    actions: accepting trusteeship, establishing principal place of administration,
+    authorizing bank accounts, confirming EIN, accepting initial trust property,
+    setting fiscal year, and establishing trustee compensation terms.
+    """
+    trust_name = trust.get("name", "[Trust Name]")
+    trustees = trust.get("trustees", [])
+    trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
+    jurisdiction = trust.get("jurisdiction") or trust.get("state_code") or "[State]"
+    start_date = trust.get("start_date", "[Date of Trust Indenture]")
+    ein = trust.get("ein", "")
+    
+    # Data from template form
+    meeting_location = data.get("meeting_location", "[City, State]")
+    principal_place = data.get("principal_place", meeting_location)
+    bank_name = data.get("bank_name", "[Bank Name]")
+    initial_deposit = data.get("initial_deposit", "")
+    fiscal_year_end = data.get("fiscal_year_end", "December 31")
+    compensation_type = data.get("compensation_type", "none")
+    compensation_amount = data.get("compensation_amount", "")
+    accept_trusteeship = data.get("accept_trusteeship", True)
+    authorize_ein = data.get("authorize_ein", True)
+    accept_initial_property = data.get("accept_initial_property", True)
+    authorize_insurance = data.get("authorize_insurance", True)
+    designate_record_keeper = data.get("designate_record_keeper", True)
+    
+    content = """
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 1: ACCEPTANCE OF TRUSTEESHIP
+
+WHEREAS, the Trustee(s) have been named in the Trust Instrument as the initial 
+Trustee(s) of the Trust; and
+
+WHEREAS, each Trustee is willing and desirous of accepting the responsibilities 
+and duties of Trustee;
+
+"""
+
+    if accept_trusteeship:
+        for trustee in trustee_names:
+            content += f"BE IT RESOLVED, that {trustee} hereby accepts the appointment as Trustee of the {trust_name} and agrees to serve in such capacity subject to the terms and conditions set forth in the Trust Instrument.\n\n"
+    
+    content += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 2: ESTABLISHMENT OF PRINCIPAL PLACE OF ADMINISTRATION
+
+WHEREAS, the Trust Instrument provides for the establishment of a principal 
+place of administration for the Trust; and
+
+WHEREAS, it is in the best interest of the Trust to formally establish the 
+principal place of administration;
+
+BE IT RESOLVED, that the principal place of administration of the {trust_name} 
+shall be {principal_place}, {jurisdiction};
+
+FURTHER RESOLVED, that the Trustee(s) may change the principal place of 
+administration from time to time as circumstances require, in accordance with 
+the terms of the Trust Instrument.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 3: AUTHORIZATION TO OPEN BANK ACCOUNTS
+
+WHEREAS, the Trust requires a banking relationship to hold trust funds and 
+conduct trust business; and
+
+WHEREAS, it is necessary and proper for the Trustee(s) to establish one or more 
+bank or financial institution accounts in the name of the Trust;
+
+BE IT RESOLVED, that the Trustee(s) are authorized and directed to open one or 
+more bank accounts at {bank_name}{" and such other financial institutions as the Trustee(s) may deem appropriate" if not bank_name or bank_name == "[Bank Name]" else ""} in the name of the {trust_name};
+
+"""
+    
+    if initial_deposit:
+        content += f"FURTHER RESOLVED, that the Trustee(s) shall deposit the initial trust corpus of {initial_deposit} into the trust bank account.\n\n"
+    else:
+        content += "FURTHER RESOLVED, that the Trustee(s) shall deposit all initial trust property into the trust bank account.\n\n"
+    
+    content += f"""BE IT FURTHER RESOLVED, that any Trustee acting alone is authorized to:
+  (a) Execute any and all documents necessary to open and maintain such accounts;
+  (b) Make deposits to and withdrawals from such accounts;
+  (c) Endorse checks and other negotiable instruments payable to the Trust;
+  (d) Apply for and obtain debit cards, checks, and other banking instruments.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 4: EMPLOYER IDENTIFICATION NUMBER
+
+"""
+    
+    if ein and authorize_ein:
+        content += f"""WHEREAS, the Trust has obtained Employer Identification Number {ein} from the Internal Revenue Service;
+
+BE IT RESOLVED, that the EIN {ein} is hereby confirmed as the official tax identification number for the {trust_name}, and the Trustee(s) are authorized to use this EIN for all tax filing and banking purposes.\n\n"""
+    elif authorize_ein:
+        content += f"""WHEREAS, the Trust requires an Employer Identification Number (EIN) for tax filing and banking purposes;
+
+BE IT RESOLVED, that the Trustee(s) are authorized and directed to apply for and obtain an EIN from the Internal Revenue Service for the {trust_name};
+
+FURTHER RESOLVED, that once obtained, the EIN shall be used for all tax filing and banking purposes related to the Trust.\n\n"""
+    
+    content += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 5: ACCEPTANCE OF INITIAL TRUST PROPERTY
+
+WHEREAS, the Settlor has conveyed or will convey property to the Trustee(s) as 
+the initial trust corpus; and
+
+WHEREAS, the Trustee(s) are willing to accept such property in accordance with 
+the terms of the Trust Instrument;
+
+"""
+    
+    if accept_initial_property:
+        content += f"BE IT RESOLVED, that the Trustee(s) hereby accept the initial trust property conveyed by the Settlor, as described in Schedule A of the Trust Instrument, to be held and administered in accordance with the terms of the {trust_name}.\n\n"
+    
+    content += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 6: FISCAL YEAR DESIGNATION
+
+WHEREAS, the Trust must designate a fiscal year for tax reporting purposes;
+
+BE IT RESOLVED, that the fiscal year of the {trust_name} shall end on {fiscal_year_end};
+
+FURTHER RESOLVED, that the Trustee(s) are authorized to file any necessary tax 
+elections with the Internal Revenue Service to establish or confirm the 
+Trust's fiscal year.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 7: TRUSTEE COMPENSATION
+
+"""
+    
+    if compensation_type == "none":
+        content += f"""WHEREAS, the Trust Instrument addresses the matter of Trustee compensation;
+
+BE IT RESOLVED, that the initial Trustee(s) shall serve without compensation at 
+this time, reserving the right to establish reasonable compensation in the 
+future as permitted by the Trust Instrument.\n\n"""
+    elif compensation_type == "fixed":
+        content += f"""WHEREAS, the Trust Instrument permits reasonable compensation for Trustee services;
+
+BE IT RESOLVED, that the initial Trustee(s) shall receive annual compensation of {compensation_amount or "[Amount]"} for services rendered to the Trust, payable in accordance with the terms of the Trust Instrument.\n\n"""
+    elif compensation_type == "percentage":
+        content += f"""WHEREAS, the Trust Instrument permits reasonable compensation for Trustee services;
+
+BE IT RESOLVED, that the initial Trustee(s) shall receive compensation equal to {compensation_amount or "[Percentage]"}% of the trust corpus value, computed annually in accordance with the terms of the Trust Instrument.\n\n"""
+    
+    if authorize_insurance:
+        content += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 8: AUTHORIZATION OF INSURANCE
+
+WHEREAS, it is prudent and in the best interest of the Trust to maintain 
+appropriate insurance coverage;
+
+BE IT RESOLVED, that the Trustee(s) are authorized to obtain and maintain the 
+following insurance on behalf of the {trust_name}:
+  (a) Trustee liability (errors and omissions) insurance;
+  (b) Property insurance for trust real and personal property; and
+  (c) Such other insurance as the Trustee(s) may deem appropriate.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+"""
+    
+    if designate_record_keeper:
+        content += f"""RESOLUTION 9: DESIGNATION OF RECORD KEEPER
+
+WHEREAS, the Trust Instrument requires that adequate records be kept of all 
+trust proceedings;
+
+BE IT RESOLVED, that {trustee_names[0] if trustee_names else "[Trustee Name]"} is hereby designated as the Record Keeper of the {trust_name}, responsible for maintaining all trust records, minutes, and documents at the principal place of administration;
+
+FURTHER RESOLVED, that all trust records shall be kept in a secure and accessible manner, and shall be available for review by any Trustee or beneficiary as required by law.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+"""
+    
+    content += f"""ADJOURNMENT
+
+There being no further business to come before the meeting, on motion duly made 
+and seconded, the meeting was adjourned.
+
+________________________________________
+{trustee_names[0] if trustee_names else "[Trustee Name]"}, Trustee
+
+Date: {data.get("meeting_date", "[Date]")}
+
+CERTIFICATE
+
+I, {trustee_names[0] if trustee_names else "[Trustee Name]"}, the duly elected and acting 
+Trustee of the {trust_name}, do hereby certify that the above and foregoing is a 
+true and correct copy of the minutes of the initial meeting of the Trustee(s) 
+held on {data.get("meeting_date", "[Date]")}.
+
+________________________________________
+{trustee_names[0] if trustee_names else "[Trustee Name]"}, Trustee
+
+Date: {data.get("meeting_date", "[Date]")}
+"""
+    
+    return content
 
 def generate_general_meeting_content(data: dict) -> str:
     """Generate content for general meeting with multiple resolutions"""
@@ -2929,6 +3146,14 @@ async def get_template_options(trust_id: Optional[str] = None, user: dict = Depe
             "description": "Record a general trustee meeting with multiple resolutions",
             "icon": "users",
             "category": "basic"
+        },
+        {
+            "type": "initial_trustee_meeting",
+            "name": "Initial Trustee Meeting",
+            "description": "The first organizational meeting — accept trusteeship, open bank accounts, establish the trust's foundation",
+            "icon": "gavel",
+            "category": "basic",
+            "priority": True
         },
         {
             "type": "distribution_to_beneficiaries",
