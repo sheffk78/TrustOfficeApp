@@ -80,7 +80,10 @@ async def add_document(trust_id: str, doc: dict, user: dict = Depends(get_curren
         "updated_at": now,
     }
     await db.vault_documents.insert_one(record)
-    await auto_update_onboarding(user["user_id"], trust_id)
+    try:
+        await auto_update_onboarding(user["user_id"], trust_id)
+    except Exception:
+        pass
     return {"doc_id": record["doc_id"], "message": "Document added to vault"}
 
 
@@ -161,8 +164,11 @@ async def upload_document(
 
     await db.vault_documents.insert_one(record)
 
-    # Update onboarding checklist
-    await auto_update_onboarding(user["user_id"], trust_id)
+    # Update onboarding checklist (non-blocking — don't fail the upload if this errors)
+    try:
+        await auto_update_onboarding(user["user_id"], trust_id)
+    except Exception:
+        pass
 
     # Return without file_content in the response
     response = {k: v for k, v in record.items() if k != "file_content"}

@@ -119,7 +119,8 @@ export default function VaultPage() {
         setSummary(sData);
       }
     } catch (e) {
-      toast.error(e.message);
+      // Silently fail — loadData is a background refresh, not a user action
+      console.error('Failed to reload vault data:', e);
     } finally {
       setLoading(false);
     }
@@ -176,8 +177,25 @@ export default function VaultPage() {
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+      if (!res.ok) {
+        let errorMsg = 'Upload failed';
+        try {
+          const errData = await res.json();
+          errorMsg = errData.detail || errorMsg;
+        } catch (e) {
+          // Response wasn't JSON — use status text
+          errorMsg = `Upload failed (${res.status})`;
+        }
+        throw new Error(errorMsg);
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        // Response wasn't JSON but upload succeeded (status OK)
+        data = {};
+      }
 
       setUploadProgress('Upload complete!');
       toast.success('File uploaded to vault');
