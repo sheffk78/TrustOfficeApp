@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -13,7 +12,8 @@ import { toast } from 'sonner';
 import {
   FolderOpen, Plus, FileText, Calendar, Link as LinkIcon,
   Search, AlertTriangle, CheckCircle2, ExternalLink,
-  Trash2, Tag, Shield, FileCheck
+  Trash2, Tag, Shield, FileCheck, Upload, Download,
+  File, X, CloudUpload, Link2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -32,11 +32,13 @@ const CATEGORY_ICONS = {
   deed: FileText,
   bank_statement: FileText,
   legal_opinion: Shield,
-  court_order: Gavel,
+  court_order: FileText,
   other: FileText,
 };
 
 function Gavel(props) { return <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 13l6-6"/><circle cx="8" cy="8" r="6"/><path d="M4 20l6-6"/></svg>; }
+
+const ACCEPTED_TYPES = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.tiff,.tif,.doc,.docx,.xls,.xlsx,.txt';
 
 export default function VaultPage() {
   const { selectedTrust } = useAuth();
@@ -45,8 +47,13 @@ export default function VaultPage() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [addMode, setAddMode] = useState('upload'); // 'upload' or 'link'
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const fileInputRef = useRef(null);
+
   const [form, setForm] = useState({
     title: '',
     category: 'trust_instrument',
@@ -60,6 +67,8 @@ export default function VaultPage() {
     expiration_date: '',
     needs_renewal: false,
   });
+
+  const [uploadFile, setUploadFile] = useState(null);
 
   useEffect(() => {
     if (selectedTrust) loadData();
@@ -103,11 +112,88 @@ export default function VaultPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed');
       toast.success('Document added to vault');
-      setShowAdd(false);
-      setForm({ title: '', category: 'trust_instrument', date: '', description: '', storage_provider: 'google_drive', storage_url: '', storage_path: '', file_name: '', tags: '', expiration_date: '', needs_renewal: false });
+      resetForm();
       loadData();
     } catch (e) {
       toast.error(e.message);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile) {
+      toast.error('Please select a file to upload');
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error('Please enter a document title');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress('Uploading...');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('title', form.title);
+      formData.append('category', form.category);
+      if (form.date) formData.append('date', form.date);
+      if (form.description) formData.append('description', form.description);
+      formData.append('tags', form.tags);
+      if (form.expiration_date) formData.append('expiration_date', form.expiration_date);
+      formData.append('needs_renewal', form.needs_renewal ? 'true' : 'false');
+
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api'}/trusts/${selectedTrust.trust_id}/vault/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+      setUploadProgress('Upload complete!');
+      toast.success('File uploaded to vault');
+      resetForm();
+      loadData();
+    } catch (e) {
+      setUploadProgress('');
+      toast.error(e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setShowAdd(false);
+    setUploadFile(null);
+    setAddMode('upload');
+    setUploadProgress('');
+    setForm({
+      title: '', category: 'trust_instrument', date: '', description: '',
+      storage_provider: 'google_drive', storage_url: '', storage_path: '',
+      file_name: '', tags: '', expiration_date: '', needs_renewal: false,
+    });
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Client-side size check (16MB)
+    if (file.size > 16 * 1024 * 1024) {
+      toast.error(`File too large (${(file.size / (1024*1024)).toFixed(1)}MB). Maximum is 16MB.`);
+      return;
+    }
+
+    setUploadFile(file);
+    // Auto-fill title from filename if empty
+    if (!form.title) {
+      const name = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      setForm(f => ({ ...f, title: name, file_name: file.name }));
+    } else {
+      setForm(f => ({ ...f, file_name: file.name }));
     }
   };
 
@@ -120,6 +206,28 @@ export default function VaultPage() {
       }
     } catch (e) {
       toast.error('Failed');
+    }
+  };
+
+  const downloadDocument = async (docId, fileName) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api'}/vault/documents/${docId}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Download failed');
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'document';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error('Download failed');
     }
   };
 
@@ -155,10 +263,10 @@ export default function VaultPage() {
                 <FolderOpen className="w-6 h-6 text-navy"/>
                 Trust Document Vault
               </h1>
-              <p className="text-sm text-neutral-600 mt-1">Organize references to your trust documents for <span className="font-semibold">{selectedTrust.name}</span></p>
-              <p className="text-xs text-neutral-400 mt-1">Link to files stored on Google Drive, Dropbox, OneDrive, or your local server.</p>
+              <p className="text-sm text-neutral-600 mt-1">Organize and store trust documents for <span className="font-semibold">{selectedTrust.name}</span></p>
+              <p className="text-xs text-neutral-400 mt-1">Upload files directly or link to external storage.</p>
             </div>
-            <Button onClick={() => setShowAdd(!showAdd)}>
+            <Button onClick={() => { setShowAdd(!showAdd); setAddMode('upload'); }}>
               <Plus className="w-4 h-4 mr-2"/>
               Add Document
             </Button>
@@ -212,38 +320,130 @@ export default function VaultPage() {
           {showAdd && (
             <Card className="mb-6 border border-neutral-200">
               <CardContent className="p-4">
-                <h3 className="font-semibold text-navy mb-3">Add Document Reference</h3>
+                {/* Mode Toggle */}
+                <div className="flex gap-2 mb-4">
+                  <button
+                    onClick={() => setAddMode('upload')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      addMode === 'upload' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Upload className="w-4 h-4"/> Upload File
+                  </button>
+                  <button
+                    onClick={() => setAddMode('link')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      addMode === 'link' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Link2 className="w-4 h-4"/> Link External
+                  </button>
+                </div>
+
+                <h3 className="font-semibold text-navy mb-3">
+                  {addMode === 'upload' ? 'Upload a Document' : 'Add Document Reference'}
+                </h3>
+
+                {/* Upload Drop Zone */}
+                {addMode === 'upload' && (
+                  <div className="mb-4">
+                    {!uploadFile ? (
+                      <label
+                        htmlFor="vault-file-upload"
+                        className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:border-navy hover:bg-gray-50 transition-colors"
+                      >
+                        <CloudUpload className="w-10 h-10 text-gray-400 mb-2"/>
+                        <p className="text-sm font-medium text-gray-700">Click to upload or drag and drop</p>
+                        <p className="text-xs text-gray-500 mt-1">PDF, images, Word, Excel — up to 16MB</p>
+                        <input
+                          id="vault-file-upload"
+                          ref={fileInputRef}
+                          type="file"
+                          accept={ACCEPTED_TYPES}
+                          className="hidden"
+                          onChange={handleFileSelect}
+                        />
+                      </label>
+                    ) : (
+                      <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <File className="w-8 h-8 text-navy"/>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{uploadFile.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(uploadFile.size / 1024).toFixed(1)} KB
+                            {uploadFile.size > 1024 * 1024 && ` (${(uploadFile.size / (1024*1024)).toFixed(1)} MB)`}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => { setUploadFile(null); setForm(f => ({...f, file_name: ''})); }}
+                          className="text-gray-400 hover:text-red-500"
+                        >
+                          <X className="w-5 h-5"/>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Common Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                  <Input placeholder="Document title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                  <Input placeholder="Document title *" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
                   <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="border border-neutral-300 rounded-md px-3 py-2 text-sm">
                     {Object.entries(categories).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <Input type="date" placeholder="Document date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
                   <Input placeholder="Tags (comma-separated)" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
-                  <select value={form.storage_provider} onChange={e => setForm({ ...form, storage_provider: e.target.value })} className="border border-neutral-300 rounded-md px-3 py-2 text-sm">
-                    <option value="google_drive">Google Drive</option>
-                    <option value="dropbox">Dropbox</option>
-                    <option value="onedrive">OneDrive</option>
-                    <option value="local_server">Local Server</option>
-                    <option value="cloud_url">Cloud URL</option>
-                    <option value="physical">Physical / Paper</option>
-                  </select>
-                  <Input placeholder="File name" value={form.file_name} onChange={e => setForm({ ...form, file_name: e.target.value })} />
                 </div>
-                <div className="mb-3">
-                  <Input placeholder="Storage URL or path (paste Google Drive link, Dropbox link, etc.)" value={form.storage_url} onChange={e => setForm({ ...form, storage_url: e.target.value })} />
-                </div>
-                <textarea placeholder="Description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm mb-3" rows={3} />
+
+                {/* Link-specific fields */}
+                {addMode === 'link' && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                      <select value={form.storage_provider} onChange={e => setForm({ ...form, storage_provider: e.target.value })} className="border border-neutral-300 rounded-md px-3 py-2 text-sm">
+                        <option value="google_drive">Google Drive</option>
+                        <option value="dropbox">Dropbox</option>
+                        <option value="onedrive">OneDrive</option>
+                        <option value="local_server">Local Server</option>
+                        <option value="cloud_url">Cloud URL</option>
+                        <option value="physical">Physical / Paper</option>
+                      </select>
+                      <Input placeholder="File name" value={form.file_name} onChange={e => setForm({ ...form, file_name: e.target.value })} />
+                    </div>
+                    <div className="mb-3">
+                      <Input placeholder="Storage URL or path (paste Google Drive link, Dropbox link, etc.)" value={form.storage_url} onChange={e => setForm({ ...form, storage_url: e.target.value })} />
+                    </div>
+                  </>
+                )}
+
+                <textarea placeholder="Description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm mb-3" rows={2} />
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <Input type="date" placeholder="Expires on" value={form.expiration_date} onChange={e => setForm({ ...form, expiration_date: e.target.value })} />
                   <div className="flex items-center gap-2">
                     <input type="checkbox" checked={form.needs_renewal} onChange={e => setForm({ ...form, needs_renewal: e.target.checked })} id="renew" />
-                    <label htmlFor="renew" className="text-sm text-neutral-600">Requires periodic renewal / update</label>
+                    <label htmlFor="renew" className="text-sm text-neutral-600">Requires periodic renewal</label>
                   </div>
                 </div>
+
+                {/* Upload progress */}
+                {uploadProgress && (
+                  <p className="text-sm text-amber-600 mb-2">{uploadProgress}</p>
+                )}
+
                 <div className="flex gap-2">
-                  <Button onClick={addDocument}>Save to Vault</Button>
-                  <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+                  <Button
+                    onClick={addMode === 'upload' ? handleUpload : addDocument}
+                    disabled={addMode === 'upload' ? uploading || !uploadFile : !form.title}
+                  >
+                    {addMode === 'upload' ? (
+                      <>
+                        <Upload className="w-4 h-4 mr-2"/>
+                        {uploading ? 'Uploading...' : 'Upload to Vault'}
+                      </>
+                    ) : (
+                      'Save to Vault'
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={resetForm}>Cancel</Button>
                 </div>
               </CardContent>
             </Card>
@@ -258,8 +458,8 @@ export default function VaultPage() {
             <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
               <FolderOpen className="w-12 h-12 text-slate-300 mb-3"/>
               <h2 className="text-lg font-semibold text-navy mb-1">Vault is empty</h2>
-              <p className="text-sm text-neutral-600 mb-4">Your trust documents should be organized here. Link to files stored externally.</p>
-              <Button onClick={() => setShowAdd(true)}>Add First Document</Button>
+              <p className="text-sm text-neutral-600 mb-4">Upload your trust documents or link to files stored externally.</p>
+              <Button onClick={() => { setShowAdd(true); setAddMode('upload'); }}>Upload First Document</Button>
             </div>
           ) : (
             <div className="space-y-8">
@@ -276,11 +476,21 @@ export default function VaultPage() {
                         <div key={doc.doc_id} className="bg-white border border-neutral-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
                           <div className="flex items-start justify-between mb-2">
                             <p className="font-semibold text-navy text-sm line-clamp-2">{doc.title}</p>
-                            <button onClick={() => deleteDocument(doc.doc_id)} className="text-neutral-400 hover:text-red-500">
+                            <button onClick={() => deleteDocument(doc.doc_id)} className="text-neutral-400 hover:text-red-500 ml-2 flex-shrink-0">
                               <Trash2 className="w-3.5 h-3.5"/>
                             </button>
                           </div>
-                          <p className="text-xs text-neutral-500 mb-2">{doc.file_name}</p>
+
+                          {/* File indicator */}
+                          {doc.storage_provider === 'trustoffice' ? (
+                            <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1 mb-2 w-fit">
+                              <File className="w-3 h-3"/>
+                              {doc.file_name} {doc.file_size && `(${doc.file_size})`}
+                            </div>
+                          ) : doc.file_name ? (
+                            <p className="text-xs text-neutral-500 mb-2">{doc.file_name}</p>
+                          ) : null}
+
                           {doc.description && <p className="text-xs text-neutral-600 mb-2 line-clamp-2">{doc.description}</p>}
                           <div className="flex flex-wrap gap-1 mb-3">
                             {doc.tags?.map((tag, i) => (
@@ -288,7 +498,14 @@ export default function VaultPage() {
                             ))}
                           </div>
                           <div className="flex items-center justify-between">
-                            {doc.storage_url ? (
+                            {doc.storage_provider === 'trustoffice' ? (
+                              <button
+                                onClick={() => downloadDocument(doc.doc_id, doc.file_name)}
+                                className="text-xs text-navy hover:text-gold flex items-center gap-1"
+                              >
+                                <Download className="w-3 h-3"/> Download
+                              </button>
+                            ) : doc.storage_url ? (
                               <a href={doc.storage_url} target="_blank" rel="noopener noreferrer" className="text-xs text-navy hover:text-gold flex items-center gap-1">
                                 <ExternalLink className="w-3 h-3"/> Open
                               </a>

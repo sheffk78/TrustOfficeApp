@@ -1,9 +1,11 @@
-# Document Vault router — trust document organization and reference tracking
-# NO file upload (no S3). Users store files externally and reference them here.
-from fastapi import APIRouter, HTTPException, Depends
+# Vault router — trust document organization, reference tracking, and file upload
+# File uploads stored as BSON binary in vault_documents (max 16MB per file)
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
+from fastapi.responses import Response
 from datetime import datetime, timezone
 from typing import Optional
 import uuid
+import base64
 
 from database import db
 from dependencies import get_current_user
@@ -31,6 +33,22 @@ DOC_CATEGORIES = {
 
 STORAGE_PROVIDERS = ["google_drive", "dropbox", "onedrive", "local_server", "cloud_url", "physical"]
 
+ALLOWED_MIME_TYPES = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "text/plain": "txt",
+    "image/tiff": "tiff",
+}
+
+MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB BSON limit
+
 
 @router.post("/trusts/{trust_id}/vault/documents")
 async def add_document(trust_id: str, doc: dict, user: dict = Depends(get_current_user)):
@@ -49,19 +67,133 @@ async def add_document(trust_id: str, doc: dict, user: dict = Depends(get_curren
         "date": doc.get("date"),
         "description": doc.get("description"),
         "storage_provider": doc.get("storage_provider", "google_drive"),
-        "storage_url": doc.get("storage_url"),     # external link
-        "storage_path": doc.get("storage_path"),   # path or identifier
+        "storage_url": doc.get("storage_url"),
+        "storage_path": doc.get("storage_path"),
         "file_name": doc.get("file_name"),
         "file_size": doc.get("file_size"),
         "tags": doc.get("tags", []),
         "expiration_date": doc.get("expiration_date"),
         "needs_renewal": doc.get("needs_renewal", False),
-        "tags": doc.get("tags", []),
         "created_at": now,
         "updated_at": now,
     }
     await db.vault_documents.insert_one(record)
     return {"doc_id": record["doc_id"], "message": "Document added to vault"}
+
+
+@router.post("/trusts/{trust_id}/vault/upload")
+async def upload_document(
+    trust_id: str,
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    category: str = Form("trust_instrument"),
+    date: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    tags: Optional[str] = Form(""),
+    expiration_date: Optional[str] = Form(None),
+    needs_renewal: Optional[str] = Form("false"),
+    user: dict = Depends(get_current_user),
+):
+    """Upload a file to the vault. Stores file content as BSON binary."""
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    # Validate MIME type
+    content_type = file.content_type or "application/octet-stream"
+    if content_type not in ALLOWED_MIME_TYPES and not content_type.startswith("image/"):
+        # Accept any image type even if not in our explicit list
+        if not content_type.startswith(("image/", "application/pdf", "application/msword", "application/vnd.", "text/")):
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type '{content_type}' is not supported. Supported types: PDF, images, Word docs, Excel, and text files."
+            )
+
+    # Read and validate file size
+    file_content = await file.read()
+    if len(file_content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is 16MB. Your file is {len(file_content) / (1024*1024):.1f}MB."
+        )
+
+    # Parse tags
+    tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
+
+    # Format file size for display
+    size_bytes = len(file_content)
+    if size_bytes < 1024:
+        size_display = f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        size_display = f"{size_bytes / 1024:.1f} KB"
+    else:
+        size_display = f"{size_bytes / (1024 * 1024):.1f} MB"
+
+    now = datetime.now(timezone.utc).isoformat()
+    doc_id = f"doc_{uuid.uuid4().hex[:12]}"
+
+    record = {
+        "doc_id": doc_id,
+        "trust_id": trust_id,
+        "title": title,
+        "category": category,
+        "category_label": DOC_CATEGORIES.get(category, "Other"),
+        "date": date,
+        "description": description,
+        "storage_provider": "trustoffice",
+        "storage_url": None,
+        "storage_path": None,
+        "file_name": file.filename or "document",
+        "file_size": size_display,
+        "file_size_bytes": size_bytes,
+        "file_content_type": content_type,
+        "file_content": file_content,  # BSON binary — stored directly
+        "tags": tag_list,
+        "expiration_date": expiration_date,
+        "needs_renewal": needs_renewal.lower() == "true",
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    await db.vault_documents.insert_one(record)
+
+    # Return without file_content in the response
+    response = {k: v for k, v in record.items() if k != "file_content"}
+    response["message"] = "File uploaded to vault"
+    return response
+
+
+@router.get("/vault/documents/{doc_id}/download")
+async def download_document(doc_id: str, user: dict = Depends(get_current_user)):
+    """Download a file from the vault."""
+    doc = await db.vault_documents.find_one({"doc_id": doc_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Verify ownership
+    trust = await db.trusts.find_one({"trust_id": doc["trust_id"], "user_id": user["user_id"]})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_content = doc.get("file_content")
+    if not file_content:
+        # This is a reference-only doc (no uploaded file) — redirect to external URL
+        storage_url = doc.get("storage_url")
+        if storage_url:
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url=storage_url)
+        raise HTTPException(status_code=404, detail="No file content available")
+
+    content_type = doc.get("file_content_type", "application/octet-stream")
+    filename = doc.get("file_name", "document")
+
+    return Response(
+        content=file_content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
 
 
 @router.get("/trusts/{trust_id}/vault/documents")
@@ -70,9 +202,9 @@ async def list_documents(
     category: Optional[str] = None,
     search: Optional[str] = None,
     provider: Optional[str] = None,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
-    """List vault documents with filtering."""
+    """List vault documents with filtering. Excludes file_content from responses."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
@@ -89,7 +221,8 @@ async def list_documents(
             {"tags": {"$regex": search, "$options": "i"}},
         ]
 
-    docs = await db.vault_documents.find(query, {"_id": 0}).sort("date", -1).to_list(200)
+    # Exclude file_content from list responses (it can be huge)
+    docs = await db.vault_documents.find(query, {"_id": 0, "file_content": 0}).sort("date", -1).to_list(200)
 
     # Group by category
     by_category = {}
@@ -121,24 +254,29 @@ async def update_document(doc_id: str, update: dict, user: dict = Depends(get_cu
 
     trust = await db.trusts.find_one({"trust_id": doc["trust_id"], "user_id": user["user_id"]})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Document not found")
 
     update_data = {k: v for k, v in update.items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    # Update category_label if category changed
+    if "category" in update_data:
+        update_data["category_label"] = DOC_CATEGORIES.get(update_data["category"], "Other")
+
     await db.vault_documents.update_one({"doc_id": doc_id}, {"$set": update_data})
     return {"message": "Document updated"}
 
 
 @router.delete("/vault/documents/{doc_id}")
 async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
-    """Remove a document reference from vault."""
+    """Remove a document from vault (and its file content)."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
     trust = await db.trusts.find_one({"trust_id": doc["trust_id"], "user_id": user["user_id"]})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Document not found")
 
     await db.vault_documents.delete_one({"doc_id": doc_id})
     return {"message": "Document removed from vault"}
