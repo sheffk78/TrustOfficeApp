@@ -44,6 +44,13 @@ import { Switch } from '@/components/ui/switch';
 const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
 export default function SettingsPage() {
+  // EIN formatting: auto-inserts dash so user sees XX-XXXXXXX as they type
+  const formatEIN = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 9);
+    if (digits.length <= 2) return digits;
+    return digits.slice(0, 2) + '-' + digits.slice(2);
+  };
+
   const navigate = useNavigate();
   const { user, setUser, selectedTrust, setSelectedTrust, loadTrusts } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -302,12 +309,12 @@ export default function SettingsPage() {
       });
       
       if (!response.ok) {
-        // Revert on error
-        setNotificationPrefs({ ...notificationPrefs });
+        // Revert on error — use functional updater to avoid stale closure
+        setNotificationPrefs(prev => ({ ...prev, [key]: !value }));
         toast.error('Failed to update preference');
       }
     } catch (error) {
-      setNotificationPrefs({ ...notificationPrefs });
+      setNotificationPrefs(prev => ({ ...prev, [key]: !value }));
       toast.error('Failed to update preference');
     } finally {
       setNotificationLoading(false);
@@ -497,7 +504,7 @@ export default function SettingsPage() {
       
       toast.success('Trust created successfully!');
       setCreateTrustOpen(false);
-      setNewTrustData({ name: '', trust_type: 'family', jurisdiction: '', role: 'Trustee', start_date: '', trustees: '', authority_clause: '' });
+      setNewTrustData({ name: '', trust_type: 'family', jurisdiction: '', role: 'Trustee', start_date: '', trustees: '', authority_clause: '', ein: '', state_code: '', tax_year_end_month: '', tax_year_end_day: '', is_fiscal_year: false });
       await loadTrusts();
       setSelectedTrust(createdTrust);
     } catch (error) {
@@ -773,7 +780,7 @@ export default function SettingsPage() {
                         <Label className="label-trust">EIN</Label>
                         <Input
                           value={newTrustData.ein}
-                          onChange={(e) => setNewTrustData({ ...newTrustData, ein: e.target.value })}
+                          onChange={(e) => setNewTrustData({ ...newTrustData, ein: formatEIN(e.target.value) })}
                           className="mt-1 input-trust"
                           placeholder="XX-XXXXXXX"
                           data-testid="new-trust-ein"
@@ -1046,7 +1053,7 @@ export default function SettingsPage() {
                       <Label className="label-trust">EIN</Label>
                       <Input
                         value={trustData.ein}
-                        onChange={(e) => setTrustData({ ...trustData, ein: e.target.value })}
+                        onChange={(e) => setTrustData({ ...trustData, ein: formatEIN(e.target.value) })}
                         className="mt-1 input-trust"
                         placeholder="XX-XXXXXXX"
                         data-testid="settings-ein"

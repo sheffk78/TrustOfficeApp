@@ -85,13 +85,20 @@ export default function VaultPage() {
         fetchWithAuth(`/trusts/${selectedTrust.trust_id}/vault/documents?${params.toString()}`),
         fetchWithAuth(`/trusts/${selectedTrust.trust_id}/vault/summary`),
       ]);
-      const dData = await docRes.json();
+      
       if (docRes.ok) {
+        const dData = await docRes.json();
         setDocuments(dData.documents || []);
         setByCategory(dData.by_category || {});
+      } else {
+        setDocuments([]);
+        setByCategory({});
       }
-      const sData = await sumRes.json();
-      if (sumRes.ok) setSummary(sData);
+      
+      if (sumRes.ok) {
+        const sData = await sumRes.json();
+        setSummary(sData);
+      }
     } catch (e) {
       toast.error(e.message);
     } finally {
@@ -203,9 +210,12 @@ export default function VaultPage() {
       if (res.ok) {
         toast.success('Document removed');
         loadData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.detail || 'Failed to delete document');
       }
     } catch (e) {
-      toast.error('Failed');
+      toast.error('Failed to delete document');
     }
   };
 
