@@ -16,7 +16,8 @@ export const TrialBanner = ({ location = 'dashboard' }) => {
   
   // Show for active free users (forever_free or legacy trial)
   const isActiveFreeTier = (subscription?.is_trial && subscription?.is_active) || 
-                           (subscription?.plan_type === 'forever_free' && subscription?.is_active);
+                           (subscription?.plan_type === 'forever_free' && subscription?.is_active) ||
+                           (subscription?.plan_type === 'free' && subscription?.is_active);
   
   // Track banner view once
   useEffect(() => {

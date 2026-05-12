@@ -25,7 +25,8 @@ import {
   PieChart,
   Trash2,
   CreditCard,
-  Clock
+  Clock,
+  Lock
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -368,15 +369,37 @@ export default function OnboardingPage() {
               </div>
 
               <div className="bg-navy/5 border border-navy/10 p-6 mb-8">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-success/20 rounded-full flex items-center justify-center">
-                    <CheckCircle2 className="w-5 h-5 text-success" />
+                {subscription?.plan_type === 'free' ? (
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                        <Lock className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-navy">Free Plan — Core Features Only</p>
+                        <p className="text-sm text-muted-foreground">Minutes, distributions, and basic governance — upgrade for the full toolkit.</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => navigate('/settings/billing')}
+                      className="btn-primary w-full py-3"
+                      data-testid="upgrade-cta-onboarding"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Upgrade to Full Access
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-success/20 rounded-full flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-success" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-navy">Full Access Active</p>
+                      <p className="text-sm text-muted-foreground">You have access to all TrustOffice features.</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-navy">Free Access Active</p>
-                    <p className="text-sm text-muted-foreground">Full access to all features for individual trustees.</p>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">

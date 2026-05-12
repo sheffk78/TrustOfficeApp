@@ -253,6 +253,8 @@ app.add_middleware(RateLimitMiddleware, config=RateLimitConfig())
 app.add_middleware(SubscriptionMiddleware)
 
 # CORS middleware — added LAST so it executes FIRST (outermost)
+
+# CORS middleware — added LAST so it executes FIRST (outermost)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,

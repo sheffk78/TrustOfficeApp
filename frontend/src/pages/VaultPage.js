@@ -171,11 +171,26 @@ export default function VaultPage() {
       formData.append('needs_renewal', form.needs_renewal ? 'true' : 'false');
 
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api'}/trusts/${selectedTrust.trust_id}/vault/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout for large files
+
+      let res;
+      try {
+        res = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api'}/trusts/${selectedTrust.trust_id}/vault/upload`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+          signal: controller.signal,
+        });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Upload timed out — the file may be too large or your connection is slow. Please try again.');
+        }
+        // Network-level error (CORS block, DNS, offline, etc.)
+        throw new Error('Could not reach the server. Please check your internet connection and try again.');
+      }
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         let errorMsg = 'Upload failed';
@@ -203,7 +218,13 @@ export default function VaultPage() {
       loadData();
     } catch (e) {
       setUploadProgress('');
-      toast.error(e.message);
+      // Provide more specific error messages for common failure modes
+      let errorMsg = e.message || 'Upload failed';
+      if (errorMsg === 'Failed to fetch') {
+        errorMsg = 'Network error — please check your connection and try again. If the file is large, it may have timed out.';
+      }
+      console.error('Vault upload error:', e);
+      toast.error(errorMsg);
     } finally {
       setUploading(false);
     }

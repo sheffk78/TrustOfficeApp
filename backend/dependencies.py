@@ -64,7 +64,7 @@ class SubscriptionState(BaseModel):
     """Normalized subscription state object for consistent access across modules"""
     user_id: str
     subscription_id: Optional[str] = None
-    plan_type: str  # "trial", "monthly", "annual"
+    plan_type: str  # "free", "trial", "forever_free", "monthly", "annual"
     status: str  # "trialing", "active", "past_due", "canceled", "expired"
     trial_start_date: Optional[str] = None
     trial_end_date: Optional[str] = None
@@ -99,13 +99,13 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
     
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
     
-    # If no subscription exists, create one (forever_free for all individual trustees)
+    # If no subscription exists, create one (free plan for all individual trustees)
     if not sub:
-# All new users get forever_free — individual trustees are free
+# All new users get the 'free' plan — individual trustees are free
         sub = {
             "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
             "user_id": user_id,
-            "plan_type": "forever_free",
+            "plan_type": "free",
             "status": "active",
             "trial_start_date": None,
             "trial_end_date": None,
@@ -117,9 +117,15 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
         }
         await db.subscriptions.insert_one(sub)
     
-    # For forever free accounts, always return active status regardless of stored status
-    # Also upgrade legacy trial accounts to forever_free
-    effective_plan_type = "forever_free" if sub.get("plan_type") in ("trial", "forever_free") else sub.get("plan_type", "trial")
+    # Map legacy trial accounts to 'free'; forever_free only for admin/FOREVER_FREE_EMAILS accounts
+    if sub.get("plan_type") == "trial":
+        effective_plan_type = "forever_free" if is_forever_free else "free"
+    elif sub.get("plan_type") == "forever_free":
+        effective_plan_type = "forever_free" if is_forever_free else "free"
+    elif sub.get("plan_type") == "free":
+        effective_plan_type = "forever_free" if is_forever_free else "free"
+    else:
+        effective_plan_type = sub.get("plan_type", "trial")
     
     if effective_plan_type == "forever_free":
         return SubscriptionState(
@@ -137,6 +143,24 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
             stripe_subscription_id=None,
             current_period_end=None,
             cancel_at_period_end=None,
+        )
+    
+    if effective_plan_type == "free":
+        return SubscriptionState(
+            user_id=user_id,
+            subscription_id=sub.get("subscription_id"),
+            plan_type="free",
+            status="active",
+            trial_start_date=sub.get("trial_start_date"),
+            trial_end_date=sub.get("trial_end_date"),
+            trial_days_remaining=None,
+            is_trial=True,
+            is_active=True,
+            is_read_only=False,
+            stripe_customer_id=sub.get("stripe_customer_id"),
+            stripe_subscription_id=sub.get("stripe_subscription_id"),
+            current_period_end=sub.get("current_period_end"),
+            cancel_at_period_end=sub.get("cancel_at_period_end"),
         )
     
     # Initialize state with base values
@@ -235,6 +259,13 @@ PLAN_FEATURES = {
         Feature.SINGLE_TRUST,
         # Trial gets limited features with watermark (legacy — existing trial users)
     },
+    "free": {
+        # Free plan — same features as trial. Core trust management only.
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.SINGLE_TRUST,
+    },
     "none": {
         # No features until they subscribe
     },
@@ -332,7 +363,7 @@ async def get_user_features(user_id: str) -> dict:
     Useful for frontend to show/hide features.
     """
     state = await get_subscription_state(user_id)
-    plan_features = PLAN_FEATURES.get(state.plan_type, set()) if state.is_active else PLAN_FEATURES.get("trial", set())
+    plan_features = PLAN_FEATURES.get(state.plan_type, set()) if state.is_active else PLAN_FEATURES.get("free", set())
     
     return {
         "plan_type": state.plan_type,

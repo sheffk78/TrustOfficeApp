@@ -252,7 +252,7 @@ export default function BillingPage() {
     
     switch (status) {
       case 'active':
-        if (subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial') {
+        if (subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial' || subscription?.plan_type === 'free') {
           return (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
               <Check className="w-4 h-4" />
@@ -303,7 +303,7 @@ export default function BillingPage() {
     }
   };
 
-  const isFreePlan = subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial' || subscription?.plan_type === 'none';
+  const isFreePlan = subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial' || subscription?.plan_type === 'none' || subscription?.plan_type === 'free';
   const isActivePaidSubscription = subscription?.status === 'active' && !isFreePlan;
   const isCanceling = subscription?.cancel_at_period_end;
   const canUpgrade = isActivePaidSubscription && subscription?.plan_type === 'monthly' && !isCanceling;
@@ -347,6 +347,7 @@ export default function BillingPage() {
                        subscription?.plan_type === 'monthly' ? 'Monthly Plan' :
                        subscription?.plan_type === 'annual' ? 'Annual Plan' : 
                        subscription?.plan_type === 'forever_free' ? 'Free Plan' :
+                       subscription?.plan_type === 'free' ? 'Free Plan' :
                        subscription?.plan_type || 'Unknown'}
                     </h2>
                   </div>
