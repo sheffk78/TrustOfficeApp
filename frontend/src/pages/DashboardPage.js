@@ -131,7 +131,8 @@ export default function DashboardPage() {
       loadDashboardData();
       loadAiSuggestions();
       loadTaxDeadlines();
-    } else if (trusts.length === 0) {
+    } else {
+      // No trust selected — stop loading to prevent blank screen
       setLoading(false);
     }
   }, [selectedTrust, trusts, trustsLoading]);

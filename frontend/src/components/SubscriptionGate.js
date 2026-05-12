@@ -48,10 +48,11 @@ export const SubscriptionGate = ({ children }) => {
     );
   }
 
-  // Check if it's an active free-tier user
-  const isActiveFreeTier = subscription?.is_trial && subscription?.is_active;
+  // Check if it's an active free-tier user (legacy trial or forever_free)
+  const isActiveFreeTier = (subscription?.is_trial && subscription?.is_active) || 
+                           (subscription?.plan_type === 'forever_free' && subscription?.is_active);
 
-  // If subscription is active, show content with TrialBanner if applicable
+  // If subscription is active, show content with UpgradeBanner for free users
   if (!subscriptionExpired && !isReadOnly) {
     return (
       <div className="flex flex-col min-h-screen">

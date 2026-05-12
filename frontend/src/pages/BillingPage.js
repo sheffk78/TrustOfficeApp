@@ -252,6 +252,16 @@ export default function BillingPage() {
     
     switch (status) {
       case 'active':
+        if (subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial') {
+          return (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
+              <Check className="w-4 h-4" />
+              <span className="font-mono text-xs uppercase">
+                Free Access
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
             <Check className="w-4 h-4" />
@@ -293,9 +303,10 @@ export default function BillingPage() {
     }
   };
 
-  const isActiveSubscription = subscription?.status === 'active';
+  const isFreePlan = subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial' || subscription?.plan_type === 'none';
+  const isActivePaidSubscription = subscription?.status === 'active' && !isFreePlan;
   const isCanceling = subscription?.cancel_at_period_end;
-  const canUpgrade = isActiveSubscription && subscription?.plan_type === 'monthly' && !isCanceling;
+  const canUpgrade = isActivePaidSubscription && subscription?.plan_type === 'monthly' && !isCanceling;
 
   return (
     <div className="main-layout" data-testid="billing-page">
@@ -342,8 +353,25 @@ export default function BillingPage() {
                   {getStatusBadge()}
                 </div>
 
-                {/* Subscription Details Grid */}
-                {isActiveSubscription && (
+                {/* Free Plan Info */}
+                {isFreePlan && (
+                  <div className="p-4 bg-success/5 border border-success/10 mb-6">
+                    <div className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-navy">
+                          Free Plan — Core features included
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          You have full access to trust management, minutes, distributions, and governance tools. Upgrade to a paid plan for team features, priority support, and dedicated account management.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Subscription Details Grid (paid plans only) */}
+                {isActivePaidSubscription && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-subtle-bg border border-border">
                     <div>
                       <p className="label-trust text-xs mb-1">
@@ -363,22 +391,7 @@ export default function BillingPage() {
                   </div>
                 )}
 
-                {/* Free Access Info */}
-                {subscription?.status === 'trialing' && (
-                  <div className="p-4 bg-success/5 border border-success/10 mb-6">
-                    <div className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-navy">
-                          Free access — all features included
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Individual trustees get full access at no cost. Subscribe for team and institutional features.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Expired Access Warning */}
                 {subscription?.status === 'expired' && (
@@ -426,8 +439,8 @@ export default function BillingPage() {
                   </div>
                 )}
 
-                {/* Active Subscription Actions */}
-                {isActiveSubscription && !isCanceling && (
+                {/* Active Paid Subscription Actions (not for free plan) */}
+                {isActivePaidSubscription && !isCanceling && (
                   <div className="flex flex-wrap gap-3">
                     {canUpgrade && (
                       <Button
@@ -477,8 +490,8 @@ export default function BillingPage() {
                 )}
               </div>
 
-              {/* Pricing Plans - Show for non-active subscriptions */}
-              {!isActiveSubscription && (
+              {/* Pricing Plans — Show for free plan, expired, or non-active subscriptions */}
+              {(isFreePlan || !isActivePaidSubscription) && (
                 <>
                   <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

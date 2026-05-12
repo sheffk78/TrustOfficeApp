@@ -1,20 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Check, Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { trackTrialBannerViewed, trackTrialBannerClicked } from '@/utils/analytics';
 
 /**
- * TrialBanner - Shows status banner for active free-tier users
+ * TrialBanner - Shows status banner for free-tier users
  * Displays at the top of dashboard to indicate free access status
+ * and encourage upgrade to paid plan for full features.
  */
 export const TrialBanner = ({ location = 'dashboard' }) => {
   const { subscription } = useAuth();
   const hasTrackedView = useRef(false);
   
-  // Only show for active free-tier users
-  const isActiveFreeTier = subscription?.is_trial && subscription?.is_active;
+  // Show for active free users (forever_free or legacy trial)
+  const isActiveFreeTier = (subscription?.is_trial && subscription?.is_active) || 
+                           (subscription?.plan_type === 'forever_free' && subscription?.is_active);
   
   // Track banner view once
   useEffect(() => {
@@ -38,25 +40,25 @@ export const TrialBanner = ({ location = 'dashboard' }) => {
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-success/10 rounded-full">
-            <Check className="h-4 w-4 text-success" />
+            <Lock className="h-4 w-4 text-navy" />
           </div>
           <div>
             <p className="text-sm font-medium text-navy">
-              Free Access — All Features Included
+              Free Plan — Core Features Only
             </p>
             <p className="text-xs text-muted-foreground">
-              Individual trustees get full access at no cost
+              Upgrade to unlock PDF exports, multiple trusts, advanced templates, and more
             </p>
           </div>
         </div>
-        <Link to="/settings?tab=subscription" onClick={handleUpgradeClick}>
+        <Link to="/settings/billing" onClick={handleUpgradeClick}>
           <Button 
             size="sm" 
             className="bg-navy hover:bg-navy/90 text-white flex items-center gap-2"
             data-testid="trial-upgrade-btn"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Upgrade for Teams
+            Upgrade Now
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </Link>
