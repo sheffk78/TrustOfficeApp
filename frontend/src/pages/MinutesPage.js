@@ -167,13 +167,13 @@ export default function MinutesPage() {
     return matchesType;
   });
 
-  // Handle new minutes button with read-only check
-  const handleNewMinutes = () => {
+  // Handle create minutes button with read-only check
+  const handleCreateMinutes = () => {
     if (isReadOnly) {
       showUpgradeModal('create meeting minutes', 'button_click', 'minutes_page');
       return;
     }
-    navigate('/minutes/new');
+    navigate('/minutes/create');
   };
 
   return (
@@ -191,16 +191,14 @@ export default function MinutesPage() {
                 {selectedTrust?.name || 'Select a trust'}
               </p>
             </div>
-            <div>
-              <Button 
-                onClick={handleNewMinutes}
-                className={`btn-primary ${isReadOnly ? 'opacity-60' : ''}`}
-                data-testid="new-minutes-btn"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New Minutes
-              </Button>
-            </div>
+            <Button 
+              onClick={handleCreateMinutes}
+              className={`btn-primary ${isReadOnly ? 'opacity-60' : ''}`}
+              data-testid="create-minutes-btn"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Minutes
+            </Button>
           </div>
 
           {/* Drafts Section */}
@@ -254,7 +252,7 @@ export default function MinutesPage() {
                         </div>
                         <Button
                           size="sm"
-                          onClick={() => navigate(`/minutes/new?draft_id=${draft.minutes_id}`)}
+                          onClick={() => navigate(`/minutes/create?draft_id=${draft.minutes_id}`)}
                           className="btn-primary text-xs ml-4"
                           data-testid={`continue-draft-${draft.minutes_id}`}
                         >
@@ -352,8 +350,8 @@ export default function MinutesPage() {
               <p className="text-muted-foreground mb-6">
                 {searchTerm ? 'Try a different search term' : 'Record your first minutes to get started'}
               </p>
-              <Button onClick={handleNewMinutes} className="btn-primary">
-                New Minutes
+              <Button onClick={() => navigate('/minutes/create')} className="btn-primary">
+                Create Minutes
               </Button>
             </div>
           ) : (

@@ -569,7 +569,7 @@ export default function CompensationPage() {
                                       prefill_recipient: payment.classification_text || 'Trustee',
                                       prefill_description: `Compensation payment on ${formatDate(payment.date)}`
                                     });
-                                    navigate(`/guided-minutes?${params.toString()}`);
+                                    navigate(`/minutes/create?${params.toString()}`);
                                   }}>
                                     <FileText className="w-4 h-4 mr-2" />
                                     Document in minutes (retroactive)

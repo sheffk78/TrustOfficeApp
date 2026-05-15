@@ -34,6 +34,11 @@ export default function NewMinutesPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   
+  // Redirect /minutes/new to /minutes/create (preserves deep links)
+  useEffect(() => {
+    navigate('/minutes/create', { replace: true });
+  }, [navigate]);
+  
   // AI Drafting state
   const [aiDrafting, setAiDrafting] = useState(false);
   const [aiDraftModalOpen, setAiDraftModalOpen] = useState(false);

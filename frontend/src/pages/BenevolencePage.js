@@ -700,7 +700,7 @@ export default function BenevolencePage() {
                                   prefill_recipient: record.recipient_name || '',
                                   prefill_description: record.description || record.category || ''
                                 });
-                                navigate(`/guided-minutes?${params.toString()}`);
+                                navigate(`/minutes/create?${params.toString()}`);
                               }}>
                                 <FileText className="w-4 h-4 mr-2" />
                                 Document in minutes (retroactive)

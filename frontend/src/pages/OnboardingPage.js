@@ -111,7 +111,7 @@ const FEATURES = [
 
 // Quick start tasks shown after trust creation
 const QUICK_START_TASKS = [
-  { label: 'Record your first meeting minutes', path: '/guided-minutes', icon: FileText },
+  { label: 'Record your first meeting minutes', path: '/minutes/create?from=onboarding', icon: FileText },
   { label: 'Add assets to Schedule A', path: '/schedule-a', icon: ClipboardList },
   { label: 'Set up beneficiaries', path: '/beneficiaries', icon: Users },
   { label: 'Review governance tasks', path: '/governance', icon: HeartPulse }
@@ -803,7 +803,7 @@ export default function OnboardingPage() {
                   Go to Dashboard
                 </Button>
                 <Button
-                  onClick={() => navigate('/guided-minutes')}
+                  onClick={() => navigate('/minutes/create?from=onboarding')}
                   variant="outline"
                   className="flex-1 btn-secondary h-12"
                 >

@@ -383,7 +383,7 @@ export default function DashboardPage() {
         description: 'Trustees are legally required to document decisions. Your first meeting covers accepting trusteeship, opening bank accounts, and setting up the trust.',
         done: onboarding.minutes_generated,
         icon: ClipboardList,
-        action: '/minutes/new?type=initial_trustee_meeting'
+        action: '/minutes/create?type=initial_trustee_meeting'
       },
       { 
         id: 'calendar', 
@@ -1010,7 +1010,7 @@ export default function DashboardPage() {
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">No activity yet</p>
                     <Button 
-                      onClick={() => navigate('/minutes/new')}
+                      onClick={() => navigate('/minutes/create')}
                       className="btn-secondary mt-4"
                     >
                       Record Your First Minutes

@@ -73,7 +73,7 @@ export default function MinutesTemplatesPage() {
     }
     
     if (templateType === 'blank') {
-      navigate('/minutes/new');
+      navigate('/minutes/create');
     } else {
       navigate(`/minutes/template/${templateType}`);
     }

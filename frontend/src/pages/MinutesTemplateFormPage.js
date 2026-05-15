@@ -1046,10 +1046,10 @@ export default function MinutesTemplateFormPage() {
             <Button 
               variant="ghost" 
               className="mb-4"
-              onClick={() => previewMode ? setPreviewMode(false) : navigate('/minutes/templates')}
+              onClick={() => previewMode ? setPreviewMode(false) : navigate(searchParams.get('from') === 'create' ? '/minutes/create' : '/minutes/templates')}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              {previewMode ? 'Back to Form' : 'Back to Templates'}
+              {previewMode ? 'Back to Form' : searchParams.get('from') === 'create' ? 'Back to Create' : 'Back to Templates'}
             </Button>
             <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">
               {TEMPLATE_TITLES[templateType] || 'Create Minutes'}
@@ -3033,7 +3033,7 @@ export default function MinutesTemplateFormPage() {
 
               {/* Generate Button */}
               <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => navigate('/minutes/templates')}>
+                <Button variant="outline" onClick={() => navigate(searchParams.get('from') === 'create' ? '/minutes/create' : '/minutes/templates')}>
                   Cancel
                 </Button>
                 <Button className="btn-primary" onClick={handleGeneratePreview} disabled={loading}>

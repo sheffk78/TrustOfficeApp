@@ -308,7 +308,7 @@ export default function DistributionsPage() {
     setDialogOpen(open);
   };
 
-  // Navigate to Guided Minutes to document this distribution (retroactive)
+  // Navigate to Create Minutes to document this distribution (retroactive)
   const handleCreateMinutesFromDistribution = (dist) => {
     const params = new URLSearchParams({
       prefill_type: 'distribution',
@@ -316,7 +316,7 @@ export default function DistributionsPage() {
       prefill_recipient: dist.beneficiary_name || dist.beneficiary || '',
       prefill_description: dist.purpose_classification || dist.category || ''
     });
-    navigate(`/guided-minutes?${params.toString()}`);
+    navigate(`/minutes/create?${params.toString()}`);
   };
 
   // Handle successful minutes attachment
