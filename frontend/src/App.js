@@ -209,23 +209,14 @@ const AppRouter = () => {
         </SubscriptionProtectedRoute>
       } />
       */}
-      {/* Redirect old minutes routes to new unified wizard */}
+      {/* Redirect old templates list to new unified wizard */}
       <Route path="/minutes/templates" element={<Navigate to="/minutes/create" replace />} />
-      {/* DEPRECATED — remove after migration
-      <Route path="/minutes/templates" element={
-        <SubscriptionProtectedRoute>
-          <MinutesTemplatesPage />
-        </SubscriptionProtectedRoute>
-      } />
-      */}
-      <Route path="/minutes/template/:templateType" element={<Navigate to="/minutes/create" replace />} />
-      {/* DEPRECATED — remove after migration
+      {/* Template form — used by CreateMinutesPage template selection */}
       <Route path="/minutes/template/:templateType" element={
         <SubscriptionProtectedRoute>
           <MinutesTemplateFormPage />
         </SubscriptionProtectedRoute>
       } />
-      */}
       <Route path="/guided-minutes" element={<Navigate to="/minutes/create" replace />} />
       {/* DEPRECATED — remove after migration
       <Route path="/guided-minutes" element={

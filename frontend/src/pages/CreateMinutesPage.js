@@ -204,7 +204,14 @@ export default function CreateMinutesPage() {
     const prefillRecipient = searchParams.get('prefill_recipient');
     const prefillDescription = searchParams.get('prefill_description');
 
-    if (prefillType && prefillAmount) {
+    const hasPrefill = prefillType && prefillAmount;
+
+    // Guard: don't proceed if prefill params exist but selectedTrust isn't loaded yet
+    if (hasPrefill && !selectedTrust?.trust_id) {
+      return;
+    }
+
+    if (hasPrefill) {
       // Auto-select "Draft with AI" flow and jump to Step 2
       const decision = `${prefillType === 'compensation' ? 'Approved compensation' : prefillType === 'distribution' ? 'Approved distribution' : 'Approved benevolence'} of $${parseFloat(prefillAmount).toLocaleString()} to ${prefillRecipient || 'recipient'}${prefillDescription ? ` for ${prefillDescription}` : ''}`;
       setKeyDecisions([decision]);
@@ -229,7 +236,7 @@ export default function CreateMinutesPage() {
       loadTrustContext();
       setStep(2);
     }
-  }, [searchParams]);
+  }, [searchParams, selectedTrust?.trust_id]);
 
   // ----- Step state (1 = template picker, 2 = guided input, 3 = AI draft review) -----
   const [step, setStep] = useState(1);
@@ -271,6 +278,7 @@ export default function CreateMinutesPage() {
   const [saving, setSaving] = useState(false);
 
   const [showDraftExample, setShowDraftExample] = useState(false);
+  const [templateFetchKey, setTemplateFetchKey] = useState(0);
 
   // =========================================================================
   // Step 1 — Load template options
@@ -298,7 +306,7 @@ export default function CreateMinutesPage() {
         if (!cancelled) setTemplatesLoading(false);
       });
     return () => { cancelled = true; };
-  }, [selectedTrust?.trust_id]);
+  }, [selectedTrust?.trust_id, templateFetchKey]);
 
   // =========================================================================
   // Step 2 — Load trust context for guided flow
@@ -354,6 +362,7 @@ export default function CreateMinutesPage() {
     agendaItems.concat(keyDecisions).some((s) => s.trim());
 
   const handleGenerateDraft = async () => {
+    if (aiDrafting) return;
     if (!selectedTrust?.trust_id) {
       toast.error('Please select a trust first');
       return;
@@ -565,6 +574,7 @@ export default function CreateMinutesPage() {
     setRecordsToCreate([]);
     setCreatedRecordsCounts(null);
     setSaving(false);
+    setTemplateFetchKey(k => k + 1);
   };
 
   // =========================================================================
@@ -785,7 +795,12 @@ export default function CreateMinutesPage() {
           </p>
         </div>
 
-        {contextLoading ? (
+        {trustContext === null && !contextLoading ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground mb-4">Failed to load trust context.</p>
+            <Button onClick={loadTrustContext} className="btn-secondary">Retry</Button>
+          </div>
+        ) : contextLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-gold" />
           </div>
@@ -827,8 +842,10 @@ export default function CreateMinutesPage() {
                     mode="single"
                     selected={meetingDate}
                     onSelect={(date) => {
-                      setMeetingDate(date);
-                      setDatePopoverOpen(false);
+                      if (date) {
+                        setMeetingDate(date);
+                        setDatePopoverOpen(false);
+                      }
                     }}
                     initialFocus
                   />
@@ -1091,7 +1108,18 @@ export default function CreateMinutesPage() {
   // Render: Step 3 — Review & Edit AI Draft
   // =========================================================================
 
-  const renderStep3 = () => (
+  const renderStep3 = () => {
+    if (!draftResponse) {
+      return (
+        <div className="card-trust corner-mark p-6 md:p-8">
+          <div className="text-center py-12">
+            <p className="text-muted-foreground mb-4">No draft to review. Please go back and generate one.</p>
+            <Button onClick={() => setStep(2)} className="btn-secondary">Back to Meeting Details</Button>
+          </div>
+        </div>
+      );
+    }
+    return (
     <div className="card-trust corner-mark p-6 md:p-8">
       <div className="space-y-8">
       {/* Header */}
@@ -1350,8 +1378,11 @@ export default function CreateMinutesPage() {
             ) : (
               <Save className="h-4 w-4 mr-2" />
             )}
-          Save Minutes
+          {createLinkedRecords && recordsToCreate.length > 0 ? 'Save Minutes Only' : 'Save Minutes'}
           </Button>
+          {createLinkedRecords && recordsToCreate.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">Linked records won't be saved. Use the gold button to save everything.</p>
+          )}
           {(createLinkedRecords && (createCompensationRecords || createDistributionRecords || createBenevolenceRecords)) && (
             <Button
               onClick={() => handleSave(true)}
@@ -1371,7 +1402,8 @@ export default function CreateMinutesPage() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   // =========================================================================
   // Render: Step 4 — Success
