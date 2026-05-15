@@ -7,6 +7,7 @@ import uuid
 import io
 import base64
 import re
+import logging
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -16,10 +17,17 @@ from reportlab.lib import colors
 
 from database import db
 from dependencies import get_current_user, require_write_access, should_show_watermark, auto_update_onboarding
-from models import MinutesCreate, MinutesResponse, MinutesTemplateCreate, MinutesTemplateResponse
+from models import (
+    MinutesCreate, MinutesResponse, MinutesTemplateCreate, MinutesTemplateResponse,
+    MinutesDraftRequest, MinutesDraftResponse, MinutesAutosaveRequest,
+    GuidedMinutesContext
+)
 from email_service import email_service
+from ai_service import draft_minutes_from_structured_input, MinutesDraftRequest as AiMinutesDraftRequest
+from routers.template_registry import get_template_registry, get_template_definition, build_ai_prompt
 
 router = APIRouter(tags=["minutes"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/minutes", response_model=MinutesResponse)
@@ -37,7 +45,17 @@ async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTas
         "meeting_date": minutes.meeting_date,
         "participants_text": minutes.participants_text,
         "decisions_text": minutes.decisions_text,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        # New fields for minutes redesign
+        "template_type": minutes.template_type,
+        "sections": minutes.sections or [],
+        "template_data": minutes.template_data or {},
+        "status": minutes.status,
+        "is_retroactive": minutes.is_retroactive,
+        "retroactive_reason": minutes.retroactive_reason,
+        "retroactive_trustees_aware": minutes.retroactive_trustees_aware,
+        "retroactive_type": minutes.retroactive_type,
+        "manually_edited": minutes.manually_edited,
     }
     
     await db.minutes_records.insert_one(minutes_doc)
@@ -56,7 +74,9 @@ async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTas
             {"$set": {"minutes_record_id": minutes_id}}
         )
     
-    await auto_update_onboarding(user["user_id"], minutes.trust_id)
+    # Only update onboarding when finalized (not drafts)
+    if minutes.status == "finalized":
+        await auto_update_onboarding(user["user_id"], minutes.trust_id)
     
     # Send notification email
     background_tasks.add_task(
@@ -77,6 +97,8 @@ async def get_minutes(
     trust_id: Optional[str] = None, 
     search: Optional[str] = None,
     minutes_type: Optional[str] = None,
+    template_type: Optional[str] = None,
+    status: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     user: dict = Depends(get_current_user)
@@ -87,6 +109,10 @@ async def get_minutes(
         query["trust_id"] = trust_id
     if minutes_type:
         query["minutes_type"] = minutes_type
+    if template_type:
+        query["template_type"] = template_type
+    if status:
+        query["status"] = status
     if date_from or date_to:
         date_query = {}
         if date_from:
@@ -106,6 +132,349 @@ async def get_minutes(
     minutes = await db.minutes_records.find(query, {"_id": 0}).sort("meeting_date", -1).to_list(1000)
     return [MinutesResponse(**m) for m in minutes]
 
+
+# ==================== STATIC-PATH MINUTES ENDPOINTS (must be before /minutes/{minutes_id}) ====================
+
+@router.post("/minutes/draft", response_model=MinutesDraftResponse)
+async def create_minutes_draft(
+    request: MinutesDraftRequest,
+    user: dict = Depends(require_write_access)
+):
+    """
+    Unified AI draft generation for minutes.
+    
+    Supports two modes:
+    1. Quick minutes (bullet-point input): agenda_items + key_decisions
+    2. Template mode (structured fields): template_type + template_data
+    
+    Both modes include trust context (jurisdiction, trustee names, trust name).
+    """
+    user_id = user["user_id"]
+    
+    # Get trust context for AI
+    trust = await db.trusts.find_one(
+        {"trust_id": request.trust_id, "user_id": user_id},
+        {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    # Get entity-level details for beneficiary standard
+    entity = await db.entities.find_one(
+        {"trust_id": request.trust_id, "entity_type": "Trust", "user_id": user_id},
+        {"_id": 0}
+    )
+    beneficiary_standard = entity.get("beneficiary_standard") if entity else None
+    
+    trust_name = trust.get("name", "")
+    jurisdiction = trust.get("jurisdiction", "")
+    participants_str = ", ".join(request.participants) if request.participants else ""
+    
+    # Determine minutes_type for backward compat
+    minutes_type = request.minutes_type or "general"
+    
+    # Build AI prompt based on mode
+    if request.template_type:
+        # ── Template mode: use template-specific prompt ──
+        template_def = get_template_definition(request.template_type)
+        ai_context = {
+            "trust_name": trust_name,
+            "meeting_date": request.meeting_date,
+            "participants": participants_str,
+            "additional_context": request.additional_context or "",
+        }
+        
+        # Add template_data fields to the context
+        if request.template_data:
+            ai_context.update(request.template_data)
+        
+        # Add bullet-point context if also provided
+        if request.agenda_items:
+            ai_context["agenda_items"] = "; ".join(request.agenda_items)
+        if request.key_decisions:
+            ai_context["key_decisions"] = "; ".join(request.key_decisions)
+        
+        # Add other attendees
+        if request.other_attendees:
+            ai_context.setdefault("additional_context", "")
+            ai_context["additional_context"] += f"\nOther attendees: {', '.join(request.other_attendees)}"
+        
+        # Add retroactive context
+        if request.is_retroactive:
+            retro_note = f"\nRETROACTIVE: These minutes document a past event. Reason: {request.retroactive_reason or 'Not specified'}"
+            ai_context["additional_context"] += retro_note
+        
+        # Add section context
+        if request.section_context:
+            ai_context["additional_context"] += f"\n{request.section_context}"
+        
+        ai_prompt_text = build_ai_prompt(request.template_type, ai_context)
+        
+        # Use the AI service with the constructed prompt
+        try:
+            ai_request = AiMinutesDraftRequest(
+                minutes_type=minutes_type,
+                meeting_date=request.meeting_date,
+                participants=request.participants or [trust.get("role", "Trustee")],
+                decisions_outline=[ai_prompt_text],
+                trust_name=trust_name,
+                jurisdiction=jurisdiction,
+                beneficiary_standard=beneficiary_standard,
+                additional_context=ai_context.get("additional_context", "")
+            )
+            ai_response = await draft_minutes_from_structured_input(ai_request)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error generating template minutes draft: {e}")
+            raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again.")
+    else:
+        # ── Quick minutes / bullet-point mode ──
+        decisions_outline = []
+        
+        if request.agenda_items:
+            decisions_outline.append("AGENDA ITEMS DISCUSSED:")
+            decisions_outline.extend([f"  - {item}" for item in request.agenda_items])
+        
+        if request.key_decisions:
+            decisions_outline.append("KEY DECISIONS MADE:")
+            decisions_outline.extend([f"  - {decision}" for decision in request.key_decisions])
+        
+        # Build additional context
+        additional_context_parts = []
+        if request.additional_context:
+            additional_context_parts.append(f"Additional notes: {request.additional_context}")
+        
+        if request.other_attendees:
+            additional_context_parts.append(
+                f"Other attendees present (not trustees): {', '.join(request.other_attendees)}"
+            )
+        
+        if request.is_retroactive:
+            additional_context_parts.append(
+                f"RETROACTIVE: These minutes document a past event. Reason: {request.retroactive_reason or 'Not specified'}"
+            )
+        
+        if request.section_context:
+            additional_context_parts.append(request.section_context)
+        
+        additional_context_parts.append(
+            "WIZARD INPUT: This is from a guided wizard where the user provided brief bullet points. "
+            "Please expand these into proper formal minutes language with WHEREAS clauses for context "
+            "and RESOLVED clauses for each decision. Make the document complete and professional."
+        )
+        
+        # Map minutes_type for AI service
+        minutes_type_map = {
+            "annual": "annual",
+            "quarterly": "quarterly",
+            "general": "quarterly"
+        }
+        ai_minutes_type = minutes_type_map.get(minutes_type, "quarterly")
+        
+        try:
+            ai_request = AiMinutesDraftRequest(
+                minutes_type=ai_minutes_type,
+                meeting_date=request.meeting_date,
+                participants=request.participants or [trust.get("role", "Trustee")],
+                decisions_outline=decisions_outline if decisions_outline else ["No specific decisions recorded"],
+                trust_name=trust_name,
+                jurisdiction=jurisdiction,
+                beneficiary_standard=beneficiary_standard,
+                additional_context="\n".join(additional_context_parts)
+            )
+            ai_response = await draft_minutes_from_structured_input(ai_request)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error generating minutes draft: {e}")
+            raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again.")
+    
+    return MinutesDraftResponse(
+        suggested_title=ai_response.suggested_title,
+        draft_body=ai_response.draft_body,
+        cautions=ai_response.cautions + [
+            "AI-generated content. Review all dates, amounts, and decisions before finalizing.",
+            "You are responsible for accuracy and legal sufficiency of these minutes."
+        ],
+        minutes_type=minutes_type,
+        meeting_date=request.meeting_date,
+        participants_text=participants_str,
+        template_type=request.template_type
+    )
+
+
+@router.post("/minutes/autosave", response_model=MinutesResponse)
+async def autosave_minutes(
+    request: MinutesAutosaveRequest,
+    user: dict = Depends(require_write_access)
+):
+    """
+    Save or update a draft minutes record.
+    
+    If minutes_id is provided, updates existing draft.
+    If no minutes_id, creates a new draft record.
+    Always forces status="draft".
+    """
+    user_id = user["user_id"]
+    
+    # Verify trust exists
+    trust = await db.trusts.find_one(
+        {"trust_id": request.trust_id, "user_id": user_id},
+        {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if request.minutes_id:
+        # Update existing draft
+        existing = await db.minutes_records.find_one(
+            {"minutes_id": request.minutes_id, "user_id": user_id},
+            {"_id": 0}
+        )
+        if not existing:
+            raise HTTPException(status_code=404, detail="Draft minutes not found")
+        
+        update_doc = {
+            "minutes_type": request.minutes_type,
+            "template_type": request.template_type,
+            "meeting_date": request.meeting_date,
+            "participants_text": request.participants_text,
+            "decisions_text": request.decisions_text,
+            "sections": request.sections or [],
+            "template_data": request.template_data or {},
+            "status": "draft",  # Force draft status
+            "is_retroactive": request.is_retroactive,
+            "retroactive_reason": request.retroactive_reason,
+            "retroactive_trustees_aware": request.retroactive_trustees_aware,
+            "retroactive_type": request.retroactive_type,
+            "updated_at": now,
+        }
+        
+        await db.minutes_records.update_one(
+            {"minutes_id": request.minutes_id, "user_id": user_id},
+            {"$set": update_doc}
+        )
+        
+        # Fetch updated doc for response
+        updated = await db.minutes_records.find_one(
+            {"minutes_id": request.minutes_id},
+            {"_id": 0}
+        )
+        logger.info(f"Autosave updated draft: {request.minutes_id}")
+        return MinutesResponse(**updated)
+    else:
+        # Create new draft
+        minutes_id = f"minutes_{uuid.uuid4().hex[:12]}"
+        minutes_doc = {
+            "minutes_id": minutes_id,
+            "trust_id": request.trust_id,
+            "user_id": user_id,
+            "minutes_type": request.minutes_type,
+            "template_type": request.template_type,
+            "meeting_date": request.meeting_date,
+            "participants_text": request.participants_text,
+            "decisions_text": request.decisions_text,
+            "sections": request.sections or [],
+            "template_data": request.template_data or {},
+            "status": "draft",
+            "is_retroactive": request.is_retroactive,
+            "retroactive_reason": request.retroactive_reason,
+            "retroactive_trustees_aware": request.retroactive_trustees_aware,
+            "retroactive_type": request.retroactive_type,
+            "manually_edited": False,
+            "created_at": now,
+            "source": "wizard",
+        }
+        
+        await db.minutes_records.insert_one(minutes_doc)
+        logger.info(f"Autosave created new draft: {minutes_id}")
+        return MinutesResponse(**minutes_doc)
+
+
+@router.get("/minutes/drafts", response_model=List[MinutesResponse])
+async def get_draft_minutes(
+    trust_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    List draft minutes for current trust.
+    
+    Returns only records with status="draft", sorted by most recently updated.
+    """
+    query = {
+        "user_id": user["user_id"],
+        "trust_id": trust_id,
+        "status": "draft"
+    }
+    
+    minutes = await db.minutes_records.find(query, {"_id": 0}).sort("updated_at", -1).to_list(100)
+    return [MinutesResponse(**m) for m in minutes]
+
+
+@router.get("/minutes/context", response_model=GuidedMinutesContext)
+async def get_minutes_context(
+    trust_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Get trust context for the unified minutes wizard.
+    
+    Returns trust information including name, jurisdiction, trustees list,
+    and beneficiary standard to prefill the wizard and provide AI context.
+    Same data as /guided-minutes/context but at /minutes/context.
+    """
+    user_id = user["user_id"]
+    
+    # If trust_id not provided, get the first/default trust
+    if not trust_id:
+        trust = await db.trusts.find_one(
+            {"user_id": user_id},
+            {"_id": 0}
+        )
+    else:
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"_id": 0}
+        )
+    
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    # Get trustees from trust document or from entities
+    trustees = trust.get("trustees", [])
+    
+    # If no trustees in trust doc, try to get from entities
+    if not trustees:
+        entity = await db.entities.find_one(
+            {"trust_id": trust["trust_id"], "entity_type": "Trust", "user_id": user_id},
+            {"_id": 0}
+        )
+        if entity and entity.get("trustee_names"):
+            trustees = [t.strip() for t in entity.get("trustee_names", "").split(",") if t.strip()]
+        
+        beneficiary_standard = entity.get("beneficiary_standard") if entity else None
+        article_ref_distribution = entity.get("article_ref_distribution") if entity else None
+        article_ref_compensation = entity.get("article_ref_compensation") if entity else None
+    else:
+        beneficiary_standard = None
+        article_ref_distribution = None
+        article_ref_compensation = None
+    
+    return GuidedMinutesContext(
+        trust_id=trust["trust_id"],
+        trust_name=trust.get("name", ""),
+        jurisdiction=trust.get("jurisdiction"),
+        trustees=trustees,
+        beneficiary_standard=beneficiary_standard,
+        article_ref_distribution=article_ref_distribution,
+        article_ref_compensation=article_ref_compensation,
+        tax_status=trust.get("tax_status")
+    )
+
+
 @router.get("/minutes/{minutes_id}", response_model=MinutesResponse)
 async def get_minutes_by_id(minutes_id: str, user: dict = Depends(get_current_user)):
     minutes = await db.minutes_records.find_one(
@@ -123,7 +492,12 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
     data = await request.json()
     
     # Only allow updating specific fields
-    allowed_fields = ['decisions_text', 'participants_text', 'other_attendees_text']
+    allowed_fields = [
+        'decisions_text', 'participants_text', 'other_attendees_text',
+        'template_type', 'sections', 'template_data', 'status',
+        'is_retroactive', 'retroactive_reason', 'retroactive_trustees_aware',
+        'retroactive_type', 'manually_edited', 'meeting_date'
+    ]
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
     
     if not update_data:
@@ -506,6 +880,7 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
         "pdf_base64": pdf_base64,
         "filename": f"minutes_{minutes_id}.pdf"
     }
+
 
 # ==================== MINUTES TEMPLATES ====================
 
@@ -3410,245 +3785,12 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
 
 @router.get("/template-options")
 async def get_template_options(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
-    """Get available minutes template options with descriptions"""
-    templates = [
-        {
-            "type": "blank",
-            "name": "Blank Minutes",
-            "description": "Start with a blank minutes document",
-            "icon": "file-text",
-            "category": "basic"
-        },
-        {
-            "type": "general_meeting",
-            "name": "General Meeting",
-            "description": "Record a general trustee meeting with multiple resolutions",
-            "icon": "users",
-            "category": "basic"
-        },
-        {
-            "type": "initial_trustee_meeting",
-            "name": "Initial Trustee Meeting",
-            "description": "Your trust's first organizational meeting — accept trusteeship, open bank accounts, confirm EIN, set fiscal year, adopt governance standards, and more",
-            "icon": "gavel",
-            "priority": True
-        },
-        {
-            "type": "distribution_to_beneficiaries",
-            "name": "Distribution to Beneficiaries",
-            "description": "Document a distribution of trust proceeds to beneficiaries",
-            "icon": "dollar-sign",
-            "category": "distributions"
-        },
-        {
-            "type": "hems_distribution",
-            "name": "HEMS Distribution",
-            "description": "Health, Education, Maintenance, Support distribution with standard compliance",
-            "icon": "heart-pulse",
-            "category": "distributions"
-        },
-        {
-            "type": "acceptance_of_property",
-            "name": "Accept Property into Trust",
-            "description": "Accept additional property into the trust corpus and update Schedule A",
-            "icon": "plus-circle",
-            "category": "assets"
-        },
-        {
-            "type": "disposition_of_asset",
-            "name": "Dispose / Sell Asset",
-            "description": "Record the sale, transfer, or removal of an asset from Schedule A",
-            "icon": "minus-circle",
-            "category": "assets"
-        },
-        {
-            "type": "appointment_additional_trustee",
-            "name": "Appoint Additional Trustee",
-            "description": "Appoint a new trustee to serve alongside existing trustees",
-            "icon": "user-plus",
-            "category": "governance"
-        },
-        {
-            "type": "appointment_successor_trustee",
-            "name": "Appoint Successor Trustee",
-            "description": "Appoint a replacement trustee due to resignation, death, or removal",
-            "icon": "user-check",
-            "category": "governance"
-        },
-        {
-            "type": "trustee_resignation",
-            "name": "Trustee Resignation/Removal",
-            "description": "Document a trustee's departure from office",
-            "icon": "user-minus",
-            "category": "governance"
-        },
-        {
-            "type": "trustee_compensation",
-            "name": "Trustee Compensation",
-            "description": "Approve trustee fee arrangements and compensation",
-            "icon": "wallet",
-            "category": "governance"
-        },
-        {
-            "type": "designation_of_beneficiaries",
-            "name": "Designate Beneficiaries",
-            "description": "Establish or amend beneficiary designations and units of beneficial interest",
-            "icon": "users-round",
-            "category": "beneficiaries"
-        },
-        {
-            "type": "beneficiary_request_denial",
-            "name": "Beneficiary Request Denial",
-            "description": "Document denial of a beneficiary request with proper reasoning",
-            "icon": "x-circle",
-            "category": "beneficiaries"
-        },
-        {
-            "type": "beneficiary_loan",
-            "name": "Loan to Beneficiary",
-            "description": "Authorize an intra-family loan to a beneficiary",
-            "icon": "hand-coins",
-            "category": "beneficiaries"
-        },
-        {
-            "type": "bank_account_authorization",
-            "name": "Open Bank Account",
-            "description": "Authorize opening a bank or investment account for the trust",
-            "icon": "landmark",
-            "category": "financial"
-        },
-        {
-            "type": "investment_policy",
-            "name": "Investment Policy",
-            "description": "Adopt, amend, or review the trust's investment policy statement",
-            "icon": "trending-up",
-            "category": "financial"
-        },
-        {
-            "type": "loan_authorization",
-            "name": "Loan Authorization",
-            "description": "Authorize the trust to make or receive a loan",
-            "icon": "banknote",
-            "category": "financial"
-        },
-        {
-            "type": "insurance_authorization",
-            "name": "Insurance Authorization",
-            "description": "Approve trust insurance policies and coverage",
-            "icon": "shield-check",
-            "category": "financial"
-        },
-        {
-            "type": "annual_review",
-            "name": "Annual Review Meeting",
-            "description": "Year-end financial and governance review with comprehensive report",
-            "icon": "calendar-check",
-            "category": "reviews"
-        },
-        {
-            "type": "quarterly_review",
-            "name": "Quarterly Review Meeting",
-            "description": "Routine quarterly trustee meeting and financial review",
-            "icon": "calendar-days",
-            "category": "reviews"
-        },
-        {
-            "type": "change_of_situs",
-            "name": "Change Trust Situs",
-            "description": "Change the jurisdiction and principal place of administration",
-            "icon": "map-pin",
-            "category": "administrative"
-        },
-        {
-            "type": "benevolence_approval",
-            "name": "Benevolence Assistance",
-            "description": "Approve and document a benevolence grant for charitable assistance",
-            "icon": "heart-handshake",
-            "category": "benevolence",
-            "requires_benevolence": True
-        },
-        # Legal/Amendment templates
-        {
-            "type": "trust_amendment",
-            "name": "Trust Amendment",
-            "description": "Modify specific provisions of the trust instrument",
-            "icon": "file-edit",
-            "category": "legal"
-        },
-        {
-            "type": "power_of_attorney",
-            "name": "Power of Attorney",
-            "description": "Grant limited power of attorney to a trustee or agent",
-            "icon": "stamp",
-            "category": "legal"
-        },
-        {
-            "type": "trust_termination",
-            "name": "Trust Termination",
-            "description": "Document trust dissolution and final distribution",
-            "icon": "file-x",
-            "category": "legal"
-        },
-        # Asset Management templates
-        {
-            "type": "real_estate_purchase",
-            "name": "Real Estate Purchase",
-            "description": "Authorize acquisition of real property for the trust",
-            "icon": "home",
-            "category": "assets"
-        },
-        {
-            "type": "business_interest_acquisition",
-            "name": "Business Interest Acquisition",
-            "description": "Authorize purchase of LLC, partnership, or corporate interest",
-            "icon": "building-2",
-            "category": "assets"
-        },
-        {
-            "type": "real_estate_lease",
-            "name": "Real Estate Lease",
-            "description": "Authorize leasing of trust real property to third parties",
-            "icon": "key",
-            "category": "assets"
-        },
-        # Tax & Compliance templates
-        {
-            "type": "fiscal_year_election",
-            "name": "Fiscal Year Election",
-            "description": "Document the trust's fiscal year choice for tax purposes",
-            "icon": "calendar-range",
-            "category": "administrative"
-        },
-        {
-            "type": "tax_filing_authorization",
-            "name": "Tax Filing Authorization",
-            "description": "Authorize preparation and filing of trust tax returns",
-            "icon": "receipt",
-            "category": "administrative"
-        },
-        # Special Situation templates
-        {
-            "type": "emergency_ratification",
-            "name": "Emergency Action Ratification",
-            "description": "Ratify trustee actions taken during an emergency",
-            "icon": "alert-triangle",
-            "category": "governance"
-        },
-        {
-            "type": "conflict_of_interest",
-            "name": "Conflict of Interest Disclosure",
-            "description": "Document trustee's disclosure and waiver of conflict",
-            "icon": "scale",
-            "category": "governance"
-        }
-    ]
-    
-    # Filter benevolence template based on trust settings
+    """Get available minutes template options with descriptions and fields"""
+    # Determine benevolence status
+    benevolence_enabled = False
     if trust_id:
-        trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+        trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0, "benevolence_enabled": 1})
         if trust and trust.get("benevolence_enabled"):
-            return templates
-        else:
-            return [t for t in templates if not t.get("requires_benevolence")]
+            benevolence_enabled = True
     
-    return templates
+    return get_template_registry(trust_id=trust_id, benevolence_enabled=benevolence_enabled)

@@ -463,6 +463,16 @@ class MinutesCreate(BaseModel):
     decisions_text: str
     distribution_id: Optional[str] = None
     compensation_payment_id: Optional[str] = None
+    # New fields for minutes redesign
+    template_type: Optional[str] = None
+    sections: Optional[List[dict]] = None
+    template_data: Optional[dict] = None
+    status: str = "finalized"
+    is_retroactive: bool = False
+    retroactive_reason: Optional[str] = None
+    retroactive_trustees_aware: Optional[str] = None
+    retroactive_type: Optional[str] = None
+    manually_edited: bool = False
 
 class MinutesResponse(BaseModel):
     minutes_id: str
@@ -475,6 +485,16 @@ class MinutesResponse(BaseModel):
     other_attendees_text: Optional[str] = None
     source: Optional[str] = None
     updated_at: Optional[str] = None
+    # New fields for minutes redesign
+    template_type: Optional[str] = None
+    sections: List[dict] = []
+    template_data: Optional[dict] = None
+    status: str = "finalized"
+    is_retroactive: bool = False
+    retroactive_reason: Optional[str] = None
+    retroactive_trustees_aware: Optional[str] = None
+    retroactive_type: Optional[str] = None
+    manually_edited: bool = False
 
 class MinutesResolution(BaseModel):
     title: str
@@ -548,6 +568,64 @@ class MinutesTemplateResponse(BaseModel):
     created_at: str
     updated_at: Optional[str] = None
     updated_by: Optional[str] = None
+
+
+# ==================== UNIFIED MINUTES REDESIGN MODELS ====================
+
+class MinutesSection(BaseModel):
+    """A single section within a multi-section minutes document"""
+    section_id: str
+    template_type: str
+    title: str
+    template_data: dict = {}
+    generated_text: str = ""
+
+class MinutesDraftRequest(BaseModel):
+    """Unified AI minutes draft request — merges GuidedMinutesDraftRequest + /ai/minutes-draft"""
+    trust_id: str
+    template_type: Optional[str] = None  # MinutesTemplateType value
+    minutes_type: Optional[str] = None   # MinutesType for backward compat
+    meeting_date: str
+    participants: List[str] = []
+    other_attendees: List[str] = []
+    # Quick minutes mode (bullets)
+    agenda_items: List[str] = []
+    key_decisions: List[str] = []
+    additional_context: Optional[str] = None
+    # Template mode (structured fields)
+    template_data: Optional[dict] = None
+    # Retroactive
+    is_retroactive: bool = False
+    retroactive_reason: Optional[str] = None
+    # Section mode (for multi-section)
+    section_context: Optional[str] = None
+
+class MinutesDraftResponse(BaseModel):
+    """Response model for unified AI minutes draft — same as GuidedMinutesDraftResponse + template_type"""
+    suggested_title: str = Field(..., description="Suggested title for the minutes")
+    draft_body: str = Field(..., description="The main minutes text body")
+    cautions: List[str] = Field(default_factory=list, description="Warnings or notes for the trustee")
+    minutes_type: str
+    meeting_date: str
+    participants_text: str
+    template_type: Optional[str] = None
+
+class MinutesAutosaveRequest(BaseModel):
+    """Subset of MinutesCreate for autosave draft operations"""
+    trust_id: str
+    minutes_type: str
+    template_type: Optional[str] = None
+    meeting_date: str
+    participants_text: str
+    decisions_text: str
+    sections: List[dict] = []
+    template_data: Optional[dict] = None
+    is_retroactive: bool = False
+    retroactive_reason: Optional[str] = None
+    retroactive_trustees_aware: Optional[str] = None
+    retroactive_type: Optional[str] = None
+    status: str = "draft"
+    minutes_id: Optional[str] = None  # If provided, update existing draft; otherwise create new
 
 
 # ==================== SCHEDULE A MODELS ====================

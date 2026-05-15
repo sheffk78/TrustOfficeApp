@@ -21,7 +21,12 @@ import {
   Eye,
   Pencil,
   Clock,
-  UserCircle
+  UserCircle,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Sparkles,
+  FilePenLine
 } from 'lucide-react';
 
 export default function MinutesDetailPage() {
@@ -41,6 +46,13 @@ export default function MinutesDetailPage() {
   
   // PDF Preview
   const [pdfPreview, setPdfPreview] = useState({ show: false, loading: false, data: null, filename: '' });
+
+  // Collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState({});
+
+  const toggleSection = (index) => {
+    setCollapsedSections(prev => ({ ...prev, [index]: !prev[index] }));
+  };
 
   const loadMinutes = useCallback(async () => {
     if (!minutesId) return;
@@ -130,6 +142,12 @@ export default function MinutesDetailPage() {
     }
   };
 
+  // Helper: format template_type for display
+  const formatTemplateType = (templateType) => {
+    if (!templateType) return null;
+    return templateType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -161,22 +179,66 @@ export default function MinutesDetailPage() {
     );
   }
 
+  const hasSections = Array.isArray(minutes.sections) && minutes.sections.length > 0;
+  const isRetroactive = minutes.is_retroactive === true;
+  const isAiGenerated = minutes.source === 'ai_generated';
+  const isDraft = minutes.status === 'draft';
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
       <main className="lg:pl-64 pt-16 lg:pt-0">
         <div className="p-4 lg:p-8 max-w-5xl">
+
+          {/* Retroactive Banner */}
+          {isRetroactive && (
+            <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div className="text-sm text-amber-800 dark:text-amber-200">
+                <p className="font-semibold">Retroactive Minutes</p>
+                <p className="mt-1">
+                  Created {formatDateTime(minutes.created_at)} for meeting on {formatDate(minutes.meeting_date)}.
+                  {minutes.retroactive_reason && (
+                    <span className="block mt-1 italic">Reason: {minutes.retroactive_reason}</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex items-center gap-4 mb-6">
             <Button variant="ghost" onClick={() => navigate('/minutes')} className="p-2">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="flex-1">
-              <h1 className="font-serif text-2xl lg:text-3xl text-navy dark:text-gold">
-                {minutes.minutes_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Minutes
-              </h1>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="font-serif text-2xl lg:text-3xl text-navy dark:text-gold">
+                  {minutes.minutes_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Minutes
+                </h1>
+                {/* Template Type Badge */}
+                {minutes.template_type && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-navy/10 dark:bg-gold/10 text-navy dark:text-gold text-xs font-mono rounded-full border border-navy/20 dark:border-gold/20">
+                    <FilePenLine className="w-3 h-3" />
+                    {formatTemplateType(minutes.template_type)}
+                  </span>
+                )}
+                {/* AI Generated Badge */}
+                {isAiGenerated && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs font-mono rounded-full border border-purple-200 dark:border-purple-700">
+                    <Sparkles className="w-3 h-3" />
+                    AI Generated
+                  </span>
+                )}
+                {/* Draft Badge */}
+                {isDraft && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-xs font-mono rounded-full border border-red-300 dark:border-red-700 font-semibold uppercase tracking-wider">
+                    Draft
+                  </span>
+                )}
+              </div>
               <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mt-1">
-                {selectedTrust?.name} • {formatDate(minutes.meeting_date)}
+                {selectedTrust?.name} • {isRetroactive ? `Meeting: ${formatDate(minutes.meeting_date)}` : formatDate(minutes.meeting_date)}
               </p>
             </div>
             <div className="flex gap-2">
@@ -227,15 +289,28 @@ export default function MinutesDetailPage() {
               <div className="flex items-start gap-3">
                 <Clock className="w-5 h-5 text-navy dark:text-gold mt-0.5" />
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Created</p>
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {isRetroactive ? 'Date Created' : 'Created'}
+                  </p>
                   <p className="font-medium">{formatDateTime(minutes.created_at)}</p>
+                  {isRetroactive && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                      After meeting date
+                    </p>
+                  )}
                 </div>
               </div>
               
-              {minutes.source === 'guided_wizard' && (
+              {/* Show meeting date distinctly for retroactive records */}
+              {isRetroactive && (
                 <div className="flex items-start gap-3">
-                  <div className="px-2 py-1 bg-gold/10 text-gold text-xs font-mono">
-                    AI Generated
+                  <Calendar className="w-5 h-5 text-amber-500 mt-0.5" />
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-amber-600 dark:text-amber-400">Meeting Date</p>
+                    <p className="font-medium">{formatDate(minutes.meeting_date)}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                      Before creation date
+                    </p>
                   </div>
                 </div>
               )}
@@ -278,7 +353,7 @@ export default function MinutesDetailPage() {
                 <div>
                   <p className="text-xs font-mono uppercase tracking-widest text-navy/50 dark:text-white/50 mb-2">Trustees Present</p>
                   <div className="flex flex-wrap gap-2">
-                    {minutes.participants_text?.split(',').map((p, i) => (
+                    {minutes.participants_text?.split(',').filter(p => p.trim()).map((p, i) => (
                       <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-navy/5 dark:bg-gold/5 border border-navy/10 dark:border-gold/10">
                         <UserCircle className="w-4 h-4 text-navy dark:text-gold" />
                         <span className="text-sm">{p.trim()}</span>
@@ -296,7 +371,7 @@ export default function MinutesDetailPage() {
                   <div>
                     <p className="text-xs font-mono uppercase tracking-widest text-navy/50 dark:text-white/50 mb-2">Also Present</p>
                     <div className="flex flex-wrap gap-2">
-                      {minutes.other_attendees_text.split(',').map((p, i) => (
+                      {minutes.other_attendees_text.split(',').filter(p => p.trim()).map((p, i) => (
                         <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border border-border">
                           <UserCircle className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">{p.trim()}</span>
@@ -309,11 +384,60 @@ export default function MinutesDetailPage() {
             )}
           </div>
 
+          {/* Sections Display (collapsible) */}
+          {hasSections && !isEditing && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-4 h-4 text-navy dark:text-gold" />
+                <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Sections</h2>
+              </div>
+              <div className="space-y-3">
+                {minutes.sections.map((section, index) => {
+                  const isCollapsed = collapsedSections[index] !== false; // default expanded
+                  const sectionTitle = section.title || section.template_type
+                    ? formatTemplateType(section.template_type || section.title)
+                    : `Section ${index + 1}`;
+                  return (
+                    <div key={index} className="card-trust overflow-hidden">
+                      <button
+                        onClick={() => toggleSection(index)}
+                        className="w-full flex items-center gap-3 p-4 hover:bg-navy/5 dark:hover:bg-gold/5 transition-colors text-left"
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="w-4 h-4 text-navy dark:text-gold shrink-0" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-navy dark:text-gold shrink-0" />
+                        )}
+                        <span className="font-semibold text-sm text-navy dark:text-gold flex-1">
+                          {sectionTitle}
+                        </span>
+                        {section.template_type && (
+                          <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                            {formatTemplateType(section.template_type)}
+                          </span>
+                        )}
+                      </button>
+                      {!isCollapsed && (
+                        <div className="px-4 pb-4 pt-0">
+                          <pre className="whitespace-pre-wrap font-mono text-sm bg-muted/30 p-4 border border-border rounded overflow-auto max-h-[400px]">
+                            {section.content || 'No content for this section.'}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Minutes Content */}
           <div className="card-trust p-6">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-4 h-4 text-navy dark:text-gold" />
-              <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Minutes Content</h2>
+              <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                {hasSections ? 'Full Minutes Content' : 'Minutes Content'}
+              </h2>
             </div>
             
             {isEditing ? (

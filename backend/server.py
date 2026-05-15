@@ -358,6 +358,7 @@ async def startup_event():
         await db.minutes_records.create_index([("trust_id", 1), ("user_id", 1)])
         await db.minutes_records.create_index([("user_id", 1), ("meeting_date", -1)])
         await db.minutes_records.create_index("minutes_id", unique=True)
+        await db.minutes_records.create_index([("user_id", 1), ("status", 1)])  # For drafts filtering
         
         # Distribution indexes
         await db.distribution_records.create_index([("trust_id", 1), ("user_id", 1)])

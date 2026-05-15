@@ -11,9 +11,13 @@ import AuthCallback from "@/pages/AuthCallback";
 import DashboardPage from "@/pages/DashboardPage";
 import MinutesPage from "@/pages/MinutesPage";
 import MinutesDetailPage from "@/pages/MinutesDetailPage";
+// DEPRECATED — remove after migration
 import NewMinutesPage from "@/pages/NewMinutesPage";
+// DEPRECATED — remove after migration
 import MinutesTemplatesPage from "@/pages/MinutesTemplatesPage";
+// DEPRECATED — remove after migration
 import MinutesTemplateFormPage from "@/pages/MinutesTemplateFormPage";
+// DEPRECATED — remove after migration
 import GuidedMinutesPage from "@/pages/GuidedMinutesPage";
 import DistributionsPage from "@/pages/DistributionsPage";
 import ExpensesPage from "@/pages/ExpensesPage";
@@ -29,7 +33,9 @@ import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
 import PricingPage from "@/pages/PricingPage";
 import AuthorityPage from "@/pages/AuthorityPage";
+// DEPRECATED — remove after migration
 import RetroactiveMinutesPage from "@/pages/RetroactiveMinutesPage";
+import MinutesNewPage from "@/pages/MinutesNewPage";
 import AuditTrailPage from "@/pages/AuditTrailPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
@@ -197,24 +203,49 @@ const AppRouter = () => {
       } />
       <Route path="/minutes/new" element={
         <SubscriptionProtectedRoute>
+          <MinutesNewPage />
+        </SubscriptionProtectedRoute>
+      } />
+      {/* DEPRECATED — remove after migration
+      <Route path="/minutes/new" element={
+        <SubscriptionProtectedRoute>
           <NewMinutesPage />
         </SubscriptionProtectedRoute>
       } />
+      */}
+      {/* Redirect old minutes routes to new unified wizard */}
+      <Route path="/minutes/templates" element={<Navigate to="/minutes/new" replace />} />
+      {/* DEPRECATED — remove after migration
       <Route path="/minutes/templates" element={
         <SubscriptionProtectedRoute>
           <MinutesTemplatesPage />
         </SubscriptionProtectedRoute>
       } />
+      */}
+      <Route path="/minutes/template/:templateType" element={<Navigate to="/minutes/new" replace />} />
+      {/* DEPRECATED — remove after migration
       <Route path="/minutes/template/:templateType" element={
         <SubscriptionProtectedRoute>
           <MinutesTemplateFormPage />
         </SubscriptionProtectedRoute>
       } />
+      */}
+      <Route path="/guided-minutes" element={<Navigate to="/minutes/new" replace />} />
+      {/* DEPRECATED — remove after migration
       <Route path="/guided-minutes" element={
         <SubscriptionProtectedRoute>
           <GuidedMinutesPage />
         </SubscriptionProtectedRoute>
       } />
+      */}
+      <Route path="/retroactive-minutes" element={<Navigate to="/minutes/new?retroactive=1" replace />} />
+      {/* DEPRECATED — remove after migration
+      <Route path="/retroactive-minutes" element={
+        <SubscriptionProtectedRoute>
+          <RetroactiveMinutesPage />
+        </SubscriptionProtectedRoute>
+      } />
+      */}
       <Route path="/schedule-a" element={
         <SubscriptionProtectedRoute>
           <ScheduleAPage />
@@ -261,11 +292,7 @@ const AppRouter = () => {
           <AuthorityPage />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/retroactive-minutes" element={
-        <SubscriptionProtectedRoute>
-          <RetroactiveMinutesPage />
-        </SubscriptionProtectedRoute>
-      } />
+      {/* Removed duplicate retroactive-minutes route — redirect added above */}
       <Route path="/audit-trail" element={
         <SubscriptionProtectedRoute>
           <AuditTrailPage />

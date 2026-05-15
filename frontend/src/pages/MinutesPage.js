@@ -17,9 +17,10 @@ import {
   Calendar,
   Users,
   ChevronRight,
+  ChevronDown,
   Eye,
   Loader2,
-  Sparkles
+  Pencil
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -54,11 +55,17 @@ export default function MinutesPage() {
   const [pdfPreview, setPdfPreview] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  // Drafts state
+  const [drafts, setDrafts] = useState([]);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+
   const debouncedSearch = useDebounce(searchTerm, 300);
 
   useEffect(() => {
     if (selectedTrust) {
       loadMinutes(debouncedSearch);
+      loadDrafts();
     }
   }, [selectedTrust, debouncedSearch, dateFrom, dateTo]);
 
@@ -88,6 +95,22 @@ export default function MinutesPage() {
       console.error('Failed to load minutes:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDrafts = async () => {
+    if (!selectedTrust) return;
+    setDraftsLoading(true);
+    try {
+      const url = `/minutes?status=draft&trust_id=${selectedTrust.trust_id}`;
+      const response = await fetchWithAuth(url);
+      if (response.ok) {
+        setDrafts(await response.json());
+      }
+    } catch (error) {
+      console.error('Failed to load drafts:', error);
+    } finally {
+      setDraftsLoading(false);
     }
   };
 
@@ -129,28 +152,28 @@ export default function MinutesPage() {
     }
   };
 
+  const getTemplateTypeLabel = (type) => {
+    switch (type) {
+      case 'guided': return 'Guided';
+      case 'manual': return 'Manual';
+      case 'ai': return 'AI';
+      default: return type;
+    }
+  };
+
   const filteredMinutes = minutes.filter(m => {
     const entryType = m.entry_type || m.minutes_type || '';
     const matchesType = filterType === 'all' || entryType === filterType;
     return matchesType;
   });
 
-  // Handle record minutes button with read-only check
-  const handleRecordMinutes = () => {
+  // Handle new minutes button with read-only check
+  const handleNewMinutes = () => {
     if (isReadOnly) {
       showUpgradeModal('create meeting minutes', 'button_click', 'minutes_page');
       return;
     }
-    navigate('/minutes/templates');
-  };
-
-  // Handle guided minutes with read-only check
-  const handleGuidedMinutes = () => {
-    if (isReadOnly) {
-      showUpgradeModal('use AI-assisted minutes', 'button_click', 'minutes_page');
-      return;
-    }
-    navigate('/guided-minutes');
+    navigate('/minutes/new');
   };
 
   return (
@@ -168,29 +191,82 @@ export default function MinutesPage() {
                 {selectedTrust?.name || 'Select a trust'}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div>
               <Button 
-                onClick={handleGuidedMinutes}
-                variant="outline"
-                className={`border-gold/50 text-gold hover:bg-gold/10 ${isReadOnly ? 'opacity-60' : ''}`}
-                data-testid="guided-minutes-link"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Guided Minutes
-                <span className="ml-2 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20">
-                  beta
-                </span>
-              </Button>
-              <Button 
-                onClick={handleRecordMinutes}
+                onClick={handleNewMinutes}
                 className={`btn-primary ${isReadOnly ? 'opacity-60' : ''}`}
-                data-testid="record-minutes-btn"
+                data-testid="new-minutes-btn"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Record Minutes
+                New Minutes
               </Button>
             </div>
           </div>
+
+          {/* Drafts Section */}
+          {drafts.length > 0 && (
+            <div className="card-trust mb-6">
+              <button
+                className="flex items-center justify-between w-full text-left"
+                onClick={() => setDraftsOpen(!draftsOpen)}
+                data-testid="drafts-toggle"
+              >
+                <div className="flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-gold" />
+                  <span className="font-serif text-lg text-navy">Drafts</span>
+                  <span className="ml-1 px-2 py-0.5 text-xs font-mono bg-gold/20 text-gold rounded-full">
+                    {drafts.length}
+                  </span>
+                </div>
+                {draftsOpen ? (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                )}
+              </button>
+              {draftsOpen && (
+                <div className="mt-4 space-y-3">
+                  {drafts.map((draft) => {
+                    const summary = draft.summary || `${(draft.minutes_type || 'Meeting').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Minutes`;
+                    const entryDate = draft.date || draft.meeting_date;
+                    const entryType = draft.entry_type || draft.minutes_type || 'meeting';
+                    return (
+                      <div
+                        key={draft.minutes_id}
+                        className="flex items-center justify-between p-3 bg-navy/[0.03] border border-navy/10 rounded"
+                        data-testid={`draft-item-${draft.minutes_id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-serif text-navy">{summary}</span>
+                            <span className="badge-trust">{getEntryTypeLabel(entryType)}</span>
+                            {draft.template_type && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-blue-100 text-blue-700 rounded">
+                                {getTemplateTypeLabel(draft.template_type)}
+                              </span>
+                            )}
+                          </div>
+                          {entryDate && (
+                            <span className="font-mono text-xs text-muted-foreground mt-1 block">
+                              {formatDate(entryDate)}
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => navigate(`/minutes/new?draft_id=${draft.minutes_id}`)}
+                          className="btn-primary text-xs ml-4"
+                          data-testid={`continue-draft-${draft.minutes_id}`}
+                        >
+                          Continue
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Filters */}
           <div className="card-trust mb-6">
@@ -276,8 +352,8 @@ export default function MinutesPage() {
               <p className="text-muted-foreground mb-6">
                 {searchTerm ? 'Try a different search term' : 'Record your first minutes to get started'}
               </p>
-              <Button onClick={() => navigate('/minutes/new')} className="btn-primary">
-                Record Minutes
+              <Button onClick={handleNewMinutes} className="btn-primary">
+                New Minutes
               </Button>
             </div>
           ) : (
@@ -344,6 +420,11 @@ export default function MinutesPage() {
                         <span className="badge-trust">
                           {getEntryTypeLabel(entryType)}
                         </span>
+                        {entry.template_type && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-blue-100 text-blue-700 rounded">
+                            {getTemplateTypeLabel(entry.template_type)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
