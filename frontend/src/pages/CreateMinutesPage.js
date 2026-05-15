@@ -3,8 +3,8 @@
  *
  * Unified entry point for creating minutes — a clean 3-step experience:
  *   Step 1: Template picker grid ("What are you documenting?")
- *   Step 2: Guided input (only for "Write from scratch")
- *   Step 3: AI draft review & save (only for "Write from scratch")
+ *   Step 2: Guided input (only for "Draft with AI")
+ *   Step 3: AI draft review & save (only for "Draft with AI")
  *
  * When a template IS selected in Step 1, the user is immediately navigated
  * to /minutes/template/{type}?from=create instead of entering Steps 2–3.
@@ -269,6 +269,8 @@ export default function CreateMinutesPage() {
   const [recordsToCreate, setRecordsToCreate] = useState([]);
   const [createdRecordsCounts, setCreatedRecordsCounts] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const [showDraftExample, setShowDraftExample] = useState(false);
 
   // =========================================================================
   // Step 1 — Load template options
@@ -604,7 +606,7 @@ export default function CreateMinutesPage() {
         key={t.type}
         data-testid={`template-${t.type}`}
         onClick={() => handleTemplateSelect(t.type)}
-        className="card-trust group relative flex flex-col items-start gap-2 p-5 text-left transition-all hover:border-gold/50 hover:shadow-md"
+        className="card-trust corner-mark overflow-visible group relative flex flex-col items-start gap-2 p-5 text-left transition-all hover:border-gold/50 hover:shadow-md"
       >
         {/* Priority/Start Here badge */}
         {isPriority && (
@@ -720,12 +722,27 @@ export default function CreateMinutesPage() {
                     Draft with AI
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Start with bullet points and let AI draft formal minutes
+                    Describe your meeting in plain English. AI transforms your notes into formal, compliant minutes — no legal jargon needed.
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
               </div>
             </button>
+            <button
+              type="button"
+              onClick={() => setShowDraftExample(!showDraftExample)}
+              className="text-xs text-gold hover:text-gold/80 font-mono uppercase tracking-wider mt-1"
+            >
+              {showDraftExample ? 'Hide example' : 'See example'} →
+            </button>
+            {showDraftExample && (
+              <div className="rounded-lg border border-gold/20 bg-gold/5 p-3 text-xs text-muted-foreground font-mono mt-2">
+                <p className="font-semibold text-navy mb-1">Your input:</p>
+                <p className="italic">&ldquo;Discussed selling the rental property on Oak St. Agreed to list at $340K. Trustee Jane will contact the realtor.&rdquo;</p>
+                <p className="font-semibold text-navy mb-1 mt-2">AI produces:</p>
+                <p className="italic">A formal resolution authorizing the sale, documenting trustee consensus, naming the realtor, and recording the price decision — ready to save.</p>
+              </div>
+            )}
           </section>
         )}
 
@@ -734,9 +751,9 @@ export default function CreateMinutesPage() {
           <p className="flex items-start gap-2">
             <FileText className="h-4 w-4 mt-0.5 text-gold flex-shrink-0" />
             <span>
-              Templates pre-fill form fields for common meeting types. Choose
-              &ldquo;Draft with AI&rdquo; to describe your meeting in plain
-              language and let AI produce a formal minutes draft.
+              Templates guide you through common trustee decisions. New here?
+              Start with &ldquo;Initial Trustee Meeting&rdquo; — it walks you through everything.
+              Or choose &ldquo;Draft with AI&rdquo; and describe your meeting in plain language.
             </span>
           </p>
         </div>
@@ -776,9 +793,9 @@ export default function CreateMinutesPage() {
           <div className="space-y-8 max-w-2xl">
             {/* Meeting Type */}
             <div className="space-y-2">
-              <Label className="label-trust">Meeting Type</Label>
+              <Label className="label-trust" htmlFor="meeting-type">Meeting Type</Label>
               <Select value={meetingType} onValueChange={setMeetingType}>
-                <SelectTrigger className="input-trust">
+                <SelectTrigger className="input-trust" id="meeting-type">
                   <SelectValue placeholder="Select meeting type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -793,10 +810,11 @@ export default function CreateMinutesPage() {
 
             {/* Meeting Date */}
             <div className="space-y-2">
-              <Label className="label-trust">Meeting Date</Label>
+              <Label className="label-trust" htmlFor="meeting-date">Meeting Date</Label>
               <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
+                    id="meeting-date"
                     variant="outline"
                     className="input-trust w-full justify-start text-left font-normal"
                   >
@@ -860,6 +878,7 @@ export default function CreateMinutesPage() {
                       size="icon"
                       onClick={() => removeCustomTrustee(name)}
                       className="ml-auto flex-shrink-0 text-muted-foreground hover:text-destructive h-6 w-6"
+                      aria-label="Remove trustee"
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -914,6 +933,7 @@ export default function CreateMinutesPage() {
                       setOtherAttendees((prev) => prev.filter((_, i) => i !== idx))
                     }
                     className="flex-shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label="Remove attendee"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -963,6 +983,7 @@ export default function CreateMinutesPage() {
                         setAgendaItems((prev) => prev.filter((_, i) => i !== idx))
                       }
                       className="flex-shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label="Remove agenda item"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -1005,6 +1026,7 @@ export default function CreateMinutesPage() {
                         setKeyDecisions((prev) => prev.filter((_, i) => i !== idx))
                       }
                       className="flex-shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label="Remove decision"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -1023,8 +1045,9 @@ export default function CreateMinutesPage() {
 
             {/* Additional Context */}
             <div className="space-y-2">
-              <Label className="label-trust">Additional Context (Optional)</Label>
+              <Label className="label-trust" htmlFor="additional-context">Additional Context (Optional)</Label>
               <Textarea
+                id="additional-context"
                 value={additionalContext}
                 onChange={(e) => setAdditionalContext(e.target.value)}
                 placeholder="Any additional notes or context for the AI drafter..."
@@ -1088,8 +1111,9 @@ export default function CreateMinutesPage() {
       <div className="space-y-6 max-w-3xl">
         {/* Title */}
         <div className="space-y-2">
-          <Label className="label-trust">Minutes Title</Label>
+          <Label className="label-trust" htmlFor="minutes-title">Minutes Title</Label>
           <Input
+            id="minutes-title"
             value={editedTitle}
             onChange={(e) => setEditedTitle(e.target.value)}
             className="input-trust"
@@ -1110,8 +1134,9 @@ export default function CreateMinutesPage() {
 
         {/* Draft body */}
         <div className="space-y-2">
-          <Label className="label-trust">Minutes Content</Label>
+          <Label className="label-trust" htmlFor="minutes-content">Minutes Content</Label>
           <Textarea
+            id="minutes-content"
             value={editedDraft}
             onChange={(e) => setEditedDraft(e.target.value)}
             className="input-trust font-mono min-h-[400px] text-sm leading-relaxed"
@@ -1228,6 +1253,7 @@ export default function CreateMinutesPage() {
                             size="sm"
                             onClick={() => handleRemoveRecord(idx)}
                             className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                            aria-label="Remove record"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -1281,6 +1307,9 @@ export default function CreateMinutesPage() {
                                 ))}
                               </SelectContent>
                             </Select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              HEMS = Health, Education, Maintenance, or Support — standard trust distribution categories that help document the purpose of each payment.
+                            </p>
                           </div>
                         )}
                         <div className="space-y-1">
@@ -1351,8 +1380,8 @@ export default function CreateMinutesPage() {
   const renderStep4 = () => (
     <div className="card-trust corner-mark p-6 md:p-8">
       <div className="text-center py-12" data-testid="step-4-content">
-        <div className="w-20 h-20 mx-auto mb-6 bg-green-100 dark:bg-green-900/30 flex items-center justify-center rounded-full">
-          <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
+        <div className="w-20 h-20 mx-auto mb-6 bg-gold/10 dark:bg-gold/20 flex items-center justify-center rounded-full">
+          <CheckCircle className="w-10 h-10 text-gold" />
         </div>
         <h2 className="font-serif text-2xl text-navy mb-4">Minutes Saved</h2>
         <p className="text-muted-foreground mb-4">
@@ -1422,15 +1451,17 @@ export default function CreateMinutesPage() {
     ];
 
     return (
-      <div className="flex items-center gap-2 mb-8">
+      <div className="flex items-center gap-2 mb-8" role="navigation" aria-label="Progress">
         {steps.map((s, idx) => (
           <React.Fragment key={s.num}>
             <div
+              aria-label={s.label}
+              aria-current={step === s.num ? 'step' : undefined}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 step === s.num
                   ? 'bg-gold/10 text-gold border border-gold/50'
                   : step > s.num
-                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  ? 'bg-gold/10 text-navy border border-gold/30'
                   : 'bg-muted text-muted-foreground border border-transparent'
               }`}
             >
@@ -1441,12 +1472,12 @@ export default function CreateMinutesPage() {
                   {s.num}
                 </span>
               )}
-              <span className="hidden sm:inline">{s.label}</span>
+              <span className={`hidden sm:inline ${step > s.num ? 'text-navy' : ''}`}>{s.label}</span>
             </div>
             {idx < steps.length - 1 && (
               <div
                 className={`h-px flex-1 ${
-                  step > s.num ? 'bg-green-300' : 'bg-muted'
+                  step > s.num ? 'bg-gold' : 'bg-muted'
                 }`}
               />
             )}
@@ -1463,7 +1494,7 @@ export default function CreateMinutesPage() {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <div className="lg:ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen dot-grid">
         <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-5xl mx-auto">
           {/* Back to minutes list */}
           <button
