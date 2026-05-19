@@ -18,5 +18,10 @@ RUN chmod -R 755 /usr/share/nginx/html && \
     find /usr/share/nginx/html -type f -exec chmod 644 {} \;
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
-CMD sed -i "s/listen 80/listen ${PORT:-80}/" /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
+# Railway assigns $PORT at runtime; start.sh dynamically configures nginx to listen on it
+EXPOSE 80
+
+CMD ["/app/start.sh"]

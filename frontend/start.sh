@@ -1,6 +1,11 @@
 #!/bin/sh
-# Force nginx to listen on port 80 (matching Railway's EXPOSE 80)
-# Railway V2 gateway proxies traffic from the external domain to port 80
-sed -i "s/listen 80/listen 80/" /etc/nginx/conf.d/default.conf
-echo "Starting nginx on port 80 (Railway expects EXPOSE 80)"
+# Railway V2 gateway proxies traffic from the external domain to the container's $PORT
+# We dynamically update nginx to listen on Railway's assigned port
+if [ -n "$PORT" ]; then
+    echo "Railway PORT detected: $PORT"
+    sed -i "s/listen 80/listen $PORT/" /etc/nginx/conf.d/default.conf
+else
+    echo "No PORT env var set, defaulting to port 80"
+fi
+echo "Starting nginx..."
 nginx -g "daemon off;"
