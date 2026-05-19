@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Q
 from fastapi.responses import Response
 from datetime import datetime, timezone
 from typing import Optional
+import re
 import uuid
 import base64
 
@@ -228,10 +229,11 @@ async def list_documents(
     if provider:
         query["storage_provider"] = provider
     if search:
+        escaped_search = re.escape(search)
         query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}},
-            {"tags": {"$regex": search, "$options": "i"}},
+            {"title": {"$regex": escaped_search, "$options": "i"}},
+            {"description": {"$regex": escaped_search, "$options": "i"}},
+            {"tags": {"$regex": escaped_search, "$options": "i"}},
         ]
 
     # Exclude file_content from list responses (it can be huge)

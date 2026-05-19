@@ -71,10 +71,14 @@ async def verify_api_key(request: Request, api_key: str = Depends(api_key_header
 
 
 def get_client_ip(request: Request) -> str:
-    """Extract client IP from request."""
+    """Extract client IP from request.
+    
+    Security: Use the rightmost IP in X-Forwarded-For, which is set by
+    the closest trusted proxy and harder to spoof than the leftmost IP.
+    """
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"
 
 

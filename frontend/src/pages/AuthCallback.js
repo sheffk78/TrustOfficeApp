@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 export default function AuthCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { exchangeSession, setUser, setLoading, loadTrusts, loadSubscriptionState } = useAuth();
+  const { setUser, setLoading, loadTrusts, loadSubscriptionState } = useAuth();
   const hasProcessed = useRef(false);
 
   useEffect(() => {
@@ -15,12 +15,13 @@ export default function AuthCallback() {
     hasProcessed.current = true;
 
     const processAuth = async () => {
-      // Check for custom Google OAuth callback (token in query params)
-      const token = searchParams.get('token');
+      // Security: OAuth callback now sends a one-time authorization code instead of a JWT in the URL.
+      // The code is exchanged for the JWT via POST /api/auth/session (no token in browser history/referrer).
+      const code = searchParams.get('code');
       const redirect = searchParams.get('redirect') || '/dashboard';
       const error = searchParams.get('error');
       
-      console.log('[AuthCallback] Processing:', { hasToken: !!token, redirect, error });
+      console.log('[AuthCallback] Processing:', { hasCode: !!code, redirect, error });
       
       // Handle OAuth errors
       if (error) {
@@ -41,43 +42,45 @@ export default function AuthCallback() {
         return;
       }
       
-      // Handle custom Google OAuth (token in URL)
-      if (token) {
+      // Handle custom Google OAuth (authorization code in URL)
+      if (code) {
         try {
           setLoading(true);
           
-          // Store the token
-          localStorage.setItem('auth_token', token);
-          console.log('[AuthCallback] Token stored, fetching user...');
-          
-          // Fetch user data
-          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app'}/api/auth/me`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
+          // Exchange the one-time auth code for a JWT + user data
+          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app'}/api/auth/session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include', // Include cookies (session_token is set by backend)
+            body: JSON.stringify({ code })
           });
           
-          console.log('[AuthCallback] /auth/me status:', response.status);
-          
-          if (response.ok) {
-            const userData = await response.json();
-            console.log('[AuthCallback] User loaded:', userData.email);
-            setUser(userData);
-            
-            // Load trusts and subscription state (pass email for admin override)
-            await Promise.all([loadTrusts(), loadSubscriptionState(userData.email)]);
-            
-            toast.success('Welcome!');
-            
-            console.log('[AuthCallback] Redirecting to:', redirect);
-            // Use navigate for SPA routing (no full page reload)
-            navigate(redirect, { replace: true });
-            return;
-          } else {
-            const errorText = await response.text();
-            console.error('[AuthCallback] /auth/me error:', errorText);
-            throw new Error('Failed to fetch user data');
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('[AuthCallback] Auth code exchange failed:', response.status, errorData);
+            throw new Error(errorData.detail || 'Authentication failed');
           }
+          
+          const data = await response.json();
+          console.log('[AuthCallback] User loaded:', data.user?.email);
+          
+          // Security: Store token in localStorage for the current session.
+          // The HttpOnly session_cookie is also set by the backend — this is the
+          // Authorization header fallback used by api.js. Both mechanisms work together.
+          if (data.token) {
+            localStorage.setItem('auth_token', data.token);
+          }
+          
+          setUser(data.user);
+          
+          // Load trusts and subscription state (pass email for admin override)
+          await Promise.all([loadTrusts(), loadSubscriptionState(data.user.email)]);
+          
+          toast.success('Welcome!');
+          
+          console.log('[AuthCallback] Redirecting to:', redirect);
+          navigate(redirect, { replace: true });
+          return;
         } catch (err) {
           console.error('[AuthCallback] Error:', err);
           toast.error('Authentication failed');
@@ -90,44 +93,13 @@ export default function AuthCallback() {
         return;
       }
       
-      // Legacy: Handle Emergent OAuth callback (session_id in hash)
-      const hash = window.location.hash;
-      const sessionIdMatch = hash.match(/session_id=([^&]+)/);
-      
-      if (!sessionIdMatch) {
-        toast.error('Authentication failed');
-        navigate('/', { replace: true });
-        return;
-      }
-
-      const sessionId = sessionIdMatch[1];
-
-      try {
-        setLoading(true);
-        const data = await exchangeSession(sessionId);
-        
-        // Load trusts after auth
-        await loadTrusts();
-        
-        toast.success('Welcome!');
-        
-        // Navigate to onboarding with user data to skip auth check
-        navigate('/onboarding', { 
-          replace: true,
-          state: { user: data.user }
-        });
-      } catch (error) {
-        console.error('Auth callback error:', error);
-        toast.error('Authentication failed');
-        hasProcessed.current = false; // Allow retry if user goes back
-        navigate('/', { replace: true });
-      } finally {
-        setLoading(false);
-      }
+      // No code or error — invalid callback
+      toast.error('Authentication failed');
+      navigate('/', { replace: true });
     };
 
     processAuth();
-  }, [exchangeSession, navigate, setUser, setLoading, loadTrusts, loadSubscriptionState, searchParams]);
+  }, [navigate, setUser, setLoading, loadTrusts, loadSubscriptionState, searchParams]);
 
   return (
     <div className="min-h-screen bg-subtle-bg flex items-center justify-center">

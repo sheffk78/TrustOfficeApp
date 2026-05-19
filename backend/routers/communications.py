@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone
 from typing import Optional
+import re
 import uuid
 
 from database import db
@@ -72,9 +73,10 @@ async def list_communications(
         query["action_required"] = action_required
 
     if search:
+        escaped_search = re.escape(search)
         query["$or"] = [
-            {"subject": {"$regex": search, "$options": "i"}},
-            {"content": {"$regex": search, "$options": "i"}},
+            {"subject": {"$regex": escaped_search, "$options": "i"}},
+            {"content": {"$regex": escaped_search, "$options": "i"}},
         ]
 
     docs = await db.communications.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)

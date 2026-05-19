@@ -253,12 +253,21 @@ app.add_middleware(RateLimitMiddleware, config=RateLimitConfig())
 app.add_middleware(SubscriptionMiddleware)
 
 # CORS middleware — added LAST so it executes FIRST (outermost)
+# Security: CORS_ORIGINS must be set explicitly. Wildcard (*) is rejected.
+cors_origins_str = os.environ.get('CORS_ORIGINS', '')
+if not cors_origins_str or cors_origins_str.strip() == '*':
+    raise RuntimeError(
+        "CORS_ORIGINS environment variable is required for security. "
+        "Set it to a comma-separated list of allowed origins (e.g., 'https://app.trustoffice.app'). "
+        "Wildcard '*' is not allowed."
+    )
+CORS_ORIGINS = [origin.strip() for origin in cors_origins_str.split(',') if origin.strip()]
+logger.info(f"CORS origins configured: {CORS_ORIGINS}")
 
-# CORS middleware — added LAST so it executes FIRST (outermost)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '').split(','),
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -391,6 +400,10 @@ async def startup_event():
         await db.referral_tracking.create_index("referrer_user_id")
         await db.referral_tracking.create_index("referee_user_id", unique=True)
         
+        # OAuth auth codes (one-time use, short-lived)
+        await db.oauth_auth_codes.create_index("code", unique=True)
+        await db.oauth_auth_codes.create_index("expires_at", expireAfterSeconds=0)  # Auto-delete expired
+        
         # JWT revocation indexes (auto-cleanup via TTL)
         await db.jwt_revocations.create_index("jti")
         await db.jwt_revocations.create_index("user_id")
@@ -449,7 +462,12 @@ async def startup_event():
 
 
 async def ensure_primary_admin():
-    """Ensure the primary admin account (contact@trustoffice.app) exists."""
+    """Ensure the primary admin account (contact@trustoffice.app) exists.
+    
+    Security: ADMIN_DEFAULT_PASSWORD is required. If not set, the admin account
+    will not be created — this prevents hardcoded credentials in source code.
+    The password must be rotated periodically and should match a strong generated value.
+    """
     import uuid
     import bcrypt
     from datetime import datetime, timezone
@@ -457,7 +475,11 @@ async def ensure_primary_admin():
     primary_admin_email = "contact@trustoffice.app"
     default_password = os.environ.get('ADMIN_DEFAULT_PASSWORD')
     if not default_password:
-        logger.error("ADMIN_DEFAULT_PASSWORD not set — cannot ensure admin account")
+        logger.error("ADMIN_DEFAULT_PASSWORD not set — admin account creation skipped. Set ADMIN_DEFAULT_PASSWORD in Railway env vars.")
+        return
+    
+    if len(default_password) < 12:
+        logger.error("ADMIN_DEFAULT_PASSWORD too short (minimum 12 characters) — admin account creation skipped for security.")
         return
     
     existing = await db.users.find_one({"email": primary_admin_email}, {"_id": 0})

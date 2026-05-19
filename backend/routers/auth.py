@@ -198,7 +198,7 @@ async def login(user: UserLogin, response: Response):
         value=token,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite="lax",
         max_age=JWT_EXPIRATION_HOURS * 3600,
         path="/"
     )
@@ -277,9 +277,10 @@ async def reset_password(request: PasswordResetConfirm):
         await db.password_resets.delete_one({"token": request.token})
         raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
     
-    # Validate password
-    if len(request.new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    # Validate password strength (same requirements as registration)
+    is_valid, error_msg = validate_password_strength(request.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
     
     # Update password
     new_hash = hash_password(request.new_password)
@@ -327,17 +328,65 @@ async def verify_reset_token(token: str):
 
 @router.post("/auth/session")
 async def exchange_session(request: Request, response: Response):
-    """Exchange OAuth session for JWT token"""
+    """Exchange a one-time authorization code for a JWT token.
+    
+    This replaces the old JWT-in-URL pattern. The OAuth callback now generates
+    a short-lived auth code that the frontend exchanges for the actual JWT.
+    """
     body = await request.json()
-    session_id = body.get("session_id")
+    code = body.get("code")
     
-    if not session_id:
-        raise HTTPException(status_code=400, detail="session_id required")
+    if not code:
+        raise HTTPException(status_code=400, detail="code required")
     
-    # This endpoint is not currently in use. Google OAuth callback handles
-    # session exchange directly via /auth/google/callback. The session-based
-    # flow (Emergent) is no longer available on Railway.
-    raise HTTPException(status_code=501, detail="OAuth session exchange not yet configured on this platform")
+    # Look up the auth code
+    auth_record = await db.oauth_auth_codes.find_one({"code": code})
+    if not auth_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired authorization code")
+    
+    # Check expiration
+    expires_at = datetime.fromisoformat(auth_record["expires_at"].replace('Z', '+00:00'))
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < datetime.now(timezone.utc):
+        await db.oauth_auth_codes.delete_one({"code": code})
+        raise HTTPException(status_code=400, detail="Authorization code has expired")
+    
+    # Delete the code (one-time use)
+    await db.oauth_auth_codes.delete_one({"code": code})
+    
+    # Return the JWT and user info
+    user_doc = await db.users.find_one({"user_id": auth_record["user_id"]}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    jwt_token = auth_record["jwt_token"]
+    
+    # Also set the session cookie
+    response.set_cookie(
+        key="session_token",
+        value=auth_record["session_token"],
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=7 * 24 * 3600,
+        path="/"
+    )
+    
+    PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
+    is_admin = user_doc.get("is_admin", False) or user_doc.get("email", "").lower() == PRIMARY_ADMIN_EMAIL
+    
+    return {
+        "token": jwt_token,
+        "user": {
+            "user_id": user_doc["user_id"],
+            "email": user_doc["email"],
+            "name": user_doc["name"],
+            "picture": user_doc.get("picture"),
+            "is_admin": is_admin
+        }
+    }
 
 
 # ==================== USER PROFILE ====================
@@ -499,7 +548,7 @@ async def google_callback(request: Request, response: Response, code: str = None
             )
             
             if token_response.status_code != 200:
-                logger.error(f"Token exchange failed: {token_response.text}")
+                logger.error(f"Token exchange failed: status={token_response.status_code}")
                 return RedirectResponse(url=f"{frontend_url}/login?error=token_exchange_failed")
             
             tokens = token_response.json()
@@ -515,7 +564,7 @@ async def google_callback(request: Request, response: Response, code: str = None
             )
             
             if userinfo_response.status_code != 200:
-                logger.error(f"Failed to fetch user info: {userinfo_response.text}")
+                logger.error(f"Failed to fetch user info: status={userinfo_response.status_code}")
                 return RedirectResponse(url=f"{frontend_url}/login?error=userinfo_failed")
             
             google_user = userinfo_response.json()
@@ -598,14 +647,28 @@ async def google_callback(request: Request, response: Response, code: str = None
             upsert=True
         )
         
+        # Security: Use a one-time authorization code instead of passing JWT in the URL.
+        # The frontend exchanges this code for the JWT via POST /auth/session/exchange.
+        auth_code = secrets.token_urlsafe(48)
+        auth_code_expires = datetime.now(timezone.utc) + timedelta(minutes=2)
+        
+        await db.oauth_auth_codes.insert_one({
+            "code": auth_code,
+            "jwt_token": jwt_token,
+            "user_id": user_id,
+            "session_token": session_token,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": auth_code_expires.isoformat(),
+        })
+        
         # Set session cookie
-        response = RedirectResponse(url=f"{frontend_url}/auth/callback?token={jwt_token}&redirect={urllib.parse.quote(redirect_after)}")
+        response = RedirectResponse(url=f"{frontend_url}/auth/callback?code={auth_code}&redirect={urllib.parse.quote(redirect_after)}")
         response.set_cookie(
             key="session_token",
             value=session_token,
             httponly=True,
             secure=True,
-            samesite="none",
+            samesite="lax",
             max_age=7 * 24 * 3600,
             path="/"
         )

@@ -281,21 +281,25 @@ export const AuthProvider = ({ children }) => {
     setSelectedTrust(null);
   }, []);
 
-  const exchangeSession = useCallback(async (sessionId) => {
+  const exchangeAuthCode = useCallback(async (code) => {
+    // Security: Exchange one-time authorization code for JWT.
+    // This replaces the old JWT-in-URL OAuth flow and the session_id (Emergent) flow.
     const response = await fetch(`${API}/auth/session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ session_id: sessionId })
+      body: JSON.stringify({ code })
     });
     
     if (!response.ok) {
-      throw new Error('Session exchange failed');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Auth code exchange failed');
     }
     
     const data = await response.json();
     
-    // Store token in localStorage (CRITICAL for subsequent API calls)
+    // Security: Store token in localStorage for Authorization header fallback.
+    // The HttpOnly session_cookie is also set by the backend response.
     if (data.token) {
       localStorage.setItem('auth_token', data.token);
     }
@@ -383,7 +387,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    exchangeSession,
+    exchangeAuthCode,
     seedDemoData
   };
 

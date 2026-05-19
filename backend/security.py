@@ -127,9 +127,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return f"user:{user_id}"
         
         # Fall back to IP address
+        # Security: Use the rightmost IP in X-Forwarded-For, which is set by
+        # the closest trusted proxy and harder to spoof than the leftmost IP.
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            ip = forwarded.split(",")[0].strip()
+            # Rightmost IP is the one added by the most recent (trusted) proxy
+            ip = forwarded.split(",")[-1].strip()
         else:
             ip = request.client.host if request.client else "unknown"
         

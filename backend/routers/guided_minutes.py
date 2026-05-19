@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime, timezone
 from typing import Optional, List
+import re
 import uuid
 import logging
 
@@ -299,9 +300,10 @@ async def search_minutes(
         search_query["meeting_date"]["$lte"] = end_date
     
     if query:
+        escaped_query = re.escape(query)
         search_query["$or"] = [
-            {"decisions_text": {"$regex": query, "$options": "i"}},
-            {"participants_text": {"$regex": query, "$options": "i"}}
+            {"decisions_text": {"$regex": escaped_query, "$options": "i"}},
+            {"participants_text": {"$regex": escaped_query, "$options": "i"}}
         ]
     
     minutes_docs = await db.minutes_records.find(
