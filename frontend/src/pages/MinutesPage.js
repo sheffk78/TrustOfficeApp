@@ -346,13 +346,32 @@ export default function MinutesPage() {
               <div className="empty-state-icon">
                 <FileText className="w-16 h-16 text-navy/20" />
               </div>
-              <h2 className="font-serif text-2xl text-navy mb-2">No Minutes Found</h2>
-              <p className="text-muted-foreground mb-6">
-                {searchTerm ? 'Try a different search term' : 'Record your first minutes to get started'}
-              </p>
-              <Button onClick={() => navigate('/minutes/create')} className="btn-primary">
-                Create Minutes
-              </Button>
+              {searchTerm ? (
+                <>
+                  <h2 className="font-serif text-2xl text-navy mb-2">No Minutes Found</h2>
+                  <p className="text-muted-foreground mb-6">Try a different search term</p>
+                </>
+              ) : (
+                <>
+                  <h2 className="font-serif text-2xl text-navy mb-2">Document Your First Meeting</h2>
+                  <p className="text-muted-foreground mb-2 max-w-lg mx-auto">
+                    Trustees are legally required to document every decision. Your first meeting covers accepting trusteeship, opening bank accounts, and setting up the trust.
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-6">
+                    We'll walk you through it — most trustees finish in under 5 minutes.
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <Button onClick={() => navigate('/minutes/create?type=initial_trustee_meeting&from=onboarding')} className="btn-primary">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Hold Your First Trustee Meeting
+                    </Button>
+                    <Button onClick={() => navigate('/minutes/create')} variant="outline" className="btn-secondary">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Choose a Different Template
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-4">

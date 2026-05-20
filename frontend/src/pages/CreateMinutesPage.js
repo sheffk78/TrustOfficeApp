@@ -195,8 +195,19 @@ export default function CreateMinutesPage() {
     }
   }, [isReadOnly, navigate]);
 
-  // ----- URL prefill support (Money → Minutes onboarding flow) -----
+  // ----- Onboarding deep-link: auto-navigate to template when ?type= is passed -----
   const fromOnboarding = searchParams.get('from') === 'onboarding';
+  const templateType = searchParams.get('type');
+
+  useEffect(() => {
+    // If the dashboard onboarding provides ?type=initial_trustee_meeting (or any template type),
+    // auto-navigate directly to that template form instead of showing the picker.
+    if (templateType && selectedTrust?.trust_id) {
+      navigate(`/minutes/template/${templateType}?from=create${fromOnboarding ? '&from=onboarding' : ''}`, { replace: true });
+    }
+  }, [templateType, selectedTrust?.trust_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ----- URL prefill support (Money → Minutes onboarding flow) -----
 
   useEffect(() => {
     const prefillType = searchParams.get('prefill_type');

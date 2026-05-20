@@ -383,7 +383,7 @@ export default function DashboardPage() {
         description: 'Trustees are legally required to document decisions. Your first meeting covers accepting trusteeship, opening bank accounts, and setting up the trust.',
         done: onboarding.minutes_generated,
         icon: ClipboardList,
-        action: '/minutes/create?type=initial_trustee_meeting'
+        action: '/minutes/create?type=initial_trustee_meeting&from=onboarding'
       },
       { 
         id: 'calendar', 
