@@ -69,6 +69,8 @@ export default function AiDraftPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          template_type: minutesType || null,
           minutes_type: minutesType || 'general',
           meeting_date: meetingDate ? meetingDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           participants: participants || [],
@@ -76,7 +78,8 @@ export default function AiDraftPanel({
           trust_name: selectedTrust.name,
           jurisdiction: selectedTrust.jurisdiction || null,
           beneficiary_standard: selectedTrust.beneficiary_standard || null,
-          additional_context: extraContext || null
+          additional_context: extraContext || null,
+          template_data: templateFields && Object.keys(templateFields).length > 0 ? templateFields : null
         })
       });
 

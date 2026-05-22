@@ -88,7 +88,7 @@ export default function MinutesTemplateFormPage() {
     meeting_type: 'unanimous_written_consent',
     meeting_location: '',
     trustees_present: [],
-    trust_indenture_date: '',
+    trust_formation_date: '',
     adjournment_time: '10:30 AM'
   });
 
@@ -467,12 +467,18 @@ export default function MinutesTemplateFormPage() {
         if (mainTrust) {
           setTrustEntity(mainTrust);
           
-          // Auto-populate trust_indenture_date
+          // Auto-populate trust_formation_date from entity formation date or trust start_date
           if (mainTrust.formation_date) {
             const formattedDate = format(new Date(mainTrust.formation_date), 'MMMM d, yyyy');
             setFormData(prev => ({
               ...prev,
-              trust_indenture_date: formattedDate
+              trust_formation_date: formattedDate
+            }));
+          } else if (selectedTrust?.start_date) {
+            const formattedDate = format(new Date(selectedTrust.start_date), 'MMMM d, yyyy');
+            setFormData(prev => ({
+              ...prev,
+              trust_formation_date: formattedDate
             }));
           }
           
@@ -1147,10 +1153,10 @@ export default function MinutesTemplateFormPage() {
                     </div>
                   )}
                   <div className="md:col-span-2">
-                    <Label className="label-trust">Trust Indenture Date</Label>
+                    <Label className="label-trust">Trust Formation Date</Label>
                     <Input
-                      value={formData.trust_indenture_date}
-                      onChange={(e) => setFormData({ ...formData, trust_indenture_date: e.target.value })}
+                      value={formData.trust_formation_date}
+                      onChange={(e) => setFormData({ ...formData, trust_formation_date: e.target.value })}
                       className="mt-1 input-trust"
                       placeholder="January 1, 2020"
                     />

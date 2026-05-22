@@ -177,16 +177,24 @@ async def create_minutes_draft(
     if request.template_type:
         # ── Template mode: use template-specific prompt ──
         template_def = get_template_definition(request.template_type)
+        if not template_def:
+            raise HTTPException(status_code=400, detail=f"Unknown template type: {request.template_type}")
         ai_context = {
             "trust_name": trust_name,
             "meeting_date": request.meeting_date,
             "participants": participants_str,
+            "jurisdiction": jurisdiction,
+            "beneficiary_standard": beneficiary_standard or "Not specified",
             "additional_context": request.additional_context or "",
         }
         
         # Add template_data fields to the context
         if request.template_data:
             ai_context.update(request.template_data)
+            # Ensure additional_context remains a string after template_data update
+            # (template_data may contain None values that would crash += operations)
+            if ai_context.get("additional_context") is None:
+                ai_context["additional_context"] = ""
         
         # Add bullet-point context if also provided
         if request.agenda_items:
@@ -444,24 +452,29 @@ async def get_minutes_context(
         raise HTTPException(status_code=404, detail="Trust not found")
     
     # Get trustees from trust document or from entities
-    trustees = trust.get("trustees", [])
-    
-    # If no trustees in trust doc, try to get from entities
-    if not trustees:
-        entity = await db.entities.find_one(
-            {"trust_id": trust["trust_id"], "entity_type": "Trust", "user_id": user_id},
-            {"_id": 0}
-        )
-        if entity and entity.get("trustee_names"):
-            trustees = [t.strip() for t in entity.get("trustee_names", "").split(",") if t.strip()]
-        
-        beneficiary_standard = entity.get("beneficiary_standard") if entity else None
-        article_ref_distribution = entity.get("article_ref_distribution") if entity else None
-        article_ref_compensation = entity.get("article_ref_compensation") if entity else None
+    # trustees is stored as comma-separated string in MongoDB, must parse it
+    trustees_raw = trust.get("trustees", "")
+    if isinstance(trustees_raw, str):
+        trustees = [t.strip() for t in trustees_raw.split(",") if t.strip()] if trustees_raw else []
+    elif isinstance(trustees_raw, list):
+        trustees = trustees_raw
     else:
-        beneficiary_standard = None
-        article_ref_distribution = None
-        article_ref_compensation = None
+        trustees = []
+    
+    # Always query entity for beneficiary standard (not just when trustees is empty)
+    entity = await db.entities.find_one(
+        {"trust_id": trust["trust_id"], "entity_type": "Trust", "user_id": user_id},
+        {"_id": 0}
+    )
+    
+    # If no trustees from trust doc, try entity trustee_names
+    if not trustees and entity and entity.get("trustee_names"):
+        trustees = [t.strip() for t in entity.get("trustee_names", "").split(",") if t.strip()]
+    
+    # Get beneficiary standard from entity if available
+    beneficiary_standard = entity.get("beneficiary_standard") if entity else None
+    article_ref_distribution = entity.get("article_ref_distribution") if entity else None
+    article_ref_compensation = entity.get("article_ref_compensation") if entity else None
     
     return GuidedMinutesContext(
         trust_id=trust["trust_id"],
@@ -471,7 +484,8 @@ async def get_minutes_context(
         beneficiary_standard=beneficiary_standard,
         article_ref_distribution=article_ref_distribution,
         article_ref_compensation=article_ref_compensation,
-        tax_status=trust.get("tax_status")
+        tax_status=trust.get("tax_status"),
+        start_date=trust.get("start_date")
     )
 
 
@@ -904,7 +918,7 @@ def generate_template_document(trust: dict, template_type: str, template_data: d
     meeting_time = template_data.get("meeting_time", "10:00 AM")
     meeting_type = template_data.get("meeting_type", "unanimous_written_consent")
     trustees_present = template_data.get("trustees_present", trustee_names)
-    trust_indenture_date = template_data.get("trust_indenture_date", "[Date of Trust Indenture]")
+    trust_formation_date = template_data.get("trust_formation_date") or template_data.get("trust_indenture_date", "[Date of Trust Formation]")
     
     meeting_type_text = {
         "in_person": f"In person at {template_data.get('meeting_location', '[Location]')}",
@@ -938,7 +952,7 @@ Quorum: YES
 
 OPENING STATEMENT
 
-The Trustees, acting in their fiduciary capacity and not in any personal capacity, convened this meeting to conduct the business of the Trust in accordance with the Declaration and Indenture of Private Irrevocable Trust dated {trust_indenture_date}, and the principles of Natural Law, Common Law, Equity, and Ecclesiastical Jurisdiction declared therein.
+The Trustees, acting in their fiduciary capacity and not in any personal capacity, convened this meeting to conduct the business of the Trust in accordance with the Declaration and Indenture of Private Irrevocable Trust dated {trust_formation_date}, and the principles of Natural Law, Common Law, Equity, and Ecclesiastical Jurisdiction declared therein.
 
 All Trustees present affirm they are acting as living men and women in private capacity, and not as surety, representative, or accommodation party for any artificial PERSON or all-capital-letter NAME.
 
@@ -1071,7 +1085,7 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
         trustees = []
     trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
     jurisdiction = trust.get("jurisdiction") or trust.get("state_code") or "[State]"
-    start_date = trust.get("start_date", "[Date of Trust Indenture]")
+    start_date = trust.get("start_date", "[Date of Trust Formation]")
     ein = trust.get("ein", "")
     trust_address = ""
     if trust.get("address_line1"):

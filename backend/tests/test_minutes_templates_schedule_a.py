@@ -90,7 +90,7 @@ class TestDistributionTemplate:
                 "meeting_time": "2:00 PM",
                 "meeting_type": "unanimous_written_consent",
                 "trustees_present": ["Test Trustee 1", "Test Trustee 2"],
-                "trust_indenture_date": "January 1, 2020",
+                "trust_formation_date": "January 1, 2020",
                 "distribution_total": 100000,
                 "distribution_items": [
                     {"beneficiary_name": "Beneficiary A", "amount": 60000, "percentage": 60},
@@ -130,7 +130,7 @@ class TestTrusteeAppointmentTemplate:
                 "meeting_date": "January 25, 2026",
                 "meeting_time": "10:00 AM",
                 "trustees_present": ["Existing Trustee"],
-                "trust_indenture_date": "January 1, 2020",
+                "trust_formation_date": "January 1, 2020",
                 "new_trustee_name": "New Trustee Person",
                 "new_trustee_gender": "woman",
                 "signature_requirement": "any_two",
@@ -160,7 +160,7 @@ class TestTrusteeAppointmentTemplate:
                 "minute_number": f"TEST-{uuid.uuid4().hex[:6]}",
                 "meeting_date": "January 25, 2026",
                 "trustees_present": ["Current Trustee"],
-                "trust_indenture_date": "January 1, 2020",
+                "trust_formation_date": "January 1, 2020",
                 "new_trustee_name": "Successor Trustee",
                 "new_trustee_gender": "man",
                 "departing_trustee_name": "Old Trustee",
@@ -194,7 +194,7 @@ class TestPropertyAcceptanceAutoAdd:
                 "minute_number": f"TEST-{uuid.uuid4().hex[:6]}",
                 "meeting_date": "January 25, 2026",
                 "trustees_present": ["Test Trustee"],
-                "trust_indenture_date": "January 1, 2020",
+                "trust_formation_date": "January 1, 2020",
                 "grantor_name": "John Test Grantor",
                 "property_description": unique_desc,
                 "property_value": 125000,
@@ -343,7 +343,7 @@ class TestMinutesDocumentGeneration:
                 "minute_number": f"TEST-{uuid.uuid4().hex[:6]}",
                 "meeting_date": "January 25, 2026",
                 "trustees_present": ["Test Trustee"],
-                "trust_indenture_date": "January 1, 2020",
+                "trust_formation_date": "January 1, 2020",
                 "resolutions": [
                     {
                         "title": "Test Resolution",
@@ -375,7 +375,7 @@ class TestMinutesPreviewEdit:
                 "minute_number": f"TEST-{uuid.uuid4().hex[:6]}",
                 "meeting_date": "January 25, 2026",
                 "trustees_present": ["Test Trustee"],
-                "trust_indenture_date": "January 1, 2020"
+                "trust_formation_date": "January 1, 2020"
             }
         }
         
@@ -415,7 +415,7 @@ class TestPDFDownload:
                 "minute_number": f"PDF-TEST-{uuid.uuid4().hex[:6]}",
                 "meeting_date": "January 25, 2026",
                 "trustees_present": ["Test Trustee"],
-                "trust_indenture_date": "January 1, 2020"
+                "trust_formation_date": "January 1, 2020"
             }
         }
         

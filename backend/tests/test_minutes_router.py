@@ -407,7 +407,7 @@ class TestMinutesTemplates:
                 "meeting_type": "in_person",
                 "meeting_location": "Test Location",
                 "trustees_present": [f"TEST_Trustee1_{unique_id}", f"TEST_Trustee2_{unique_id}"],
-                "trust_indenture_date": "2020-01-01",
+                "trust_formation_date": "2020-01-01",
                 "resolutions": [
                     {
                         "title": f"Test Resolution {unique_id}",

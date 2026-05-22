@@ -512,7 +512,9 @@ class MinutesTemplateData(BaseModel):
     trustees_present: List[str] = []
     protector_present: Optional[str] = None
     quorum_met: bool = True
-    trust_indenture_date: str = ""
+    trust_formation_date: str = ""
+    # Backward compat: accept old field name from existing data
+    trust_indenture_date: Optional[str] = None
     resolutions: List[dict] = []
     distribution_total: Optional[float] = None
     distribution_items: List[dict] = []
@@ -545,6 +547,14 @@ class MinutesTemplateData(BaseModel):
     executive_trustee: str = ""
     secretary_trustee: str = ""
     treasurer_trustee: str = ""
+
+    @model_validator(mode='after')
+    def map_legacy_indenture_date(self):
+        """Map trust_indenture_date (legacy) → trust_formation_date (current)."""
+        if self.trust_indenture_date and not self.trust_formation_date:
+            self.trust_formation_date = self.trust_indenture_date
+        return self
+
 
 class MinutesTemplateCreate(BaseModel):
     trust_id: str
@@ -997,6 +1007,7 @@ class GuidedMinutesContext(BaseModel):
     article_ref_distribution: Optional[str] = None
     article_ref_compensation: Optional[str] = None
     tax_status: Optional[str] = None
+    start_date: Optional[str] = None
 
 class GuidedMinutesDraftRequest(BaseModel):
     """Request model for guided minutes draft generation"""

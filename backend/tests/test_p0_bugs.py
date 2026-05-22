@@ -4,7 +4,7 @@ Test P0 Bug Fixes:
 2. Distribution Clock Icon - PATCH /distributions/{id}/status to set back to review
 
 P1 Feature:
-- Auto-populate Minutes Form from Entity data (trust_indenture_date, trustees_present)
+- Auto-populate Minutes Form from Entity data (trust_formation_date, trustees_present)
 """
 
 import pytest
@@ -70,7 +70,7 @@ class TestMinutesSaveFlow:
                 "meeting_time": "10:00 AM",
                 "meeting_type": "unanimous_written_consent",
                 "trustees_present": ["John Smith", "Jane Doe"],
-                "trust_indenture_date": "January 1, 2020",
+                "trust_formation_date": "January 1, 2020",
                 "resolutions": [{
                     "title": "Test Resolution",
                     "whereas_clauses": ["The Trust requires testing"],
@@ -247,7 +247,7 @@ class TestAutoPopulateMinutesForm:
     """P1 Feature: Test that minutes form auto-populates from Entity data"""
     
     def test_get_entity_data(self, auth_session, trust_data):
-        """Get entity data to verify trust_indenture_date and trustees are available"""
+        """Get entity data to verify trust_formation_date and trustees are available"""
         trust_id = trust_data['trust_id']
         
         response = auth_session.get(f"{BASE_URL}/api/entities?trust_id={trust_id}")
@@ -267,7 +267,7 @@ class TestAutoPopulateMinutesForm:
             TestAutoPopulateMinutesForm.trust_entity = trust_entity
             
             # These fields should exist for auto-population
-            # formation_date -> trust_indenture_date
+            # formation_date -> trust_formation_date
             # trustee_names -> trustees_present
             if trust_entity.get('formation_date') or trust_entity.get('trustee_names'):
                 print("Entity has data that can be used for auto-population")
@@ -280,7 +280,7 @@ class TestAutoPopulateMinutesForm:
         trust_id = trust_data['trust_id']
         trust_entity = getattr(TestAutoPopulateMinutesForm, 'trust_entity', None)
         
-        # Get formation_date from entity to use as trust_indenture_date
+        # Get formation_date from entity to use as trust_formation_date
         formation_date = trust_entity.get('formation_date') if trust_entity else ''
         trustee_names_str = trust_entity.get('trustee_names', '') if trust_entity else ''
         
@@ -297,7 +297,7 @@ class TestAutoPopulateMinutesForm:
                 "meeting_time": "2:00 PM",
                 "meeting_type": "unanimous_written_consent",
                 "trustees_present": trustees if trustees else ["Default Trustee"],
-                "trust_indenture_date": formation_date if formation_date else "January 1, 2020",
+                "trust_formation_date": formation_date if formation_date else "January 1, 2020",
                 "resolutions": [{
                     "title": "Auto-Populate Test",
                     "whereas_clauses": ["Testing auto-population feature"],

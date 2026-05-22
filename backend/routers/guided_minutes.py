@@ -56,27 +56,29 @@ async def get_guided_minutes_context(
         raise HTTPException(status_code=404, detail="Trust not found")
     
     # Get trustees from trust document or from entities
-    trustees = trust.get("trustees", [])
-    
-    # If no trustees in trust doc, try to get from entities
-    if not trustees:
-        # Look for the main trust entity
-        entity = await db.entities.find_one(
-            {"trust_id": trust["trust_id"], "entity_type": "Trust", "user_id": user_id},
-            {"_id": 0}
-        )
-        if entity and entity.get("trustee_names"):
-            # Parse comma-separated trustee names
-            trustees = [t.strip() for t in entity.get("trustee_names", "").split(",") if t.strip()]
-        
-        # Also check beneficiary standard from entity
-        beneficiary_standard = entity.get("beneficiary_standard") if entity else None
-        article_ref_distribution = entity.get("article_ref_distribution") if entity else None
-        article_ref_compensation = entity.get("article_ref_compensation") if entity else None
+    # trustees is stored as comma-separated string in MongoDB, must parse it
+    trustees_raw = trust.get("trustees", "")
+    if isinstance(trustees_raw, str):
+        trustees = [t.strip() for t in trustees_raw.split(",") if t.strip()] if trustees_raw else []
+    elif isinstance(trustees_raw, list):
+        trustees = trustees_raw
     else:
-        beneficiary_standard = None
-        article_ref_distribution = None
-        article_ref_compensation = None
+        trustees = []
+    
+    # Look for the main trust entity (needed for trustee names fallback + beneficiary standard)
+    entity = await db.entities.find_one(
+        {"trust_id": trust["trust_id"], "entity_type": "Trust", "user_id": user_id},
+        {"_id": 0}
+    )
+    
+    # If no trustees from trust doc, try entity trustee_names
+    if not trustees and entity and entity.get("trustee_names"):
+        trustees = [t.strip() for t in entity.get("trustee_names", "").split(",") if t.strip()]
+    
+    # Get beneficiary standard from entity if available
+    beneficiary_standard = entity.get("beneficiary_standard") if entity else None
+    article_ref_distribution = entity.get("article_ref_distribution") if entity else None
+    article_ref_compensation = entity.get("article_ref_compensation") if entity else None
     
     return GuidedMinutesContext(
         trust_id=trust["trust_id"],
@@ -86,7 +88,8 @@ async def get_guided_minutes_context(
         beneficiary_standard=beneficiary_standard,
         article_ref_distribution=article_ref_distribution,
         article_ref_compensation=article_ref_compensation,
-        tax_status=trust.get("tax_status")
+        tax_status=trust.get("tax_status"),
+        start_date=trust.get("start_date")
     )
 
 
