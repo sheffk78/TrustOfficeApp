@@ -663,9 +663,10 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
     if task_count > 0:
         updates["calendar_set"] = True
     
-    # Check minutes
+    # Check minutes (both records from unified flow and templates from template form)
     minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
-    if minutes_count > 0:
+    templates_count = await db.minutes_templates.count_documents({"trust_id": trust_id, "user_id": user_id})
+    if minutes_count > 0 or templates_count > 0:
         updates["minutes_generated"] = True
     
     if updates:

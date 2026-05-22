@@ -403,9 +403,11 @@ export default function MinutesTemplateFormPage() {
 
   // Trust entity data for auto-population
   const [trustEntity, setTrustEntity] = useState(null);
+  const [trustEntityLoading, setTrustEntityLoading] = useState(true);
 
   useEffect(() => {
     if (selectedTrust) {
+      setTrustEntityLoading(true);
       loadTrustEntityData();
     }
   }, [selectedTrust]);
@@ -500,6 +502,8 @@ export default function MinutesTemplateFormPage() {
       }
     } catch (error) {
       console.error('Failed to load trust entity data:', error);
+    } finally {
+      setTrustEntityLoading(false);
     }
   };
 
@@ -998,7 +1002,8 @@ export default function MinutesTemplateFormPage() {
 
       if (response.ok) {
         toast.success('Minutes saved');
-        navigate('/minutes');
+        const fromOnboarding = searchParams.get('source') === 'onboarding';
+        navigate(fromOnboarding ? '/dashboard' : '/minutes');
       } else {
         toast.error('Failed to save minutes');
       }
@@ -1052,10 +1057,10 @@ export default function MinutesTemplateFormPage() {
             <Button 
               variant="ghost" 
               className="mb-4"
-              onClick={() => previewMode ? setPreviewMode(false) : navigate(searchParams.get('from') === 'create' ? '/minutes/create' : '/minutes/templates')}
+              onClick={() => previewMode ? setPreviewMode(false) : navigate(searchParams.get('source') === 'onboarding' ? '/dashboard' : searchParams.get('from') === 'create' ? '/minutes/create' : '/minutes/templates')}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              {previewMode ? 'Back to Form' : searchParams.get('from') === 'create' ? 'Back to Create' : 'Back to Templates'}
+              {previewMode ? 'Back to Form' : searchParams.get('source') === 'onboarding' ? 'Back to Dashboard' : searchParams.get('from') === 'create' ? 'Back to Create' : 'Back to Templates'}
             </Button>
             <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">
               {TEMPLATE_TITLES[templateType] || 'Create Minutes'}
@@ -3039,10 +3044,10 @@ export default function MinutesTemplateFormPage() {
 
               {/* Generate Button */}
               <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => navigate(searchParams.get('from') === 'create' ? '/minutes/create' : '/minutes/templates')}>
+                <Button variant="outline" onClick={() => navigate(searchParams.get('source') === 'onboarding' ? '/dashboard' : searchParams.get('from') === 'create' ? '/minutes/create' : '/minutes/templates')}>
                   Cancel
                 </Button>
-                <Button className="btn-primary" onClick={handleGeneratePreview} disabled={loading}>
+                <Button className="btn-primary" onClick={handleGeneratePreview} disabled={loading || trustEntityLoading}>
                   <Eye className="w-4 h-4 mr-2" />
                   {loading ? 'Generating...' : 'Generate Preview'}
                 </Button>

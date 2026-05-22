@@ -3591,6 +3591,12 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
     
     await db.minutes_templates.insert_one(minutes_doc)
     
+    # Update onboarding checklist — minutes were generated
+    try:
+        await auto_update_onboarding(user["user_id"], template.trust_id)
+    except Exception:
+        pass
+    
     # If accepting property and add_to_schedule_a is true, add to Schedule A
     if template.template_type.value == "acceptance_of_property" and template.template_data.get("add_to_schedule_a"):
         category = template.template_data.get("schedule_a_category", "other_property")
@@ -3703,6 +3709,13 @@ async def update_minutes_template(minutes_id: str, update_data: MinutesTemplateU
         {"minutes_id": minutes_id},
         {"$set": update_fields}
     )
+    
+    # Update onboarding checklist if minutes are finalized
+    if update_data.status == "final":
+        try:
+            await auto_update_onboarding(user["user_id"], minutes["trust_id"])
+        except Exception:
+            pass
     
     updated = await db.minutes_templates.find_one({"minutes_id": minutes_id}, {"_id": 0})
     return updated

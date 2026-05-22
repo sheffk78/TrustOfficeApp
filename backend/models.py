@@ -83,6 +83,7 @@ class AssetCategory(str, Enum):
 
 class MinutesTemplateType(str, Enum):
     blank = "blank"
+    initial_trustee_meeting = "initial_trustee_meeting"
     general_meeting = "general_meeting"
     distribution_to_beneficiaries = "distribution_to_beneficiaries"
     acceptance_of_property = "acceptance_of_property"
