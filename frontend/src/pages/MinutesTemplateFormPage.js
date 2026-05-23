@@ -469,7 +469,7 @@ export default function MinutesTemplateFormPage() {
         if (mainTrust) {
           setTrustEntity(mainTrust);
           
-          // Auto-populate trust_formation_date from entity formation date or trust start_date
+          // Auto-populate trust_formation_date from entity formation date
           if (mainTrust.formation_date) {
             const formattedDate = format(new Date(mainTrust.formation_date), 'MMMM d, yyyy');
             setFormData(prev => ({
@@ -477,6 +477,7 @@ export default function MinutesTemplateFormPage() {
               trust_formation_date: formattedDate
             }));
           } else if (selectedTrust?.start_date) {
+            // Fallback: use trust.start_date from auth context
             const formattedDate = format(new Date(selectedTrust.start_date), 'MMMM d, yyyy');
             setFormData(prev => ({
               ...prev,
@@ -484,9 +485,44 @@ export default function MinutesTemplateFormPage() {
             }));
           }
           
-          // Auto-populate trustees from trustee_names field
+          // Auto-populate trustees from entity trustee_names field
           if (mainTrust.trustee_names) {
             const trustees = mainTrust.trustee_names.split(',').map(t => t.trim()).filter(t => t);
+            if (trustees.length > 0) {
+              setFormData(prev => ({
+                ...prev,
+                trustees_present: trustees
+              }));
+              setBankData(prev => ({
+                ...prev,
+                authorized_signers: trustees
+              }));
+            }
+          } else if (selectedTrust?.trustees) {
+            // Fallback: use trust.trustees from auth context (comma-separated string)
+            const trustees = selectedTrust.trustees.split(',').map(t => t.trim()).filter(t => t);
+            if (trustees.length > 0) {
+              setFormData(prev => ({
+                ...prev,
+                trustees_present: trustees
+              }));
+              setBankData(prev => ({
+                ...prev,
+                authorized_signers: trustees
+              }));
+            }
+          }
+        } else {
+          // No Trust entity exists yet — fall back to trust data from auth context
+          if (selectedTrust?.start_date) {
+            const formattedDate = format(new Date(selectedTrust.start_date), 'MMMM d, yyyy');
+            setFormData(prev => ({
+              ...prev,
+              trust_formation_date: formattedDate
+            }));
+          }
+          if (selectedTrust?.trustees) {
+            const trustees = selectedTrust.trustees.split(',').map(t => t.trim()).filter(t => t);
             if (trustees.length > 0) {
               setFormData(prev => ({
                 ...prev,
