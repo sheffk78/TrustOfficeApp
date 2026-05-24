@@ -27,7 +27,6 @@ import {
   Sparkles,
   ChevronRight,
   Loader2,
-  Info,
   Bot,
   CalendarDays,
   Clock,
@@ -451,16 +450,6 @@ export default function DashboardPage() {
             <p className="page-subtitle">
               {dashboard?.trust_name || selectedTrust?.name || 'Select a trust'} • {selectedTrust?.role}
             </p>
-          </div>
-
-          {/* Rename Notice Banner */}
-          <div className="mb-6 p-3 bg-navy/5 border border-navy/20 rounded flex items-start gap-3" data-testid="rename-notice">
-            <Info className="w-4 h-4 text-navy flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-navy">
-                We renamed <strong>Governance Health</strong> to <strong>Trust Health</strong>. Same score, clearer name — it tracks how well your records would hold up if anyone ever asked.
-              </p>
-            </div>
           </div>
 
           {loading ? (
