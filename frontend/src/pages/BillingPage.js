@@ -361,7 +361,7 @@ export default function BillingPage() {
                       <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="font-medium text-navy">
-                          Free Plan — Core features included
+                          Core Features Only
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
                           You have full access to trust management, minutes, distributions, and governance tools. Upgrade to a paid plan for team features, priority support, and dedicated account management.
