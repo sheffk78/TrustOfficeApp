@@ -156,7 +156,7 @@ export const Sidebar = () => {
             />
           </Link>
           <p className="font-mono text-[9px] uppercase tracking-widest text-white/40 mt-2">
-            AnchorPoint Governance
+            TrustOffice
           </p>
         </div>
 

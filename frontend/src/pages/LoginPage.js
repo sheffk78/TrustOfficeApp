@@ -110,7 +110,7 @@ export default function LoginPage() {
             Trust Governance Workspace
           </p>
           <div className="mt-16 text-white/60 font-mono text-[10px] uppercase tracking-widest">
-            AnchorPoint Governance
+            TrustOffice
           </div>
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function LoginPage() {
 
           {/* Login card with corner marks */}
           <div className="card-trust corner-mark relative">
-            <h1 className="font-serif text-3xl text-navy mb-2">Welcome Back</h1>
+            <h1 className="font-serif text-3xl text-navy mb-2">Sign In</h1>
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-8">
               Sign in to your account
             </p>
@@ -235,7 +235,7 @@ export default function LoginPage() {
           {/* Footer */}
           <div className="mt-8 text-center">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Powered by AnchorPoint
+              Powered by TrustOffice
             </p>
           </div>
         </div>

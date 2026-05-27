@@ -99,21 +99,21 @@
     }
 }
 
-/* Sharp corners everywhere - override any border-radius */
+/* Sharp corners by default - override rounded classes except rounded-full */
 @layer utilities {
     .rounded-none {
         border-radius: 0 !important;
     }
     
-    /* Override all rounded classes */
+    /* Override rounded classes for brand sharpness, but preserve rounded-full
+       for circles, pills, avatars, progress bars, spinners, and status dots */
     .rounded,
     .rounded-sm,
     .rounded-md,
     .rounded-lg,
     .rounded-xl,
     .rounded-2xl,
-    .rounded-3xl,
-    .rounded-full {
+    .rounded-3xl {
         border-radius: 0 !important;
     }
 }

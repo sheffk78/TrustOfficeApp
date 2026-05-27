@@ -184,7 +184,7 @@ export default function SignUpPage() {
             Trust Governance Workspace
           </p>
           <div className="mt-16 text-white/60 font-mono text-[10px] uppercase tracking-widest">
-            AnchorPoint Governance
+            TrustOffice
           </div>
         </div>
       </div>
@@ -365,7 +365,7 @@ export default function SignUpPage() {
           {/* Footer */}
           <div className="mt-8 text-center">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Powered by AnchorPoint
+              Powered by TrustOffice
             </p>
           </div>
         </div>
