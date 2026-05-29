@@ -18,7 +18,8 @@ import {
   FileText,
   Download,
   Save,
-  Eye
+  Eye,
+  Landmark
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -1153,7 +1154,7 @@ export default function MinutesTemplateFormPage() {
             <div className="space-y-8">
               {/* Common Fields */}
               <div className="card-trust corner-mark p-6">
-                <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Meeting Information</h2>
+                <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Meeting Information</h2>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <Label className="label-trust">Minute Number</Label>
@@ -1249,7 +1250,7 @@ export default function MinutesTemplateFormPage() {
               {/* Template-specific fields */}
               {templateType === 'distribution_to_beneficiaries' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Distribution Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Distribution Details</h2>
                   <div className="grid md:grid-cols-2 gap-4 mb-6">
                     <div>
                       <Label className="label-trust">Total Distribution Amount ($)</Label>
@@ -1345,7 +1346,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'acceptance_of_property' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Property Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Property Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Grantor/Creator Name</Label>
@@ -1435,7 +1436,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'disposition_of_asset' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Asset Disposition Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Asset Disposition Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Select Asset from Schedule A</Label>
@@ -1567,7 +1568,7 @@ export default function MinutesTemplateFormPage() {
 
               {(templateType === 'appointment_additional_trustee' || templateType === 'appointment_successor_trustee') && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">
                     {templateType === 'appointment_successor_trustee' ? 'Successor Trustee Details' : 'New Trustee Details'}
                   </h2>
                   <div className="grid md:grid-cols-2 gap-4">
@@ -1675,7 +1676,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'designation_of_beneficiaries' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Beneficiary Designation</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Beneficiary Designation</h2>
                   <div className="grid md:grid-cols-2 gap-4 mb-6">
                     <div>
                       <Label className="label-trust">Designation Type</Label>
@@ -1783,7 +1784,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'bank_account_authorization' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Bank Account Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Bank Account Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Bank/Institution Name</Label>
@@ -1899,7 +1900,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'change_of_situs' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Change of Situs Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Change of Situs Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Current Situs (State/Jurisdiction)</Label>
@@ -1973,7 +1974,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'benevolence_approval' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Benevolence Grant Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Benevolence Grant Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Beneficiary Name *</Label>
@@ -2063,7 +2064,7 @@ export default function MinutesTemplateFormPage() {
               {/* INVESTMENT POLICY TEMPLATE */}
               {templateType === 'investment_policy' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Investment Policy Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Investment Policy Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Policy Action</Label>
@@ -2106,7 +2107,7 @@ export default function MinutesTemplateFormPage() {
               {/* LOAN AUTHORIZATION TEMPLATE */}
               {templateType === 'loan_authorization' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Loan Authorization Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Loan Authorization Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Loan Direction</Label>
@@ -2154,7 +2155,7 @@ export default function MinutesTemplateFormPage() {
               {/* INSURANCE AUTHORIZATION TEMPLATE */}
               {templateType === 'insurance_authorization' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Insurance Authorization Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Insurance Authorization Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Insurance Type</Label>
@@ -2209,7 +2210,7 @@ export default function MinutesTemplateFormPage() {
               {/* ANNUAL REVIEW TEMPLATE */}
               {templateType === 'annual_review' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Annual Review Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Annual Review Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Fiscal Year</Label>
@@ -2242,7 +2243,7 @@ export default function MinutesTemplateFormPage() {
               {/* QUARTERLY REVIEW TEMPLATE */}
               {templateType === 'quarterly_review' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Quarterly Review Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Quarterly Review Details</h2>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div>
                       <Label className="label-trust">Quarter</Label>
@@ -2285,7 +2286,7 @@ export default function MinutesTemplateFormPage() {
               {/* TRUSTEE COMPENSATION TEMPLATE */}
               {templateType === 'trustee_compensation' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trustee Compensation Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Trustee Compensation Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2 flex items-center gap-3">
                       <Checkbox checked={trusteeCompData.all_trustees} onCheckedChange={(c) => setTrusteeCompData({ ...trusteeCompData, all_trustees: c })} id="all-trustees" />
@@ -2328,7 +2329,7 @@ export default function MinutesTemplateFormPage() {
               {/* TRUSTEE RESIGNATION TEMPLATE */}
               {templateType === 'trustee_resignation' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trustee Departure Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Trustee Departure Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Departing Trustee Name</Label>
@@ -2371,7 +2372,7 @@ export default function MinutesTemplateFormPage() {
               {/* BENEFICIARY REQUEST DENIAL TEMPLATE */}
               {templateType === 'beneficiary_request_denial' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Request Denial Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Request Denial Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Beneficiary Name</Label>
@@ -2434,7 +2435,7 @@ export default function MinutesTemplateFormPage() {
               {/* HEMS DISTRIBUTION TEMPLATE */}
               {templateType === 'hems_distribution' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">HEMS Distribution Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">HEMS Distribution Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Beneficiary Name</Label>
@@ -2485,7 +2486,7 @@ export default function MinutesTemplateFormPage() {
               {/* BENEFICIARY LOAN TEMPLATE */}
               {templateType === 'beneficiary_loan' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Beneficiary Loan Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Beneficiary Loan Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Beneficiary Name</Label>
@@ -2532,7 +2533,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'trust_amendment' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trust Amendment Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Trust Amendment Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Amendment Type</Label>
@@ -2572,7 +2573,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'power_of_attorney' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Power of Attorney Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Power of Attorney Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Agent Name *</Label>
@@ -2607,7 +2608,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'trust_termination' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trust Termination Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Trust Termination Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Termination Date *</Label>
@@ -2635,7 +2636,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'real_estate_purchase' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Real Estate Purchase Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Real Estate Purchase Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Property Address *</Label>
@@ -2684,7 +2685,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'business_interest_acquisition' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Business Interest Acquisition Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Business Interest Acquisition Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Entity Name *</Label>
@@ -2725,7 +2726,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'real_estate_lease' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Real Estate Lease Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Real Estate Lease Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Property Address *</Label>
@@ -2757,7 +2758,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'fiscal_year_election' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Fiscal Year Election Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Fiscal Year Election Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Fiscal Year End *</Label>
@@ -2796,7 +2797,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'tax_filing_authorization' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Tax Filing Authorization Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Tax Filing Authorization Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Tax Year *</Label>
@@ -2824,7 +2825,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'emergency_ratification' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Emergency Action Ratification Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Emergency Action Ratification Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Date of Emergency *</Label>
@@ -2856,7 +2857,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'conflict_of_interest' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Conflict of Interest Disclosure Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Conflict of Interest Disclosure Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Trustee with Conflict *</Label>
@@ -2904,7 +2905,7 @@ export default function MinutesTemplateFormPage() {
               {templateType === 'initial_trustee_meeting' && (
                 <div className="space-y-6">
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Initial Meeting Details</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Initial Meeting Details</h2>
                     <p className="text-sm text-muted-foreground mb-6">
                       This is your trust's first organizational meeting. It covers one-time actions — accepting trusteeship, opening bank accounts, confirming your EIN, and establishing the trust's foundation.
                     </p>
@@ -2958,7 +2959,7 @@ export default function MinutesTemplateFormPage() {
                   </div>
 
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Fiscal Year</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Fiscal Year</h2>
                     <div>
                       <Label className="label-trust">Fiscal Year End</Label>
                       <select
@@ -2976,7 +2977,7 @@ export default function MinutesTemplateFormPage() {
                   </div>
 
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trustee Compensation</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Trustee Compensation</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label className="label-trust">Compensation Type</Label>
@@ -3007,7 +3008,7 @@ export default function MinutesTemplateFormPage() {
                   </div>
 
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Include Resolutions</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Include Resolutions</h2>
                     <p className="text-sm text-muted-foreground mb-4">
                       Select which resolutions to include. All are recommended for a new trust's first meeting.
                     </p>
