@@ -203,6 +203,25 @@ class EmailService:
             metadata={"email_type": "welcome"}
         )
     
+    async def send_welcome_set_password_email(
+        self,
+        to_email: str,
+        user_name: str,
+        set_password_url: str
+    ) -> Dict[str, Any]:
+        """Send welcome email with set-password link for admin-created accounts"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="welcome_set_password",
+            template_data={
+                "user_name": user_name or "there",
+                "set_password_url": set_password_url
+            },
+            to_name=user_name,
+            tag="welcome_set_password",
+            metadata={"email_type": "welcome_set_password"}
+        )
+    
     async def send_task_reminder(
         self,
         to_email: str,

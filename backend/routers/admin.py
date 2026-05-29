@@ -16,9 +16,11 @@ FEATURES:
 - Grant/revoke access
 - View system stats
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from typing import Optional, List
 import re
+import os
+import secrets
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, EmailStr
 import uuid
@@ -26,6 +28,7 @@ import logging
 
 from database import db
 from dependencies import get_current_user, hash_password, TRIAL_DAYS
+from email_service import email_service
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +84,11 @@ class CreateAdminUserRequest(BaseModel):
     email: EmailStr
     name: str
     password: Optional[str] = None  # If None, OAuth-only account
+
+
+class CreateUserRequest(BaseModel):
+    email: EmailStr
+    name: str
 
 
 class SystemStats(BaseModel):
@@ -1017,6 +1025,111 @@ async def create_admin_user(
         "message": f"Admin user {email} created",
         "user_id": user_id,
         "login_method": "password" if request.password else "google_oauth"
+    }
+
+
+@router.post("/create-user")
+async def create_user(
+    request: CreateUserRequest,
+    background_tasks: BackgroundTasks,
+    admin: dict = Depends(require_admin)
+):
+    """
+    Create a new regular user account (name + email only).
+    Sends a welcome email with a set-password link.
+    User sets their own password on first login.
+    """
+    email = request.email.lower().strip()
+    name = request.name.strip()
+    
+    # Check if user already exists
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A user with email {email} already exists"
+        )
+    
+    # Create new user (no password — user sets their own via welcome email)
+    now = datetime.now(timezone.utc)
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    
+    user_doc = {
+        "user_id": user_id,
+        "email": email,
+        "name": name,
+        "is_admin": False,
+        "created_at": now.isoformat(),
+        "created_by": admin["user_id"],
+        "created_via": "admin_create"
+    }
+    
+    await db.users.insert_one(user_doc)
+    
+    # Create trial subscription
+    trial_end = now + timedelta(days=TRIAL_DAYS)
+    await db.subscriptions.insert_one({
+        "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+        "user_id": user_id,
+        "plan_type": "trial",
+        "status": "trialing",
+        "trial_end": trial_end.isoformat(),
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat()
+    })
+    
+    # Initialize onboarding
+    await db.user_onboarding.insert_one({
+        "user_id": user_id,
+        "formation_date_added": False,
+        "ein_entered": False,
+        "trust_doc_uploaded": False,
+        "ein_doc_uploaded": False,
+        "beneficiaries_added": False,
+        "assets_added": False,
+        "minutes_generated": False,
+        "calendar_set": False,
+        "checklist_dismissed": False,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat()
+    })
+    
+    # Generate password set token (expires in 24 hours — longer than normal reset)
+    set_password_token = secrets.token_urlsafe(32)
+    expires_at = now + timedelta(hours=24)
+    
+    await db.password_resets.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "token": set_password_token,
+            "expires_at": expires_at.isoformat(),
+            "created_at": now.isoformat(),
+            "purpose": "set_password"
+        }},
+        upsert=True
+    )
+    
+    # Build set-password URL
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
+    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}"
+    
+    # Send welcome + set-password email in background
+    background_tasks.add_task(
+        email_service.send_welcome_set_password_email,
+        to_email=email,
+        user_name=name,
+        set_password_url=set_password_url
+    )
+    
+    logger.info(f"Admin {admin['email']} created new user {email} (via admin create-user)")
+    
+    return {
+        "message": f"User {email} created. Welcome email sent with set-password link.",
+        "user_id": user_id,
+        "email": email,
+        "name": name,
+        "set_password_expires": expires_at.isoformat()
     }
 
 

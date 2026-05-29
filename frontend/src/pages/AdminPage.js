@@ -65,6 +65,8 @@ export default function AdminPage() {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [showImpersonateDialog, setShowImpersonateDialog] = useState(false);
   const [impersonateLoading, setImpersonateLoading] = useState(false);
+  const [showCreateUserDialog, setShowCreateUserDialog] = useState(false);
+  const [createUserLoading, setCreateUserLoading] = useState(false);
   
   // Multi-select state
   const [selectedCustomerIds, setSelectedCustomerIds] = useState(new Set());
@@ -73,6 +75,7 @@ export default function AdminPage() {
   // Form states
   const [grantAccessForm, setGrantAccessForm] = useState({ plan_type: 'trial', days: 14 });
   const [createAdminForm, setCreateAdminForm] = useState({ email: '', name: '', password: '' });
+  const [createUserForm, setCreateUserForm] = useState({ email: '', name: '' });
   const [fixReferralForm, setFixReferralForm] = useState({ referrer_email: '', referee_email: '', action: 'create', status: '' });
   
   // Referrals list
@@ -329,6 +332,39 @@ export default function AdminPage() {
       }
     } catch (error) {
       toast.error('Failed to create admin');
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!createUserForm.email.trim() || !createUserForm.name.trim()) {
+      toast.error('Please fill in name and email');
+      return;
+    }
+    
+    setCreateUserLoading(true);
+    try {
+      const response = await fetchWithAuth('/admin/create-user', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: createUserForm.email.trim().toLowerCase(),
+          name: createUserForm.name.trim()
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message);
+        setShowCreateUserDialog(false);
+        setCreateUserForm({ email: '', name: '' });
+        fetchCustomers();
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to create user');
+      }
+    } catch (error) {
+      toast.error('Failed to create user');
+    } finally {
+      setCreateUserLoading(false);
     }
   };
 
@@ -612,6 +648,13 @@ export default function AdminPage() {
                   </Select>
                   <Button onClick={fetchCustomers} variant="outline">
                     <RefreshCw className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    onClick={() => setShowCreateUserDialog(true)}
+                    className="btn-primary"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add User
                   </Button>
                 </div>
 
@@ -1146,6 +1189,54 @@ export default function AdminPage() {
                   disabled={!createAdminForm.email || !createAdminForm.name}
                 >
                   Create Admin
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Create User Dialog */}
+          <Dialog open={showCreateUserDialog} onOpenChange={setShowCreateUserDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif text-xl text-navy dark:text-white">Add New User</DialogTitle>
+                <DialogDescription>
+                  Create a user account. They will receive a welcome email with a link to set their password.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label className="label-trust">Name *</Label>
+                  <Input
+                    value={createUserForm.name}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, name: e.target.value })}
+                    className="mt-1 input-trust"
+                    placeholder="John Smith"
+                  />
+                </div>
+                <div>
+                  <Label className="label-trust">Email *</Label>
+                  <Input
+                    type="email"
+                    value={createUserForm.email}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
+                    className="mt-1 input-trust"
+                    placeholder="user@example.com"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  An email will be sent to this address with a link to set their password. The link expires in 24 hours.
+                </p>
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreateUserDialog(false)}>Cancel</Button>
+                <Button 
+                  className="btn-primary" 
+                  onClick={handleCreateUser}
+                  disabled={!createUserForm.email.trim() || !createUserForm.name.trim() || createUserLoading}
+                >
+                  {createUserLoading ? 'Creating...' : 'Add User'}
                 </Button>
               </DialogFooter>
             </DialogContent>

@@ -150,6 +150,64 @@ The TrustOffice Team
         """
     },
 
+    # Welcome + Set Password Email (for admin-created accounts)
+    "welcome_set_password": {
+        "subject": "Welcome to TrustOffice - Set Up Your Account",
+        "html": lambda data: _base_template(f"""
+            <h2>Welcome to TrustOffice, {data.get('user_name', 'there')}!</h2>
+            <p>An account has been created for you on TrustOffice — your trusted companion for managing trust governance with confidence and clarity.</p>
+            
+            <div class="success">
+              <strong>Your account is ready!</strong> To get started, you need to set your password.
+            </div>
+            
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="{data.get('set_password_url', '#')}" class="button">Set Your Password</a>
+            </p>
+            
+            <div class="alert">
+              <strong>This link expires in 24 hours.</strong> After setting your password, you can log in and start managing your trusts.
+            </div>
+            
+            <h3>What you can do with TrustOffice:</h3>
+            <ul>
+              <li><strong>Track Minutes</strong> — Document trust meetings and decisions</li>
+              <li><strong>Manage Distributions</strong> — Record and approve trust distributions</li>
+              <li><strong>Governance Calendar</strong> — Stay on top of important dates</li>
+              <li><strong>Compliance Dashboard</strong> — Monitor trust health at a glance</li>
+            </ul>
+            
+            <p style="font-size: 12px; color: #666;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <span style="word-break: break-all;">{data.get('set_password_url', '#')}</span>
+            </p>
+            
+            <p>If you have any questions, don't hesitate to reach out to our support team.</p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Welcome to TrustOffice, {data.get('user_name', 'there')}!
+
+An account has been created for you on TrustOffice — your trusted companion for managing trust governance.
+
+To get started, set your password here: {data.get('set_password_url', '#')}
+
+This link expires in 24 hours. After setting your password, you can log in and start managing your trusts.
+
+What you can do with TrustOffice:
+- Track Minutes — Document trust meetings and decisions
+- Manage Distributions — Record and approve trust distributions
+- Governance Calendar — Stay on top of important dates
+- Compliance Dashboard — Monitor trust health at a glance
+
+If you have any questions, don't hesitate to reach out to our support team.
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
     # Task Reminder Email
     "task_reminder": {
         "subject": lambda data: f"Reminder: {data.get('task_type', 'Task')} Due {data.get('due_date', 'Soon')}",

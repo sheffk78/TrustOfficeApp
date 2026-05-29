@@ -1,14 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
-  <!-- TrustOffice Vertical Logo - Clean Vector -->
-  <!-- Checkmark / Shield icon -->
-  <g transform="translate(100, 20)">
-    <!-- Outer circle -->
-    <circle cx="100" cy="100" r="95" fill="#010079"/>
-    <!-- Checkmark -->
-    <path d="M55 100 L85 130 L145 70" stroke="#d5ad36" stroke-width="18" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TrustOffice Logo — Vertical Lockup — NAVY (for light backgrounds) -->
+<!-- Clean vector — no embedded raster images -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200" width="800" height="1200">
+  <!-- Trust -->
+  <g fill="#010079">
+    <polygon points="100,80 300,80 300,140 230,140 230,340 170,340 170,140 100,140"/>
+    <path d="M340,80 L520,80 Q600,80 600,160 Q600,220 540,240 L600,340 L520,340 L470,240 L400,240 L400,340 L340,340 Z M400,140 L400,190 L500,190 Q520,190 520,165 Q520,140 500,140 Z"/>
+    <path d="M620,80 L680,80 L680,280 Q680,320 720,320 Q760,320 760,280 L760,80 L820,80 L820,290 Q820,380 720,380 Q620,380 620,290 Z"/>
+    <path d="M860,80 L1000,80 Q1080,80 1080,150 Q1080,200 1030,220 Q1100,240 1100,310 Q1100,380 1020,380 L860,380 L860,320 L1000,320 Q1020,320 1020,300 Q1020,280 1000,280 L920,280 L920,220 L1000,220 Q1020,220 1020,200 Q1020,180 1000,180 L860,180 Z"/>
+    <polygon points="1120,80 1320,80 1320,140 1250,140 1250,340 1190,340 1190,140 1120,140"/>
   </g>
-  <!-- Text: TrustOffice -->
-  <text x="200" y="280" text-anchor="middle" font-family="'Georgia', 'Times New Roman', serif" font-size="42" font-weight="700" fill="#010079" letter-spacing="1">TrustOffice</text>
-  <!-- Tagline -->
-  <text x="200" y="320" text-anchor="middle" font-family="'Courier New', monospace" font-size="11" fill="#666" letter-spacing="4" text-transform="uppercase">TRUST GOVERNANCE</text>
+  <!-- Office -->
+  <g fill="#010079">
+    <path d="M180,440 L340,440 Q420,440 420,560 Q420,680 340,680 L180,680 Q100,680 100,560 Q100,440 180,440 Z M180,500 Q160,500 160,560 Q160,620 180,620 L340,620 Q360,620 360,560 Q360,500 340,500 Z"/>
+    <polygon points="440,440 620,440 620,500 500,500 500,540 600,540 600,600 500,600 500,620 620,620 620,680 440,680"/>
+    <polygon points="640,440 820,440 820,500 700,500 700,540 800,540 800,600 700,600 700,620 820,620 820,680 640,680"/>
+    <polygon points="840,440 920,440 920,680 840,680"/>
+    <path d="M960,440 L1120,440 Q1200,440 1200,500 L1140,500 Q1140,500 1120,500 L960,500 Q940,500 940,560 Q940,620 960,620 L1120,620 Q1140,620 1140,620 L1200,620 Q1200,680 1120,680 L960,680 Q880,680 880,560 Q880,440 960,440 Z"/>
+    <polygon points="1240,440 1400,440 1400,500 1300,500 1300,540 1380,540 1380,600 1300,600 1300,620 1400,620 1400,680 1240,680"/>
+  </g>
+  <!-- Gold accent square -->
+  <rect x="700" y="600" width="60" height="60" fill="#d5ad36"/>
 </svg>
