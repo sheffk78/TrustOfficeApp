@@ -22,6 +22,19 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+/** Format a number as currency for display (e.g., 500000 → "$500,000") */
+const formatCurrency = (value) => {
+  if (!value && value !== 0) return '';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return value;
+  return '$' + num.toLocaleString('en-US');
+};
+
+/** Parse a formatted currency string back to a number string (e.g., "$500,000" → "500000") */
+const parseCurrencyInput = (value) => {
+  return value.replace(/[$,\s]/g, '');
+};
+
 const TEMPLATE_TITLES = {
   'initial_trustee_meeting': 'Initial Trustee Meeting',
   'general_meeting': 'General Meeting Minutes',
@@ -1092,16 +1105,16 @@ export default function MinutesTemplateFormPage() {
           <div className="mb-8">
             <Button 
               variant="ghost" 
-              className="mb-4"
+              className="mb-4 text-muted-foreground hover:text-navy font-mono text-xs uppercase tracking-widest"
               onClick={() => previewMode ? setPreviewMode(false) : navigate(searchParams.get('source') === 'onboarding' ? '/dashboard' : searchParams.get('from') === 'create' ? '/minutes/create' : '/minutes/templates')}
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
               {previewMode ? 'Back to Form' : searchParams.get('source') === 'onboarding' ? 'Back to Dashboard' : searchParams.get('from') === 'create' ? 'Back to Create' : 'Back to Templates'}
             </Button>
             <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">
               {TEMPLATE_TITLES[templateType] || 'Create Minutes'}
             </h1>
-            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            <p className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-navy/40 dark:text-gold/40 mt-1">
               {selectedTrust.name}
             </p>
           </div>
@@ -1140,7 +1153,7 @@ export default function MinutesTemplateFormPage() {
             <div className="space-y-8">
               {/* Common Fields */}
               <div className="card-trust corner-mark p-6">
-                <h2 className="font-serif text-xl text-navy mb-4">Meeting Information</h2>
+                <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Meeting Information</h2>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <Label className="label-trust">Minute Number</Label>
@@ -1148,7 +1161,7 @@ export default function MinutesTemplateFormPage() {
                       value={formData.minute_number}
                       onChange={(e) => setFormData({ ...formData, minute_number: e.target.value })}
                       className="mt-1 input-trust"
-                      placeholder="2024-001"
+                      placeholder="e.g., 2024-001"
                     />
                   </div>
                   <div>
@@ -1157,7 +1170,7 @@ export default function MinutesTemplateFormPage() {
                       value={formData.meeting_date}
                       onChange={(e) => setFormData({ ...formData, meeting_date: e.target.value })}
                       className="mt-1 input-trust"
-                      placeholder="February 23, 2024"
+                      placeholder="e.g., February 23, 2024"
                     />
                   </div>
                   <div>
@@ -1166,13 +1179,13 @@ export default function MinutesTemplateFormPage() {
                       value={formData.meeting_time}
                       onChange={(e) => setFormData({ ...formData, meeting_time: e.target.value })}
                       className="mt-1 input-trust"
-                      placeholder="10:00 AM"
+                      placeholder="e.g., 10:00 AM"
                     />
                   </div>
                   <div>
                     <Label className="label-trust">Meeting Type</Label>
                     <Select value={formData.meeting_type} onValueChange={(v) => setFormData({ ...formData, meeting_type: v })}>
-                      <SelectTrigger className="mt-1">
+                      <SelectTrigger className="mt-1 h-10">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1223,8 +1236,8 @@ export default function MinutesTemplateFormPage() {
                           placeholder="Trustee name"
                         />
                         {formData.trustees_present.length > 1 && (
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveTrustee(index)}>
-                            <Trash2 className="w-4 h-4 text-red-500" />
+                          <Button type="button" variant="ghost" size="icon" className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={() => handleRemoveTrustee(index)}>
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
                       </div>
@@ -1236,16 +1249,17 @@ export default function MinutesTemplateFormPage() {
               {/* Template-specific fields */}
               {templateType === 'distribution_to_beneficiaries' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Distribution Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Distribution Details</h2>
                   <div className="grid md:grid-cols-2 gap-4 mb-6">
                     <div>
-                      <Label className="label-trust">Total Distribution Amount</Label>
+                      <Label className="label-trust">Total Distribution Amount ($)</Label>
                       <Input
-                        type="number"
-                        value={distributionData.distribution_total}
-                        onChange={(e) => setDistributionData({ ...distributionData, distribution_total: e.target.value })}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatCurrency(distributionData.distribution_total)}
+                        onChange={(e) => setDistributionData({ ...distributionData, distribution_total: parseCurrencyInput(e.target.value) })}
                         className="mt-1 input-trust"
-                        placeholder="50000"
+                        placeholder="$50,000"
                       />
                     </div>
                     <div>
@@ -1260,7 +1274,7 @@ export default function MinutesTemplateFormPage() {
                     <div className="md:col-span-2">
                       <Label className="label-trust">Characterization</Label>
                       <Select value={distributionData.distribution_characterization} onValueChange={(v) => setDistributionData({ ...distributionData, distribution_characterization: v })}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 h-10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1279,10 +1293,16 @@ export default function MinutesTemplateFormPage() {
                       Add Beneficiary
                     </Button>
                   </div>
+                  <div className="flex gap-2 mb-1 px-1">
+                    <span className="flex-1 min-w-0 label-trust">Name</span>
+                    <span className="w-40 label-trust">Amount</span>
+                    <span className="w-20 label-trust">%</span>
+                    <span className="w-10" />
+                  </div>
                   <div className="space-y-3">
                     {distributionData.distribution_items.map((item, index) => (
-                      <div key={index} className="flex gap-2 items-end">
-                        <div className="flex-1">
+                      <div key={index} className="flex gap-2 items-center">
+                        <div className="flex-1 min-w-0">
                           <Input
                             value={item.beneficiary_name}
                             onChange={(e) => handleDistributionItemChange(index, 'beneficiary_name', e.target.value)}
@@ -1290,16 +1310,17 @@ export default function MinutesTemplateFormPage() {
                             className="input-trust"
                           />
                         </div>
-                        <div className="w-32">
+                        <div className="w-40">
                           <Input
-                            type="number"
-                            value={item.amount}
-                            onChange={(e) => handleDistributionItemChange(index, 'amount', e.target.value)}
-                            placeholder="Amount"
+                            type="text"
+                            inputMode="numeric"
+                            value={formatCurrency(item.amount)}
+                            onChange={(e) => handleDistributionItemChange(index, 'amount', parseCurrencyInput(e.target.value))}
+                            placeholder="$0"
                             className="input-trust"
                           />
                         </div>
-                        <div className="w-24">
+                        <div className="w-20">
                           <Input
                             type="number"
                             value={item.percentage}
@@ -1309,9 +1330,12 @@ export default function MinutesTemplateFormPage() {
                           />
                         </div>
                         {distributionData.distribution_items.length > 1 && (
-                          <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveDistributionItem(index)}>
-                            <Trash2 className="w-4 h-4 text-red-500" />
+                          <Button type="button" variant="ghost" size="icon" className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={() => handleRemoveDistributionItem(index)}>
+                            <Trash2 className="w-4 h-4" />
                           </Button>
+                        )}
+                        {distributionData.distribution_items.length <= 1 && (
+                          <span className="w-10" />
                         )}
                       </div>
                     ))}
@@ -1321,7 +1345,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'acceptance_of_property' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Property Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Property Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Grantor/Creator Name</Label>
@@ -1361,13 +1385,14 @@ export default function MinutesTemplateFormPage() {
                       />
                     </div>
                     <div>
-                      <Label className="label-trust">Approximate Value</Label>
+                      <Label className="label-trust">Approximate Value ($)</Label>
                       <Input
-                        type="number"
-                        value={propertyData.property_value}
-                        onChange={(e) => setPropertyData({ ...propertyData, property_value: e.target.value })}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatCurrency(propertyData.property_value)}
+                        onChange={(e) => setPropertyData({ ...propertyData, property_value: parseCurrencyInput(e.target.value) })}
                         className="mt-1 input-trust"
-                        placeholder="250000"
+                        placeholder="$250,000"
                       />
                     </div>
                     <div>
@@ -1376,7 +1401,7 @@ export default function MinutesTemplateFormPage() {
                         value={propertyData.conveyance_date}
                         onChange={(e) => setPropertyData({ ...propertyData, conveyance_date: e.target.value })}
                         className="mt-1 input-trust"
-                        placeholder="February 23, 2024"
+                        placeholder="e.g., February 23, 2024"
                       />
                     </div>
                     <div className="md:col-span-2 flex items-center gap-3 mt-2">
@@ -1393,7 +1418,7 @@ export default function MinutesTemplateFormPage() {
                       <div className="md:col-span-2">
                         <Label className="label-trust">Asset Category (for Schedule A)</Label>
                         <Select value={propertyData.schedule_a_category} onValueChange={(v) => setPropertyData({ ...propertyData, schedule_a_category: v })}>
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="mt-1 h-10">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1410,7 +1435,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'disposition_of_asset' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Asset Disposition Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Asset Disposition Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Select Asset from Schedule A</Label>
@@ -1430,7 +1455,7 @@ export default function MinutesTemplateFormPage() {
                             });
                           }}
                         >
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="mt-1 h-10">
                             <SelectValue placeholder="Select an asset to dispose" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1464,7 +1489,7 @@ export default function MinutesTemplateFormPage() {
                             value={dispositionData.disposition_reason} 
                             onValueChange={(v) => setDispositionData({ ...dispositionData, disposition_reason: v })}
                           >
-                            <SelectTrigger className="mt-1">
+                            <SelectTrigger className="mt-1 h-10">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1483,20 +1508,21 @@ export default function MinutesTemplateFormPage() {
                             value={dispositionData.disposition_date}
                             onChange={(e) => setDispositionData({ ...dispositionData, disposition_date: e.target.value })}
                             className="mt-1 input-trust"
-                            placeholder="February 23, 2024"
+                            placeholder="e.g., February 23, 2024"
                           />
                         </div>
                         
                         <div>
                           <Label className="label-trust">
-                            {dispositionData.disposition_reason === 'sale' ? 'Sale Price' : 'Fair Market Value'}
+                            {dispositionData.disposition_reason === 'sale' ? 'Sale Price ($)' : 'Fair Market Value ($)'}
                           </Label>
                           <Input
-                            type="number"
-                            value={dispositionData.disposition_value}
-                            onChange={(e) => setDispositionData({ ...dispositionData, disposition_value: e.target.value })}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatCurrency(dispositionData.disposition_value)}
+                            onChange={(e) => setDispositionData({ ...dispositionData, disposition_value: parseCurrencyInput(e.target.value) })}
                             className="mt-1 input-trust"
-                            placeholder="25000"
+                            placeholder="$25,000"
                           />
                         </div>
                         
@@ -1541,7 +1567,7 @@ export default function MinutesTemplateFormPage() {
 
               {(templateType === 'appointment_additional_trustee' || templateType === 'appointment_successor_trustee') && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">
                     {templateType === 'appointment_successor_trustee' ? 'Successor Trustee Details' : 'New Trustee Details'}
                   </h2>
                   <div className="grid md:grid-cols-2 gap-4">
@@ -1557,7 +1583,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Gender (for document language)</Label>
                       <Select value={trusteeData.new_trustee_gender} onValueChange={(v) => setTrusteeData({ ...trusteeData, new_trustee_gender: v })}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 h-10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1581,7 +1607,7 @@ export default function MinutesTemplateFormPage() {
                         <div>
                           <Label className="label-trust">Reason for Departure</Label>
                           <Select value={trusteeData.departing_reason} onValueChange={(v) => setTrusteeData({ ...trusteeData, departing_reason: v })}>
-                            <SelectTrigger className="mt-1">
+                            <SelectTrigger className="mt-1 h-10">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1601,13 +1627,13 @@ export default function MinutesTemplateFormPage() {
                         value={trusteeData.effective_date}
                         onChange={(e) => setTrusteeData({ ...trusteeData, effective_date: e.target.value })}
                         className="mt-1 input-trust"
-                        placeholder="February 23, 2024"
+                        placeholder="e.g., February 23, 2024"
                       />
                     </div>
                     <div>
                       <Label className="label-trust">Signature Requirement</Label>
                       <Select value={trusteeData.signature_requirement} onValueChange={(v) => setTrusteeData({ ...trusteeData, signature_requirement: v })}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 h-10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1621,13 +1647,14 @@ export default function MinutesTemplateFormPage() {
                     
                     {(trusteeData.signature_requirement === 'threshold' || trusteeData.signature_requirement === 'all_trustees') && (
                       <div>
-                        <Label className="label-trust">Signature Threshold Amount</Label>
+                        <Label className="label-trust">Signature Threshold Amount ($)</Label>
                         <Input
-                          type="number"
-                          value={trusteeData.signature_threshold}
-                          onChange={(e) => setTrusteeData({ ...trusteeData, signature_threshold: e.target.value })}
+                          type="text"
+                          inputMode="numeric"
+                          value={formatCurrency(trusteeData.signature_threshold)}
+                          onChange={(e) => setTrusteeData({ ...trusteeData, signature_threshold: parseCurrencyInput(e.target.value) })}
                           className="mt-1 input-trust"
-                          placeholder="10000"
+                          placeholder="$10,000"
                         />
                       </div>
                     )}
@@ -1648,12 +1675,12 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'designation_of_beneficiaries' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Beneficiary Designation</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Beneficiary Designation</h2>
                   <div className="grid md:grid-cols-2 gap-4 mb-6">
                     <div>
                       <Label className="label-trust">Designation Type</Label>
                       <Select value={beneficiaryData.designation_type} onValueChange={(v) => setBeneficiaryData({ ...beneficiaryData, designation_type: v })}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 h-10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1756,7 +1783,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'bank_account_authorization' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Bank Account Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Bank Account Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Bank/Institution Name</Label>
@@ -1770,7 +1797,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Account Type</Label>
                       <Select value={bankData.account_type} onValueChange={(v) => setBankData({ ...bankData, account_type: v })}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 h-10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1793,7 +1820,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Signature Requirement</Label>
                       <Select value={bankData.signature_requirement} onValueChange={(v) => setBankData({ ...bankData, signature_requirement: v })}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 h-10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1805,24 +1832,26 @@ export default function MinutesTemplateFormPage() {
                     </div>
                     {bankData.signature_requirement === 'threshold' && (
                       <div>
-                        <Label className="label-trust">Signature Threshold</Label>
+                        <Label className="label-trust">Signature Threshold ($)</Label>
                         <Input
-                          type="number"
-                          value={bankData.signature_threshold}
-                          onChange={(e) => setBankData({ ...bankData, signature_threshold: e.target.value })}
+                          type="text"
+                          inputMode="numeric"
+                          value={formatCurrency(bankData.signature_threshold)}
+                          onChange={(e) => setBankData({ ...bankData, signature_threshold: parseCurrencyInput(e.target.value) })}
                           className="mt-1 input-trust"
-                          placeholder="10000"
+                          placeholder="$10,000"
                         />
                       </div>
                     )}
                     <div>
-                      <Label className="label-trust">Initial Deposit (optional)</Label>
+                      <Label className="label-trust">Initial Deposit ($)</Label>
                       <Input
-                        type="number"
-                        value={bankData.initial_deposit}
-                        onChange={(e) => setBankData({ ...bankData, initial_deposit: e.target.value })}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatCurrency(bankData.initial_deposit)}
+                        onChange={(e) => setBankData({ ...bankData, initial_deposit: parseCurrencyInput(e.target.value) })}
                         className="mt-1 input-trust"
-                        placeholder="0.00"
+                        placeholder="$0"
                       />
                     </div>
                   </div>
@@ -1870,7 +1899,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'change_of_situs' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Change of Situs Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Change of Situs Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Current Situs (State/Jurisdiction)</Label>
@@ -1944,7 +1973,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'benevolence_approval' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Benevolence Grant Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Benevolence Grant Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Beneficiary Name *</Label>
@@ -1958,7 +1987,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Beneficiary Type</Label>
                       <Select value={benevolenceData.beneficiary_type} onValueChange={(v) => setBenevolenceData({ ...benevolenceData, beneficiary_type: v })}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 h-10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1971,7 +2000,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Purpose Category</Label>
                       <Select value={benevolenceData.benevolence_purpose} onValueChange={(v) => setBenevolenceData({ ...benevolenceData, benevolence_purpose: v })}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 h-10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1998,13 +2027,14 @@ export default function MinutesTemplateFormPage() {
                       />
                     </div>
                     <div>
-                      <Label className="label-trust">Grant Amount *</Label>
+                      <Label className="label-trust">Grant Amount ($) *</Label>
                       <Input
-                        type="number"
-                        value={benevolenceData.amount}
-                        onChange={(e) => setBenevolenceData({ ...benevolenceData, amount: e.target.value })}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatCurrency(benevolenceData.amount)}
+                        onChange={(e) => setBenevolenceData({ ...benevolenceData, amount: parseCurrencyInput(e.target.value) })}
                         className="mt-1 input-trust"
-                        placeholder="500.00"
+                        placeholder="$500"
                       />
                     </div>
                     <div>
@@ -2033,12 +2063,12 @@ export default function MinutesTemplateFormPage() {
               {/* INVESTMENT POLICY TEMPLATE */}
               {templateType === 'investment_policy' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Investment Policy Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Investment Policy Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Policy Action</Label>
                       <Select value={investmentPolicyData.policy_type} onValueChange={(v) => setInvestmentPolicyData({ ...investmentPolicyData, policy_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="adopt">Adopt New Policy</SelectItem>
                           <SelectItem value="amend">Amend Existing Policy</SelectItem>
@@ -2049,7 +2079,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Risk Tolerance</Label>
                       <Select value={investmentPolicyData.risk_tolerance} onValueChange={(v) => setInvestmentPolicyData({ ...investmentPolicyData, risk_tolerance: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="conservative">Conservative</SelectItem>
                           <SelectItem value="moderate">Moderate</SelectItem>
@@ -2061,7 +2091,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Review Frequency</Label>
                       <Select value={investmentPolicyData.review_frequency} onValueChange={(v) => setInvestmentPolicyData({ ...investmentPolicyData, review_frequency: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="quarterly">Quarterly</SelectItem>
                           <SelectItem value="semi-annually">Semi-Annually</SelectItem>
@@ -2076,12 +2106,12 @@ export default function MinutesTemplateFormPage() {
               {/* LOAN AUTHORIZATION TEMPLATE */}
               {templateType === 'loan_authorization' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Loan Authorization Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Loan Authorization Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Loan Direction</Label>
                       <Select value={loanAuthData.loan_direction} onValueChange={(v) => setLoanAuthData({ ...loanAuthData, loan_direction: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="making">Trust Making Loan</SelectItem>
                           <SelectItem value="receiving">Trust Receiving Loan</SelectItem>
@@ -2099,7 +2129,7 @@ export default function MinutesTemplateFormPage() {
                     </div>
                     <div>
                       <Label className="label-trust">Loan Amount ($)</Label>
-                      <Input type="number" value={loanAuthData.loan_amount} onChange={(e) => setLoanAuthData({ ...loanAuthData, loan_amount: e.target.value })} className="mt-1 input-trust" placeholder="50000" />
+                      <Input type="text" inputMode="numeric" value={formatCurrency(loanAuthData.loan_amount)} onChange={(e) => setLoanAuthData({ ...loanAuthData, loan_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$50,000" />
                     </div>
                     <div>
                       <Label className="label-trust">Interest Rate</Label>
@@ -2124,12 +2154,12 @@ export default function MinutesTemplateFormPage() {
               {/* INSURANCE AUTHORIZATION TEMPLATE */}
               {templateType === 'insurance_authorization' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Insurance Authorization Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Insurance Authorization Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Insurance Type</Label>
                       <Select value={insuranceData.insurance_type} onValueChange={(v) => setInsuranceData({ ...insuranceData, insurance_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="property">Property & Casualty</SelectItem>
                           <SelectItem value="liability">Liability</SelectItem>
@@ -2143,7 +2173,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Action</Label>
                       <Select value={insuranceData.policy_action} onValueChange={(v) => setInsuranceData({ ...insuranceData, policy_action: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="obtain">Obtain New Policy</SelectItem>
                           <SelectItem value="renew">Renew Existing</SelectItem>
@@ -2158,11 +2188,11 @@ export default function MinutesTemplateFormPage() {
                     </div>
                     <div>
                       <Label className="label-trust">Coverage Amount ($)</Label>
-                      <Input type="number" value={insuranceData.coverage_amount} onChange={(e) => setInsuranceData({ ...insuranceData, coverage_amount: e.target.value })} className="mt-1 input-trust" placeholder="1000000" />
+                      <Input type="text" inputMode="numeric" value={formatCurrency(insuranceData.coverage_amount)} onChange={(e) => setInsuranceData({ ...insuranceData, coverage_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$1,000,000" />
                     </div>
                     <div>
                       <Label className="label-trust">Annual Premium ($)</Label>
-                      <Input type="number" value={insuranceData.premium_amount} onChange={(e) => setInsuranceData({ ...insuranceData, premium_amount: e.target.value })} className="mt-1 input-trust" placeholder="5000" />
+                      <Input type="text" inputMode="numeric" value={formatCurrency(insuranceData.premium_amount)} onChange={(e) => setInsuranceData({ ...insuranceData, premium_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$5,000" />
                     </div>
                     <div>
                       <Label className="label-trust">Policy Number (if existing)</Label>
@@ -2179,7 +2209,7 @@ export default function MinutesTemplateFormPage() {
               {/* ANNUAL REVIEW TEMPLATE */}
               {templateType === 'annual_review' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Annual Review Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Annual Review Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Fiscal Year</Label>
@@ -2190,20 +2220,20 @@ export default function MinutesTemplateFormPage() {
                       <Input value={annualReviewData.investment_return} onChange={(e) => setAnnualReviewData({ ...annualReviewData, investment_return: e.target.value })} className="mt-1 input-trust" placeholder="7.5%" />
                     </div>
                     <div>
-                      <Label className="label-trust">Total Assets (Year End)</Label>
-                      <Input type="number" value={annualReviewData.total_assets} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_assets: e.target.value })} className="mt-1 input-trust" placeholder="1000000" />
+                      <Label className="label-trust">Total Assets (Year End) ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(annualReviewData.total_assets)} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_assets: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$1,000,000" />
                     </div>
                     <div>
-                      <Label className="label-trust">Total Income</Label>
-                      <Input type="number" value={annualReviewData.total_income} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_income: e.target.value })} className="mt-1 input-trust" placeholder="50000" />
+                      <Label className="label-trust">Total Income ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(annualReviewData.total_income)} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_income: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$50,000" />
                     </div>
                     <div>
-                      <Label className="label-trust">Total Expenses</Label>
-                      <Input type="number" value={annualReviewData.total_expenses} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_expenses: e.target.value })} className="mt-1 input-trust" placeholder="10000" />
+                      <Label className="label-trust">Total Expenses ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(annualReviewData.total_expenses)} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_expenses: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$10,000" />
                     </div>
                     <div>
-                      <Label className="label-trust">Total Distributions</Label>
-                      <Input type="number" value={annualReviewData.total_distributions} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_distributions: e.target.value })} className="mt-1 input-trust" placeholder="30000" />
+                      <Label className="label-trust">Total Distributions ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(annualReviewData.total_distributions)} onChange={(e) => setAnnualReviewData({ ...annualReviewData, total_distributions: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$30,000" />
                     </div>
                   </div>
                 </div>
@@ -2212,12 +2242,12 @@ export default function MinutesTemplateFormPage() {
               {/* QUARTERLY REVIEW TEMPLATE */}
               {templateType === 'quarterly_review' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Quarterly Review Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Quarterly Review Details</h2>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div>
                       <Label className="label-trust">Quarter</Label>
                       <Select value={quarterlyReviewData.quarter} onValueChange={(v) => setQuarterlyReviewData({ ...quarterlyReviewData, quarter: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
                           <SelectItem value="Q2">Q2 (Apr-Jun)</SelectItem>
@@ -2233,20 +2263,20 @@ export default function MinutesTemplateFormPage() {
                   </div>
                   <div className="grid md:grid-cols-2 gap-4 mt-4">
                     <div>
-                      <Label className="label-trust">Beginning Balance</Label>
-                      <Input type="number" value={quarterlyReviewData.beginning_balance} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, beginning_balance: e.target.value })} className="mt-1 input-trust" placeholder="500000" />
+                      <Label className="label-trust">Beginning Balance ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(quarterlyReviewData.beginning_balance)} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, beginning_balance: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$500,000" />
                     </div>
                     <div>
-                      <Label className="label-trust">Ending Balance</Label>
-                      <Input type="number" value={quarterlyReviewData.ending_balance} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, ending_balance: e.target.value })} className="mt-1 input-trust" placeholder="510000" />
+                      <Label className="label-trust">Ending Balance ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(quarterlyReviewData.ending_balance)} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, ending_balance: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$510,000" />
                     </div>
                     <div>
-                      <Label className="label-trust">Income Received</Label>
-                      <Input type="number" value={quarterlyReviewData.income_received} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, income_received: e.target.value })} className="mt-1 input-trust" placeholder="15000" />
+                      <Label className="label-trust">Income Received ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(quarterlyReviewData.income_received)} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, income_received: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$15,000" />
                     </div>
                     <div>
-                      <Label className="label-trust">Distributions Made</Label>
-                      <Input type="number" value={quarterlyReviewData.distributions_made} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, distributions_made: e.target.value })} className="mt-1 input-trust" placeholder="5000" />
+                      <Label className="label-trust">Distributions Made ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(quarterlyReviewData.distributions_made)} onChange={(e) => setQuarterlyReviewData({ ...quarterlyReviewData, distributions_made: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$5,000" />
                     </div>
                   </div>
                 </div>
@@ -2255,7 +2285,7 @@ export default function MinutesTemplateFormPage() {
               {/* TRUSTEE COMPENSATION TEMPLATE */}
               {templateType === 'trustee_compensation' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Trustee Compensation Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trustee Compensation Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2 flex items-center gap-3">
                       <Checkbox checked={trusteeCompData.all_trustees} onCheckedChange={(c) => setTrusteeCompData({ ...trusteeCompData, all_trustees: c })} id="all-trustees" />
@@ -2270,7 +2300,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Compensation Type</Label>
                       <Select value={trusteeCompData.compensation_type} onValueChange={(v) => setTrusteeCompData({ ...trusteeCompData, compensation_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="annual">Annual Fee</SelectItem>
                           <SelectItem value="hourly">Hourly Rate</SelectItem>
@@ -2280,8 +2310,8 @@ export default function MinutesTemplateFormPage() {
                       </Select>
                     </div>
                     <div>
-                      <Label className="label-trust">Amount</Label>
-                      <Input type="number" value={trusteeCompData.compensation_amount} onChange={(e) => setTrusteeCompData({ ...trusteeCompData, compensation_amount: e.target.value })} className="mt-1 input-trust" placeholder="5000" />
+                      <Label className="label-trust">Amount ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(trusteeCompData.compensation_amount)} onChange={(e) => setTrusteeCompData({ ...trusteeCompData, compensation_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$5,000" />
                     </div>
                     <div>
                       <Label className="label-trust">Effective Date</Label>
@@ -2298,7 +2328,7 @@ export default function MinutesTemplateFormPage() {
               {/* TRUSTEE RESIGNATION TEMPLATE */}
               {templateType === 'trustee_resignation' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Trustee Departure Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trustee Departure Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Departing Trustee Name</Label>
@@ -2307,7 +2337,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Departure Type</Label>
                       <Select value={trusteeResignData.departure_type} onValueChange={(v) => setTrusteeResignData({ ...trusteeResignData, departure_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="resignation">Resignation</SelectItem>
                           <SelectItem value="removal">Removal</SelectItem>
@@ -2341,7 +2371,7 @@ export default function MinutesTemplateFormPage() {
               {/* BENEFICIARY REQUEST DENIAL TEMPLATE */}
               {templateType === 'beneficiary_request_denial' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Request Denial Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Request Denial Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Beneficiary Name</Label>
@@ -2350,7 +2380,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Request Type</Label>
                       <Select value={denialData.request_type} onValueChange={(v) => setDenialData({ ...denialData, request_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="distribution">Distribution Request</SelectItem>
                           <SelectItem value="loan">Loan Request</SelectItem>
@@ -2361,7 +2391,7 @@ export default function MinutesTemplateFormPage() {
                     </div>
                     <div>
                       <Label className="label-trust">Request Amount ($)</Label>
-                      <Input type="number" value={denialData.request_amount} onChange={(e) => setDenialData({ ...denialData, request_amount: e.target.value })} className="mt-1 input-trust" placeholder="25000" />
+                      <Input type="text" inputMode="numeric" value={formatCurrency(denialData.request_amount)} onChange={(e) => setDenialData({ ...denialData, request_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$25,000" />
                     </div>
                     <div>
                       <Label className="label-trust">Request Date</Label>
@@ -2404,7 +2434,7 @@ export default function MinutesTemplateFormPage() {
               {/* HEMS DISTRIBUTION TEMPLATE */}
               {templateType === 'hems_distribution' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">HEMS Distribution Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">HEMS Distribution Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Beneficiary Name</Label>
@@ -2413,7 +2443,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">HEMS Category</Label>
                       <Select value={hemsData.hems_category} onValueChange={(v) => setHemsData({ ...hemsData, hems_category: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="health">Health (Medical)</SelectItem>
                           <SelectItem value="education">Education</SelectItem>
@@ -2424,7 +2454,7 @@ export default function MinutesTemplateFormPage() {
                     </div>
                     <div>
                       <Label className="label-trust">Distribution Amount ($)</Label>
-                      <Input type="number" value={hemsData.distribution_amount} onChange={(e) => setHemsData({ ...hemsData, distribution_amount: e.target.value })} className="mt-1 input-trust" placeholder="10000" />
+                      <Input type="text" inputMode="numeric" value={formatCurrency(hemsData.distribution_amount)} onChange={(e) => setHemsData({ ...hemsData, distribution_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$10,000" />
                     </div>
                     <div className="flex items-center gap-3">
                       <Checkbox checked={hemsData.recurring} onCheckedChange={(c) => setHemsData({ ...hemsData, recurring: c })} id="recurring-hems" />
@@ -2434,7 +2464,7 @@ export default function MinutesTemplateFormPage() {
                       <div>
                         <Label className="label-trust">Frequency</Label>
                         <Select value={hemsData.recurring_frequency} onValueChange={(v) => setHemsData({ ...hemsData, recurring_frequency: v })}>
-                          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="monthly">Monthly</SelectItem>
                             <SelectItem value="quarterly">Quarterly</SelectItem>
@@ -2455,7 +2485,7 @@ export default function MinutesTemplateFormPage() {
               {/* BENEFICIARY LOAN TEMPLATE */}
               {templateType === 'beneficiary_loan' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Beneficiary Loan Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Beneficiary Loan Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Beneficiary Name</Label>
@@ -2463,7 +2493,7 @@ export default function MinutesTemplateFormPage() {
                     </div>
                     <div>
                       <Label className="label-trust">Loan Amount ($)</Label>
-                      <Input type="number" value={beneficiaryLoanData.loan_amount} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, loan_amount: e.target.value })} className="mt-1 input-trust" placeholder="50000" />
+                      <Input type="text" inputMode="numeric" value={formatCurrency(beneficiaryLoanData.loan_amount)} onChange={(e) => setBeneficiaryLoanData({ ...beneficiaryLoanData, loan_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$50,000" />
                     </div>
                     <div>
                       <Label className="label-trust">Interest Rate</Label>
@@ -2476,7 +2506,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Repayment Terms</Label>
                       <Select value={beneficiaryLoanData.repayment_terms} onValueChange={(v) => setBeneficiaryLoanData({ ...beneficiaryLoanData, repayment_terms: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="monthly installments">Monthly Installments</SelectItem>
                           <SelectItem value="quarterly installments">Quarterly Installments</SelectItem>
@@ -2502,12 +2532,12 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'trust_amendment' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Trust Amendment Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trust Amendment Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Amendment Type</Label>
                       <Select value={amendmentData.amendment_type} onValueChange={(v) => setAmendmentData({ ...amendmentData, amendment_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="modification">Modification of Existing Provision</SelectItem>
                           <SelectItem value="addition">Addition of New Provision</SelectItem>
@@ -2542,7 +2572,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'power_of_attorney' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Power of Attorney Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Power of Attorney Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Agent Name *</Label>
@@ -2551,7 +2581,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Scope of Authority</Label>
                       <Select value={poaData.scope} onValueChange={(v) => setPoaData({ ...poaData, scope: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="limited">Limited (Specific Tasks)</SelectItem>
                           <SelectItem value="special">Special (Defined Transactions)</SelectItem>
@@ -2577,7 +2607,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'trust_termination' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Trust Termination Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trust Termination Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Termination Date *</Label>
@@ -2605,7 +2635,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'real_estate_purchase' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Real Estate Purchase Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Real Estate Purchase Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Property Address *</Label>
@@ -2614,7 +2644,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Property Type</Label>
                       <Select value={realEstatePurchaseData.property_type} onValueChange={(v) => setRealEstatePurchaseData({ ...realEstatePurchaseData, property_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="residential">Residential</SelectItem>
                           <SelectItem value="commercial">Commercial</SelectItem>
@@ -2631,7 +2661,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Financing Method</Label>
                       <Select value={realEstatePurchaseData.financing} onValueChange={(v) => setRealEstatePurchaseData({ ...realEstatePurchaseData, financing: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all cash">All Cash</SelectItem>
                           <SelectItem value="mortgage financing">Mortgage Financing</SelectItem>
@@ -2654,7 +2684,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'business_interest_acquisition' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Business Interest Acquisition Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Business Interest Acquisition Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Entity Name *</Label>
@@ -2663,7 +2693,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Entity Type</Label>
                       <Select value={businessInterestData.entity_type} onValueChange={(v) => setBusinessInterestData({ ...businessInterestData, entity_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="LLC">LLC</SelectItem>
                           <SelectItem value="Corporation">Corporation</SelectItem>
@@ -2695,7 +2725,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'real_estate_lease' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Real Estate Lease Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Real Estate Lease Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label className="label-trust">Property Address *</Label>
@@ -2727,12 +2757,12 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'fiscal_year_election' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Fiscal Year Election Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Fiscal Year Election Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Fiscal Year End *</Label>
                       <Select value={fiscalYearData.fiscal_year_end} onValueChange={(v) => setFiscalYearData({ ...fiscalYearData, fiscal_year_end: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="December 31">December 31 (Calendar Year)</SelectItem>
                           <SelectItem value="January 31">January 31</SelectItem>
@@ -2745,7 +2775,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Election Type</Label>
                       <Select value={fiscalYearData.election_type} onValueChange={(v) => setFiscalYearData({ ...fiscalYearData, election_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="initial">Initial Election</SelectItem>
                           <SelectItem value="change">Change from Prior Year</SelectItem>
@@ -2766,7 +2796,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'tax_filing_authorization' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Tax Filing Authorization Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Tax Filing Authorization Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Tax Year *</Label>
@@ -2794,7 +2824,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'emergency_ratification' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Emergency Action Ratification Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Emergency Action Ratification Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Date of Emergency *</Label>
@@ -2826,7 +2856,7 @@ export default function MinutesTemplateFormPage() {
 
               {templateType === 'conflict_of_interest' && (
                 <div className="card-trust corner-mark p-6">
-                  <h2 className="font-serif text-xl text-navy mb-4">Conflict of Interest Disclosure Details</h2>
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Conflict of Interest Disclosure Details</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Trustee with Conflict *</Label>
@@ -2835,7 +2865,7 @@ export default function MinutesTemplateFormPage() {
                     <div>
                       <Label className="label-trust">Type of Conflict</Label>
                       <Select value={conflictData.conflict_type} onValueChange={(v) => setConflictData({ ...conflictData, conflict_type: v })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="financial_interest">Financial Interest</SelectItem>
                           <SelectItem value="family_relationship">Family Relationship</SelectItem>
@@ -2874,7 +2904,7 @@ export default function MinutesTemplateFormPage() {
               {templateType === 'initial_trustee_meeting' && (
                 <div className="space-y-6">
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4">Initial Meeting Details</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Initial Meeting Details</h2>
                     <p className="text-sm text-muted-foreground mb-6">
                       This is your trust's first organizational meeting. It covers one-time actions — accepting trusteeship, opening bank accounts, confirming your EIN, and establishing the trust's foundation.
                     </p>
@@ -2928,7 +2958,7 @@ export default function MinutesTemplateFormPage() {
                   </div>
 
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4">Fiscal Year</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Fiscal Year</h2>
                     <div>
                       <Label className="label-trust">Fiscal Year End</Label>
                       <select
@@ -2946,7 +2976,7 @@ export default function MinutesTemplateFormPage() {
                   </div>
 
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4">Trustee Compensation</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Trustee Compensation</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label className="label-trust">Compensation Type</Label>
@@ -2977,7 +3007,7 @@ export default function MinutesTemplateFormPage() {
                   </div>
 
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4">Include Resolutions</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/10">Include Resolutions</h2>
                     <p className="text-sm text-muted-foreground mb-4">
                       Select which resolutions to include. All are recommended for a new trust's first meeting.
                     </p>
