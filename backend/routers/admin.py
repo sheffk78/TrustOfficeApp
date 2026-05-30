@@ -16,7 +16,7 @@ FEATURES:
 - Grant/revoke access
 - View system stats
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List
 import re
 import os
@@ -1031,7 +1031,6 @@ async def create_admin_user(
 @router.post("/create-user")
 async def create_user(
     request: CreateUserRequest,
-    background_tasks: BackgroundTasks,
     admin: dict = Depends(require_admin)
 ):
     """
@@ -1114,22 +1113,31 @@ async def create_user(
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
     set_password_url = f"{frontend_url}/reset-password?token={set_password_token}"
     
-    # Send welcome + set-password email in background
-    background_tasks.add_task(
-        email_service.send_welcome_set_password_email,
+    # Send welcome + set-password email (awaited so we can report status)
+    email_result = await email_service.send_welcome_set_password_email(
         to_email=email,
         user_name=name,
         set_password_url=set_password_url
     )
     
-    logger.info(f"Admin {admin['email']} created new user {email} (via admin create-user)")
+    email_status = email_result.get("status", "unknown")
+    email_message = "Welcome email sent with set-password link."
+    if email_status == "failed":
+        email_message = f"User created, but welcome email failed: {email_result.get('error', 'unknown error')}"
+        logger.error(f"Welcome email failed for {email}: {email_result.get('error')}")
+    elif email_status == "skipped":
+        email_message = "User created, but email service is not configured. Set-password link generated but not emailed."
+        logger.warning(f"Email service not configured — welcome email skipped for {email}")
+    
+    logger.info(f"Admin {admin['email']} created new user {email} (via admin create-user) — email: {email_status}")
     
     return {
-        "message": f"User {email} created. Welcome email sent with set-password link.",
+        "message": f"User {email} created. {email_message}",
         "user_id": user_id,
         "email": email,
         "name": name,
-        "set_password_expires": expires_at.isoformat()
+        "set_password_expires": expires_at.isoformat(),
+        "email_status": email_status
     }
 
 
