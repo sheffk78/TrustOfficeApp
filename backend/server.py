@@ -78,6 +78,7 @@ from routers.communications import router as communications_router
 from routers.vault import router as vault_router
 from routers.risk_dashboard import router as risk_dashboard_router
 from routers.binder import router as binder_router
+from routers.external import router as external_router
 
 # Import security middleware
 from security import (
@@ -133,6 +134,10 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/subscription/upgrade",
     "/api/stripe/webhook",
     "/api/categories",
+    # External partner API (auth via API key, not user session)
+    "/api/external/provision-trustoffice",
+    "/api/external/provision-trustoffice/resend",
+    "/api/external/provision-trustoffice/status",
 }
 
 # HTTP methods that modify data (write operations)
@@ -179,8 +184,8 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         if "/vault/upload" in path:
             return await call_next(request)
         
-        # Skip subscription check for fully exempt paths
-        if path in SUBSCRIPTION_EXEMPT_PATHS or not path.startswith("/api/"):
+        # Skip subscription check for fully exempt paths or external API (auth via API key)
+        if path in SUBSCRIPTION_EXEMPT_PATHS or path.startswith("/api/external/") or not path.startswith("/api/"):
             return await call_next(request)
         
         # Skip for OPTIONS requests (CORS preflight)
@@ -308,6 +313,7 @@ app.include_router(communications_router, prefix="/api")
 app.include_router(vault_router, prefix="/api")
 app.include_router(risk_dashboard_router, prefix="/api")
 app.include_router(binder_router, prefix="/api")
+app.include_router(external_router, prefix="/api")
 
 
 # ==================== HEALTH CHECK ====================
