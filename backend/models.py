@@ -145,6 +145,8 @@ class UserCreate(BaseModel):
     password: str
     name: str
     referral_code: Optional[str] = None  # Optional referral code from friend
+    wp_ref: Optional[str] = None  # WingPoint reference ID for attribution
+    wp_trust_name: Optional[str] = None  # WingPoint trust name (pre-fill)
 
 class UserLogin(BaseModel):
     email: EmailStr

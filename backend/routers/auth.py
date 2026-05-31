@@ -96,7 +96,9 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
         "name": name,
         "password_hash": hash_password(user.password),
         "picture": None,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "wp_ref": user.wp_ref or None,
+        "wp_trust_name": user.wp_trust_name or None,
     }
     
     await db.users.insert_one(user_doc)
@@ -149,7 +151,7 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
 
 
 @router.post("/auth/login")
-async def login(user: UserLogin, response: Response):
+async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks):
     """Login with email/password"""
     # Validate email format
     if not validate_email_format(user.email):
@@ -192,6 +194,25 @@ async def login(user: UserLogin, response: Response):
         logger.info(f"Ensured admin status and subscription for {email}")
     
     token = create_jwt_token(user_doc["user_id"], user_doc["email"])
+    
+    # Track last login and check if this is the first login (for WingPoint webhook)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    previous_login = user_doc.get("last_login")
+    
+    # Update last_login timestamp
+    await db.users.update_one(
+        {"user_id": user_doc["user_id"]},
+        {"$set": {"last_login": now_iso}}
+    )
+    
+    # Fire first_login webhook for WingPoint-provisioned users (only on first login)
+    # A first login = no previous last_login timestamp
+    if not previous_login:
+        try:
+            from routers.external import fire_activation_webhook
+            background_tasks.add_task(fire_activation_webhook, user_doc["user_id"], "first_login")
+        except Exception:
+            pass  # Don't fail login if webhook fails
     
     response.set_cookie(
         key="session_token",
@@ -260,7 +281,7 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
 
 
 @router.post("/auth/reset-password")
-async def reset_password(request: PasswordResetConfirm):
+async def reset_password(request: PasswordResetConfirm, background_tasks: BackgroundTasks):
     """Reset password using token"""
     # Find valid reset token
     reset_record = await db.password_resets.find_one({"token": request.token}, {"_id": 0})
@@ -302,6 +323,13 @@ async def reset_password(request: PasswordResetConfirm):
         "created_at": datetime.now(timezone.utc).isoformat(),
         "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()  # Auto-cleanup after max token lifetime
     })
+    
+    # Fire activation webhook for WingPoint-provisioned users (fire-and-forget)
+    try:
+        from routers.external import fire_activation_webhook
+        background_tasks.add_task(fire_activation_webhook, reset_record["user_id"], "password_set")
+    except Exception:
+        pass  # Don't fail password reset if webhook fails
     
     return {"message": "Password has been reset successfully. Please log in with your new password."}
 

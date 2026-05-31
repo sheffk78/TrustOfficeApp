@@ -25,6 +25,8 @@ import secrets
 import uuid
 import hashlib
 import hmac
+import json
+import asyncio
 import logging
 import re
 
@@ -38,6 +40,8 @@ router = APIRouter(prefix="/external", tags=["external"])
 # ==================== AUTHENTICATION ====================
 
 EXTERNAL_API_KEY = os.environ.get("EXTERNAL_API_KEY", "")
+WINGPOINT_WEBHOOK_URL = os.environ.get("WINGPOINT_WEBHOOK_URL", "")
+WINGPOINT_WEBHOOK_SECRET = os.environ.get("WINGPOINT_WEBHOOK_SECRET", "")
 
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
@@ -651,3 +655,127 @@ async def provision_status(
         "last_login": last_login,
         "created_at": provision.get("created_at"),
     }
+
+
+# ==================== ACTIVATION WEBHOOKS ====================
+# Fired when a WingPoint-provisioned user sets their password or first logs in.
+# These notify WingPoint so they can auto-advance CRM lead status.
+
+async def fire_activation_webhook(user_id: str, event_type: str):
+    """
+    Fire an activation webhook to WingPoint if this user was provisioned via external API.
+    
+    event_type: "password_set" | "first_login"
+    
+    Looks up the external_provisions record for this user_id, then POSTs
+    a signed payload to the partner's webhook_url (if configured).
+    """
+    import httpx
+    
+    # Find the provision record for this user
+    provision = await db.external_provisions.find_one(
+        {"user_id": user_id},
+        {"_id": 0, "request_payload": 0}
+    )
+    
+    if not provision:
+        # Not a WingPoint-provisioned user — skip silently
+        return
+    
+    # Get partner config to find the webhook URL and secret
+    partner_id = provision.get("partner_id", "wingpoint")
+    partner = await db.partner_api_keys.find_one(
+        {"partner_id": partner_id},
+        {"_id": 0}
+    )
+    
+    # Try partner config first, then fall back to env vars
+    webhook_url = (partner.get("webhook_url") if partner else None) or WINGPOINT_WEBHOOK_URL
+    webhook_secret = (partner.get("webhook_secret") if partner else None) or WINGPOINT_WEBHOOK_SECRET
+    
+    if not webhook_url:
+        # No webhook configured for this partner — skip silently
+        return
+    
+    # Build the webhook payload
+    now = datetime.now(timezone.utc)
+    payload = {
+        "event": event_type,
+        "user_id": user_id,
+        "email": provision.get("email"),
+        "trust_id": provision.get("trust_id"),
+        "trust_name": provision.get("trust_name"),
+        "wingpoint_ref": provision.get("wingpoint_ref"),
+        "timestamp": now.isoformat(),
+    }
+    
+    # Add event-specific fields
+    if event_type == "password_set":
+        payload["message"] = "User has set their password and can now log in."
+    elif event_type == "first_login":
+        payload["message"] = "User has logged in for the first time."
+        # Add last_login timestamp from user record
+        user = await db.users.find_one({"user_id": user_id}, {"last_login": 1})
+        if user and user.get("last_login"):
+            payload["last_login"] = user["last_login"]
+    
+    # Sign the payload with HMAC-SHA256
+    payload_json = json.dumps(payload, sort_keys=True)
+    if webhook_secret:
+        signature = hmac.new(
+            webhook_secret.encode(),
+            payload_json.encode(),
+            hashlib.sha256
+        ).hexdigest()
+    else:
+        signature = "unsigned"
+    
+    # Send the webhook with retry (fire-and-forget, non-blocking)
+    headers = {
+        "Content-Type": "application/json",
+        "X-Webhook-Signature": signature,
+        "X-Webhook-Event": event_type,
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for attempt in range(3):
+                try:
+                    resp = await client.post(
+                        webhook_url,
+                        content=payload_json,
+                        headers=headers,
+                    )
+                    logger.info(
+                        f"Webhook {event_type} delivered for user {user_id}: "
+                        f"HTTP {resp.status_code} (attempt {attempt + 1})"
+                    )
+                    # Record the delivery
+                    await db.external_api_audit.insert_one({
+                        "action": f"webhook_{event_type}",
+                        "partner_id": partner_id,
+                        "user_id": user_id,
+                        "wingpoint_ref": provision.get("wingpoint_ref"),
+                        "webhook_url": webhook_url,
+                        "response_status": resp.status_code,
+                        "timestamp": now.isoformat(),
+                    })
+                    return  # Success
+                except httpx.RequestError as e:
+                    logger.warning(
+                        f"Webhook {event_type} delivery failed (attempt {attempt + 1}): {e}"
+                    )
+                    if attempt < 2:
+                        await asyncio.sleep(1 * (attempt + 1))  # Backoff: 1s, 2s
+                    continue
+    except Exception as e:
+        logger.error(f"Webhook {event_type} delivery failed after retries for user {user_id}: {e}")
+        # Record the failure
+        await db.external_api_audit.insert_one({
+            "action": f"webhook_{event_type}_failed",
+            "partner_id": partner_id,
+            "user_id": user_id,
+            "wingpoint_ref": provision.get("wingpoint_ref"),
+            "error": str(e),
+            "timestamp": now.isoformat(),
+        })

@@ -55,21 +55,56 @@ export default function SignUpPage() {
   const [referralCode, setReferralCode] = useState('');
   const [referralInfo, setReferralInfo] = useState(null);
   
-  // Coupon code from URL params (e.g., /signup?coupon=TRUST49)
+  // Coupon code from URL params (e.g., /signup?coupon=WINGPOINT3M)
   const [couponCode, setCouponCode] = useState('');
   const [couponInfo, setCouponInfo] = useState(null);
   
-  // Check for referral code and coupon on mount
+  // WingPoint partnership params (e.g., /signup?ref=wp&wp_ref=WP-123&trust_name=Smith+Family+Trust&coupon=WINGPOINT3M)
+  const [isWingPoint, setIsWingPoint] = useState(false);
+  const [wingPointTrustName, setWingPointTrustName] = useState('');
+  const [wingPointRef, setWingPointRef] = useState('');
+  
+  // Check for referral code, coupon, and WingPoint params on mount
   useEffect(() => {
     const refCode = searchParams.get('ref');
-    if (refCode) {
+    
+    // WingPoint partnership flow
+    if (refCode && refCode.toLowerCase() === 'wp') {
+      setIsWingPoint(true);
+      const trustName = searchParams.get('trust_name') || '';
+      const wpRef = searchParams.get('wp_ref') || '';
+      const coupon = searchParams.get('coupon') || 'WINGPOINT3M';
+      
+      setWingPointTrustName(decodeURIComponent(trustName));
+      setWingPointRef(wpRef);
+      
+      // Auto-apply WingPoint coupon
+      const couponUpper = coupon.toUpperCase();
+      setCouponCode(couponUpper);
+      if (couponUpper === 'WINGPOINT3M') {
+        setCouponInfo({
+          code: 'WINGPOINT3M',
+          description: '50% off for your first 3 months',
+          regularPrice: '$79/month',
+          savings: 'Save $39.50/month for 3 months'
+        });
+      }
+      
+      // Store WingPoint ref for the backend
+      if (wpRef) {
+        sessionStorage.setItem('wp_ref', wpRef);
+      }
+      if (trustName) {
+        sessionStorage.setItem('wp_trust_name', decodeURIComponent(trustName));
+      }
+    } else if (refCode) {
       setReferralCode(refCode.toUpperCase());
       validateReferralCode(refCode);
     }
     
-    // Check for coupon parameter
+    // Check for coupon parameter (non-WingPoint flow)
     const coupon = searchParams.get('coupon');
-    if (coupon) {
+    if (coupon && !isWingPoint) {
       const couponUpper = coupon.toUpperCase();
       setCouponCode(couponUpper);
       
@@ -80,6 +115,13 @@ export default function SignUpPage() {
           description: '$49/month for your first 3 months',
           regularPrice: '$79/month',
           savings: '$30 off per month'
+        });
+      } else if (couponUpper === 'WINGPOINT3M') {
+        setCouponInfo({
+          code: 'WINGPOINT3M',
+          description: '50% off for your first 3 months',
+          regularPrice: '$79/month',
+          savings: 'Save $39.50/month for 3 months'
         });
       }
     }
@@ -127,12 +169,16 @@ export default function SignUpPage() {
     setLoading(true);
     
     try {
-      // Step 1: Register using XMLHttpRequest (include referral code if present)
+      // Step 1: Register using XMLHttpRequest (include referral code, WingPoint ref, and trust name if present)
+      const wpRef = sessionStorage.getItem('wp_ref') || null;
+      const wpTrustName = sessionStorage.getItem('wp_trust_name') || null;
       await xhrPost(`${API_URL}/api/auth/register`, {
         email: trimmedEmail,
         password: password,
         name: trimmedName,
-        referral_code: referralCode || null
+        referral_code: referralCode || null,
+        wp_ref: wpRef,
+        wp_trust_name: wpTrustName
       });
       
       // Step 2: Login using XMLHttpRequest
@@ -204,7 +250,7 @@ export default function SignUpPage() {
           {/* Sign up card with corner marks */}
           <div className="card-trust corner-mark relative">
             {/* Coupon banner */}
-            {couponInfo && !referralInfo && (
+            {couponInfo && !isWingPoint && !referralInfo && (
               <div className="bg-gradient-to-r from-green-500/20 to-emerald-100 dark:from-green-500/30 dark:to-emerald-900/30 -mx-6 -mt-6 px-6 py-4 mb-6 border-b border-green-500/30">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xl">🎉</span>
@@ -215,6 +261,29 @@ export default function SignUpPage() {
                   {' '}(regularly {couponInfo.regularPrice}). 
                   <span className="text-navy dark:text-white"> Applied at checkout.</span>
                 </p>
+              </div>
+            )}
+            
+            {/* WingPoint partnership banner */}
+            {isWingPoint && (
+              <div className="bg-gradient-to-r from-navy/10 to-blue-50 dark:from-navy/30 dark:to-blue-900/30 -mx-6 -mt-6 px-6 py-5 mb-6 border-b border-navy/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl">🤝</span>
+                  <span className="font-medium text-navy dark:text-white">Welcome from WingPoint</span>
+                </div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Your trust governance workspace is ready. Create your account to start managing your trust.
+                </p>
+                {wingPointTrustName && (
+                  <p className="text-sm font-medium text-navy dark:text-white">
+                    Trust: {wingPointTrustName}
+                  </p>
+                )}
+                {couponInfo && (
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                    ✦ {couponInfo.description} — applied at checkout
+                  </p>
+                )}
               </div>
             )}
             
