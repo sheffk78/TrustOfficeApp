@@ -161,8 +161,16 @@ export default function SignUpPage() {
       return;
     }
 
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    if (!/[A-Za-z]/.test(password)) {
+      toast.error('Password must contain at least one letter');
+      return;
+    }
+    if (!/\d/.test(password)) {
+      toast.error('Password must contain at least one number');
       return;
     }
 

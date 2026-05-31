@@ -422,6 +422,14 @@ async def startup_event():
         # AI usage tracking indexes (for cost protection)
         await db.ai_usage_tracking.create_index([("user_id", 1), ("endpoint", 1), ("date", 1)], unique=True)
         await db.ai_usage_tracking.create_index("date")  # For monthly aggregation queries
+
+        # External API indexes (WingPoint integration)
+        await db.external_provisions.create_index("wingpoint_ref", unique=True)
+        await db.external_provisions.create_index("user_id")
+        await db.external_provisions.create_index("email")
+        await db.external_api_audit.create_index([("partner_id", 1), ("timestamp", 1)])
+        await db.external_api_audit.create_index("timestamp", expireAfterSeconds=7776000)  # 90 days TTL
+        await db.partner_api_keys.create_index("api_key")
         
         # AI suggestion cache indexes (1hr TTL)
         await db.ai_suggestion_cache.create_index([("user_id", 1), ("trust_id", 1)], unique=True)

@@ -61,7 +61,7 @@ async def verify_external_api_key(request: Request, authorization: str = Header(
 
     # Check against configured external API keys
     # In production, these come from the partner_api_keys collection
-    if EXTERNAL_API_KEY and key == EXTERNAL_API_KEY:
+    if EXTERNAL_API_KEY and hmac.compare_digest(key, EXTERNAL_API_KEY):
         return {
             "partner_id": "wingpoint",
             "partner_name": "WingPoint",
@@ -366,7 +366,20 @@ async def provision_trustoffice(
             "role_for_trust": request.role_for_trust,
             "use_wingpoint_trustee": request.use_wingpoint_trustee,
         }
-        await db.users.insert_one(user_doc)
+        try:
+            await db.users.insert_one(user_doc)
+        except Exception as e:
+            # Handle race condition: another request may have created this user
+            if "duplicate key" in str(e).lower() or "E11000" in str(e):
+                existing_user = await db.users.find_one({"email": email}, {"_id": 0})
+                if existing_user:
+                    user_id = existing_user["user_id"]
+                    is_new_user = False
+                    logger.info(f"Provision: Race condition resolved — user {user_id} ({email}) already exists")
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to create user due to concurrent request. Please retry.")
+            else:
+                raise
 
         # Create free subscription for new user
         await db.subscriptions.insert_one({
@@ -639,7 +652,8 @@ async def provision_status(
         raise HTTPException(status_code=404, detail="No provision found for this wingpoint_ref")
 
     # Check if user has set password and logged in
-    user = await db.users.find_one({"user_id": provision["user_id"]}, {"_id": 0, "password_hash": 0})
+    # Use inclusion projection so password_hash is actually returned
+    user = await db.users.find_one({"user_id": provision["user_id"]}, {"password_hash": 1, "last_login": 1})
     has_password = bool(user and user.get("password_hash"))
     last_login = user.get("last_login") if user else None
 

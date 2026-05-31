@@ -211,8 +211,8 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         try:
             from routers.external import fire_activation_webhook
             background_tasks.add_task(fire_activation_webhook, user_doc["user_id"], "first_login")
-        except Exception:
-            pass  # Don't fail login if webhook fails
+        except Exception as e:
+            logger.warning(f"Failed to queue first_login webhook for {user_doc['user_id']}: {e}")
     
     response.set_cookie(
         key="session_token",
@@ -328,8 +328,8 @@ async def reset_password(request: PasswordResetConfirm, background_tasks: Backgr
     try:
         from routers.external import fire_activation_webhook
         background_tasks.add_task(fire_activation_webhook, reset_record["user_id"], "password_set")
-    except Exception:
-        pass  # Don't fail password reset if webhook fails
+    except Exception as e:
+        logger.warning(f"Failed to queue password_set webhook for {reset_record['user_id']}: {e}")
     
     return {"message": "Password has been reset successfully. Please log in with your new password."}
 
