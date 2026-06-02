@@ -60,13 +60,16 @@ async def verify_external_api_key(request: Request, authorization: str = Header(
     key = authorization.split("Bearer ", 1)[1].strip()
 
     # Check against configured external API keys
+    # Accept both the main EXTERNAL_API_KEY and the dedicated TRUSTOFFICE_EXTERNAL_API_KEY
     # In production, these come from the partner_api_keys collection
-    if EXTERNAL_API_KEY and hmac.compare_digest(key, EXTERNAL_API_KEY):
-        return {
-            "partner_id": "wingpoint",
-            "partner_name": "WingPoint",
-            "key_id": "env_default"
-        }
+    valid_keys = [k for k in [EXTERNAL_API_KEY, os.environ.get("TRUSTOFFICE_EXTERNAL_API_KEY", "")] if k]
+    for valid_key in valid_keys:
+        if hmac.compare_digest(key, valid_key):
+            return {
+                "partner_id": "wingpoint",
+                "partner_name": "WingPoint",
+                "key_id": "env_default"
+            }
 
     # Check MongoDB for partner keys
     partner = await db.partner_api_keys.find_one({
