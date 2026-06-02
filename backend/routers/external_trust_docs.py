@@ -26,9 +26,11 @@ TRUSTOFFICE_EXTERNAL_API_KEY = os.environ.get("TRUSTOFFICE_EXTERNAL_API_KEY", ""
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 
-async def verify_document_api_key(request: Request, authorization: str = Depends(api_key_header)) -> None:
+async def verify_document_api_key(request: Request) -> None:
     """Verify API key for document delivery. Uses TRUSTOFFICE_EXTERNAL_API_KEY or falls back to EXTERNAL_API_KEY."""
-    key = (authorization or "").replace("Bearer ", "").strip() if authorization else ""
+    # Read Authorization header directly from request (not via Depends — this is called manually)
+    authorization = request.headers.get("authorization", "")
+    key = authorization.replace("Bearer ", "").strip()
     
     if not key:
         raise HTTPException(status_code=401, detail="Missing Authorization header. Use: Bearer <api_key>")
