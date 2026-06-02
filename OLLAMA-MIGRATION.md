@@ -1,19 +1,20 @@
-# TrustOffice AI Backbone — Ollama Migration
+# TrustOffice AI Backbone — Provider Migration
 
-**Date:** April 30, 2026
-**Status:** Implemented — ready for local testing, needs staging verification
+**Date:** April 30, 2026 (initial), updated May 30, 2026
+**Status:** Production — OpenRouter (Gemini) primary, Claude fallback. Live and stable.
 
 ---
 
-## What Changed
+## What Changed (May 2026 Update)
 
-The AI backend for TrustOffice minutes drafting and governance suggestions has been migrated from Claude-only to **Ollama-first with Claude fallback**.
+The AI backend has been **migrated from Claude-only to OpenRouter (Gemini) primary with Claude fallback**.
 
-This means:
-- **Primary provider:** Ollama (local or Ollama Max cloud models)
-- ** fallback:** Claude (Anthropic API) — kicks in automatically if Ollama fails
-- **Customer experience:** Unchanged. No downtime, no quality degradation.
-- **Cost:** Drops from ~$80-100/mo Claude spend to ~$0 (Ollama models) plus incidental Claude fallback usage.
+- **Primary provider:** OpenRouter → Google Gemini 2.5 Flash (drafting) / Gemini 2.5 Pro (suggestions)
+- **Fallback provider:** Claude (Anthropic API) — kicks in automatically if OpenRouter fails
+- **Health status:** ✅ Both providers available and healthy (verified May 30, 2026)
+- **Quality:** Tested 5 minutes drafts — all pass quality checks (WHEREAS/RESOLVED format, proper length, legal structure, cautions)
+- **Customer complaints:** Zero AI-related complaints in support inbox (May 2026)
+- **Cost savings:** ~$82/mo estimated (previous $80-100/mo Claude → ~$8/mo OpenRouter + minimal Claude fallback)
 
 ---
 

@@ -103,189 +103,195 @@ async def receive_trust_documents(request: Request, payload: DeliverDocumentsReq
     
     Multi-trust: pass trust_id from provision response for accurate document placement.
     """
-    await verify_document_api_key(request)
+    # Auth check
+    try:
+        await verify_document_api_key(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auth verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
-    # 1. Find user by email
-    email_lower = payload.customer_email.lower()
-    user = await db.users.find_one({"email": email_lower}, {"_id": 0})
-    if not user:
-        raise HTTPException(status_code=404, detail=f"No TrustOffice user found for email: {payload.customer_email}")
+    # ─── Main handler with error reporting ─────────────────────────────────
+    try:
+        # 1. Find user by email
+        email_lower = payload.customer_email.lower()
+        user = await db.users.find_one({"email": email_lower}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=404, detail=f"No TrustOffice user found for email: {payload.customer_email}")
 
-    user_id = user["user_id"]
+        user_id = user["user_id"]
 
-    # 2. Find the trust — prefer explicit trust_id, then wingpoint_ref, then name match
-    trust = None
+        # 2. Find the trust — prefer explicit trust_id, then name match, then any trust
+        trust = None
 
-    if payload.trust_id:
-        # Explicit trust_id from provision response (best for multi-trust)
-        trust = await db.trusts.find_one({"trust_id": payload.trust_id, "user_id": user_id})
+        if payload.trust_id:
+            trust = await db.trusts.find_one({"trust_id": payload.trust_id, "user_id": user_id})
 
-    if not trust:
-        # Try wingpoint_ref
-        trust = await db.trusts.find_one({"user_id": user_id, "wingpoint_ref": payload.wingpoint_ref})
+        if not trust:
+            trust = await db.trusts.find_one(
+                {"user_id": user_id, "name": {"$regex": f"^{payload.trust_name}$", "$options": "i"}}
+            )
 
-    if not trust:
-        # Try name match
-        trust = await db.trusts.find_one(
-            {"user_id": user_id, "name": {"$regex": f"^{payload.trust_name}$", "$options": "i"}}
-        )
+        if not trust:
+            trust = await db.trusts.find_one({"user_id": user_id})
 
-    if not trust:
-        # Fallback: any trust for this user
-        trust = await db.trusts.find_one({"user_id": user_id})
+        if not trust:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No trust found for user {payload.customer_email}. User may not have completed TrustOffice onboarding yet."
+            )
 
-    if not trust:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No trust found for user {payload.customer_email}. User may not have completed TrustOffice onboarding yet."
-        )
+        trust_id = trust["trust_id"]
 
-    trust_id = trust["trust_id"]
+        # 3. Check for duplicates (idempotency by wingpoint_ref + doc type)
+        existing_docs = await db.vault_documents.find(
+            {"user_id": user_id, "trust_id": trust_id, "wingpoint_ref": payload.wingpoint_ref},
+            {"_id": 0, "doc_id": 1, "wingpoint_doc_type": 1}
+        ).to_list(100)
 
-    # 3. Check for duplicates (idempotency by wingpoint_ref + doc type)
-    existing_docs = await db.vault_documents.find(
-        {"user_id": user_id, "trust_id": trust_id, "wingpoint_ref": payload.wingpoint_ref},
-        {"_id": 0, "doc_id": 1, "wingpoint_doc_type": 1}
-    ).to_list(100)
+        existing_by_type = {d["wingpoint_doc_type"]: d["doc_id"] for d in existing_docs}
 
-    existing_by_type = {d["wingpoint_doc_type"]: d["doc_id"] for d in existing_docs}
+        # If all doc types already exist, return existing (idempotent)
+        incoming_types = {d.type for d in payload.documents}
+        if existing_by_type and incoming_types.issubset(existing_by_type.keys()):
+            stored_docs = []
+            for doc in payload.documents:
+                if doc.type in existing_by_type:
+                    stored_docs.append(DocumentStored(
+                        doc_id=existing_by_type[doc.type],
+                        type=doc.type,
+                        category=doc.category,
+                        title=doc.title,
+                        stored=True
+                    ))
+            return TrustDocumentsResponse(
+                status="delivered",
+                documents_stored=len(stored_docs),
+                documents=stored_docs,
+                ein_updated=bool(payload.ein and trust.get("ein") != payload.ein),
+                trust_name=trust.get("name", payload.trust_name)
+            )
 
-    # If all doc types already exist, return existing (idempotent)
-    incoming_types = {d.type for d in payload.documents}
-    if existing_by_type and incoming_types.issubset(existing_by_type.keys()):
+        # 4. Download and store each document
         stored_docs = []
-        for doc in payload.documents:
-            if doc.type in existing_by_type:
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            for doc in payload.documents:
+                if doc.type in existing_by_type:
+                    stored_docs.append(DocumentStored(
+                        doc_id=existing_by_type[doc.type],
+                        type=doc.type,
+                        category=doc.category,
+                        title=doc.title,
+                        stored=True
+                    ))
+                    continue
+
+                # Download the PDF from WingPoint
+                try:
+                    response = await http_client.get(str(doc.url))
+                    response.raise_for_status()
+                    file_content = response.content
+                except httpx.HTTPError as e:
+                    logger.warning(f"Failed to download {doc.url}: {e}")
+                    stored_docs.append(DocumentStored(
+                        doc_id="",
+                        type=doc.type,
+                        category=doc.category,
+                        title=doc.title,
+                        stored=False
+                    ))
+                    continue
+
+                # Validate size
+                if len(file_content) > MAX_FILE_SIZE:
+                    logger.warning(f"Document {doc.filename} exceeds {MAX_FILE_SIZE} bytes, skipping")
+                    stored_docs.append(DocumentStored(
+                        doc_id="",
+                        type=doc.type,
+                        category=doc.category,
+                        title=doc.title,
+                        stored=False
+                    ))
+                    continue
+
+                # Category label
+                category_label = DOC_CATEGORIES.get(doc.category, "Other")
+
+                # Create vault document record
+                now = datetime.now(timezone.utc).isoformat()
+                doc_id = f"doc_{uuid.uuid4().hex[:12]}"
+
+                record = {
+                    "doc_id": doc_id,
+                    "trust_id": trust_id,
+                    "user_id": user_id,
+                    "title": doc.title,
+                    "category": doc.category,
+                    "category_label": category_label,
+                    "date": now[:10],
+                    "description": f"Uploaded from WingPoint (ref: {payload.wingpoint_ref})",
+                    "storage_provider": "trustoffice",
+                    "storage_url": None,
+                    "storage_path": None,
+                    "file_name": doc.filename,
+                    "file_size": f"{len(file_content) / 1024:.1f} KB" if len(file_content) < 1024 * 1024 else f"{len(file_content) / (1024 * 1024):.1f} MB",
+                    "file_size_bytes": len(file_content),
+                    "file_content_type": "application/pdf",
+                    "file_content": file_content,
+                    "tags": ["wingpoint", "auto-generated"],
+                    "expiration_date": None,
+                    "needs_renewal": False,
+                    "created_at": now,
+                    "updated_at": now,
+                    "wingpoint_ref": payload.wingpoint_ref,
+                    "wingpoint_doc_type": doc.type,
+                    "source": "wingpoint",
+                }
+
+                await db.vault_documents.insert_one(record)
+
                 stored_docs.append(DocumentStored(
-                    doc_id=existing_by_type[doc.type],
+                    doc_id=doc_id,
                     type=doc.type,
                     category=doc.category,
                     title=doc.title,
                     stored=True
                 ))
+
+        # 5. Update EIN on trust record if provided
+        ein_updated = False
+        if payload.ein:
+            current_ein = trust.get("ein")
+            if current_ein != payload.ein:
+                await db.trusts.update_one(
+                    {"trust_id": trust_id, "user_id": user_id},
+                    {"$set": {"ein": payload.ein, "updated_at": datetime.now(timezone.utc).isoformat()}}
+                )
+                ein_updated = True
+
+        # 6. Trigger onboarding checklist update (non-blocking)
+        try:
+            await auto_update_onboarding(user_id, trust_id)
+        except Exception as e:
+            logger.warning(f"Onboarding update failed for user {user_id} / trust {trust_id}: {e}")
+
+        # 7. Return response
+        successfully_stored = sum(1 for d in stored_docs if d.stored)
+
         return TrustDocumentsResponse(
-            status="delivered",
-            documents_stored=len(stored_docs),
+            status="delivered" if successfully_stored > 0 else "partial_failure",
+            documents_stored=successfully_stored,
             documents=stored_docs,
-            ein_updated=bool(payload.ein and trust.get("ein") != payload.ein),
+            ein_updated=ein_updated,
             trust_name=trust.get("name", payload.trust_name)
         )
 
-    # 4. Download and store each document
-    stored_docs = []
-    async with httpx.AsyncClient(timeout=30.0) as http_client:
-        for doc in payload.documents:
-            # Skip if already stored for this wingpoint_ref + type
-            if doc.type in existing_by_type:
-                stored_docs.append(DocumentStored(
-                    doc_id=existing_by_type[doc.type],
-                    type=doc.type,
-                    category=doc.category,
-                    title=doc.title,
-                    stored=True
-                ))
-                continue
-
-            # Download the PDF from WingPoint
-            try:
-                response = await http_client.get(str(doc.url))
-                response.raise_for_status()
-                file_content = response.content
-            except httpx.HTTPError as e:
-                logger.warning(f"Failed to download {doc.url}: {e}")
-                stored_docs.append(DocumentStored(
-                    doc_id="",
-                    type=doc.type,
-                    category=doc.category,
-                    title=doc.title,
-                    stored=False
-                ))
-                continue
-
-            # Validate size
-            if len(file_content) > MAX_FILE_SIZE:
-                logger.warning(f"Document {doc.filename} exceeds {MAX_FILE_SIZE} bytes, skipping")
-                stored_docs.append(DocumentStored(
-                    doc_id="",
-                    type=doc.type,
-                    category=doc.category,
-                    title=doc.title,
-                    stored=False
-                ))
-                continue
-
-            # Category label
-            category_label = DOC_CATEGORIES.get(doc.category, "Other")
-
-            # Create vault document record (same structure as user uploads)
-            now = datetime.now(timezone.utc).isoformat()
-            doc_id = f"doc_{uuid.uuid4().hex[:12]}"
-
-            record = {
-                "doc_id": doc_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "title": doc.title,
-                "category": doc.category,
-                "category_label": category_label,
-                "date": now[:10],
-                "description": f"Uploaded from WingPoint (ref: {payload.wingpoint_ref})",
-                "storage_provider": "trustoffice",
-                "storage_url": None,
-                "storage_path": None,
-                "file_name": doc.filename,
-                "file_size": f"{len(file_content) / 1024:.1f} KB" if len(file_content) < 1024 * 1024 else f"{len(file_content) / (1024 * 1024):.1f} MB",
-                "file_size_bytes": len(file_content),
-                "file_content_type": "application/pdf",
-                "file_content": file_content,  # BSON binary — stored directly
-                "tags": ["wingpoint", "auto-generated"],
-                "expiration_date": None,
-                "needs_renewal": False,
-                "created_at": now,
-                "updated_at": now,
-                # WingPoint tracking fields
-                "wingpoint_ref": payload.wingpoint_ref,
-                "wingpoint_doc_type": doc.type,
-                "source": "wingpoint",
-            }
-
-            await db.vault_documents.insert_one(record)
-
-            stored_docs.append(DocumentStored(
-                doc_id=doc_id,
-                type=doc.type,
-                category=doc.category,
-                title=doc.title,
-                stored=True
-            ))
-
-    # 5. Update EIN on trust record if provided
-    ein_updated = False
-    if payload.ein:
-        current_ein = trust.get("ein")
-        if current_ein != payload.ein:
-            await db.trusts.update_one(
-                {"trust_id": trust_id, "user_id": user_id},
-                {"$set": {"ein": payload.ein, "updated_at": datetime.now(timezone.utc).isoformat()}}
-            )
-            ein_updated = True
-
-    # 6. Trigger onboarding checklist update (non-blocking)
-    try:
-        await auto_update_onboarding(user_id, trust_id)
-    except Exception:
-        logger.warning(f"Onboarding update failed for user {user_id} / trust {trust_id}")
-
-    # 7. Return response
-    successfully_stored = sum(1 for d in stored_docs if d.stored)
-
-    return TrustDocumentsResponse(
-        status="delivered" if successfully_stored > 0 else "partial_failure",
-        documents_stored=successfully_stored,
-        documents=stored_docs,
-        ein_updated=ein_updated,
-        trust_name=trust.get("name", payload.trust_name)
-    )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Document delivery failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Document delivery failed: {str(e)}")
 
 
 # ─── Health Check ─────────────────────────────────────────────────────────
