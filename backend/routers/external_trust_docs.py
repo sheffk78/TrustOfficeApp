@@ -1,68 +1,45 @@
-# External Provision + Trust Management API — WingPoint → TrustOffice
+# External Trust Documents API — WingPoint → TrustOffice Document Delivery
+# Provision endpoint is in routers/external.py (Emergent-built). This module handles
+# document delivery and health check only.
 
 import os
 import uuid
-import hashlib
-import hmac
 import httpx
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, field_validator, EmailStr
 
-import logging
-
 from database import db
-from dependencies import create_initial_governance_tasks
+from dependencies import auto_update_onboarding
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["external"])
 
 # ─── Config ───────────────────────────────────────────────────────────────
-EXTERNAL_API_KEY = os.environ.get("TRUSTOFFICE_EXTERNAL_API_KEY", "")
-TRUST_TYPE_MAP = {
-    "IRREVOCABLE_TRUST": "irrevocable",
-    "REVOCABLE_TRUST": "revocable",
-    "BUSINESS_TRUST": "business",
-    "FAMILY_TRUST": "family",
-    "CHARITABLE_TRUST": "charitable",
-    "ECCLESIASTICAL_TRUST": "ecclesiastical",
-}
+TRUSTOFFICE_EXTERNAL_API_KEY = os.environ.get("TRUSTOFFICE_EXTERNAL_API_KEY", "")
+
+# Use the same auth as the provision endpoint (EXTERNAL_API_KEY env var)
+api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 
-# ─── Auth ──────────────────────────────────────────────────────────────────
-def verify_external_api_key(request: Request) -> None:
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-    token = auth_header[len("Bearer "):]
-    if not EXTERNAL_API_KEY or token != EXTERNAL_API_KEY:
+async def verify_document_api_key(request: Request, authorization: str = Depends(api_key_header)) -> None:
+    """Verify API key for document delivery. Uses TRUSTOFFICE_EXTERNAL_API_KEY or falls back to EXTERNAL_API_KEY."""
+    key = (authorization or "").replace("Bearer ", "").strip() if authorization else ""
+    
+    if not key:
+        raise HTTPException(status_code=401, detail="Missing Authorization header. Use: Bearer <api_key>")
+    
+    # Accept either the dedicated doc key or the general external key
+    valid_keys = [k for k in [TRUSTOFFICE_EXTERNAL_API_KEY, os.environ.get("EXTERNAL_API_KEY", "")] if k]
+    if not valid_keys or key not in valid_keys:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
 # ─── Models ───────────────────────────────────────────────────────────────
-class ProvisionTrustOfficeRequest(BaseModel):
-    wingpoint_ref: str
-    customer_email: EmailStr
-    customer_first_name: str
-    customer_last_name: str
-    trust_name: str
-    trust_type: str = "IRREVOCABLE_TRUST"
-    formation_state: Optional[str] = None
-    trustee_first_name: Optional[str] = None
-    trustee_last_name: Optional[str] = None
-    idempotency_key: Optional[str] = None
-
-    @field_validator("trust_type")
-    @classmethod
-    def validate_trust_type(cls, v: str) -> str:
-        v = v.upper()
-        if v not in TRUST_TYPE_MAP and v not in TRUST_TYPE_MAP.values():
-            raise ValueError(f"Invalid trust type: {v}")
-        return v
-
-
 class TrustDocumentInput(BaseModel):
     type: str
     url: str
@@ -88,207 +65,6 @@ class DeliverDocumentsRequest(BaseModel):
     documents: List[TrustDocumentInput]
 
 
-class ProvisionResponse(BaseModel):
-    status: str
-    user_id: str
-    trust_id: str
-    email: str
-    trust_name: str
-    is_new_user: bool
-    is_new_trust: bool
-
-
-# ─── Provision Endpoint ────────────────────────────────────────────────────
-@router.post("/api/external/provision-trustoffice")
-async def provision_trustoffice(request: Request, payload: ProvisionTrustOfficeRequest):
-    """
-    Create or link a TrustOffice account + trust for a WingPoint customer.
-    
-    Handles three scenarios:
-    1. New user, first trust → create account + trust
-    2. Existing user, new trust → link to existing account, create new trust
-    3. Existing user, existing trust → return existing account + trust (idempotent)
-    """
-    verify_external_api_key(request)
-
-    # Idempotency: check by wingpoint_ref first
-    existing_provision = await db.wingpoint_provisions.find_one(
-        {"wingpoint_ref": payload.wingpoint_ref},
-        {"_id": 0}
-    )
-    if existing_provision:
-        # Already provisioned — return existing state
-        return ProvisionResponse(
-            status="already_provisioned",
-            user_id=existing_provision["user_id"],
-            trust_id=existing_provision["trust_id"],
-            email=existing_provision["email"],
-            trust_name=existing_provision["trust_name"],
-            is_new_user=False,
-            is_new_trust=False,
-        )
-
-    # Also check idempotency by email + idempotency_key if provided
-    if payload.idempotency_key:
-        idempotent = await db.wingpoint_provisions.find_one(
-            {"customer_email": payload.customer_email.lower(), "idempotency_key": payload.idempotency_key},
-            {"_id": 0}
-        )
-        if idempotent:
-            return ProvisionResponse(
-                status="already_provisioned",
-                user_id=idempotent["user_id"],
-                trust_id=idempotent["trust_id"],
-                email=idempotent["email"],
-                trust_name=idempotent["trust_name"],
-                is_new_user=False,
-                is_new_trust=False,
-            )
-
-    # 1. Find or create user
-    email_lower = payload.customer_email.lower()
-    user = await db.users.find_one({"email": email_lower}, {"_id": 0})
-    is_new_user = user is None
-
-    if user:
-        user_id = user["user_id"]
-    else:
-        # Create new user account (no password — they'll set it via WingPoint webhook)
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat()
-
-        user_doc = {
-            "user_id": user_id,
-            "email": email_lower,
-            "name": f"{payload.customer_first_name} {payload.customer_last_name}",
-            "first_name": payload.customer_first_name,
-            "last_name": payload.customer_last_name,
-            "is_admin": False,
-            "created_at": now,
-            "updated_at": now,
-            "source": "wingpoint",
-            "wingpoint_ref": payload.wingpoint_ref,
-        }
-        await db.users.insert_one(user_doc)
-
-        # Create free subscription
-        sub_id = f"sub_{uuid.uuid4().hex[:12]}"
-        await db.subscriptions.insert_one({
-            "subscription_id": sub_id,
-            "user_id": user_id,
-            "plan_type": "free",
-            "status": "active",
-            "trial_start_date": None,
-            "trial_end_date": None,
-            "stripe_customer_id": None,
-            "stripe_subscription_id": None,
-            "created_at": now,
-            "updated_at": now,
-            "notes": "Free individual trustee account — provisioned from WingPoint",
-        })
-
-        # Create onboarding record
-        await db.user_onboarding.insert_one({
-            "user_id": user_id,
-            "email": email_lower,
-            "onboarding_completed": False,
-            "created_at": now,
-            "updated_at": now,
-        })
-
-    # 2. Find or create trust for this user
-    trust_type = TRUST_TYPE_MAP.get(payload.trust_type.upper(), "irrevocable")
-    jurisdiction = payload.formation_state or ""
-
-    # Check if this user already has a trust with this name
-    existing_trust = await db.trusts.find_one(
-        {"user_id": user_id, "name": {"$regex": f"^{payload.trust_name}$", "$options": "i"}},
-        {"_id": 0}
-    )
-
-    # Also check by wingpoint_ref
-    if not existing_trust:
-        existing_trust = await db.trusts.find_one(
-            {"user_id": user_id, "wingpoint_ref": payload.wingpoint_ref},
-            {"_id": 0}
-        )
-
-    if existing_trust:
-        trust_id = existing_trust["trust_id"]
-        is_new_trust = False
-    else:
-        # Create new trust
-        trust_id = f"trust_{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat()
-
-        trustee_name = None
-        if payload.trustee_first_name or payload.trustee_last_name:
-            trustee_name = f"{payload.trustee_first_name or ''} {payload.trustee_last_name or ''}".strip()
-
-        trust_doc = {
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "name": payload.trust_name,
-            "trust_type": trust_type,
-            "jurisdiction": jurisdiction,
-            "state_code": jurisdiction,
-            "role": "trustee",
-            "start_date": "",
-            "trustees": trustee_name,
-            "authority_clause": None,
-            "ein": None,
-            "tax_year_end_month": 12,
-            "tax_year_end_day": 31,
-            "is_fiscal_year": False,
-            "wingpoint_ref": payload.wingpoint_ref,
-            "created_at": now,
-            "updated_at": now,
-        }
-        await db.trusts.insert_one(trust_doc)
-        is_new_trust = True
-
-        # Create initial governance tasks
-        await create_initial_governance_tasks(trust_id, user_id)
-
-    # 3. Record provision for idempotency
-    provision_record = {
-        "wingpoint_ref": payload.wingpoint_ref,
-        "idempotency_key": payload.idempotency_key,
-        "user_id": user_id,
-        "trust_id": trust_id,
-        "customer_email": email_lower,
-        "trust_name": payload.trust_name,
-        "is_new_user": is_new_user,
-        "is_new_trust": is_new_trust,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.wingpoint_provisions.insert_one(provision_record)
-
-    return ProvisionResponse(
-        status="provisioned",
-        user_id=user_id,
-        trust_id=trust_id,
-        email=email_lower,
-        trust_name=payload.trust_name,
-        is_new_user=is_new_user,
-        is_new_trust=is_new_trust,
-    )
-
-
-# ─── Document Delivery Endpoint ───────────────────────────────────────────
-VALID_DOC_TYPES = {"ein_confirmation", "declaration", "certification", "binder_kit"}
-DOC_CATEGORIES = {
-    "ein_confirmation": "ein_letter",
-    "declaration": "trust_instrument",
-    "certification": "trust_instrument",
-    "binder_kit": "other",
-}
-ALLOWED_MIME_TYPES = {
-    "application/pdf": "pdf",
-}
-MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB BSON limit
-
-
 class DocumentStored(BaseModel):
     doc_id: str
     type: str
@@ -305,6 +81,17 @@ class TrustDocumentsResponse(BaseModel):
     trust_name: str
 
 
+# ─── Constants ─────────────────────────────────────────────────────────────
+DOC_CATEGORIES = {
+    "ein_confirmation": "ein_letter",
+    "declaration": "trust_instrument",
+    "certification": "trust_instrument",
+    "binder_kit": "other",
+}
+MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB BSON limit
+
+
+# ─── Document Delivery Endpoint ───────────────────────────────────────────
 @router.post("/api/external/trust-documents")
 async def receive_trust_documents(request: Request, payload: DeliverDocumentsRequest):
     """
@@ -312,9 +99,11 @@ async def receive_trust_documents(request: Request, payload: DeliverDocumentsReq
     
     WingPoint calls this after a trust application has all documents generated.
     TrustOffice downloads each PDF from the provided URLs and stores them as BSON binary
-    in the vault — same as the existing user upload flow.
+    in the vault — same as the existing user upload flow. No URL dependency.
+    
+    Multi-trust: pass trust_id from provision response for accurate document placement.
     """
-    verify_external_api_key(request)
+    await verify_document_api_key(request)
 
     # 1. Find user by email
     email_lower = payload.customer_email.lower()
@@ -482,11 +271,10 @@ async def receive_trust_documents(request: Request, payload: DeliverDocumentsReq
             ein_updated = True
 
     # 6. Trigger onboarding checklist update (non-blocking)
-    from dependencies import auto_update_onboarding
     try:
         await auto_update_onboarding(user_id, trust_id)
     except Exception:
-        pass
+        logger.warning(f"Onboarding update failed for user {user_id} / trust {trust_id}")
 
     # 7. Return response
     successfully_stored = sum(1 for d in stored_docs if d.stored)
