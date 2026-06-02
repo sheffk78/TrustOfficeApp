@@ -79,6 +79,7 @@ from routers.vault import router as vault_router
 from routers.risk_dashboard import router as risk_dashboard_router
 from routers.binder import router as binder_router
 from routers.external import router as external_router
+from routers.external_trust_docs import router as external_trust_docs_router
 
 # Import security middleware
 from security import (
@@ -134,10 +135,12 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/subscription/upgrade",
     "/api/stripe/webhook",
     "/api/categories",
-    # External partner API (auth via API key, not user session)
+# External partner API (auth via API key, not user session)
     "/api/external/provision-trustoffice",
     "/api/external/provision-trustoffice/resend",
     "/api/external/provision-trustoffice/status",
+    "/api/external/trust-documents",
+    "/api/external/trust-documents/health",
 }
 
 # HTTP methods that modify data (write operations)
@@ -313,7 +316,10 @@ app.include_router(communications_router, prefix="/api")
 app.include_router(vault_router, prefix="/api")
 app.include_router(risk_dashboard_router, prefix="/api")
 app.include_router(binder_router, prefix="/api")
+# External partner API — WingPoint provision endpoints (Emergent built)
 app.include_router(external_router, prefix="/api")
+# External partner API — WingPoint document delivery (Kit built)
+app.include_router(external_trust_docs_router)
 
 
 # ==================== HEALTH CHECK ====================
