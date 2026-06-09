@@ -25,8 +25,10 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
     
     Feature Gate: MULTIPLE_TRUSTS
     - Trial users can only have 1 trust
-    - Paid users (monthly/annual) can create unlimited trusts
+    - Paid users (monthly/annual) can create up to 10 trusts
     """
+    TRUST_LIMIT = 10
+    
     # Check if user already has a trust - need MULTIPLE_TRUSTS feature for more
     existing_count = await db.trusts.count_documents({"user_id": user["user_id"]})
     if existing_count >= 1:
@@ -36,6 +38,13 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
                 status_code=PREMIUM_FEATURE_ERROR_CODE,
                 detail="Multiple trusts require a paid subscription. Trial accounts are limited to 1 trust."
             )
+    
+    # Hard cap for paid users
+    if existing_count >= TRUST_LIMIT:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Your account can manage up to {TRUST_LIMIT} trusts. Contact contact@trustoffice.app with subject 'Need more trusts' if you need more."
+        )
     
     trust_id = f"trust_{uuid.uuid4().hex[:12]}"
     
