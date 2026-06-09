@@ -519,7 +519,7 @@ TrustOffice
             
             <h3>You now have full access to:</h3>
             <ul>
-              <li>Unlimited trusts & entities</li>
+              <li>Up to 10 trusts & entities</li>
               <li>Governance health tracking</li>
               <li>Minutes & distribution management</li>
               <li>PDF generation & CSV export</li>
@@ -545,7 +545,7 @@ Subscription Details:
 - Amount: ${data.get('amount', '79')}/{'year' if data.get('plan_type') == 'annual' else 'month'}
 
 You now have full access to:
-- Unlimited trusts & entities
+- Up to 10 trusts & entities
 - Governance health tracking
 - Minutes & distribution management
 - PDF generation & CSV export
