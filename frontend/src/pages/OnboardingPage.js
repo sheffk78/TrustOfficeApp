@@ -294,7 +294,7 @@ export default function OnboardingPage() {
                 <div className="grid md:grid-cols-2 gap-3">
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
-                    <span>Unlimited trusts & entities</span>
+                    <span>Up to 10 trusts & entities</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />

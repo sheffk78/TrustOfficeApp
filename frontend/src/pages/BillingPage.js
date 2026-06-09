@@ -27,7 +27,7 @@ const PLANS = [
     price: 79,
     period: 'month',
     features: [
-      'Unlimited trusts & entities',
+      'Up to 10 trusts & entities',
       'Governance health tracking',
       'Minutes & distribution management',
       'PDF generation',

@@ -136,7 +136,7 @@ export const FullSubscriptionGate = ({ children }) => {
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Unlimited trusts & entities
+                Up to 10 trusts & entities
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
