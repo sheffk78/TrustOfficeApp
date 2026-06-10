@@ -9,6 +9,8 @@ Showcases all TrustOffice features including:
 - Benevolence records
 - Compensation plans and payments
 - Governance tasks (completed, upcoming, overdue)
+- Transactions
+- Tax calendar entries
 """
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timezone, timedelta
@@ -45,6 +47,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "jurisdiction": "Delaware",
         "state_code": "DE",
         "ein": "12-3456789",
+        "start_date": "2020-01-15",
         "tax_year_end_month": 12,
         "tax_year_end_day": 31,
         "is_fiscal_year": False,
@@ -68,6 +71,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "jurisdiction": "California",
         "state_code": "CA",
         "ein": "98-7654321",
+        "start_date": "2023-01-01",
         "tax_year_end_month": 6,
         "tax_year_end_day": 30,
         "is_fiscal_year": True,
@@ -475,26 +479,26 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         # Trust 1 Tasks
         {"task_id": f"task_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "task_type": "annual_review", "due_date": (now + timedelta(days=60)).isoformat(),
-         "completed_at": None, "description": "Annual trust administration review", "created_at": now.isoformat()},
+         "completed_at": None, "description": "Annual trust administration review", "created_at": now.isoformat(), "is_demo": True},
         {"task_id": f"task_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "task_type": "quarterly_review", "due_date": (now + timedelta(days=30)).isoformat(),
-         "completed_at": None, "description": "Q1 2026 quarterly review", "created_at": now.isoformat()},
+         "completed_at": None, "description": "Q1 2026 quarterly review", "created_at": now.isoformat(), "is_demo": True},
         {"task_id": f"task_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "task_type": "compensation_review", "due_date": (now - timedelta(days=5)).isoformat(),
-         "completed_at": None, "description": "Review trustee compensation for 2026 (OVERDUE)", "created_at": (now - timedelta(days=30)).isoformat()},
+         "completed_at": None, "description": "Review trustee compensation for 2026 (OVERDUE)", "created_at": (now - timedelta(days=30)).isoformat(), "is_demo": True},
         {"task_id": f"task_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "task_type": "distribution_review", "due_date": (now + timedelta(days=15)).isoformat(),
-         "completed_at": (now - timedelta(days=2)).isoformat(), "description": "Review Q4 distributions - COMPLETED", "created_at": (now - timedelta(days=20)).isoformat()},
+         "completed_at": (now - timedelta(days=2)).isoformat(), "description": "Review Q4 distributions - COMPLETED", "created_at": (now - timedelta(days=20)).isoformat(), "is_demo": True},
         {"task_id": f"task_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "task_type": "tax_filing", "due_date": (now + timedelta(days=90)).isoformat(),
-         "completed_at": None, "description": "File trust income tax returns", "created_at": now.isoformat()},
+         "completed_at": None, "description": "File trust income tax returns", "created_at": now.isoformat(), "is_demo": True},
         # Trust 2 Tasks
         {"task_id": f"task_{uuid.uuid4().hex[:12]}", "trust_id": trust2_id, "user_id": user["user_id"],
          "task_type": "annual_review", "due_date": (now + timedelta(days=120)).isoformat(),
-         "completed_at": None, "description": "Annual education trust review", "created_at": now.isoformat()},
+         "completed_at": None, "description": "Annual education trust review", "created_at": now.isoformat(), "is_demo": True},
         {"task_id": f"task_{uuid.uuid4().hex[:12]}", "trust_id": trust2_id, "user_id": user["user_id"],
          "task_type": "beneficiary_review", "due_date": (now + timedelta(days=45)).isoformat(),
-         "completed_at": None, "description": "Review beneficiary eligibility for fall semester", "created_at": now.isoformat()}
+         "completed_at": None, "description": "Review beneficiary eligibility for fall semester", "created_at": now.isoformat(), "is_demo": True}
     ])
     
     # ==================== MINUTES RECORDS (Various types including disposition) ====================
@@ -592,33 +596,33 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
          "purpose_classification": "distribution", "authority_clause_ref": "Article IV, Section 4.1(a)",
          "notes": "Spring 2026 semester tuition - State University", "solvency_confirmed": True,
          "recusal_acknowledged": True, "approved_by": user["user_id"], "approved_at": (now - timedelta(days=10)).isoformat(),
-         "minutes_record_id": None, "created_at": (now - timedelta(days=10)).isoformat()},
+         "minutes_record_id": None, "created_at": (now - timedelta(days=10)).isoformat(), "is_demo": True},
         # PENDING distribution (not yet approved)
         {"distribution_id": f"dist_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "beneficiary_name": "Emily Smith", "amount": 2500, "date": (now - timedelta(days=3)).isoformat(),
          "purpose_classification": "distribution", "authority_clause_ref": "Article IV, Section 4.1(b)",
          "notes": "Monthly living allowance - PENDING APPROVAL", "solvency_confirmed": False,
          "recusal_acknowledged": False, "approved_by": None, "approved_at": None,
-         "minutes_record_id": None, "created_at": (now - timedelta(days=3)).isoformat()},
+         "minutes_record_id": None, "created_at": (now - timedelta(days=3)).isoformat(), "is_demo": True},
         {"distribution_id": f"dist_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "beneficiary_name": "Michael Smith", "amount": 8000, "date": (now - timedelta(days=45)).isoformat(),
          "purpose_classification": "distribution", "authority_clause_ref": "Article IV, Section 4.2",
          "notes": "Medical expenses - dental surgery", "solvency_confirmed": True,
          "recusal_acknowledged": True, "approved_by": user["user_id"], "approved_at": (now - timedelta(days=44)).isoformat(),
-         "minutes_record_id": None, "created_at": (now - timedelta(days=45)).isoformat()},
+         "minutes_record_id": None, "created_at": (now - timedelta(days=45)).isoformat(), "is_demo": True},
         {"distribution_id": f"dist_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "beneficiary_name": "James Smith Jr.", "amount": 5000, "date": (now - timedelta(days=75)).isoformat(),
          "purpose_classification": "distribution", "authority_clause_ref": "Article IV, Section 4.1(c)",
          "notes": "First car purchase assistance", "solvency_confirmed": True,
          "recusal_acknowledged": True, "approved_by": user["user_id"], "approved_at": (now - timedelta(days=74)).isoformat(),
-         "minutes_record_id": None, "created_at": (now - timedelta(days=75)).isoformat()},
+         "minutes_record_id": None, "created_at": (now - timedelta(days=75)).isoformat(), "is_demo": True},
         # Trust 2 Distribution
         {"distribution_id": f"dist_{uuid.uuid4().hex[:12]}", "trust_id": trust2_id, "user_id": user["user_id"],
          "beneficiary_name": "Sarah Johnson", "amount": 12000, "date": (now - timedelta(days=20)).isoformat(),
          "purpose_classification": "distribution", "authority_clause_ref": "Article III",
          "notes": "College tuition - freshman year", "solvency_confirmed": True,
          "recusal_acknowledged": True, "approved_by": user["user_id"], "approved_at": (now - timedelta(days=20)).isoformat(),
-         "minutes_record_id": None, "created_at": (now - timedelta(days=20)).isoformat()}
+         "minutes_record_id": None, "created_at": (now - timedelta(days=20)).isoformat(), "is_demo": True}
     ])
     
     # ==================== BENEVOLENCE RECORDS (Trust 1 only) ====================
@@ -628,63 +632,63 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
          "purpose_description": "Annual ministry support for youth programs and community outreach",
          "amount": 25000, "date": (now - timedelta(days=45)).isoformat(),
          "approved_by": ["John Smith", "Jane Smith"], "approval_method": "unanimous", "status": "approved",
-         "minutes_id": None, "notes": "5th consecutive year of support", "created_at": (now - timedelta(days=45)).isoformat()},
+         "minutes_id": None, "notes": "5th consecutive year of support", "created_at": (now - timedelta(days=45)).isoformat(), "is_demo": True},
         {"record_id": f"ben_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "beneficiary_name": "Johnson Family", "beneficiary_type": "family", "purpose": "medical",
          "purpose_description": "Cancer treatment expenses - chemotherapy and hospital bills",
          "amount": 15000, "date": (now - timedelta(days=30)).isoformat(),
          "approved_by": ["John Smith", "Jane Smith"], "approval_method": "unanimous", "status": "approved",
-         "minutes_id": None, "notes": "Referred by Pastor Williams", "created_at": (now - timedelta(days=30)).isoformat()},
+         "minutes_id": None, "notes": "Referred by Pastor Williams", "created_at": (now - timedelta(days=30)).isoformat(), "is_demo": True},
         {"record_id": f"ben_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "beneficiary_name": "Maria Rodriguez", "beneficiary_type": "individual", "purpose": "education",
          "purpose_description": "Community college tuition for nursing program",
          "amount": 4500, "date": (now - timedelta(days=20)).isoformat(),
          "approved_by": ["John Smith"], "approval_method": "majority", "status": "approved",
-         "minutes_id": None, "notes": "Single mother pursuing RN degree", "created_at": (now - timedelta(days=20)).isoformat()},
+         "minutes_id": None, "notes": "Single mother pursuing RN degree", "created_at": (now - timedelta(days=20)).isoformat(), "is_demo": True},
         {"record_id": f"ben_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "beneficiary_name": "Local Food Bank", "beneficiary_type": "organization", "purpose": "food_necessities",
          "purpose_description": "Thanksgiving meal packages for 200 families",
          "amount": 5000, "date": (now - timedelta(days=90)).isoformat(),
          "approved_by": ["John Smith", "Jane Smith"], "approval_method": "unanimous", "status": "approved",
-         "minutes_id": None, "notes": "Annual holiday contribution", "created_at": (now - timedelta(days=90)).isoformat()},
+         "minutes_id": None, "notes": "Annual holiday contribution", "created_at": (now - timedelta(days=90)).isoformat(), "is_demo": True},
         {"record_id": f"ben_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "beneficiary_name": "Thomas Williams", "beneficiary_type": "individual", "purpose": "housing",
          "purpose_description": "Emergency rent assistance - 2 months rent after job loss",
          "amount": 3200, "date": (now - timedelta(days=7)).isoformat(),
          "approved_by": ["John Smith", "Jane Smith"], "approval_method": "unanimous", "status": "approved",
-         "minutes_id": None, "notes": "New job starting next month", "created_at": (now - timedelta(days=7)).isoformat()},
+         "minutes_id": None, "notes": "New job starting next month", "created_at": (now - timedelta(days=7)).isoformat(), "is_demo": True},
         # PENDING benevolence request
         {"record_id": f"ben_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "beneficiary_name": "Hope Academy", "beneficiary_type": "organization", "purpose": "education",
          "purpose_description": "Scholarship fund for underprivileged students",
          "amount": 10000, "date": (now - timedelta(days=2)).isoformat(),
          "approved_by": [], "approval_method": "pending", "status": "pending",
-         "minutes_id": None, "notes": "PENDING APPROVAL - Requested by school principal", "created_at": (now - timedelta(days=2)).isoformat()}
+         "minutes_id": None, "notes": "PENDING APPROVAL - Requested by school principal", "created_at": (now - timedelta(days=2)).isoformat(), "is_demo": True}
     ])
     
     # ==================== COMPENSATION PLANS AND PAYMENTS ====================
     await db.compensation_plans.insert_many([
         {"plan_id": f"plan_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "trustee_name": "John Smith", "annual_fee": 24000, "fee_type": "fixed",
-         "effective_date": "2024-01-01", "notes": "Fixed quarterly payments of $6,000", "created_at": now.isoformat()},
+         "effective_date": "2024-01-01", "notes": "Fixed quarterly payments of $6,000", "created_at": now.isoformat(), "is_demo": True},
         {"plan_id": f"plan_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "trustee_name": "Jane Smith", "annual_fee": 24000, "fee_type": "fixed",
-         "effective_date": "2024-01-01", "notes": "Fixed quarterly payments of $6,000", "created_at": now.isoformat()}
+         "effective_date": "2024-01-01", "notes": "Fixed quarterly payments of $6,000", "created_at": now.isoformat(), "is_demo": True}
     ])
     
     await db.compensation_payments.insert_many([
         {"payment_id": f"pay_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "trustee_name": "John Smith", "amount": 6000, "payment_date": (now - timedelta(days=90)).isoformat(),
-         "notes": "Q4 2025 compensation", "created_at": (now - timedelta(days=90)).isoformat()},
+         "notes": "Q4 2025 compensation", "created_at": (now - timedelta(days=90)).isoformat(), "is_demo": True},
         {"payment_id": f"pay_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "trustee_name": "Jane Smith", "amount": 6000, "payment_date": (now - timedelta(days=90)).isoformat(),
-         "notes": "Q4 2025 compensation", "created_at": (now - timedelta(days=90)).isoformat()},
+         "notes": "Q4 2025 compensation", "created_at": (now - timedelta(days=90)).isoformat(), "is_demo": True},
         {"payment_id": f"pay_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "trustee_name": "John Smith", "amount": 6000, "payment_date": (now - timedelta(days=5)).isoformat(),
-         "notes": "Q1 2026 compensation", "created_at": (now - timedelta(days=5)).isoformat()},
+         "notes": "Q1 2026 compensation", "created_at": (now - timedelta(days=5)).isoformat(), "is_demo": True},
         {"payment_id": f"pay_{uuid.uuid4().hex[:12]}", "trust_id": trust1_id, "user_id": user["user_id"],
          "trustee_name": "Jane Smith", "amount": 6000, "payment_date": (now - timedelta(days=5)).isoformat(),
-         "notes": "Q1 2026 compensation", "created_at": (now - timedelta(days=5)).isoformat()}
+         "notes": "Q1 2026 compensation", "created_at": (now - timedelta(days=5)).isoformat(), "is_demo": True}
     ])
     
     # ==================== TRUST UNIT CERTIFICATES (Trust 1) ====================
@@ -738,17 +742,175 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     ])
     
     # ==================== NOTIFICATION PREFERENCES ====================
-    await db.notification_preferences.insert_one({
-        "user_id": user["user_id"],
-        "minutes_created": True,
-        "distribution_created": True,
-        "distribution_approved": True,
-        "task_reminders": True,
-        "task_overdue": True,
-        "subscription_updates": True,
-        "weekly_digest": True
-    })
-    
+    await db.notification_preferences.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "minutes_created": True,
+            "distribution_created": True,
+            "distribution_approved": True,
+            "task_reminders": True,
+            "task_overdue": True,
+            "subscription_updates": True,
+            "weekly_digest": True
+        }},
+        upsert=True
+    )
+
+    # ==================== TRANSACTIONS (Trust 1 - Money module) ====================
+    await db.transactions.insert_many([
+        {
+            "transaction_id": f"tx_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "type": "distribution",
+            "amount": 15000,
+            "description": "Educational distribution to Emily Smith - Spring tuition",
+            "date": (now - timedelta(days=10)).isoformat(),
+            "from_account": "Trust Operating Account",
+            "to_entity": "State University",
+            "category": "education",
+            "status": "completed",
+            "reference_id": None,
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+        {
+            "transaction_id": f"tx_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "type": "compensation",
+            "amount": 6000,
+            "description": "Q1 2026 Trustee compensation - John Smith",
+            "date": (now - timedelta(days=5)).isoformat(),
+            "from_account": "Trust Operating Account",
+            "to_entity": "John Smith",
+            "category": "trustee_compensation",
+            "status": "completed",
+            "reference_id": None,
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+        {
+            "transaction_id": f"tx_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "type": "sale_of_asset",
+            "amount": 38500,
+            "description": "Sale of 2019 BMW X5 to CarMax Delaware",
+            "date": (now - timedelta(days=120)).isoformat(),
+            "from_account": "CarMax Delaware",
+            "to_entity": "Trust Operating Account",
+            "category": "asset_disposition",
+            "status": "completed",
+            "reference_id": None,
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+        {
+            "transaction_id": f"tx_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "type": "investment_income",
+            "amount": 12500,
+            "description": "Q1 2026 dividend distribution - Schwab Growth Portfolio",
+            "date": (now - timedelta(days=14)).isoformat(),
+            "from_account": "Schwab Brokerage",
+            "to_entity": "Trust Operating Account",
+            "category": "investment_income",
+            "status": "completed",
+            "reference_id": None,
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+        {
+            "transaction_id": f"tx_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "type": "expense",
+            "amount": 850,
+            "description": "Annual trust filing fee - Delaware Division of Corporations",
+            "date": (now - timedelta(days=60)).isoformat(),
+            "from_account": "Trust Operating Account",
+            "to_entity": "Delaware Division of Corporations",
+            "category": "administrative",
+            "status": "completed",
+            "reference_id": None,
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+    ])
+
+    # ==================== TAX CALENDAR ENTRIES ====================
+    await db.tax_calendar_entries.insert_many([
+        {
+            "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "description": "Federal trust income tax return (Form 1041)",
+            "due_date": (now + timedelta(days=90)).isoformat(),
+            "status": "pending",
+            "estimated_tax": 15000,
+            "notes": "Estimated based on prior year income",
+            "filing_type": "federal",
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+        {
+            "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "description": "Delaware state trust income tax return",
+            "due_date": (now + timedelta(days=90)).isoformat(),
+            "status": "pending",
+            "estimated_tax": 3000,
+            "notes": "Delaware does not tax trusts on accumulated income",
+            "filing_type": "state",
+            "state_code": "DE",
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+        {
+            "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "description": "Estimated tax payment - Q2 2026",
+            "due_date": (now + timedelta(days=45)).isoformat(),
+            "status": "pending",
+            "estimated_tax": 5000,
+            "notes": "Quarterly estimated payment",
+            "filing_type": "estimated",
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+        {
+            "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust1_id,
+            "user_id": user["user_id"],
+            "description": "Form 1041 extension filed",
+            "due_date": (now - timedelta(days=60)).isoformat(),
+            "status": "filed",
+            "estimated_tax": 14500,
+            "notes": "Extension granted to September 15",
+            "filing_type": "federal",
+            "created_at": (now - timedelta(days=60)).isoformat(),
+            "is_demo": True
+        },
+        {
+            "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust2_id,
+            "user_id": user["user_id"],
+            "description": "California state trust tax filing",
+            "due_date": (now + timedelta(days=120)).isoformat(),
+            "status": "pending",
+            "estimated_tax": 500,
+            "notes": "Small trust - minimal CA tax exposure",
+            "filing_type": "state",
+            "state_code": "CA",
+            "created_at": now.isoformat(),
+            "is_demo": True
+        },
+    ])
+
     return {
         "message": "Demo data created with 2 trusts showcasing all features",
         "seeded": True,
@@ -764,7 +926,9 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "Benevolence records with multiple purposes",
             "Compensation plans and payment history",
             "Trust unit certificates",
-            "Governance tasks (upcoming, overdue, completed)"
+            "Governance tasks (upcoming, overdue, completed)",
+            "Transaction records (Money module)",
+            "Tax calendar entries"
         ]
     }
 
@@ -795,6 +959,8 @@ async def delete_demo_data(user: dict = Depends(require_write_access)):
         ("governance_tasks", "governance_tasks"),
         ("entity_relationships", "entity_relationships"),
         ("entities", "entities"),
+        ("transactions", "transactions"),
+        ("tax_calendar_entries", "tax_calendar_entries"),
         ("health_score_snapshots", "health_score_snapshots"),
         ("trusts", "trusts"),
     ]
@@ -835,6 +1001,8 @@ async def get_demo_status(user: dict = Depends(get_current_user)):
         "compensation_plans": await db.compensation_plans.count_documents({"user_id": user_id}),
         "compensation_payments": await db.compensation_payments.count_documents({"user_id": user_id}),
         "trust_unit_certificates": await db.trust_unit_certificates.count_documents({"user_id": user_id}),
+        "transactions": await db.transactions.count_documents({"user_id": user_id}),
+        "tax_calendar_entries": await db.tax_calendar_entries.count_documents({"user_id": user_id}),
     }
     
     # Count demo records only
@@ -849,6 +1017,8 @@ async def get_demo_status(user: dict = Depends(get_current_user)):
         "compensation_plans": await db.compensation_plans.count_documents({"user_id": user_id, "is_demo": True}),
         "compensation_payments": await db.compensation_payments.count_documents({"user_id": user_id, "is_demo": True}),
         "trust_unit_certificates": await db.trust_unit_certificates.count_documents({"user_id": user_id, "is_demo": True}),
+        "transactions": await db.transactions.count_documents({"user_id": user_id, "is_demo": True}),
+        "tax_calendar_entries": await db.tax_calendar_entries.count_documents({"user_id": user_id, "is_demo": True}),
     }
     
     total = sum(counts.values())
