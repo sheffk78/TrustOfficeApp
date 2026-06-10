@@ -137,7 +137,48 @@ async def get_risk_dashboard(trust_id: str, user: dict = Depends(get_current_use
             "deeplink": "/vault",
         })
 
-    # === INVESTMENT RISK ===
+    # === PORTFOLIO CONCENTRATION RISK (cash-heavy / uninvested assets) ===
+    total_investments = await db.investments.count_documents({"trust_id": trust_id, "is_active": True})
+    schedule_a_items = await db.schedule_a_items.find(
+        {"trust_id": trust_id, "status": "active"},
+        {"_id": 0, "category": 1, "approximate_value": 1}
+    ).to_list(1000)
+
+    # Rule A: Trust has assets on Schedule A but zero investments recorded
+    if total_investments == 0 and len(schedule_a_items) > 0:
+        total_schedule_a_value = sum(item.get("approximate_value", 0) or 0 for item in schedule_a_items)
+        if total_schedule_a_value > 0:
+            risks.append({
+                "type": "uninvested_assets",
+                "severity": "high",
+                "title": "Trust assets may be uninvested",
+                "detail": f"No investment holdings tracked. Schedule A shows ${total_schedule_a_value:,.0f} in assets — review for idle cash exposure under the Prudent Investor Rule.",
+                "action": "Add investment holdings or document why assets are held in cash",
+                "module": "investments",
+                "deeplink": "/investments",
+            })
+
+    # Rule B: Cash-heavy portfolio — financial accounts > 60% of total tracked investments
+    if total_investments > 0:
+        cash_items = [i for i in schedule_a_items if i.get("category") == "financial_accounts"]
+        cash_value = sum(item.get("approximate_value", 0) or 0 for item in cash_items)
+        total_invested = 0
+        async for inv in db.investments.find({"trust_id": trust_id, "is_active": True}):
+            total_invested += inv.get("current_value", 0) or 0
+
+        if cash_value > 0 and total_invested > 0 and (cash_value / (cash_value + total_invested)) > 0.6:
+            cash_pct = (cash_value / (cash_value + total_invested)) * 100
+            risks.append({
+                "type": "cash_heavy_portfolio",
+                "severity": "medium",
+                "title": f"Portfolio may be cash-heavy ({cash_pct:.0f}% in financial accounts)",
+                "detail": f"${cash_value:,.0f} in financial accounts vs ${total_invested:,.0f} invested. Cash-heavy portfolios may breach the Prudent Investor Rule.",
+                "action": "Evaluate allocation and rebalance or document investment rationale",
+                "module": "investments",
+                "deeplink": "/investments",
+            })
+
+    # === INVESTMENT DECLINE RISK ===
     async for inv in db.investments.find({"trust_id": trust_id, "is_active": True}):
         if inv.get("current_value", 0) < inv.get("cost_basis", 0) * 0.8:
             pct = (1 - (inv["current_value"] / inv["cost_basis"])) * 100 if inv["cost_basis"] > 0 else 0
