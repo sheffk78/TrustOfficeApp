@@ -13,6 +13,7 @@ import time
 from database import db
 from email_service import email_service
 from email_templates import _base_template
+from dependencies import get_subscription_state
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +101,8 @@ async def get_lesson_access(lesson_num: int, email: str):
     """Check if user has access to a specific lesson.
     
     Lesson 1: Always public (free lead magnet)
-    Lessons 2-9: Requires course_purchased = True
-    Lessons 10-12: Requires specific bundle purchase
+    Lessons 2-9: Requires active TrustOffice subscription
+    Lessons 10-12: Requires annual subscription
     """
     email = email.strip().lower()
 
@@ -114,31 +115,48 @@ async def get_lesson_access(lesson_num: int, email: str):
             "type": "free"
         }
 
-    # Paid lessons require enrollment + purchase
-    lead = await db.course_leads.find_one({"email": email})
-    if not lead:
+    # Paid lessons require an active TrustOffice subscription
+    # Look up user by email to get user_id
+    user = await db.users.find_one({"email": email})
+    if not user:
         return {
             "has_access": False,
             "lesson_num": lesson_num,
             "lesson_title": _get_lesson_title(lesson_num),
             "type": "paid",
-            "requires": "purchase"
+            "requires": "active_subscription"
         }
 
-    if not lead.get("course_purchased", False):
+    state = await get_subscription_state(user["user_id"])
+    
+    if not state.is_active:
         return {
             "has_access": False,
             "lesson_num": lesson_num,
             "lesson_title": _get_lesson_title(lesson_num),
             "type": "paid",
-            "requires": "purchase"
+            "requires": "active_subscription",
+            "subscription_status": state.status,
+            "coupon": "TRUSTEE101"
         }
+
+    # For lessons 10-12, require annual subscription
+    if lesson_num >= 10:
+        if state.plan_type != "annual":
+            return {
+                "has_access": False,
+                "lesson_num": lesson_num,
+                "lesson_title": _get_lesson_title(lesson_num),
+                "type": "bonus",
+                "requires": "annual_subscription"
+            }
 
     return {
         "has_access": True,
         "lesson_num": lesson_num,
         "lesson_title": _get_lesson_title(lesson_num),
-        "type": "paid"
+        "type": "paid",
+        "plan_type": state.plan_type
     }
 
 
@@ -150,11 +168,13 @@ async def _send_lesson_1_access_email(email: str, name: str) -> Dict:
     embed_url = "https://iframe.mediadelivery.net/embed/609821/b095719e-96c6-4a0a-a845-5f003777ff2f"
     pdf_url = "https://trustoffice.app/assets/trustees-first-7-days-checklist.pdf"
     
+    app_url = "https://app.trustoffice.app/subscription?coupon=TRUSTEE101"
+    
     html_content = _base_template(f"""
         <h2>Your First Lesson is Ready</h2>
         <p>Hi {name},</p>
         <p>Welcome to <strong>Trustee 101: The Course That Should Have Come With Your Trust Document</strong>.</p>
-        <p>Your first lesson — <em>What Fiduciary Actually Means</em> — is ready to watch below.</p>
+        <p>Your first lesson - <em>What Fiduciary Actually Means</em> - is ready to watch below.</p>
         
         <div style="margin: 30px 0; text-align: center;">
             <iframe src="{embed_url}" 
@@ -170,9 +190,17 @@ async def _send_lesson_1_access_email(email: str, name: str) -> Dict:
             <p style="margin-top: 10px; font-size: 14px;">This checklist covers exactly what to do in your first week as trustee.</p>
         </div>
         
+        <div class="task-card" style="background:#f9f9f9; border-left:4px solid #D5AD36; padding:15px; margin:15px 0;">
+            <h3 style="margin:0 0 10px 0;color:#010079;">📺 Want the full 9-lesson course?</h3>
+            <p style="margin:0 0 10px 0;font-size:14px;">Subscribe to TrustOffice and unlock <strong>all 9 lessons</strong> plus downloadable templates, checklists, and the software to automate everything the course teaches.</p>
+            <p style="margin:0;text-align:center;">
+                <a href="{app_url}" style="display:inline-block;background:#010079;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold;">Subscribe &amp; Use Code TRUSTEE101</a>
+            </p>
+            <p style="margin:8px 0 0 0;font-size:12px;color:#666;text-align:center;">Use coupon code <strong>TRUSTEE101</strong> at checkout for a discount on your first month. Cancel anytime.</p>
+        </div>
+        
         <p style="font-size: 14px; color: #666;">
-            <strong>Coming next:</strong> Over the next week, we'll send you tips and a special offer 
-            for the complete Trustee 101 course (Lessons 2-9 with templates and quizzes).
+            <strong>Why subscribe?</strong> The course teaches you the system. TrustOffice automates it — minutes, accounting, distributions, and beneficiary communication — all in one place.
         </p>
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
