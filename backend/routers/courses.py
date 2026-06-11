@@ -194,9 +194,9 @@ async def _send_lesson_1_access_email(email: str, name: str) -> Dict:
             <h3 style="margin:0 0 10px 0;color:#010079;">📺 Want the full 9-lesson course?</h3>
             <p style="margin:0 0 10px 0;font-size:14px;">Subscribe to TrustOffice and unlock <strong>all 9 lessons</strong> plus downloadable templates, checklists, and the software to automate everything the course teaches.</p>
             <p style="margin:0;text-align:center;">
-                <a href="{app_url}" style="display:inline-block;background:#010079;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold;">Subscribe &amp; Use Code TRUSTEE101</a>
+                <a href="{app_url}" style="display:inline-block;background:#010079;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold;">$29 First Month &amp; Full Course Access</a>
             </p>
-            <p style="margin:8px 0 0 0;font-size:12px;color:#666;text-align:center;">Use coupon code <strong>TRUSTEE101</strong> at checkout for a discount on your first month. Cancel anytime.</p>
+            <p style="margin:8px 0 0 0;font-size:12px;color:#666;text-align:center;">Use code <strong>TRUSTEE101</strong> for $29 first month (normally $79). Cancel anytime.</p>
         </div>
         
         <p style="font-size: 14px; color: #666;">
