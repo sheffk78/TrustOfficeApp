@@ -12,9 +12,11 @@ import {
   Clock, 
   AlertTriangle,
   ChevronDown,
-  X
+  ChevronUp,
+  X,
+  Check
 } from 'lucide-react';
-import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 import { toast } from 'sonner';
 
 const TASK_TYPES = [
@@ -23,6 +25,9 @@ const TASK_TYPES = [
   { value: 'compensation_review', label: 'Compensation Review' },
   { value: 'distribution_review', label: 'Distribution Review' },
   { value: 'insurance_compliance', label: 'Insurance Compliance' },
+  { value: 'transaction_review', label: 'Transaction Review' },
+  { value: 'tax_filing_1041', label: 'Tax Filing 1041' },
+  { value: 'tax_filing_k1', label: 'Tax Filing K-1' },
   { value: 'custom', label: 'Custom Task' }
 ];
 
@@ -32,6 +37,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
+  const [expandedTask, setExpandedTask] = useState(null);
   const [newTask, setNewTask] = useState({
     task_type: 'quarterly_review',
     due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -127,6 +133,20 @@ export default function CalendarPage() {
       }
     } catch (error) {
       toast.error('Failed to delete task');
+    }
+  };
+
+  const handleToggleChecklistItem = async (taskId, itemIndex, completed) => {
+    try {
+      const response = await fetchWithAuth(`/tasks/${taskId}/checklist/${itemIndex}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ completed })
+      });
+      if (response.ok) {
+        loadTasks();
+      }
+    } catch (error) {
+      toast.error('Failed to update checklist');
     }
   };
 
@@ -243,12 +263,27 @@ export default function CalendarPage() {
                   data-testid={`task-${task.task_id}`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-4 flex-1">
                       {getStatusIcon(task.status)}
-                      <div>
-                        <h3 className="font-medium text-navy">
-                          {task.task_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                        </h3>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <h3 className="font-medium text-navy">
+                            {task.task_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                          </h3>
+                          {task.checklist_items && task.checklist_items.length > 0 && (
+                            <button
+                              onClick={() => setExpandedTask(expandedTask === task.task_id ? null : task.task_id)}
+                              className="text-xs font-mono text-muted-foreground hover:text-navy flex items-center gap-1"
+                              data-testid={`toggle-checklist-${task.task_id}`}
+                            >
+                              {expandedTask === task.task_id ? (
+                                <>Hide checklist <ChevronUp className="w-3 h-3" /></>
+                              ) : (
+                                <>Checklist ({task.checklist_items.filter(ci => ci.completed).length}/{task.checklist_items.length}) <ChevronDown className="w-3 h-3" /></>
+                              )}
+                            </button>
+                          )}
+                        </div>
                         {task.description && (
                           <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
                         )}
@@ -262,9 +297,53 @@ export default function CalendarPage() {
                             </span>
                           )}
                         </div>
+                        {/* Checklist Items */}
+                        {expandedTask === task.task_id && task.checklist_items && task.checklist_items.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-navy/10">
+                            <div className="space-y-2">
+                              {task.checklist_items.map((item, idx) => (
+                                <label
+                                  key={idx}
+                                  className={`flex items-start gap-3 p-2 cursor-pointer hover:bg-muted/30 transition-colors ${item.completed ? 'opacity-70' : ''}`}
+                                >
+                                  <button
+                                                role="checkbox"
+                                                aria-checked={item.completed}
+                                                aria-label={item.completed ? `Mark "${item.text}" as incomplete` : `Mark "${item.text}" as complete`}
+                                                onClick={() => handleToggleChecklistItem(task.task_id, idx)}
+                                                className={`w-5 h-5 flex items-center justify-center rounded-none border-2 transition-colors focus:ring-2 focus:ring-gold focus:ring-offset-1 ${
+                                                  item.completed
+                                                    ? 'bg-gold border-gold text-navy'
+                                                    : 'border-navy/30 hover:border-gold'
+                                                }`}
+                                              >
+                                  >
+                                    {item.completed && <Check className="w-3 h-3" />}
+                                  </button>
+                                  <span className={`text-sm ${item.completed ? 'line-through text-muted-foreground' : 'text-navy'}`}>
+                                    {item.text}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-navy/5">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 bg-muted rounded-none">
+                                  <div
+                                    className="h-full bg-gold rounded-none transition-all duration-300"
+                                    style={{ width: `${(task.checklist_items.filter(ci => ci.completed).length / task.checklist_items.length) * 100}%` }}
+                                  />
+                                </div>
+                                <span className="font-mono text-[10px] text-muted-foreground">
+                                  {task.checklist_items.filter(ci => ci.completed).length}/{task.checklist_items.length}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 ml-4">
                       {task.status !== 'completed' ? (
                         <Button 
                           onClick={() => handleCompleteTask(task.task_id)}

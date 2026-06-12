@@ -40,6 +40,7 @@ import AuditTrailPage from "@/pages/AuditTrailPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
+import StatsPage from "@/pages/StatsPage";
 import TaxCalendarPage from "@/pages/TaxCalendarPage";
 import StateCompliancePage from "@/pages/StateCompliancePage";
 import InvestmentsPage from "@/pages/InvestmentsPage";
@@ -359,6 +360,12 @@ const AppRouter = () => {
       <Route path="/admin" element={
         <ProtectedRoute>
           <AdminPage />
+        </ProtectedRoute>
+      } />
+      {/* Stats dashboard - accessible to stats users and admins */}
+      <Route path="/stats" element={
+        <ProtectedRoute>
+          <StatsPage />
         </ProtectedRoute>
       } />
 

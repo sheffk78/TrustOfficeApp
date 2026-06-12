@@ -34,6 +34,8 @@ class TaskType(str, Enum):
     insurance_compliance = "insurance_compliance"
     transaction_review = "transaction_review"
     custom = "custom"
+    tax_filing_1041 = "tax_filing_1041"
+    tax_filing_k1 = "tax_filing_k1"
 
 class MinutesType(str, Enum):
     annual = "annual"
@@ -159,6 +161,7 @@ class UserResponse(BaseModel):
     picture: Optional[str] = None
     created_at: str
     is_admin: bool = False
+    is_stats_user: bool = False
 
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
@@ -382,6 +385,8 @@ class TrustUnitCertificateCreate(BaseModel):
     units: float
     issue_date: str
     notes: str = ""
+    email: Optional[str] = None
+    phone: Optional[str] = None
 
 class TrustUnitCertificateUpdate(BaseModel):
     holder_name: Optional[str] = None
@@ -389,6 +394,8 @@ class TrustUnitCertificateUpdate(BaseModel):
     units: Optional[float] = None
     status: Optional[CertificateStatus] = None
     notes: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
 
 class TrustUnitCertificateResponse(BaseModel):
     certificate_id: str
@@ -402,6 +409,8 @@ class TrustUnitCertificateResponse(BaseModel):
     status: str
     replaced_by_certificate_id: Optional[str] = None
     notes: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
     created_at: str
     updated_at: Optional[str] = None
 
@@ -439,11 +448,16 @@ class BootstrapFromMinutesResponse(BaseModel):
 
 # ==================== GOVERNANCE TASK MODELS ====================
 
+class ChecklistItem(BaseModel):
+    text: str
+    completed: bool = False
+
 class GovernanceTaskCreate(BaseModel):
     trust_id: str
     task_type: TaskType
     due_date: str
     description: str = ""
+    checklist_items: Optional[List[ChecklistItem]] = None
 
 class GovernanceTaskResponse(BaseModel):
     task_id: str
@@ -453,6 +467,7 @@ class GovernanceTaskResponse(BaseModel):
     completed_at: Optional[str] = None
     status: str
     description: str
+    checklist_items: List[dict] = []
     created_at: str
 
 
@@ -927,6 +942,8 @@ class OnboardingState(BaseModel):
 class BeneficiaryAllocation(BaseModel):
     holder_name: str
     holder_identifier: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
     total_units: float
     percentage: float
     certificate_count: int

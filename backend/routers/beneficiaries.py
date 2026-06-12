@@ -71,6 +71,8 @@ async def get_beneficiary_dashboard(
             holder_map[holder] = {
                 "holder_name": holder,
                 "holder_identifier": cert.get("holder_identifier"),
+                "email": cert.get("email"),
+                "phone": cert.get("phone"),
                 "total_units": 0,
                 "certificates": []
             }
@@ -80,7 +82,9 @@ async def get_beneficiary_dashboard(
             "certificate_number": cert["certificate_number"],
             "units": cert["units"],
             "issue_date": cert["issue_date"],
-            "notes": cert.get("notes", "")
+            "notes": cert.get("notes", ""),
+            "email": cert.get("email", ""),
+            "phone": cert.get("phone", ""),
         })
     
     # Build beneficiary allocations with percentages
@@ -92,6 +96,8 @@ async def get_beneficiary_dashboard(
         beneficiaries.append(BeneficiaryAllocation(
             holder_name=holder_data["holder_name"],
             holder_identifier=holder_data["holder_identifier"],
+            email=holder_data.get("email"),
+            phone=holder_data.get("phone"),
             total_units=holder_data["total_units"],
             percentage=round(percentage, 4),
             certificate_count=len(holder_data["certificates"]),

@@ -795,6 +795,48 @@ View Subscription: {data.get('app_url', '#')}/settings/billing
 Best regards,
 The TrustOffice Team
         """
+    },
+
+    # Distribution Notice to Beneficiary
+    "distribution_notice": {
+        "subject": lambda data: f"Distribution Notice — {data.get('trust_name', 'Your Trust')}",
+        "html": lambda data: _base_template(f"""
+            <h2>Distribution Notice</h2>
+            <p>Dear {data.get('beneficiary_name', 'Beneficiary')},</p>
+            <p>This notice is to inform you of a distribution from the <strong>{data.get('trust_name', 'Trust')}</strong>.</p>
+            
+            <div class="task-card">
+                <h3>Distribution Details</h3>
+                <p><span class="label">Amount:</span> <span class="value">${{data.get('amount', '0.00'):,.2f}}</span></p>
+                <p><span class="label">Date:</span> <span class="value">{data.get('date', 'N/A')}</span></p>
+                <p><span class="label">Category:</span> <span class="value">{data.get('category', 'N/A')}</span></p>
+                <p><span class="label">Status:</span> <span class="value">{data.get('status', 'N/A').replace('_', ' ').title()}</span></p>
+                {f'<p><span class="label">Notes:</span> <span class="value">{data.get("notes", "")}</span></p>' if data.get('notes') else ''}
+            </div>
+            
+            <p>This notice was sent by the trustee of the trust. If you have questions about this distribution, please contact the trustee directly.</p>
+            
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Distribution Notice — {data.get('trust_name', 'Your Trust')}
+
+Dear {data.get('beneficiary_name', 'Beneficiary')},
+
+This notice is to inform you of a distribution from the {data.get('trust_name', 'Trust')}.
+
+Distribution Details:
+- Amount: ${data.get('amount', 0):,.2f}
+- Date: {data.get('date', 'N/A')}
+- Category: {data.get('category', 'N/A')}
+- Status: {data.get('status', 'N/A').replace('_', ' ').title() if data.get('status') else 'N/A'}
+{'- Notes: ' + data.get('notes', '') if data.get('notes') else ''}
+
+This notice was sent by the trustee of the trust. If you have questions about this distribution, please contact the trustee directly.
+
+Best regards,
+The TrustOffice Team
+        """
     }
 }
 

@@ -221,6 +221,8 @@ async def create_unit_certificate(
         "user_id": user["user_id"],
         "holder_name": certificate.holder_name,
         "holder_identifier": certificate.holder_identifier,
+        "email": certificate.email,
+        "phone": certificate.phone,
         "units": units,
         "issue_date": certificate.issue_date,
         "certificate_number": certificate_number,
@@ -276,6 +278,10 @@ async def update_unit_certificate(
         update_fields["holder_identifier"] = update.holder_identifier
     if update.notes is not None:
         update_fields["notes"] = update.notes
+    if update.email is not None:
+        update_fields["email"] = update.email
+    if update.phone is not None:
+        update_fields["phone"] = update.phone
     if update.status is not None:
         update_fields["status"] = update.status.value
     
@@ -409,6 +415,8 @@ async def create_unit_transfer(
                 "user_id": user["user_id"],
                 "holder_name": transfer.from_holder,
                 "holder_identifier": from_cert.get("holder_identifier"),
+                "email": from_cert.get("email"),
+                "phone": from_cert.get("phone"),
                 "units": remaining_units,
                 "issue_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 "certificate_number": remainder_cert_number,
@@ -447,6 +455,8 @@ async def create_unit_transfer(
             "user_id": user["user_id"],
             "holder_name": transfer.to_holder,
             "holder_identifier": existing_to_cert.get("holder_identifier"),
+            "email": existing_to_cert.get("email"),
+            "phone": existing_to_cert.get("phone"),
             "units": combined_units,
             "issue_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "certificate_number": new_cert_number,
@@ -468,6 +478,8 @@ async def create_unit_transfer(
             "user_id": user["user_id"],
             "holder_name": transfer.to_holder,
             "holder_identifier": None,
+            "email": None,
+            "phone": None,
             "units": units,
             "issue_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "certificate_number": new_cert_number,
@@ -828,6 +840,8 @@ async def create_certificates_from_beneficiary_designation(minutes_id: str, user
             "user_id": user_id,
             "holder_name": name,
             "holder_identifier": None,
+            "email": None,
+            "phone": None,
             "units": units,
             "issue_date": minutes.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
             "certificate_number": certificate_number,
@@ -997,6 +1011,8 @@ async def bootstrap_certificates_from_minutes(
             "user_id": user["user_id"],
             "holder_name": name,
             "holder_identifier": None,
+            "email": None,
+            "phone": None,
             "units": units,
             "issue_date": meeting_date,
             "certificate_number": certificate_number,

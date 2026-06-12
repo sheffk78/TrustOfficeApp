@@ -36,7 +36,8 @@ import {
   HeartPulse,
   ClipboardList,
   BookOpen,
-  NotebookTabs
+  NotebookTabs,
+  BarChart3
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -292,6 +293,24 @@ export const Sidebar = () => {
                 Admin
                 <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
                   staff
+                </span>
+              </span>
+            </Link>
+          )}
+          
+          {/* Stats link - visible to stats users. Appears next to Admin */}
+          {(user?.is_stats_user) && (
+            <Link
+              to="/stats"
+              className={`sidebar-item ${location.pathname === '/stats' ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+              data-testid="nav-stats"
+            >
+              <BarChart3 className="w-5 h-5" />
+              <span className="flex items-center gap-2">
+                Stats
+                <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
+                  view
                 </span>
               </span>
             </Link>

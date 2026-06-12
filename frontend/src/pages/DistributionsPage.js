@@ -29,7 +29,9 @@ import {
   HeartHandshake,
   MoreVertical,
   Link2,
-  FileText
+  FileText,
+  Send,
+  Mail
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -69,6 +71,10 @@ export default function DistributionsPage() {
   // Attach minutes dialog state
   const [attachMinutesDialog, setAttachMinutesDialog] = useState({ open: false, recordId: null });
   
+  // Send notice state
+  const [sendingNotice, setSendingNotice] = useState({});
+  const [sendNoticeResult, setSendNoticeResult] = useState({});
+
   const [formData, setFormData] = useState({
     date: new Date(),
     amount: '',
@@ -323,6 +329,30 @@ export default function DistributionsPage() {
   const handleMinutesAttached = () => {
     loadDistributions();
     setAttachMinutesDialog({ open: false, recordId: null });
+  };
+
+  // Send distribution notice to beneficiary
+  const handleSendNotice = async (dist) => {
+    setSendingNotice(prev => ({ ...prev, [dist.distribution_id]: true }));
+    setSendNoticeResult(prev => ({ ...prev, [dist.distribution_id]: null }));
+    try {
+      const response = await fetchWithAuth(`/distributions/${dist.distribution_id}/send-notice`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(`Notice sent to ${data.recipient_email}`);
+        setSendNoticeResult(prev => ({ ...prev, [dist.distribution_id]: 'sent' }));
+      } else {
+        toast.error(data.detail || 'Failed to send notice');
+        setSendNoticeResult(prev => ({ ...prev, [dist.distribution_id]: 'error' }));
+      }
+    } catch (error) {
+      toast.error('Failed to send notice');
+      setSendNoticeResult(prev => ({ ...prev, [dist.distribution_id]: 'error' }));
+    } finally {
+      setSendingNotice(prev => ({ ...prev, [dist.distribution_id]: false }));
+    }
   };
 
   return (
@@ -608,6 +638,7 @@ export default function DistributionsPage() {
                     <th className="text-right">Amount</th>
                     <th className="text-center">Status</th>
                     <th className="text-center">Minutes</th>
+                    <th className="text-center">Notice</th>
                     <th className="text-center">Actions</th>
                   </tr>
                 </thead>
@@ -651,6 +682,27 @@ export default function DistributionsPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
+                      </td>
+                      <td className="text-center">
+                        <button
+                          onClick={() => handleSendNotice(dist)}
+                          disabled={sendingNotice[dist.distribution_id] || sendNoticeResult[dist.distribution_id] === 'sent'}
+                          className={`p-1 transition-colors ${
+                            sendNoticeResult[dist.distribution_id] === 'sent'
+                              ? 'text-gold'
+                              : 'text-navy/60 hover:text-navy hover:bg-navy/10'
+                          }`}
+                          title={sendNoticeResult[dist.distribution_id] === 'sent' ? 'Notice sent' : 'Send distribution notice to beneficiary'}
+                          data-testid={`send-notice-${dist.distribution_id}`}
+                        >
+                          {sendingNotice[dist.distribution_id] ? (
+                            <div className="w-4 h-4 border-2 border-navy/30 border-t-navy animate-spin" />
+                          ) : sendNoticeResult[dist.distribution_id] === 'sent' ? (
+                            <Mail className="w-4 h-4" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                        </button>
                       </td>
                       <td className="text-center">
                         {status === 'review' && (

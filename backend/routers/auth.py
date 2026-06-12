@@ -424,6 +424,7 @@ async def get_me(user: dict = Depends(get_current_user)):
     """Get current user profile"""
     PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
     is_admin = user.get("is_admin", False) or user.get("email", "").lower() == PRIMARY_ADMIN_EMAIL
+    is_stats_user = user.get("is_stats_user", False)
     
     return UserResponse(
         user_id=user["user_id"],
@@ -431,7 +432,8 @@ async def get_me(user: dict = Depends(get_current_user)):
         name=user["name"],
         picture=user.get("picture"),
         created_at=user.get("created_at", ""),
-        is_admin=is_admin
+        is_admin=is_admin,
+        is_stats_user=is_stats_user
     )
 
 

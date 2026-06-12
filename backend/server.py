@@ -69,6 +69,7 @@ from routers.referrals import router as referrals_router
 from routers.admin import router as admin_router
 from routers.contact import router as contact_router
 from routers.admin_api import router as admin_api_router
+from routers.stats import router as stats_router
 from routers.transactions import router as transactions_router
 from routers.alerts import router as alerts_router
 from routers.audit_defense import router as audit_defense_router
@@ -312,6 +313,7 @@ app.include_router(referrals_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(contact_router, prefix="/api")
 app.include_router(admin_api_router, prefix="/api")
+app.include_router(stats_router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
 app.include_router(audit_defense_router, prefix="/api")

@@ -106,6 +106,8 @@ export default function BeneficiariesPage() {
   const [certificateForm, setCertificateForm] = useState({
     holder_name: '',
     holder_identifier: '',
+    email: '',
+    phone: '',
     units: '',
     issue_date: format(new Date(), 'yyyy-MM-dd'),
     notes: ''
@@ -194,6 +196,8 @@ export default function BeneficiariesPage() {
       setCertificateForm({
         holder_name: editing.holder_name,
         holder_identifier: editing.holder_identifier || '',
+        email: editing.email || '',
+        phone: editing.phone || '',
         units: editing.units.toString(),
         issue_date: editing.issue_date?.split('T')[0] || format(new Date(), 'yyyy-MM-dd'),
         notes: editing.notes || ''
@@ -244,8 +248,12 @@ export default function BeneficiariesPage() {
       toast.error('Failed to save settings');
     }
   };
+  const sanitizeOptional = (val) => {
+        return val === null || val === undefined || val.trim() === '' ? null : val;
+      };
 
-  const handleIssueCertificate = async () => {
+      // Handle issue/update certificate
+      const handleIssueCertificate = async () => {
     if (!certificateForm.holder_name || !certificateForm.units) {
       toast.error('Holder name and units are required');
       return;
@@ -261,13 +269,17 @@ export default function BeneficiariesPage() {
       const url = editingCertificate 
         ? `/trust-units/certificates/${editingCertificate.certificate_id}`
         : '/trust-units/certificates';
-      const method = editingCertificate ? 'PUT' : 'POST';
+      const method = editingCertificate ? 'PATCH' : 'POST';
       
       const response = await fetchWithAuth(url, {
         method,
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
           ...certificateForm,
+          holder_identifier: sanitizeOptional(certificateForm.holder_identifier),
+          email: sanitizeOptional(certificateForm.email),
+          phone: sanitizeOptional(certificateForm.phone),
+          notes: sanitizeOptional(certificateForm.notes),
           units: parseFloat(certificateForm.units)
         })
       });
@@ -363,6 +375,8 @@ export default function BeneficiariesPage() {
     setCertificateForm({
       holder_name: '',
       holder_identifier: '',
+      email: '',
+      phone: '',
       units: '',
       issue_date: format(new Date(), 'yyyy-MM-dd'),
       notes: ''
@@ -375,6 +389,8 @@ export default function BeneficiariesPage() {
     setCertificateForm({
       holder_name: certificate.holder_name,
       holder_identifier: certificate.holder_identifier || '',
+      email: certificate.email || '',
+      phone: certificate.phone || '',
       units: certificate.units.toString(),
       issue_date: certificate.issue_date,
       notes: certificate.notes || ''
@@ -556,6 +572,12 @@ export default function BeneficiariesPage() {
                                     {ben.holder_identifier && (
                                       <p className="text-xs text-muted-foreground font-mono">{ben.holder_identifier}</p>
                                     )}
+                                    {ben.email && (
+                                      <p className="text-xs text-muted-foreground">{ben.email}</p>
+                                    )}
+                                    {ben.phone && (
+                                      <p className="text-xs text-muted-foreground">{ben.phone}</p>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-6">
@@ -683,6 +705,12 @@ export default function BeneficiariesPage() {
                               {cert.certificate_number} • {cert.units} {summary?.settings?.unit_label || 'Unit'}s ({cert.percentage.toFixed(2)}%)
                             </p>
                             <p className="text-xs text-muted-foreground font-mono">Issued {formatDate(cert.issue_date)}</p>
+                            {cert.email && (
+                              <p className="text-xs text-muted-foreground">{cert.email}</p>
+                            )}
+                            {cert.phone && (
+                              <p className="text-xs text-muted-foreground">{cert.phone}</p>
+                            )}
                           </div>
                         </div>
                         
@@ -800,6 +828,26 @@ export default function BeneficiariesPage() {
                 value={certificateForm.holder_identifier}
                 onChange={(e) => setCertificateForm({ ...certificateForm, holder_identifier: e.target.value })}
                 placeholder="SSN last 4, EIN, etc."
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="label-trust">Email</Label>
+              <Input
+                type="email"
+                value={certificateForm.email}
+                onChange={(e) => setCertificateForm({ ...certificateForm, email: e.target.value })}
+                placeholder="beneficiary@email.com"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="label-trust">Phone</Label>
+              <Input
+                type="tel"
+                value={certificateForm.phone}
+                onChange={(e) => setCertificateForm({ ...certificateForm, phone: e.target.value })}
+                placeholder="(555) 123-4567"
                 className="mt-1"
               />
             </div>

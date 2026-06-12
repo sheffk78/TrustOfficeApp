@@ -388,7 +388,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     exchangeAuthCode,
-    seedDemoData
+    seedDemoData,
+    isStatsUser: user?.is_stats_user || false,
   };
 
   return (

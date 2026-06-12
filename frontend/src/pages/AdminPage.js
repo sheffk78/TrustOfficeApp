@@ -36,7 +36,9 @@ import {
   RefreshCw,
   Eye,
   CheckSquare,
-  LogIn
+  LogIn,
+  BarChart3,
+  Calendar
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -84,6 +86,15 @@ export default function AdminPage() {
   
   // Admin list
   const [admins, setAdmins] = useState([]);
+  
+  // Revenue data for Revenue tab
+  const [revenueData, setRevenueData] = useState(null);
+  const [revenuePreset, setRevenuePreset] = useState('last_30_days');
+  const [revenueLoading, setRevenueLoading] = useState(false);
+  const [revenueError, setRevenueError] = useState(null);
+  
+  // Stats users list
+  const [statsUsers, setStatsUsers] = useState([]);
   
   // Check if user is admin - first check from user object, then verify with API
   const [isAdmin, setIsAdmin] = useState(false);
@@ -209,6 +220,83 @@ export default function AdminPage() {
     }
   };
 
+  // Fetch revenue data
+  const fetchRevenueData = useCallback(async () => {
+    setRevenueLoading(true);
+    setRevenueError(null);
+    try {
+      const response = await fetchWithAuth(`/admin/revenue?preset=${revenuePreset}`);
+      if (response.ok) {
+        const data = await response.json();
+        setRevenueData(data);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setRevenueError(errorData.detail || 'Failed to load revenue data');
+      }
+    } catch (error) {
+      console.error('Failed to fetch revenue data:', error);
+      setRevenueError('Failed to load revenue data. Please try again.');
+    } finally {
+      setRevenueLoading(false);
+    }
+  }, [revenuePreset]);
+
+  // Fetch stats users
+  const fetchStatsUsers = async () => {
+    try {
+      const response = await fetchWithAuth('/admin/stats-users');
+      if (response.ok) {
+        const data = await response.json();
+        setStatsUsers(data.stats_users || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats users:', error);
+    }
+  };
+
+  // Grant/revoke stats access handlers
+  const handleGrantStats = async (userId) => {
+    try {
+      const response = await fetchWithAuth(`/admin/customers/${userId}/grant-stats`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      if (response.ok) {
+        toast.success('Stats access granted');
+        fetchCustomers();
+        if (customerDetail?.user_id === userId) {
+          fetchCustomerDetail(userId);
+        }
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to grant stats access');
+      }
+    } catch (error) {
+      toast.error('Failed to grant stats access');
+    }
+  };
+
+  const handleRevokeStats = async (userId) => {
+    try {
+      const response = await fetchWithAuth(`/admin/customers/${userId}/revoke-stats`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      if (response.ok) {
+        toast.success('Stats access revoked');
+        fetchCustomers();
+        if (customerDetail?.user_id === userId) {
+          fetchCustomerDetail(userId);
+        }
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to revoke stats access');
+      }
+    } catch (error) {
+      toast.error('Failed to revoke stats access');
+    }
+  };
+
   useEffect(() => {
     if (isAdmin && activeTab === 'referrals') {
       fetchReferrals();
@@ -216,7 +304,13 @@ export default function AdminPage() {
     if (isAdmin && activeTab === 'admins') {
       fetchAdmins();
     }
-  }, [isAdmin, activeTab]);
+    if (isAdmin && activeTab === 'revenue') {
+      fetchRevenueData();
+    }
+    if (isAdmin && activeTab === 'admins') {
+      fetchStatsUsers();
+    }
+  }, [isAdmin, activeTab, fetchRevenueData]);
 
   // Actions
   const handleMakeAdmin = async (userId) => {
@@ -610,6 +704,10 @@ export default function AdminPage() {
                 <Users className="w-4 h-4" />
                 Customers
               </TabsTrigger>
+              <TabsTrigger value="revenue" className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Revenue
+              </TabsTrigger>
               <TabsTrigger value="admins" className="flex items-center gap-2">
                 <Crown className="w-4 h-4" />
                 Admins
@@ -619,6 +717,284 @@ export default function AdminPage() {
                 Referrals
               </TabsTrigger>
             </TabsList>
+
+            {/* Revenue Tab */}
+            <TabsContent value="revenue">
+              {/* Date Range Selector */}
+              <div className="card-trust p-4 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium text-navy dark:text-white text-sm">Date Range</span>
+                  </div>
+                  <button
+                    onClick={() => fetchRevenueData()}
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-navy dark:hover:text-white"
+                    disabled={revenueLoading}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${revenueLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: 'today', label: 'Today' },
+                    { key: 'this_week', label: 'This Week' },
+                    { key: 'this_month', label: 'This Month' },
+                    { key: 'last_30_days', label: 'Last 30 Days' },
+                    { key: 'last_90_days', label: 'Last 90 Days' },
+                    { key: 'all_time', label: 'All Time' },
+                  ].map((p) => (
+                    <button
+                      key={p.key}
+                      onClick={() => setRevenuePreset(p.key)}
+                      className={`px-3 py-1.5 text-sm font-mono transition-colors ${
+                        revenuePreset === p.key
+                          ? 'bg-navy text-white dark:bg-gold dark:text-navy'
+                          : 'bg-navy/5 dark:bg-white/5 text-navy dark:text-white hover:bg-navy/10 dark:hover:bg-white/10'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {revenueData?.date_range && (
+                  <p className="text-xs text-muted-foreground mt-2 font-mono">
+                    {new Date(revenueData.date_range.start).toLocaleDateString()} — {new Date(revenueData.date_range.end).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+
+              {/* Error state */}
+              {revenueError && (
+                <div className="card-trust p-4 mb-6 border border-rust/30 bg-rust/5 dark:bg-rust/10">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 text-rust" />
+                    <p className="font-medium text-rust">{revenueError}</p>
+                  </div>
+                </div>
+              )}
+
+              {revenueLoading && !revenueData ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-8 h-8 animate-spin text-navy dark:text-white" />
+                </div>
+              ) : revenueData ? (
+                <>
+                  {/* Revenue Metric Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <DollarSign className="w-4 h-4 text-gold" />
+                        <span className="text-xs">Total Revenue</span>
+                      </div>
+                      <p className="text-2xl font-bold text-navy dark:text-white">
+                        {revenueData.total_revenue_formatted}
+                      </p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <TrendingUp className="w-4 h-4 text-gold" />
+                        <span className="text-xs">MRR</span>
+                      </div>
+                      <p className="text-2xl font-bold text-gold">
+                        {revenueData.mrr_formatted}
+                      </p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <TrendingUp className="w-4 h-4 text-navy dark:text-white" />
+                        <span className="text-xs">ARR</span>
+                      </div>
+                      <p className="text-2xl font-bold text-navy dark:text-white">
+                        {revenueData.arr_formatted}
+                      </p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <Users className="w-4 h-4 text-navy dark:text-white" />
+                        <span className="text-xs">Paid Customers</span>
+                      </div>
+                      <p className="text-2xl font-bold text-navy dark:text-white">
+                        {revenueData.paid_customers}
+                      </p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <DollarSign className="w-4 h-4 text-navy dark:text-white" />
+                        <span className="text-xs">Avg/Customer</span>
+                      </div>
+                      <p className="text-2xl font-bold text-navy dark:text-white">
+                        {revenueData.avg_revenue_per_customer_formatted}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Period Revenue Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div className="card-trust p-4">
+                      <div className="text-xs text-muted-foreground mb-1">Today</div>
+                      <p className="text-lg font-bold text-navy dark:text-white">{revenueData.revenue_today_formatted}</p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="text-xs text-muted-foreground mb-1">This Week</div>
+                      <p className="text-lg font-bold text-navy dark:text-white">{revenueData.revenue_this_week_formatted}</p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="text-xs text-muted-foreground mb-1">This Month</div>
+                      <p className="text-lg font-bold text-navy dark:text-white">{revenueData.revenue_this_month_formatted}</p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="text-xs text-muted-foreground mb-1">All Time</div>
+                      <p className="text-lg font-bold text-gold">{revenueData.revenue_all_time_formatted}</p>
+                    </div>
+                  </div>
+
+                  {/* Revenue Over Time & Plan Breakdown */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    {/* Revenue Chart */}
+                    <div className="card-trust p-6 lg:col-span-2">
+                      <h2 className="font-serif text-xl text-navy dark:text-white mb-4">Revenue Over Time</h2>
+                      {revenueData.revenue_by_month?.length > 0 ? (
+                        <div className="space-y-2">
+                          {revenueData.revenue_by_month.map((month) => {
+                            const maxRev = Math.max(...revenueData.revenue_by_month.map(m => m.amount_cents));
+                            return (
+                              <div key={month.month} className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-muted-foreground w-20 shrink-0">
+                                  {(() => {
+                                    const [y, m] = month.month.split('-');
+                                    return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                  })()}
+                                </span>
+                                <div className="flex-1 bg-navy/5 dark:bg-white/5 h-8 relative overflow-hidden">
+                                  <div
+                                    className="h-full bg-gold/80 dark:bg-gold/60 transition-all duration-300"
+                                    style={{ width: maxRev > 0 ? `${(month.amount_cents / maxRev) * 100}%` : '0%' }}
+                                  />
+                                </div>
+                                <span className="text-sm font-mono text-navy dark:text-white w-24 text-right shrink-0">
+                                  ${(month.amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                          <p>No revenue data available for this period</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Plan Breakdown */}
+                    <div className="card-trust p-6">
+                      <h2 className="font-serif text-xl text-navy dark:text-white mb-4">Plan Breakdown</h2>
+                      <div className="space-y-4">
+                        <div className="p-4 bg-navy/5 dark:bg-white/5">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-navy dark:text-white">Monthly</span>
+                            <span className="text-sm font-mono text-gold">{revenueData.subscriptions_by_plan?.monthly || 0} invoices</span>
+                          </div>
+                          <div className="w-full bg-navy/10 dark:bg-white/10 h-2">
+                            <div
+                              className="h-full bg-gold transition-all"
+                              style={{ width: `${((revenueData.subscriptions_by_plan?.monthly || 0) / Math.max((revenueData.subscriptions_by_plan?.monthly || 0) + (revenueData.subscriptions_by_plan?.annual || 0), 1)) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="p-4 bg-navy/5 dark:bg-white/5">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-navy dark:text-white">Annual</span>
+                            <span className="text-sm font-mono text-navy dark:text-white">{revenueData.subscriptions_by_plan?.annual || 0} invoices</span>
+                          </div>
+                          <div className="w-full bg-navy/10 dark:bg-white/10 h-2">
+                            <div
+                              className="h-full bg-navy dark:bg-white transition-all"
+                              style={{ width: `${((revenueData.subscriptions_by_plan?.annual || 0) / Math.max((revenueData.subscriptions_by_plan?.monthly || 0) + (revenueData.subscriptions_by_plan?.annual || 0), 1)) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="border-t border-navy/10 dark:border-white/10 pt-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground">Active Monthly Subs</span>
+                            <span className="text-sm font-bold text-navy dark:text-white">{revenueData.monthly_subs || 0}</span>
+                          </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-sm font-medium text-muted-foreground">Active Annual Subs</span>
+                            <span className="text-sm font-bold text-navy dark:text-white">{revenueData.annual_subs || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent Transactions */}
+                  <div className="card-trust p-6">
+                    <h2 className="font-serif text-xl text-navy dark:text-white mb-4">
+                      Recent Transactions
+                    </h2>
+                    {revenueData.recent_transactions?.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-navy/10 dark:border-white/10">
+                              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
+                              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Customer</th>
+                              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
+                              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Plan</th>
+                              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {revenueData.recent_transactions.slice(0, 25).map((tx, idx) => (
+                              <tr key={idx} className="border-b border-navy/5 dark:border-white/5 hover:bg-navy/5 dark:hover:bg-white/5">
+                                <td className="py-3 px-4 text-sm text-navy dark:text-white">
+                                  {new Date(tx.date).toLocaleDateString()}
+                                </td>
+                                <td className="py-3 px-4 text-sm text-muted-foreground">
+                                  {tx.customer_email || '—'}
+                                </td>
+                                <td className="py-3 px-4 text-sm font-mono text-gold">
+                                  ${(tx.amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className={`px-2 py-0.5 text-xs font-mono ${
+                                    tx.plan === 'annual'
+                                      ? 'bg-navy/10 dark:bg-white/10 text-navy dark:text-white'
+                                      : 'bg-gold/20 text-gold'
+                                  }`}>
+                                    {tx.plan}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                    {tx.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No transactions found for this period</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="card-trust p-12 text-center">
+                  <BarChart3 className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-30" />
+                  <h2 className="font-serif text-xl text-navy dark:text-white mb-2">No Revenue Data</h2>
+                  <p className="text-muted-foreground">
+                    Revenue data will appear here once there are paid subscriptions.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
 
             {/* Customers Tab */}
             <TabsContent value="customers">
@@ -732,6 +1108,9 @@ export default function AdminPage() {
                                 {customer.name}
                                 {customer.is_admin && (
                                   <Crown className="w-4 h-4 text-gold" />
+                                )}
+                                {customer.is_stats_user && !customer.is_admin && (
+                                  <BarChart3 className="w-4 h-4 text-gold" />
                                 )}
                               </p>
                               <p className="text-sm text-muted-foreground">{customer.email}</p>
@@ -867,6 +1246,52 @@ export default function AdminPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Stats Users Section */}
+              <div className="card-trust mt-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="font-serif text-xl text-navy dark:text-white flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-gold" />
+                    Stats Users
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Users with read-only revenue dashboard access</p>
+                </div>
+                
+                {statsUsers.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No stats users configured. Grant stats access from the customer detail view.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {statsUsers.map((su) => (
+                      <div key={su.user_id} className="flex items-center justify-between p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
+                            <BarChart3 className="w-5 h-5 text-gold" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-navy dark:text-white">
+                              {su.name}
+                              {su.is_admin && <Crown className="w-4 h-4 text-gold ml-2 inline" />}
+                            </p>
+                            <p className="text-sm text-muted-foreground">{su.email}</p>
+                            {su.stats_granted_at && (
+                              <p className="text-xs text-muted-foreground">Granted: {new Date(su.stats_granted_at).toLocaleDateString()}</p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleRevokeStats(su.user_id)}
+                        >
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Revoke Stats
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </TabsContent>
 
             {/* Referrals Tab */}
@@ -950,6 +1375,12 @@ export default function AdminPage() {
                       <span className="text-sm text-muted-foreground">
                         {customerDetail.subscription?.plan_type}
                       </span>
+                      {customerDetail.is_stats_user && (
+                        <Badge className="bg-gold/20 text-gold ml-2">
+                          <BarChart3 className="w-3 h-3 mr-1" />
+                          Stats Access
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   
@@ -1036,6 +1467,27 @@ export default function AdminPage() {
                       >
                         <XCircle className="w-4 h-4 mr-2" />
                         Remove Admin
+                      </Button>
+                    )}
+                    
+                    {customerDetail.is_stats_user ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-rust hover:text-rust"
+                        onClick={() => handleRevokeStats(customerDetail.user_id)}
+                      >
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Revoke Stats
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleGrantStats(customerDetail.user_id)}
+                      >
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Grant Stats
                       </Button>
                     )}
                     

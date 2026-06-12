@@ -519,6 +519,37 @@ Amount: ${amount}
         """Get list of available template names"""
         return list(TEMPLATES.keys())
 
+    async def send_distribution_notice_to_beneficiary(
+        self,
+        to_email: str,
+        beneficiary_name: str,
+        trust_name: str,
+        amount: float,
+        date: str,
+        category: str = None,
+        status: str = None,
+        notes: str = None,
+        from_user_name: str = None
+    ) -> Dict[str, Any]:
+        """Send distribution notice directly to a beneficiary"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="distribution_notice",
+            template_data={
+                "beneficiary_name": beneficiary_name,
+                "trust_name": trust_name,
+                "amount": amount,
+                "date": date,
+                "category": category or "Distribution",
+                "status": status or "approved",
+                "notes": notes,
+                "sender_name": from_user_name or "Trustee"
+            },
+            to_name=beneficiary_name,
+            tag="distribution_notice",
+            metadata={"email_type": "distribution_notice"}
+        )
+
 
 # Create singleton instance
 email_service = EmailService()

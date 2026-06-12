@@ -16,6 +16,7 @@ from models import (
     DashboardResponse, DashboardSubscriptionState,
     DismissedInsightCreate, DismissedInsightResponse
 )
+from routers.tasks import CHECKLIST_TEMPLATES
 
 router = APIRouter(tags=["governance"])
 
@@ -61,13 +62,17 @@ async def ensure_transaction_review_task(trust_id: str, user_id: str):
             else:
                 due = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
 
+            task_type = "transaction_review"
+            checklist_items = CHECKLIST_TEMPLATES.get(task_type, [])
+            
             await db.governance_tasks.insert_one({
                 "task_id": f"task_{uuid.uuid4().hex[:12]}",
                 "trust_id": trust_id,
                 "user_id": user_id,
-                "task_type": "transaction_review",
+                "task_type": task_type,
                 "due_date": due.isoformat(),
                 "description": "Monthly Transaction Classification Review — classify any untagged imported transactions and review separation alerts",
+                "checklist_items": checklist_items,
                 "status": "pending",
                 "completed_at": None,
                 "created_at": now.isoformat()

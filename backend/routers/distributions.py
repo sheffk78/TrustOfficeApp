@@ -378,7 +378,7 @@ async def delete_distribution(distribution_id: str, user: dict = Depends(require
 @router.get("/benevolence-log", response_model=BenevolenceLogResponse)
 async def get_benevolence_log(
     trust_id: Optional[str] = None,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """
     Get all benevolence distributions for a trust with aggregated totals.
@@ -481,3 +481,93 @@ async def get_benevolence_log(
         total_count=len(benevolence_dists),
         incomplete_documentation_count=incomplete_count
     )
+
+
+@router.post("/distributions/{distribution_id}/send-notice")
+async def send_distribution_notice(
+    distribution_id: str,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(require_write_access)
+):
+    """Send a distribution notice email to the beneficiary.
+    
+    Looks up the beneficiary's email from certificate records (Phase 1 data).
+    Requires the distribution to exist and the beneficiary to have an email on file.
+    """
+    # Find the distribution
+    dist = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not dist:
+        raise HTTPException(status_code=404, detail="Distribution not found")
+    
+    # Get trust info
+    trust = await db.trusts.find_one(
+        {"trust_id": dist["trust_id"], "user_id": user["user_id"]},
+        {"_id": 0, "name": 1, "trust_id": 1}
+    )
+    trust_name = trust.get("name", "Trust") if trust else "Trust"
+    
+    # Idempotency check — reject if notice was already sent
+    if dist.get("notice_sent_at"):
+        existing_cert = await db.trust_unit_certificates.find_one(
+            {"trust_id": dist["trust_id"], "holder_name": dist.get("beneficiary_name", "")},
+            {"_id": 0, "email": 1}
+        )
+        existing_email = existing_cert.get("email") if existing_cert else None
+        raise HTTPException(
+            status_code=409,
+            detail=f"Distribution notice was already sent on {dist['notice_sent_at']}"
+        )
+
+    # Look up beneficiary email from certificate records (case-insensitive)
+    beneficiary_name = dist.get("beneficiary_name", "")
+    escaped_name = re.escape(beneficiary_name.strip())
+    cert = await db.trust_unit_certificates.find_one(
+        {"trust_id": dist["trust_id"], "holder_name": {"$regex": f"^{escaped_name}$", "$options": "i"}},
+        {"_id": 0, "email": 1, "phone": 1, "holder_name": 1}
+    )
+    
+    beneficiary_email = cert.get("email") if cert else None
+    
+    if not beneficiary_email:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No email address on file for beneficiary '{beneficiary_name}'. Add an email to their certificate record first."
+        )
+    
+    # Format amount
+    amount = dist.get("amount", 0)
+    date_str = dist.get("date", "")
+    status = "approved" if dist.get("approved_at") else "review"
+    category = dist.get("purpose_classification", "Distribution")
+    notes = dist.get("notes", "")
+    
+    # Send the notice
+    background_tasks.add_task(
+        email_service.send_distribution_notice_to_beneficiary,
+        to_email=beneficiary_email,
+        beneficiary_name=beneficiary_name,
+        trust_name=trust_name,
+        amount=amount,
+        date=date_str,
+        category=category,
+        status=status,
+        notes=notes,
+        from_user_name=user.get("name", "")
+    )
+    
+    # Record that notice was sent (idempotency)
+    notice_sent_at = datetime.now(timezone.utc).isoformat()
+    await db.distribution_records.update_one(
+        {"distribution_id": distribution_id},
+        {"$set": {"notice_sent_at": notice_sent_at}}
+    )
+    
+    return {
+        "message": "Distribution notice sent",
+        "recipient_email": beneficiary_email,
+        "beneficiary_name": beneficiary_name,
+        "notice_sent_at": notice_sent_at
+    }

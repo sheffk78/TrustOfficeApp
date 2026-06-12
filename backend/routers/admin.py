@@ -15,6 +15,8 @@ FEATURES:
 - Delete accounts
 - Grant/revoke access
 - View system stats
+- View revenue data from Stripe
+- Grant/revoke stats access
 """
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List
@@ -22,15 +24,22 @@ import re
 import os
 import secrets
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict
 from pydantic import BaseModel, EmailStr
 import uuid
 import logging
+
+import stripe
 
 from database import db
 from dependencies import get_current_user, hash_password, TRIAL_DAYS
 from email_service import email_service
 
 logger = logging.getLogger(__name__)
+
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID')
+STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -42,6 +51,7 @@ class CustomerListItem(BaseModel):
     email: str
     name: str
     is_admin: bool = False
+    is_stats_user: bool = False
     created_at: str
     subscription_status: str
     subscription_plan: str
@@ -55,6 +65,7 @@ class CustomerDetail(BaseModel):
     name: str
     picture: Optional[str] = None
     is_admin: bool = False
+    is_stats_user: bool = False
     created_at: str
     google_id: Optional[str] = None
     subscription: dict
@@ -102,6 +113,14 @@ class SystemStats(BaseModel):
     total_distributions: int
     new_users_30d: int
     revenue_estimate_monthly: float
+    # Real Stripe revenue fields
+    stripe_total_revenue_cents: int = 0
+    stripe_mrr_cents: int = 0
+    stripe_arr_cents: int = 0
+    stripe_paid_customers: int = 0
+    stripe_total_transactions: int = 0
+    monthly_subs: int = 0
+    annual_subs: int = 0
 
 
 # ==================== ADMIN CHECK ====================
@@ -204,6 +223,7 @@ async def list_customers(
             email=user["email"],
             name=user.get("name", ""),
             is_admin=user.get("is_admin", False),
+            is_stats_user=user.get("is_stats_user", False),
             created_at=user.get("created_at", ""),
             subscription_status=sub_status,
             subscription_plan=sub_plan,
@@ -275,6 +295,7 @@ async def get_customer_detail(
         name=user.get("name", ""),
         picture=user.get("picture"),
         is_admin=user.get("is_admin", False),
+        is_stats_user=user.get("is_stats_user", False),
         created_at=user.get("created_at", ""),
         google_id=user.get("google_id"),
         subscription=sub or {"status": "none", "plan_type": "none"},
@@ -858,6 +879,7 @@ async def fix_referral(
 async def get_system_stats(admin: dict = Depends(require_admin)):
     """
     Get system-wide statistics for the admin dashboard.
+    Now includes real Stripe revenue data alongside estimates.
     """
     now = datetime.now(timezone.utc)
     thirty_days_ago = (now - timedelta(days=30)).isoformat()
@@ -879,10 +901,45 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
     total_minutes = await db.minutes_records.count_documents({})
     total_distributions = await db.distribution_records.count_documents({})
     
-    # Revenue estimate (very rough)
+    # Revenue estimate (rough calculation from DB)
     monthly_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
     annual_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "annual"})
     revenue_estimate = (monthly_subs * 79) + (annual_subs * 790 / 12)
+    
+    # Real Stripe revenue data
+    stripe_total_revenue_cents = 0
+    stripe_mrr_cents = 0
+    stripe_arr_cents = 0
+    stripe_paid_customers = 0
+    stripe_total_transactions = 0
+    
+    try:
+        # Fetch all-time paid invoices from Stripe for total revenue
+        all_invoices = stripe.Invoice.list(
+            status="paid",
+            limit=100,
+            created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())}
+        )
+        
+        customer_ids = set()
+        for inv in all_invoices.auto_paging_iter():
+            amount = inv.amount_paid or inv.total or 0
+            stripe_total_revenue_cents += amount
+            stripe_total_transactions += 1
+            if inv.customer_id:
+                customer_ids.add(inv.customer_id)
+        
+        stripe_paid_customers = len(customer_ids)
+        
+        # Calculate MRR from active subscriptions
+        # Monthly: $79/mo, Annual: $790/yr ≈ $65.83/mo
+        stripe_mrr_cents = (monthly_subs * 7900) + (annual_subs * 6583)
+        stripe_arr_cents = stripe_mrr_cents * 12
+        
+    except stripe.StripeError as e:
+        logger.error(f"Stripe API error in /admin/stats: {e}")
+    except Exception as e:
+        logger.error(f"Error fetching Stripe data in /admin/stats: {e}")
     
     return SystemStats(
         total_users=total_users,
@@ -894,8 +951,307 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
         total_minutes=total_minutes,
         total_distributions=total_distributions,
         new_users_30d=new_users_30d,
-        revenue_estimate_monthly=round(revenue_estimate, 2)
+        revenue_estimate_monthly=round(revenue_estimate, 2),
+        stripe_total_revenue_cents=stripe_total_revenue_cents,
+        stripe_mrr_cents=stripe_mrr_cents,
+        stripe_arr_cents=stripe_arr_cents,
+        stripe_paid_customers=stripe_paid_customers,
+        stripe_total_transactions=stripe_total_transactions,
+        monthly_subs=monthly_subs,
+        annual_subs=annual_subs,
     )
+
+
+# ==================== REVENUE ENDPOINT ====================
+
+@router.get("/revenue")
+async def get_revenue_data(
+    preset: str = Query("last_30_days", description="Date range preset: today, this_week, this_month, last_30_days, last_90_days, all_time"),
+    start_date: Optional[str] = Query(None, description="Custom start date (ISO format). Overrides preset."),
+    end_date: Optional[str] = Query(None, description="Custom end date (ISO format). Overrides preset."),
+    admin: dict = Depends(require_admin)
+):
+    """
+    Get detailed revenue data from Stripe for the admin dashboard.
+    Includes customer-level transaction data (admin only).
+    """
+    # Determine date range
+    now = datetime.now(timezone.utc)
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            if end_dt <= start_dt:
+                raise HTTPException(status_code=400, detail="end_date must be after start_date")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format.")
+    else:
+        # Use preset
+        if preset == "today":
+            start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_dt = now
+        elif preset == "this_week":
+            days_since_monday = now.weekday()
+            start_dt = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+            end_dt = now
+        elif preset == "this_month":
+            start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_dt = now
+        elif preset == "last_30_days":
+            start_dt = now - timedelta(days=30)
+            end_dt = now
+        elif preset == "last_90_days":
+            start_dt = now - timedelta(days=90)
+            end_dt = now
+        elif preset == "all_time":
+            start_dt = datetime(2020, 1, 1, tzinfo=timezone.utc)
+            end_dt = now
+        else:
+            start_dt = now - timedelta(days=30)
+            end_dt = now
+    
+    start_ts = int(start_dt.timestamp())
+    end_ts = int(end_dt.timestamp())
+    
+    total_revenue_cents = 0
+    total_transactions = 0
+    customer_ids = set()
+    revenue_by_month = defaultdict(int)
+    subscriptions_by_plan = {"monthly": 0, "annual": 0}
+    recent_transactions = []
+    stripe_error = None
+    
+    try:
+        has_more = True
+        starting_after = None
+        invoice_count = 0
+        
+        while has_more and invoice_count < 5000:
+            params = {
+                "status": "paid",
+                "created": {"gte": start_ts, "lte": end_ts},
+                "limit": 100,
+            }
+            if starting_after:
+                params["starting_after"] = starting_after
+            
+            invoices = stripe.Invoice.list(**params)
+            
+            for inv in invoices.data:
+                invoice_count += 1
+                amount = inv.amount_paid or inv.total or 0
+                total_revenue_cents += amount
+                total_transactions += 1
+                
+                if inv.customer_id:
+                    customer_ids.add(inv.customer_id)
+                
+                # Revenue by month
+                inv_date = datetime.fromtimestamp(inv.created, tz=timezone.utc)
+                month_key = inv_date.strftime("%Y-%m")
+                revenue_by_month[month_key] += amount
+                
+                # Plan detection
+                plan_type = "monthly"
+                for line in inv.lines.data:
+                    if line.price and line.price.id:
+                        if line.price.id == STRIPE_ANNUAL_PRICE_ID:
+                            plan_type = "annual"
+                            break
+                        elif line.price.id == STRIPE_MONTHLY_PRICE_ID:
+                            plan_type = "monthly"
+                            break
+                
+                subscriptions_by_plan[plan_type] = subscriptions_by_plan.get(plan_type, 0) + 1
+                
+                # Customer email (admin can see)
+                customer_email = ""
+                try:
+                    if inv.customer_id:
+                        customer = stripe.Customer.retrieve(inv.customer_id)
+                        customer_email = customer.email or ""
+                except stripe.StripeError:
+                    customer_email = inv.customer_email or ""
+                
+                recent_transactions.append({
+                    "date": inv_date.isoformat(),
+                    "customer_email": customer_email,
+                    "amount_cents": amount,
+                    "plan": plan_type,
+                    "status": inv.status,
+                    "invoice_id": inv.id,
+                })
+            
+            has_more = invoices.has_more
+            if has_more and invoices.data:
+                starting_after = invoices.data[-1].id
+            else:
+                break
+                
+    except stripe.StripeError as e:
+        logger.error(f"Stripe API error in /admin/revenue: {e}")
+        stripe_error = str(e)
+    except Exception as e:
+        logger.error(f"Error fetching revenue data: {e}")
+        stripe_error = str(e)
+    
+    # Sort recent transactions by date descending
+    recent_transactions.sort(key=lambda t: t["date"], reverse=True)
+    recent_transactions = recent_transactions[:100]
+    
+    # Format revenue by month
+    revenue_by_month_list = [
+        {"month": k, "amount_cents": v}
+        for k, v in sorted(revenue_by_month.items())
+    ]
+    
+    # Calculate MRR and ARR from DB subscriptions
+    monthly_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
+    annual_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "annual"})
+    mrr_cents = (monthly_active * 7900) + (annual_active * 6583)
+    arr_cents = mrr_cents * 12
+    
+    # Period-specific revenue
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    revenue_today_cents = 0
+    revenue_this_week_cents = 0
+    revenue_this_month_cents = 0
+    revenue_all_time_cents = 0
+    
+    try:
+        today_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(today_start.timestamp())})
+        for inv in today_data.auto_paging_iter():
+            revenue_today_cents += inv.amount_paid or inv.total or 0
+        
+        week_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(week_start.timestamp())})
+        for inv in week_data.auto_paging_iter():
+            revenue_this_week_cents += inv.amount_paid or inv.total or 0
+        
+        month_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(month_start.timestamp())})
+        for inv in month_data.auto_paging_iter():
+            revenue_this_month_cents += inv.amount_paid or inv.total or 0
+        
+        all_time_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())})
+        for inv in all_time_data.auto_paging_iter():
+            revenue_all_time_cents += inv.amount_paid or inv.total or 0
+    except stripe.StripeError as e:
+        logger.error(f"Stripe API error fetching period revenue: {e}")
+        if not stripe_error:
+            stripe_error = str(e)
+    
+    avg_revenue_per_customer_cents = (
+        total_revenue_cents // len(customer_ids) if len(customer_ids) > 0 else 0
+    )
+    
+    return {
+        "total_revenue_cents": total_revenue_cents,
+        "total_revenue_formatted": f"${total_revenue_cents / 100:,.2f}",
+        "mrr_cents": mrr_cents,
+        "mrr_formatted": f"${mrr_cents / 100:,.2f}",
+        "arr_cents": arr_cents,
+        "arr_formatted": f"${arr_cents / 100:,.2f}",
+        "total_transactions": total_transactions,
+        "paid_customers": len(customer_ids),
+        "avg_revenue_per_customer_cents": avg_revenue_per_customer_cents,
+        "avg_revenue_per_customer_formatted": f"${avg_revenue_per_customer_cents / 100:,.2f}",
+        "revenue_by_month": revenue_by_month_list,
+        "subscriptions_by_plan": subscriptions_by_plan,
+        "revenue_today_cents": revenue_today_cents,
+        "revenue_today_formatted": f"${revenue_today_cents / 100:,.2f}",
+        "revenue_this_week_cents": revenue_this_week_cents,
+        "revenue_this_week_formatted": f"${revenue_this_week_cents / 100:,.2f}",
+        "revenue_this_month_cents": revenue_this_month_cents,
+        "revenue_this_month_formatted": f"${revenue_this_month_cents / 100:,.2f}",
+        "revenue_all_time_cents": revenue_all_time_cents,
+        "revenue_all_time_formatted": f"${revenue_all_time_cents / 100:,.2f}",
+        "monthly_subs": monthly_active,
+        "annual_subs": annual_active,
+        "recent_transactions": recent_transactions,
+        "date_range": {
+            "start": start_dt.isoformat(),
+            "end": end_dt.isoformat(),
+            "preset": preset,
+        },
+        "stripe_error": stripe_error,
+    }
+
+
+# ==================== STATS USER MANAGEMENT ====================
+
+@router.post("/customers/{user_id}/grant-stats")
+async def grant_stats_access(
+    user_id: str,
+    admin: dict = Depends(require_admin)
+):
+    """Grant stats access to a user."""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "is_stats_user": True,
+            "stats_granted_by": admin["user_id"],
+            "stats_granted_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    logger.info(f"Admin {admin['email']} granted stats access to {user['email']}")
+    
+    return {"message": f"Stats access granted to {user['email']}"}
+
+
+@router.post("/customers/{user_id}/revoke-stats")
+async def revoke_stats_access(
+    user_id: str,
+    admin: dict = Depends(require_admin)
+):
+    """Revoke stats access from a user."""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "is_stats_user": False,
+            "stats_revoked_by": admin["user_id"],
+            "stats_revoked_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    logger.info(f"Admin {admin['email']} revoked stats access from {user['email']}")
+    
+    return {"message": f"Stats access revoked from {user['email']}"}
+
+
+@router.get("/stats-users")
+async def list_stats_users(admin: dict = Depends(require_admin)):
+    """List all users with stats access."""
+    stats_users = await db.users.find(
+        {"is_stats_user": True},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    
+    return {
+        "stats_users": [
+            {
+                "user_id": u["user_id"],
+                "email": u.get("email", ""),
+                "name": u.get("name", ""),
+                "is_admin": u.get("is_admin", False),
+                "created_at": u.get("created_at", ""),
+                "stats_granted_at": u.get("stats_granted_at"),
+            }
+            for u in stats_users
+        ]
+    }
 
 
 @router.get("/debug/db-check")

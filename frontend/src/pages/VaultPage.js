@@ -13,7 +13,7 @@ import {
   FolderOpen, Plus, FileText, Calendar, Link as LinkIcon,
   Search, AlertTriangle, CheckCircle2, ExternalLink,
   Trash2, Tag, Shield, FileCheck, Upload, Download,
-  File, X, CloudUpload, Link2
+  File, X, CloudUpload, Link2, Copy, Check
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -71,7 +71,9 @@ export default function VaultPage() {
   const [activeCategory, setActiveCategory] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [copiedLinkId, setCopiedLinkId] = useState(null);
   const fileInputRef = useRef(null);
+  const copyTimeoutRef = useRef(null);
 
   const [form, setForm] = useState({
     title: '',
@@ -574,9 +576,35 @@ export default function VaultPage() {
                                 <Download className="w-3 h-3"/> Download
                               </button>
                             ) : doc.storage_url ? (
-                              <a href={doc.storage_url} target="_blank" rel="noopener noreferrer" className="text-xs text-navy hover:text-gold flex items-center gap-1">
-                                <ExternalLink className="w-3 h-3"/> Open
-                              </a>
+                              <div className="flex items-center gap-3">
+                                <a href={doc.storage_url} target="_blank" rel="noopener noreferrer" className="text-xs text-navy hover:text-gold flex items-center gap-1">
+                                  <ExternalLink className="w-3 h-3"/> Open
+                                </a>
+                                <button
+                                  onClick={() => {
+                                    // Clear any previous timeout to prevent flicker
+                                    if (copyTimeoutRef.current) {
+                                      clearTimeout(copyTimeoutRef.current);
+                                    }
+                                    navigator.clipboard.writeText(doc.storage_url).then(() => {
+                                      setCopiedLinkId(doc.doc_id);
+                                      toast.success('Link copied to clipboard');
+                                      copyTimeoutRef.current = setTimeout(() => setCopiedLinkId(null), 2000);
+                                    }).catch(() => {
+                                      toast.error('Failed to copy link');
+                                    });
+                                  }}
+                                  className="text-xs text-navy hover:text-gold flex items-center gap-1"
+                                  title="Copy external link"
+                                  data-testid={`copy-link-${doc.doc_id}`}
+                                >
+                                  {copiedLinkId === doc.doc_id ? (
+                                    <><Check className="w-3 h-3"/> Copied</>
+                                  ) : (
+                                    <><Copy className="w-3 h-3"/> Copy Link</>
+                                  )}
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-xs text-neutral-400">No link</span>
                             )}
