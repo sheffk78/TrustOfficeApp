@@ -226,8 +226,7 @@ export default function CoursePage() {
                         }`}
                         onClick={() => {
                           if (unlocked) {
-                            // Phase 2: navigate to lesson player
-                            // navigate(`/course/lesson/${lesson.number}`);
+                            navigate(`/course/lesson/${lesson.number}`);
                           }
                         }}
                       >
@@ -278,8 +277,7 @@ export default function CoursePage() {
                 <Button
                   className="btn-primary"
                   onClick={() => {
-                    // Phase 2: navigate to first lesson
-                    // navigate('/course/lesson/1');
+                    navigate('/course/lesson/1');
                   }}
                 >
                   <Play className="w-4 h-4 mr-2" />
