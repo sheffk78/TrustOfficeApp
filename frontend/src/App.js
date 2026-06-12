@@ -41,7 +41,6 @@ import VaultPage from "@/pages/VaultPage";
 import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import PrintableBinderPage from "@/pages/PrintableBinderPage";
 import CoursePage from "@/pages/CoursePage";
-import LessonPlayerPage from "@/pages/LessonPlayerPage";
 import TrustAssistantPage from "@/pages/TrustAssistantPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -316,11 +315,6 @@ const AppRouter = () => {
 <Route path="/course" element={
         <SubscriptionProtectedRoute>
           <CoursePage />
-        </SubscriptionProtectedRoute>
-      } />
-      <Route path="/course/lesson/:lessonNumber" element={
-        <SubscriptionProtectedRoute>
-          <LessonPlayerPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/binder" element={
