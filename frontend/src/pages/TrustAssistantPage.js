@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import SnapshotColumn from '@/components/SnapshotColumn';
 import ChatPanel from '@/components/ChatPanel';
+import ActionEditModal from '@/components/ActionEditModal';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
 
@@ -50,6 +51,12 @@ const TrustAssistantPage = () => {
     confirmAction,
   } = useChatHistory();
 
+  // Edit modal state
+  const [editingCard, setEditingCard] = useState(null);
+
+  // Conversation switching loading state
+  const [loadingConversation, setLoadingConversation] = useState(false);
+
   // Load conversations on mount
   useEffect(() => {
     fetchConversations();
@@ -62,11 +69,14 @@ const TrustAssistantPage = () => {
 
   // Handle selecting a conversation from history
   const handleConversationSelect = useCallback(async (conv) => {
+    setLoadingConversation(true);
     try {
       const fullConv = await getConversation(conv.conversation_id || conv.id);
       loadConversation(fullConv);
     } catch (err) {
       console.error('[TrustAssistant] Failed to load conversation:', err);
+    } finally {
+      setLoadingConversation(false);
     }
   }, [getConversation, loadConversation]);
 
@@ -112,11 +122,42 @@ const TrustAssistantPage = () => {
     }
   }, [confirmAction, conversationId, setMessages]);
 
-  // Handle action edit — sends a follow-up message asking to edit
-  const handleActionEdit = useCallback(async (card) => {
-    // For now, send a follow-up message. Could be enhanced with an edit modal.
-    handleSendMessage(`I'd like to edit the ${card.type || 'action'}: ${card.title || card.summary || 'item'}`);
-  }, [handleSendMessage]);
+  // Handle action edit — opens the edit modal
+  const handleActionEdit = useCallback((card) => {
+    setEditingCard(card);
+  }, []);
+
+  // Handle save from edit modal — calls confirmAction with action='edit' and editedData
+  const handleActionEditSave = useCallback(async (card, editedData) => {
+    if (!conversationId || card.message_index == null) {
+      console.warn('[TrustAssistant] Cannot edit: missing conversationId or message_index');
+      setEditingCard(null);
+      return;
+    }
+    try {
+      await confirmAction(conversationId, card.message_index, 'edit', editedData);
+      // Update local state to reflect the edited data
+      setMessages(prev => prev.map((msg, idx) => {
+        if (idx !== card.message_index) return msg;
+        return {
+          ...msg,
+          action_cards: (msg.action_cards || []).map(ac =>
+            ac.id === card.id
+              ? {
+                  ...ac,
+                  data: { ...(ac.data || {}), ...editedData },
+                  status: 'pending',
+                }
+              : ac
+          ),
+        };
+      }));
+    } catch (err) {
+      console.error('[TrustAssistant] Action edit error:', err);
+    } finally {
+      setEditingCard(null);
+    }
+  }, [confirmAction, conversationId, setMessages]);
 
   // Handle action discard — calls confirm endpoint with reject
   const handleActionDiscard = useCallback(async (card) => {
@@ -175,11 +216,21 @@ const TrustAssistantPage = () => {
               onActionEdit={handleActionEdit}
               onActionDiscard={handleActionDiscard}
               onVideoClick={handleVideoClick}
+              loadingConversation={loadingConversation}
             />
           </div>
         </div>
       </main>
       <MobileBottomNav />
+
+      {/* Edit modal overlay */}
+      {editingCard && (
+        <ActionEditModal
+          card={editingCard}
+          onSave={handleActionEditSave}
+          onCancel={() => setEditingCard(null)}
+        />
+      )}
     </div>
   );
 };

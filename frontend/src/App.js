@@ -342,7 +342,7 @@ const AppRouter = () => {
           <TrustAssistantPage />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/course" element={
+<Route path="/course" element={
         <SubscriptionProtectedRoute>
           <CoursePage />
         </SubscriptionProtectedRoute>

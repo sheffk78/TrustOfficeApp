@@ -30,6 +30,7 @@ const ChatPanel = ({
   onActionEdit,
   onActionDiscard,
   onVideoClick,
+  loadingConversation,
 }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -82,25 +83,36 @@ const ChatPanel = ({
       {/* Messages area */}
       <div className="chat-messages flex-1 overflow-y-auto p-6" ref={messagesContainerRef}>
         <div className="max-w-3xl mx-auto">
-          {displayMessages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              onActionApprove={onActionApprove}
-              onActionEdit={onActionEdit}
-              onActionDiscard={onActionDiscard}
-              onVideoClick={onVideoClick}
-            />
-          ))}
-
-          {/* Loading indicator */}
-          {loading && (
-            <div className="flex justify-start mb-4">
-              <div className="message-bubble-ai border border-navy/5 flex items-center gap-2">
+          {loadingConversation ? (
+            <div className="flex justify-center py-12">
+              <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                <span className="font-mono text-xs text-muted-foreground">Thinking...</span>
+                <span className="font-mono text-xs text-muted-foreground">Loading conversation...</span>
               </div>
             </div>
+          ) : (
+            <>
+              {displayMessages.map((msg) => (
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  onActionApprove={onActionApprove}
+                  onActionEdit={onActionEdit}
+                  onActionDiscard={onActionDiscard}
+                  onVideoClick={onVideoClick}
+                />
+              ))}
+
+              {/* Loading indicator */}
+              {loading && (
+                <div className="flex justify-start mb-4">
+                  <div className="message-bubble-ai border border-navy/5 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    <span className="font-mono text-xs text-muted-foreground">Thinking...</span>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           <div ref={messagesEndRef} />
