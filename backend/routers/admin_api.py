@@ -13,6 +13,7 @@ Endpoints:
 - POST /admin-api/users/{user_id}/extend-trial      - Extend trial period
 - POST /admin-api/users/{user_id}/gift-subscription - Gift subscription
 - POST /admin-api/users/{user_id}/grant-stats      - Grant stats access
+- POST /admin-api/subscriptions/{user_id}/fix      - Fix subscription fields
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
@@ -124,6 +125,14 @@ class UserListParams(BaseModel):
     created_before: Optional[str] = None
     limit: int = 50
     skip: int = 0
+
+
+class FixSubscriptionRequest(BaseModel):
+    plan_type: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    status: Optional[str] = None
+    current_period_end: Optional[str] = None
 
 
 # ==================== STATS ENDPOINTS ====================
@@ -781,4 +790,82 @@ async def grant_stats_access(
         "email": user.get("email"),
         "is_stats_user": True,
         "stats_granted_at": now.isoformat()
+    }
+
+
+# ==================== SUBSCRIPTION FIX ENDPOINT ====================
+
+@router.post("/subscriptions/{user_id}/fix")
+async def fix_subscription(
+    user_id: str,
+    request: Request,
+    body: FixSubscriptionRequest,
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Fix a user's subscription fields to correct mismatches between Stripe and the DB.
+    
+    Accepts any combination of:
+    - plan_type: e.g. "monthly", "annual", "forever_free"
+    - stripe_subscription_id: Stripe subscription ID
+    - stripe_customer_id: Stripe customer ID
+    - status: subscription status
+    - current_period_end: ISO date string
+    """
+    # Verify user exists
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify subscription exists
+    subscription = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found for this user")
+    
+    # Build update set from non-None fields
+    update_fields = body.dict(exclude_none=True)
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields provided to update")
+    
+    # Validate plan_type if provided
+    if body.plan_type is not None:
+        valid_plans = ["monthly", "annual", "forever_free"]
+        if body.plan_type not in valid_plans:
+            raise HTTPException(status_code=400, detail=f"Invalid plan_type. Must be one of: {', '.join(valid_plans)}")
+    
+    # Always update the timestamp
+    update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.subscriptions.update_one(
+        {"user_id": user_id},
+        {"$set": update_fields}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    # Fetch updated subscription to return
+    updated_subscription = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+    
+    await log_api_action(
+        action="fix_subscription",
+        details={
+            "target_user_id": user_id,
+            "updated_fields": list(body.dict(exclude_none=True).keys()),
+            "before": {k: subscription.get(k) for k in body.dict(exclude_none=True).keys()},
+            "after": {k: updated_subscription.get(k) for k in body.dict(exclude_none=True).keys()}
+        },
+        user_id=user_id,
+        ip_address=get_client_ip(request)
+    )
+    
+    logger.info(f"API: Fixed subscription for {user['email']}: {list(update_fields.keys())}")
+    
+    return {
+        "success": True,
+        "message": f"Subscription updated for {user.get('email')}",
+        "user_id": user_id,
+        "email": user.get("email"),
+        "updated_fields": list(body.dict(exclude_none=True).keys()),
+        "subscription": updated_subscription
     }
