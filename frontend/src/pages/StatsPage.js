@@ -190,7 +190,7 @@ export default function StatsPage() {
           {revenueData && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-                <div className="card-trust p-4">
+                <div className="card-trust p-4" title="Gross revenue from all paid TrustOffice invoices (Stripe) in the selected date range">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <DollarSign className="w-4 h-4 text-gold" />
                     <span className="text-xs">Total Revenue</span>
@@ -199,7 +199,7 @@ export default function StatsPage() {
                     {revenueData.total_revenue_formatted}
                   </p>
                 </div>
-                <div className="card-trust p-4">
+                <div className="card-trust p-4" title="Monthly Recurring Revenue — (monthly subscribers × $79) + (annual subscribers × $65.83)">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <TrendingUp className="w-4 h-4 text-gold" />
                     <span className="text-xs">MRR</span>
@@ -208,7 +208,7 @@ export default function StatsPage() {
                     {revenueData.mrr_formatted}
                   </p>
                 </div>
-                <div className="card-trust p-4">
+                <div className="card-trust p-4" title="Annual Recurring Revenue — MRR × 12. A projection of annual revenue based on current monthly subscriptions">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <TrendingUp className="w-4 h-4 text-navy dark:text-white" />
                     <span className="text-xs">ARR</span>
