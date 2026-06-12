@@ -320,7 +320,7 @@ async def _send_module_1_access_email(email: str, name: str) -> Dict:
     """Send Module 1 access email via Postmark with video embed and lesson list."""
 
     embed_url = "https://iframe.mediadelivery.net/embed/609821/b095719e-96c6-4a0a-a845-5f003777ff2f"
-    pdf_url = "https://trustoffice.app/static/trustees-first-7-days-checklist.pdf"
+    pdf_url = "https://api.trustoffice.app/static/trustees-first-7-days-checklist.pdf"
     subscribe_url = "https://app.trustoffice.app/subscription"
 
     module_1_lessons = [
