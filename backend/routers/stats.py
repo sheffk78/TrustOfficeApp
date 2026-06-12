@@ -23,6 +23,22 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID')
 STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
 
+TRUSTOFFICE_PRICE_IDS = {STRIPE_MONTHLY_PRICE_ID, STRIPE_ANNUAL_PRICE_ID}
+
+
+def _is_trustoffice_invoice(inv) -> bool:
+    """Check if an invoice has a line item matching a TrustOffice Price ID."""
+    if not STRIPE_MONTHLY_PRICE_ID and not STRIPE_ANNUAL_PRICE_ID:
+        return True
+    try:
+        for line in inv.lines.data:
+            price_obj = getattr(line, 'price', None)
+            if price_obj and getattr(price_obj, 'id', None) in TRUSTOFFICE_PRICE_IDS:
+                return True
+    except Exception:
+        pass
+    return False
+
 
 # ==================== AUTH ====================
 
@@ -122,6 +138,8 @@ def _fetch_stripe_revenue(start_date: datetime, end_date: datetime):
             invoices = stripe.Invoice.list(**params)
 
             for inv in invoices.data:
+                if not _is_trustoffice_invoice(inv):
+                    continue
                 invoice_count += 1
                 amount = inv.amount_paid or inv.total or 0
                 total_revenue_cents += amount

@@ -41,6 +41,21 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID')
 STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
 
+TRUSTOFFICE_PRICE_IDS = {STRIPE_MONTHLY_PRICE_ID, STRIPE_ANNUAL_PRICE_ID}
+
+def _is_trustoffice_invoice(inv) -> bool:
+    """Check if an invoice has a line item matching a TrustOffice Price ID."""
+    if not STRIPE_MONTHLY_PRICE_ID and not STRIPE_ANNUAL_PRICE_ID:
+        return True  # No price IDs configured — include everything
+    try:
+        for line in inv.lines.data:
+            price_obj = getattr(line, 'price', None)
+            if price_obj and getattr(price_obj, 'id', None) in TRUSTOFFICE_PRICE_IDS:
+                return True
+    except Exception:
+        pass
+    return False
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -1045,6 +1060,8 @@ async def get_revenue_data(
             invoices = stripe.Invoice.list(**params)
             
             for inv in invoices.data:
+                if not _is_trustoffice_invoice(inv):
+                    continue
                 invoice_count += 1
                 amount = inv.amount_paid or inv.total or 0
                 total_revenue_cents += amount
@@ -1141,19 +1158,23 @@ async def get_revenue_data(
         try:
             today_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(today_start.timestamp())})
             for inv in today_data.auto_paging_iter():
-                revenue_today_cents += inv.amount_paid or inv.total or 0
+                if _is_trustoffice_invoice(inv):
+                    revenue_today_cents += inv.amount_paid or inv.total or 0
             
             week_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(week_start.timestamp())})
             for inv in week_data.auto_paging_iter():
-                revenue_this_week_cents += inv.amount_paid or inv.total or 0
+                if _is_trustoffice_invoice(inv):
+                    revenue_this_week_cents += inv.amount_paid or inv.total or 0
             
             month_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(month_start.timestamp())})
             for inv in month_data.auto_paging_iter():
-                revenue_this_month_cents += inv.amount_paid or inv.total or 0
+                if _is_trustoffice_invoice(inv):
+                    revenue_this_month_cents += inv.amount_paid or inv.total or 0
             
             all_time_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())})
             for inv in all_time_data.auto_paging_iter():
-                revenue_all_time_cents += inv.amount_paid or inv.total or 0
+                if _is_trustoffice_invoice(inv):
+                    revenue_all_time_cents += inv.amount_paid or inv.total or 0
         except stripe.StripeError as e:
             logger.error(f"Stripe API error fetching period revenue: {e}")
             if not stripe_error:
