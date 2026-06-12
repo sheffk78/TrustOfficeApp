@@ -206,10 +206,10 @@ const TrustAssistantPage = () => {
       <Sidebar />
       <main className="main-content">
         {/* Page header */}
-        <div className="px-6 pt-4 pb-2">
-          <h1 className="font-serif text-2xl font-bold text-navy">Trust Assistant</h1>
-          <p className="font-mono text-xs text-muted-foreground mt-1">
-            Your AI-powered guide for trust management. Ask questions, check deadlines, and take action on your trust.
+        <div className="page-header">
+          <h1 className="page-title">Trust Assistant</h1>
+          <p className="page-subtitle">
+            {selectedTrust?.name || 'Select a trust'}
           </p>
         </div>
         <div className="trust-assistant-layout">
@@ -221,6 +221,7 @@ const TrustAssistantPage = () => {
             conversationsLoading={conversationsLoading}
             onConversationSelect={handleConversationSelect}
             onConversationDelete={handleConversationDelete}
+            onSendSuggestion={handleSendMessage}
           />
 
           {/* Chat panel */}
