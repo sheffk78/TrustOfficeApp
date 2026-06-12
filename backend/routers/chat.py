@@ -432,6 +432,13 @@ async def _execute_approved_action(
     """
     card_type = action_card.get("type", "")
     action_data = action_card.get("data", {})
+    
+    # Normalize: intent classifier sends log_minutes → log_minutes_preview
+    TYPE_ALIASES = {
+        "log_minutes_preview": "minutes_preview",
+    }
+    card_type = TYPE_ALIASES.get(card_type, card_type)
+    
     mapping = ACTION_EXECUTION_MAP.get(card_type)
 
     if not mapping:
