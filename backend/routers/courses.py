@@ -284,17 +284,16 @@ async def _send_lesson_1_access_email(email: str, name: str) -> Dict:
 
     lesson_1_info = next((m for m in CURRICULUM if m["lesson"] == 1), None)
 
-    module_list_html = "".join(
+    lesson_list_html = "".join(
         f'<li>{m["title"]}</li>' for m in CURRICULUM
     )
 
     html_content = _base_template(f"""
-        <h2>Your Module 1 Access is Ready</h2>
-        <p>Hi {name},</p>
         <h2>Your Lesson 1 Access is Ready</h2>
-                                        <p>Lesson 1 — <em>What Is a Trust?</em> — is free. The foundational video every trustee needs before day one.</p>
+        <p>Hi {name},</p>
+        <p>Lesson 1 — <em>What Is a Trust?</em> — is free. The foundational video every trustee needs before day one.</p>
 
-                                        <h3 style="color:#010079; margin-top:24px;">📺 Lesson 1: What Is a Trust?</h3>
+        <h3 style="color:#010079; margin-top:24px;">📺 Lesson 1: What Is a Trust?</h3>
         <div style="margin: 16px 0; text-align: center;">
             <iframe src="{embed_url}"
                 style="width:100%; max-width:560px; height:315px; border:none; border-radius:8px;"
