@@ -48,7 +48,7 @@ CURRICULUM = [
         "video_guid": "c34cbf6b-fc5d-4c5e-bd33-cb5e6c84b422",
         "duration": "~5 min",
         "free": True,
-        "pdf_url": None,
+        "pdf_url": "/pdfs/minute-templates-l3.pdf",
         "status": "ready",
     },
     {
