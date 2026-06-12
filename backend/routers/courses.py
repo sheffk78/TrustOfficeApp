@@ -1,6 +1,6 @@
 """
 Trustee 101 Course Router
-9-module curriculum (1 module = 1 video), public enrollment,
+9-lesson curriculum (1 lesson = 1 video), public enrollment,
 access control, progress tracking, and landing page.
 """
 from fastapi import APIRouter, HTTPException, Request
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/courses", tags=["courses"])
 
 CURRICULUM = [
     {
-        "module": 1,
+        "lesson": 1,
         "title": "What Is a Trust?",
         "video_guid": "b095719e-96c6-4a0a-a845-5f003777ff2f",
         "duration": "~7 min",
@@ -34,7 +34,7 @@ CURRICULUM = [
         "status": "ready",
     },
     {
-        "module": 2,
+        "lesson": 2,
         "title": "The Trustee's Role & Duties",
         "video_guid": "670222ba-cde6-4772-b3af-dac84fd91db0",
         "duration": "~8 min",
@@ -43,7 +43,7 @@ CURRICULUM = [
         "status": "ready",
     },
     {
-        "module": 3,
+        "lesson": 3,
         "title": "The Trustee's First Seven Days",
         "video_guid": "c34cbf6b-fc5d-4c5e-bd33-cb5e6c84b422",
         "duration": "~5 min",
@@ -52,7 +52,7 @@ CURRICULUM = [
         "status": "ready",
     },
     {
-        "module": 4,
+        "lesson": 4,
         "title": "HEMS Decoded",
         "video_guid": "41982ee9-6c8a-4fe7-babd-29671b44a82c",
         "duration": "~16 min",
@@ -61,7 +61,7 @@ CURRICULUM = [
         "status": "ready",
     },
     {
-        "module": 5,
+        "lesson": 5,
         "title": "The Commingling Trap",
         "video_guid": "27edf118-8dc1-41b8-b32a-0c5057a55fec",
         "duration": "~15 min",
@@ -70,7 +70,7 @@ CURRICULUM = [
         "status": "ready",
     },
     {
-        "module": 6,
+        "lesson": 6,
         "title": "Prudent Investor Rule",
         "video_guid": None,
         "duration": "Coming Soon",
@@ -79,7 +79,7 @@ CURRICULUM = [
         "status": "coming_soon",
     },
     {
-        "module": 7,
+        "lesson": 7,
         "title": "Trust Accounting Basics",
         "video_guid": None,
         "duration": "Coming Soon",
@@ -88,7 +88,7 @@ CURRICULUM = [
         "status": "coming_soon",
     },
     {
-        "module": 8,
+        "lesson": 8,
         "title": "Tax & Compliance Essentials",
         "video_guid": None,
         "duration": "Coming Soon",
@@ -97,7 +97,7 @@ CURRICULUM = [
         "status": "coming_soon",
     },
     {
-        "module": 9,
+        "lesson": 9,
         "title": "Building Your Trustee Practice",
         "video_guid": None,
         "duration": "Coming Soon",
@@ -139,24 +139,24 @@ async def trustee_101_landing_page():
 
 @router.get("/trustee-101/curriculum")
 async def get_curriculum():
-    """Return the 9-module curriculum as JSON."""
+    """Return the 9-lesson curriculum as JSON."""
     return JSONResponse(content={
         "course": "Trustee 101",
         "tagline": "The Course That Should Have Come With Your Trust Document",
-        "total_modules": 9,
-        "free_modules": [1, 2, 3],
-        "modules": CURRICULUM,
+        "total_lessons": 9,
+        "free_lessons": [1, 2, 3],
+        "lessons": CURRICULUM,
     })
 
 
 @router.post("/trustee-101/enroll")
 async def enroll_in_trustee_101(enrollment: CourseEnrollment, request: Request):
-    """Enroll in free Module 1 of Trustee 101 course.
+    """Enroll in free Lesson 1 of Trustee 101 course.
 
     Stores lead, sends access email via Postmark with:
-    - Video embed for Module 1
-    - Module 1 info
-    - Subscription CTA for full 9-module course
+    - Video embed for Lesson 1
+    - Lesson 1 info
+    - Subscription CTA for full 9-lesson course
     """
     try:
         name = enrollment.name.strip()
@@ -167,10 +167,10 @@ async def enroll_in_trustee_101(enrollment: CourseEnrollment, request: Request):
         existing = await db.course_leads.find_one({"email": email})
         if existing:
             # Already enrolled — re-send access email
-            await _send_module_1_access_email(email, name)
+            await _send_lesson_1_access_email(email, name)
             return {
                 "success": True,
-                "message": "Access re-sent. Check your email for Module 1.",
+                "message": "Access re-sent. Check your email for Lesson 1.",
                 "is_returning": True,
             }
 
@@ -179,8 +179,8 @@ async def enroll_in_trustee_101(enrollment: CourseEnrollment, request: Request):
             "email": email,
             "name": name,
             "source": source,
-            "module_1_access_granted": True,
-            "module_1_watched": False,
+            "lesson_1_access_granted": True,
+            "lesson_1_watched": False,
             "course_purchased": False,
             "stripe_session_id": None,
             "stripe_customer_id": None,
@@ -192,11 +192,11 @@ async def enroll_in_trustee_101(enrollment: CourseEnrollment, request: Request):
         await db.course_leads.insert_one(lead)
 
         # Send access email
-        email_result = await _send_module_1_access_email(email, name)
+        email_result = await _send_lesson_1_access_email(email, name)
 
         return {
             "success": True,
-            "message": "Welcome! Check your email for Module 1 access.",
+            "message": "Welcome! Check your email for Lesson 1 access.",
             "is_returning": False,
             "email_sent": email_result.get("success", False),
         }
@@ -206,38 +206,37 @@ async def enroll_in_trustee_101(enrollment: CourseEnrollment, request: Request):
         raise HTTPException(status_code=500, detail="Failed to process enrollment. Please try again.")
 
 
-@router.get("/trustee-101/module/{module_num}/access")
-async def get_module_access(module_num: int, email: str):
-    """Check if user has access to a specific module.
+@router.get("/trustee-101/lesson/{lesson_num}/access")
+async def get_lesson_access(lesson_num: int, email: str):
+    """Check if user has access to a specific lesson.
 
-    Modules 1-3: Always free
-    Modules 4-9: Requires enrollment (email captured) or active TrustOffice subscription
+    Lessons 1-3: Always free
+    Lessons 4-9: Requires enrollment (email captured) or active TrustOffice subscription
     """
     email = email.strip().lower()
 
-    if module_num < 1 or module_num > 9:
-        raise HTTPException(status_code=404, detail=f"Module {module_num} not found. Valid range: 1-9.")
+    if lesson_num < 1 or lesson_num > 9:
+        raise HTTPException(status_code=404, detail=f"Lesson {lesson_num} not found. Valid range: 1-9.")
 
-    module_info = next((m for m in CURRICULUM if m["module"] == module_num), None)
-    if not module_info:
-        raise HTTPException(status_code=404, detail=f"Module {module_num} not found.")
+    lesson_info = next((m for m in CURRICULUM if m["lesson"] == lesson_num), None)
+    if not lesson_info:
+        raise HTTPException(status_code=404, detail=f"Lesson {lesson_num} not found.")
 
-    # Modules 1-3 are always free
-    if module_num <= 3:
+    if lesson_num <= 3:
         return {
             "has_access": True,
-            "module": module_num,
-            "title": module_info["title"],
+            "lesson": lesson_num,
+            "title": lesson_info["title"],
             "type": "free",
         }
 
-    # Modules 4-9: check if enrolled or subscribed
+    # Lessons 4-9: check if enrolled or subscribed
     lead = await db.course_leads.find_one({"email": email})
     if lead:
         return {
             "has_access": True,
-            "module": module_num,
-            "title": module_info["title"],
+            "lesson": lesson_num,
+            "title": lesson_info["title"],
             "type": "enrolled",
         }
 
@@ -248,16 +247,16 @@ async def get_module_access(module_num: int, email: str):
         if state.is_active:
             return {
                 "has_access": True,
-                "module": module_num,
-                "title": module_info["title"],
+                "lesson": lesson_num,
+                "title": lesson_info["title"],
                 "type": "subscription",
                 "plan_type": state.plan_type,
             }
 
     return {
         "has_access": False,
-        "module": module_num,
-        "title": module_info["title"],
+        "lesson": lesson_num,
+        "title": lesson_info["title"],
         "type": "paid",
         "requires": "enrollment_or_subscription",
     }
@@ -276,14 +275,14 @@ def _get_landing_page_html() -> str:
 
 # ==================== EMAIL HELPERS ====================
 
-async def _send_module_1_access_email(email: str, name: str) -> Dict:
-    """Send Module 1 access email via Postmark with video embed and module info."""
+async def _send_lesson_1_access_email(email: str, name: str) -> Dict:
+    """Send Lesson 1 access email via Postmark with video embed and lesson info."""
 
     embed_url = "https://iframe.mediadelivery.net/embed/609821/b095719e-96c6-4a0a-a845-5f003777ff2f"
     pdf_url = "https://api.trustoffice.app/static/trustees-first-7-days-checklist.pdf"
     subscribe_url = "https://app.trustoffice.app/subscription"
 
-    module_1_info = next((m for m in CURRICULUM if m["module"] == 1), None)
+    lesson_1_info = next((m for m in CURRICULUM if m["lesson"] == 1), None)
 
     module_list_html = "".join(
         f'<li>{m["title"]}</li>' for m in CURRICULUM
@@ -292,10 +291,10 @@ async def _send_module_1_access_email(email: str, name: str) -> Dict:
     html_content = _base_template(f"""
         <h2>Your Module 1 Access is Ready</h2>
         <p>Hi {name},</p>
-        <p>Welcome to <strong>Trustee 101: The Course That Should Have Come With Your Trust Document</strong>.</p>
-        <p>Module 1 — <em>What Is a Trust?</em> — is free. The foundational video every trustee needs before day one.</p>
+        <h2>Your Lesson 1 Access is Ready</h2>
+                                        <p>Lesson 1 — <em>What Is a Trust?</em> — is free. The foundational video every trustee needs before day one.</p>
 
-        <h3 style="color:#010079; margin-top:24px;">📺 Module 1: What Is a Trust?</h3>
+                                        <h3 style="color:#010079; margin-top:24px;">📺 Lesson 1: What Is a Trust?</h3>
         <div style="margin: 16px 0; text-align: center;">
             <iframe src="{embed_url}"
                 style="width:100%; max-width:560px; height:315px; border:none; border-radius:8px;"
@@ -311,13 +310,13 @@ async def _send_module_1_access_email(email: str, name: str) -> Dict:
         </div>
 
         <div class="task-card" style="background:#f9f9f9; border-left:4px solid #D5AD36; padding:15px; margin:15px 0;">
-            <h3 style="margin:0 0 10px 0;color:#010079;">🔓 Subscribe — Full 9-Module Course Included</h3>
-            <p style="margin:0 0 10px 0;font-size:14px;">
-                Module 1 is free. The full course covers <strong>all 9 modules</strong> — plus downloadable templates, checklists, and the software to automate everything the course teaches.
+            <h3 style="margin:0 0 10px 0;color:#010079;">🔓 Subscribe — Full 9-Lesson Course Included</h3>
+                                            <p style="margin:0 0 10px 0;color:#555;font-size:14px;line-height:1.6;">
+                                                Lesson 1 is free. The full course covers <strong>all 9 lessons</strong> — plus downloadable templates, checklists, and the software to automate everything the course teaches.
             </p>
             <p style="margin:0 0 6px 0; font-size:14px;"><strong>What's included:</strong></p>
             <ul style="font-size:14px; margin:0 0 12px 0; padding-left:20px;">
-                {module_list_html}
+                {lesson_list_html}
             </ul>
             <p style="margin:0;text-align:center;">
                 <a href="{subscribe_url}" style="display:inline-block;background:#010079;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold;border-radius:4px;">Subscribe at $79/mo — Full 9-Module Course Included</a>
