@@ -205,6 +205,13 @@ const TrustAssistantPage = () => {
     <div className="trust-assistant-layout" data-testid="trust-assistant-page">
       <Sidebar />
       <main className="main-content">
+        {/* Page header */}
+        <div className="px-6 pt-4 pb-2">
+          <h1 className="font-serif text-2xl font-bold text-navy">Trust Assistant</h1>
+          <p className="font-mono text-xs text-muted-foreground mt-1">
+            Your AI-powered guide for trust management. Ask questions, check deadlines, and take action on your trust.
+          </p>
+        </div>
         <div className="trust-assistant-layout">
           {/* Snapshot column */}
           <SnapshotColumn

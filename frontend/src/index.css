@@ -489,10 +489,9 @@
 }
 
 .snapshot-column.collapsed {
-  width: 0;
-  min-width: 0;
-  overflow: hidden;
-  border-right: none;
+  width: 40px;
+  min-width: 40px;
+  border-right: 1px solid rgba(1, 0, 121, 0.1);
 }
 
 @media (max-width: 1024px) {

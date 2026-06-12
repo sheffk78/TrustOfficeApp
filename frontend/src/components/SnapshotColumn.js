@@ -23,10 +23,56 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
     const fetchHealth = async () => {
       setHealthLoading(true);
       try {
-        const response = await fetchWithAuth(`/governance/health?trust_id=${selectedTrust.trust_id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setHealthData(data);
+        // Fetch governance health score
+        const healthResponse = await fetchWithAuth(`/governance/${selectedTrust.trust_id}`);
+        if (healthResponse.ok) {
+          const healthJson = await healthResponse.json();
+          // Fetch upcoming deadlines
+          let upcomingDeadlines = [];
+          try {
+            const deadlinesResponse = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/tax-calendar/upcoming?days=90`);
+            if (deadlinesResponse.ok) {
+              const deadlinesJson = await deadlinesResponse.json();
+              upcomingDeadlines = (deadlinesJson.upcoming || []).map(d => ({
+                title: d.filing_type || d.title || d.name,
+                name: d.filing_type || d.title || d.name,
+                due_date: d.due_date,
+              }));
+            }
+          } catch (e) {
+            console.error('[SnapshotColumn] Failed to fetch deadlines:', e);
+          }
+
+          // Fetch governance tasks for pending count
+          let pendingCount = 0;
+          try {
+            const tasksResponse = await fetchWithAuth(`/tasks?trust_id=${selectedTrust.trust_id}&status=pending`);
+            if (tasksResponse.ok) {
+              const tasksJson = await tasksResponse.json();
+              pendingCount = Array.isArray(tasksJson) ? tasksJson.length : (tasksJson.total || 0);
+            }
+          } catch (e) {
+            console.error('[SnapshotColumn] Failed to fetch tasks:', e);
+          }
+
+          // Fetch beneficiary count
+          let beneficiaryCount = 0;
+          try {
+            const benResponse = await fetchWithAuth(`/beneficiaries?trust_id=${selectedTrust.trust_id}`);
+            if (benResponse.ok) {
+              const benJson = await benResponse.json();
+              beneficiaryCount = Array.isArray(benJson) ? benJson.length : (benJson.total || 0);
+            }
+          } catch (e) {
+            console.error('[SnapshotColumn] Failed to fetch beneficiaries:', e);
+          }
+
+          setHealthData({
+            score: healthJson.total_score,
+            upcoming_deadlines: upcomingDeadlines,
+            pending_items: pendingCount,
+            beneficiary_count: beneficiaryCount,
+          });
         }
       } catch (err) {
         console.error('[SnapshotColumn] Failed to fetch health:', err);
@@ -45,7 +91,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
 
   if (collapsed) {
     return (
-      <div className="snapshot-column collapsed flex flex-col items-center py-4 bg-white border-r border-navy/10">
+      <div className="snapshot-column collapsed flex flex-col items-center py-4 bg-white">
         <button
           onClick={onToggle}
           className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors"
@@ -93,8 +139,8 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
             </div>
           ) : healthData ? (
             <div className="flex items-baseline gap-1">
-              <span className={`font-serif text-4xl font-bold ${scoreColor(healthData.score || healthData.defensibility_score || 0)}`}>
-                {healthData.score || healthData.defensibility_score || '—'}
+              <span className={`font-serif text-4xl font-bold ${scoreColor(healthData.score ?? 0)}`}>
+                {healthData.score ?? '—'}
               </span>
               <span className="font-mono text-xs text-muted-foreground">/100</span>
             </div>
@@ -136,7 +182,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
             </span>
           </div>
           <span className="font-mono text-lg font-bold text-foreground">
-            {healthData?.pending_items ?? healthData?.pending_count ?? '—'}
+            {healthData?.pending_items ?? '—'}
           </span>
         </div>
 
@@ -149,7 +195,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
             </span>
           </div>
           <span className="font-mono text-lg font-bold text-foreground">
-            {healthData?.beneficiary_count ?? healthData?.active_beneficiaries ?? '—'}
+            {healthData?.beneficiary_count ?? '—'}
           </span>
         </div>
 
