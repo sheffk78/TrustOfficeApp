@@ -40,7 +40,6 @@ import CommunicationsPage from "@/pages/CommunicationsPage";
 import VaultPage from "@/pages/VaultPage";
 import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import PrintableBinderPage from "@/pages/PrintableBinderPage";
-import CoursePage from "@/pages/CoursePage";
 import TrustAssistantPage from "@/pages/TrustAssistantPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -312,11 +311,8 @@ const AppRouter = () => {
           <TrustAssistantPage />
         </SubscriptionProtectedRoute>
       } />
-<Route path="/course" element={
-        <SubscriptionProtectedRoute>
-          <CoursePage />
-        </SubscriptionProtectedRoute>
-      } />
+<Route path="/course" element={<Navigate to="https://trustoffice.app/trustee-101" replace />} />
+      <Route path="/course/lesson/:lessonNumber" element={<Navigate to="https://trustoffice.app/trustee-101" replace />} />
       <Route path="/binder" element={
         <SubscriptionProtectedRoute>
           <PrintableBinderPage />
