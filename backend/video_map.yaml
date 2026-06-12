@@ -1,0 +1,389 @@
+# TrustOffice Video Map
+# Maps video IDs to topics for the Trust Assistant.
+# Used by chat_service.py to reference specific course videos
+# when answering knowledge questions about trustee education.
+#
+# Bunny Stream Library: 609821 (Trustee 101 Course collection)
+# Embed URL format: https://iframe.mediadelivery.net/embed/609821/{guid}
+#
+# Access control: Lessons 1-3 free, 4-27 require active subscription.
+
+videos:
+  # ============================================================
+  # Module 1: The Trustee's Role (Lessons 1-3) — FREE
+  # ============================================================
+  - id: "b095719e-96c6-4a0a-a845-5f003777ff2f"
+    title: "What Is a Trustee?"
+    lesson: 1
+    module: 1
+    module_title: "The Trustee's Role"
+    library: 609821
+    duration: "5:30"
+    free: true
+    description: >
+      Introduction to what a trustee is and the responsibilities you've taken on.
+      Covers the definition of a trustee, how you became one (intentional or accidental),
+      and why the role matters more than most people realize.
+
+  - id: "670222ba-cde6-4772-b3af-dac84fd91db0"
+    title: "Your Fiduciary Duties"
+    lesson: 2
+    module: 1
+    module_title: "The Trustee's Role"
+    library: 609821
+    duration: "6:15"
+    free: true
+    description: >
+      The three core fiduciary duties — loyalty, prudence, and impartiality — and
+      what they actually mean in practice. Includes the enforcement mechanism:
+      beneficiaries can petition a court at any time to force you to account for
+      every decision you've made.
+
+  - id: "c34cbf6b-fc5d-4c5e-bd33-cb5e6c84b422"
+    title: "Getting Organized"
+    lesson: 3
+    module: 1
+    module_title: "The Trustee's Role"
+    library: 609821
+    duration: "7:00"
+    free: true
+    description: >
+      The first seven days as a trustee — what to do, in order. Covers gathering
+      trust documents, identifying beneficiaries, locating assets, and setting up
+      the systems that will protect you going forward. Includes the Trustee's
+      First 7 Days checklist.
+
+  # ============================================================
+  # Module 2: Trust Administration Basics (Lessons 4-6) — SUBSCRIPTION
+  # ============================================================
+  - id: "pending-module2-lesson4"
+    title: "Understanding the Trust Document"
+    lesson: 4
+    module: 2
+    module_title: "Trust Administration Basics"
+    library: 609821
+    duration: "5:30"
+    free: false
+    description: >
+      How to read and interpret the trust document — the single most important
+      document in your trustee life. Covers key clauses, beneficiary designations,
+      trustee powers, and what happens when the language is ambiguous.
+
+  - id: "pending-module2-lesson5"
+    title: "Separating Personal and Trust Finances"
+    lesson: 5
+    module: 2
+    module_title: "Trust Administration Basics"
+    library: 609821
+    duration: "6:00"
+    free: false
+    description: >
+      Why commingling funds is the number one way trustees get into trouble.
+      Covers opening trust bank accounts, EIN requirements, the prudent investor
+      standard, and how to document every financial decision.
+
+  - id: "pending-module2-lesson6"
+    title: "Recordkeeping That Holds Up in Court"
+    lesson: 6
+    module: 2
+    module_title: "Trust Administration Basics"
+    library: 609821
+    duration: "5:45"
+    free: false
+    description: >
+      What records to keep, for how long, and why. Covers the difference between
+      good recordkeeping and defensible recordkeeping — including what a court will
+      ask for if a beneficiary challenges your administration.
+
+  # ============================================================
+  # Module 3: Beneficiary Relations (Lessons 7-9) — SUBSCRIPTION
+  # ============================================================
+  - id: "pending-module3-lesson7"
+    title: "Who Your Beneficiaries Really Are"
+    lesson: 7
+    module: 3
+    module_title: "Beneficiary Relations"
+    library: 609821
+    duration: "5:30"
+    free: false
+    description: >
+      Understanding beneficiary types, the HEMS standard, and why treating
+      all beneficiaries "fairly" doesn't mean treating them equally. Covers
+      the difference between income beneficiaries and remainder beneficiaries.
+
+  - id: "pending-module3-lesson8"
+    title: "Communication and Transparency"
+    lesson: 8
+    module: 3
+    module_title: "Beneficiary Relations"
+    library: 609821
+    duration: "6:00"
+    free: false
+    description: >
+      The UTC §813 notification requirement and why proactive communication
+      prevents disputes. Covers what to share, when to share it, and how to
+      document that you've met your duty to inform.
+
+  - id: "pending-module3-lesson9"
+    title: "Handling Beneficiary Disputes"
+    lesson: 9
+    module: 3
+    module_title: "Beneficiary Relations"
+    library: 609821
+    duration: "6:15"
+    free: false
+    description: >
+      When beneficiaries disagree — mediation, formal accounting, and when
+      to involve legal counsel. Covers the most common dispute triggers and
+      how to de-escalate before they reach court.
+
+  # ============================================================
+  # Module 4: Trust Assets and Investments (Lessons 10-12) — SUBSCRIPTION
+  # ============================================================
+  - id: "pending-module4-lesson10"
+    title: "Schedule A and the Asset Inventory"
+    lesson: 10
+    module: 4
+    module_title: "Trust Assets and Investments"
+    library: 609821
+    duration: "5:30"
+    free: false
+    description: >
+      How to take inventory of trust assets, understand Schedule A, and
+      why a complete asset list is the foundation of defensible administration.
+
+  - id: "pending-module4-lesson11"
+    title: "The Prudent Investor Rule"
+    lesson: 11
+    module: 4
+    module_title: "Trust Assets and Investments"
+    library: 609821
+    duration: "6:15"
+    free: false
+    description: >
+      UPIA and the prudent investor standard — what it means to manage trust
+      investments properly. Covers diversification, risk tolerance tied to
+      beneficiary needs, and why "manage like your own money" is not the standard.
+
+  - id: "pending-module4-lesson12"
+    title: "Real Property in a Trust"
+    lesson: 12
+    module: 4
+    module_title: "Trust Assets and Investments"
+    library: 609821
+    duration: "5:45"
+    free: false
+    description: >
+      Managing real estate held in trust — taxes, insurance, maintenance,
+      rental income, and the specific fiduciary concerns that come with
+      trust-owned property.
+
+  # ============================================================
+  # Module 5: Distributions (Lessons 13-15) — SUBSCRIPTION
+  # ============================================================
+  - id: "pending-module5-lesson13"
+    title: "When and How to Distribute"
+    lesson: 13
+    module: 5
+    module_title: "Distributions"
+    library: 609821
+    duration: "6:00"
+    free: false
+    description: >
+      Distribution authority, the HEMS standard in practice, and how to document
+      distribution decisions so they hold up under scrutiny. Covers the difference
+      between mandatory and discretionary distributions.
+
+  - id: "pending-module5-lesson14"
+    title: "Tax Considerations for Distributions"
+    lesson: 14
+    module: 5
+    module_title: "Distributions"
+    library: 609821
+    duration: "5:30"
+    free: false
+    description: >
+      How distributions affect trust income, K-1s, and beneficiary tax obligations.
+      Covers the difference between income and principal distributions, and why
+      the tax treatment matters for both trustee and beneficiary.
+
+  - id: "pending-module5-lesson15"
+    title: "Documenting Every Distribution"
+    lesson: 15
+    module: 5
+    module_title: "Distributions"
+    library: 609821
+    duration: "5:15"
+    free: false
+    description: >
+      The distribution record that protects you — what to document, how to
+      categorize, and why "I thought it was fine" doesn't hold up in court.
+      Includes solvency checks and conflict-of-interest recusal.
+
+  # ============================================================
+  # Module 6: Governance and Compliance (Lessons 16-18) — SUBSCRIPTION
+  # ============================================================
+  - id: "pending-module6-lesson16"
+    title: "Meeting Minutes That Protect You"
+    lesson: 16
+    module: 6
+    module_title: "Governance and Compliance"
+    library: 609821
+    duration: "6:30"
+    free: false
+    description: >
+      Why minutes are your best defense, what makes minutes legally sufficient,
+      and the difference between good minutes and minutes that actually protect
+      you in a dispute.
+
+  - id: "pending-module6-lesson17"
+    title: "Annual and Quarterly Reviews"
+    lesson: 17
+    module: 6
+    module_title: "Governance and Compliance"
+    library: 609821
+    duration: "5:45"
+    free: false
+    description: >
+      The trustee's governance calendar — what needs to happen annually, quarterly,
+      and on an ongoing basis. Covers required meetings, accounting reviews, and
+      compliance checkpoints.
+
+  - id: "pending-module6-lesson18"
+    title: "State Compliance Requirements"
+    lesson: 18
+    module: 6
+    module_title: "Governance and Compliance"
+    library: 609821
+    duration: "6:00"
+    free: false
+    description: >
+      Trust law varies by state — this lesson covers the UTC adoption landscape,
+      state-specific filing requirements, and how to check your jurisdiction's
+      rules. Covers registration, tax filing, and reporting obligations.
+
+  # ============================================================
+  # Module 7: Taxes and Reporting (Lessons 19-21) — SUBSCRIPTION
+  # ============================================================
+  - id: "pending-module7-lesson19"
+    title: "Trust Tax Basics"
+    lesson: 19
+    module: 7
+    module_title: "Taxes and Reporting"
+    library: 609821
+    duration: "6:15"
+    free: false
+    description: >
+      Understanding the trust tax return (Form 1041), estimated tax payments,
+      and the difference between grantor and non-grantor trust taxation. When
+      to hire a CPA and what to hand them.
+
+  - id: "pending-module7-lesson20"
+    title: "EIN and Trust Banking"
+    lesson: 20
+    module: 7
+    module_title: "Taxes and Reporting"
+    library: 609821
+    duration: "5:30"
+    free: false
+    description: >
+      How to obtain an EIN, open a trust bank account, and keep trust finances
+      completely separate from personal finances. Covers revocable vs. irrevocable
+      trust EIN requirements.
+
+  - id: "pending-module7-lesson21"
+    title: "Filing Deadlines and Extensions"
+    lesson: 21
+    module: 7
+    module_title: "Taxes and Reporting"
+    library: 609821
+    duration: "5:00"
+    free: false
+    description: >
+      The trust tax calendar — key deadlines, extension rules, and penalties
+      for late filing. Covers the September 15 estimated tax deadline and
+      how to avoid the most common filing mistakes.
+
+  # ============================================================
+  # Module 8: Risk Management (Lessons 22-24) — SUBSCRIPTION
+  # ============================================================
+  - id: "pending-module8-lesson22"
+    title: "Common Trustee Mistakes"
+    lesson: 22
+    module: 8
+    module_title: "Risk Management"
+    library: 609821
+    duration: "6:00"
+    free: false
+    description: >
+      The top mistakes that get trustees surcharged — commingling, self-dealing,
+      failure to diversify, and neglect. Real case examples and how each mistake
+      could have been avoided.
+
+  - id: "pending-module8-lesson23"
+    title: "Self-Dealing and Conflicts of Interest"
+    lesson: 23
+    module: 8
+    module_title: "Risk Management"
+    library: 609821
+    duration: "5:45"
+    free: false
+    description: >
+      The absolute prohibition on self-dealing — even when nobody got hurt.
+      Covers the duty of loyalty, conflicts of interest, recusal procedures,
+      and the narrow exceptions that exist.
+
+  - id: "pending-module8-lesson24"
+    title: "What Happens When Things Go Wrong"
+    lesson: 24
+    module: 8
+    module_title: "Risk Management"
+    library: 609821
+    duration: "6:15"
+    free: false
+    description: >
+      Surcharge actions, removal petitions, and court-supervised accounting.
+      What the process looks like when a beneficiary challenges your
+      administration — and how good records turn a crisis into an inconvenience.
+
+  # ============================================================
+  # Module 9: Building Your System (Lessons 25-27) — SUBSCRIPTION
+  # ============================================================
+  - id: "pending-module9-lesson25"
+    title: "The Trustee's Operating System"
+    lesson: 25
+    module: 9
+    module_title: "Building Your System"
+    library: 609821
+    duration: "6:00"
+    free: false
+    description: >
+      How to set up a repeatable system for trust administration — annual calendar,
+      quarterly reviews, and the habits that keep you out of trouble. Introduces
+      the TrustOffice workflow as the system that makes the right behavior easy.
+
+  - id: "pending-module9-lesson26"
+    title: "Working with Professionals"
+    lesson: 26
+    module: 9
+    module_title: "Building Your System"
+    library: 609821
+    duration: "5:30"
+    free: false
+    description: >
+      When to hire an attorney, CPA, and financial advisor — and how to work
+      with them effectively. Covers the difference between delegating and
+      abdicating, and why professional support is a strength, not a weakness.
+
+  - id: "pending-module9-lesson27"
+    title: "Your First 90 Days — A Complete Checklist"
+    lesson: 27
+    module: 9
+    module_title: "Building Your System"
+    library: 609821
+    duration: "7:00"
+    free: false
+    description: >
+      The complete 90-day action plan for new trustees. Walks through what to
+      do in your first week, first month, and first quarter. Ties together every
+      lesson in the course into a single, actionable roadmap.

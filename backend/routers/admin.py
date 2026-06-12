@@ -923,11 +923,16 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
         
         customer_ids = set()
         for inv in all_invoices.auto_paging_iter():
-            amount = inv.amount_paid or inv.total or 0
-            stripe_total_revenue_cents += amount
-            stripe_total_transactions += 1
-            if inv.customer_id:
-                customer_ids.add(inv.customer_id)
+            try:
+                amount = inv.amount_paid or inv.total or 0
+                stripe_total_revenue_cents += amount
+                stripe_total_transactions += 1
+                customer_id = getattr(inv, 'customer', None)
+                if customer_id:
+                    customer_ids.add(customer_id)
+            except Exception as inv_err:
+                logger.warning(f"Skipping invoice in stats: {inv_err}")
+                continue
         
         stripe_paid_customers = len(customer_ids)
         
@@ -1040,51 +1045,57 @@ async def get_revenue_data(
             invoices = stripe.Invoice.list(**params)
             
             for inv in invoices.data:
-                invoice_count += 1
-                amount = inv.amount_paid or inv.total or 0
-                total_revenue_cents += amount
-                total_transactions += 1
-                
-                if inv.customer_id:
-                    customer_ids.add(inv.customer_id)
-                
-                # Revenue by month
-                inv_date = datetime.fromtimestamp(inv.created, tz=timezone.utc)
-                month_key = inv_date.strftime("%Y-%m")
-                revenue_by_month[month_key] += amount
-                
-                # Plan detection
-                plan_type = "monthly"
-                for line in inv.lines.data:
-                    if line.price and line.price.id:
-                        if line.price.id == STRIPE_ANNUAL_PRICE_ID:
-                            plan_type = "annual"
-                            break
-                        elif line.price.id == STRIPE_MONTHLY_PRICE_ID:
-                            plan_type = "monthly"
-                            break
-                
-                subscriptions_by_plan[plan_type] = subscriptions_by_plan.get(plan_type, 0) + 1
-                
-                # Customer email (admin can see)
-                customer_email = ""
                 try:
-                    if inv.customer_id:
-                        customer = stripe.Customer.retrieve(inv.customer_id)
-                        customer_email = customer.email or ""
-                    else:
-                        customer_email = inv.customer_email or ""
-                except Exception:
-                    customer_email = inv.customer_email or ""
-                
-                recent_transactions.append({
-                    "date": inv_date.isoformat(),
-                    "customer_email": customer_email,
-                    "amount_cents": amount,
-                    "plan": plan_type,
-                    "status": inv.status,
-                    "invoice_id": inv.id,
-                })
+                    invoice_count += 1
+                    amount = inv.amount_paid or inv.total or 0
+                    total_revenue_cents += amount
+                    total_transactions += 1
+                    
+                    # Stripe Invoice uses .customer (not .customer_id) for the customer ID
+                    customer_id = getattr(inv, 'customer', None)
+                    if customer_id:
+                        customer_ids.add(customer_id)
+                    
+                    # Revenue by month
+                    inv_date = datetime.fromtimestamp(inv.created, tz=timezone.utc)
+                    month_key = inv_date.strftime("%Y-%m")
+                    revenue_by_month[month_key] += amount
+                    
+                    # Plan detection
+                    plan_type = "monthly"
+                    for line in inv.lines.data:
+                        if line.price and line.price.id:
+                            if line.price.id == STRIPE_ANNUAL_PRICE_ID:
+                                plan_type = "annual"
+                                break
+                            elif line.price.id == STRIPE_MONTHLY_PRICE_ID:
+                                plan_type = "monthly"
+                                break
+                    
+                    subscriptions_by_plan[plan_type] = subscriptions_by_plan.get(plan_type, 0) + 1
+                    
+                    # Customer email (admin can see)
+                    customer_email = ""
+                    try:
+                        if customer_id:
+                            customer = stripe.Customer.retrieve(customer_id)
+                            customer_email = customer.email or ""
+                        else:
+                            customer_email = getattr(inv, 'customer_email', '') or ""
+                    except Exception:
+                        customer_email = getattr(inv, 'customer_email', '') or ""
+                    
+                    recent_transactions.append({
+                        "date": inv_date.isoformat(),
+                        "customer_email": customer_email,
+                        "amount_cents": amount,
+                        "plan": plan_type,
+                        "status": inv.status,
+                        "invoice_id": inv.id,
+                    })
+                except Exception as inv_err:
+                    logger.warning(f"Skipping invoice due to error: {inv_err}")
+                    continue
             
             has_more = invoices.has_more
             if has_more and invoices.data:
