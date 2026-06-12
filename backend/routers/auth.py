@@ -231,7 +231,8 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
             "email": user_doc["email"],
             "name": user_doc["name"],
             "picture": user_doc.get("picture"),
-            "is_admin": user_doc.get("is_admin", False) or email == PRIMARY_ADMIN_EMAIL
+            "is_admin": user_doc.get("is_admin", False) or email == PRIMARY_ADMIN_EMAIL,
+            "is_stats_user": user_doc.get("is_stats_user", False)
         }
     }
 
