@@ -18,6 +18,7 @@ This file contains only:
 - Background task lifecycle
 """
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -142,8 +143,10 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/external/provision-trustoffice/status",
     "/api/external/trust-documents",
     "/api/external/trust-documents/health",
-    # Course routes (public enrollment, no subscription needed)
+    # Course routes (public enrollment, landing page, curriculum — no subscription needed)
     "/api/courses/trustee-101/enroll",
+    "/api/courses/trustee-101",
+    "/api/courses/trustee-101/curriculum",
 }
 
 # HTTP methods that modify data (write operations)
@@ -326,6 +329,11 @@ app.include_router(external_trust_docs_router)
 # Course routes
 app.include_router(courses_router, prefix="/api")
 
+# Serve static files (PDF checklists, etc.)
+STATIC_DIR = Path(__file__).parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 
 # ==================== HEALTH CHECK ====================
 
@@ -462,6 +470,10 @@ async def startup_event():
         await db.separation_alerts.create_index("alert_id", unique=True)
         await db.alert_audit_log.create_index("alert_id")
         await db.alert_audit_log.create_index("audit_id", unique=True)
+        # Course leads index (unique email)
+        await db.course_leads.create_index("email", unique=True)
+        
+        # Personal vendor index for separation alerts
         await db.personal_vendors.create_index("user_id")
         
         logger.info("Database indexes created/verified successfully")

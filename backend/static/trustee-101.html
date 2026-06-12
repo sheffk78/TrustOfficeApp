@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trustee 101 — The Course That Prepares You for the Role You Already Have</title>
+  <meta name="description" content="27 lessons. Real dollar amounts from real cases. A step-by-step system for every trustee who needs to get it right.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --navy: #010079;
+      --navy-light: #0a0a9e;
+      --gold: #D5AD36;
+      --gold-hover: #c49e2b;
+      --gold-soft: rgba(213, 173, 54, 0.12);
+      --white: #FFFFFF;
+      --gray-50: #fafafa;
+      --gray-100: #f5f5f5;
+      --gray-200: #e8e8e8;
+      --gray-300: #d0d0d0;
+      --gray-400: #a0a0a0;
+      --gray-500: #777;
+      --gray-600: #555;
+      --gray-700: #333;
+      --text-primary: #1a1a2e;
+      --text-secondary: #4a4a6a;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+      --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-primary);
+      line-height: 1.7;
+      background: var(--white);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ====== UTILITY ====== */
+    .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+    .container--wide { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+    /* ====== HERO ====== */
+    .hero {
+      background: linear-gradient(165deg, var(--navy) 0%, #0505a0 60%, var(--navy-light) 100%);
+      color: var(--white);
+      padding: 100px 24px 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(213,173,54,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero__badge {
+      display: inline-block;
+      background: var(--gold);
+      color: var(--navy);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 18px;
+      border-radius: 20px;
+      margin-bottom: 28px;
+    }
+    .hero h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.8rem;
+      font-weight: 700;
+      line-height: 1.15;
+      color: var(--white);
+      max-width: 720px;
+      margin: 0 auto 20px;
+    }
+    .hero h1 em {
+      color: var(--gold);
+      font-style: normal;
+    }
+    .hero__sub {
+      font-size: 1.15rem;
+      max-width: 640px;
+      margin: 0 auto 36px;
+      color: rgba(255,255,255,0.82);
+      line-height: 1.7;
+    }
+    .hero__ctas { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 36px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
+    .btn--primary {
+      background: var(--gold);
+      color: var(--navy);
+    }
+    .btn--primary:hover { background: var(--gold-hover); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .btn--secondary {
+      background: transparent;
+      color: var(--gold);
+      border: 2px solid rgba(213,173,54,0.5);
+    }
+    .btn--secondary:hover { border-color: var(--gold); background: rgba(213,173,54,0.08); }
+    .hero__note {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.5);
+      margin-top: 16px;
+    }
+
+    /* ====== SECTIONS ====== */
+    section { padding: 80px 0; }
+    section:nth-child(even) { background: var(--gray-50); }
+
+    .section__label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+    .section__title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 16px;
+      line-height: 1.25;
+    }
+    .section__subtitle {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      max-width: 640px;
+      margin-bottom: 40px;
+    }
+
+    /* ====== CURRICULUM ====== */
+    .modules { display: flex; flex-direction: column; gap: 16px; }
+    .module {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .module:hover { box-shadow: var(--shadow-md); }
+    .module__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      background: var(--navy);
+      color: var(--gold);
+      font-weight: 600;
+      font-size: 1.05rem;
+    }
+    .module__number {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.5);
+      margin-right: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .module__tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      letter-spacing: 0.04em;
+    }
+    .module__tag--free { background: var(--gold); color: var(--navy); }
+    .module__tag--sub { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+    .module__lessons { padding: 8px 0; }
+    .lesson {
+      display: flex;
+      align-items: baseline;
+      padding: 10px 24px;
+      gap: 12px;
+      border-bottom: 1px solid var(--gray-100);
+      transition: background 0.15s;
+    }
+    .lesson:last-child { border-bottom: none; }
+    .lesson:hover { background: var(--gray-50); }
+    .lesson__num {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--gray-400);
+      min-width: 28px;
+    }
+    .lesson__title { flex: 1; font-size: 0.95rem; color: var(--text-primary); }
+    .lesson__duration {
+      font-size: 0.8rem;
+      color: var(--gray-400);
+      white-space: nowrap;
+    }
+    .lesson__badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      letter-spacing: 0.03em;
+    }
+    .lesson__badge--free { background: #d4edda; color: #155724; }
+    .lesson__badge--sub { background: var(--gold-soft); color: #856404; }
+
+    /* ====== VIDEO / ENROLL ====== */
+    .preview {
+      background: var(--gray-50);
+    }
+    .preview__grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 48px;
+      align-items: start;
+    }
+    .video-wrap {
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      background: #000;
+    }
+    .video-wrap iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: 0;
+    }
+    .enroll-card {
+      background: var(--white);
+      border: 2px solid var(--gold);
+      border-radius: var(--radius-lg);
+      padding: 36px 32px;
+      box-shadow: var(--shadow-md);
+    }
+    .enroll-card h3 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.4rem;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+    .enroll-card p {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--gray-600);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 1rem;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(213,173,54,0.15);
+    }
+    .btn--enroll {
+      width: 100%;
+      background: var(--gold);
+      color: var(--navy);
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: var(--radius-sm);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .btn--enroll:hover { background: var(--gold-hover); }
+    .btn--enroll:disabled { opacity: 0.6; cursor: not-allowed; }
+    .enroll-msg {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      min-height: 1.4em;
+    }
+    .enroll-msg--success { color: #155724; }
+    .enroll-msg--error { color: #dc3545; }
+    .enroll-card__includes {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gray-200);
+    }
+    .enroll-card__includes h4 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+    .enroll-card__includes ul {
+      list-style: none;
+      padding: 0;
+    }
+    .enroll-card__includes li {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      padding: 3px 0;
+      padding-left: 18px;
+      position: relative;
+    }
+    .enroll-card__includes li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #28a745;
+      font-weight: 700;
+    }
+
+    /* ====== VALUE PROP ====== */
+    .value-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .value-card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      padding: 32px 28px;
+      text-align: center;
+      transition: box-shadow 0.2s;
+    }
+    .value-card:hover { box-shadow: var(--shadow-md); }
+    .value-card__amount {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+    .value-card__label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .value-card__source {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      margin-top: 8px;
+    }
+    .trust-expense {
+      background: var(--gold-soft);
+      border-left: 4px solid var(--gold);
+      padding: 24px 28px;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      margin-top: 40px;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+    .trust-expense strong { color: var(--navy); }
+
+    /* ====== WHO THIS IS FOR ====== */
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    .audience-card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      padding: 28px 24px;
+      transition: box-shadow 0.2s;
+    }
+    .audience-card:hover { box-shadow: var(--shadow-md); }
+    .audience-card__icon {
+      font-size: 1.6rem;
+      margin-bottom: 12px;
+    }
+    .audience-card h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .audience-card p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .disclaimer {
+      margin-top: 32px;
+      padding: 16px 20px;
+      background: var(--gray-100);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: var(--gray-500);
+      line-height: 1.5;
+    }
+
+    /* ====== BUNDLE ====== */
+    .bundle {
+      background: linear-gradient(135deg, var(--navy) 0%, #0505a0 100%);
+      color: var(--white);
+    }
+    .bundle .section__label { color: var(--gold); }
+    .bundle .section__title { color: var(--white); }
+    .bundle .section__subtitle { color: rgba(255,255,255,0.7); }
+    .connections {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .connection {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+    .connection__module {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .connection__lesson {
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+    .connection__feature {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.6);
+      line-height: 1.5;
+    }
+    .connection__feature::before { content: '→ '; color: var(--gold); }
+    .bundle__ctas {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .bundle__annual {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.5);
+      margin-top: 8px;
+    }
+    .bundle__annual strong { color: var(--gold); }
+
+    /* ====== FAQ ====== */
+    .faq-list { max-width: 760px; }
+    .faq-item {
+      border-bottom: 1px solid var(--gray-200);
+      padding: 0;
+    }
+    .faq-item:first-child { border-top: 1px solid var(--gray-200); }
+    .faq-question {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      text-align: left;
+      transition: color 0.2s;
+    }
+    .faq-question:hover { color: var(--navy); }
+    .faq-question__icon {
+      font-size: 1.4rem;
+      font-weight: 300;
+      color: var(--gray-400);
+      transition: transform 0.3s;
+      flex-shrink: 0;
+      margin-left: 16px;
+    }
+    .faq-item.open .faq-question__icon { transform: rotate(45deg); }
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease, padding 0.35s ease;
+    }
+    .faq-item.open .faq-answer {
+      max-height: 300px;
+      padding-bottom: 20px;
+    }
+    .faq-answer p {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    /* ====== FINAL CTA ====== */
+    .final-cta {
+      background: linear-gradient(165deg, var(--navy) 0%, #0505a0 100%);
+      color: var(--white);
+      text-align: center;
+      padding: 100px 24px;
+    }
+    .final-cta h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--white);
+    }
+    .final-cta p {
+      font-size: 1.1rem;
+      color: rgba(255,255,255,0.7);
+      max-width: 520px;
+      margin: 0 auto 36px;
+    }
+    .final-cta .btn--secondary { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.3); }
+    .final-cta .btn--secondary:hover { border-color: rgba(255,255,255,0.6); color: #fff; }
+
+    /* ====== FOOTER ====== */
+    .footer {
+      background: #000040;
+      color: rgba(255,255,255,0.4);
+      padding: 40px 24px;
+      text-align: center;
+      font-size: 0.8rem;
+    }
+    .footer a { color: var(--gold); text-decoration: none; }
+
+    /* ====== RESPONSIVE ====== */
+    @media (max-width: 768px) {
+      .hero { padding: 72px 20px 60px; }
+      .hero h1 { font-size: 2rem; }
+      .hero__sub { font-size: 1rem; }
+      section { padding: 56px 0; }
+      .section__title { font-size: 1.6rem; }
+      .preview__grid { grid-template-columns: 1fr; gap: 32px; }
+      .value-grid { grid-template-columns: 1fr; }
+      .audience-grid { grid-template-columns: 1fr; }
+      .connections { grid-template-columns: 1fr; }
+      .final-cta h2 { font-size: 1.6rem; }
+      .btn { padding: 14px 28px; font-size: 1rem; }
+    }
+
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 1.65rem; }
+      .hero__sub { font-size: 0.92rem; }
+      .module__header { padding: 12px 16px; font-size: 0.95rem; }
+      .lesson { padding: 8px 16px; }
+      .enroll-card { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== HERO ==================== -->
+  <header class="hero">
+    <div class="container">
+      <div class="hero__badge">27 Lessons · 9 Modules</div>
+      <h1>The Course That Prepares You for <em>the Role You Already Have</em></h1>
+      <p class="hero__sub">27 lessons. Real dollar amounts from real cases. A step-by-step system for every trustee who needs to get it right — because the court won't accept "I didn't know" as a defense.</p>
+      <div class="hero__ctas">
+        <a href="https://app.trustoffice.app/subscription" class="btn btn--primary">Subscribe at $79/mo — Full 27-Lesson Course Included</a>
+        <a href="#preview" class="btn btn--secondary">Watch Module 1 Free (3 lessons + First Seven Days checklist)</a>
+      </div>
+      <p class="hero__note">$79/mo is a trust expense — paid from the trust, for the trust.</p>
+    </div>
+  </header>
+
+  <!-- ==================== CURRICULUM ==================== -->
+  <section id="curriculum">
+    <div class="container">
+      <div class="section__label">Full Curriculum</div>
+      <h2 class="section__title">What You'll Learn — Module by Module</h2>
+      <p class="section__subtitle">Nine modules. Three lessons each. Every lesson is built around what actually happens to trustees — the formalities they miss, the decisions they can't prove, the commingling they didn't see coming. Each lesson includes real case amounts so you understand what's at stake.</p>
+
+      <div class="modules">
+        <!-- Module 1 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 1</span> The Weight of the Role</span>
+            <span class="module__tag module__tag--free">FREE WITH EMAIL</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">01</span>
+              <span class="lesson__title">The Highest Standard in American Law</span>
+              <span class="lesson__badge lesson__badge--free">FREE</span>
+              <span class="lesson__duration">~7 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">02</span>
+              <span class="lesson__title">Should You Accept? What Happens When the Grantor Dies</span>
+              <span class="lesson__badge lesson__badge--free">FREE</span>
+              <span class="lesson__duration">~5 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">03</span>
+              <span class="lesson__title">The Trustee's First Seven Days</span>
+              <span class="lesson__badge lesson__badge--free">FREE</span>
+              <span class="lesson__duration">~5 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 2 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 2</span> The Paper Trail</span>
+            <span class="module__tag module__tag--sub">SUBSCRIBERS</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">04</span>
+              <span class="lesson__title">Accounting Is a Verb with a Capital A</span>
+              <span class="lesson__duration">13 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">05</span>
+              <span class="lesson__title">Three Trustees Who Lost Everything Over Records</span>
+              <span class="lesson__duration">11 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">06</span>
+              <span class="lesson__title">The 4-Bucket System That Protects You</span>
+              <span class="lesson__duration">10 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 3 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 3</span> Write It Down</span>
+            <span class="module__tag module__tag--sub">SUBSCRIBERS</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">07</span>
+              <span class="lesson__title">The $11,700 Blank Page</span>
+              <span class="lesson__duration">12 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">08</span>
+              <span class="lesson__title">Five Decisions That Landed Trustees in Court</span>
+              <span class="lesson__duration">14 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">09</span>
+              <span class="lesson__title">The 5-Minute Minute and Court-Ready Resolutions</span>
+              <span class="lesson__duration">11 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 4 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 4</span> Who Gets What</span>
+            <span class="module__tag module__tag--sub">SUBSCRIBERS</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">10</span>
+              <span class="lesson__title">HEMS — The Four Words That Govern Every Dollar</span>
+              <span class="lesson__duration">13 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">11</span>
+              <span class="lesson__title">Five HEMS Mistakes That Ended in Lawsuits</span>
+              <span class="lesson__duration">12 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">12</span>
+              <span class="lesson__title">The 4-Question Test for Every Distribution</span>
+              <span class="lesson__duration">10 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 5 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 5</span> The Commingling Trap</span>
+            <span class="module__tag module__tag--sub">SUBSCRIBERS</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">13</span>
+              <span class="lesson__title">Six Rules That Keep Trust Money Clean</span>
+              <span class="lesson__duration">12 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">14</span>
+              <span class="lesson__title">Six Real Commingling Cases</span>
+              <span class="lesson__duration">14 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">15</span>
+              <span class="lesson__title">The Simple Separation Rule</span>
+              <span class="lesson__duration">9 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 6 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 6</span> Taxes and Deadlines</span>
+            <span class="module__tag module__tag--sub">SUBSCRIBERS</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">16</span>
+              <span class="lesson__title">How Trust Taxes Work</span>
+              <span class="lesson__duration">13 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">17</span>
+              <span class="lesson__title">Five Tax Mistakes</span>
+              <span class="lesson__duration">11 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">18</span>
+              <span class="lesson__title">Your Tax Calendar and the 65-Day Rule</span>
+              <span class="lesson__duration">10 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 7 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 7</span> Invest and Delegate</span>
+            <span class="module__tag module__tag--sub">SUBSCRIBERS</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">19</span>
+              <span class="lesson__title">The Prudent Investor Rule</span>
+              <span class="lesson__duration">12 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">20</span>
+              <span class="lesson__title">Four Investment Mistakes</span>
+              <span class="lesson__duration">11 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">21</span>
+              <span class="lesson__title">Your Investment Process</span>
+              <span class="lesson__duration">10 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 8 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 8</span> Communication That Prevents Lawsuits</span>
+            <span class="module__tag module__tag--sub">SUBSCRIBERS</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">22</span>
+              <span class="lesson__title">The Communication Duty</span>
+              <span class="lesson__duration">12 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">23</span>
+              <span class="lesson__title">Five Communication Failures</span>
+              <span class="lesson__duration">11 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">24</span>
+              <span class="lesson__title">The 4-Pillar Communication System</span>
+              <span class="lesson__duration">10 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 9 -->
+        <div class="module">
+          <div class="module__header">
+            <span><span class="module__number">Module 9</span> When Family and Trust Collide</span>
+            <span class="module__tag module__tag--sub">SUBSCRIBERS</span>
+          </div>
+          <div class="module__lessons">
+            <div class="lesson">
+              <span class="lesson__num">25</span>
+              <span class="lesson__title">Two Hats, One Head</span>
+              <span class="lesson__duration">12 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">26</span>
+              <span class="lesson__title">Four Family Trust Traps</span>
+              <span class="lesson__duration">11 min</span>
+            </div>
+            <div class="lesson">
+              <span class="lesson__num">27</span>
+              <span class="lesson__title">The 5 Rules for Family Trustees</span>
+              <span class="lesson__duration">13 min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MODULE 1 FREE PREVIEW ==================== -->
+  <section class="preview" id="preview">
+    <div class="container--wide">
+      <div class="section__label">Free Preview</div>
+      <h2 class="section__title">Watch Module 1 — Free</h2>
+      <p class="section__subtitle">Three lessons. No credit card. Enter your email and we'll send you full access to Module 1: The Weight of the Role.</p>
+
+      <div class="preview__grid">
+        <div>
+          <div class="video-wrap">
+            <iframe
+              src="https://iframe.mediadelivery.net/embed/609821/b095719e-96c6-4a0a-a845-5f003777ff2f"
+              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+              allowfullscreen
+              loading="lazy"
+            ></iframe>
+          </div>
+          <p style="margin-top: 16px; font-size: 0.85rem; color: var(--gray-500);">Lesson 1: The Highest Standard in American Law · ~7 min</p>
+        </div>
+
+        <div class="enroll-card" id="enroll">
+          <h3>Get Module 1 Free</h3>
+          <p>Lessons 1–3, no credit card. Just your email so we can send you the access link.</p>
+          <form id="enroll-form" onsubmit="handleEnroll(event)">
+            <div class="form-group">
+              <label for="enroll-name">Name</label>
+              <input type="text" id="enroll-name" placeholder="Your full name" required autocomplete="name">
+            </div>
+            <div class="form-group">
+              <label for="enroll-email">Email</label>
+              <input type="email" id="enroll-email" placeholder="you@example.com" required autocomplete="email">
+            </div>
+            <input type="hidden" id="enroll-source" value="trustee-101-landing-page">
+            <button type="submit" class="btn--enroll" id="enroll-btn">Send Me Module 1</button>
+          </form>
+          <p class="enroll-msg" id="enroll-msg"></p>
+          <div class="enroll-card__includes">
+            <h4>Module 1 includes:</h4>
+            <ul>
+              <li>Lesson 1: The Highest Standard in American Law</li>
+              <li>Lesson 2: Should You Accept? What Happens When the Grantor Dies</li>
+              <li>Lesson 3: The Trustee's First Seven Days</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== VALUE PROPOSITION ==================== -->
+  <section id="value">
+    <div class="container">
+      <div class="section__label">The Measurable Cost</div>
+      <h2 class="section__title">The Cost of Not Knowing Is Measurable</h2>
+      <p class="section__subtitle">These aren't hypotheticals. They're real surcharges from real court cases — the dollar amounts trustees paid out of their own pockets.</p>
+
+      <div class="value-grid">
+        <div class="value-card">
+          <div class="value-card__amount">$700K+</div>
+          <div class="value-card__label">Combined surcharges from cases covered in this course — paid by trustees from personal funds</div>
+          <div class="value-card__source">Specific case citations in each lesson</div>
+        </div>
+        <div class="value-card">
+          <div class="value-card__amount">$250–500</div>
+          <div class="value-card__label">For a single attorney consultation — and most don't cover the governance discipline this course teaches</div>
+          <div class="value-card__source">National average for trust & estate counsel</div>
+        </div>
+        <div class="value-card">
+          <div class="value-card__amount">$15K–50K</div>
+          <div class="value-card__label">In legal fees for a trust dispute — and that's before any surcharges or removal proceedings</div>
+          <div class="value-card__source">Average trust litigation cost range</div>
+        </div>
+      </div>
+
+      <div class="trust-expense">
+        <strong>$79/month is a trust expense.</strong> It's paid from the trust, for the trust — just like accounting fees, tax preparation, and any other cost of sound governance. The course teaches the formalities. The software makes them automatic. Both are legitimate trust expenses.
+      </div>
+
+      <div style="text-align: center; margin-top: 32px;">
+        <a href="https://app.trustoffice.app/subscription" class="btn btn--primary">Subscribe at $79/mo — Full Course + Governance Tools Included</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== WHO THIS IS FOR ==================== -->
+  <section id="who-for">
+    <div class="container">
+      <div class="section__label">Who This Is For</div>
+      <h2 class="section__title">Built for the People Who Actually Serve</h2>
+      <p class="section__subtitle">This course is for anyone who has a duty they didn't ask for, didn't study for, and can't afford to get wrong.</p>
+
+      <div class="audience-grid">
+        <div class="audience-card">
+          <div class="audience-card__icon">🏚️</div>
+          <h4>Accidental Trustees</h4>
+          <p>You were just appointed and you're not sure where to start. The trust document is 40 pages, the legal terms are unfamiliar, and the court holds you to the highest standard in American law. This course gives you a framework — not a law degree, but a clear sequence of actions.</p>
+        </div>
+        <div class="audience-card">
+          <div class="audience-card__icon">👨‍👩‍👧‍👦</div>
+          <h4>Family Trustees</h4>
+          <p>You're wearing two hats — family member and fiduciary. The law doesn't have a family exception. Module 9 was written for you: how to say no at Thanksgiving, how to document decisions that affect siblings, and how to keep the trust and the relationship intact.</p>
+        </div>
+        <div class="audience-card">
+          <div class="audience-card__icon">📋</div>
+          <h4>Trustees with Gaps</h4>
+          <p>You've been serving for a while and you suspect there are gaps — minutes you never wrote, distributions you didn't document, commingling you didn't catch. This course helps you find those gaps before a beneficiary or a court does.</p>
+        </div>
+        <div class="audience-card">
+          <div class="audience-card__icon">⚖️</div>
+          <h4>Experienced Trustees</h4>
+          <p>You've been at this for years. But real surcharges from real courts show that experience alone doesn't prevent governance decay. This course covers the specific formalities, real case outcomes, and systems that make governance discipline automatic instead of aspirational.</p>
+        </div>
+      </div>
+
+      <div class="disclaimer">
+        <strong>Important:</strong> This is not legal advice. It will not replace your attorney or your CPA. It will not tell you what your specific state requires — because trust law varies by jurisdiction. What it will do is prepare you to have better conversations with the professionals you hire, and to maintain the formalities that keep your trust defensible between those conversations.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== BUNDLE ==================== -->
+  <section class="bundle" id="bundle">
+    <div class="container">
+      <div class="section__label">Course + Software</div>
+      <h2 class="section__title">The Course Teaches the Formalities.<br>The Software Makes Them Automatic.</h2>
+      <p class="section__subtitle">Knowing what to do is half the work. Doing it — consistently, month after month, with the records to prove it — is what separates a defensible trust from governance decay.</p>
+
+      <p style="font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 32px; text-align: center; max-width: 700px; margin-left: auto; margin-right: auto;">That's why Trustee 101 isn't sold separately. It's included with TrustOffice because the course and the software are one system.</p>
+
+      <div class="connections">
+        <div class="connection">
+          <div class="connection__module">Module 2 · The Paper Trail</div>
+          <div class="connection__lesson">Accounting, record-keeping, the 4-bucket system</div>
+          <div class="connection__feature">TrustOffice automated trust accounting and audit-ready reports</div>
+        </div>
+        <div class="connection">
+          <div class="connection__module">Module 3 · Write It Down</div>
+          <div class="connection__lesson">Minutes, resolutions, decision documentation</div>
+          <div class="connection__feature">TrustOffice minute templates and court-ready resolution generator</div>
+        </div>
+        <div class="connection">
+          <div class="connection__module">Module 5 · The Commingling Trap</div>
+          <div class="connection__lesson">Separation rules, clean accounts</div>
+          <div class="connection__feature">TrustOffice dedicated trust accounting with built-in separation enforcement</div>
+        </div>
+        <div class="connection">
+          <div class="connection__module">Module 8 · Communication That Prevents Lawsuits</div>
+          <div class="connection__lesson">Beneficiary notices, reporting cadence</div>
+          <div class="connection__feature">TrustOffice automated beneficiary communication and notice tracking</div>
+        </div>
+      </div>
+
+      <p style="font-size: 1.05rem; color: var(--text-secondary); margin-top: 40px; text-align: center; max-width: 700px; margin-left: auto; margin-right: auto;">Every lesson in this course connects to a feature in the software. You learn the principle, then the system enforces it — not because you'll remember to, but because you won't have to.</p>
+
+      <div class="bundle__ctas">
+        <a href="https://app.trustoffice.app/subscription" class="btn btn--primary">Subscribe at $79/mo — Course + Software, One System</a>
+        <p class="bundle__annual">Annual option: <strong>$790/yr saves $158</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FAQ ==================== -->
+  <section id="faq">
+    <div class="container">
+      <div class="section__label">Questions</div>
+      <h2 class="section__title">Questions You're Probably Asking</h2>
+
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            <span>Is the course sold separately from the software?</span>
+            <span class="faq-question__icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>It's not available as a standalone purchase. The course and software are designed as one system — the lessons teach the formalities and the software enforces them. Separating them would undermine both.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            <span>What does $79/month include?</span>
+            <span class="faq-question__icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>The full 27-lesson Trustee 101 course, plus the TrustOffice platform — recordkeeping, decision documentation, commingling detection, tax calendar, investment tracking, beneficiary communication, and AI-powered minutes. Everything a trustee needs to maintain a defensible structure in one place. Active subscription required.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            <span>Is this legal advice?</span>
+            <span class="faq-question__icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>No. This course is educational. It teaches the governance discipline trustees are responsible for — the formalities, the case law, the frameworks. It does not replace counsel for specific trust or legal questions.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            <span>How long do I have access?</span>
+            <span class="faq-question__icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>The course unlocks immediately on subscription. There's no drip schedule — all 27 lessons are available from day one. Access continues for the duration of your subscription.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            <span>What if I only need the course?</span>
+            <span class="faq-question__icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>The formalities the course teaches require ongoing practice — documentation, accounting, communication. The software is what makes that practice sustainable. That's why they're bundled. Most trustees who learn the principles but don't have the infrastructure find themselves back in the same gaps within months.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            <span>I'm a professional trustee — is this too basic?</span>
+            <span class="faq-question__icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>The course uses real surcharges from real courts — $17,600 for missing records, $11,700 for an undocumented decision, $120,000 for an imprudent investment. These are from Modules 2, 3, and 7. The case law applies regardless of experience level. If you've been doing this for years, you'll still find the specific dollar amounts and court references relevant.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" onclick="toggleFaq(this)">
+            <span>Can the trust pay for this?</span>
+            <span class="faq-question__icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>Yes. $79/month is a legitimate trust expense — like accounting fees, tax preparation, or any other cost of sound governance. The trust pays it, because the trust benefits from it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FINAL CTA ==================== -->
+  <section class="final-cta" id="subscribe">
+    <h2>The Trust Needs a Trustee Who's Ready</h2>
+    <p>You've been given a legal office with the highest standard in American law. The court expects you to know the formalities, keep the records, document the decisions, and communicate with beneficiaries — whether anyone explained that to you or not. Trustee 101 walks you through every one of those obligations, with real cases showing what happens when they're missed. TrustOffice makes the ongoing practice automatic. Together, they're a governance system that keeps your trust defensible — month after month, decision after decision.</p>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 14px;">
+      <a href="https://app.trustoffice.app/subscription" class="btn btn--primary">Subscribe at $79/mo — Full 27-Lesson Course Included</a>
+      <a href="#preview" class="btn btn--secondary">Watch Module 1 Free (3 lessons + First Seven Days checklist)</a>
+    </div>
+    <p style="margin-top: 16px; font-size: 0.85rem; color: rgba(255,255,255,0.4);">$79/mo is a trust expense. Annual option: $790/yr saves $158.</p>
+  </section>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="footer">
+    <p>&copy; 2025 TrustOffice. All rights reserved.</p>
+    <p><a href="https://trustoffice.app">trustoffice.app</a></p>
+  </footer>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <script>
+  // Enrollment form handler
+  async function handleEnroll(e) {
+    e.preventDefault();
+    var btn = document.getElementById('enroll-btn');
+    var msg = document.getElementById('enroll-msg');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    msg.textContent = '';
+    msg.className = 'enroll-msg';
+
+    try {
+      var resp = await fetch('/api/courses/trustee-101/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('enroll-name').value,
+          email: document.getElementById('enroll-email').value,
+          source: document.getElementById('enroll-source').value
+        })
+      });
+      var data = await resp.json();
+      if (data.success) {
+        msg.className = 'enroll-msg enroll-msg--success';
+        msg.textContent = data.is_returning
+          ? 'Welcome back! Check your email — Module 1 access has been re-sent.'
+          : 'Welcome! Check your email for Module 1 access.';
+      } else {
+        msg.className = 'enroll-msg enroll-msg--error';
+        msg.textContent = data.detail || 'Something went wrong. Please try again.';
+      }
+    } catch(err) {
+      msg.className = 'enroll-msg enroll-msg--error';
+      msg.textContent = 'Network error. Please try again.';
+    }
+    btn.disabled = false;
+    btn.textContent = 'Send Me Module 1';
+  }
+
+  // FAQ accordion
+  function toggleFaq(button) {
+    var item = button.parentElement;
+    var wasOpen = item.classList.contains('open');
+    // Close all
+    document.querySelectorAll('.faq-item').forEach(function(el) {
+      el.classList.remove('open');
+    });
+    // Toggle current
+    if (!wasOpen) {
+      item.classList.add('open');
+    }
+  }
+  </script>
+</body>
+</html>

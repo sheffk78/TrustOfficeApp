@@ -47,6 +47,7 @@ import CommunicationsPage from "@/pages/CommunicationsPage";
 import VaultPage from "@/pages/VaultPage";
 import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import PrintableBinderPage from "@/pages/PrintableBinderPage";
+import CoursePage from "@/pages/CoursePage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -331,6 +332,11 @@ const AppRouter = () => {
       <Route path="/risk" element={
         <SubscriptionProtectedRoute>
           <RiskDashboardPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/course" element={
+        <SubscriptionProtectedRoute>
+          <CoursePage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/binder" element={
