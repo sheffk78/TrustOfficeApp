@@ -8,4 +8,4 @@ else
     echo "No PORT env var set, defaulting to port 80"
 fi
 echo "Starting nginx..."
-nginx -g "daemon off;"
+exec nginx -g "daemon off;"

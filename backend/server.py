@@ -83,6 +83,7 @@ from routers.binder import router as binder_router
 from routers.external import router as external_router
 from routers.external_trust_docs import router as external_trust_docs_router
 from routers.courses import router as courses_router
+from routers.chat import router as chat_router  # Trust Assistant
 
 # Import security middleware
 from security import (
@@ -330,6 +331,8 @@ app.include_router(external_router, prefix="/api")
 app.include_router(external_trust_docs_router)
 # Course routes
 app.include_router(courses_router, prefix="/api")
+# Trust Assistant conversational AI
+app.include_router(chat_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -458,6 +461,11 @@ async def startup_event():
         
         # Admin user index
         await db.users.create_index("is_admin", sparse=True)
+        
+        # Chat conversation indexes (Trust Assistant)
+        await db.chat_conversations.create_index([("user_id", 1), ("updated_at", -1)])
+        await db.chat_conversations.create_index("conversation_id", unique=True)
+        await db.chat_conversations.create_index("updated_at", expireAfterSeconds=15552000)  # 180 days TTL
         
         # Transaction ledger indexes
         await db.transactions.create_index([("trust_id", 1), ("user_id", 1), ("date", -1)])

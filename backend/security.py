@@ -41,6 +41,9 @@ class RateLimitConfig:
         "/api/governance-suggestions": (10, 60),
         "/api/guided-minutes/draft": (10, 60),
         
+        # Chat endpoint (Trust Assistant)
+        "/api/ai/chat": (30, 60),               # 30 requests per minute
+        
         # File generation - resource intensive
         "/api/minutes-templates": (20, 60),    # 20 requests per minute
         "/api/trust-units/certificates": (20, 60),

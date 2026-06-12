@@ -1352,3 +1352,61 @@ class TrustStateComplianceUpdate(BaseModel):
 
 # Fix forward reference
 DashboardResponse.model_rebuild()
+
+
+# ==================== CHAT / TRUST ASSISTANT MODELS ====================
+
+class ChatAction(BaseModel):
+    """An action card presented to the user for review/approval"""
+    type: str = Field(..., description="Action type: minutes_preview, distribution_preview, asset_preview, beneficiary_preview")
+    data: dict = Field(default_factory=dict, description="Action data payload")
+    requires_confirmation: bool = Field(default=True, description="Whether user confirmation is required before execution")
+    confirmation_status: Optional[str] = Field(None, description="Status: pending, approved, rejected")
+    warning_summary: Optional[str] = Field(None, description="Brief warning about this action, if any")
+
+
+class ChatMessage(BaseModel):
+    """A single message in a conversation"""
+    role: str = Field(..., description="user or assistant")
+    content: str = Field(..., description="Message text")
+    action_card: Optional[dict] = Field(None, description="Action card attached to this message")
+    citation_note: Optional[str] = Field(None, description="What the AI is basing this response on")
+    unknown_note: Optional[str] = Field(None, description="What the AI doesn't know")
+    caveat: Optional[str] = Field(None, description="Required caveat language")
+    timestamp: str = Field(default_factory=lambda: __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat())
+
+
+class ChatRequest(BaseModel):
+    """Request to the chat endpoint"""
+    message: str = Field(..., max_length=5000, description="User's message")
+    conversation_id: Optional[str] = Field(None, description="Existing conversation ID")
+    trust_id: Optional[str] = Field(None, description="Trust ID to scope the conversation")
+
+
+class ChatResponse(BaseModel):
+    """Non-streaming chat response"""
+    message: dict
+    conversation_id: str
+    trust_context_summary: Optional[dict] = None
+    has_pending_actions: bool = False
+
+
+class Conversation(BaseModel):
+    """A chat conversation document in MongoDB"""
+    conversation_id: str
+    user_id: str
+    trust_id: str
+    title: str
+    messages: list = []
+    created_at: str
+    updated_at: str
+
+
+class ConversationListItem(BaseModel):
+    """Summary of a conversation for the history list"""
+    conversation_id: str
+    title: str
+    message_count: int
+    last_message_preview: str
+    updated_at: str
+    trust_id: Optional[str] = None

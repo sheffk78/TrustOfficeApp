@@ -75,6 +75,7 @@ const NAV_GROUPS = [
     { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
     { path: '/binder', icon: NotebookTabs, label: 'Binder Tools' },
   ]},
+  { key: 'trust-assistant', icon: MessageSquare, label: 'Trust Assistant', items: [] },
   { key: 'score', icon: HeartPulse, label: 'Trust Health', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
@@ -200,6 +201,7 @@ export const Sidebar = () => {
             if (group.items.length === 0) {
               const path = group.key === 'dashboard' ? '/dashboard' 
                 : group.key === 'score' ? '/governance' 
+                : group.key === 'trust-assistant' ? '/trust-assistant'
                 : '/settings';
               const isActive = location.pathname === path;
               
