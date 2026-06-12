@@ -261,8 +261,8 @@ async def get_summary_stats(
     forever_free = await db.subscriptions.count_documents({"status": "forever_free"})
     
     # Plan breakdown for active subscriptions
-    monthly_active = await db.subscriptions.count_documents({"status": "active", "plan": "monthly"})
-    annual_active = await db.subscriptions.count_documents({"status": "active", "plan": "annual"})
+    monthly_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
+    annual_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "annual"})
     
     # Users who registered in the last 7 days
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
