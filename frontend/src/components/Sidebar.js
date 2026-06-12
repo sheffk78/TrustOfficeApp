@@ -20,7 +20,6 @@ import {
   Package,
   Award,
   Users,
-  Sparkles,
   Crown,
   ArrowUpDown,
   TrendingUp,
@@ -57,7 +56,6 @@ const NAV_GROUPS = [
   { key: 'governance', icon: BookOpen, label: 'Governance', items: [
     { path: '/calendar', icon: Calendar, label: 'Calendar' },
     { path: '/minutes', icon: FilePen, label: 'Minutes' },
-    { path: '/minutes/create', icon: Sparkles, label: 'Create Minutes' },
     { path: '/tax-calendar', icon: CalendarDays, label: 'Tax Calendar' },
   ]},
   { key: 'money', icon: Coins, label: 'Money', items: [

@@ -1,3 +1,4 @@
+# DEPRECATED — Replaced by Trust Assistant conversational AI. Kept for backward compatibility.
 # Guided Minutes router - AI-assisted wizard for creating minutes
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime, timezone

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -12,6 +13,8 @@ const COLLAPSED_KEY = 'trust_assistant_snapshot_collapsed';
 
 const TrustAssistantPage = () => {
   const { selectedTrust } = useAuth();
+  const [searchParams] = useSearchParams();
+  const promptSent = useRef(false);
 
   // Snapshot column collapse state — collapsed by default on revisit
   const [snapshotCollapsed, setSnapshotCollapsed] = useState(() => {
@@ -61,6 +64,15 @@ const TrustAssistantPage = () => {
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  // Auto-send ?prompt= query parameter on first mount
+  useEffect(() => {
+    const prompt = searchParams.get('prompt');
+    if (prompt && !promptSent.current && messages.length === 0 && !loading) {
+      promptSent.current = true;
+      sendMessage(prompt, conversationId, messages);
+    }
+  }, [searchParams, messages.length, loading, sendMessage, conversationId, messages]);
 
   // Handle sending a message through the chat
   const handleSendMessage = useCallback(async (text) => {

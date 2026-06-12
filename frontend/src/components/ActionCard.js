@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Check, Pencil, X, AlertTriangle, FileText, DollarSign, Building2, Users, Loader2 } from 'lucide-react';
 
 const TYPE_CONFIG = {
@@ -98,6 +99,17 @@ const ActionCard = ({ card, onApprove, onEdit, onDiscard, disabled }) => {
               : `✗ Failed: ${card.execution_result.error || 'Unknown error'}`
             }
           </p>
+          {card.execution_result.success && card.execution_result.record_id && (
+            (card.type === 'minutes_preview' || card.type?.startsWith('minutes')) && (
+              <Link
+                to={`/minutes/${card.execution_result.record_id}`}
+                className="inline-flex items-center gap-1 mt-1.5 text-gold hover:underline font-mono text-xs"
+              >
+                <FileText className="w-3 h-3" />
+                View in Minutes
+              </Link>
+            )
+          )}
         </div>
       )}
 
