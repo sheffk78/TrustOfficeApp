@@ -1072,7 +1072,9 @@ async def get_revenue_data(
                     if inv.customer_id:
                         customer = stripe.Customer.retrieve(inv.customer_id)
                         customer_email = customer.email or ""
-                except stripe.StripeError:
+                    else:
+                        customer_email = inv.customer_email or ""
+                except Exception:
                     customer_email = inv.customer_email or ""
                 
                 recent_transactions.append({
