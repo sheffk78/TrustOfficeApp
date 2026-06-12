@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -20,7 +20,8 @@ import {
   ChevronDown,
   Eye,
   Loader2,
-  Pencil
+  Pencil,
+  Bot
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -370,11 +371,28 @@ export default function MinutesPage() {
                       Choose a Different Template
                     </Button>
                   </div>
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Or ask{' '}
+                    <Link to="/trust-assistant?prompt=I+need+to+document+a+meeting" className="text-gold hover:underline font-medium">
+                      Trust Assistant to draft them for you
+                    </Link>.
+                  </p>
                 </>
               )}
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Trust Assistant banner */}
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-gold/5 border border-gold/20 rounded">
+                <Bot className="w-4 h-4 text-gold flex-shrink-0" />
+                <p className="font-mono text-xs text-navy/70">
+                  Need help drafting minutes?{' '}
+                  <Link to="/trust-assistant?prompt=I+need+to+document+a+meeting" className="text-gold hover:underline font-medium">
+                    Ask Trust Assistant
+                  </Link>.
+                </p>
+              </div>
+
               {filteredMinutes.map((entry) => {
                 const summary = entry.summary || `${(entry.minutes_type || 'Meeting').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Minutes`;
                 const details = entry.details || entry.decisions_text || '';
@@ -452,6 +470,18 @@ export default function MinutesPage() {
         </div>
       </main>
       <MobileBottomNav />
+
+      {/* Trust Assistant FAB */}
+      {selectedTrust && (
+        <Link
+          to="/trust-assistant?prompt=I+need+to+document+a+meeting"
+          className="fixed bottom-24 md:bottom-8 right-8 z-40 shadow-lg bg-gold text-navy font-medium inline-flex items-center gap-2 px-4 py-3 rounded hover:bg-gold/90 transition-colors"
+          data-testid="trust-assistant-fab"
+        >
+          <Bot className="w-5 h-5" />
+          <span className="hidden sm:inline font-mono text-xs uppercase tracking-wider">Ask Trust Assistant</span>
+        </Link>
+      )}
 
       {/* PDF Preview Modal */}
       <PDFPreviewModal
