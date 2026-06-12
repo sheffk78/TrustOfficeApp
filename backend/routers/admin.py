@@ -435,7 +435,7 @@ async def remove_admin(
         {"$set": {
             "plan_type": "free",
             "status": "expired",
-            "updated_at": now.isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "notes": f"Admin access removed by {admin['email']}"
         }}
     )
@@ -502,7 +502,7 @@ async def grant_access(
         
         return {"message": f"Forever free access granted to {user['email']}"}
     
-    elif request.plan_type in ("gifted_monthly", "gifted_monthly"):
+    elif request.plan_type in ("gifted_monthly", "gifted_annual"):
         # Gift monthly access
         plan_type_map = {"gifted_monthly": "monthly", "gifted_annual": "annual"}
         duration_map = {"gifted_monthly": 30, "gifted_annual": 365}

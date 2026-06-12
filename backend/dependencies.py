@@ -263,7 +263,7 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
         gift_type = sub.get("gift_type", "14day")
         state.gift_type = gift_type
         
-        # Compute gift days remaining
+        # Compute gift days remaining and check expiry
         gift_end = sub.get("gift_end_date")
         if gift_end:
             try:
@@ -271,6 +271,12 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
                 if end.tzinfo is None:
                     end = end.replace(tzinfo=timezone.utc)
                 state.gift_days_remaining = max(0, (end - now).days)
+                # If gift has expired and no active Stripe subscription, mark as expired
+                if end < now and not sub.get("stripe_subscription_id"):
+                    state.status = "expired"
+                    state.is_active = False
+                    state.is_read_only = True
+                    state.is_trial = False
             except (ValueError, TypeError, AttributeError):
                 state.gift_days_remaining = None
     
