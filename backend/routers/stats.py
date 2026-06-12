@@ -26,14 +26,24 @@ STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
 TRUSTOFFICE_PRICE_IDS = {STRIPE_MONTHLY_PRICE_ID, STRIPE_ANNUAL_PRICE_ID}
 
 
+def _get_price_id(price_field):
+    """Extract Price ID from a Stripe line item's price field.
+    
+    Stripe may return it as a string (unexpanded) or an object with .id (expanded).
+    """
+    if isinstance(price_field, str):
+        return price_field
+    return getattr(price_field, 'id', None)
+
+
 def _is_trustoffice_invoice(inv) -> bool:
     """Check if an invoice has a line item matching a TrustOffice Price ID."""
     if not STRIPE_MONTHLY_PRICE_ID and not STRIPE_ANNUAL_PRICE_ID:
         return True
     try:
         for line in inv.lines.data:
-            price_obj = getattr(line, 'price', None)
-            if price_obj and getattr(price_obj, 'id', None) in TRUSTOFFICE_PRICE_IDS:
+            price_field = getattr(line, 'price', None)
+            if price_field and _get_price_id(price_field) in TRUSTOFFICE_PRICE_IDS:
                 return True
     except Exception:
         pass
@@ -159,9 +169,9 @@ def _fetch_stripe_revenue(start_date: datetime, end_date: datetime):
                 plan_type = "monthly"
                 try:
                     for line in inv.lines.data:
-                        price_obj = getattr(line, 'price', None)
-                        if price_obj:
-                            price_id = getattr(price_obj, 'id', None)
+                        price_field = getattr(line, 'price', None)
+                        if price_field:
+                            price_id = _get_price_id(price_field)
                             if price_id == STRIPE_ANNUAL_PRICE_ID:
                                 plan_type = "annual"
                                 break
