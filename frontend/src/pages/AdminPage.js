@@ -41,6 +41,27 @@ import {
   Calendar
 } from 'lucide-react';
 
+function formatLastActive(lastLogin) {
+  if (!lastLogin) return '—';
+  const now = new Date();
+  const date = new Date(lastLogin);
+  const diffMs = now - date;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours === 0) {
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      if (diffMinutes === 0) return 'Just now';
+      return `${diffMinutes} min ago`;
+    }
+    if (diffHours === 1) return '1 hour ago';
+    return `${diffHours} hours ago`;
+  }
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 30) return `${diffDays} days ago`;
+  return date.toLocaleDateString();
+}
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const { user, setUser, loadTrusts, loadSubscriptionState } = useAuth();
@@ -1085,6 +1106,7 @@ export default function AdminPage() {
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Plan</th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Trusts</th>
                         <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Joined</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Last Active</th>
                         <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
@@ -1136,6 +1158,9 @@ export default function AdminPage() {
                           </td>
                           <td className="py-3 px-4 text-sm text-muted-foreground">
                             {customer.created_at ? new Date(customer.created_at).toLocaleDateString() : '—'}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-muted-foreground">
+                            {formatLastActive(customer.last_login)}
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
