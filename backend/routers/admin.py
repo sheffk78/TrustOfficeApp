@@ -121,8 +121,8 @@ class AdminActionRequest(BaseModel):
 
 
 class GrantAccessRequest(BaseModel):
-    plan_type: str = "annual"  # trial, monthly, annual, forever_free
-    days: Optional[int] = None  # For trial extension
+    plan_type: str = "gifted_14day"  # gifted_14day, gifted_monthly, gifted_annual, monthly, annual, forever_free
+    days: Optional[int] = None  # For gift period extension
 
 
 class FixReferralRequest(BaseModel):
@@ -141,13 +141,16 @@ class CreateAdminUserRequest(BaseModel):
 class CreateUserRequest(BaseModel):
     email: EmailStr
     name: str
+    gifted_tier: str = "14day"  # REQUIRED: "14day", "monthly", "annual", "forever_free"
 
 
 class SystemStats(BaseModel):
     total_users: int
     active_subscriptions: int
-    trial_users: int
-    expired_trials: int
+    trial_users: int  # Legacy — replaced by gifted_users below
+    expired_trials: int  # Legacy — keep for backward compat
+    gifted_users: int = 0  # Total gifted users (all gift types)
+    expired_gifts: int = 0  # Expired gifts
     admin_count: int
     total_trusts: int
     total_minutes: int
@@ -426,13 +429,13 @@ async def remove_admin(
         }}
     )
     
-    # Revert to expired trial (they'll need to subscribe)
+    # Revert to expired state (they'll need to subscribe)
     await db.subscriptions.update_one(
         {"user_id": user_id},
         {"$set": {
-            "plan_type": "trial",
+            "plan_type": "free",
             "status": "expired",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": now.isoformat(),
             "notes": f"Admin access removed by {admin['email']}"
         }}
     )
@@ -462,25 +465,28 @@ async def grant_access(
     
     now = datetime.now(timezone.utc)
     
-    if request.plan_type == "trial":
-        # Extend or create trial
-        days = request.days or TRIAL_DAYS
-        trial_end = (now + timedelta(days=days)).isoformat()
+    if request.plan_type in ("trial", "gifted_14day"):
+        # Gift or extend 14-day access
+        days = request.days or 14
+        gift_end = (now + timedelta(days=days)).isoformat()
         
         await db.subscriptions.update_one(
             {"user_id": user_id},
             {"$set": {
-                "plan_type": "trial",
-                "status": "trialing",
-                "trial_start_date": now.isoformat(),
-                "trial_end_date": trial_end,
+                "plan_type": "free",
+                "status": "active",
+                "gifted": True,
+                "gift_type": "14day",
+                "gift_start_date": now.isoformat(),
+                "gift_end_date": gift_end,
+                "gifted_at": now.isoformat(),
                 "updated_at": now.isoformat(),
-                "notes": f"Trial extended by admin {admin['email']}"
+                "notes": f"Gifted 14-day access granted by admin {admin['email']}"
             }},
             upsert=True
         )
         
-        return {"message": f"Trial extended by {days} days for {user['email']}"}
+        return {"message": f"Gifted {days} days of access to {user['email']}"}
     
     elif request.plan_type == "forever_free":
         await db.subscriptions.update_one(
@@ -496,20 +502,46 @@ async def grant_access(
         
         return {"message": f"Forever free access granted to {user['email']}"}
     
+    elif request.plan_type in ("gifted_monthly", "gifted_monthly"):
+        # Gift monthly access
+        plan_type_map = {"gifted_monthly": "monthly", "gifted_annual": "annual"}
+        duration_map = {"gifted_monthly": 30, "gifted_annual": 365}
+        plan = plan_type_map.get(request.plan_type, "monthly")
+        duration = duration_map.get(request.plan_type, 30)
+        gift_end = (now + timedelta(days=duration)).isoformat()
+        
+        await db.subscriptions.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "plan_type": plan,
+                "status": "active",
+                "gifted": True,
+                "gift_type": plan,
+                "gift_start_date": now.isoformat(),
+                "gift_end_date": gift_end,
+                "gifted_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": f"Gifted {plan} access granted by admin {admin['email']}"
+            }},
+            upsert=True
+        )
+        
+        return {"message": f"Gifted {plan} access to {user['email']}"}
+    
     else:
-        # Grant paid plan access (complimentary)
+        # Grant paid plan access (direct, not gifted)
         await db.subscriptions.update_one(
             {"user_id": user_id},
             {"$set": {
                 "plan_type": request.plan_type,
                 "status": "active",
                 "updated_at": now.isoformat(),
-                "notes": f"Complimentary {request.plan_type} access granted by admin {admin['email']}"
+                "notes": f"Access granted by admin {admin['email']}"
             }},
             upsert=True
         )
         
-        return {"message": f"Complimentary {request.plan_type} access granted to {user['email']}"}
+        return {"message": f"{request.plan_type} access granted to {user['email']}"}
 
 
 @router.delete("/customers/{user_id}")
@@ -937,6 +969,16 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
     trial_users = await db.subscriptions.count_documents({"status": "trialing"})
     expired_trials = await db.subscriptions.count_documents({"status": "expired"})
     
+    # Gifted users count — active gifted subscriptions (not expired)
+    gifted_users = await db.subscriptions.count_documents({
+        "gifted": True,
+        "status": {"$ne": "expired"}
+    })
+    expired_gifts = await db.subscriptions.count_documents({
+        "gifted": True,
+        "status": "expired"
+    })
+    
     # Content counts
     total_trusts = await db.trusts.count_documents({})
     total_minutes = await db.minutes_records.count_documents({})
@@ -992,6 +1034,8 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
         active_subscriptions=active_subscriptions,
         trial_users=trial_users,
         expired_trials=expired_trials,
+        gifted_users=gifted_users,
+        expired_gifts=expired_gifts,
         admin_count=admin_count,
         total_trusts=total_trusts,
         total_minutes=total_minutes,
@@ -1453,11 +1497,20 @@ async def create_user(
 ):
     """
     Create a new regular user account (name + email only).
+    Admin must select a gifted tier or forever_free.
     Sends a welcome email with a set-password link.
     User sets their own password on first login.
     """
     email = request.email.lower().strip()
     name = request.name.strip()
+    
+    # Validate gifted_tier
+    valid_tiers = {"14day", "monthly", "annual", "forever_free"}
+    if request.gifted_tier not in valid_tiers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid gifted_tier '{request.gifted_tier}'. Must be one of: {', '.join(sorted(valid_tiers))}"
+        )
     
     # Check if user already exists
     existing = await db.users.find_one({"email": email}, {"_id": 0})
@@ -1484,17 +1537,37 @@ async def create_user(
     
     await db.users.insert_one(user_doc)
     
-    # Create trial subscription
-    trial_end = now + timedelta(days=TRIAL_DAYS)
-    await db.subscriptions.insert_one({
-        "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
-        "user_id": user_id,
-        "plan_type": "trial",
-        "status": "trialing",
-        "trial_end": trial_end.isoformat(),
-        "created_at": now.isoformat(),
-        "updated_at": now.isoformat()
-    })
+    # Create gifted subscription based on admin's choice
+    if request.gifted_tier == "forever_free":
+        await db.subscriptions.insert_one({
+            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+            "user_id": user_id,
+            "plan_type": "forever_free",
+            "status": "active",
+            "gifted": False,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        })
+    else:
+        # Gifted tier — create time-limited gift
+        gift_duration_days = {"14day": 14, "monthly": 30, "annual": 365}
+        duration = gift_duration_days[request.gifted_tier]
+        plan_type_map = {"14day": "free", "monthly": "monthly", "annual": "annual"}
+        
+        gift_end = (now + timedelta(days=duration)).isoformat()
+        await db.subscriptions.insert_one({
+            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+            "user_id": user_id,
+            "plan_type": plan_type_map[request.gifted_tier],
+            "status": "active",
+            "gifted": True,
+            "gift_type": request.gifted_tier,
+            "gift_start_date": now.isoformat(),
+            "gift_end_date": gift_end,
+            "gifted_at": now.isoformat(),
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        })
     
     # Initialize onboarding
     await db.user_onboarding.insert_one({

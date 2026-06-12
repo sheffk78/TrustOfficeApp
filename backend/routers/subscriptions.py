@@ -139,12 +139,15 @@ async def get_subscription_state_endpoint(user: dict = Depends(get_current_user)
     This endpoint provides the single source of truth for subscription status.
     
     Returns:
-        - plan_type: "trial", "monthly", "annual"
+        - plan_type: "trial", "free", "forever_free", "monthly", "annual"
         - status: "trialing", "active", "past_due", "canceled", "expired"
         - is_trial: boolean
         - is_active: boolean
         - is_read_only: boolean (determines if write operations are blocked)
         - trial_days_remaining: int or null
+        - is_gifted: boolean (whether admin-gifted account)
+        - gift_type: "14day", "monthly", "annual" or null
+        - gift_days_remaining: int or null
     """
     # Failsafe: Check if user is primary admin by email
     PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"

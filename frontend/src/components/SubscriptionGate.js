@@ -48,10 +48,13 @@ export const SubscriptionGate = ({ children }) => {
     );
   }
 
-  // Check if it's an active free-tier user (legacy trial or forever_free)
-  const isActiveFreeTier = (subscription?.is_trial && subscription?.is_active) || 
-                           (subscription?.plan_type === 'forever_free' && subscription?.is_active) ||
-                           (subscription?.plan_type === 'free' && subscription?.is_active);
+  // Check if it's an active free-tier user (but NOT gifted — gifted users get GiftedBanner at app root)
+  const isGiftedUser = subscription?.is_gifted;
+  const isActiveFreeTier = !isGiftedUser && (
+    (subscription?.is_trial && subscription?.is_active) || 
+    (subscription?.plan_type === 'forever_free' && subscription?.is_active) ||
+    (subscription?.plan_type === 'free' && subscription?.is_active)
+  );
 
   // If subscription is active, show content with UpgradeBanner for free users
   if (!subscriptionExpired && !isReadOnly) {

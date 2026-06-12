@@ -72,6 +72,9 @@ class SubscriptionState(BaseModel):
     is_trial: bool = False
     is_active: bool = False
     is_read_only: bool = True  # Default to read-only for safety
+    is_gifted: bool = False  # Whether this is an admin-gifted account
+    gift_type: Optional[str] = None  # "14day", "monthly", "annual"
+    gift_days_remaining: Optional[int] = None  # Days left on gift
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
     current_period_end: Optional[str] = None
@@ -146,7 +149,7 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
         )
     
     if effective_plan_type == "free":
-        return SubscriptionState(
+        state = SubscriptionState(
             user_id=user_id,
             subscription_id=sub.get("subscription_id"),
             plan_type="free",
@@ -162,6 +165,35 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
             current_period_end=sub.get("current_period_end"),
             cancel_at_period_end=sub.get("cancel_at_period_end"),
         )
+        # Gifted free users — set gift messaging fields and check expiration
+        if sub.get("gifted"):
+            state.is_gifted = True
+            state.gift_type = sub.get("gift_type", "14day")
+            gift_end = sub.get("gift_end_date")
+            if gift_end:
+                try:
+                    end = datetime.fromisoformat(gift_end.replace('Z', '+00:00'))
+                    if end.tzinfo is None:
+                        end = end.replace(tzinfo=timezone.utc)
+                    state.gift_days_remaining = max(0, (end - now).days)
+                    if end < now:
+                        # Gift expired — switch to expired status
+                        state.status = "expired"
+                        state.is_active = False
+                        state.is_read_only = True
+                        state.is_trial = False
+                except (ValueError, TypeError, AttributeError):
+                    pass
+            elif sub.get("trial_end_date"):
+                # Legacy trial — use trial_end_date for days remaining
+                try:
+                    end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
+                    if end.tzinfo is None:
+                        end = end.replace(tzinfo=timezone.utc)
+                    state.gift_days_remaining = max(0, (end - now).days)
+                except:
+                    pass
+        return state
     
     # Initialize state with base values
     state = SubscriptionState(
@@ -223,6 +255,24 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
         # Unknown status - default to read-only for safety
         state.is_active = False
         state.is_read_only = True
+    
+    # Gifted subscription handling — override display fields for gift messaging
+    # This runs for all plan types that reach the main path
+    if sub.get("gifted") and not state.is_gifted:
+        state.is_gifted = True
+        gift_type = sub.get("gift_type", "14day")
+        state.gift_type = gift_type
+        
+        # Compute gift days remaining
+        gift_end = sub.get("gift_end_date")
+        if gift_end:
+            try:
+                end = datetime.fromisoformat(gift_end.replace('Z', '+00:00'))
+                if end.tzinfo is None:
+                    end = end.replace(tzinfo=timezone.utc)
+                state.gift_days_remaining = max(0, (end - now).days)
+            except (ValueError, TypeError, AttributeError):
+                state.gift_days_remaining = None
     
     return state
 

@@ -96,9 +96,9 @@ export default function AdminPage() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   
   // Form states
-  const [grantAccessForm, setGrantAccessForm] = useState({ plan_type: 'trial', days: 14 });
+  const [grantAccessForm, setGrantAccessForm] = useState({ plan_type: 'gifted_14day', days: 14 });
+  const [createUserForm, setCreateUserForm] = useState({ email: '', name: '', gifted_tier: '14day' });
   const [createAdminForm, setCreateAdminForm] = useState({ email: '', name: '', password: '' });
-  const [createUserForm, setCreateUserForm] = useState({ email: '', name: '' });
   const [fixReferralForm, setFixReferralForm] = useState({ referrer_email: '', referee_email: '', action: 'create', status: '' });
   
   // Referrals list
@@ -455,6 +455,10 @@ export default function AdminPage() {
       toast.error('Please fill in name and email');
       return;
     }
+    if (!createUserForm.gifted_tier) {
+      toast.error('Please select a gift tier for this user');
+      return;
+    }
     
     setCreateUserLoading(true);
     try {
@@ -462,7 +466,8 @@ export default function AdminPage() {
         method: 'POST',
         body: JSON.stringify({
           email: createUserForm.email.trim().toLowerCase(),
-          name: createUserForm.name.trim()
+          name: createUserForm.name.trim(),
+          gifted_tier: createUserForm.gifted_tier
         })
       });
       
@@ -470,7 +475,7 @@ export default function AdminPage() {
         const data = await response.json();
         toast.success(data.message);
         setShowCreateUserDialog(false);
-        setCreateUserForm({ email: '', name: '' });
+        setCreateUserForm({ email: '', name: '', gifted_tier: '14day' });
         fetchCustomers();
       } else {
         const data = await response.json();
@@ -625,7 +630,7 @@ export default function AdminPage() {
   const getStatusBadge = (status) => {
     const styles = {
       active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-      trialing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+      trialing: 'bg-gold/20 text-gold dark:bg-gold/30 dark:text-gold',
       expired: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
       canceled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
       none: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
@@ -696,10 +701,10 @@ export default function AdminPage() {
               </div>
               <div className="card-trust p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Clock className="w-4 h-4 text-blue-500" />
-                  <span className="text-xs">In Trial</span>
+                  <Gift className="w-4 h-4 text-gold" />
+                  <span className="text-xs">Gifted</span>
                 </div>
-                <p className="text-2xl font-bold text-blue-600">{stats.trial_users}</p>
+                <p className="text-2xl font-bold text-gold">{stats.gifted_users || stats.trial_users}</p>
               </div>
               <div className="card-trust p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -1547,9 +1552,9 @@ export default function AdminPage() {
           <Dialog open={showGrantAccessDialog} onOpenChange={setShowGrantAccessDialog}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle className="font-serif text-xl text-navy dark:text-white">Grant Access</DialogTitle>
+                <DialogTitle className="font-serif text-xl text-navy dark:text-white">Gift Access</DialogTitle>
                 <DialogDescription>
-                  Grant subscription access to {selectedCustomer?.email}
+                  Gift subscription access to {selectedCustomer?.email}
                 </DialogDescription>
               </DialogHeader>
               
@@ -1564,17 +1569,17 @@ export default function AdminPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="trial">Trial (14 days)</SelectItem>
-                      <SelectItem value="monthly">Monthly (complimentary)</SelectItem>
-                      <SelectItem value="annual">Annual (complimentary)</SelectItem>
+                      <SelectItem value="gifted_14day">Gift 14 Days</SelectItem>
+                      <SelectItem value="gifted_monthly">Gift 1 Month</SelectItem>
+                      <SelectItem value="gifted_annual">Gift 1 Year</SelectItem>
                       <SelectItem value="forever_free">Forever Free</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 
-                {grantAccessForm.plan_type === 'trial' && (
+                {grantAccessForm.plan_type === 'gifted_14day' && (
                   <div>
-                    <Label className="label-trust">Trial Days</Label>
+                    <Label className="label-trust">Gift Days</Label>
                     <Input
                       type="number"
                       value={grantAccessForm.days}
@@ -1707,6 +1712,26 @@ export default function AdminPage() {
                     className="mt-1 input-trust"
                     placeholder="user@example.com"
                   />
+                </div>
+                <div>
+                  <Label className="label-trust">Gift Tier *</Label>
+                  <Select
+                    value={createUserForm.gifted_tier}
+                    onValueChange={(v) => setCreateUserForm({ ...createUserForm, gifted_tier: v })}
+                  >
+                    <SelectTrigger className="mt-1 input-trust">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="14day">Gift 14 Days</SelectItem>
+                      <SelectItem value="monthly">Gift 1 Month</SelectItem>
+                      <SelectItem value="annual">Gift 1 Year</SelectItem>
+                      <SelectItem value="forever_free">Forever Free</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This user will receive gifted access on the selected tier.
+                  </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   An email will be sent to this address with a link to set their password. The link expires in 24 hours.

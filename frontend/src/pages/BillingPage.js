@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   Loader2,
   Calendar,
+  Gift,
   XCircle,
   RefreshCw,
   ArrowUpCircle,
@@ -252,6 +253,16 @@ export default function BillingPage() {
     
     switch (status) {
       case 'active':
+        if (subscription?.is_gifted) {
+          return (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gold/20 text-gold border border-gold/30">
+              <Gift className="w-4 h-4" />
+              <span className="font-mono text-xs uppercase">
+                Gifted
+              </span>
+            </div>
+          );
+        }
         if (subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial' || subscription?.plan_type === 'free') {
           return (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
@@ -269,6 +280,16 @@ export default function BillingPage() {
           </div>
         );
       case 'trialing':
+        if (subscription?.is_gifted) {
+          return (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gold/20 text-gold border border-gold/30">
+              <Gift className="w-4 h-4" />
+              <span className="font-mono text-xs uppercase">
+                Gifted
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
             <Check className="w-4 h-4" />
