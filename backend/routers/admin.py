@@ -43,14 +43,30 @@ STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
 
 TRUSTOFFICE_PRICE_IDS = {STRIPE_MONTHLY_PRICE_ID, STRIPE_ANNUAL_PRICE_ID}
 
-def _get_price_id(price_field):
-    """Extract Price ID from a Stripe line item's price field.
+def _get_price_id(line):
+    """Extract Price ID from a Stripe invoice line item.
     
-    Stripe may return it as a string (unexpanded) or an object with .id (expanded).
+    Stripe SDK v15+ deprecates line.price. The Price ID may be:
+    - line.price (string or object) — older SDK / expanded
+    - line.pricing.price_details.price (string) — SDK v15+ standard
+    
+    Returns None if no Price ID found.
     """
-    if isinstance(price_field, str):
-        return price_field
-    return getattr(price_field, 'id', None)
+    # Method 1: Direct price field (older SDK or expanded)
+    price_field = getattr(line, 'price', None)
+    if price_field is not None:
+        if isinstance(price_field, str):
+            return price_field
+        return getattr(price_field, 'id', None)
+    
+    # Method 2: pricing.price_details.price (SDK v15+)
+    pricing = getattr(line, 'pricing', None)
+    if pricing:
+        price_details = getattr(pricing, 'price_details', None)
+        if price_details:
+            return getattr(price_details, 'price', None)
+    
+    return None
 
 
 def _is_trustoffice_invoice(inv) -> bool:
@@ -59,8 +75,8 @@ def _is_trustoffice_invoice(inv) -> bool:
         return True  # No price IDs configured — include everything
     try:
         for line in inv.lines.data:
-            price_field = getattr(line, 'price', None)
-            if price_field and _get_price_id(price_field) in TRUSTOFFICE_PRICE_IDS:
+            price_id = _get_price_id(line)
+            if price_id and price_id in TRUSTOFFICE_PRICE_IDS:
                 return True
     except Exception:
         pass
@@ -1091,15 +1107,13 @@ async def get_revenue_data(
                 plan_type = "monthly"
                 try:
                     for line in inv.lines.data:
-                        price_field = getattr(line, 'price', None)
-                        if price_field:
-                            price_id = _get_price_id(price_field)
-                            if price_id == STRIPE_ANNUAL_PRICE_ID:
-                                plan_type = "annual"
-                                break
-                            elif price_id == STRIPE_MONTHLY_PRICE_ID:
-                                plan_type = "monthly"
-                                break
+                        price_id = _get_price_id(line)
+                        if price_id == STRIPE_ANNUAL_PRICE_ID:
+                            plan_type = "annual"
+                            break
+                        elif price_id == STRIPE_MONTHLY_PRICE_ID:
+                            plan_type = "monthly"
+                            break
                 except Exception:
                     plan_type = "monthly"  # fallback
                 
