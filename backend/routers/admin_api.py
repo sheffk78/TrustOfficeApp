@@ -12,6 +12,7 @@ Endpoints:
 - GET  /admin-api/users/{user_id} - Get specific user details
 - POST /admin-api/users/{user_id}/extend-trial      - Extend trial period
 - POST /admin-api/users/{user_id}/gift-subscription - Gift subscription
+- POST /admin-api/users/{user_id}/grant-stats      - Grant stats access
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
@@ -735,4 +736,49 @@ async def reset_user_onboarding(
         "message": "Onboarding checklist reset successfully",
         "user_id": user_id,
         "note": "Auto-detection will re-mark completed steps on next dashboard load"
+    }
+
+
+@router.post("/users/{user_id}/grant-stats")
+async def grant_stats_access(
+    user_id: str,
+    request: Request,
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Grant stats access to a user.
+    
+    Sets is_stats_user: true and stats_granted_at on the user document.
+    """
+    # Verify user exists
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    now = datetime.now(timezone.utc)
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "is_stats_user": True,
+            "stats_granted_at": now.isoformat()
+        }}
+    )
+    
+    await log_api_action(
+        action="grant_stats",
+        details={"target_user_id": user_id},
+        user_id=user_id,
+        ip_address=get_client_ip(request)
+    )
+    
+    logger.info(f"API: Granted stats access to {user['email']}")
+    
+    return {
+        "success": True,
+        "message": f"Stats access granted to {user.get('email')}",
+        "user_id": user_id,
+        "email": user.get("email"),
+        "is_stats_user": True,
+        "stats_granted_at": now.isoformat()
     }
