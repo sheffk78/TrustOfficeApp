@@ -310,7 +310,7 @@ export default function AdminPage() {
     if (isAdmin && activeTab === 'admins') {
       fetchStatsUsers();
     }
-  }, [isAdmin, activeTab, fetchRevenueData]);
+  }, [isAdmin, activeTab, revenuePreset, fetchRevenueData]);
 
   // Actions
   const handleMakeAdmin = async (userId) => {
@@ -855,7 +855,14 @@ export default function AdminPage() {
                     {/* Revenue Chart */}
                     <div className="card-trust p-6 lg:col-span-2">
                       <h2 className="font-serif text-xl text-navy dark:text-white mb-4">Revenue Over Time</h2>
-                      {revenueData.revenue_by_month?.length > 0 ? (
+                      {revenueData?.stripe_error && (
+                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            <strong>Stripe Error:</strong> {revenueData.stripe_error}
+                          </p>
+                        </div>
+                      )}
+                      {revenueData?.revenue_by_month?.length > 0 ? (
                         <div className="space-y-2">
                           {revenueData.revenue_by_month.map((month) => {
                             const maxRev = Math.max(...revenueData.revenue_by_month.map(m => m.amount_cents));

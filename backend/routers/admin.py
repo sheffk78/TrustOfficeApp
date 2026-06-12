@@ -1022,6 +1022,8 @@ async def get_revenue_data(
     stripe_error = None
     
     try:
+        if not stripe.api_key:
+            raise stripe.error.AuthenticationError("Stripe API key not configured (STRIPE_SECRET_KEY missing)")
         has_more = True
         starting_after = None
         invoice_count = 0
@@ -1121,26 +1123,27 @@ async def get_revenue_data(
     revenue_this_month_cents = 0
     revenue_all_time_cents = 0
     
-    try:
-        today_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(today_start.timestamp())})
-        for inv in today_data.auto_paging_iter():
-            revenue_today_cents += inv.amount_paid or inv.total or 0
-        
-        week_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(week_start.timestamp())})
-        for inv in week_data.auto_paging_iter():
-            revenue_this_week_cents += inv.amount_paid or inv.total or 0
-        
-        month_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(month_start.timestamp())})
-        for inv in month_data.auto_paging_iter():
-            revenue_this_month_cents += inv.amount_paid or inv.total or 0
-        
-        all_time_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())})
-        for inv in all_time_data.auto_paging_iter():
-            revenue_all_time_cents += inv.amount_paid or inv.total or 0
-    except stripe.StripeError as e:
-        logger.error(f"Stripe API error fetching period revenue: {e}")
-        if not stripe_error:
-            stripe_error = str(e)
+    if not stripe_error:
+        try:
+            today_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(today_start.timestamp())})
+            for inv in today_data.auto_paging_iter():
+                revenue_today_cents += inv.amount_paid or inv.total or 0
+            
+            week_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(week_start.timestamp())})
+            for inv in week_data.auto_paging_iter():
+                revenue_this_week_cents += inv.amount_paid or inv.total or 0
+            
+            month_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(month_start.timestamp())})
+            for inv in month_data.auto_paging_iter():
+                revenue_this_month_cents += inv.amount_paid or inv.total or 0
+            
+            all_time_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())})
+            for inv in all_time_data.auto_paging_iter():
+                revenue_all_time_cents += inv.amount_paid or inv.total or 0
+        except stripe.StripeError as e:
+            logger.error(f"Stripe API error fetching period revenue: {e}")
+            if not stripe_error:
+                stripe_error = str(e)
     
     avg_revenue_per_customer_cents = (
         total_revenue_cents // len(customer_ids) if len(customer_ids) > 0 else 0
