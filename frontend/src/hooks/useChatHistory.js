@@ -1,9 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { fetchWithAuth, getErrorMessage } from '@/utils/api';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
-const API = `${BACKEND_URL}/api`;
-
 export const useChatHistory = () => {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -59,16 +56,19 @@ export const useChatHistory = () => {
     }
   }, []);
 
-  const confirmAction = useCallback(async (conversationId, messageIndex, action) => {
+  const confirmAction = useCallback(async (conversationId, messageIndex, action, editedData = null) => {
     try {
-      const response = await fetchWithAuth('/ai/chat/actions/confirm', {
-        method: 'POST',
-        body: JSON.stringify({
-          conversation_id: conversationId,
-          message_index: messageIndex,
-          action,
-        }),
-      });
+      const body = { action };
+      if (editedData) {
+        body.edited_data = editedData;
+      }
+      const response = await fetchWithAuth(
+        `/ai/chat/actions/${conversationId}/${messageIndex}/confirm`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }
+      );
       if (!response.ok) {
         const errMsg = await getErrorMessage(response);
         throw new Error(errMsg);

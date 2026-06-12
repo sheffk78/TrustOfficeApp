@@ -37,7 +37,8 @@ import {
   ClipboardList,
   BookOpen,
   NotebookTabs,
-  BarChart3
+  BarChart3,
+  Bot
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -48,7 +49,11 @@ import {
 import { HeartHandshake } from 'lucide-react';
 
 const NAV_GROUPS = [
-  { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', items: [] },
+  // ═══ HERO ITEMS — gold-tinted standout links ═══
+  { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', items: [], standout: true },
+  { key: 'trust-assistant', icon: Bot, label: 'Trust Assistant', items: [], standout: true, badge: 'NEW' },
+
+  // ═══ CORE SECTIONS ═══
   { key: 'governance', icon: BookOpen, label: 'Governance', items: [
     { path: '/calendar', icon: Calendar, label: 'Calendar' },
     { path: '/minutes', icon: FilePen, label: 'Minutes' },
@@ -75,7 +80,6 @@ const NAV_GROUPS = [
     { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
     { path: '/binder', icon: NotebookTabs, label: 'Binder Tools' },
   ]},
-  { key: 'trust-assistant', icon: MessageSquare, label: 'Trust Assistant', items: [] },
   { key: 'score', icon: HeartPulse, label: 'Trust Health', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
@@ -197,7 +201,7 @@ export const Sidebar = () => {
             const GroupIcon = group.icon;
             const isExpanded = expandedGroups[group.key];
             
-            // Single-item groups (Dashboard, Score, Settings) render directly
+            // Single-item groups (Dashboard, Trust Assistant, Score, Settings) render directly
             if (group.items.length === 0) {
               const path = group.key === 'dashboard' ? '/dashboard' 
                 : group.key === 'score' ? '/governance' 
@@ -206,16 +210,28 @@ export const Sidebar = () => {
               const isActive = location.pathname === path;
               
               return (
-                <Link
-                  key={group.key}
-                  to={path}
-                  className={`sidebar-item ${isActive ? 'active' : ''}`}
-                  onClick={() => setMobileOpen(false)}
-                  data-testid={`nav-${group.key}`}
-                >
-                  <GroupIcon className="w-5 h-5" />
-                  <span>{group.label}</span>
-                </Link>
+                <div key={group.key}>
+                  <Link
+                    to={path}
+                    className={`sidebar-item ${group.standout ? 'sidebar-item-standout' : ''} ${isActive ? 'active' : ''}`}
+                    onClick={() => setMobileOpen(false)}
+                    data-testid={`nav-${group.key}`}
+                  >
+                    <GroupIcon className={`w-5 h-5 ${group.standout ? 'text-gold' : ''}`} />
+                    <span className="flex items-center gap-2">
+                      {group.label}
+                      {group.badge && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold text-navy font-bold">
+                          {group.badge}
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                  {/* Divider after Trust Assistant separates hero items from core nav */}
+                  {group.key === 'trust-assistant' && (
+                    <div className="sidebar-section-divider" />
+                  )}
+                </div>
               );
             }
             

@@ -55,11 +55,11 @@ const ChatHistoryList = ({ conversations, loading, onSelect, onDelete }) => {
             <p className="font-mono text-xs font-medium text-foreground truncate">
               {conv.title || 'Untitled Conversation'}
             </p>
-            {conv.last_message && (
+            {(conv.last_message_preview || conv.last_message) && (
               <p className="font-mono text-[11px] text-muted-foreground truncate mt-0.5">
-                {conv.last_message.length > 60
-                  ? conv.last_message.substring(0, 60) + '…'
-                  : conv.last_message}
+                {(conv.last_message_preview || conv.last_message || '').length > 60
+                  ? (conv.last_message_preview || conv.last_message || '').substring(0, 60) + '…'
+                  : (conv.last_message_preview || conv.last_message || '')}
               </p>
             )}
             <div className="flex items-center gap-1 mt-1">

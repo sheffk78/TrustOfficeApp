@@ -83,27 +83,65 @@ const TrustAssistantPage = () => {
     }
   }, [deleteConversation, conversationId, resetConversation]);
 
-  // Handle action approve/edit/discard
+  // Handle action approve — calls confirm endpoint, then updates local message state
   const handleActionApprove = useCallback(async (card) => {
+    if (!conversationId || card.message_index == null) {
+      console.warn('[TrustAssistant] Cannot approve: missing conversationId or message_index');
+      return;
+    }
     try {
-      await confirmAction(conversationId, card.message_index || 0, 'approve');
+      const result = await confirmAction(conversationId, card.message_index, 'approve');
+      // Update local state to reflect the approved status
+      setMessages(prev => prev.map((msg, idx) => {
+        if (idx !== card.message_index) return msg;
+        return {
+          ...msg,
+          action_cards: (msg.action_cards || []).map(ac =>
+            ac.id === card.id
+              ? {
+                  ...ac,
+                  status: 'approved',
+                  execution_result: result?.execution_result || null,
+                }
+              : ac
+          ),
+        };
+      }));
     } catch (err) {
       console.error('[TrustAssistant] Action approve error:', err);
     }
-  }, [confirmAction, conversationId]);
+  }, [confirmAction, conversationId, setMessages]);
 
+  // Handle action edit — sends a follow-up message asking to edit
   const handleActionEdit = useCallback(async (card) => {
-    // Edit would typically open a modal; for now we send a follow-up message
+    // For now, send a follow-up message. Could be enhanced with an edit modal.
     handleSendMessage(`I'd like to edit the ${card.type || 'action'}: ${card.title || card.summary || 'item'}`);
   }, [handleSendMessage]);
 
+  // Handle action discard — calls confirm endpoint with reject
   const handleActionDiscard = useCallback(async (card) => {
+    if (!conversationId || card.message_index == null) {
+      console.warn('[TrustAssistant] Cannot discard: missing conversationId or message_index');
+      return;
+    }
     try {
-      await confirmAction(conversationId, card.message_index || 0, 'discard');
+      await confirmAction(conversationId, card.message_index, 'reject');
+      // Update local state to reflect the discarded status
+      setMessages(prev => prev.map((msg, idx) => {
+        if (idx !== card.message_index) return msg;
+        return {
+          ...msg,
+          action_cards: (msg.action_cards || []).map(ac =>
+            ac.id === card.id
+              ? { ...ac, status: 'discarded' }
+              : ac
+          ),
+        };
+      }));
     } catch (err) {
       console.error('[TrustAssistant] Action discard error:', err);
     }
-  }, [confirmAction, conversationId]);
+  }, [confirmAction, conversationId, setMessages]);
 
   // Video card click handler placeholder
   const handleVideoClick = useCallback((card) => {

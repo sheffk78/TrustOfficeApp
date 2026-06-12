@@ -13,9 +13,6 @@ import {
 } from 'lucide-react';
 import ChatHistoryList from './ChatHistoryList';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
-const API = `${BACKEND_URL}/api`;
-
 const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversations, conversationsLoading, onConversationDelete }) => {
   const { selectedTrust } = useAuth();
   const [healthData, setHealthData] = useState(null);

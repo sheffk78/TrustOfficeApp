@@ -293,6 +293,43 @@
     border-left-color: var(--gold);
 }
 
+/* Standout items (Dashboard, Trust Assistant) — gold-tinted glow */
+.sidebar-item-standout {
+    @apply text-white mb-1;
+}
+
+.sidebar-item-standout:hover {
+    background-color: rgba(213, 173, 54, 0.15);
+    border-left-color: var(--gold);
+}
+
+.sidebar-item-standout.active {
+    background-color: rgba(213, 173, 54, 0.2);
+    border-left-color: var(--gold);
+    @apply font-semibold;
+}
+
+.sidebar-item-standout .lucide {
+    color: var(--gold);
+}
+
+.dark .sidebar-item-standout {
+    @apply text-white;
+}
+
+.dark .sidebar-item-standout:hover {
+    background-color: rgba(213, 173, 54, 0.12);
+}
+
+.dark .sidebar-item-standout.active {
+    background-color: rgba(213, 173, 54, 0.18);
+}
+
+/* Separator between standout section and core sections */
+.sidebar-section-divider {
+    @apply mx-6 my-2 border-t border-white/10;
+}
+
 /* Governance score indicator */
 .score-indicator {
     @apply font-serif text-6xl font-bold;

@@ -259,6 +259,7 @@ async def get_summary_stats(
     expired = await db.subscriptions.count_documents({"status": "expired"})
     canceled = await db.subscriptions.count_documents({"status": "canceled"})
     forever_free = await db.subscriptions.count_documents({"status": "forever_free"})
+    gifted = await db.subscriptions.count_documents({"gifted": True})
     
     # Plan breakdown for active subscriptions
     monthly_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
@@ -318,7 +319,8 @@ async def get_summary_stats(
             "trialing": trialing,
             "expired": expired,
             "canceled": canceled,
-            "forever_free": forever_free
+            "forever_free": forever_free,
+            "gifted": gifted
         },
         "plans": {
             "monthly_active": monthly_active,

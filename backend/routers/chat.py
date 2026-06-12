@@ -263,6 +263,7 @@ async def chat(
                 }
             },
             "$set": {"updated_at": now},
+            "$inc": {"message_count": 2},
         }
     )
 
@@ -314,30 +315,25 @@ async def list_conversations(
     if trust_id:
         query["trust_id"] = trust_id
 
+    # Fetch conversations — include messages with $slice to get last message for preview
+    # Note: message_count here will be approximate (1 if has messages, 0 if empty)
+    # The total message count is stored on the conversation document
     convs = await db.chat_conversations.find(
         query,
-        {"_id": 0, "conversation_id": 1, "title": 1, "updated_at": 1, "trust_id": 1}
+        {"_id": 0, "conversation_id": 1, "title": 1, "updated_at": 1, "trust_id": 1, "messages": {"$slice": -1}}
     ).sort("updated_at", -1).limit(min(limit, 50)).to_list(limit)
 
     result = []
     for c in convs:
-        message_count = await db.chat_conversations.count_documents({
-            "conversation_id": c["conversation_id"],
-        })
-
-        # Get last message preview
-        full_conv = await db.chat_conversations.find_one(
-            {"conversation_id": c["conversation_id"]},
-            {"messages": {"$slice": -1}}
-        )
+        messages = c.get("messages", [])
         last_msg = ""
-        if full_conv and full_conv.get("messages"):
-            last_msg = full_conv["messages"][-1].get("content", "")[:80]
+        if messages:
+            last_msg = messages[-1].get("content", "")[:80]
 
         result.append({
             "conversation_id": c["conversation_id"],
             "title": c.get("title", "Conversation"),
-            "message_count": message_count,
+            "message_count": c.get("message_count", len(messages) if messages else 0),
             "last_message_preview": last_msg,
             "updated_at": c.get("updated_at", ""),
             "trust_id": c.get("trust_id"),
@@ -376,20 +372,256 @@ async def delete_conversation(
     return {"message": "Conversation deleted"}
 
 
+class ConfirmActionRequest(BaseModel):
+    action: str = Field(..., description="Action to take: approve, reject, or edit")
+    edited_data: Optional[dict] = Field(None, description="Updated data if action=edit")
+
+
+# Maps action_card type to the backend write endpoint and field mappings
+ACTION_EXECUTION_MAP = {
+    "distribution_preview": {
+        "endpoint_type": "distribution",
+        "field_map": {
+            "beneficiary_name": "beneficiary_name",
+            "amount": "amount",
+            "purpose": "purpose_classification",
+            "date": "date",
+            "from_account": "notes",
+        },
+    },
+    "asset_preview": {
+        "endpoint_type": "asset",
+        "field_map": {
+            "asset_type": "category",
+            "description": "description",
+            "value": "approximate_value",
+            "date_acquired": "date_conveyed",
+            "ownership_pct": "notes",
+        },
+    },
+    "minutes_preview": {
+        "endpoint_type": "minutes",
+        "field_map": {
+            "minutes_type": "minutes_type",
+            "meeting_date": "meeting_date",
+            "participants": "participants_text",
+            "decisions": "decisions_text",
+            "trust_name": "notes",
+        },
+    },
+    "beneficiary_preview": {
+        "endpoint_type": "beneficiary",
+        "field_map": {
+            "name": "holder_name",
+            "email": "email",
+            "phone": "phone",
+            "allocation_pct": "units",
+        },
+    },
+}
+
+
+async def _execute_approved_action(
+    action_card: dict,
+    user_id: str,
+    trust_id: str,
+) -> dict:
+    """
+    Execute the real backend write operation for an approved action card.
+    Creates the corresponding record in the database.
+    """
+    card_type = action_card.get("type", "")
+    action_data = action_card.get("data", {})
+    mapping = ACTION_EXECUTION_MAP.get(card_type)
+
+    if not mapping:
+        return {"success": False, "error": f"Unknown action type: {card_type}"}
+
+    endpoint_type = mapping["endpoint_type"]
+    field_map = mapping["field_map"]
+
+    # Map action_card fields to backend model fields
+    mapped_data = {}
+    for src_key, dst_key in field_map.items():
+        if src_key in action_data and action_data[src_key] is not None:
+            mapped_data[dst_key] = action_data[src_key]
+
+    # Always include trust_id and user_id
+    mapped_data["trust_id"] = trust_id
+
+    try:
+        if endpoint_type == "distribution":
+            # Create distribution record
+            from models import PurposeClassification
+
+            purpose = mapped_data.pop("purpose_classification", "other")
+            try:
+                purpose_enum = PurposeClassification(purpose)
+            except ValueError:
+                purpose_enum = PurposeClassification.other
+
+            dist_id = f"dist_{uuid.uuid4().hex[:12]}"
+            dist_doc = {
+                "distribution_id": dist_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "beneficiary_name": mapped_data.get("beneficiary_name", "Unknown"),
+                "amount": float(mapped_data.get("amount", 0)),
+                "date": mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                "purpose_classification": purpose_enum.value,
+                "authority_clause_ref": "",
+                "notes": mapped_data.get("notes", ""),
+                "solvency_confirmed": False,
+                "recusal_acknowledged": False,
+                "approved_by": None,
+                "approved_at": None,
+                "minutes_record_id": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "is_benevolence": False,
+                "benevolence_recipient_name": None,
+                "benevolence_need_description": None,
+                "benevolence_notes": None,
+            }
+            await db.distribution_records.insert_one(dist_doc)
+            return {"success": True, "record_id": dist_id, "endpoint": "distributions"}
+
+        elif endpoint_type == "asset":
+            from models import AssetCategory
+
+            category = mapped_data.pop("category", "other_property")
+            try:
+                category_enum = AssetCategory(category)
+            except ValueError:
+                category_enum = AssetCategory.other_property
+
+            item_id = f"asset_{uuid.uuid4().hex[:12]}"
+            asset_doc = {
+                "item_id": item_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "category": category_enum.value,
+                "description": mapped_data.get("description", ""),
+                "identifier": "",
+                "location": "",
+                "approximate_value": mapped_data.get("approximate_value"),
+                "date_conveyed": mapped_data.get("date_conveyed", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                "notes": mapped_data.get("notes", ""),
+                "status": "active",
+                "minutes_ref": None,
+                "disposition_minutes_ref": None,
+                "disposition_date": None,
+                "disposition_notes": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": None,
+            }
+            await db.schedule_a_items.insert_one(asset_doc)
+            return {"success": True, "record_id": item_id, "endpoint": "schedule-a"}
+
+        elif endpoint_type == "minutes":
+            from models import MinutesType
+
+            minutes_type_val = mapped_data.pop("minutes_type", "general")
+            try:
+                minutes_type_enum = MinutesType(minutes_type_val)
+            except ValueError:
+                minutes_type_enum = MinutesType.general
+
+            participants_text = mapped_data.get("participants_text", "")
+            if isinstance(participants_text, list):
+                participants_text = ", ".join(participants_text)
+
+            decisions_text = mapped_data.get("decisions_text", "")
+            if isinstance(decisions_text, list):
+                decisions_text = "; ".join(decisions_text)
+
+            minutes_id = f"minutes_{uuid.uuid4().hex[:12]}"
+            minutes_doc = {
+                "minutes_id": minutes_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "minutes_type": minutes_type_enum.value,
+                "meeting_date": mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                "participants_text": participants_text,
+                "decisions_text": decisions_text,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "template_type": None,
+                "sections": [],
+                "template_data": {},
+                "status": "finalized",
+                "is_retroactive": False,
+                "retroactive_reason": None,
+                "retroactive_trusttees_aware": None,
+                "retroactive_type": None,
+                "manually_edited": False,
+            }
+            await db.minutes_records.insert_one(minutes_doc)
+            return {"success": True, "record_id": minutes_id, "endpoint": "minutes"}
+
+        elif endpoint_type == "beneficiary":
+            # Beneficiaries are managed via trust unit certificates
+            cert_id = f"cert_{uuid.uuid4().hex[:12]}"
+            cert_number = f"TC-{uuid.uuid4().hex[:6].upper()}"
+
+            # Get unit settings for the trust
+            settings = await db.trust_unit_settings.find_one(
+                {"trust_id": trust_id}
+            )
+            total_authorized = settings.get("total_authorized_units", 0) if settings else 0
+
+            allocation_pct = mapped_data.get("units", 0)
+            # Convert percentage to units if settings exist
+            if total_authorized > 0 and isinstance(allocation_pct, (int, float)) and allocation_pct < 100:
+                units = max(1, round(total_authorized * allocation_pct / 100))
+            elif isinstance(allocation_pct, (int, float)):
+                units = int(allocation_pct) if allocation_pct > 0 else 1
+            else:
+                units = 1
+
+            cert_doc = {
+                "certificate_id": cert_id,
+                "certificate_number": cert_number,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "holder_name": mapped_data.get("holder_name", "Unknown"),
+                "holder_identifier": "",
+                "email": mapped_data.get("email", ""),
+                "phone": mapped_data.get("phone", ""),
+                "units": units,
+                "issue_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "status": "active",
+                "notes": "",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.trust_unit_certificates.insert_one(cert_doc)
+            return {"success": True, "record_id": cert_id, "endpoint": "trust-units/certificates"}
+
+        return {"success": False, "error": f"Unhandled endpoint type: {endpoint_type}"}
+
+    except Exception as e:
+        logger.error(f"Action execution error: {type(e).__name__}: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @router.post("/chat/actions/{conversation_id}/{message_index}/confirm")
 async def confirm_action(
     conversation_id: str,
     message_index: int,
-    action: str,  # "approve", "reject", or "edit"
+    request: ConfirmActionRequest,
     user: dict = Depends(get_current_user),
 ):
     """
     Confirm, reject, or request edits for an action card.
     
-    This is the user's explicit approval step before any write operation executes.
+    When approved, this endpoint:
+    1. Marks the action card as approved
+    2. Executes the real backend write operation (creating the actual record)
+    
+    For reject/edit, only the action card status is updated.
     """
+    user_id = user["user_id"]
+
     conv = await db.chat_conversations.find_one(
-        {"conversation_id": conversation_id, "user_id": user["user_id"]}
+        {"conversation_id": conversation_id, "user_id": user_id}
     )
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -402,33 +634,65 @@ async def confirm_action(
     if msg.get("role") != "assistant" or not msg.get("action_card"):
         raise HTTPException(status_code=400, detail="No action card found at this message index")
 
+    action_card = msg["action_card"]
+
     # Update the action card status
     status_map = {"approve": "approved", "reject": "rejected", "edit": "pending"}
-    new_status = status_map.get(action, "pending")
+    new_status = status_map.get(request.action, "pending")
 
-    # Use positional operator to update the specific message's action card
+    # If editing, update the action card data with the edited fields
+    update_fields = {
+        f"messages.{message_index}.action_card.confirmation_status": new_status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    if request.action == "edit" and request.edited_data:
+        # Merge edited data into the existing action card data
+        for key, value in request.edited_data.items():
+            update_fields[f"messages.{message_index}.action_card.data.{key}"] = value
+
     await db.chat_conversations.update_one(
         {
             "conversation_id": conversation_id,
-            "user_id": user["user_id"],
+            "user_id": user_id,
         },
-        {
-            "$set": {
-                f"messages.{message_index}.action_card.confirmation_status": new_status,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        }
+        {"$set": update_fields}
     )
+
+    # Execute the real write operation on approval
+    execution_result = None
+    if request.action == "approve":
+        trust_id = conv.get("trust_id")
+        if trust_id:
+            execution_result = await _execute_approved_action(
+                action_card=action_card,
+                user_id=user_id,
+                trust_id=trust_id,
+            )
+            # Store the execution result in the action card
+            if execution_result:
+                await db.chat_conversations.update_one(
+                    {"conversation_id": conversation_id, "user_id": user_id},
+                    {"$set": {
+                        f"messages.{message_index}.action_card.execution_result": execution_result,
+                        f"messages.{message_index}.action_card.executed_at": datetime.now(timezone.utc).isoformat(),
+                    }}
+                )
 
     logger.info(
-        f"ACTION | user={user['user_id']} | conversation={conversation_id} | "
-        f"message={message_index} | action={action} | status={new_status}"
+        f"ACTION | user={user_id} | conversation={conversation_id} | "
+        f"message={message_index} | action={request.action} | status={new_status} | "
+        f"executed={execution_result.get('success') if execution_result else 'N/A'}"
     )
 
-    return {
-        "message": f"Action {action}d",
+    response = {
+        "message": f"Action {request.action}d",
         "action_status": new_status,
     }
+    if execution_result:
+        response["execution_result"] = execution_result
+
+    return response
 
 
 @router.post("/chat/conversations/{conversation_id}/rename")
