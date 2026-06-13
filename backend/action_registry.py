@@ -47,7 +47,7 @@ ACTION_REGISTRY = {
         "requires_write": True,
         "confirmation_required": True,
         "description": "Draft meeting minutes for review and approval",
-        "api_endpoint": "POST /api/minutes/create",
+        "api_endpoint": "POST /api/minutes",
         "fields": [
             {"name": "minutes_type", "type": "string", "required": True, "description": "Type of minutes (annual, quarterly, distribution, etc.)"},
             {"name": "meeting_date", "type": "string", "required": True, "description": "ISO date of the meeting"},
@@ -61,9 +61,9 @@ ACTION_REGISTRY = {
         "requires_write": True,
         "confirmation_required": True,
         "description": "Log a new asset on Schedule A",
-        "api_endpoint": "POST /api/schedule-a/create",
+        "api_endpoint": "POST /api/schedule-a",
         "fields": [
-            {"name": "asset_type", "type": "string", "required": True, "description": "Category of asset (real_property, financial_accounts, etc.)"},
+            {"name": "asset_type", "type": "string", "required": True, "description": "Category of asset (real_property, financial_accounts, tangible_property, business_interests, intellectual_property, other)"},
             {"name": "description", "type": "string", "required": True, "description": "Description of the asset"},
             {"name": "value", "type": "number", "required": False, "description": "Estimated value of the asset"},
             {"name": "date_acquired", "type": "string", "required": True, "description": "Date the asset was acquired or contributed"},
@@ -75,26 +75,74 @@ ACTION_REGISTRY = {
         "requires_write": True,
         "confirmation_required": True,
         "description": "Create a distribution record to a beneficiary",
-        "api_endpoint": "POST /api/distributions/create",
+        "api_endpoint": "POST /api/distributions",
         "fields": [
             {"name": "beneficiary_name", "type": "string", "required": True, "description": "Name of the beneficiary receiving the distribution"},
             {"name": "amount", "type": "number", "required": True, "description": "Distribution amount"},
-            {"name": "purpose", "type": "string", "required": True, "description": "Purpose classification (HEMS category or description)"},
+            {"name": "purpose", "type": "string", "required": True, "description": "Purpose classification (HEMS category: health, education, maintenance, support, medical_expenses, education_expenses, housing, emergency, or other)"},
             {"name": "date", "type": "string", "required": True, "description": "Date of the distribution"},
             {"name": "from_account", "type": "string", "required": False, "description": "Source account if known"},
         ],
     },
-    "add_beneficiary": {
+    "create_beneficiary": {
         "type": "beneficiary_preview",
         "requires_write": True,
         "confirmation_required": True,
-        "description": "Add or update beneficiary information",
+        "description": "Add a new beneficiary",
         "api_endpoint": "POST /api/beneficiaries/create",
         "fields": [
             {"name": "name", "type": "string", "required": True, "description": "Beneficiary full name"},
             {"name": "email", "type": "string", "required": False, "description": "Beneficiary email address"},
             {"name": "phone", "type": "string", "required": False, "description": "Beneficiary phone number"},
-            {"name": "allocation_pct", "type": "number", "required": False, "description": "Allocation percentage if relevant"},
+            {"name": "notes", "type": "string", "required": False, "description": "Any additional notes about the beneficiary"},
+        ],
+    },
+    "update_beneficiary": {
+        "type": "beneficiary_update_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Update existing beneficiary contact or allocation information",
+        "api_endpoint": "PATCH /api/beneficiaries/{beneficiary_id}",
+        "fields": [
+            {"name": "beneficiary_name", "type": "string", "required": True, "description": "Name of the beneficiary to update (used to look up their record)"},
+            {"name": "email", "type": "string", "required": False, "description": "New email address"},
+            {"name": "phone", "type": "string", "required": False, "description": "New phone number"},
+            {"name": "notes", "type": "string", "required": False, "description": "Updated notes"},
+        ],
+    },
+    "remove_beneficiary": {
+        "type": "beneficiary_removal_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Remove a beneficiary from the trust",
+        "api_endpoint": "DELETE /api/beneficiaries/{beneficiary_id}",
+        "fields": [
+            {"name": "beneficiary_name", "type": "string", "required": True, "description": "Name of the beneficiary to remove"},
+            {"name": "reason", "type": "string", "required": False, "description": "Reason for removal"},
+        ],
+    },
+    "cancel_distribution": {
+        "type": "distribution_cancel_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Cancel or delete a distribution record",
+        "api_endpoint": "DELETE /api/distributions/{distribution_id}",
+        "fields": [
+            {"name": "beneficiary_name", "type": "string", "required": True, "description": "Name of the beneficiary on the distribution to cancel"},
+            {"name": "amount", "type": "number", "required": False, "description": "Amount of the distribution (to help identify the correct one)"},
+            {"name": "date", "type": "string", "required": False, "description": "Date of the distribution to cancel"},
+        ],
+    },
+    "upload_document": {
+        "type": "document_upload_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Upload a document to the vault",
+        "api_endpoint": "POST /api/trusts/{trust_id}/vault/upload",
+        "fields": [
+            {"name": "title", "type": "string", "required": True, "description": "Document title or name"},
+            {"name": "category", "type": "string", "required": False, "description": "Document category (trust_document, court_filing, tax_return, correspondence, financial_statement, legal, insurance, property, beneficiary_doc, other)"},
+            {"name": "notes", "type": "string", "required": False, "description": "Any notes about the document"},
         ],
     },
     "review_document": {
@@ -103,6 +151,68 @@ ACTION_REGISTRY = {
         "confirmation_required": False,
         "description": "Search and retrieve documents from the vault",
         "fields": [],
+    },
+    "setup_compensation": {
+        "type": "compensation_plan_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Create a trustee compensation plan",
+        "api_endpoint": "POST /api/compensation-plans",
+        "fields": [
+            {"name": "trustee_name", "type": "string", "required": True, "description": "Name of the trustee being compensated"},
+            {"name": "amount", "type": "number", "required": True, "description": "Compensation amount"},
+            {"name": "frequency", "type": "string", "required": True, "description": "Payment frequency (monthly, quarterly, annually, per_meeting)"},
+            {"name": "effective_date", "type": "string", "required": True, "description": "Date compensation takes effect"},
+            {"name": "role", "type": "string", "required": False, "description": "Trustee role or title"},
+        ],
+    },
+    "dismiss_alert": {
+        "type": "alert_dismiss",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Dismiss a governance insight or alert",
+        "api_endpoint": "POST /api/insights/dismiss",
+        "fields": [
+            {"name": "criterion_name", "type": "string", "required": True, "description": "Name of the insight or criterion to dismiss (e.g. 'Quarterly Minutes', 'Task Compliance')"},
+        ],
+    },
+    "schedule_task": {
+        "type": "task_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Create a new governance task",
+        "api_endpoint": "POST /api/tasks",
+        "fields": [
+            {"name": "task_type", "type": "string", "required": True, "description": "Type of task (annual_review, quarterly_review, compensation_review, distribution_review, insurance_compliance, transaction_review, tax_filing_1041, tax_filing_k1, custom)"},
+            {"name": "description", "type": "string", "required": True, "description": "Description of the task"},
+            {"name": "due_date", "type": "string", "required": True, "description": "ISO date when the task is due"},
+            {"name": "priority", "type": "string", "required": False, "description": "Priority level (normal, high, critical)"},
+        ],
+    },
+    "add_transaction": {
+        "type": "transaction_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Log a trust income or expense transaction",
+        "api_endpoint": "POST /api/transactions",
+        "fields": [
+            {"name": "type", "type": "string", "required": True, "description": "Transaction type (income, expense, transfer)"},
+            {"name": "amount", "type": "number", "required": True, "description": "Transaction amount"},
+            {"name": "category", "type": "string", "required": True, "description": "Category (rental_income, interest, dividends, capital_gains, business_income, other_income, legal_fees, accounting_fees, trustee_fees, insurance, property_taxes, maintenance, utilities, distributions, investments, other_expense)"},
+            {"name": "date", "type": "string", "required": True, "description": "Date of the transaction"},
+            {"name": "description", "type": "string", "required": False, "description": "Optional description or memo"},
+        ],
+    },
+    "change_settings": {
+        "type": "settings_update_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Update trust profile settings",
+        "api_endpoint": "PUT /api/trusts/{trust_id}",
+        "fields": [
+            {"name": "field", "type": "string", "required": True, "description": "Field to update (name, trust_type, formation_date, ein, jurisdiction, state_code)"},
+            {"name": "value", "type": "string", "required": True, "description": "New value for the field"},
+        ],
     },
     "general_chat": {
         "type": "general_response",
@@ -148,3 +258,11 @@ def get_field_descriptions(intent: str) -> dict:
     if action:
         return {f["name"]: f["description"] for f in action.get("fields", [])}
     return {}
+
+
+def get_write_intents() -> list:
+    """Return list of all intents that require write access."""
+    return [
+        intent for intent, config in ACTION_REGISTRY.items()
+        if config.get("requires_write", False)
+    ]

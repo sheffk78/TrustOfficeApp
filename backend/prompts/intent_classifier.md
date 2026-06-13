@@ -14,8 +14,17 @@ Given a user message in a trust administration context, classify it into exactly
 | `log_minutes` | "I had a meeting yesterday", "I need to record a decision", "Draft minutes for..." | Create or draft meeting minutes |
 | `add_asset` | "I bought a property", "I need to add a car to the trust", "New asset to log" | Log an asset on Schedule A |
 | `create_distribution` | "I need to give money to John", "Distribution to my daughter", "Pay for medical expenses" | Create a distribution record |
-| `add_beneficiary` | "I have a new beneficiary", "Add someone to the trust" | Add or update beneficiary info |
-| `review_document` | "Find the trust document", "Where's the EIN letter?", "Show me the deed" | Locate a document in the vault |
+| `create_beneficiary` | "I have a new beneficiary", "Add someone to the trust", "New beneficiary to add" | Add a new beneficiary |
+| `update_beneficiary` | "Change Jane's email", "Update Mary's phone number", "Modify beneficiary info", "Change allocation for Bob" | Update existing beneficiary contact or allocation info |
+| `remove_beneficiary` | "Remove this beneficiary", "Delete John", "Take Jane off the trust" | Delete a beneficiary |
+| `cancel_distribution` | "Cancel that distribution", "Undo the payment I just made", "Remove distribution #3", "Delete that disbursement" | Cancel or delete a distribution record |
+| `upload_document` | "Upload my trust document", "Store the EIN letter", "Add a deed to the vault", "Save this PDF" | Upload or link a document in the vault |
+| `review_document` | "Find the trust document", "Where's the EIN letter?", "Show me the deed" | Locate or retrieve a document from the vault |
+| `setup_compensation` | "Set up trustee compensation", "I need to pay myself as trustee", "Create a compensation plan" | Create a trustee compensation plan |
+| `dismiss_alert` | "Dismiss this insight", "Hide that recommendation", "I already did that" | Dismiss a governance insight or alert |
+| `schedule_task` | "Schedule a quarterly review", "Remind me to file taxes", "Create a task for annual review" | Create a governance task with due date |
+| `add_transaction` | "I paid the insurance", "Record trust income", "Log a bank fee", "Add a transaction" | Log a trust income or expense transaction |
+| `change_settings` | "Change my EIN", "Update the trust name", "Change my state", "Modify formation date" | Update trust profile settings |
 | `general_chat` | "Hello", "Thanks", "What can you do?", "Tell me a joke" | Greeting, casual, off-topic |
 | `emergency` | "I'm worried I messed up", "I think I missed a deadline", "I need help urgently" | Distress, concern, anxiety about trust duties |
 
@@ -25,6 +34,8 @@ Given a user message in a trust administration context, classify it into exactly
 - Extract any `entities` from the message (names, dates, amounts, document types)
 - `entities` can be empty `{}` if nothing specific is mentioned
 - If multiple intents seem equally strong, prefer the intent that requires action (output) over knowledge (input)
+- IMPORTANT: Distinguish between `create_beneficiary` (new person) vs `update_beneficiary` (modifying an existing person). If the user mentions an existing name and says "change" or "update" or "modify", prefer `update_beneficiary`. If they say "add" or "new" without modification language, prefer `create_beneficiary`.
+- IMPORTANT: Distinguish between `remove_beneficiary` (delete) and `update_beneficiary` (modify) — "remove", "delete", "take off" = remove; "change", "update", "modify" = update.
 
 ## Output Format
 ```json

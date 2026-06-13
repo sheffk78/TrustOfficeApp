@@ -418,6 +418,80 @@ ACTION_EXECUTION_MAP = {
             "allocation_pct": "units",
         },
     },
+    "beneficiary_update_preview": {
+        "endpoint_type": "beneficiary_update",
+        "field_map": {
+            "beneficiary_name": "holder_name",
+            "email": "email",
+            "phone": "phone",
+            "notes": "notes",
+        },
+    },
+    "beneficiary_removal_preview": {
+        "endpoint_type": "beneficiary_removal",
+        "field_map": {
+            "beneficiary_name": "holder_name",
+            "reason": "reason",
+        },
+    },
+    "distribution_cancel_preview": {
+        "endpoint_type": "distribution_cancel",
+        "field_map": {
+            "beneficiary_name": "beneficiary_name",
+            "amount": "amount",
+            "date": "date",
+        },
+    },
+    "document_upload_preview": {
+        "endpoint_type": "document_upload",
+        "field_map": {
+            "title": "title",
+            "category": "category",
+            "notes": "notes",
+        },
+    },
+    "compensation_plan_preview": {
+        "endpoint_type": "compensation_plan",
+        "field_map": {
+            "trustee_name": "trustee_name",
+            "amount": "amount",
+            "frequency": "frequency",
+            "effective_date": "effective_date",
+            "role": "role",
+        },
+    },
+    "task_preview": {
+        "endpoint_type": "task",
+        "field_map": {
+            "task_type": "task_type",
+            "description": "description",
+            "due_date": "due_date",
+            "priority": "priority",
+        },
+    },
+    "transaction_preview": {
+        "endpoint_type": "transaction",
+        "field_map": {
+            "type": "transaction_type",
+            "amount": "amount",
+            "category": "category",
+            "date": "date",
+            "description": "description",
+        },
+    },
+    "settings_update_preview": {
+        "endpoint_type": "settings_update",
+        "field_map": {
+            "field": "field",
+            "value": "value",
+        },
+    },
+    "alert_dismiss": {
+        "endpoint_type": "alert_dismiss",
+        "field_map": {
+            "criterion_name": "criterion_name",
+        },
+    },
 }
 
 
@@ -601,6 +675,167 @@ async def _execute_approved_action(
             }
             await db.trust_unit_certificates.insert_one(cert_doc)
             return {"success": True, "record_id": cert_id, "endpoint": "trust-units/certificates"}
+
+        elif endpoint_type == "beneficiary_update":
+            # Find the existing beneficiary certificate by holder_name
+            existing = await db.trust_unit_certificates.find_one({
+                "trust_id": trust_id,
+                "holder_name": {"$regex": f"^{mapped_data.get('holder_name', '')}$", "$options": "i"},
+                "status": "active",
+            })
+            if not existing:
+                return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found. Use 'Create Beneficiary' to add them first."}
+            
+            update_fields = {}
+            if mapped_data.get("email"):
+                update_fields["email"] = mapped_data["email"]
+            if mapped_data.get("phone"):
+                update_fields["phone"] = mapped_data["phone"]
+            if mapped_data.get("notes"):
+                update_fields["notes"] = mapped_data["notes"]
+            
+            if update_fields:
+                await db.trust_unit_certificates.update_one(
+                    {"certificate_id": existing["certificate_id"]},
+                    {"$set": update_fields}
+                )
+            return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "updated"}
+
+        elif endpoint_type == "beneficiary_removal":
+            existing = await db.trust_unit_certificates.find_one({
+                "trust_id": trust_id,
+                "holder_name": {"$regex": f"^{mapped_data.get('holder_name', '')}$", "$options": "i"},
+                "status": "active",
+            })
+            if not existing:
+                return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found."}
+            
+            await db.trust_unit_certificates.update_one(
+                {"certificate_id": existing["certificate_id"]},
+                {"$set": {"status": "inactive", "deactivated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "removed"}
+
+        elif endpoint_type == "distribution_cancel":
+            # Find matching distribution
+            query = {"trust_id": trust_id}
+            if mapped_data.get("beneficiary_name"):
+                query["beneficiary_name"] = {"$regex": f"^{mapped_data['beneficiary_name']}$", "$options": "i"}
+            if mapped_data.get("amount"):
+                query["amount"] = float(mapped_data["amount"])
+            
+            existing = await db.distribution_records.find_one(query, sort=[("created_at", -1)])
+            if not existing:
+                return {"success": False, "error": "Distribution not found matching those details."}
+            
+            await db.distribution_records.update_one(
+                {"distribution_id": existing["distribution_id"]},
+                {"$set": {"status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            return {"success": True, "record_id": existing["distribution_id"], "endpoint": "distributions", "action": "cancelled"}
+
+        elif endpoint_type == "document_upload":
+            doc_id = f"doc_{uuid.uuid4().hex[:12]}"
+            doc_doc = {
+                "document_id": doc_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "title": mapped_data.get("title", "Untitled Document"),
+                "category": mapped_data.get("category", "other"),
+                "notes": mapped_data.get("notes", ""),
+                "file_url": "",
+                "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                "status": "pending_upload",
+            }
+            await db.vault_documents.insert_one(doc_doc)
+            return {"success": True, "record_id": doc_id, "endpoint": "vault/documents", "action": "created", "note": "Document record created. Upload the file in the Vault page to complete."}
+
+        elif endpoint_type == "compensation_plan":
+            plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+            plan_doc = {
+                "plan_id": plan_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "trustee_name": mapped_data.get("trustee_name", "Trustee"),
+                "amount": float(mapped_data.get("amount", 0)),
+                "frequency": mapped_data.get("frequency", "monthly"),
+                "effective_date": mapped_data.get("effective_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                "role": mapped_data.get("role", ""),
+                "status": "active",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.compensation_plans.insert_one(plan_doc)
+            return {"success": True, "record_id": plan_id, "endpoint": "compensation-plans", "action": "created"}
+
+        elif endpoint_type == "task":
+            task_id = f"task_{uuid.uuid4().hex[:12]}"
+            task_doc = {
+                "task_id": task_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "task_type": mapped_data.get("task_type", "custom"),
+                "description": mapped_data.get("description", ""),
+                "due_date": mapped_data.get("due_date", ""),
+                "priority": mapped_data.get("priority", "normal"),
+                "completed_at": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.governance_tasks.insert_one(task_doc)
+            return {"success": True, "record_id": task_id, "endpoint": "tasks", "action": "created"}
+
+        elif endpoint_type == "transaction":
+            txn_id = f"txn_{uuid.uuid4().hex[:12]}"
+            txn_doc = {
+                "transaction_id": txn_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "transaction_type": mapped_data.get("transaction_type", "expense"),
+                "amount": float(mapped_data.get("amount", 0)),
+                "category": mapped_data.get("category", "other_expense"),
+                "date": mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                "description": mapped_data.get("description", ""),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.transactions.insert_one(txn_doc)
+            return {"success": True, "record_id": txn_id, "endpoint": "transactions", "action": "created"}
+
+        elif endpoint_type == "settings_update":
+            field = mapped_data.get("field", "")
+            value = mapped_data.get("value", "")
+            field_mapping = {
+                "name": "name",
+                "trust_type": "trust_type",
+                "formation_date": "formation_date",
+                "ein": "ein",
+                "jurisdiction": "jurisdiction",
+                "state_code": "state_code",
+            }
+            db_field = field_mapping.get(field.lower().replace(" ", "_"))
+            if not db_field:
+                return {"success": False, "error": f"Unknown field: {field}. Valid fields: name, trust_type, formation_date, ein, jurisdiction, state_code"}
+            
+            await db.trusts.update_one(
+                {"trust_id": trust_id, "user_id": user_id},
+                {"$set": {db_field: value}}
+            )
+            return {"success": True, "record_id": trust_id, "endpoint": "trusts", "action": "updated", "field": db_field}
+
+        elif endpoint_type == "alert_dismiss":
+            criterion = mapped_data.get("criterion_name", "")
+            if not criterion:
+                return {"success": False, "error": "No criterion name provided to dismiss."}
+            
+            await db.dismissed_insights.update_one(
+                {"trust_id": trust_id, "criterion_name": criterion},
+                {"$set": {
+                    "trust_id": trust_id,
+                    "criterion_name": criterion,
+                    "user_id": user_id,
+                    "dismissed_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True
+            )
+            return {"success": True, "endpoint": "insights", "action": "dismissed", "criterion": criterion}
 
         return {"success": False, "error": f"Unhandled endpoint type: {endpoint_type}"}
 
