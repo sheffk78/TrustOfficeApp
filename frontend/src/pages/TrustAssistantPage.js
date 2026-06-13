@@ -202,19 +202,20 @@ const TrustAssistantPage = () => {
   }, []);
 
   return (
-    <div className="trust-assistant-layout" data-testid="trust-assistant-page">
+    <div className="main-layout" data-testid="trust-assistant-page">
       <Sidebar />
-      <main className="main-content">
-        {/* Page header */}
-        <div className="page-header">
-          <h1 className="page-title">Trust Assistant</h1>
-          <p className="page-subtitle">
-            {selectedTrust?.name || 'Select a trust'}
-          </p>
-        </div>
-        <div className="trust-assistant-layout">
-          {/* Snapshot column */}
-          <SnapshotColumn
+      <main className="main-content dot-grid flex flex-col">
+        <div className="page-container flex flex-col flex-1 min-h-0">
+          {/* Page header */}
+          <div className="page-header">
+            <h1 className="page-title">Trust Assistant</h1>
+            <p className="page-subtitle">
+              {selectedTrust?.name || 'Select a trust'}
+            </p>
+          </div>
+          <div className="trust-assistant-layout">
+            {/* Snapshot column */}
+            <SnapshotColumn
             collapsed={snapshotCollapsed}
             onToggle={handleToggleSnapshot}
             conversations={conversations}
@@ -240,6 +241,7 @@ const TrustAssistantPage = () => {
             />
           </div>
         </div>
+      </div>
       </main>
       <MobileBottomNav />
 

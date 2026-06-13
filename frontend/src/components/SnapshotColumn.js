@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { fetchWithAuth, getErrorMessage } from '@/utils/api';
+import { fetchWithAuth } from '@/utils/api';
 import {
   ChevronLeft,
   ChevronRight,
@@ -102,16 +102,17 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
     fetchHealth();
   }, [selectedTrust?.trust_id]);
 
+  // Brand-consistent color functions using gold/navy/rust tokens
   const scoreColor = (score) => {
-    if (score >= 80) return 'text-emerald-600 dark:text-emerald-400';
-    if (score >= 60) return 'text-amber-500 dark:text-amber-400';
-    return 'text-red-500 dark:text-red-400';
+    if (score >= 80) return 'text-gold';
+    if (score >= 60) return 'text-gold/80';
+    return 'text-rust';
   };
 
   const scoreBarColor = (score) => {
-    if (score >= 80) return 'bg-emerald-500';
-    if (score >= 60) return 'bg-amber-500';
-    return 'bg-red-500';
+    if (score >= 80) return 'bg-gold';
+    if (score >= 60) return 'bg-gold/60';
+    return 'bg-rust';
   };
 
   const unmetCriteria = criteria.filter(c => !c.achieved && !c.no_data);
@@ -119,7 +120,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
 
   if (collapsed) {
     return (
-      <div className="snapshot-column collapsed flex flex-col items-center py-4 bg-white dark:bg-[#0a0a0f]">
+      <div className="snapshot-column collapsed flex flex-col items-center py-4 bg-background">
         <button
           onClick={onToggle}
           className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors"
@@ -136,12 +137,10 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
   }
 
   return (
-    <div className="snapshot-column flex flex-col bg-white dark:bg-[#0a0a0f] border-r border-navy/10 dark:border-white/10">
+    <div className="snapshot-column flex flex-col bg-background border-r border-navy/10 dark:border-white/10">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-navy/10 dark:border-white/10">
-        <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          Trust Health
-        </h2>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-navy/10 dark:border-white/10">
+        <span className="label-trust">Trust Health</span>
         <button
           onClick={onToggle}
           className="p-1 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors"
@@ -153,17 +152,15 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
 
       <div className="flex-1 overflow-y-auto">
         {/* Trust Health Score with Criteria Breakdown */}
-        <div className="p-4 border-b border-navy/10 dark:border-white/10">
+        <div className="card-trust m-3 p-4">
           <div className="flex items-center gap-2 mb-3">
             <Shield className="w-4 h-4 text-muted-foreground" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Defensibility Score
-            </span>
+            <span className="label-trust">Defensibility Score</span>
           </div>
           {healthLoading ? (
             <div className="flex items-center gap-2">
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              <span className="font-mono text-xs text-muted-foreground">Loading...</span>
+              <span className="text-sm text-muted-foreground">Loading...</span>
             </div>
           ) : healthData ? (
             <>
@@ -171,7 +168,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
                 <span className={`font-serif text-4xl font-bold ${scoreColor(healthData.total_score ?? 0)}`}>
                   {healthData.total_score ?? '—'}
                 </span>
-                <span className="font-mono text-xs text-muted-foreground">/100</span>
+                <span className="text-xs text-muted-foreground">/100</span>
               </div>
               {/* Score bar */}
               <div className="w-full h-2 bg-navy/10 dark:bg-white/10 mb-3">
@@ -185,16 +182,16 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
                 {criteria.map((c) => (
                   <div key={c.name} className="flex items-center gap-2">
                     {c.achieved ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-gold flex-shrink-0" />
                     ) : c.no_data ? (
                       <Circle className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />
                     ) : (
-                      <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                      <XCircle className="w-3.5 h-3.5 text-rust/70 flex-shrink-0" />
                     )}
-                    <span className={`font-mono text-[11px] ${c.achieved ? 'text-foreground' : 'text-muted-foreground'} flex-1 truncate`}>
+                    <span className={`text-xs ${c.achieved ? 'text-foreground' : 'text-muted-foreground'} flex-1 truncate`}>
                       {c.name}
                     </span>
-                    <span className={`font-mono text-[10px] ${c.achieved ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                    <span className={`text-[10px] ${c.achieved ? 'text-gold' : 'text-muted-foreground'}`}>
                       {c.points}/{c.max_points}
                     </span>
                   </div>
@@ -202,18 +199,16 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
               </div>
             </>
           ) : (
-            <p className="font-mono text-xs text-muted-foreground">No score available</p>
+            <p className="text-sm text-muted-foreground">No score available</p>
           )}
         </div>
 
         {/* Opportunities to Improve */}
         {(unmetCriteria.length > 0 || noDataCriteria.length > 0) && (
-          <div className="p-4 border-b border-navy/10 dark:border-white/10">
+          <div className="card-trust m-3 p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className="w-4 h-4 text-amber-500" />
-              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                Opportunities
-              </span>
+              <Lightbulb className="w-4 h-4 text-gold" />
+              <span className="label-trust">Opportunities</span>
             </div>
             <div className="space-y-2">
               {[...unmetCriteria, ...noDataCriteria].slice(0, 4).map((c) => {
@@ -226,7 +221,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
                     disabled={!suggestion || !onSendSuggestion}
                   >
                     <ArrowRight className="w-3 h-3 text-gold flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
-                    <span className="font-mono text-[11px] text-foreground group-hover:text-navy dark:group-hover:text-white transition-colors flex-1">
+                    <span className="text-xs text-foreground group-hover:text-navy dark:group-hover:text-white transition-colors flex-1">
                       {suggestion ? suggestion.label : c.description}
                     </span>
                   </button>
@@ -237,12 +232,10 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
         )}
 
         {/* Upcoming Deadlines */}
-        <div className="p-4 border-b border-navy/10 dark:border-white/10">
+        <div className="card-trust m-3 p-4">
           <div className="flex items-center gap-2 mb-2">
             <Calendar className="w-4 h-4 text-muted-foreground" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Upcoming Deadlines
-            </span>
+            <span className="label-trust">Upcoming Deadlines</span>
           </div>
           {upcomingDeadlines.length > 0 ? (
             <div className="space-y-1.5">
@@ -251,8 +244,8 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
                 const daysLeft = dl.days_remaining != null ? dl.days_remaining : null;
                 return (
                   <div key={i} className="flex items-center justify-between">
-                    <span className="font-mono text-[11px] text-foreground truncate">{dl.filing_type || dl.title || dl.name}</span>
-                    <span className={`font-mono text-[10px] flex-shrink-0 ml-2 ${isOverdue ? 'text-red-500 font-bold' : daysLeft != null && daysLeft <= 14 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                    <span className="text-xs text-foreground truncate">{dl.filing_type || dl.title || dl.name}</span>
+                    <span className={`text-[10px] flex-shrink-0 ml-2 ${isOverdue ? 'text-rust font-bold' : daysLeft != null && daysLeft <= 14 ? 'text-gold/80' : 'text-muted-foreground'}`}>
                       {dl.due_date
                         ? new Date(dl.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                         : ''}
@@ -271,11 +264,11 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
             <div className="space-y-1.5">
               {pendingTasks.slice(0, 3).map((task, i) => (
                 <div key={i} className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-foreground truncate">
+                  <span className="text-xs text-foreground truncate">
                     {task.title || task.task_type || task.description || 'Task'}
                   </span>
                   {task.due_date && (
-                    <span className="font-mono text-[10px] text-muted-foreground flex-shrink-0 ml-2">
+                    <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-2">
                       {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                   )}
@@ -284,19 +277,17 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
             </div>
           ) : (
             <div className="flex items-center gap-2 py-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              <p className="font-mono text-[11px] text-muted-foreground">No upcoming deadlines</p>
+              <CheckCircle2 className="w-3.5 h-3.5 text-gold" />
+              <p className="text-xs text-muted-foreground">No upcoming deadlines</p>
             </div>
           )}
         </div>
 
         {/* Smart Suggestions */}
-        <div className="p-4 border-b border-navy/10 dark:border-white/10">
+        <div className="card-trust m-3 p-4">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-gold" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Ask the Assistant
-            </span>
+            <span className="label-trust">Ask the Assistant</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {[
@@ -308,7 +299,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
               <button
                 key={suggestion.label}
                 onClick={() => onSendSuggestion?.(suggestion.prompt)}
-                className="px-2.5 py-1.5 text-[11px] font-mono border border-navy/20 dark:border-white/20 text-navy dark:text-white/80 hover:bg-navy/10 dark:hover:bg-white/10 transition-colors"
+                className="px-2.5 py-1.5 text-xs border border-navy/20 dark:border-white/20 text-navy dark:text-white/80 hover:bg-navy/10 dark:hover:bg-white/10 transition-colors"
                 disabled={!onSendSuggestion}
               >
                 {suggestion.label}
@@ -318,12 +309,10 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
         </div>
 
         {/* Chat History */}
-        <div className="p-2">
-          <div className="flex items-center gap-2 px-2 py-2">
+        <div className="card-trust m-3 p-4">
+          <div className="flex items-center gap-2 mb-2">
             <MessageSquare className="w-4 h-4 text-muted-foreground" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Chat History
-            </span>
+            <span className="label-trust">Chat History</span>
           </div>
           <ChatHistoryList
             conversations={conversations}

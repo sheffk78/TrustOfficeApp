@@ -70,7 +70,7 @@ const ChatPanel = ({
       {error && (
         <div className="bg-rust/10 border-b border-rust/20 px-4 py-3 flex items-center gap-3">
           <AlertCircle className="w-4 h-4 text-rust flex-shrink-0" />
-          <p className="flex-1 font-mono text-xs text-rust">{error}</p>
+          <p className="flex-1 text-xs text-rust">{error}</p>
           <button
             onClick={onClearError}
             className="text-rust hover:text-rust/70 transition-colors"
@@ -80,14 +80,14 @@ const ChatPanel = ({
         </div>
       )}
 
-      {/* Messages area */}
-      <div className="chat-messages flex-1 overflow-y-auto p-6" ref={messagesContainerRef}>
+      {/* Messages area — scrollable, constrained */}
+      <div className="chat-messages flex-1 overflow-y-auto px-6 py-4" ref={messagesContainerRef}>
         <div className="max-w-3xl mx-auto">
           {loadingConversation ? (
             <div className="flex justify-center py-12">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                <span className="font-mono text-xs text-muted-foreground">Loading conversation...</span>
+                <span className="text-xs text-muted-foreground">Loading conversation...</span>
               </div>
             </div>
           ) : (
@@ -108,7 +108,7 @@ const ChatPanel = ({
                 <div className="flex justify-start mb-4">
                   <div className="message-bubble-ai border border-navy/5 flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                    <span className="font-mono text-xs text-muted-foreground">Thinking...</span>
+                    <span className="text-xs text-muted-foreground">Thinking...</span>
                   </div>
                 </div>
               )}
@@ -120,14 +120,14 @@ const ChatPanel = ({
       </div>
 
       {/* Quick-action chips */}
-      <div className="quick-chips px-6 pb-2 pt-1">
+      <div className="px-6 pb-2 pt-1">
         <div className="max-w-3xl mx-auto flex flex-wrap gap-2">
           {QUICK_CHIPS.map((chip) => (
             <button
               key={chip.label}
               onClick={() => handleChipClick(chip.message)}
               disabled={loading}
-              className="font-mono text-[10px] uppercase tracking-wider px-3 py-1.5 border border-navy/10 bg-navy/5 text-navy hover:bg-gold/10 hover:border-gold/30 hover:text-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-[10px] uppercase tracking-wider px-3 py-1.5 border border-navy/10 bg-navy/5 text-navy hover:bg-gold/10 hover:border-gold/30 hover:text-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {chip.label}
             </button>
@@ -135,8 +135,8 @@ const ChatPanel = ({
         </div>
       </div>
 
-      {/* Input bar */}
-      <div className="chat-input-bar border-t border-navy/10 bg-white">
+      {/* Input bar — always visible */}
+      <div className="chat-input-bar border-t border-navy/10 bg-background">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
           <button
             className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors flex-shrink-0"
@@ -151,12 +151,12 @@ const ChatPanel = ({
             onKeyDown={handleKeyDown}
             placeholder="Ask about your trust..."
             disabled={loading}
-            className="flex-1 font-mono text-sm border-0 bg-transparent focus:outline-none focus:ring-0 placeholder:text-muted-foreground/50 disabled:opacity-50"
+            className="input-trust flex-1 placeholder:text-muted-foreground/50 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || loading}
-            className="p-2 bg-navy text-white hover:bg-navy/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            className="btn-primary p-2 flex-shrink-0"
             title="Send message"
           >
             <Send className="w-4 h-4" />
