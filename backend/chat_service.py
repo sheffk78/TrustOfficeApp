@@ -67,14 +67,60 @@ def get_knowledge_base() -> Dict[str, str]:
     return _KNOWLEDGE_BASE_CACHE
 
 
-def _format_knowledge_context() -> str:
-    """Format all knowledge base entries into a single context string."""
+def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
+    """Format relevant knowledge base entries into a single context string.
+
+    The Trust Assistant's product/workflow files are long. If we blindly append
+    every file and then truncate the combined context, the newer workflow guide
+    can be pushed out of the prompt by unrelated foundational files. Keep the
+    feature and workflow guides pinned, then add the most relevant topical files.
+    """
     kb = get_knowledge_base()
     if not kb:
         return "No curated knowledge base entries available."
+
+    query = f"{intent} {user_message}".lower()
+    # Put workflows first so "how do I" guidance survives final prompt truncation.
+    pinned_topics = ["13-trustoffice-workflows", "12-trustoffice-features"]
+
+    topic_keywords = {
+        "07-distributions": ["distribution", "distribute", "beneficiary payment", "hems", "pay beneficiary"],
+        "05-trust-minutes": ["minutes", "meeting", "decision", "resolution", "document a decision"],
+        "09-guided-minutes": ["draft minutes", "guided minutes", "meeting template"],
+        "04-schedule-a-assets": ["asset", "schedule a", "property", "deed", "account", "inventory"],
+        "02-1041-tax-returns": ["1041", "tax", "k-1", "irs", "filing", "ein"],
+        "06-state-compliance": ["state", "compliance", "jurisdiction", "law"],
+        "08-defensibility-score": ["score", "defensibility", "trust health", "dashboard", "risk", "alert"],
+        "10-getting-started": ["start", "onboarding", "first", "setup", "new trustee"],
+        "11-video-library": ["video", "lesson", "course", "trustee 101"],
+        "03-trustee-duties": ["duty", "fiduciary", "trustee", "responsibility"],
+        "01-hems-standard": ["hems", "health", "education", "maintenance", "support"],
+    }
+
+    selected = []
+    for topic in pinned_topics:
+        if topic in kb:
+            selected.append(topic)
+
+    for topic, keywords in topic_keywords.items():
+        if topic in kb and any(keyword in query for keyword in keywords):
+            selected.append(topic)
+
+    # De-duplicate while preserving order, then add one fallback conceptual file.
+    selected = list(dict.fromkeys(selected))
+    if len(selected) == len([t for t in pinned_topics if t in kb]) and "03-trustee-duties" in kb:
+        selected.append("03-trustee-duties")
+
     sections = []
-    for topic, content in kb.items():
-        sections.append(f"### {topic}\n{content[:2000]}")  # Truncate per-entry
+    for topic in selected[:5]:
+        content = kb[topic]
+        if topic == "13-trustoffice-workflows":
+            per_entry_limit = 5200
+        elif topic == "12-trustoffice-features":
+            per_entry_limit = 1800
+        else:
+            per_entry_limit = 1200
+        sections.append(f"### {topic}\n{content[:per_entry_limit]}")
     return "\n\n".join(sections)
 
 
@@ -332,7 +378,7 @@ async def generate_response(
     trust_info = ctx.get("trust", {})
 
     # Build the system prompt with context
-    knowledge_context = _format_knowledge_context()
+    knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
 
     system_prompt = f"""{CHAT_SYSTEM_PROMPT}
 
@@ -360,7 +406,7 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/100 ({ctx.get
 {json.dumps(ctx.get('tax_deadlines', []), indent=2)}
 
 ## Knowledge Base
-{knowledge_context[:3000] if knowledge_context else "No knowledge base available."}
+{knowledge_context[:6500] if knowledge_context else "No knowledge base available."}
 
 ## Conversation History (recent)
 {json.dumps(conversation_history[-5:] if conversation_history else [], indent=2)}
