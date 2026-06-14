@@ -80,8 +80,8 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
         return "No curated knowledge base entries available."
 
     query = f"{intent} {user_message}".lower()
-    # Put workflows first so "how do I" guidance survives final prompt truncation.
-    pinned_topics = ["13-trustoffice-workflows", "12-trustoffice-features"]
+    # Put high-level training first so "how do I" and scenario guidance survives final prompt truncation.
+    pinned_topics = ["15-trustoffice-scenarios", "14-trustoffice-page-playbooks", "13-trustoffice-workflows", "12-trustoffice-features"]
 
     topic_keywords = {
         "07-distributions": ["distribution", "distribute", "beneficiary payment", "hems", "pay beneficiary"],
@@ -111,16 +111,80 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
     if len(selected) == len([t for t in pinned_topics if t in kb]) and "03-trustee-duties" in kb:
         selected.append("03-trustee-duties")
 
+    def relevant_excerpt(topic: str, content: str) -> str:
+        """Return a compact excerpt, preferring the section matching this request."""
+        section_hints = {
+            "15-trustoffice-scenarios": [
+                ("beneficiary", "## Scenario: Beneficiary Asks for Money"),
+                ("tax", "## Scenario: Tax Season / Upcoming Filing"),
+                ("1041", "## Scenario: Tax Season / Upcoming Filing"),
+                ("k-1", "## Scenario: Tax Season / Upcoming Filing"),
+                ("missed", "## Scenario: Missed Deadline / Overdue Task"),
+                ("overdue", "## Scenario: Missed Deadline / Overdue Task"),
+                ("score", "## Scenario: Low Defensibility Score"),
+                ("health", "## Scenario: Low Defensibility Score"),
+                ("commingling", "## Scenario: Commingling / Personal vs Trust Funds Confusion"),
+                ("mixed funds", "## Scenario: Commingling / Personal vs Trust Funds Confusion"),
+                ("new trustee", "## Scenario: New Trustee — First 30 Days"),
+                ("start", "## Scenario: New Trustee — First 30 Days"),
+                ("annual review", "## Scenario: Annual Review"),
+                ("prove", "## Scenario: Need to Prove a Decision Was Proper"),
+                ("defensible", "## Scenario: Need to Prove a Decision Was Proper"),
+            ],
+            "14-trustoffice-page-playbooks": [
+                ("dashboard", "## Dashboard"),
+                ("trust assistant", "## Trust Assistant"),
+                ("calendar", "## Governance Calendar"),
+                ("governance calendar", "## Governance Calendar"),
+                ("minutes", "## Minutes"),
+                ("distribution", "## Distributions"),
+                ("vault", "## Vault"),
+                ("beneficiar", "## Beneficiaries"),
+                ("schedule a", "## Schedule A"),
+                ("asset", "## Schedule A"),
+                ("compensation", "## Compensation"),
+                ("settings", "## Settings"),
+                ("tax calendar", "## Tax Calendar"),
+                ("trust health", "## Trust Health"),
+                ("risk", "## Risk Dashboard"),
+                ("communication", "## Communications"),
+                ("audit", "## Audit Trail"),
+            ],
+            "13-trustoffice-workflows": [
+                ("distribution", "## Workflow: Prepare and Document a Distribution"),
+                ("calendar", "## Workflow: Use the Governance Calendar"),
+                ("dashboard", "## Workflow: Use Dashboard Alerts and Governance Insights"),
+                ("vault", "## Workflow: Use the Document Vault"),
+                ("minutes", "## Workflow: Run and Document Trustee Meetings"),
+                ("beneficiar", "## Workflow: Add and Maintain Beneficiaries"),
+                ("compensation", "## Workflow: Trustee Compensation"),
+                ("transaction", "## Workflow: Track Trust Money Movement"),
+                ("schedule a", "## Workflow: Maintain Schedule A / Trust Assets"),
+                ("asset", "## Workflow: Maintain Schedule A / Trust Assets"),
+                ("settings", "## Workflow: Update Trust Settings and Tax Calendar"),
+                ("tax", "## Workflow: Update Trust Settings and Tax Calendar"),
+            ],
+        }
+        limits = {
+            "15-trustoffice-scenarios": 3000,
+            "14-trustoffice-page-playbooks": 2500,
+            "13-trustoffice-workflows": 2200,
+            "12-trustoffice-features": 1400,
+        }
+        limit = limits.get(topic, 900)
+        for keyword, heading in section_hints.get(topic, []):
+            if keyword in query:
+                start = content.find(heading)
+                if start >= 0:
+                    next_heading = content.find("\n## ", start + 4)
+                    excerpt = content[start: next_heading if next_heading >= 0 else len(content)]
+                    return excerpt[:limit]
+        return content[:limit]
+
     sections = []
     for topic in selected[:5]:
         content = kb[topic]
-        if topic == "13-trustoffice-workflows":
-            per_entry_limit = 5200
-        elif topic == "12-trustoffice-features":
-            per_entry_limit = 1800
-        else:
-            per_entry_limit = 1200
-        sections.append(f"### {topic}\n{content[:per_entry_limit]}")
+        sections.append(f"### {topic}\n{relevant_excerpt(topic, content)}")
     return "\n\n".join(sections)
 
 
@@ -406,7 +470,7 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/100 ({ctx.get
 {json.dumps(ctx.get('tax_deadlines', []), indent=2)}
 
 ## Knowledge Base
-{knowledge_context[:6500] if knowledge_context else "No knowledge base available."}
+{knowledge_context[:9500] if knowledge_context else "No knowledge base available."}
 
 ## Conversation History (recent)
 {json.dumps(conversation_history[-5:] if conversation_history else [], indent=2)}
