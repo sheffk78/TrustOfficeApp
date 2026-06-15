@@ -89,12 +89,12 @@ CURRICULUM = [
     },
     {
         "lesson": 8,
-        "title": "Tax & Compliance Essentials",
-        "video_guid": None,
-        "duration": "Coming Soon",
+        "title": "Beneficiary Communication",
+        "video_guid": "c8089b18-d6cf-47eb-84ed-96c0a328b4f0",
+        "duration": "~13 min",
         "free": False,
-        "pdf_url": None,
-        "status": "coming_soon",
+        "pdf_url": "/pdfs/beneficiary-communication-templates-l8.pdf",
+        "status": "ready",
     },
     {
         "lesson": 9,
