@@ -98,12 +98,12 @@ CURRICULUM = [
     },
     {
         "lesson": 9,
-        "title": "Building Your Trustee Practice",
-        "video_guid": None,
-        "duration": "Coming Soon",
+        "title": "Family Trusts and Sibling Dynamics",
+        "video_guid": "4a9c7291-43ba-4231-9772-8832b232c97a",
+        "duration": "~12 min",
         "free": False,
-        "pdf_url": None,
-        "status": "coming_soon",
+        "pdf_url": "/pdfs/family-governance-framework-l9.pdf",
+        "status": "ready",
     },
 ]
 
