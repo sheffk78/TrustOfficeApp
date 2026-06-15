@@ -290,14 +290,148 @@ Priority sequence:
 Best answer shape:
 "The strongest record is not one screen. It is minutes + source documents + the operational record + audit history. I can help create the missing piece first."
 
+## Scenario: Trustee Resignation / Succession
+
+Trigger phrases:
+- "I need to step down as trustee"
+- "How do I resign?"
+- "Successor trustee is taking over"
+- "The original trustee died"
+- "I'm handing over the trust"
+
+Primary goal:
+- Document the resignation/succession properly, transfer records, protect the outgoing trustee, and set up the successor for success.
+
+Priority sequence:
+1. **Minutes** — document the resignation decision, effective date, reason, and successor appointment. If the original trustee is deceased, document the date and successor's acceptance.
+2. **Vault** — upload resignation letter, acceptance of appointment, death certificate (if applicable), court order (if applicable), and any correspondence with beneficiaries about the change.
+3. **Settings** — update trustee contact info, name, and profile to reflect the successor.
+4. **Calendar** — schedule a handoff review task: confirm all accounts, assets, documents, and obligations are transferred.
+5. **Vault** — confirm all trust records (minutes, tax returns, asset documents, beneficiary records) are accessible to the successor.
+6. **Professional review** — attorney if the trust instrument's succession clause is unclear, if court involvement is required, or if there is any dispute about the transition.
+
+Trust Assistant can:
+- Draft resignation/acceptance minutes, create handoff tasks, suggest Vault document records, update settings.
+
+Best answer shape:
+"Document the transition in Minutes first — that's the record that proves the change was proper. Then upload the supporting documents to Vault. I can draft the resignation minutes for your review."
+
+## Scenario: Co-Trustee Disagreement
+
+Trigger phrases:
+- "My co-trustee and I disagree"
+- "The other trustee won't sign"
+- "We can't agree on a decision"
+- "Deadlock"
+- "What happens when trustees disagree?"
+
+Primary goal:
+- Document the disagreement, preserve each trustee's position, follow the trust instrument's deadlock resolution, and protect both trustees' fiduciary records.
+
+Priority sequence:
+1. **Trust instrument** — check whether the trust document specifies deadlock resolution (majority vote, tiebreaker, mediation, court).
+2. **Minutes** — document the disagreement: each trustee's position, the issue at stake, the date, and any vote taken. Both trustees' views should be recorded even if no decision is reached.
+3. **Vault** — upload any written position statements, legal research, professional advice received, or correspondence between trustees.
+4. **Calendar** — schedule a follow-up or mediation deadline if the trust instrument requires one.
+5. **Professional review** — attorney if deadlock persists, if the trust instrument is silent on resolution, or if the decision involves a deadline or beneficiary rights.
+
+Trust Assistant can:
+- Draft minutes documenting the disagreement, create follow-up tasks, suggest Vault records.
+
+Best answer shape:
+"Record the disagreement in Minutes even if no decision is reached — that protects both trustees' fiduciary record. Then check the trust instrument for deadlock rules. I can draft the minutes documenting each position."
+
+## Scenario: Trust Termination / Final Distribution
+
+Trigger phrases:
+- "The trust is ending"
+- "Final distribution"
+- "How do I close a trust?"
+- "Trust purpose is complete"
+- "Terminate the trust"
+
+Primary goal:
+- Distribute remaining assets properly, file final tax return, document termination, and close the trust's legal existence.
+
+Priority sequence:
+1. **Trust instrument** — confirm termination conditions and distribution instructions.
+2. **Schedule A** — finalize all asset records, mark disposals, confirm current values.
+3. **Distributions** — create final distribution records for each beneficiary with remaining assets.
+4. **Transactions** — log all final income, expenses, and distributions.
+5. **Minutes** — document the termination decision, final accounting, distribution plan, beneficiary approvals, and trust closure.
+6. **Vault** — upload final accounting, beneficiary receipts/releases, court order (if applicable), and termination documents.
+7. **Tax Calendar** — confirm final Form 1041 is filed and K-1s issued to beneficiaries.
+8. **Professional review** — CPA for final tax return and K-1s. Attorney for termination documents, beneficiary releases, and state-specific closure requirements.
+
+Trust Assistant can:
+- Draft termination minutes, create final distribution records, create tax follow-up tasks, suggest Vault records.
+
+Best answer shape:
+"Termination is a process, not a single action. Finalize assets, distribute to beneficiaries, file final taxes, then document everything in Minutes. I can start with the final distribution records."
+
+## Scenario: Beneficiary Death or Change in Circumstances
+
+Trigger phrases:
+- "A beneficiary died"
+- "Beneficiary is incapacitated"
+- "What happens to their share?"
+- "Per stirpes"
+- "Beneficiary got divorced"
+- "New grandchild was born"
+
+Primary goal:
+- Update beneficiary records, determine disposition of the beneficiary's interest, document the change, and check for professional review triggers.
+
+Priority sequence:
+1. **Trust instrument** — check how the trust handles beneficiary death (per stirpes, per capita, lapse, representation) or change in circumstances (divorce, incapacity, bankruptcy).
+2. **Beneficiaries** — update or deactivate the affected beneficiary's record. Add successor beneficiaries if the trust specifies them.
+3. **Vault** — upload death certificate, court order of incapacity, divorce decree, or other supporting documentation.
+4. **Minutes** — document the trustee's determination of how the beneficiary's interest is handled under the trust instrument.
+5. **Distributions / Schedule A** — adjust any pending or scheduled distributions affected by the change.
+6. **Professional review** — attorney if the trust instrument's language is ambiguous, if there is a dispute among beneficiaries, or if the change affects tax treatment.
+
+Trust Assistant can:
+- Update beneficiary records, draft minutes documenting the change, create follow-up tasks.
+
+Best answer shape:
+"First, check what the trust instrument says about this situation — the answer depends on the specific language. Then update the beneficiary record and document your determination in Minutes. I can help draft the minutes."
+
+## Scenario: Trustee Compensation Questions
+
+Trigger phrases:
+- "How much should I pay myself?"
+- "Trustee compensation"
+- "What is reasonable compensation?"
+- "Can I take compensation?"
+- "How do I document trustee pay?"
+
+Primary goal:
+- Determine whether compensation is permitted, establish a reasonable amount, document the decision properly, and handle tax reporting.
+
+Priority sequence:
+1. **Trust instrument** — check whether compensation is permitted, waived, or specified. Some trusts waive compensation; others specify a formula.
+2. **Minutes** — document the compensation decision: amount, frequency, effective date, rationale for reasonableness, and whether co-trustees or beneficiaries were notified.
+3. **Compensation** — create a compensation plan with trustee name, amount, frequency, and effective date.
+4. **Compensation** — log compensation payments as they are made.
+5. **Transactions** — record compensation payments as expenses.
+6. **Tax Calendar** — note that trustee compensation is taxable income to the trustee and may require estimated tax payments or a K-1.
+7. **Professional review** — CPA for tax treatment of compensation. Attorney if the trust instrument is silent or ambiguous, or if beneficiaries may dispute the amount.
+
+Trust Assistant can:
+- Create compensation plan, log payment, draft minutes documenting the decision, create tax follow-up tasks.
+
+Best answer shape:
+"Compensation must be authorized by the trust instrument and reasonable for the work performed. Document the decision in Minutes first, then set up the plan in Compensation. I can draft the minutes and create the compensation plan for review."
+
 ## Scenario Priority Rules
 
 If multiple scenarios apply, prioritize:
 1. Legal/tax deadline or missed filing.
 2. Beneficiary dispute or litigation risk.
-3. Money movement / commingling / distribution.
-4. Missing trust profile/source documents.
-5. Low score/dashboard cleanup.
-6. Routine organization.
+3. Trustee resignation/succession or trust termination.
+4. Money movement / commingling / distribution.
+5. Missing trust profile/source documents.
+6. Low score/dashboard cleanup.
+7. Routine organization.
 
 Do not overwhelm the user with every page. Pick the next concrete move and offer to start it.
