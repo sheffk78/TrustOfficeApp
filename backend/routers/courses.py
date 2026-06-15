@@ -105,6 +105,15 @@ CURRICULUM = [
         "pdf_url": "/pdfs/family-governance-framework-l9.pdf",
         "status": "ready",
     },
+    {
+        "lesson": 10,
+        "title": "HEMS Decoded",
+        "video_guid": "ac5f3e48-470c-48b7-a142-2db5d632558b",
+        "duration": "~8 min",
+        "free": False,
+        "pdf_url": "/pdfs/hems-decision-framework.pdf",
+        "status": "ready",
+    },
 ]
 
 
