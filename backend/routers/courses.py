@@ -90,7 +90,7 @@ CURRICULUM = [
     {
         "lesson": 8,
         "title": "Beneficiary Communication",
-        "video_guid": "c8089b18-d6cf-47eb-84ed-96c0a328b4f0",
+        "video_guid": "c8c94726-c534-414b-ac20-0702a2427021",
         "duration": "~13 min",
         "free": False,
         "pdf_url": "/pdfs/beneficiary-communication-templates-l8.pdf",
