@@ -48,9 +48,30 @@ LEAD_SOURCES = [
     "trustee-90-day-checklist",
     "commingling-checklist",
     "blog-subscribe",
+    "blog-article-pdf",
     "webinar-signup",
     "booked-call",
     "liability-protection-kit",
+    "homepage-trustee-101",
+    "commingling-explained",
+    "distribution-guide",
+    "new-trustee-guide",
+    "trust-software-guide",
+    "admin-checklist",
+    "document-distributions",
+    "fiduciary-duty-guide",
+    "minutes-template",
+    "private-trustee-guide",
+    "resources-subscribe",
+    "pricing-lead",
+    "features-lead",
+    "how-it-works-lead",
+    "about-lead",
+    "faq-lead",
+    "for-professionals",
+    "advisors",
+    "get-started",
+    "governance-offer",
     "manual",
     "direct",
 ]
@@ -181,9 +202,30 @@ def calculate_lead_score(lead: dict) -> int:
         "webinar-signup": 8,            # High intent — signed up for an event
         "liability-protection-kit": 6,  # Medium-high — downloaded multiple checklists
         "trustee-101-landing-page": 5,  # Medium — enrolled in the free course
+        "homepage-trustee-101": 5,      # Same as trustee-101
+        "governance-offer": 5,          # Offer page — medium intent
         "trustee-90-day-checklist": 4,
         "commingling-checklist": 4,
+        "commingling-explained": 4,     # Content guide — medium intent
+        "distribution-guide": 4,
+        "new-trustee-guide": 4,
+        "trust-software-guide": 4,
+        "admin-checklist": 4,
+        "document-distributions": 4,
+        "fiduciary-duty-guide": 4,
+        "minutes-template": 4,
+        "private-trustee-guide": 4,
+        "for-professionals": 4,         # Professional pages — medium intent
+        "advisors": 4,
+        "get-started": 3,               # General interest
+        "resources-subscribe": 3,
+        "pricing-lead": 3,
+        "features-lead": 3,
+        "how-it-works-lead": 3,
+        "about-lead": 2,
+        "faq-lead": 2,
         "blog-subscribe": 2,            # Low intent — casual blog reader
+        "blog-article-pdf": 2,           # Low intent — casual blog reader
         "direct": 1,                    # Unknown / direct traffic
         "manual": 0,                    # Manually entered
     }
@@ -236,9 +278,30 @@ def get_score_breakdown(lead: dict) -> dict:
         "webinar-signup": 8,
         "liability-protection-kit": 6,
         "trustee-101-landing-page": 5,
+        "homepage-trustee-101": 5,
+        "governance-offer": 5,
         "trustee-90-day-checklist": 4,
         "commingling-checklist": 4,
+        "commingling-explained": 4,
+        "distribution-guide": 4,
+        "new-trustee-guide": 4,
+        "trust-software-guide": 4,
+        "admin-checklist": 4,
+        "document-distributions": 4,
+        "fiduciary-duty-guide": 4,
+        "minutes-template": 4,
+        "private-trustee-guide": 4,
+        "for-professionals": 4,
+        "advisors": 4,
+        "get-started": 3,
+        "resources-subscribe": 3,
+        "pricing-lead": 3,
+        "features-lead": 3,
+        "how-it-works-lead": 3,
+        "about-lead": 2,
+        "faq-lead": 2,
         "blog-subscribe": 2,
+        "blog-article-pdf": 2,
         "direct": 1,
         "manual": 0,
     }
