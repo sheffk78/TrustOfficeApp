@@ -83,6 +83,7 @@ from routers.binder import router as binder_router
 from routers.external import router as external_router
 from routers.external_trust_docs import router as external_trust_docs_router
 from routers.courses import router as courses_router
+from routers.leads import router as leads_router
 from routers.chat import router as chat_router  # Trust Assistant
 
 # Import security middleware
@@ -331,6 +332,8 @@ app.include_router(external_router, prefix="/api")
 app.include_router(external_trust_docs_router)
 # Course routes
 app.include_router(courses_router, prefix="/api")
+# Lead management (admin)
+app.include_router(leads_router, prefix="/api")
 # Trust Assistant conversational AI
 app.include_router(chat_router, prefix="/api")
 
@@ -482,6 +485,14 @@ async def startup_event():
         await db.alert_audit_log.create_index("audit_id", unique=True)
         # Course leads index (unique email)
         await db.course_leads.create_index("email", unique=True)
+        
+        # Lead management indexes
+        await db.leads.create_index("email", unique=True)
+        await db.leads.create_index([("stage", 1), ("created_at", -1)])
+        await db.leads.create_index("source")
+        await db.leads.create_index("lead_id", unique=True)
+        await db.lead_activities.create_index([("lead_id", 1), ("created_at", -1)])
+        await db.lead_activities.create_index("activity_id", unique=True)
         
         # Personal vendor index for separation alerts
         await db.personal_vendors.create_index("user_id")

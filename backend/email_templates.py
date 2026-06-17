@@ -101,6 +101,107 @@ The TrustOffice Team
         """
     },
 
+    # Lead Welcome Email — sent when someone signs up for Trustee 101 or downloads a checklist
+    "lead_welcome": {
+        "subject": lambda data: f"Welcome to Trustee 101, {data.get('name', 'there')}!",
+        "html": lambda data: _base_template(f"""
+            <h2>Welcome to Trustee 101 🎉</h2>
+            <p>Hi {data.get('name', 'there')},</p>
+            <p>Thanks for signing up! You now have access to <strong>Trustee 101</strong> — a free 9-lesson course designed to help you navigate your role as a trustee with confidence.</p>
+
+            <h3>Your First Lesson</h3>
+            <p>Start with <strong>Lesson 1: What Is a Trust?</strong> — a 7-minute overview that lays the foundation for everything that follows.</p>
+
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="{data.get('course_url', '#')}" class="button">Start Lesson 1</a>
+            </p>
+
+            <h3>What You'll Learn</h3>
+            <ul>
+                <li>The trustee's role and legal duties</li>
+                <li>Your first 7 days as a trustee</li>
+                <li>HEMS — the standard for trust distributions</li>
+                <li>The commingling trap (and how to avoid it)</li>
+                <li>Trust taxes, investments, and beneficiary communication</li>
+            </ul>
+
+            <p>Each lesson takes 5–16 minutes. Go at your own pace.</p>
+
+            <p>If you ever have questions, just reply to this email.</p>
+
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Welcome to Trustee 101!
+
+Hi {data.get('name', 'there')},
+
+Thanks for signing up! You now have access to Trustee 101 — a free 9-lesson course designed to help you navigate your role as a trustee with confidence.
+
+Start with Lesson 1: What Is a Trust? — a 7-minute overview.
+
+Start here: {data.get('course_url', '#')}
+
+What You'll Learn:
+- The trustee's role and legal duties
+- Your first 7 days as a trustee
+- HEMS — the standard for trust distributions
+- The commingling trap (and how to avoid it)
+- Trust taxes, investments, and beneficiary communication
+
+Each lesson takes 5-16 minutes. Go at your own pace.
+
+Best regards,
+The TrustOffice Team
+""",
+    },
+
+    # Lead Re-engagement Email — sent 3 days after capture if no lessons watched
+    "lead_reengagement": {
+        "subject": lambda data: f"Your first lesson is waiting, {data.get('name', 'there')}",
+        "html": lambda data: _base_template(f"""
+            <h2>Your First Lesson Is Waiting</h2>
+            <p>Hi {data.get('name', 'there')},</p>
+            <p>You signed up for <strong>Trustee 101</strong> a few days ago, but we noticed you haven't started your first lesson yet.</p>
+
+            <p>No pressure — but the first lesson (<strong>What Is a Trust?</strong>) only takes 7 minutes, and it's the foundation for everything else.</p>
+
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="{data.get('course_url', '#')}" class="button">Watch Lesson 1 Now</a>
+            </p>
+
+            <p>Here's a quick preview of what you'll learn:</p>
+            <ul>
+                <li>What a trust actually is (in plain English)</li>
+                <li>Why trustees have legal duties — and what they are</li>
+                <li>How to avoid the most common trustee mistakes</li>
+            </ul>
+
+            <p>If you have questions or need help getting started, just reply to this email.</p>
+
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Your First Lesson Is Waiting
+
+Hi {data.get('name', 'there')},
+
+You signed up for Trustee 101 a few days ago, but we noticed you haven't started your first lesson yet.
+
+No pressure — but the first lesson (What Is a Trust?) only takes 7 minutes, and it's the foundation for everything else.
+
+Watch Lesson 1 Now: {data.get('course_url', '#')}
+
+Here's a quick preview:
+- What a trust actually is (in plain English)
+- Why trustees have legal duties — and what they are
+- How to avoid the most common trustee mistakes
+
+Best regards,
+The TrustOffice Team
+""",
+    },
+
     # Welcome / Onboarding Email
     "welcome": {
         "subject": "Welcome to TrustOffice - Let's Get Started",

@@ -38,7 +38,10 @@ import {
   CheckSquare,
   LogIn,
   BarChart3,
-  Calendar
+  Calendar,
+  Target,
+  MessageSquare,
+  Activity
 } from 'lucide-react';
 
 function formatLastActive(lastLogin) {
@@ -116,6 +119,18 @@ export default function AdminPage() {
   
   // Stats users list
   const [statsUsers, setStatsUsers] = useState([]);
+  
+  // Leads state
+  const [leads, setLeads] = useState([]);
+  const [leadsTotal, setLeadsTotal] = useState(0);
+  const [leadsPage, setLeadsPage] = useState(1);
+  const [leadsSearch, setLeadsSearch] = useState('');
+  const [leadsStageFilter, setLeadsStageFilter] = useState('all');
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadsStageCounts, setLeadsStageCounts] = useState({});
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [leadDetailLoading, setLeadDetailLoading] = useState(false);
+  const [leadNoteText, setLeadNoteText] = useState('');
   
   // Check if user is admin - first check from user object, then verify with API
   const [isAdmin, setIsAdmin] = useState(false);
@@ -228,6 +243,79 @@ export default function AdminPage() {
     setReferralsLoading(false);
   };
 
+  // Fetch leads
+  const fetchLeads = async () => {
+    setLeadsLoading(true);
+    try {
+      let url = `/admin/leads?page=${leadsPage}&limit=20`;
+      if (leadsSearch) url += `&search=${encodeURIComponent(leadsSearch)}`;
+      if (leadsStageFilter !== 'all') url += `&stage=${leadsStageFilter}`;
+      
+      const response = await fetchWithAuth(url);
+      if (response.ok) {
+        const data = await response.json();
+        setLeads(data.leads);
+        setLeadsTotal(data.total);
+        setLeadsStageCounts(data.stages || {});
+      }
+    } catch (error) {
+      console.error('Failed to fetch leads:', error);
+    }
+    setLeadsLoading(false);
+  };
+
+  // Fetch lead detail
+  const fetchLeadDetail = async (leadId) => {
+    setLeadDetailLoading(true);
+    try {
+      const response = await fetchWithAuth(`/admin/leads/${leadId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedLead(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch lead detail:', error);
+    }
+    setLeadDetailLoading(false);
+  };
+
+  // Add lead note
+  const addLeadNote = async (leadId) => {
+    if (!leadNoteText.trim()) return;
+    try {
+      const response = await fetchWithAuth(`/admin/leads/${leadId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: leadNoteText, action_type: 'manual' }),
+      });
+      if (response.ok) {
+        setLeadNoteText('');
+        fetchLeadDetail(leadId);
+      }
+    } catch (error) {
+      console.error('Failed to add lead note:', error);
+    }
+  };
+
+  // Update lead stage
+  const updateLeadStage = async (leadId, stage) => {
+    try {
+      const response = await fetchWithAuth(`/admin/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage }),
+      });
+      if (response.ok) {
+        fetchLeads();
+        if (selectedLead?.lead_id === leadId) {
+          fetchLeadDetail(leadId);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update lead stage:', error);
+    }
+  };
+
   // Fetch admins
   const fetchAdmins = async () => {
     try {
@@ -321,6 +409,9 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAdmin && activeTab === 'referrals') {
       fetchReferrals();
+    }
+    if (isAdmin && activeTab === 'leads') {
+      fetchLeads();
     }
     if (isAdmin && activeTab === 'admins') {
       fetchAdmins();
@@ -741,6 +832,15 @@ export default function AdminPage() {
               <TabsTrigger value="referrals" className="flex items-center gap-2">
                 <Link2 className="w-4 h-4" />
                 Referrals
+              </TabsTrigger>
+              <TabsTrigger value="leads" className="flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                Leads
+                {leadsStageCounts.new > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-rust text-white rounded-full">
+                    {leadsStageCounts.new}
+                  </span>
+                )}
               </TabsTrigger>
             </TabsList>
 
@@ -1387,6 +1487,297 @@ export default function AdminPage() {
                 )}
               </div>
             </TabsContent>
+
+            {/* Leads Tab */}
+            <TabsContent value="leads">
+              <div className="card-trust">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="font-serif text-xl text-navy dark:text-white">Leads</h2>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={fetchLeads}>
+                      <RefreshCw className={`w-4 h-4 ${leadsLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Stage filter pills */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {[
+                    { key: 'all', label: 'All', count: leadsStageCounts.all },
+                    { key: 'new', label: 'New', count: leadsStageCounts.new },
+                    { key: 'engaged', label: 'Engaged', count: leadsStageCounts.engaged },
+                    { key: 'warm', label: 'Warm', count: leadsStageCounts.warm },
+                    { key: 'converted', label: 'Converted', count: leadsStageCounts.converted },
+                    { key: 'lost', label: 'Lost', count: leadsStageCounts.lost },
+                  ].map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => { setLeadsStageFilter(s.key); setLeadsPage(1); }}
+                      className={`px-3 py-1.5 text-sm transition-colors ${
+                        leadsStageFilter === s.key
+                          ? 'bg-navy text-white dark:bg-gold dark:text-navy'
+                          : 'bg-navy/5 dark:bg-white/5 text-navy dark:text-white hover:bg-navy/10 dark:hover:bg-white/10'
+                      }`}
+                    >
+                      {s.label}
+                      {s.count !== undefined && (
+                        <span className="ml-1.5 text-xs opacity-70">({s.count})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search leads by name or email..."
+                    value={leadsSearch}
+                    onChange={(e) => setLeadsSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { setLeadsPage(1); fetchLeads(); } }}
+                    className="w-full pl-10 pr-4 py-2 border border-navy/10 dark:border-white/10 bg-transparent text-navy dark:text-white text-sm focus:outline-none focus:border-gold"
+                  />
+                </div>
+
+                {leadsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="w-8 h-8 animate-spin text-navy dark:text-white" />
+                  </div>
+                ) : leads.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No leads found</p>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-navy/10 dark:border-white/10">
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Name</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Email</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Stage</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Score</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Next Action</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Source</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Created</th>
+                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {leads.map((lead) => (
+                            <tr key={lead.lead_id} className="border-b border-navy/5 dark:border-white/5 hover:bg-navy/5 dark:hover:bg-white/5">
+                              <td className="py-3 px-4">
+                                <p className="font-medium text-navy dark:text-white">{lead.name || '—'}</p>
+                              </td>
+                              <td className="py-3 px-4 text-sm text-muted-foreground">{lead.email}</td>
+                              <td className="py-3 px-4">
+                                <Badge className={
+                                  lead.stage === 'new' ? 'bg-blue-100 text-blue-800' :
+                                  lead.stage === 'engaged' ? 'bg-purple-100 text-purple-800' :
+                                  lead.stage === 'warm' ? 'bg-amber-100 text-amber-800' :
+                                  lead.stage === 'converted' ? 'bg-green-100 text-green-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }>
+                                  {lead.stage_label || lead.stage}
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        lead.score >= 70 ? 'bg-green-500' :
+                                        lead.score >= 40 ? 'bg-amber-500' :
+                                        'bg-rust'
+                                      }`}
+                                      style={{ width: `${lead.score}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">{lead.score}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-xs text-muted-foreground max-w-[200px] truncate">
+                                {lead.next_action || '—'}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-muted-foreground">{lead.source || '—'}</td>
+                              <td className="py-3 px-4 text-sm text-muted-foreground">
+                                {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => fetchLeadDetail(lead.lead_id)}
+                                    className="p-1.5 text-muted-foreground hover:text-navy dark:hover:text-white transition-colors"
+                                    title="View details"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                  <select
+                                    value={lead.stage}
+                                    onChange={(e) => updateLeadStage(lead.lead_id, e.target.value)}
+                                    className="text-xs border border-navy/20 dark:border-white/20 bg-transparent rounded px-1 py-0.5"
+                                    title="Change stage"
+                                  >
+                                    <option value="new">New</option>
+                                    <option value="engaged">Engaged</option>
+                                    <option value="warm">Warm</option>
+                                    <option value="converted">Converted</option>
+                                    <option value="lost">Lost</option>
+                                  </select>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    {leadsTotal > 20 && (
+                      <div className="flex items-center justify-between mt-4">
+                        <p className="text-sm text-muted-foreground">
+                          Showing {((leadsPage - 1) * 20) + 1}-{Math.min(leadsPage * 20, leadsTotal)} of {leadsTotal}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setLeadsPage(p => Math.max(1, p - 1)); }}
+                            disabled={leadsPage === 1}
+                            className="p-2 text-muted-foreground hover:text-navy dark:hover:text-white disabled:opacity-30"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => { setLeadsPage(p => p + 1); }}
+                            disabled={leadsPage * 20 >= leadsTotal}
+                            className="p-2 text-muted-foreground hover:text-navy dark:hover:text-white disabled:opacity-30"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Lead Detail Dialog */}
+            <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="font-serif text-xl text-navy dark:text-white flex items-center gap-2">
+                    <Target className="w-5 h-5 text-gold" />
+                    {selectedLead?.name || 'Lead Details'}
+                  </DialogTitle>
+                  <DialogDescription>{selectedLead?.email}</DialogDescription>
+                </DialogHeader>
+
+                {leadDetailLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="w-8 h-8 animate-spin text-navy dark:text-white" />
+                  </div>
+                ) : selectedLead ? (
+                  <div className="space-y-4 py-4">
+                    {/* Status Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                        <p className="text-xs text-muted-foreground mb-1">Stage</p>
+                        <Badge className={
+                          selectedLead.stage === 'new' ? 'bg-blue-100 text-blue-800' :
+                          selectedLead.stage === 'engaged' ? 'bg-purple-100 text-purple-800' :
+                          selectedLead.stage === 'warm' ? 'bg-amber-100 text-amber-800' :
+                          selectedLead.stage === 'converted' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }>
+                          {selectedLead.stage_label || selectedLead.stage}
+                        </Badge>
+                      </div>
+                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                        <p className="text-xs text-muted-foreground mb-1">Score</p>
+                        <p className="text-lg font-bold text-navy dark:text-white">{selectedLead.score || 0}</p>
+                      </div>
+                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                        <p className="text-xs text-muted-foreground mb-1">Plan</p>
+                        <p className="text-sm font-medium text-navy dark:text-white capitalize">{selectedLead.plan_type}</p>
+                      </div>
+                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                        <p className="text-xs text-muted-foreground mb-1">Lessons</p>
+                        <p className="text-lg font-bold text-navy dark:text-white">{selectedLead.lessons_watched || 0}/9</p>
+                      </div>
+                    </div>
+
+                    {/* Next Action */}
+                    <div className="p-3 border border-gold/30 bg-gold/5 rounded-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Activity className="w-4 h-4 text-gold" />
+                        <span className="text-sm font-medium text-navy dark:text-white">Next Action</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{selectedLead.next_action || 'Monitor — no action needed'}</p>
+                    </div>
+
+                    {/* Stage changer */}
+                    <div>
+                      <label className="text-sm font-medium text-navy dark:text-white block mb-2">Change Stage</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['new', 'engaged', 'warm', 'converted', 'lost'].map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => updateLeadStage(selectedLead.lead_id, s)}
+                            className={`px-3 py-1.5 text-sm transition-colors ${
+                              selectedLead.stage === s
+                                ? 'bg-navy text-white dark:bg-gold dark:text-navy'
+                                : 'bg-navy/5 dark:bg-white/5 text-navy dark:text-white hover:bg-navy/10 dark:hover:bg-white/10'
+                            }`}
+                          >
+                            {s.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Add Note */}
+                    <div>
+                      <label className="text-sm font-medium text-navy dark:text-white block mb-2">
+                        <MessageSquare className="w-4 h-4 inline mr-1" />
+                        Add Note
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={leadNoteText}
+                          onChange={(e) => setLeadNoteText(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') addLeadNote(selectedLead.lead_id); }}
+                          placeholder="Type a note about this lead..."
+                          className="flex-1 px-3 py-2 border border-navy/10 dark:border-white/10 bg-transparent text-navy dark:text-white text-sm focus:outline-none focus:border-gold"
+                        />
+                        <Button onClick={() => addLeadNote(selectedLead.lead_id)} disabled={!leadNoteText.trim()}>
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Activity Log */}
+                    {selectedLead.activities && selectedLead.activities.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-medium text-navy dark:text-white mb-3">Activity Log</h3>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {selectedLead.activities.map((act, i) => (
+                            <div key={act.activity_id || i} className="flex items-start gap-3 p-2 border-b border-navy/5 dark:border-white/5 last:border-0">
+                              <div className="w-2 h-2 mt-1.5 rounded-full bg-gold shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-navy dark:text-white">{act.content}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {act.action_type} · {act.created_at ? new Date(act.created_at).toLocaleString() : '—'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </DialogContent>
+            </Dialog>
           </Tabs>
 
           {/* Customer Detail Sidebar */}

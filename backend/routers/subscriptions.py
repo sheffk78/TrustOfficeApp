@@ -558,12 +558,12 @@ async def stripe_webhook(request: Request):
             
             # Send activation email
             user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            amount = "790" if plan_type == "annual" else "79"
             if user and email_service.is_configured:
                 try:
                     # Get subscription details from Stripe
                     stripe_sub = stripe.Subscription.retrieve(session.get("subscription"))
                     next_billing = format_date(stripe_sub.current_period_end)
-                    amount = "790" if plan_type == "annual" else "79"
                     
                     await email_service.send_subscription_activated(
                         to_email=user["email"],
@@ -583,6 +583,17 @@ async def stripe_webhook(request: Request):
                 except Exception as e:
                     logger.error(f"Failed to send activation email: {e}")
             
+            # Mark lead as subscribed in CRM (if they were captured as a lead first)
+            if user:
+                try:
+                    from routers.leads import mark_lead_as_subscribed
+                    await mark_lead_as_subscribed(
+                        email=user["email"],
+                        user_id=user_id,
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to mark lead as subscribed: {e}")
+
             # Add to Mailercloud paid members list
             if user:
                 try:

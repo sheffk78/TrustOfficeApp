@@ -6,6 +6,7 @@ Uses APScheduler for scheduling background jobs
 
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -72,7 +73,16 @@ class BackgroundTaskRunner:
             name='Create daily governance health snapshots',
             replace_existing=True
         )
-        
+
+        # Schedule lead re-engagement check every 6 hours
+        self.scheduler.add_job(
+            self.send_lead_reengagement_emails,
+            trigger=IntervalTrigger(hours=6),
+            id='lead_reengagement',
+            name='Send re-engagement emails to stale leads',
+            replace_existing=True
+        )
+
         self.scheduler.start()
         logger.info("Background task runner started with APScheduler")
         
@@ -268,11 +278,78 @@ class BackgroundTaskRunner:
             
             logger.info(f"Daily reminders complete: {emails_sent} emails sent")
             return emails_sent
-            
+
         except Exception as e:
             logger.error(f"Error sending daily reminders: {e}")
             return 0
-    
+
+    async def send_lead_reengagement_emails(self) -> int:
+        """
+        Send re-engagement emails to leads who signed up 3+ days ago
+        but haven't watched any lessons yet.
+        Runs every 6 hours. Only sends once per lead (checks reengagement_sent_at).
+        """
+        logger.info("Running lead re-engagement check")
+        try:
+            from email_service import email_service
+
+            if not email_service.is_configured:
+                logger.warning("Email service not configured, skipping lead re-engagement")
+                return 0
+
+            now = datetime.now(timezone.utc)
+            cutoff = (now - timedelta(days=3)).isoformat()
+
+            # Find leads: created 3+ days ago, 0 lessons watched, no re-engagement sent yet
+            leads = await self.db.leads.find({
+                "created_at": {"$lte": cutoff},
+                "lessons_watched": 0,
+                "reengagement_sent_at": None,
+                "stage": {"$ne": "converted"},
+            }, {"_id": 0}).to_list(200)
+
+            emails_sent = 0
+            course_url = f"{email_service.app_url}/courses/trustee-101"
+
+            for lead in leads:
+                try:
+                    await email_service.send_lead_reengagement(
+                        to_email=lead["email"],
+                        name=lead.get("name", ""),
+                        course_url=course_url
+                    )
+
+                    # Mark re-engagement as sent
+                    await self.db.leads.update_one(
+                        {"lead_id": lead["lead_id"]},
+                        {"$set": {
+                            "reengagement_sent_at": now.isoformat(),
+                            "updated_at": now.isoformat(),
+                        }}
+                    )
+
+                    # Log activity
+                    await self.db.lead_activities.insert_one({
+                        "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+                        "lead_id": lead["lead_id"],
+                        "action_type": "email",
+                        "content": "Sent re-engagement email (3+ days, no lessons watched)",
+                        "created_at": now.isoformat(),
+                    })
+
+                    emails_sent += 1
+                    logger.info(f"Sent re-engagement email to {lead['email']}")
+
+                except Exception as e:
+                    logger.error(f"Failed to send re-engagement to {lead.get('email')}: {e}")
+
+            logger.info(f"Lead re-engagement complete: {emails_sent} emails sent")
+            return emails_sent
+
+        except Exception as e:
+            logger.error(f"Error in lead re-engagement: {e}")
+            return 0
+
     async def create_daily_health_snapshots(self) -> int:
         """
         Create daily health score snapshots for all trusts.

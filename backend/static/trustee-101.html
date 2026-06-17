@@ -1127,13 +1127,17 @@
     msg.className = 'enroll-msg';
 
     try {
+      var urlParams = new URLSearchParams(window.location.search);
       var resp = await fetch('/api/courses/trustee-101/enroll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: document.getElementById('enroll-name').value,
           email: document.getElementById('enroll-email').value,
-          source: document.getElementById('enroll-source').value
+          source: document.getElementById('enroll-source').value,
+          utm_source: urlParams.get('utm_source'),
+          utm_campaign: urlParams.get('utm_campaign'),
+          utm_medium: urlParams.get('utm_medium')
         })
       });
       var data = await resp.json();

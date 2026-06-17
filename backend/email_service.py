@@ -519,6 +519,44 @@ Amount: ${amount}
         """Get list of available template names"""
         return list(TEMPLATES.keys())
 
+    async def send_lead_welcome(
+        self,
+        to_email: str,
+        name: str,
+        course_url: str
+    ) -> Dict[str, Any]:
+        """Send welcome email to new lead (Trustee 101 signup or checklist download)"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="lead_welcome",
+            template_data={
+                "name": name or "there",
+                "course_url": course_url
+            },
+            to_name=name,
+            tag="lead_welcome",
+            metadata={"email_type": "lead_welcome"}
+        )
+
+    async def send_lead_reengagement(
+        self,
+        to_email: str,
+        name: str,
+        course_url: str
+    ) -> Dict[str, Any]:
+        """Send re-engagement email to lead who hasn't started the course"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="lead_reengagement",
+            template_data={
+                "name": name or "there",
+                "course_url": course_url
+            },
+            to_name=name,
+            tag="lead_reengagement",
+            metadata={"email_type": "lead_reengagement"}
+        )
+
     async def send_distribution_notice_to_beneficiary(
         self,
         to_email: str,

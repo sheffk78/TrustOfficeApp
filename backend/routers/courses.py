@@ -123,6 +123,9 @@ class CourseEnrollment(BaseModel):
     name: str
     email: EmailStr
     source: Optional[str] = "trustee-101-landing-page"
+    utm_source: Optional[str] = None
+    utm_campaign: Optional[str] = None
+    utm_medium: Optional[str] = None
 
     @field_validator('name')
     @classmethod
@@ -199,6 +202,21 @@ async def enroll_in_trustee_101(enrollment: CourseEnrollment, request: Request):
             "updated_at": datetime.now(timezone.utc),
         }
         await db.course_leads.insert_one(lead)
+
+        # Also capture in the lead CRM
+        try:
+            from routers.leads import capture_lead as _capture_lead
+            from routers.leads import LeadCapture as _LeadCapture
+            await _capture_lead(_LeadCapture(
+                name=name,
+                email=email,
+                source=source,
+                utm_source=enrollment.utm_source,
+                utm_campaign=enrollment.utm_campaign,
+                utm_medium=enrollment.utm_medium,
+            ))
+        except Exception as e:
+            logger.error(f"Failed to capture lead in CRM: {e}")
 
         # Send access email
         email_result = await _send_lesson_1_access_email(email, name)
