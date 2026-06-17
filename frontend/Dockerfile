@@ -1,7 +1,8 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-# Build cache bust — class beneficiary feature Jun 2026
-ARG CACHE_BUST=2
+# Build cache bust
+ARG CACHE_BUST
+RUN echo "Cache bust: $CACHE_BUST"
 COPY package.json yarn.lock ./
 RUN npm install --force
 COPY . .

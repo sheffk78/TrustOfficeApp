@@ -142,6 +142,7 @@ export default function BeneficiariesPage() {
     percentage: '',
     notes: ''
   });
+  const [deleteConfirmClass, setDeleteConfirmClass] = useState(null);
 
   // ========== DATA LOADING ==========
   const loadOverviewData = useCallback(async () => {
@@ -931,7 +932,7 @@ export default function BeneficiariesPage() {
                           variant="ghost"
                           size="icon"
                           className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          onClick={() => handleDeleteClassBeneficiary(cb.class_beneficiary_id)}
+                          onClick={() => setDeleteConfirmClass(cb)}
                           data-testid={`delete-class-${cb.class_beneficiary_id}`}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1235,6 +1236,25 @@ export default function BeneficiariesPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSettingsModal(false)}>Cancel</Button>
             <Button className="btn-primary" onClick={handleSaveSettings} data-testid="save-settings-btn">Save Settings</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Class Beneficiary Confirmation */}
+      <Dialog open={!!deleteConfirmClass} onOpenChange={() => setDeleteConfirmClass(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Remove Class Beneficiary</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove "{deleteConfirmClass?.class_type_label}"? 
+              This will remove the class designation from this trust.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmClass(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { handleDeleteClassBeneficiary(deleteConfirmClass?.class_beneficiary_id); setDeleteConfirmClass(null); }} data-testid="confirm-delete-class-btn">
+              Remove Class
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -965,9 +965,9 @@ class BeneficiaryAllocation(BaseModel):
 class ClassBeneficiaryCreate(BaseModel):
     trust_id: str
     class_type: ClassBeneficiaryType
-    description: str = ""
-    percentage: float = 0.0
-    notes: str = ""
+    description: str = Field("", max_length=500)
+    percentage: float = Field(0.0, ge=0, le=100)
+    notes: str = Field("", max_length=2000)
 
 class ClassBeneficiaryResponse(BaseModel):
     class_beneficiary_id: str

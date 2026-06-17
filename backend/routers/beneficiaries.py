@@ -5,6 +5,7 @@ Migrated from server.py
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, List
 from datetime import datetime, timezone
+import uuid
 
 from dependencies import require_premium_feature, Feature
 from database import db
@@ -47,7 +48,7 @@ async def create_class_beneficiary(
         raise HTTPException(status_code=404, detail="Trust not found")
     
     class_beneficiary = {
-        "class_beneficiary_id": f"cb_{user_id[:8]}_{datetime.now(timezone.utc).timestamp():.0f}",
+        "class_beneficiary_id": f"cb_{uuid.uuid4().hex[:16]}",
         "trust_id": data.trust_id,
         "user_id": user_id,
         "class_type": data.class_type.value,
