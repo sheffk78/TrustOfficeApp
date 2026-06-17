@@ -140,6 +140,19 @@ class CertificateStatus(str, Enum):
     replaced = "replaced"
 
 
+class ClassBeneficiaryType(str, Enum):
+    """Standard trust class beneficiary designations"""
+    children = "children"
+    descendants = "descendants"
+    issue = "issue"
+    heirs = "heirs"
+    heirs_at_law = "heirs_at_law"
+    blood_relatives = "blood_relatives"
+    per_stirpes = "per_stirpes"
+    per_capita = "per_capita"
+    custom = "custom"
+
+
 # ==================== USER MODELS ====================
 
 class UserCreate(BaseModel):
@@ -949,6 +962,23 @@ class BeneficiaryAllocation(BaseModel):
     certificate_count: int
     certificates: List[dict]
 
+class ClassBeneficiaryCreate(BaseModel):
+    trust_id: str
+    class_type: ClassBeneficiaryType
+    description: str = ""
+    percentage: float = 0.0
+    notes: str = ""
+
+class ClassBeneficiaryResponse(BaseModel):
+    class_beneficiary_id: str
+    trust_id: str
+    class_type: str
+    class_type_label: str
+    description: str
+    percentage: float
+    notes: str
+    created_at: str
+
 class BeneficiaryDashboardResponse(BaseModel):
     trust_id: str
     trust_name: str
@@ -958,6 +988,7 @@ class BeneficiaryDashboardResponse(BaseModel):
     unit_label: str
     active_certificate_count: int
     beneficiaries: List[BeneficiaryAllocation]
+    class_beneficiaries: List[ClassBeneficiaryResponse] = []
     recent_transfers: List[dict]
 
 

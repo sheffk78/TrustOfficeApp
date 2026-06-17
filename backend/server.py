@@ -494,6 +494,10 @@ async def startup_event():
         await db.lead_activities.create_index([("lead_id", 1), ("created_at", -1)])
         await db.lead_activities.create_index("activity_id", unique=True)
         
+        # Class beneficiary indexes
+        await db.class_beneficiaries.create_index([("trust_id", 1), ("user_id", 1)])
+        await db.class_beneficiaries.create_index("class_beneficiary_id", unique=True)
+        
         # Personal vendor index for separation alerts
         await db.personal_vendors.create_index("user_id")
         

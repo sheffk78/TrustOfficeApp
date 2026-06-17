@@ -3,15 +3,105 @@ Beneficiaries router - Beneficiary dashboard for trust unit allocations
 Migrated from server.py
 """
 from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime, timezone
 
 from dependencies import require_premium_feature, Feature
 from database import db
-from models import BeneficiaryDashboardResponse, BeneficiaryAllocation
+from models import BeneficiaryDashboardResponse, BeneficiaryAllocation, ClassBeneficiaryCreate, ClassBeneficiaryResponse, ClassBeneficiaryType
 from routers.trust_units import get_or_create_units_settings
 
 router = APIRouter(prefix="/beneficiaries", tags=["beneficiaries"])
 
+
+# ========== CLASS BENEFICIARY LABELS ==========
+CLASS_BENEFICIARY_LABELS = {
+    "children": "Children (including after-born)",
+    "descendants": "Descendants",
+    "issue": "Issue (lineal descendants)",
+    "heirs": "Heirs",
+    "heirs_at_law": "Heirs at Law",
+    "blood_relatives": "Blood Relatives",
+    "per_stirpes": "Per Stirpes (by branch)",
+    "per_capita": "Per Capita (by head)",
+    "custom": "Custom Class",
+}
+
+
+# ========== CLASS BENEFICIARY ENDPOINTS ==========
+
+@router.post("/class-beneficiaries", response_model=ClassBeneficiaryResponse)
+async def create_class_beneficiary(
+    data: ClassBeneficiaryCreate,
+    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+):
+    """Add a class beneficiary designation to a trust"""
+    user_id = user["user_id"]
+    
+    # Verify trust ownership
+    trust = await db.trusts.find_one(
+        {"trust_id": data.trust_id, "user_id": user_id},
+        {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    
+    class_beneficiary = {
+        "class_beneficiary_id": f"cb_{user_id[:8]}_{datetime.now(timezone.utc).timestamp():.0f}",
+        "trust_id": data.trust_id,
+        "user_id": user_id,
+        "class_type": data.class_type.value,
+        "class_type_label": CLASS_BENEFICIARY_LABELS.get(data.class_type.value, data.class_type.value),
+        "description": data.description,
+        "percentage": data.percentage,
+        "notes": data.notes,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    await db.class_beneficiaries.insert_one(class_beneficiary)
+    class_beneficiary.pop("_id", None)
+    return class_beneficiary
+
+
+@router.get("/class-beneficiaries", response_model=List[ClassBeneficiaryResponse])
+async def list_class_beneficiaries(
+    trust_id: Optional[str] = None,
+    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+):
+    """List all class beneficiaries for a trust"""
+    user_id = user["user_id"]
+    
+    query = {"user_id": user_id}
+    if trust_id:
+        query["trust_id"] = trust_id
+    
+    class_beneficiaries = await db.class_beneficiaries.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return class_beneficiaries
+
+
+@router.delete("/class-beneficiaries/{class_beneficiary_id}")
+async def delete_class_beneficiary(
+    class_beneficiary_id: str,
+    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+):
+    """Remove a class beneficiary designation"""
+    user_id = user["user_id"]
+    
+    result = await db.class_beneficiaries.delete_one({
+        "class_beneficiary_id": class_beneficiary_id,
+        "user_id": user_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Class beneficiary not found")
+    
+    return {"status": "deleted"}
+
+
+# ========== DASHBOARD ENDPOINT (updated) ==========
 
 @router.get("/dashboard", response_model=BeneficiaryDashboardResponse)
 async def get_beneficiary_dashboard(
@@ -20,19 +110,11 @@ async def get_beneficiary_dashboard(
 ):
     """
     Beneficiary Dashboard showing current unit allocations per certificate holder.
-    
-    Feature Gate: BENEFICIARY_DASHBOARD
-    - Trial users cannot access the beneficiary dashboard
-    - Paid users can view unit allocations and transfer history
-    
-    Returns:
-    - Trust unit settings and totals
-    - List of beneficiaries with their aggregated holdings
-    - Recent transfers
+    Also includes class beneficiary designations.
     """
     user_id = user["user_id"]
     
-    # Get trust (use provided or default to most recent)
+    # Get trust
     if trust_id:
         trust = await db.trusts.find_one(
             {"trust_id": trust_id, "user_id": user_id},
@@ -107,6 +189,12 @@ async def get_beneficiary_dashboard(
     # Sort by total_units descending
     beneficiaries.sort(key=lambda x: x.total_units, reverse=True)
     
+    # Get class beneficiaries
+    class_beneficiaries = await db.class_beneficiaries.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
     # Get recent transfers
     transfers = await db.trust_unit_transfers.find(
         {"trust_id": trust_id, "user_id": user_id},
@@ -122,5 +210,6 @@ async def get_beneficiary_dashboard(
         unit_label=unit_label,
         active_certificate_count=len(certificates),
         beneficiaries=beneficiaries,
+        class_beneficiaries=class_beneficiaries,
         recent_transfers=transfers
     )

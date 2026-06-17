@@ -1,7 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-# Build cache bust — logo update Jun 2026
-ARG CACHE_BUST=1
+# Build cache bust — class beneficiary feature Jun 2026
+ARG CACHE_BUST=2
 COPY package.json yarn.lock ./
 RUN npm install --force
 COPY . .

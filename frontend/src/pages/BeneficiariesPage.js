@@ -33,7 +33,9 @@ import {
   ChevronUp,
   Settings,
   History,
-  Info
+  Info,
+  UsersRound,
+  Trash2
 } from 'lucide-react';
 
 // ========== PIE CHART COMPONENT ==========
@@ -131,6 +133,15 @@ export default function BeneficiariesPage() {
   
   // Filter state
   const [statusFilter, setStatusFilter] = useState('active');
+  
+  // Class beneficiary state
+  const [showClassBeneficiaryModal, setShowClassBeneficiaryModal] = useState(false);
+  const [classBeneficiaryForm, setClassBeneficiaryForm] = useState({
+    class_type: 'children',
+    description: '',
+    percentage: '',
+    notes: ''
+  });
 
   // ========== DATA LOADING ==========
   const loadOverviewData = useCallback(async () => {
@@ -371,6 +382,63 @@ export default function BeneficiariesPage() {
     }
   };
 
+  // ========== CLASS BENEFICIARY HANDLERS ==========
+  const handleAddClassBeneficiary = async () => {
+    if (!classBeneficiaryForm.class_type) {
+      toast.error('Class type is required');
+      return;
+    }
+    try {
+      const response = await fetchWithAuth('/beneficiaries/class-beneficiaries', {
+        method: 'POST',
+        body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          class_type: classBeneficiaryForm.class_type,
+          description: classBeneficiaryForm.description,
+          percentage: parseFloat(classBeneficiaryForm.percentage) || 0,
+          notes: classBeneficiaryForm.notes
+        })
+      });
+      if (response.ok) {
+        toast.success('Class beneficiary added');
+        setShowClassBeneficiaryModal(false);
+        setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' });
+        loadOverviewData();
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to add class beneficiary');
+      }
+    } catch (error) {
+      toast.error('Failed to add class beneficiary');
+    }
+  };
+
+  const handleDeleteClassBeneficiary = async (classBeneficiaryId) => {
+    try {
+      const response = await fetchWithAuth(`/beneficiaries/class-beneficiaries/${classBeneficiaryId}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        toast.success('Class beneficiary removed');
+        loadOverviewData();
+      }
+    } catch (error) {
+      toast.error('Failed to remove class beneficiary');
+    }
+  };
+
+  const CLASS_BENEFICIARY_OPTIONS = [
+    { value: 'children', label: 'Children (including after-born)' },
+    { value: 'descendants', label: 'Descendants' },
+    { value: 'issue', label: 'Issue (lineal descendants)' },
+    { value: 'heirs', label: 'Heirs' },
+    { value: 'heirs_at_law', label: 'Heirs at Law' },
+    { value: 'blood_relatives', label: 'Blood Relatives' },
+    { value: 'per_stirpes', label: 'Per Stirpes (by branch)' },
+    { value: 'per_capita', label: 'Per Capita (by head)' },
+    { value: 'custom', label: 'Custom Class' },
+  ];
+
   const resetCertificateForm = () => {
     setCertificateForm({
       holder_name: '',
@@ -457,6 +525,10 @@ export default function BeneficiariesPage() {
               <TabsTrigger value="transfers" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-transfers">
                 <ArrowRightLeft className="w-4 h-4 mr-2" />
                 Transfer History
+              </TabsTrigger>
+              <TabsTrigger value="class" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-class">
+                <UsersRound className="w-4 h-4 mr-2" />
+                Class Beneficiaries
               </TabsTrigger>
             </TabsList>
 
@@ -795,6 +867,81 @@ export default function BeneficiariesPage() {
                 )}
               </div>
             </TabsContent>
+
+            {/* ========== CLASS BENEFICIARIES TAB ========== */}
+            <TabsContent value="class">
+              <div className="card-trust p-4 mb-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                      Class beneficiaries are groups defined by relationship rather than named individuals
+                    </p>
+                  </div>
+                  <Button className="btn-primary" onClick={() => setShowClassBeneficiaryModal(true)} data-testid="add-class-beneficiary-btn">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Class
+                  </Button>
+                </div>
+              </div>
+
+              <div className="card-trust overflow-hidden">
+                <div className="p-4 border-b border-border flex items-center gap-2">
+                  <UsersRound className="w-4 h-4 text-navy dark:text-gold" />
+                  <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Class Beneficiaries</h2>
+                  <span className="ml-auto text-xs text-muted-foreground">{overviewData?.class_beneficiaries?.length || 0} classes</span>
+                </div>
+                
+                {!overviewData?.class_beneficiaries?.length ? (
+                  <div className="p-8 text-center">
+                    <UsersRound className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
+                    <p className="text-muted-foreground mb-2">No class beneficiaries defined</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Add a class like "Children" or "Descendants" to designate beneficiaries by relationship
+                    </p>
+                    <Button className="btn-primary" onClick={() => setShowClassBeneficiaryModal(true)}>
+                      <Plus className="w-4 h-4 mr-2" /> Add Class Beneficiary
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {overviewData.class_beneficiaries.map((cb) => (
+                      <div key={cb.class_beneficiary_id} className="p-4 flex items-center justify-between hover:bg-muted/20 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-navy/10 dark:bg-gold/10 flex items-center justify-center">
+                            <UsersRound className="w-6 h-6 text-navy dark:text-gold" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-navy dark:text-foreground">{cb.class_type_label}</p>
+                              {cb.percentage > 0 && (
+                                <span className="px-2 py-0.5 text-xs font-mono bg-gold/10 text-gold">
+                                  {cb.percentage}%
+                                </span>
+                              )}
+                            </div>
+                            {cb.description && (
+                              <p className="text-sm text-muted-foreground">{cb.description}</p>
+                            )}
+                            {cb.notes && (
+                              <p className="text-xs text-muted-foreground mt-1">{cb.notes}</p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          onClick={() => handleDeleteClassBeneficiary(cb.class_beneficiary_id)}
+                          data-testid={`delete-class-${cb.class_beneficiary_id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -1088,6 +1235,73 @@ export default function BeneficiariesPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSettingsModal(false)}>Cancel</Button>
             <Button className="btn-primary" onClick={handleSaveSettings} data-testid="save-settings-btn">Save Settings</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Class Beneficiary Modal */}
+      <Dialog open={showClassBeneficiaryModal} onOpenChange={(open) => { if (!open) setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' }); setShowClassBeneficiaryModal(open); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Class Beneficiary</DialogTitle>
+            <DialogDescription>
+              Designate a class of beneficiaries defined by relationship rather than naming individuals
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="label-trust">Class Type *</Label>
+              <Select
+                value={classBeneficiaryForm.class_type}
+                onValueChange={(v) => setClassBeneficiaryForm({ ...classBeneficiaryForm, class_type: v })}
+              >
+                <SelectTrigger className="mt-1" data-testid="class-type-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLASS_BENEFICIARY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="label-trust">Description (Optional)</Label>
+              <Input
+                value={classBeneficiaryForm.description}
+                onChange={(e) => setClassBeneficiaryForm({ ...classBeneficiaryForm, description: e.target.value })}
+                placeholder="e.g., All children of the grantor, including after-born"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="label-trust">Allocation Percentage (Optional)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={classBeneficiaryForm.percentage}
+                onChange={(e) => setClassBeneficiaryForm({ ...classBeneficiaryForm, percentage: e.target.value })}
+                placeholder="e.g., 50"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Percentage of trust allocated to this class (if applicable)</p>
+            </div>
+            <div>
+              <Label className="label-trust">Notes (Optional)</Label>
+              <Textarea
+                value={classBeneficiaryForm.notes}
+                onChange={(e) => setClassBeneficiaryForm({ ...classBeneficiaryForm, notes: e.target.value })}
+                placeholder="Additional context about this class designation..."
+                className="mt-1"
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowClassBeneficiaryModal(false); setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' }); }}>Cancel</Button>
+            <Button className="btn-primary" onClick={handleAddClassBeneficiary} data-testid="save-class-beneficiary-btn">Add Class</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
