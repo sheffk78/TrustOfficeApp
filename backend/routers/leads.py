@@ -72,6 +72,8 @@ LEAD_SOURCES = [
     "advisors",
     "get-started",
     "governance-offer",
+    "trust-formalities-guide",
+    "trust-governance-system",
     "manual",
     "direct",
 ]
@@ -215,6 +217,8 @@ def calculate_lead_score(lead: dict) -> int:
         "fiduciary-duty-guide": 4,
         "minutes-template": 4,
         "private-trustee-guide": 4,
+        "trust-formalities-guide": 4,
+        "trust-governance-system": 4,
         "for-professionals": 4,         # Professional pages — medium intent
         "advisors": 4,
         "get-started": 3,               # General interest
@@ -291,6 +295,8 @@ def get_score_breakdown(lead: dict) -> dict:
         "fiduciary-duty-guide": 4,
         "minutes-template": 4,
         "private-trustee-guide": 4,
+        "trust-formalities-guide": 4,
+        "trust-governance-system": 4,
         "for-professionals": 4,
         "advisors": 4,
         "get-started": 3,

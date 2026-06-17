@@ -232,7 +232,7 @@ export default function SignUpPage() {
           <img 
             src="/assets/trustoffice-logo-vertical.svg"
             alt="TrustOffice"
-            className="w-48 mb-8 brightness-0 invert"
+            className="w-48 mb-8"
           />
           <p className="text-white/80 font-mono text-xs uppercase tracking-widest text-center max-w-md">
             Trust Governance Workspace
@@ -251,7 +251,7 @@ export default function SignUpPage() {
             <img 
               src="/assets/trustoffice-logo.svg"
               alt="TrustOffice"
-              className="h-12 mx-auto dark:brightness-0 dark:invert"
+              className="h-10 mx-auto"
             />
           </div>
 

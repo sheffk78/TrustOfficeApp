@@ -240,9 +240,9 @@ export default function OnboardingPage() {
       <div className="bg-navy text-white py-4 px-8">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <img 
-            src="/assets/trustoffice-logo.svg"
+            src="/assets/trustoffice-logo-vertical.svg"
             alt="TrustOffice"
-            className="h-8 brightness-0 invert"
+            className="h-8"
           />
           <span className="font-mono text-[10px] uppercase tracking-widest text-white/60">
             {step <= totalSteps ? stepNames[step - 1] : 'Getting Started'}

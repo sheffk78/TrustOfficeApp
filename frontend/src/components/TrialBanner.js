@@ -38,7 +38,7 @@ export const TrialBanner = ({ location = 'dashboard' }) => {
   
   return (
     <div 
-      className="bg-gradient-to-r from-navy/5 to-gold/5 border-b border-navy/10 px-4 py-3"
+      className="bg-gradient-to-r from-navy/5 to-gold/5 border-b border-navy/10 pl-64 px-4 py-3"
       data-testid="trial-banner"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
