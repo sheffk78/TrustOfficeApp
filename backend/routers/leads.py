@@ -3,13 +3,16 @@ Leads Router — Lead Management for Marketing Entry Points
 Captures leads from Trustee 101 enrollment, checklist downloads, and any other
 marketing form. Tracks them through: new → engaged → warm → converted → lost.
 """
+import csv
+import io
 import re
 import uuid
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timezone, timedelta
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr
 
 from database import db
@@ -66,6 +69,7 @@ class LeadCapture(BaseModel):
     utm_source: Optional[str] = None
     utm_campaign: Optional[str] = None
     utm_medium: Optional[str] = None
+    referrer: Optional[str] = None  # document.referrer from the browser
 
 
 class LeadUpdate(BaseModel):
@@ -79,6 +83,19 @@ class LeadNote(BaseModel):
     """Schema for adding a note to a lead."""
     content: str
     action_type: str = "manual"  # manual, email, call, system
+
+
+class BulkStageUpdate(BaseModel):
+    """Schema for bulk stage change."""
+    lead_ids: List[str]
+    stage: str
+
+
+class BulkNoteAdd(BaseModel):
+    """Schema for bulk note addition."""
+    lead_ids: List[str]
+    content: str
+    action_type: str = "manual"
 
 
 # ==================== DATE HELPERS ====================
@@ -175,6 +192,67 @@ def calculate_lead_score(lead: dict) -> int:
     return min(score, 100)
 
 
+def get_score_breakdown(lead: dict) -> dict:
+    """
+    Return a detailed breakdown of how the lead score is calculated.
+    """
+    lessons_watched = lead.get("lessons_watched", 0)
+    total_lessons = 9
+    course_score = int((lessons_watched / total_lessons) * 40)
+
+    days_since_login = _days_since(lead.get("last_login"))
+    if days_since_login is not None:
+        if days_since_login <= 1:
+            login_score = 30
+        elif days_since_login <= 3:
+            login_score = 20
+        elif days_since_login <= 7:
+            login_score = 10
+        elif days_since_login <= 14:
+            login_score = 5
+        else:
+            login_score = 0
+    else:
+        login_score = 0
+
+    days_since = _days_since(lead.get("created_at"))
+    if days_since is not None:
+        if days_since <= 7:
+            recency_score = 20
+        elif days_since <= 30:
+            recency_score = 15
+        elif days_since <= 60:
+            recency_score = 10
+        else:
+            recency_score = 5
+    else:
+        recency_score = 0
+
+    booked_call_score = 15 if lead.get("booked_call") else 0
+
+    source = lead.get("source", "")
+    SOURCE_QUALITY = {
+        "booked-call": 10,
+        "webinar-signup": 8,
+        "liability-protection-kit": 6,
+        "trustee-101-landing-page": 5,
+        "trustee-90-day-checklist": 4,
+        "commingling-checklist": 4,
+        "blog-subscribe": 2,
+        "direct": 1,
+        "manual": 0,
+    }
+    source_score = SOURCE_QUALITY.get(source, 1)
+
+    return {
+        "course_progress": {"score": course_score, "max": 40, "detail": f"{lessons_watched}/{total_lessons} lessons"},
+        "login_frequency": {"score": login_score, "max": 30, "detail": f"Last login: {_days_since(lead.get('last_login'))} days ago" if lead.get('last_login') else "Never logged in"},
+        "recency": {"score": recency_score, "max": 20, "detail": f"Captured {_days_since(lead.get('created_at'))} days ago" if lead.get('created_at') else "Unknown"},
+        "booked_call": {"score": booked_call_score, "max": 15, "detail": "Booked a discovery call" if lead.get("booked_call") else "No call booked"},
+        "source_quality": {"score": source_score, "max": 10, "detail": f"Source: {source}"},
+    }
+
+
 def determine_lead_stage(lead: dict) -> str:
     """
     Auto-determine the correct stage for a lead based on their data.
@@ -269,6 +347,7 @@ async def capture_lead(lead: LeadCapture):
                 "utm_source": lead.utm_source,
                 "utm_campaign": lead.utm_campaign,
                 "utm_medium": lead.utm_medium,
+                "referrer": lead.referrer,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }}
         )
@@ -290,6 +369,7 @@ async def capture_lead(lead: LeadCapture):
         "utm_source": lead.utm_source,
         "utm_campaign": lead.utm_campaign,
         "utm_medium": lead.utm_medium,
+        "referrer": lead.referrer,
         "stage": "new",
         "manual_stage_override": False,
         "lessons_watched": 0,
@@ -421,6 +501,259 @@ async def tidycal_webhook(request: Request):
     return {"success": True, "lead_id": lead_id, "is_returning": False}
 
 
+# ==================== ANALYTICS ENDPOINT ====================
+
+
+@router.get("/analytics")
+async def get_lead_analytics(
+    admin: dict = Depends(require_admin)
+):
+    """Get lead analytics: funnel, conversion by source, time-to-convert, trend."""
+    now = datetime.now(timezone.utc)
+
+    # 1. Funnel counts
+    funnel = {}
+    for s in LEAD_STAGES:
+        funnel[s] = await db.leads.count_documents({"stage": s})
+    total = await db.leads.count_documents({})
+    funnel["all"] = total
+
+    # 2. Conversion rate by source
+    pipeline = [
+        {"$group": {
+            "_id": "$source",
+            "total": {"$sum": 1},
+            "converted": {"$sum": {"$cond": [{"$eq": ["$stage", "converted"]}, 1, 0]}},
+        }},
+        {"$sort": {"total": -1}},
+    ]
+    source_stats_raw = await db.leads.aggregate(pipeline).to_list(50)
+    source_stats = []
+    for s in source_stats_raw:
+        source_stats.append({
+            "source": s["_id"] or "unknown",
+            "total": s["total"],
+            "converted": s["converted"],
+            "conversion_rate": round(s["converted"] / s["total"] * 100, 1) if s["total"] > 0 else 0,
+        })
+
+    # 3. Time-to-convert (median days from capture to conversion)
+    converted_leads = await db.leads.find(
+        {"stage": "converted", "created_at": {"$ne": None}},
+        {"_id": 0, "created_at": 1, "updated_at": 1}
+    ).to_list(1000)
+
+    conversion_times = []
+    for lead in converted_leads:
+        created = _parse_iso_date(lead.get("created_at"))
+        updated = _parse_iso_date(lead.get("updated_at"))
+        if created and updated:
+            days = (updated - created).days
+            if days >= 0:
+                conversion_times.append(days)
+
+    avg_time_to_convert = round(sum(conversion_times) / len(conversion_times), 1) if conversion_times else None
+    median_time_to_convert = sorted(conversion_times)[len(conversion_times) // 2] if conversion_times else None
+
+    # 4. Trend (leads per day for last 30 days)
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
+    trend_pipeline = [
+        {"$match": {"created_at": {"$gte": thirty_days_ago}}},
+        {"$group": {
+            "_id": {"$substr": ["$created_at", 0, 10]},
+            "count": {"$sum": 1},
+        }},
+        {"$sort": {"_id": 1}},
+    ]
+    trend_raw = await db.leads.aggregate(trend_pipeline).to_list(30)
+    trend = [{"date": t["_id"], "count": t["count"]} for t in trend_raw]
+
+    # 5. Stage velocity (avg days in each stage)
+    # We estimate from activity logs — count stage_change activities per lead
+    velocity = {}
+    for s in LEAD_STAGES:
+        velocity[s] = await db.leads.count_documents({"stage": s})
+
+    return {
+        "funnel": funnel,
+        "source_stats": source_stats,
+        "avg_time_to_convert_days": avg_time_to_convert,
+        "median_time_to_convert_days": median_time_to_convert,
+        "total_converted": len(conversion_times),
+        "trend": trend,
+        "total_leads": total,
+    }
+
+
+# ==================== EXPORT ENDPOINT ====================
+
+
+@router.get("/export")
+async def export_leads_csv(
+    stage: Optional[str] = Query(None, description="Filter by stage"),
+    source: Optional[str] = Query(None, description="Filter by source"),
+    admin: dict = Depends(require_admin)
+):
+    """Export leads as CSV."""
+    query = {}
+    if stage and stage != "all":
+        if stage not in LEAD_STAGES:
+            raise HTTPException(status_code=400, detail=f"Invalid stage: {stage}")
+        query["stage"] = stage
+    if source:
+        query["source"] = source
+
+    leads = await db.leads.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
+
+    # Enrich all leads
+    for lead in leads:
+        _enrich_lead(lead)
+
+    # Build CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    headers = [
+        "Lead ID", "Name", "Email", "Stage", "Score", "Source",
+        "UTM Source", "UTM Campaign", "UTM Medium", "Referrer",
+        "Lessons Watched", "Booked Call", "Subscription Status",
+        "Created At", "Updated At", "Next Action", "Notes"
+    ]
+    writer.writerow(headers)
+
+    for lead in leads:
+        writer.writerow([
+            lead.get("lead_id", ""),
+            lead.get("name", ""),
+            lead.get("email", ""),
+            lead.get("stage", ""),
+            lead.get("score", 0),
+            lead.get("source", ""),
+            lead.get("utm_source", ""),
+            lead.get("utm_campaign", ""),
+            lead.get("utm_medium", ""),
+            lead.get("referrer", ""),
+            lead.get("lessons_watched", 0),
+            "Yes" if lead.get("booked_call") else "No",
+            lead.get("subscription_status", ""),
+            lead.get("created_at", ""),
+            lead.get("updated_at", ""),
+            lead.get("next_action", ""),
+            lead.get("notes", ""),
+        ])
+
+    output.seek(0)
+    filename = f"trustoffice-leads-{datetime.now().strftime('%Y-%m-%d')}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ==================== BULK ACTION ENDPOINTS ====================
+
+
+@router.post("/bulk/stage")
+async def bulk_update_stage(
+    update: BulkStageUpdate,
+    admin: dict = Depends(require_admin)
+):
+    """Bulk update stage for multiple leads."""
+    if update.stage not in LEAD_STAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid stage. Must be one of: {', '.join(LEAD_STAGES)}"
+        )
+
+    now = datetime.now(timezone.utc)
+    result = await db.leads.update_many(
+        {"lead_id": {"$in": update.lead_ids}},
+        {"$set": {
+            "stage": update.stage,
+            "manual_stage_override": True,
+            "updated_at": now.isoformat(),
+        }}
+    )
+
+    # Log activities
+    for lead_id in update.lead_ids:
+        await _log_activity(lead_id, "stage_change", f"Bulk stage change to {update.stage}")
+
+    logger.info(f"Bulk stage update: {result.modified_count} leads changed to {update.stage}")
+    return {"success": True, "modified_count": result.modified_count}
+
+
+@router.post("/bulk/notes")
+async def bulk_add_notes(
+    note: BulkNoteAdd,
+    admin: dict = Depends(require_admin)
+):
+    """Bulk add notes to multiple leads."""
+    for lead_id in note.lead_ids:
+        await _log_activity(lead_id, note.action_type, note.content)
+
+    logger.info(f"Bulk note added to {len(note.lead_ids)} leads")
+    return {"success": True, "affected_count": len(note.lead_ids)}
+
+
+@router.post("/bulk/export")
+async def bulk_export_csv(
+    lead_ids: List[str],
+    admin: dict = Depends(require_admin)
+):
+    """Export selected leads as CSV."""
+    leads = await db.leads.find(
+        {"lead_id": {"$in": lead_ids}},
+        {"_id": 0}
+    ).to_list(len(lead_ids))
+
+    for lead in leads:
+        _enrich_lead(lead)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    headers = [
+        "Lead ID", "Name", "Email", "Stage", "Score", "Source",
+        "UTM Source", "UTM Campaign", "UTM Medium", "Referrer",
+        "Lessons Watched", "Booked Call", "Subscription Status",
+        "Created At", "Updated At", "Next Action", "Notes"
+    ]
+    writer.writerow(headers)
+
+    for lead in leads:
+        writer.writerow([
+            lead.get("lead_id", ""),
+            lead.get("name", ""),
+            lead.get("email", ""),
+            lead.get("stage", ""),
+            lead.get("score", 0),
+            lead.get("source", ""),
+            lead.get("utm_source", ""),
+            lead.get("utm_campaign", ""),
+            lead.get("utm_medium", ""),
+            lead.get("referrer", ""),
+            lead.get("lessons_watched", 0),
+            "Yes" if lead.get("booked_call") else "No",
+            lead.get("subscription_status", ""),
+            lead.get("created_at", ""),
+            lead.get("updated_at", ""),
+            lead.get("next_action", ""),
+            lead.get("notes", ""),
+        ])
+
+    output.seek(0)
+    filename = f"trustoffice-selected-leads-{datetime.now().strftime('%Y-%m-%d')}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 # ==================== ADMIN ENDPOINTS ====================
 
 
@@ -487,12 +820,13 @@ async def get_lead(
     lead_id: str,
     admin: dict = Depends(require_admin)
 ):
-    """Get detailed lead information."""
+    """Get detailed lead information with score breakdown."""
     lead = await db.leads.find_one({"lead_id": lead_id}, {"_id": 0})
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
     _enrich_lead(lead)
+    lead["score_breakdown"] = get_score_breakdown(lead)
 
     activities = await db.lead_activities.find(
         {"lead_id": lead_id},

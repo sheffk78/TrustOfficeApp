@@ -132,6 +132,16 @@ export default function AdminPage() {
   const [leadDetailLoading, setLeadDetailLoading] = useState(false);
   const [leadNoteText, setLeadNoteText] = useState('');
   
+  // Lead analytics state
+  const [leadAnalytics, setLeadAnalytics] = useState(null);
+  const [leadAnalyticsLoading, setLeadAnalyticsLoading] = useState(false);
+  
+  // Lead bulk selection state
+  const [selectedLeadIds, setSelectedLeadIds] = useState(new Set());
+  const [showBulkLeadStageDialog, setShowBulkLeadStageDialog] = useState(false);
+  const [bulkLeadStage, setBulkLeadStage] = useState('new');
+  const [bulkLeadActionLoading, setBulkLeadActionLoading] = useState(false);
+  
   // Check if user is admin - first check from user object, then verify with API
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckDone, setAdminCheckDone] = useState(false);
@@ -262,6 +272,119 @@ export default function AdminPage() {
       console.error('Failed to fetch leads:', error);
     }
     setLeadsLoading(false);
+  };
+
+  // Fetch lead analytics
+  const fetchLeadAnalytics = async () => {
+    setLeadAnalyticsLoading(true);
+    try {
+      const response = await fetchWithAuth('/admin/leads/analytics');
+      if (response.ok) {
+        const data = await response.json();
+        setLeadAnalytics(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch lead analytics:', error);
+    }
+    setLeadAnalyticsLoading(false);
+  };
+
+  // Export leads as CSV
+  const exportLeadsCsv = async () => {
+    try {
+      let url = '/admin/leads/export';
+      if (leadsStageFilter !== 'all') url += `?stage=${leadsStageFilter}`;
+      const response = await fetchWithAuth(url);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trustoffice-leads-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success('Leads exported as CSV');
+      }
+    } catch (error) {
+      console.error('Failed to export leads:', error);
+      toast.error('Failed to export leads');
+    }
+  };
+
+  // Bulk lead actions
+  const toggleSelectLead = (leadId) => {
+    setSelectedLeadIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(leadId)) {
+        newSet.delete(leadId);
+      } else {
+        newSet.add(leadId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAllLeads = () => {
+    if (selectedLeadIds.size === leads.length) {
+      setSelectedLeadIds(new Set());
+    } else {
+      setSelectedLeadIds(new Set(leads.map(l => l.lead_id)));
+    }
+  };
+
+  const clearLeadSelection = () => {
+    setSelectedLeadIds(new Set());
+  };
+
+  const handleBulkLeadStageChange = async () => {
+    if (selectedLeadIds.size === 0) return;
+    setBulkLeadActionLoading(true);
+    try {
+      const response = await fetchWithAuth('/admin/leads/bulk/stage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_ids: Array.from(selectedLeadIds), stage: bulkLeadStage }),
+      });
+      if (response.ok) {
+        toast.success(`Updated ${selectedLeadIds.size} leads to ${bulkLeadStage}`);
+        setShowBulkLeadStageDialog(false);
+        setSelectedLeadIds(new Set());
+        fetchLeads();
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to update leads');
+      }
+    } catch (error) {
+      toast.error('Failed to update leads');
+    }
+    setBulkLeadActionLoading(false);
+  };
+
+  const handleBulkLeadExport = async () => {
+    if (selectedLeadIds.size === 0) return;
+    try {
+      const response = await fetchWithAuth('/admin/leads/bulk/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Array.from(selectedLeadIds)),
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trustoffice-selected-leads-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success(`Exported ${selectedLeadIds.size} leads`);
+      }
+    } catch (error) {
+      toast.error('Failed to export selected leads');
+    }
   };
 
   // Fetch lead detail
@@ -412,6 +535,9 @@ export default function AdminPage() {
     }
     if (isAdmin && activeTab === 'leads') {
       fetchLeads();
+    }
+    if (isAdmin && activeTab === 'lead-analytics') {
+      fetchLeadAnalytics();
     }
     if (isAdmin && activeTab === 'admins') {
       fetchAdmins();
@@ -841,6 +967,10 @@ export default function AdminPage() {
                     {leadsStageCounts.new}
                   </span>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="lead-analytics" className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Lead Analytics
               </TabsTrigger>
             </TabsList>
 
@@ -1494,6 +1624,10 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="font-serif text-xl text-navy dark:text-white">Leads</h2>
                   <div className="flex gap-2">
+                    <Button variant="outline" onClick={exportLeadsCsv} title="Export all leads as CSV">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Export
+                    </Button>
                     <Button variant="outline" onClick={fetchLeads}>
                       <RefreshCw className={`w-4 h-4 ${leadsLoading ? 'animate-spin' : ''}`} />
                     </Button>
@@ -1548,10 +1682,50 @@ export default function AdminPage() {
                   <p className="text-center text-muted-foreground py-8">No leads found</p>
                 ) : (
                   <>
+                    {/* Bulk Action Bar */}
+                    {selectedLeadIds.size > 0 && (
+                      <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded-lg border border-navy/10 dark:border-white/10">
+                        <div className="flex items-center gap-3">
+                          <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
+                          <span className="font-medium text-navy dark:text-white">
+                            {selectedLeadIds.size} lead{selectedLeadIds.size !== 1 ? 's' : ''} selected
+                          </span>
+                          <Button variant="ghost" size="sm" onClick={clearLeadSelection}>
+                            Clear
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleBulkLeadExport}
+                          >
+                            <FileText className="w-4 h-4 mr-1" />
+                            Export
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowBulkLeadStageDialog(true)}
+                          >
+                            <Activity className="w-4 h-4 mr-1" />
+                            Change Stage
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-navy/10 dark:border-white/10">
+                            <th className="w-10 py-3 px-2">
+                              <Checkbox
+                                checked={leads.length > 0 && selectedLeadIds.size === leads.length}
+                                onCheckedChange={toggleSelectAllLeads}
+                                aria-label="Select all leads"
+                              />
+                            </th>
                             <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Name</th>
                             <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Email</th>
                             <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Stage</th>
@@ -1564,7 +1738,14 @@ export default function AdminPage() {
                         </thead>
                         <tbody>
                           {leads.map((lead) => (
-                            <tr key={lead.lead_id} className="border-b border-navy/5 dark:border-white/5 hover:bg-navy/5 dark:hover:bg-white/5">
+                            <tr key={lead.lead_id} className={`border-b border-navy/5 dark:border-white/5 hover:bg-navy/5 dark:hover:bg-white/5 ${selectedLeadIds.has(lead.lead_id) ? 'bg-navy/10 dark:bg-white/10' : ''}`}>
+                              <td className="py-3 px-2">
+                                <Checkbox
+                                  checked={selectedLeadIds.has(lead.lead_id)}
+                                  onCheckedChange={() => toggleSelectLead(lead.lead_id)}
+                                  aria-label={`Select ${lead.name || lead.email}`}
+                                />
+                              </td>
                               <td className="py-3 px-4">
                                 <p className="font-medium text-navy dark:text-white">{lead.name || '—'}</p>
                               </td>
@@ -1660,6 +1841,132 @@ export default function AdminPage() {
               </div>
             </TabsContent>
 
+            {/* Lead Analytics Tab */}
+            <TabsContent value="lead-analytics">
+              <div className="card-trust p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="font-serif text-xl text-navy dark:text-white">Lead Analytics</h2>
+                  <Button variant="outline" onClick={fetchLeadAnalytics}>
+                    <RefreshCw className={`w-4 h-4 ${leadAnalyticsLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+
+                {leadAnalyticsLoading && !leadAnalytics ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="w-8 h-8 animate-spin text-navy dark:text-white" />
+                  </div>
+                ) : leadAnalytics ? (
+                  <div className="space-y-6">
+                    {/* Funnel Overview */}
+                    <div>
+                      <h3 className="font-medium text-navy dark:text-white mb-3">Funnel</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                        {[
+                          { key: 'new', label: 'New', color: 'bg-blue-500' },
+                          { key: 'engaged', label: 'Engaged', color: 'bg-purple-500' },
+                          { key: 'warm', label: 'Warm', color: 'bg-amber-500' },
+                          { key: 'converted', label: 'Converted', color: 'bg-green-500' },
+                          { key: 'lost', label: 'Lost', color: 'bg-gray-500' },
+                        ].map((s) => (
+                          <div key={s.key} className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                            <div className={`w-3 h-3 rounded-full ${s.color} mx-auto mb-1`} />
+                            <p className="text-lg font-bold text-navy dark:text-white">{leadAnalytics.funnel?.[s.key] || 0}</p>
+                            <p className="text-xs text-muted-foreground">{s.label}</p>
+                          </div>
+                        ))}
+                        <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                          <p className="text-lg font-bold text-navy dark:text-white">{leadAnalytics.total_leads || 0}</p>
+                          <p className="text-xs text-muted-foreground">Total</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Conversion Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Total Converted</p>
+                        <p className="text-2xl font-bold text-green-600">{leadAnalytics.total_converted || 0}</p>
+                      </div>
+                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Avg Time to Convert</p>
+                        <p className="text-2xl font-bold text-navy dark:text-white">
+                          {leadAnalytics.avg_time_to_convert_days !== null ? `${leadAnalytics.avg_time_to_convert_days} days` : '—'}
+                        </p>
+                      </div>
+                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Median Time to Convert</p>
+                        <p className="text-2xl font-bold text-navy dark:text-white">
+                          {leadAnalytics.median_time_to_convert_days !== null ? `${leadAnalytics.median_time_to_convert_days} days` : '—'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Conversion by Source */}
+                    <div>
+                      <h3 className="font-medium text-navy dark:text-white mb-3">Conversion Rate by Source</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-navy/10 dark:border-white/10">
+                              <th className="text-left py-2 px-3 text-sm font-medium text-muted-foreground">Source</th>
+                              <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Total</th>
+                              <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Converted</th>
+                              <th className="text-right py-2 px-3 text-sm font-medium text-muted-foreground">Rate</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {leadAnalytics.source_stats?.map((s) => (
+                              <tr key={s.source} className="border-b border-navy/5 dark:border-white/5">
+                                <td className="py-2 px-3 text-sm text-navy dark:text-white">{s.source}</td>
+                                <td className="py-2 px-3 text-sm text-right text-muted-foreground">{s.total}</td>
+                                <td className="py-2 px-3 text-sm text-right text-green-600">{s.converted}</td>
+                                <td className="py-2 px-3 text-sm text-right font-mono">{s.conversion_rate}%</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* 30-Day Trend */}
+                    <div>
+                      <h3 className="font-medium text-navy dark:text-white mb-3">Leads Per Day (Last 30 Days)</h3>
+                      {leadAnalytics.trend?.length > 0 ? (
+                        <div className="space-y-1">
+                          {leadAnalytics.trend.map((day) => {
+                            const maxCount = Math.max(...leadAnalytics.trend.map(d => d.count), 1);
+                            return (
+                              <div key={day.date} className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-muted-foreground w-24 shrink-0">
+                                  {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                                <div className="flex-1 bg-navy/5 dark:bg-white/5 h-6 relative overflow-hidden">
+                                  <div
+                                    className="h-full bg-gold/70 transition-all duration-300"
+                                    style={{ width: `${(day.count / maxCount) * 100}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-mono text-navy dark:text-white w-8 text-right shrink-0">
+                                  {day.count}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No lead data in the last 30 days</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>Click refresh to load lead analytics</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
             {/* Lead Detail Dialog */}
             <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
               <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -1704,6 +2011,43 @@ export default function AdminPage() {
                         <p className="text-lg font-bold text-navy dark:text-white">{selectedLead.lessons_watched || 0}/9</p>
                       </div>
                     </div>
+
+                    {/* Score Breakdown */}
+                    {selectedLead.score_breakdown && (
+                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                        <h3 className="text-sm font-medium text-navy dark:text-white mb-3 flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-gold" />
+                          Score Breakdown
+                        </h3>
+                        <div className="space-y-2">
+                          {Object.entries(selectedLead.score_breakdown).map(([key, item]) => (
+                            <div key={key} className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="text-xs text-muted-foreground capitalize">
+                                    {key.replace(/_/g, ' ')}
+                                  </span>
+                                  <span className="text-xs font-mono text-navy dark:text-white">
+                                    {item.score}/{item.max}
+                                  </span>
+                                </div>
+                                <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      item.score / item.max >= 0.7 ? 'bg-green-500' :
+                                      item.score / item.max >= 0.4 ? 'bg-amber-500' :
+                                      'bg-rust'
+                                    }`}
+                                    style={{ width: `${(item.score / item.max) * 100}%` }}
+                                  />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Next Action */}
                     <div className="p-3 border border-gold/30 bg-gold/5 rounded-lg">
@@ -1776,6 +2120,59 @@ export default function AdminPage() {
                     )}
                   </div>
                 ) : null}
+              </DialogContent>
+            </Dialog>
+
+            {/* Bulk Lead Stage Change Dialog */}
+            <Dialog open={showBulkLeadStageDialog} onOpenChange={setShowBulkLeadStageDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="font-serif text-xl text-navy dark:text-white flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-gold" />
+                    Change {selectedLeadIds.size} Lead{selectedLeadIds.size !== 1 ? 's' : ''} Stage
+                  </DialogTitle>
+                  <DialogDescription>
+                    Select the new stage for all selected leads.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="py-4">
+                  <div className="flex flex-wrap gap-2">
+                    {['new', 'engaged', 'warm', 'converted', 'lost'].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setBulkLeadStage(s)}
+                        className={`px-4 py-2 text-sm transition-colors ${
+                          bulkLeadStage === s
+                            ? 'bg-navy text-white dark:bg-gold dark:text-navy'
+                            : 'bg-navy/5 dark:bg-white/5 text-navy dark:text-white hover:bg-navy/10 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        {s.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowBulkLeadStageDialog(false)} disabled={bulkLeadActionLoading}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="btn-primary" 
+                    onClick={handleBulkLeadStageChange}
+                    disabled={bulkLeadActionLoading}
+                  >
+                    {bulkLeadActionLoading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      `Move to ${bulkLeadStage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`
+                    )}
+                  </Button>
+                </DialogFooter>
               </DialogContent>
             </Dialog>
           </Tabs>
