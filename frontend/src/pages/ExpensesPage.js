@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
 import { fetchWithAuth, API } from '@/utils/api';
 import { 
@@ -192,13 +193,20 @@ export default function ExpensesPage() {
       <main className="main-content">
         <div className="page-container">
           {/* Page Header */}
-          <div className="flex items-start justify-between mb-8">
+          <div className="page-header flex items-start justify-between">
             <div>
               <h1 className="page-title">Expenses</h1>
-              <p className="page-subtitle">
-                {selectedTrust?.name || 'Select a trust'}
-              </p>
+              <p className="page-subtitle">Track and manage trust expenses — record payments, categorize spending, and maintain accurate financial records</p>
             </div>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Track and manage trust-related expenses and payments' },
+                  { text: 'Categorize spending and maintain accurate financial records' },
+                  { text: 'Attach receipts and documentation to each expense' },
+                ]}
+                taPrompt="Help me understand the Expenses page and how to add an expense"
+              />
             <Dialog open={dialogOpen} onOpenChange={(open) => {
               if (open && isReadOnly) {
                 showUpgradeModal('add expenses', 'button_click', 'expenses_page');
@@ -325,6 +333,7 @@ export default function ExpensesPage() {
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
 
           {/* Stats Cards */}

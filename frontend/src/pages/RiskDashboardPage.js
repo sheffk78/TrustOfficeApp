@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import PageHelpButton from '@/components/PageHelpButton';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import {
@@ -98,18 +99,25 @@ export default function RiskDashboardPage() {
       <div className="md:pl-64 pb-20 md:pb-0">
         <div className="pt-16 md:pt-8 ml-4 mr-4">
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
-                <Shield className="w-6 h-6 text-navy"/>
-                Risk Dashboard
-              </h1>
-              <p className="text-sm text-neutral-600 mt-1">Complete exposure analysis for <span className="font-semibold">{selectedTrust.name}</span></p>
+              <h1 className="page-title">Risk Dashboard</h1>
+              <p className="page-subtitle">Monitor trust risks, compliance gaps, and alerts — review flagged items and take corrective action</p>
             </div>
-            <Button variant="outline" onClick={loadData} disabled={loading}>
-              <Activity className="w-4 h-4 mr-2"/>
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Monitor trust risks, compliance gaps, and alerts across all modules' },
+                  { text: 'Review flagged items and take corrective action' },
+                  { text: 'Track high, medium, and low risk items by category' },
+                ]}
+                taPrompt="Walk me through the Risk Dashboard and how to address flagged risks"
+              />
+              <Button variant="outline" onClick={loadData} disabled={loading}>
+                <Activity className="w-4 h-4 mr-2"/>
+                Refresh
+              </Button>
+            </div>
           </div>
 
           {loading ? (

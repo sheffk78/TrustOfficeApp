@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import PageHelpButton from '@/components/PageHelpButton';
 import { 
   Users, 
   Shield, 
@@ -889,7 +890,7 @@ export default function AdminPage() {
       <main className="flex-1 p-4 lg:p-8 lg:ml-64 pb-24 lg:pb-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title flex items-center gap-3">
                 <Shield className="w-8 h-8 text-navy dark:text-white" />
@@ -897,6 +898,14 @@ export default function AdminPage() {
               </h1>
               <p className="page-subtitle">Customer management and system administration</p>
             </div>
+            <PageHelpButton
+              items={[
+                { text: 'Manage customers, subscriptions, and system administration' },
+                { text: 'View and manage leads, extend trials, and gift subscriptions' },
+                { text: 'Access revenue data and customer details' },
+              ]}
+              taPrompt="Walk me through the Admin panel"
+            />
           </div>
 
           {/* Stats Cards */}

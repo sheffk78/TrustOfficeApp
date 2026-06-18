@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
+import PageHelpButton from '@/components/PageHelpButton';
 import { 
   Plus, 
   HeartHandshake,
@@ -372,10 +373,18 @@ export default function BenevolencePage() {
             <div>
               <h1 className="page-title">Benevolence Log</h1>
               <p className="page-subtitle">
-                {selectedTrust?.name} • Charitable Assistance Tracking
+                Manage benevolence requests and charitable distributions — review, approve, and document giving decisions
               </p>
             </div>
-            <div className="flex gap-3 mt-4 md:mt-0">
+            <div className="flex items-center gap-2 mt-4 md:mt-0">
+              <PageHelpButton
+                items={[
+                  { text: 'Manage benevolence requests and charitable distributions' },
+                  { text: 'Review, approve, and document giving decisions' },
+                  { text: 'Track charitable giving against trust purposes' },
+                ]}
+                taPrompt="Walk me through the Benevolence page and how to approve a request"
+              />
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="btn-primary" data-testid="record-grant-btn">

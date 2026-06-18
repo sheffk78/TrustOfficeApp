@@ -39,6 +39,7 @@ import {
   HeartPulse
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const QUICK_ACTIONS = [
   {
@@ -445,11 +446,21 @@ export default function DashboardPage() {
         
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header">
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-subtitle">
-              {dashboard?.trust_name || selectedTrust?.name || 'Select a trust'} • {selectedTrust?.role}
-            </p>
+          <div className="page-header flex items-start justify-between">
+            <div>
+              <h1 className="page-title">Dashboard</h1>
+              <p className="page-subtitle">
+                Trust administration at a glance — view key metrics, upcoming deadlines, and quick actions for {selectedTrust?.name || 'your trust'}
+              </p>
+            </div>
+            <PageHelpButton
+              items={[
+                { text: "View your trust's key metrics at a glance — defensibility score, upcoming deadlines, and recent activity" },
+                { text: 'Use Quick Actions to jump to common tasks like recording a distribution or adding an asset' },
+                { text: 'Complete your onboarding checklist to set up your trust profile' },
+              ]}
+              taPrompt="Walk me through the Dashboard page and what I should do first"
+            />
           </div>
 
           {loading ? (

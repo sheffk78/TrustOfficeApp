@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const DEADLINE_LABELS = {
   federal_1041: 'Form 1041 — Income Tax Return',
@@ -154,13 +155,10 @@ export default function TaxCalendarPage() {
       <div className="md:pl-64 pb-20 md:pb-0">
         <div className="pt-16 md:pt-8 ml-4 mr-4">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
-                <CalendarDays className="w-6 h-6 text-navy"/>
-                Tax Calendar
-              </h1>
-              <p className="text-sm text-neutral-600 mt-1">
+              <h1 className="page-title">Tax Calendar</h1>
+              <p className="page-subtitle">
                 {trustProfile.isFiscalYear
                   ? `Fiscal year ending ${trustProfile.taxYearEndMonth}/${trustProfile.taxYearEndDay} · `
                   : 'Calendar year · '}
@@ -168,7 +166,15 @@ export default function TaxCalendarPage() {
                 Federal tax deadlines for <span className="font-semibold">{selectedTrust.name}</span>
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Track tax deadlines, filing dates, and compliance events' },
+                  { text: 'Never miss a trust tax obligation with automated reminders' },
+                  { text: 'View deadlines by fiscal year and trust type' },
+                ]}
+                taPrompt="Help me understand the Tax Calendar and upcoming deadlines"
+              />
               <select
                 value={year}
                 onChange={e => setYear(Number(e.target.value))}

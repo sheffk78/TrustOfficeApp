@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PageHelpButton from '@/components/PageHelpButton';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Wallet, 
@@ -282,16 +283,26 @@ export default function CompensationPage() {
             <div>
               <h1 className="page-title">Compensation</h1>
               <p className="page-subtitle">
-                {selectedTrust?.name || 'Select a trust'} • Trustee Compensation Tracking
+                Set up and manage trustee compensation plans — track payments, document approvals, and maintain compliance
               </p>
             </div>
-            <Button 
-              onClick={() => setShowPaymentModal(true)} 
-              className="btn-primary"
-              data-testid="record-payment-btn"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Record Payment
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Set up and manage trustee compensation plans and payment schedules' },
+                  { text: 'Track payments, document approvals, and maintain compliance' },
+                  { text: 'View compensation history per trustee' },
+                ]}
+                taPrompt="Help me understand the Compensation page and how to set up trustee pay"
+              />
+              <Button 
+                onClick={() => setShowPaymentModal(true)} 
+                className="btn-primary"
+                data-testid="record-payment-btn"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Record Payment
+              </Button>
+            </div>
           </div>
 
           {loading ? (

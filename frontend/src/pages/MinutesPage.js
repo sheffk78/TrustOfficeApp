@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import PageHelpButton from '@/components/PageHelpButton';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -185,21 +186,29 @@ export default function MinutesPage() {
         
         <div className="page-container">
           {/* Page Header */}
-          <div className="flex items-start justify-between mb-8">
+          <div className="page-header flex items-start justify-between">
             <div>
               <h1 className="page-title">Minutes & Decisions</h1>
-              <p className="page-subtitle">
-                {selectedTrust?.name || 'Select a trust'}
-              </p>
+              <p className="page-subtitle">Create, review, and manage trust meeting minutes — document decisions, track approvals, and maintain a complete fiduciary record</p>
             </div>
-            <Button 
-              onClick={handleCreateMinutes}
-              className={`btn-primary ${isReadOnly ? 'opacity-60' : ''}`}
-              data-testid="create-minutes-btn"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Minutes
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Create, review, and manage trust meeting minutes for all your trust decisions' },
+                  { text: 'Filter by type, date, or search to find specific minutes quickly' },
+                  { text: 'Use the Trust Assistant to draft minutes from a natural language description' },
+                ]}
+                taPrompt="Help me understand the Minutes page and how to create trust meeting minutes"
+              />
+              <Button 
+                onClick={handleCreateMinutes}
+                className={`btn-primary ${isReadOnly ? 'opacity-60' : ''}`}
+                data-testid="create-minutes-btn"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Minutes
+              </Button>
+            </div>
           </div>
 
           {/* Drafts Section */}

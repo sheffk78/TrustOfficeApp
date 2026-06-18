@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import PageHelpButton from '@/components/PageHelpButton';
 import {
   TrendingUp, Plus, Wallet, Building2, Landmark,
   ArrowUpRight, Coins, Home, Activity, ChevronRight,
@@ -148,18 +149,25 @@ export default function InvestmentsPage() {
         <div className="pt-16 md:pt-8 ml-4 mr-4">
 
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
-                <TrendingUp className="w-6 h-6 text-navy"/>
-                Investment Holdings
-              </h1>
-              <p className="text-sm text-neutral-600 mt-1">Durable wealth tracking for <span className="font-semibold">{selectedTrust.name}</span></p>
+              <h1 className="page-title">Investment Holdings</h1>
+              <p className="page-subtitle">Manage trust investments, track performance, and document investment decisions for fiduciary compliance</p>
             </div>
-            <Button onClick={() => setShowAdd(!showAdd)}>
-              <Plus className="w-4 h-4 mr-2"/>
-              Add Investment
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Manage trust investments and track portfolio performance' },
+                  { text: 'Document investment decisions for fiduciary compliance' },
+                  { text: 'View holdings, returns, and allocation at a glance' },
+                ]}
+                taPrompt="Help me understand the Investment Holdings page and how to add an investment"
+              />
+              <Button onClick={() => setShowAdd(!showAdd)}>
+                <Plus className="w-4 h-4 mr-2"/>
+                Add Investment
+              </Button>
+            </div>
           </div>
 
           {/* Summary Cards */}

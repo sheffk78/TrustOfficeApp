@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
+import PageHelpButton from '@/components/PageHelpButton';
 import { 
   Plus, 
   Home,
@@ -356,15 +357,21 @@ export default function ScheduleAPage() {
         
         <div className="p-4 lg:p-8">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">Schedule A</h1>
-              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                {selectedTrust.name} • Initial Corpus of the Trust
-              </p>
+              <h1 className="page-title">Schedule A</h1>
+              <p className="page-subtitle">Manage trust assets and corpus — add, update, or dispose of trust property with proper documentation</p>
             </div>
             <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <Button 
+              <PageHelpButton
+                items={[
+                  { text: 'Manage trust assets and corpus — the initial and current property of the trust' },
+                  { text: 'Add, update, or dispose of trust assets with proper documentation' },
+                  { text: 'Track asset values, dates, and disposition history' },
+                ]}
+                taPrompt="Walk me through the Schedule A page and how to add an asset"
+              />
+              <Button
                 variant="outline" 
                 onClick={handleExportPDF}
                 disabled={exporting || assets.length === 0}

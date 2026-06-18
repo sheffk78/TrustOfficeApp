@@ -14,6 +14,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import PageHelpButton from '@/components/PageHelpButton';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { fetchWithAuth, API } from '@/utils/api';
@@ -363,14 +364,21 @@ export default function DistributionsPage() {
         
         <div className="page-container">
           {/* Page Header */}
-          <div className="flex items-start justify-between mb-8">
+          <div className="page-header flex items-start justify-between">
             <div>
               <h1 className="page-title">Distributions</h1>
-              <p className="page-subtitle">
-                {selectedTrust?.name || 'Select a trust'}
-              </p>
+              <p className="page-subtitle">Record and manage trust distributions to beneficiaries — document amounts, purposes, and approvals for fiduciary compliance</p>
             </div>
-            <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Record and manage all distributions to trust beneficiaries' },
+                  { text: 'Track distribution amounts, purposes, and approval status' },
+                  { text: 'Send beneficiary notices and attach supporting minutes' },
+                ]}
+                taPrompt="Walk me through the Distributions page and how to record a distribution"
+              />
+              <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
               <DialogTrigger asChild>
                 <Button className="btn-primary" data-testid="add-distribution-btn">
                   <Plus className="w-4 h-4 mr-2" />
@@ -558,6 +566,7 @@ export default function DistributionsPage() {
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
 
           {/* Stats Cards */}

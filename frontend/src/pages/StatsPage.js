@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import PageHelpButton from '@/components/PageHelpButton';
 import {
   BarChart3,
   DollarSign,
@@ -123,7 +124,7 @@ export default function StatsPage() {
       <main className="flex-1 p-4 lg:p-8 lg:ml-64 pb-24 lg:pb-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title flex items-center gap-3">
                 <BarChart3 className="w-8 h-8 text-navy dark:text-white" />
@@ -131,14 +132,24 @@ export default function StatsPage() {
               </h1>
               <p className="page-subtitle">Revenue metrics and subscription analytics</p>
             </div>
-            <button
-              onClick={fetchRevenueData}
-              className="btn-primary flex items-center gap-2"
-              disabled={loading}
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'View revenue metrics, subscription analytics, and business performance' },
+                  { text: 'Track MRR, ARR, paid customers, and revenue trends over time' },
+                  { text: 'Filter by date range to analyze specific periods' },
+                ]}
+                taPrompt="Walk me through the Stats dashboard"
+              />
+              <button
+                onClick={fetchRevenueData}
+                className="btn-primary flex items-center gap-2"
+                disabled={loading}
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {/* Error state */}

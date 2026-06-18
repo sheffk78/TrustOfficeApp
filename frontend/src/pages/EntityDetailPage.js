@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
+import PageHelpButton from '@/components/PageHelpButton';
 import { 
   ArrowLeft, 
   Save,
@@ -164,10 +165,18 @@ export default function EntityDetailPage() {
               </div>
               <div>
                 <h1 className="page-title">{entity?.name}</h1>
-                <p className="page-subtitle">{entity?.entity_type}</p>
+                <p className="page-subtitle">View and manage entity details — update information, track relationships, and maintain accurate trust records</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'View and manage entity details including type, status, and relationships' },
+                  { text: 'Update entity information and track changes over time' },
+                  { text: 'Maintain accurate records of all trust-related entities' },
+                ]}
+                taPrompt="Help me understand the Entity Detail page"
+              />
               <Button 
                 onClick={handleDelete}
                 variant="outline"

@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/api';
+import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
 import {
   MessageSquare, Phone, Mail, Video, FileText, Bell,
@@ -138,18 +139,25 @@ export default function CommunicationsPage() {
       <div className="md:pl-64 pb-20 md:pb-0">
         <div className="pt-16 md:pt-8 ml-4 mr-4">
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
-                <MessageSquare className="w-6 h-6 text-navy"/>
-                Communication Log
-              </h1>
-              <p className="text-sm text-neutral-600 mt-1">Beneficiary correspondence for <span className="font-semibold">{selectedTrust.name}</span></p>
+              <h1 className="page-title">Communication Log</h1>
+              <p className="page-subtitle">Record and track all beneficiary communications — document calls, emails, and notices to satisfy UTC § 813</p>
             </div>
-            <Button onClick={() => setShowAdd(!showAdd)}>
-              <Plus className="w-4 h-4 mr-2"/>
-              Log Communication
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Record and track all beneficiary communications in one place' },
+                  { text: 'Document calls, emails, and notices to satisfy UTC § 813 requirements' },
+                  { text: 'Maintain a complete history of beneficiary contact' },
+                ]}
+                taPrompt="Walk me through the Communication Log and how to log a beneficiary contact"
+              />
+              <Button onClick={() => setShowAdd(!showAdd)}>
+                <Plus className="w-4 h-4 mr-2"/>
+                Log Communication
+              </Button>
+            </div>
           </div>
 
           {/* Summary + Filters */}

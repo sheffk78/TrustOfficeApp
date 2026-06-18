@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
+import PageHelpButton from '@/components/PageHelpButton';
 import { 
   User,
   Building2,
@@ -520,11 +521,21 @@ export default function SettingsPage() {
       <main className="main-content">
         <div className="page-container max-w-3xl">
           {/* Page Header */}
-          <div className="page-header">
-            <h1 className="page-title">Settings</h1>
-            <p className="page-subtitle">
-              Manage your account and trust settings
-            </p>
+          <div className="page-header flex items-start justify-between">
+            <div>
+              <h1 className="page-title">Settings</h1>
+              <p className="page-subtitle">
+                Configure trust settings, preferences, and account details — manage notifications, security, and trust profile information
+              </p>
+            </div>
+            <PageHelpButton
+              items={[
+                { text: 'Configure trust settings, preferences, and account details' },
+                { text: 'Manage notifications, security, and trust profile information' },
+                { text: 'Update your personal and billing information' },
+              ]}
+              taPrompt="Walk me through the Settings page and what I can configure"
+            />
           </div>
 
           {/* Profile Section */}

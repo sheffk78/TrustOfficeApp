@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const ROLE_COLORS = {
   Trustee: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
@@ -159,19 +160,24 @@ export default function AuthorityPage() {
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="font-serif text-2xl md:text-3xl text-navy flex items-center gap-3">
-                <Shield className="w-8 h-8" />
-                Authority Management
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Who has authority, what kind, and where it comes from
-              </p>
+              <h1 className="page-title">Authority Management</h1>
+              <p className="page-subtitle">Define and manage trustee authorities, signing powers, and delegation of duties</p>
             </div>
-            <Button variant="outline" size="sm" onClick={loadData}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Define and manage trustee authorities and signing powers' },
+                  { text: 'Delegate duties and document who can act on behalf of the trust' },
+                  { text: 'Maintain a clear record of authorized decision-makers' },
+                ]}
+                taPrompt="Help me understand the Authority Management page"
+              />
+              <Button variant="outline" size="sm" onClick={loadData}>
+                <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+              </Button>
+            </div>
           </div>
 
           {/* Authority Clause */}

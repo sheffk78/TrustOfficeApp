@@ -16,6 +16,7 @@ import {
   File, X, CloudUpload, Link2, Copy, Check
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const CATEGORY_ICONS = {
   trust_instrument: Shield,
@@ -327,19 +328,25 @@ export default function VaultPage() {
       <div className="md:pl-64 pb-20 md:pb-0">
         <div className="pt-16 md:pt-8 ml-4 mr-4">
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
-                <FolderOpen className="w-6 h-6 text-navy"/>
-                Trust Document Vault
-              </h1>
-              <p className="text-sm text-neutral-600 mt-1">Organize and store trust documents for <span className="font-semibold">{selectedTrust.name}</span></p>
-              <p className="text-xs text-neutral-400 mt-1">Upload files directly or link to external storage.</p>
+              <h1 className="page-title">Trust Document Vault</h1>
+              <p className="page-subtitle">Store, organize, and access trust documents — upload files, manage categories, and share with beneficiaries</p>
             </div>
-            <Button onClick={() => { setShowAdd(!showAdd); setAddMode('upload'); }}>
-              <Plus className="w-4 h-4 mr-2"/>
-              Add Document
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Store, organize, and access all trust documents in one place' },
+                  { text: 'Upload files, manage categories, and control access' },
+                  { text: 'Share documents with beneficiaries and advisors securely' },
+                ]}
+                taPrompt="Help me understand the Document Vault and how to upload files"
+              />
+              <Button onClick={() => { setShowAdd(!showAdd); setAddMode('upload'); }}>
+                <Plus className="w-4 h-4 mr-2"/>
+                Add Document
+              </Button>
+            </div>
           </div>
 
           {/* Missing Critical Alert */}

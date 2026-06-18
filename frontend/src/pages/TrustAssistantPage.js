@@ -8,6 +8,7 @@ import ChatPanel from '@/components/ChatPanel';
 import ActionEditModal from '@/components/ActionEditModal';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const COLLAPSED_KEY = 'trust_assistant_snapshot_collapsed';
 
@@ -207,11 +208,21 @@ const TrustAssistantPage = () => {
       <main className="main-content dot-grid flex flex-col">
         <div className="page-container flex flex-col flex-1 min-h-0">
           {/* Page header */}
-          <div className="page-header">
-            <h1 className="page-title">Trust Assistant</h1>
-            <p className="page-subtitle">
-              {selectedTrust?.name || 'Select a trust'}
-            </p>
+          <div className="page-header flex items-start justify-between">
+            <div>
+              <h1 className="page-title">Trust Assistant</h1>
+              <p className="page-subtitle">
+                Ask questions, draft minutes, manage distributions, and get trust administration guidance — powered by AI
+              </p>
+            </div>
+            <PageHelpButton
+              items={[
+                { text: 'Ask questions about trust administration in plain language' },
+                { text: 'Draft minutes, manage distributions, and execute trust actions' },
+                { text: 'Get guidance on fiduciary duties, deadlines, and best practices' },
+              ]}
+              taPrompt="What can I ask you to help me with?"
+            />
           </div>
           <div className="trust-assistant-layout">
             {/* Snapshot column */}

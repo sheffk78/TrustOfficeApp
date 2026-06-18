@@ -20,6 +20,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const PLANS = [
   {
@@ -345,11 +346,21 @@ export default function BillingPage() {
           </Button>
 
           {/* Page Header */}
-          <div className="page-header">
-            <h1 className="page-title">Billing & Subscription</h1>
-            <p className="page-subtitle">
-              Manage your TrustOffice subscription and billing details
-            </p>
+          <div className="page-header flex items-start justify-between">
+            <div>
+              <h1 className="page-title">Billing & Subscription</h1>
+              <p className="page-subtitle">
+                Manage your subscription, billing history, and payment methods — upgrade, downgrade, or cancel at any time
+              </p>
+            </div>
+            <PageHelpButton
+              items={[
+                { text: 'Manage your subscription plan, billing history, and payment methods' },
+                { text: 'Upgrade, downgrade, or cancel your plan at any time' },
+                { text: 'View invoices and payment receipts' },
+              ]}
+              taPrompt="Help me understand the Billing page and my subscription options"
+            />
           </div>
 
           {loading ? (

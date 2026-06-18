@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
+import PageHelpButton from '@/components/PageHelpButton';
 import {
   Plus, Search, Calendar as CalendarIcon, ArrowUpRight, ArrowDownLeft,
   FileSpreadsheet, Tag, Trash2, Filter, X, Upload, ChevronDown,
@@ -313,16 +314,20 @@ export default function TransactionLedgerPage() {
       <Sidebar />
       <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-x-hidden" data-testid="transaction-ledger-page">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="page-header flex items-center justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-serif text-foreground tracking-tight" data-testid="ledger-title">
-              Transaction Ledger
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Log and classify all money movement for governance evidence
-            </p>
+            <h1 className="page-title">Transaction Ledger</h1>
+            <p className="page-subtitle">View and manage all trust financial transactions — track income, expenses, and transfers across accounts</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <PageHelpButton
+              items={[
+                { text: 'View and manage all trust financial transactions in one ledger' },
+                { text: 'Track income, expenses, and transfers across accounts' },
+                { text: 'Import CSV files and reconcile with bank statements' },
+              ]}
+              taPrompt="Help me understand the Transaction Ledger and how to add a transaction"
+            />
             <Button variant="outline" size="sm" onClick={() => { setShowImport(true); setImportStep(1); }} data-testid="import-csv-btn">
               <Upload className="w-4 h-4 mr-2" /> Import CSV
             </Button>

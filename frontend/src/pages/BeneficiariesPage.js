@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
+import PageHelpButton from '@/components/PageHelpButton';
 import { format, parseISO } from 'date-fns';
 import { 
   Users,
@@ -495,16 +496,20 @@ export default function BeneficiariesPage() {
       <main className="lg:pl-64 pt-16 lg:pt-0">
         <div className="p-4 lg:p-8">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="font-serif text-3xl lg:text-4xl text-navy dark:text-gold mb-2" data-testid="beneficiaries-page-title">
-                Beneficiaries
-              </h1>
-              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                {selectedTrust.name} • Beneficial Interest & Ownership
-              </p>
+              <h1 className="page-title">Beneficiaries</h1>
+              <p className="page-subtitle">Manage trust beneficiaries, ownership interests, and class designations — add, update, or remove beneficiaries with proper documentation</p>
             </div>
-            <div className="flex gap-2 mt-4 md:mt-0">
+            <div className="flex items-center gap-2 mt-4 md:mt-0">
+              <PageHelpButton
+                items={[
+                  { text: 'Manage trust beneficiaries, ownership interests, and class designations' },
+                  { text: 'Add, update, or remove beneficiaries with proper documentation' },
+                  { text: 'View beneficiary certificates and allocation percentages' },
+                ]}
+                taPrompt="Help me understand the Beneficiaries page and how to add a beneficiary"
+              />
               <Button variant="outline" onClick={() => setShowSettingsModal(true)} data-testid="settings-btn">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings

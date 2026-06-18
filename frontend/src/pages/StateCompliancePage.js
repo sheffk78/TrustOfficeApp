@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
+import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
 import {
   MapPin, AlertTriangle, Shield, CheckCircle2, Clock,
@@ -85,19 +86,24 @@ export default function StateCompliancePage() {
         <div className="pt-16 md:pt-8 ml-4 mr-4">
 
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
-                <Shield className="w-6 h-6 text-navy"/>
-                State Compliance
-              </h1>
-              <p className="text-sm text-neutral-600 mt-1">
-                Jurisdiction rules for <span className="font-semibold">{selectedTrust.name}</span>
-              </p>
+              <h1 className="page-title">State Compliance</h1>
+              <p className="page-subtitle">Review state-specific trust requirements — UTC adoption status, fiduciary standards, and beneficiary notification rules</p>
             </div>
-            <Link to="/settings">
-              <Button variant="outline">Edit Trust Profile</Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Review state-specific trust requirements for your jurisdiction' },
+                  { text: 'Check UTC adoption status, fiduciary standards, and notification rules' },
+                  { text: 'Ensure your trust administration complies with local law' },
+                ]}
+                taPrompt="Walk me through the State Compliance page for my state"
+              />
+              <Link to="/settings">
+                <Button variant="outline">Edit Trust Profile</Button>
+              </Link>
+            </div>
           </div>
 
           {loading ? (

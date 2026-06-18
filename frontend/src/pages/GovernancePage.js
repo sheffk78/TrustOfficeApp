@@ -18,6 +18,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
 import { format, parseISO, subDays } from 'date-fns';
 
@@ -144,18 +145,28 @@ export default function GovernancePage() {
             <div>
               <h1 className="page-title">Trust Health</h1>
               <p className="page-subtitle">
-                {selectedTrust?.name || 'Select a trust'} • 7-Criteria Assessment
+                Assess trust health across 7 criteria — track defensibility, compliance, and overall governance quality
               </p>
             </div>
-            <Button 
-              onClick={loadGovernanceData}
-              variant="outline"
-              className="btn-secondary"
-              data-testid="refresh-score-btn"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Assess trust health across 7 criteria including defensibility and compliance' },
+                  { text: 'Track your trust governance quality score over time' },
+                  { text: 'Identify areas that need attention to improve your trust health' },
+                ]}
+                taPrompt="Walk me through the Trust Health page and how to interpret my scores"
+              />
+              <Button 
+                onClick={loadGovernanceData}
+                variant="outline"
+                className="btn-secondary"
+                data-testid="refresh-score-btn"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
           </div>
 
           {loading ? (

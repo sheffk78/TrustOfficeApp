@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
+import PageHelpButton from '@/components/PageHelpButton';
 import { 
   HeartHandshake,
   DollarSign,
@@ -167,21 +168,27 @@ export default function BenevolenceLogPage() {
       <main className="lg:pl-64 pt-16 lg:pt-0">
         <div className="p-4 lg:p-8">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="font-serif text-3xl lg:text-4xl text-navy dark:text-gold mb-2" data-testid="page-title">
-                Benevolence Log
-              </h1>
-              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                {data?.trust_name || selectedTrust.name} • Charitable Distributions
-              </p>
+              <h1 className="page-title">Benevolence Log</h1>
+              <p className="page-subtitle">Track charitable giving and benevolence distributions — document donations, recipients, and trust purposes</p>
             </div>
-            <Link to="/distributions" className="mt-4 md:mt-0">
-              <Button variant="outline" data-testid="all-distributions-btn">
-                <DollarSign className="w-4 h-4 mr-2" />
-                All Distributions
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Track charitable giving and benevolence distributions' },
+                  { text: 'Document donations, recipients, and alignment with trust purposes' },
+                  { text: 'View giving history and totals over time' },
+                ]}
+                taPrompt="Walk me through the Benevolence Log page"
+              />
+              <Link to="/distributions" className="mt-4 md:mt-0">
+                <Button variant="outline" data-testid="all-distributions-btn">
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  All Distributions
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {loading ? (

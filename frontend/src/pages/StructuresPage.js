@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchWithAuth } from '@/utils/api';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
 import { StructuralMap } from '@/components/StructuralMap';
+import PageHelpButton from '@/components/PageHelpButton';
 import { 
   Building2, 
   Plus, 
@@ -337,8 +338,18 @@ export default function StructuresPage() {
             <div>
               <h1 className="page-title">Structures</h1>
               <p className="page-subtitle">
-                {selectedTrust?.name || 'Select a trust'} • Entities & Relationships
+                Manage trust structures, entities, and relationships — define the organizational framework of your trust
               </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Manage trust structures, entities, and their relationships' },
+                  { text: 'Define the organizational framework of your trust' },
+                  { text: 'Add entities like LLCs, partnerships, or other trusts' },
+                ]}
+                taPrompt="Help me understand the Structures page and how to add an entity"
+              />
             </div>
           </div>
 

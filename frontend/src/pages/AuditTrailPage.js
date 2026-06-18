@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const EVENT_ICONS = {
   minutes_created: FileText,
@@ -269,19 +270,24 @@ export default function AuditTrailPage() {
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="font-serif text-2xl md:text-3xl text-navy flex items-center gap-3">
-                <Shield className="w-8 h-8" />
-                Audit Trail
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Complete history of all trust actions and changes
-              </p>
+              <h1 className="page-title">Audit Trail</h1>
+              <p className="page-subtitle">View a complete log of all trust administration actions — track changes, access, and decisions for compliance</p>
             </div>
-            <Button variant="outline" size="sm" onClick={loadAuditTrail}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'View a complete log of all trust administration actions' },
+                  { text: 'Track changes, access, and decisions for compliance and transparency' },
+                  { text: 'Export audit logs for review or regulatory purposes' },
+                ]}
+                taPrompt="Walk me through the Audit Trail and what gets logged"
+              />
+              <Button variant="outline" size="sm" onClick={loadAuditTrail}>
+                <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+              </Button>
+            </div>
           </div>
 
           {/* Stats */}

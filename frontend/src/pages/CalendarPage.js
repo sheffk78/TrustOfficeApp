@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, addDays } from 'date-fns';
 import { toast } from 'sonner';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const TASK_TYPES = [
   { value: 'annual_review', label: 'Annual Review' },
@@ -199,16 +200,26 @@ export default function CalendarPage() {
             <div>
               <h1 className="page-title">Governance Calendar</h1>
               <p className="page-subtitle">
-                {selectedTrust?.name || 'Select a trust'} • Manage compliance tasks
-              </p>
+                        Schedule and track trust compliance tasks, meetings, and deadlines — never miss a fiduciary obligation
+                      </p>
             </div>
-            <Button 
-              onClick={() => setShowModal(true)} 
-              className="btn-primary"
-              data-testid="create-task-btn"
-            >
-              <Plus className="w-4 h-4 mr-2" /> New Task
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Schedule and track trust compliance tasks, meetings, and deadlines' },
+                  { text: 'View upcoming fiduciary obligations at a glance' },
+                  { text: 'Mark tasks complete and stay on top of your governance calendar' },
+                ]}
+                taPrompt="Walk me through the Governance Calendar and how to manage compliance tasks"
+              />
+              <Button
+                onClick={() => setShowModal(true)}
+                className="btn-primary"
+                data-testid="create-task-btn"
+              >
+                <Plus className="w-4 h-4 mr-2" /> New Task
+              </Button>
+            </div>
           </div>
 
           {/* Filter Tabs */}
