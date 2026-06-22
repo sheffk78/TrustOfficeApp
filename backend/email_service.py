@@ -557,6 +557,85 @@ Amount: ${amount}
             metadata={"email_type": "lead_reengagement"}
         )
 
+    # ==================== NURTURE SEQUENCE METHODS ====================
+
+    NURTURE_TEMPLATES = {
+        1: {"postmark_id": 45387225, "name": "nurture_1_checklist"},
+        2: {"postmark_id": 45387227, "name": "nurture_2_piercing"},
+        3: {"postmark_id": 45387209, "name": "nurture_3_irs"},
+        4: {"postmark_id": 45387191, "name": "nurture_4_real_estate"},
+        5: {"postmark_id": 45387229, "name": "nurture_5_conversion"},
+    }
+
+    async def send_nurture_email(
+        self,
+        to_email: str,
+        name: str,
+        step: int,
+        download_url: str = None,
+    ) -> Dict[str, Any]:
+        """Send a nurture sequence email via Postmark template API.
+
+        Args:
+            to_email: Recipient email
+            name: Recipient name
+            step: Nurture step (1-5)
+            download_url: Optional download URL for step 1
+        """
+        if step not in self.NURTURE_TEMPLATES:
+            return {"status": "failed", "error": f"Invalid nurture step: {step}"}
+
+        template = self.NURTURE_TEMPLATES[step]
+        template_model = {
+            "name": name or "there",
+            "app_url": self.app_url,
+        }
+        if download_url:
+            template_model["download_url"] = download_url
+
+        if not self.is_configured:
+            logger.warning("Email service not configured - skipping nurture email")
+            return {"status": "skipped", "reason": "not_configured"}
+
+        try:
+            to_address = f"{name} <{to_email}>" if name else to_email
+            response = self.client.emails.send_with_template(
+                TemplateId=template["postmark_id"],
+                TemplateModel=template_model,
+                From=self._get_from_address(),
+                To=to_address,
+                TrackOpens=True,
+                Tag=template["name"],
+                Metadata={"email_type": template["name"], "nurture_step": str(step)},
+            )
+            logger.info(
+                f"Nurture email {step} sent to {to_email}",
+                extra={"message_id": response.get("MessageID"), "step": step},
+            )
+            return {"status": "sent", "message_id": response.get("MessageID")}
+        except Exception as e:
+            logger.error(f"Failed to send nurture email {step} to {to_email}: {e}")
+            return {"status": "failed", "error": str(e)}
+
+    async def send_nurture_sequence(
+        self,
+        to_email: str,
+        name: str,
+        download_url: str = None,
+    ) -> Dict[str, Any]:
+        """Send the full 5-email nurture sequence.
+
+        Called when a lead is first captured. Emails 1-5 are sent
+        on a schedule managed by the background job system.
+        This method sends Email 1 immediately.
+        """
+        return await self.send_nurture_email(
+            to_email=to_email,
+            name=name,
+            step=1,
+            download_url=download_url,
+        )
+
     async def send_distribution_notice_to_beneficiary(
         self,
         to_email: str,
