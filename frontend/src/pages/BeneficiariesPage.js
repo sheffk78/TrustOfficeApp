@@ -402,16 +402,16 @@ export default function BeneficiariesPage() {
         })
       });
       if (response.ok) {
-        toast.success('Class beneficiary added');
+        toast.success('Class Beneficiary added');
         setShowClassBeneficiaryModal(false);
         setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' });
         loadOverviewData();
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to add class beneficiary');
+        toast.error(error.detail || 'Failed to add Class Beneficiary');
       }
     } catch (error) {
-      toast.error('Failed to add class beneficiary');
+      toast.error('Failed to add Class Beneficiary');
     }
   };
 
@@ -421,11 +421,11 @@ export default function BeneficiariesPage() {
         method: 'DELETE'
       });
       if (response.ok) {
-        toast.success('Class beneficiary removed');
+        toast.success('Class Beneficiary removed');
         loadOverviewData();
       }
     } catch (error) {
-      toast.error('Failed to remove class beneficiary');
+      toast.error('Failed to remove Class Beneficiary');
     }
   };
 
@@ -567,8 +567,8 @@ export default function BeneficiariesPage() {
                     
                     <div className="card-trust p-4" data-testid="issued-units-card">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                          <FileCheck className="w-5 h-5 text-green-700 dark:text-green-400" />
+                        <div className="w-10 h-10 bg-success/10 dark:bg-success/20 flex items-center justify-center">
+                          <FileCheck className="w-5 h-5 text-success dark:text-success" />
                         </div>
                         <div>
                           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Issued</p>
@@ -591,8 +591,8 @@ export default function BeneficiariesPage() {
                     
                     <div className="card-trust p-4" data-testid="beneficiaries-count-card">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                          <Users className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                        <div className="w-10 h-10 bg-warning/10 dark:bg-warning/20 flex items-center justify-center">
+                          <Users className="w-5 h-5 text-warning dark:text-warning" />
                         </div>
                         <div>
                           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Beneficiaries</p>
@@ -772,7 +772,7 @@ export default function BeneficiariesPage() {
                             <div className="flex items-center gap-2">
                               <p className="font-medium text-navy dark:text-foreground">{cert.holder_name}</p>
                               <span className={`px-2 py-0.5 text-xs font-mono ${
-                                cert.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                cert.status === 'active' ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success' :
                                 cert.status === 'revoked' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                                 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
                               }`}>
@@ -880,7 +880,7 @@ export default function BeneficiariesPage() {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                      Class beneficiaries are groups defined by relationship rather than named individuals
+                      Class Beneficiaries are groups defined by relationship rather than named individuals
                     </p>
                   </div>
                   <Button className="btn-primary" onClick={() => setShowClassBeneficiaryModal(true)} data-testid="add-class-beneficiary-btn">
@@ -900,7 +900,7 @@ export default function BeneficiariesPage() {
                 {!overviewData?.class_beneficiaries?.length ? (
                   <div className="p-8 text-center">
                     <UsersRound className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                    <p className="text-muted-foreground mb-2">No class beneficiaries defined</p>
+                    <p className="text-muted-foreground mb-2">No Class Beneficiaries defined</p>
                     <p className="text-sm text-muted-foreground mb-4">
                       Add a class like "Children" or "Descendants" to designate beneficiaries by relationship
                     </p>

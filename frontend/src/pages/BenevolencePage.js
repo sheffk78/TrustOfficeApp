@@ -518,8 +518,8 @@ export default function BenevolencePage() {
             </div>
             <div className="card-trust p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                  <HeartHandshake className="w-5 h-5 text-green-700 dark:text-green-400" />
+                <div className="w-10 h-10 bg-success/10 dark:bg-success/20 flex items-center justify-center">
+                  <HeartHandshake className="w-5 h-5 text-success dark:text-success" />
                 </div>
                 <div>
                   <p className="label-trust">All Time</p>

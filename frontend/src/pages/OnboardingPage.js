@@ -277,8 +277,8 @@ export default function OnboardingPage() {
           <div className="mt-8">
             <div className="card-trust corner-mark mb-8">
               <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Clock className="w-8 h-8 text-amber-600" />
+                <div className="w-16 h-16 bg-warning/10 dark:bg-warning/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-8 h-8 text-warning" />
                 </div>
                 <h1 className="font-serif text-4xl text-navy mb-3">
                   Your Free Access Has Ended
@@ -372,8 +372,8 @@ export default function OnboardingPage() {
                 {subscription?.plan_type === 'free' ? (
                   <>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                        <Lock className="w-5 h-5 text-amber-600" />
+                      <div className="w-10 h-10 bg-warning/10 rounded-full flex items-center justify-center">
+                        <Lock className="w-5 h-5 text-warning" />
                       </div>
                       <div>
                         <p className="font-medium text-navy">Free Plan — Core Features Only</p>

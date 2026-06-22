@@ -32,23 +32,23 @@ export const ReadOnlyBanner = () => {
   
   return (
     <div 
-      className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-3 lg:ml-64"
+      className="bg-warning/5 dark:bg-warning/10 border-b border-warning/20 dark:border-warning/30 px-4 py-3 lg:ml-64"
       data-testid="read-only-banner"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-full">
-            <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <div className="p-2 bg-warning/10 dark:bg-warning/30 rounded-full">
+            <Lock className="h-4 w-4 text-warning dark:text-warning" />
           </div>
           <div>
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+            <p className="text-sm font-medium text-warning dark:text-warning">
               {trialExpired 
                 ? 'Your free access has ended' 
                 : subCanceled 
                   ? 'Your subscription has been canceled'
                   : 'Access inactive'}
             </p>
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="text-xs text-warning dark:text-warning">
               You can view all your data, but creating or editing is disabled until you subscribe.
             </p>
           </div>
@@ -56,7 +56,7 @@ export const ReadOnlyBanner = () => {
         <Link to="/pricing">
           <Button 
             size="sm" 
-            className="bg-amber-600 hover:bg-amber-700 text-white"
+            className="bg-warning hover:bg-warning text-white"
             data-testid="subscribe-now-btn"
           >
             Subscribe Now

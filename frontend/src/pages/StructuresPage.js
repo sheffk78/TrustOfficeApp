@@ -614,21 +614,21 @@ export default function StructuresPage() {
                 <div className="space-y-6">
                   {/* Overview Stats */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="rounded border border-border bg-card p-4">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Entities</p>
                       <p className="text-2xl font-semibold text-foreground">{separationData.entities.length}</p>
                     </div>
-                    <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="rounded border border-border bg-card p-4">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Transactions (90d)</p>
                       <p className="text-2xl font-semibold text-foreground">{separationData.transaction_summary.total_transactions}</p>
                     </div>
-                    <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="rounded border border-border bg-card p-4">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Active Alerts</p>
                       <p className={`text-2xl font-semibold ${separationData.alert_summary.total_active > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
                         {separationData.alert_summary.total_active}
                       </p>
                     </div>
-                    <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="rounded border border-border bg-card p-4">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net Flow (90d)</p>
                       <p className={`text-2xl font-semibold ${(separationData.transaction_summary.total_inflows - separationData.transaction_summary.total_outflows) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                         ${(separationData.transaction_summary.total_inflows - separationData.transaction_summary.total_outflows).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
@@ -644,7 +644,7 @@ export default function StructuresPage() {
                         <div
                           key={ent.entity_id}
                           onClick={() => navigate(`/entities/${ent.entity_id}`)}
-                          className="rounded-lg border border-border bg-card p-4 hover:border-navy/40 cursor-pointer transition-all group"
+                          className="rounded border border-border bg-card p-4 hover:border-navy/40 cursor-pointer transition-all group"
                           data-testid={`sep-entity-card-${ent.entity_id}`}
                         >
                           <div className="flex items-start justify-between mb-3">
@@ -664,7 +664,7 @@ export default function StructuresPage() {
                                 </span>
                               )}
                               {ent.yellow_alerts > 0 && (
-                                <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center" title={`${ent.yellow_alerts} yellow alert(s)`}>
+                                <span className="w-6 h-6 rounded-full bg-warning text-white text-[10px] font-bold flex items-center justify-center" title={`${ent.yellow_alerts} yellow alert(s)`}>
                                   {ent.yellow_alerts}
                                 </span>
                               )}
@@ -705,7 +705,7 @@ export default function StructuresPage() {
                   {separationData.inter_entity_flows.length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">Inter-Entity Transfer Flows</h3>
-                      <div className="rounded-lg border border-border bg-card overflow-hidden">
+                      <div className="rounded border border-border bg-card overflow-hidden">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border bg-muted/50">
@@ -735,7 +735,7 @@ export default function StructuresPage() {
                   )}
 
                   {/* Alerts Panel */}
-                  <div className="rounded-lg border border-border bg-card p-4">
+                  <div className="rounded border border-border bg-card p-4">
                     <SeparationAlertsPanel />
                   </div>
                 </div>

@@ -631,7 +631,7 @@ export default function ScheduleAPage() {
                                     Disposed
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" data-testid={`status-badge-${asset.item_id}`}>
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success dark:bg-success/20 dark:text-success" data-testid={`status-badge-${asset.item_id}`}>
                                     Active
                                   </span>
                                 )}
@@ -701,7 +701,7 @@ export default function ScheduleAPage() {
           
           {assetToDispose && (
             <div className="space-y-4 mt-4">
-              <div className="bg-muted/50 p-3 rounded-lg">
+              <div className="bg-muted/50 p-3 rounded">
                 <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-1">Asset</p>
                 <p className="font-medium text-navy">{assetToDispose.description}</p>
                 <p className="text-sm text-muted-foreground">{getCategoryInfo(assetToDispose.category).label}</p>

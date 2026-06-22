@@ -192,9 +192,9 @@ export default function MinutesDetailPage() {
 
           {/* Retroactive Banner */}
           {isRetroactive && (
-            <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-              <div className="text-sm text-amber-800 dark:text-amber-200">
+            <div className="mb-6 p-4 bg-warning/5 dark:bg-warning/10 border border-warning/20 dark:border-warning/30 rounded flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-warning dark:text-warning mt-0.5 shrink-0" />
+              <div className="text-sm text-warning dark:text-warning">
                 <p className="font-semibold">Retroactive Minutes</p>
                 <p className="mt-1">
                   Created {formatDateTime(minutes.created_at)} for meeting on {formatDate(minutes.meeting_date)}.
@@ -294,7 +294,7 @@ export default function MinutesDetailPage() {
                   </p>
                   <p className="font-medium">{formatDateTime(minutes.created_at)}</p>
                   {isRetroactive && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    <p className="text-xs text-warning dark:text-warning mt-0.5">
                       After meeting date
                     </p>
                   )}
@@ -304,11 +304,11 @@ export default function MinutesDetailPage() {
               {/* Show meeting date distinctly for retroactive records */}
               {isRetroactive && (
                 <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-amber-500 mt-0.5" />
+                  <Calendar className="w-5 h-5 text-warning mt-0.5" />
                   <div>
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-amber-600 dark:text-amber-400">Meeting Date</p>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-warning dark:text-warning">Meeting Date</p>
                     <p className="font-medium">{formatDate(minutes.meeting_date)}</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    <p className="text-xs text-warning dark:text-warning mt-0.5">
                       Before creation date
                     </p>
                   </div>
@@ -462,9 +462,10 @@ export default function MinutesDetailPage() {
 
       {/* PDF Preview Modal */}
       <PDFPreviewModal
-        show={pdfPreview.show}
-        onClose={() => setPdfPreview({ show: false, loading: false, data: null, filename: '' })}
-        loading={pdfPreview.loading}
+        open={pdfPreview.show}
+        onOpenChange={(open) => {
+          if (!open) setPdfPreview({ show: false, url: null, loading: false });
+        }}
         pdfBase64={pdfPreview.data}
         filename={pdfPreview.filename}
       />

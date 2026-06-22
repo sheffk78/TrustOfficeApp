@@ -847,7 +847,7 @@ export default function AdminPage() {
   // Status badge helper
   const getStatusBadge = (status) => {
     const styles = {
-      active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      active: 'bg-success/10 text-success',
       trialing: 'bg-gold/20 text-gold dark:bg-gold/30 dark:text-gold',
       expired: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
       canceled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
@@ -920,10 +920,10 @@ export default function AdminPage() {
               </div>
               <div className="card-trust p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <CheckCircle className="w-4 h-4 text-success" />
                   <span className="text-xs">Active Subs</span>
                 </div>
-                <p className="text-2xl font-bold text-green-600">{stats.active_subscriptions}</p>
+                <p className="text-2xl font-bold text-success">{stats.active_subscriptions}</p>
               </div>
               <div className="card-trust p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -1121,7 +1121,7 @@ export default function AdminPage() {
                     <div className="card-trust p-6 lg:col-span-2">
                       <h2 className="font-serif text-xl text-navy dark:text-white mb-4">Revenue Over Time</h2>
                       {revenueData?.stripe_error && (
-                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
                           <p className="text-sm text-red-600 dark:text-red-400">
                             <strong>Stripe Error:</strong> {revenueData.stripe_error}
                           </p>
@@ -1241,7 +1241,7 @@ export default function AdminPage() {
                                   </span>
                                 </td>
                                 <td className="py-3 px-4">
-                                  <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                  <span className="px-2 py-0.5 text-xs bg-success/10 text-success">
                                     {tx.status}
                                   </span>
                                 </td>
@@ -1308,7 +1308,7 @@ export default function AdminPage() {
 
                 {/* Bulk Action Bar */}
                 {selectedCustomerIds.size > 0 && (
-                  <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded-lg border border-navy/10 dark:border-white/10">
+                  <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
                     <div className="flex items-center gap-3">
                       <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
                       <span className="font-medium text-navy dark:text-white">
@@ -1492,7 +1492,7 @@ export default function AdminPage() {
                 
                 <div className="space-y-4">
                   {admins.map((admin) => (
-                    <div key={admin.user_id} className="flex items-center justify-between p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                    <div key={admin.user_id} className="flex items-center justify-between p-4 border border-navy/10 dark:border-white/10 rounded">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
                           <Crown className="w-5 h-5 text-gold" />
@@ -1538,7 +1538,7 @@ export default function AdminPage() {
                 ) : (
                   <div className="space-y-4">
                     {statsUsers.map((su) => (
-                      <div key={su.user_id} className="flex items-center justify-between p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                      <div key={su.user_id} className="flex items-center justify-between p-4 border border-navy/10 dark:border-white/10 rounded">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
                             <BarChart3 className="w-5 h-5 text-gold" />
@@ -1611,7 +1611,7 @@ export default function AdminPage() {
                               <p className="text-sm text-muted-foreground">{ref.referee_email}</p>
                             </td>
                             <td className="py-3 px-4">
-                              <Badge className={ref.status === 'converted' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                              <Badge className={ref.status === 'converted' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}>
                                 {ref.status}
                               </Badge>
                             </td>
@@ -1693,7 +1693,7 @@ export default function AdminPage() {
                   <>
                     {/* Bulk Action Bar */}
                     {selectedLeadIds.size > 0 && (
-                      <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded-lg border border-navy/10 dark:border-white/10">
+                      <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
                         <div className="flex items-center gap-3">
                           <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
                           <span className="font-medium text-navy dark:text-white">
@@ -1763,8 +1763,8 @@ export default function AdminPage() {
                                 <Badge className={
                                   lead.stage === 'new' ? 'bg-blue-100 text-blue-800' :
                                   lead.stage === 'engaged' ? 'bg-purple-100 text-purple-800' :
-                                  lead.stage === 'warm' ? 'bg-amber-100 text-amber-800' :
-                                  lead.stage === 'converted' ? 'bg-green-100 text-green-800' :
+                                  lead.stage === 'warm' ? 'bg-warning/10 text-warning' :
+                                  lead.stage === 'converted' ? 'bg-success/10 text-success' :
                                   'bg-gray-100 text-gray-800'
                                 }>
                                   {lead.stage_label || lead.stage}
@@ -1775,8 +1775,8 @@ export default function AdminPage() {
                                   <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
                                     <div
                                       className={`h-full rounded-full ${
-                                        lead.score >= 70 ? 'bg-green-500' :
-                                        lead.score >= 40 ? 'bg-amber-500' :
+                                        lead.score >= 70 ? 'bg-success' :
+                                        lead.score >= 40 ? 'bg-warning' :
                                         'bg-rust'
                                       }`}
                                       style={{ width: `${lead.score}%` }}
@@ -1873,17 +1873,17 @@ export default function AdminPage() {
                         {[
                           { key: 'new', label: 'New', color: 'bg-blue-500' },
                           { key: 'engaged', label: 'Engaged', color: 'bg-purple-500' },
-                          { key: 'warm', label: 'Warm', color: 'bg-amber-500' },
-                          { key: 'converted', label: 'Converted', color: 'bg-green-500' },
-                          { key: 'lost', label: 'Lost', color: 'bg-gray-500' },
+                          { key: 'warm', label: 'Warm', color: 'bg-warning' },
+                          { key: 'converted', label: 'Converted', color: 'bg-success' },
+                          { key: 'lost', label: 'Lost', color: 'bg-error' },
                         ].map((s) => (
-                          <div key={s.key} className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                          <div key={s.key} className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                             <div className={`w-3 h-3 rounded-full ${s.color} mx-auto mb-1`} />
                             <p className="text-lg font-bold text-navy dark:text-white">{leadAnalytics.funnel?.[s.key] || 0}</p>
                             <p className="text-xs text-muted-foreground">{s.label}</p>
                           </div>
                         ))}
-                        <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                        <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                           <p className="text-lg font-bold text-navy dark:text-white">{leadAnalytics.total_leads || 0}</p>
                           <p className="text-xs text-muted-foreground">Total</p>
                         </div>
@@ -1892,17 +1892,17 @@ export default function AdminPage() {
 
                     {/* Conversion Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
                         <p className="text-xs text-muted-foreground mb-1">Total Converted</p>
-                        <p className="text-2xl font-bold text-green-600">{leadAnalytics.total_converted || 0}</p>
+                        <p className="text-2xl font-bold text-success">{leadAnalytics.total_converted || 0}</p>
                       </div>
-                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
                         <p className="text-xs text-muted-foreground mb-1">Avg Time to Convert</p>
                         <p className="text-2xl font-bold text-navy dark:text-white">
                           {leadAnalytics.avg_time_to_convert_days !== null ? `${leadAnalytics.avg_time_to_convert_days} days` : '—'}
                         </p>
                       </div>
-                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
                         <p className="text-xs text-muted-foreground mb-1">Median Time to Convert</p>
                         <p className="text-2xl font-bold text-navy dark:text-white">
                           {leadAnalytics.median_time_to_convert_days !== null ? `${leadAnalytics.median_time_to_convert_days} days` : '—'}
@@ -1928,7 +1928,7 @@ export default function AdminPage() {
                               <tr key={s.source} className="border-b border-navy/5 dark:border-white/5">
                                 <td className="py-2 px-3 text-sm text-navy dark:text-white">{s.source}</td>
                                 <td className="py-2 px-3 text-sm text-right text-muted-foreground">{s.total}</td>
-                                <td className="py-2 px-3 text-sm text-right text-green-600">{s.converted}</td>
+                                <td className="py-2 px-3 text-sm text-right text-success">{s.converted}</td>
                                 <td className="py-2 px-3 text-sm text-right font-mono">{s.conversion_rate}%</td>
                               </tr>
                             ))}
@@ -1995,27 +1995,27 @@ export default function AdminPage() {
                   <div className="space-y-4 py-4">
                     {/* Status Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                         <p className="text-xs text-muted-foreground mb-1">Stage</p>
                         <Badge className={
                           selectedLead.stage === 'new' ? 'bg-blue-100 text-blue-800' :
                           selectedLead.stage === 'engaged' ? 'bg-purple-100 text-purple-800' :
-                          selectedLead.stage === 'warm' ? 'bg-amber-100 text-amber-800' :
-                          selectedLead.stage === 'converted' ? 'bg-green-100 text-green-800' :
+                          selectedLead.stage === 'warm' ? 'bg-warning/10 text-warning' :
+                          selectedLead.stage === 'converted' ? 'bg-success/10 text-success' :
                           'bg-gray-100 text-gray-800'
                         }>
                           {selectedLead.stage_label || selectedLead.stage}
                         </Badge>
                       </div>
-                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                         <p className="text-xs text-muted-foreground mb-1">Score</p>
                         <p className="text-lg font-bold text-navy dark:text-white">{selectedLead.score || 0}</p>
                       </div>
-                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                         <p className="text-xs text-muted-foreground mb-1">Plan</p>
                         <p className="text-sm font-medium text-navy dark:text-white capitalize">{selectedLead.plan_type}</p>
                       </div>
-                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                      <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                         <p className="text-xs text-muted-foreground mb-1">Lessons</p>
                         <p className="text-lg font-bold text-navy dark:text-white">{selectedLead.lessons_watched || 0}/9</p>
                       </div>
@@ -2023,7 +2023,7 @@ export default function AdminPage() {
 
                     {/* Score Breakdown */}
                     {selectedLead.score_breakdown && (
-                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                      <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
                         <h3 className="text-sm font-medium text-navy dark:text-white mb-3 flex items-center gap-2">
                           <Activity className="w-4 h-4 text-gold" />
                           Score Breakdown
@@ -2043,8 +2043,8 @@ export default function AdminPage() {
                                 <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                   <div
                                     className={`h-full rounded-full ${
-                                      item.score / item.max >= 0.7 ? 'bg-green-500' :
-                                      item.score / item.max >= 0.4 ? 'bg-amber-500' :
+                                      item.score / item.max >= 0.7 ? 'bg-success' :
+                                      item.score / item.max >= 0.4 ? 'bg-warning' :
                                       'bg-rust'
                                     }`}
                                     style={{ width: `${(item.score / item.max) * 100}%` }}
@@ -2059,7 +2059,7 @@ export default function AdminPage() {
                     )}
 
                     {/* Next Action */}
-                    <div className="p-3 border border-gold/30 bg-gold/5 rounded-lg">
+                    <div className="p-3 border border-gold/30 bg-gold/5 rounded">
                       <div className="flex items-center gap-2 mb-1">
                         <Activity className="w-4 h-4 text-gold" />
                         <span className="text-sm font-medium text-navy dark:text-white">Next Action</span>
@@ -2200,7 +2200,7 @@ export default function AdminPage() {
                 
                 <div className="space-y-4 py-4">
                   {/* Subscription */}
-                  <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                  <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
                     <h3 className="font-medium text-navy dark:text-white mb-2">Subscription</h3>
                     <div className="flex items-center gap-2">
                       <Badge className={getStatusBadge(customerDetail.subscription?.status)}>
@@ -2220,17 +2220,17 @@ export default function AdminPage() {
                   
                   {/* Stats */}
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                    <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                       <Building2 className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
                       <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.trusts}</p>
                       <p className="text-xs text-muted-foreground">Trusts</p>
                     </div>
-                    <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                    <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                       <FileText className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
                       <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.minutes}</p>
                       <p className="text-xs text-muted-foreground">Minutes</p>
                     </div>
-                    <div className="p-3 border border-navy/10 dark:border-white/10 rounded-lg text-center">
+                    <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
                       <DollarSign className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
                       <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.distributions}</p>
                       <p className="text-xs text-muted-foreground">Distributions</p>
@@ -2239,7 +2239,7 @@ export default function AdminPage() {
                   
                   {/* Referral Info */}
                   {customerDetail.referral_info && (
-                    <div className="p-4 border border-navy/10 dark:border-white/10 rounded-lg">
+                    <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
                       <h3 className="font-medium text-navy dark:text-white mb-2">Referral Info</h3>
                       {customerDetail.referral_info.referral_code && (
                         <p className="text-sm text-muted-foreground">
@@ -2643,7 +2643,7 @@ export default function AdminPage() {
               
               <div className="py-4">
                 <p className="text-red-500 font-medium mb-3">This action cannot be undone!</p>
-                <div className="max-h-40 overflow-y-auto bg-muted/50 rounded-lg p-3">
+                <div className="max-h-40 overflow-y-auto bg-muted/50 rounded p-3">
                   <p className="text-sm text-muted-foreground mb-2">Accounts to be deleted:</p>
                   <ul className="text-sm space-y-1">
                     {customers
@@ -2697,7 +2697,7 @@ export default function AdminPage() {
               </DialogHeader>
               
               <div className="py-4">
-                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-4">
+                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded p-4 mb-4">
                   <p className="text-sm text-orange-800 dark:text-orange-200 mb-2">
                     <strong>You are about to view as:</strong>
                   </p>
@@ -2711,19 +2711,19 @@ export default function AdminPage() {
                 
                 <ul className="text-sm text-muted-foreground space-y-2">
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    <CheckCircle className="w-4 h-4 text-success mt-0.5 shrink-0" />
                     You'll see their dashboard, trusts, and all data
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    <CheckCircle className="w-4 h-4 text-success mt-0.5 shrink-0" />
                     An orange banner will remind you that you're impersonating
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    <CheckCircle className="w-4 h-4 text-success mt-0.5 shrink-0" />
                     Click "Exit Impersonation" to return to admin
                   </li>
                   <li className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
                     This action is logged for audit purposes
                   </li>
                 </ul>

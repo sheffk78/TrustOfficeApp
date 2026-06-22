@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, X } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -47,6 +47,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   // Redirect if already logged in
   if (user) {
@@ -60,7 +61,21 @@ export default function LoginPage() {
     
     if (loading) return;
     
+    // Clear previous errors
+    setLoginError('');
+    
+    // Basic validation
+    if (!email.trim()) {
+      setLoginError('Please enter your email address.');
+      return;
+    }
+    if (!password) {
+      setLoginError('Please enter your password.');
+      return;
+    }
+    
     setLoading(true);
+    setLoginError('');
     
     try {
       const data = await xhrPost(`${API_URL}/api/auth/login`, {
@@ -84,7 +99,20 @@ export default function LoginPage() {
       toast.success('Welcome back');
       navigate('/dashboard', { replace: true });
     } catch (error) {
-      toast.error(error.message || 'Login failed');
+      const rawMsg = error.message || 'Login failed';
+      // Provide more user-friendly messages for common error cases
+      let friendlyMsg = rawMsg;
+      if (rawMsg.includes('Network error')) {
+        friendlyMsg = 'Unable to connect to the server. Please check your internet connection and try again.';
+      } else if (rawMsg.includes('Invalid server response')) {
+        friendlyMsg = 'The server returned an unexpected response. Please try again or contact support if the problem persists.';
+      } else if (rawMsg.includes('401') || rawMsg.toLowerCase().includes('invalid credentials')) {
+        friendlyMsg = 'Incorrect email or password. Please verify your credentials and try again.';
+      } else if (rawMsg.includes('403') || rawMsg.toLowerCase().includes('not verified')) {
+        friendlyMsg = 'Your email address has not been verified. Please check your inbox for a verification email.';
+      }
+      setLoginError(friendlyMsg);
+      toast.error(friendlyMsg);
     } finally {
       setLoading(false);
     }
@@ -159,6 +187,24 @@ export default function LoginPage() {
             {/* Email login form */}
             <form onSubmit={handleEmailLogin}>
               <div className="space-y-4">
+                {/* Error state */}
+                {loginError && (
+                  <div className="p-3 bg-error/10 border border-error/20 flex items-start gap-2" data-testid="login-error">
+                    <AlertCircle className="w-4 h-4 text-error flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-error">Sign-in failed</p>
+                      <p className="text-xs text-error/80 mt-0.5">{loginError}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLoginError('')}
+                      className="text-error/60 hover:text-error flex-shrink-0"
+                      aria-label="Dismiss error"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
                 <div>
                   <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                     Email Address
@@ -168,8 +214,8 @@ export default function LoginPage() {
                     <Input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 input-trust"
+                      onChange={(e) => { setEmail(e.target.value); if (loginError) setLoginError(''); }}
+                      className={`pl-10 input-trust ${loginError ? 'border-error/40' : ''}`}
                       placeholder="your@email.com"
                       required
                       data-testid="email-input"
@@ -195,8 +241,8 @@ export default function LoginPage() {
                     <Input
                       type={showPassword ? 'text' : 'password'}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 input-trust"
+                      onChange={(e) => { setPassword(e.target.value); if (loginError) setLoginError(''); }}
+                      className={`pl-10 pr-10 input-trust ${loginError ? 'border-error/40' : ''}`}
                       placeholder="Enter password"
                       required
                       data-testid="password-input"

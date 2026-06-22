@@ -244,7 +244,7 @@ export default function CreateMinutesPage() {
           </span>
         )}
         <div className="flex items-center gap-3 w-full">
-          <div className={`flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-lg ${isPriority ? 'bg-gold/10 text-gold' : 'bg-navy/5 text-navy'}`}>
+          <div className={`flex-shrink-0 flex h-10 w-10 items-center justify-center rounded ${isPriority ? 'bg-gold/10 text-gold' : 'bg-navy/5 text-navy'}`}>
             <IconComp className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -303,7 +303,7 @@ export default function CreateMinutesPage() {
 
           {/* Money prefill banner */}
           {showPrefillBanner && (
-            <div className="rounded-lg border border-gold/30 bg-gold/10 p-4 text-sm text-navy flex items-start gap-3 mb-6">
+            <div className="rounded border border-gold/30 bg-gold/10 p-4 text-sm text-navy flex items-start gap-3 mb-6">
               <Sparkles className="h-5 w-5 text-gold flex-shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold">Action from Money</span>{' '}
@@ -328,7 +328,7 @@ export default function CreateMinutesPage() {
 
           {/* Onboarding welcome message */}
           {fromOnboarding && (
-            <div className="rounded-lg border border-gold/30 bg-gold/10 p-4 text-sm text-navy flex items-start gap-2 mb-6">
+            <div className="rounded border border-gold/30 bg-gold/10 p-4 text-sm text-navy flex items-start gap-2 mb-6">
               <Sparkles className="h-5 w-5 text-gold flex-shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold">Welcome!</span>{' '}
@@ -378,7 +378,7 @@ export default function CreateMinutesPage() {
                 className="card-trust group relative flex flex-col items-start gap-2 p-5 text-left transition-all hover:border-gold/50 hover:shadow-md w-full md:w-2/3 lg:w-1/2"
               >
                 <div className="flex items-center gap-3 w-full">
-                  <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-lg bg-gold/10 text-gold">
+                  <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded bg-gold/10 text-gold">
                     <Bot className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -396,7 +396,7 @@ export default function CreateMinutesPage() {
           )}
 
           {/* Info box */}
-          <div className="rounded-lg border border-gold/20 bg-gold/5 p-4 text-sm text-muted-foreground">
+          <div className="rounded border border-gold/20 bg-gold/5 p-4 text-sm text-muted-foreground">
             <p className="flex items-start gap-2">
               <FileText className="h-4 w-4 mt-0.5 text-gold flex-shrink-0" />
               <span>

@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-06-18T13:01:35.829562",
+  "results": [
+    {
+      "id": "dist-02",
+      "expected": "create_distribution",
+      "actual": "create_distribution",
+      "pass": true
+    },
+    {
+      "id": "dist-03",
+      "expected": "create_distribution",
+      "actual": "create_distribution",
+      "pass": true
+    },
+    {
+      "id": "dist-04",
+      "expected": "cancel_distribution",
+      "actual": "cancel_distribution",
+      "pass": true
+    },
+    {
+      "id": "mins-02",
+      "expected": "log_minutes",
+      "actual": "log_minutes",
+      "pass": true
+    },
+    {
+      "id": "ben-02",
+      "expected": "update_beneficiary",
+      "actual": "ask_knowledge",
+      "pass": false
+    },
+    {
+      "id": "ben-03",
+      "expected": "remove_beneficiary",
+      "actual": "remove_beneficiary",
+      "pass": true
+    },
+    {
+      "id": "asset-02",
+      "expected": "add_asset",
+      "actual": "add_asset",
+      "pass": true
+    },
+    {
+      "id": "comp-01",
+      "expected": "setup_compensation",
+      "actual": "setup_compensation",
+      "pass": true
+    },
+    {
+      "id": "task-01",
+      "expected": "schedule_task",
+      "actual": "schedule_task",
+      "pass": true
+    },
+    {
+      "id": "txn-01",
+      "expected": "add_transaction",
+      "actual": "ask_knowledge",
+      "pass": false
+    },
+    {
+      "id": "doc-01",
+      "expected": "upload_document",
+      "actual": "upload_document",
+      "pass": true
+    },
+    {
+      "id": "doc-02",
+      "expected": "review_document",
+      "actual": "review_document",
+      "pass": true
+    },
+    {
+      "id": "know-03",
+      "expected": "recommend_action",
+      "actual": "check_deadlines",
+      "pass": false
+    },
+    {
+      "id": "know-04",
+      "expected": "emergency",
+      "actual": "check_deadlines",
+      "pass": false
+    },
+    {
+      "id": "edge-02",
+      "expected": "dismiss_alert",
+      "actual": "dismiss_alert",
+      "pass": true
+    },
+    {
+      "id": "edge-03",
+      "expected": "change_settings",
+      "actual": "ask_knowledge",
+      "pass": false
+    }
+  ]
+}

@@ -164,7 +164,7 @@ export function StructuralMap({ entities = [], relationships = [] }) {
   }
 
   return (
-    <div style={{ width: '100%', height: '400px' }} className="rounded-lg border border-border">
+    <div style={{ width: '100%', height: '400px' }} className="rounded border border-border">
       <ReactFlow
         nodes={nodes}
         edges={edges}

@@ -36,7 +36,7 @@ const DIRECTION_OPTIONS = [
 const classificationColors = {
   'Distribution': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   'Compensation': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  'Inter-Entity Transfer': 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  'Inter-Entity Transfer': 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning',
   'Operational Expense': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
   'Capital Contribution': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
   'Tax Payment': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
@@ -339,19 +339,19 @@ export default function TransactionLedgerPage() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="rounded-lg border border-border bg-card p-4">
+          <div className="rounded border border-border bg-card p-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total Inflows</p>
             <p className="text-xl font-semibold text-emerald-600" data-testid="total-inflows">
               ${totalInflows.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
+          <div className="rounded border border-border bg-card p-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total Outflows</p>
             <p className="text-xl font-semibold text-red-500" data-testid="total-outflows">
               ${totalOutflows.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
+          <div className="rounded border border-border bg-card p-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net Flow</p>
             <p className={`text-xl font-semibold ${totalInflows - totalOutflows >= 0 ? 'text-emerald-600' : 'text-red-500'}`} data-testid="net-flow">
               ${(totalInflows - totalOutflows).toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -360,7 +360,7 @@ export default function TransactionLedgerPage() {
         </div>
 
         {/* Separation Alerts Panel */}
-        <div className="mb-6 rounded-lg border border-border bg-card p-4">
+        <div className="mb-6 rounded border border-border bg-card p-4">
           <SeparationAlertsPanel />
         </div>
 
@@ -403,7 +403,7 @@ export default function TransactionLedgerPage() {
 
         {/* Bulk action bar */}
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-navy/5 dark:bg-navy/20 border border-navy/20" data-testid="bulk-action-bar">
+          <div className="flex items-center gap-3 mb-4 p-3 rounded bg-navy/5 dark:bg-navy/20 border border-navy/20" data-testid="bulk-action-bar">
             <span className="text-sm font-medium">{selectedIds.size} selected</span>
             <Button size="sm" variant="outline" onClick={() => setShowBulkClassify(true)} data-testid="bulk-classify-btn">
               <Tag className="w-4 h-4 mr-2" /> Classify Selected
@@ -415,7 +415,7 @@ export default function TransactionLedgerPage() {
         )}
 
         {/* Transaction Table */}
-        <div className="rounded-lg border border-border overflow-hidden bg-card">
+        <div className="rounded border border-border overflow-hidden bg-card">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -614,7 +614,7 @@ export default function TransactionLedgerPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+              <div className="border-2 border-dashed border-border rounded p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
                 onClick={() => fileInputRef.current?.click()}>
                 <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Click to upload a CSV file</p>

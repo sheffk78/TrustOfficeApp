@@ -21,15 +21,15 @@ import PageHelpButton from '@/components/PageHelpButton';
 const ROLE_COLORS = {
   Trustee: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
   Grantor: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  Protector: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-  Beneficiary: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+  Protector: { bg: 'bg-warning/5', text: 'text-warning', border: 'border-warning/20' },
+  Beneficiary: { bg: 'bg-success/5', text: 'text-success', border: 'border-success/20' },
   Manager: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
   'Successor Trustee': { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
 };
 
 const AUTHORITY_LEVELS = {
-  full: { label: 'Full Authority', color: 'text-green-600', icon: CheckCircle2 },
-  limited: { label: 'Limited Authority', color: 'text-amber-600', icon: AlertTriangle },
+  full: { label: 'Full Authority', color: 'text-success', icon: CheckCircle2 },
+  limited: { label: 'Limited Authority', color: 'text-warning', icon: AlertTriangle },
   none: { label: 'No Authority', color: 'text-red-500', icon: XCircle },
 };
 
@@ -186,7 +186,7 @@ export default function AuthorityPage() {
               <h2 className="font-serif text-lg text-navy mb-3 flex items-center gap-2">
                 <FileText className="w-5 h-5" /> Governing Authority Clause
               </h2>
-              <div className="bg-slate-50 rounded-lg p-4 text-sm leading-relaxed border border-slate-200">
+              <div className="bg-slate-50 rounded p-4 text-sm leading-relaxed border border-slate-200">
                 {trustData.authority_clause}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
@@ -310,9 +310,9 @@ export default function AuthorityPage() {
                           </td>
                           <td className="py-2 px-3">
                             {entity.article_ref_compensation ? (
-                              <span className="text-xs text-green-600">Defined</span>
+                              <span className="text-xs text-success">Defined</span>
                             ) : (
-                              <span className="text-xs text-amber-600">Not specified</span>
+                              <span className="text-xs text-warning">Not specified</span>
                             )}
                           </td>
                         </tr>
@@ -332,7 +332,7 @@ export default function AuthorityPage() {
               </h2>
               <div className="space-y-2">
                 {relationships.map((rel, idx) => (
-                  <div key={idx} className="flex items-center gap-3 py-2 px-3 bg-slate-50 rounded-lg text-sm">
+                  <div key={idx} className="flex items-center gap-3 py-2 px-3 bg-slate-50 rounded text-sm">
                     <span className="font-medium text-navy">{rel.parent_entity_id}</span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">

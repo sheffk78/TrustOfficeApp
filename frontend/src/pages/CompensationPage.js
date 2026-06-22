@@ -548,7 +548,7 @@ export default function CompensationPage() {
                             </p>
                             {/* Minutes link indicator */}
                             {payment.minutes_record_id && (
-                              <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                              <p className="text-xs text-success dark:text-success mt-1 flex items-center gap-1">
                                 <Link2 className="w-3 h-3" /> Linked to minutes
                               </p>
                             )}

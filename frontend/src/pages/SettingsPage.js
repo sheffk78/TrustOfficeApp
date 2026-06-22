@@ -38,7 +38,8 @@ import {
   Users,
   Copy,
   Check,
-  DollarSign
+  DollarSign,
+  Shield
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
@@ -216,7 +217,7 @@ export default function SettingsPage() {
           });
         }
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         toast.error(error.detail || 'Failed to seed demo data');
       }
     } catch (error) {
@@ -240,7 +241,7 @@ export default function SettingsPage() {
         await loadTrusts();
         setSelectedTrust(null);
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         toast.error(error.detail || 'Failed to delete data');
       }
     } catch (error) {
@@ -341,7 +342,7 @@ export default function SettingsPage() {
         setEditingProfile(false);
         toast.success('Profile updated');
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         toast.error(error.detail || 'Failed to update profile');
       }
     } catch (error) {
@@ -478,7 +479,7 @@ export default function SettingsPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         throw new Error(error.detail || 'Failed to create trust');
       }
 
@@ -1273,7 +1274,7 @@ export default function SettingsPage() {
             ) : (
               <div className="space-y-4">
                 {/* Referral Link */}
-                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg">
+                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
                     Your Referral Link
                   </Label>
@@ -1291,7 +1292,7 @@ export default function SettingsPage() {
                       data-testid="copy-referral-link-btn"
                     >
                       {linkCopied ? (
-                        <Check className="w-4 h-4 text-green-600" />
+                        <Check className="w-4 h-4 text-success" />
                       ) : (
                         <Copy className="w-4 h-4" />
                       )}
@@ -1307,15 +1308,15 @@ export default function SettingsPage() {
                 {/* Referral Stats */}
                 {referralStats && (
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded">
                       <p className="text-2xl font-bold text-navy">{referralStats.total_referred || 0}</p>
                       <p className="text-xs text-muted-foreground">Friends Invited</p>
                     </div>
-                    <div className="text-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
-                      <p className="text-2xl font-bold text-green-700 dark:text-green-400">{referralStats.successful_conversions || 0}</p>
+                    <div className="text-center p-3 bg-success/10">
+                      <p className="text-2xl font-bold text-success">{referralStats.successful_conversions || 0}</p>
                       <p className="text-xs text-muted-foreground">Subscribed</p>
                     </div>
-                    <div className="text-center p-3 bg-gold/10 rounded-lg">
+                    <div className="text-center p-3 bg-gold/10 rounded">
                       <p className="text-2xl font-bold text-gold">{referralStats.rewards_earned || 0}</p>
                       <p className="text-xs text-muted-foreground">Rewards Earned</p>
                     </div>
@@ -1338,12 +1339,12 @@ export default function SettingsPage() {
                           </div>
                           <div className="text-right">
                             {ref.status === 'converted' ? (
-                              <span className="inline-flex items-center gap-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+                              <span className="inline-flex items-center gap-1 text-xs bg-success/10 text-success px-2 py-1">
                                 <CheckCircle2 className="w-3 h-3" />
                                 Subscribed
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded">
+                              <span className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning px-2 py-1">
                                 <Clock className="w-3 h-3" />
                                 Pending
                               </span>
@@ -1356,7 +1357,7 @@ export default function SettingsPage() {
                 )}
                 
                 {/* How it works */}
-                <div className="bg-navy/5 dark:bg-navy/20 p-4 rounded-lg mt-4">
+                <div className="bg-navy/5 dark:bg-navy/20 p-4 rounded mt-4">
                   <h3 className="text-sm font-medium text-navy mb-2">How it works</h3>
                   <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
                     <li>Share your unique referral link with friends</li>
@@ -1506,7 +1507,7 @@ export default function SettingsPage() {
               {selectedTrust && <span className="text-navy font-medium"> Exporting for: {selectedTrust.name}</span>}
             </p>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <Button
                 onClick={() => handleExport('minutes')}
                 variant="outline"
@@ -1565,6 +1566,21 @@ export default function SettingsPage() {
                   <FileText className="w-4 h-4" />
                 )}
                 Tasks
+              </Button>
+              
+              <Button
+                onClick={() => handleExport('expenses')}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+                disabled={exportLoading === 'expenses'}
+                data-testid="export-expenses-btn"
+              >
+                {exportLoading === 'expenses' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                Expenses
               </Button>
             </div>
           </div>
@@ -1692,11 +1708,11 @@ export default function SettingsPage() {
                       <li>Demo governance tasks</li>
                       <li>Demo trust unit certificates</li>
                     </ul>
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200">
-                      <p className="text-sm font-medium text-green-700">
+                    <div className="mt-4 p-3 bg-success/5 border border-success/20">
+                      <p className="text-sm font-medium text-success">
                         Your custom data is safe!
                       </p>
-                      <p className="mt-1 text-xs text-green-600">
+                      <p className="mt-1 text-xs text-success/80">
                         Any trusts, minutes, or records you created yourself will NOT be deleted.
                       </p>
                     </div>
@@ -1762,36 +1778,90 @@ export default function SettingsPage() {
             </Button>
           </div>
 
-          {/* Notification Settings */}
-          <div className="card-trust">
-            <div className="flex items-center gap-2 mb-6">
-              <Bell className="w-5 h-5 text-navy" />
-              <h2 className="font-serif text-xl text-navy">Notifications</h2>
+          {/* Privacy & Security Section */}
+          <div className="card-trust mb-8" data-testid="privacy-security-section">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="w-5 h-5 text-navy" />
+              <h2 className="font-serif text-xl text-navy">Privacy & Security</h2>
             </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              Manage your account security and data privacy preferences.
+            </p>
 
             <div className="space-y-4">
+              {/* Two-factor info */}
               <div className="flex items-center justify-between p-4 border border-navy/10">
                 <div>
-                  <p className="font-medium text-navy">Review Reminders</p>
+                  <p className="font-medium text-navy">Two-Factor Authentication</p>
                   <p className="text-sm text-muted-foreground">
-                    Get reminded when it's time for your {selectedTrust?.review_cadence || 'quarterly'} review
+                    Add an extra layer of security to your account with TOTP authentication.
                   </p>
                 </div>
                 <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                  Coming Soon
+                  Not Enabled
                 </div>
               </div>
 
+              {/* Session management */}
               <div className="flex items-center justify-between p-4 border border-navy/10">
                 <div>
-                  <p className="font-medium text-navy">Pending Item Alerts</p>
+                  <p className="font-medium text-navy">Active Sessions</p>
                   <p className="text-sm text-muted-foreground">
-                    Get notified when items are pending review for too long
+                    Your authentication session is managed securely via HTTP-only cookies and JWT tokens.
                   </p>
                 </div>
-                <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                  Coming Soon
+                <div className="font-mono text-xs uppercase tracking-widest text-success">
+                  Active
                 </div>
+              </div>
+
+              {/* Data retention */}
+              <div className="flex items-center justify-between p-4 border border-navy/10">
+                <div>
+                  <p className="font-medium text-navy">Data Retention</p>
+                  <p className="text-sm text-muted-foreground">
+                    Your trust data is retained for 90 days after subscription cancellation. 
+                    Delete your trust at any time to remove all associated records immediately.
+                  </p>
+                </div>
+              </div>
+
+              {/* Privacy policy link */}
+              <div className="flex items-center justify-between p-4 border border-navy/10">
+                <div>
+                  <p className="font-medium text-navy">Privacy Policy</p>
+                  <p className="text-sm text-muted-foreground">
+                    Review how TrustOffice handles your data and privacy.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => window.open('https://trustoffice.app/privacy', '_blank')}
+                  variant="ghost"
+                  className="text-navy hover:text-gold"
+                  data-testid="privacy-policy-link"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View
+                </Button>
+              </div>
+
+              {/* Terms of Service link */}
+              <div className="flex items-center justify-between p-4 border border-navy/10">
+                <div>
+                  <p className="font-medium text-navy">Terms of Service</p>
+                  <p className="text-sm text-muted-foreground">
+                    Review the terms and conditions for using TrustOffice.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => window.open('https://trustoffice.app/terms', '_blank')}
+                  variant="ghost"
+                  className="text-navy hover:text-gold"
+                  data-testid="terms-of-service-link"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View
+                </Button>
               </div>
             </div>
           </div>

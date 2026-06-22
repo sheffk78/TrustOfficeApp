@@ -58,7 +58,35 @@ export default function CalendarPage() {
     }
     setLoading(true);
     try {
-      const response = await fetchWithAuth(`/tasks?trust_id=${selectedTrust.trust_id}`);
+      // Use the unified /calendar/events endpoint which aggregates governance
+      // tasks AND tax calendar deadlines into a single feed.  Falls back to
+      // the legacy /tasks endpoint if the unified endpoint is unavailable.
+      let response;
+      try {
+        response = await fetchWithAuth(`/calendar/events?trust_id=${selectedTrust.trust_id}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Map unified event shape to the component's expected task shape
+          // Unified events use: id, type, title, date, status, completed, description
+          // Component expects: task_id, task_type, due_date, status, completed_at, description
+          const mapped = (data.events || []).map(e => ({
+            task_id: e.id || e.task_id,
+            task_type: e.type || e.task_type || 'task',
+            due_date: e.date || e.due_date,
+            status: e.status || 'pending',
+            completed_at: e.completed ? (e.date || new Date().toISOString()) : null,
+            description: e.description || e.title || '',
+            checklist_items: e.checklist_items || [],
+          }));
+          setTasks(mapped);
+          return;
+        }
+      } catch (e) {
+        console.warn('Unified calendar endpoint unavailable, falling back to /tasks', e);
+      }
+
+      // Fallback: legacy tasks-only endpoint
+      response = await fetchWithAuth(`/tasks?trust_id=${selectedTrust.trust_id}`);
       if (response.ok) {
         setTasks(await response.json());
       }
@@ -328,8 +356,7 @@ export default function CalendarPage() {
                                                     : 'border-navy/30 hover:border-gold'
                                                 }`}
                                               >
-                                  >
-                                    {item.completed && <Check className="w-3 h-3" />}
+                                              {item.completed ? <span className="text-xs">&#10003;</span> : ''}
                                   </button>
                                   <span className={`text-sm ${item.completed ? 'line-through text-muted-foreground' : 'text-navy'}`}>
                                     {item.text}

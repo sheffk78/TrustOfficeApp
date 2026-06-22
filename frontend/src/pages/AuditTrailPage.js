@@ -40,14 +40,14 @@ const EVENT_ICONS = {
 const EVENT_COLORS = {
   minutes_created: 'bg-blue-50 text-blue-700 border-blue-200',
   minutes_updated: 'bg-blue-50 text-blue-600 border-blue-200',
-  distribution_created: 'bg-green-50 text-green-700 border-green-200',
-  distribution_updated: 'bg-green-50 text-green-600 border-green-200',
+  distribution_created: 'bg-success/5 text-success border-success/20',
+  distribution_updated: 'bg-success/5 text-success border-success/20',
   compensation_created: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   entity_created: 'bg-purple-50 text-purple-700 border-purple-200',
   entity_updated: 'bg-purple-50 text-purple-600 border-purple-200',
   relationship_created: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  alert_created: 'bg-amber-50 text-amber-700 border-amber-200',
-  alert_resolved: 'bg-green-50 text-green-700 border-green-200',
+  alert_created: 'bg-warning/5 text-warning border-warning/20',
+  alert_resolved: 'bg-success/5 text-success border-success/20',
   transaction_created: 'bg-teal-50 text-teal-700 border-teal-200',
   transaction_updated: 'bg-teal-50 text-teal-600 border-teal-200',
   trust_updated: 'bg-navy/5 text-navy border-navy/20',
@@ -295,8 +295,8 @@ export default function AuditTrailPage() {
             {[
               { label: 'Total Events', value: events.length, color: 'text-navy' },
               { label: 'Minutes', value: events.filter(e => e.type.includes('minutes')).length, color: 'text-blue-600' },
-              { label: 'Financial', value: events.filter(e => e.type.includes('distribution') || e.type.includes('compensation') || e.type.includes('transaction')).length, color: 'text-green-600' },
-              { label: 'Alerts', value: events.filter(e => e.type.includes('alert')).length, color: 'text-amber-600' },
+              { label: 'Financial', value: events.filter(e => e.type.includes('distribution') || e.type.includes('compensation') || e.type.includes('transaction')).length, color: 'text-success' },
+              { label: 'Alerts', value: events.filter(e => e.type.includes('alert')).length, color: 'text-warning' },
             ].map(stat => (
               <div key={stat.label} className="card-trust text-center">
                 <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
@@ -352,7 +352,7 @@ export default function AuditTrailPage() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm truncate">{event.title}</p>
                         {event.is_retroactive && (
-                          <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                          <span className="text-[10px] bg-warning/10 text-warning px-1.5 py-0.5 rounded font-medium">
                             RETROACTIVE
                           </span>
                         )}

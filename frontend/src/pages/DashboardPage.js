@@ -35,11 +35,11 @@ import {
   FileUp,
   Upload,
   Users,
-  ClipboardList,
-  HeartPulse
+  ClipboardList
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import PageHelpButton from '@/components/PageHelpButton';
+import { TrustManager } from '@/components/TrustManager';
 
 const QUICK_ACTIONS = [
   {
@@ -47,7 +47,7 @@ const QUICK_ACTIONS = [
     description: 'Document a distribution to beneficiaries',
     icon: DollarSign,
     path: '/minutes/template/distribution_to_beneficiaries',
-    color: 'bg-green-500/10 text-green-600'
+    color: 'bg-success/10 text-success'
   },
   {
     title: 'Add Asset to Trust',
@@ -463,6 +463,13 @@ export default function DashboardPage() {
             />
           </div>
 
+          {/* Trust Manager Section — shown when user has 2+ trusts */}
+          {trusts.length >= 2 && !loading && (
+            <div className="mb-8" data-testid="trust-manager-section">
+              <TrustManager embedded />
+            </div>
+          )}
+
           {loading ? (
             <div className="card-grid">
               {[1, 2, 3].map((i) => (
@@ -832,7 +839,7 @@ export default function DashboardPage() {
                                 {overdue ? (
                                   <p className="text-xs text-red-600">Overdue by {Math.abs(d.days_remaining)} days</p>
                                 ) : d.days_remaining <= 30 ? (
-                                  <p className="text-xs text-amber-600">Due in {d.days_remaining} days</p>
+                                  <p className="text-xs text-warning">Due in {d.days_remaining} days</p>
                                 ) : (
                                   <p className="text-xs text-muted-foreground">Due {format(parseISO(d.due_date), 'MMMM d, yyyy')}</p>
                                 )}

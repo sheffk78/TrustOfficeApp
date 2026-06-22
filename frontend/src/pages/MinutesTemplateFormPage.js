@@ -2965,7 +2965,7 @@ export default function MinutesTemplateFormPage() {
                       <select
                         value={formData.fiscal_year_end || 'December 31'}
                         onChange={(e) => setFormData({ ...formData, fiscal_year_end: e.target.value })}
-                        className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm input-trust"
+                        className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm input-trust"
                       >
                         <option value="December 31">December 31 (Calendar Year)</option>
                         <option value="March 31">March 31</option>
@@ -2984,7 +2984,7 @@ export default function MinutesTemplateFormPage() {
                         <select
                           value={formData.compensation_type || 'none'}
                           onChange={(e) => setFormData({ ...formData, compensation_type: e.target.value })}
-                          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm input-trust"
+                          className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm input-trust"
                         >
                           <option value="none">No Compensation</option>
                           <option value="fixed">Fixed Annual Amount</option>
@@ -3052,7 +3052,7 @@ export default function MinutesTemplateFormPage() {
                   </div>
                   
                   {resolutions.map((res, index) => (
-                    <div key={index} className="mb-6 p-4 border border-border rounded-lg">
+                    <div key={index} className="mb-6 p-4 border border-border rounded">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-medium">Resolution {index + 1}</h3>
                         {resolutions.length > 1 && (

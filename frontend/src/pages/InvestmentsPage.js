@@ -130,7 +130,7 @@ export default function InvestmentsPage() {
         <Sidebar />
         <div className="md:pl-64 pb-20 md:pb-0">
           <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
               <Wallet className="w-12 h-12 text-slate-400 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
               <p className="text-sm text-neutral-600">Choose a trust to manage investments.</p>
@@ -229,13 +229,13 @@ export default function InvestmentsPage() {
                 <h3 className="font-semibold text-navy mb-3">Record New Investment</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                   <Input placeholder="Asset name (e.g. Apple, S&P 500 ETF)" value={form.asset_name} onChange={e => setForm({ ...form, asset_name: e.target.value })} />
-                  <select value={form.asset_type} onChange={e => setForm({ ...form, asset_type: e.target.value })} className="border border-neutral-300 rounded-md px-3 py-2 text-sm">
+                  <select value={form.asset_type} onChange={e => setForm({ ...form, asset_type: e.target.value })} className="border border-neutral-300 rounded px-3 py-2 text-sm">
                     {Object.entries(ASSET_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <Input type="number" placeholder="Cost basis ($)" value={form.cost_basis} onChange={e => setForm({ ...form, cost_basis: e.target.value })} />
                   <Input type="number" placeholder="Current value ($)" value={form.current_value} onChange={e => setForm({ ...form, current_value: e.target.value })} />
                   <Input placeholder="Quantity" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
-                  <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className="border border-neutral-300 rounded-md px-3 py-2 text-sm">
+                  <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className="border border-neutral-300 rounded px-3 py-2 text-sm">
                     <option value="shares">Shares</option>
                     <option value="units">Units</option>
                     <option value="coins">Coins</option>
@@ -243,7 +243,7 @@ export default function InvestmentsPage() {
                   </select>
                 </div>
                 <Input placeholder="Custodian (e.g. Fidelity, Schwab, Coinbase)" value={form.custodian} onChange={e => setForm({ ...form, custodian: e.target.value })} className="mb-3" />
-                <textarea placeholder="Notes..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm mb-3" rows={3} />
+                <textarea placeholder="Notes..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="w-full border border-neutral-300 rounded px-3 py-2 text-sm mb-3" rows={3} />
                 <div className="flex gap-2">
                   <Button onClick={createInvestment}>Record Investment</Button>
                   <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
@@ -255,10 +255,10 @@ export default function InvestmentsPage() {
           {/* Investments Table */}
           {loading ? (
             <div className="space-y-3">
-              {[1,2].map(i => <div key={i} className="h-16 bg-white border border-neutral-200 rounded-lg animate-pulse"/>)}
+              {[1,2].map(i => <div key={i} className="h-16 bg-white border border-neutral-200 rounded animate-pulse"/>)}
             </div>
           ) : investments.length === 0 ? (
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
               <TrendingUp className="w-12 h-12 text-slate-300 mb-3"/>
               <h2 className="text-lg font-semibold text-navy mb-1">No investments recorded</h2>
               <p className="text-sm text-neutral-600 mb-4">Track holdings, cost basis, and performance for this trust.</p>
@@ -271,7 +271,7 @@ export default function InvestmentsPage() {
                 const retPct = inv.cost_basis > 0 ? (ret / inv.cost_basis * 100).toFixed(1) : 0;
                 const Icon = ASSET_TYPE_ICONS[inv.asset_type] || Activity;
                 return (
-                  <div key={inv.investment_id} className="bg-white border border-neutral-200 rounded-lg p-4 flex items-start gap-4 hover:shadow-sm transition-shadow">
+                  <div key={inv.investment_id} className="bg-white border border-neutral-200 rounded p-4 flex items-start gap-4 hover:shadow-sm transition-shadow">
                     <div className="w-10 h-10 bg-navy/5 flex items-center justify-center rounded flex-shrink-0">
                       <Icon className="w-5 h-5 text-navy" />
                     </div>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Check, ArrowRight } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
 // Use XMLHttpRequest for maximum compatibility
 const xhrPost = (url, data, token = null) => {
@@ -181,7 +181,7 @@ export default function PricingPage() {
             <ul className="space-y-3 mb-8">
               {features.map((feature, i) => (
                 <li key={i} className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                   <span className="text-sm">{feature}</span>
                 </li>
               ))}
@@ -210,7 +210,7 @@ export default function PricingPage() {
                 <span className="font-serif text-5xl text-navy">$790</span>
                 <span className="text-muted-foreground">/year</span>
               </div>
-              <p className="text-sm text-green-600 font-medium mt-2">
+              <p className="text-sm text-success font-medium mt-2">
                 Save $158 (2 months free)
               </p>
             </div>
@@ -218,7 +218,7 @@ export default function PricingPage() {
             <ul className="space-y-3 mb-8">
               {features.map((feature, i) => (
                 <li key={i} className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                   <span className="text-sm">{feature}</span>
                 </li>
               ))}

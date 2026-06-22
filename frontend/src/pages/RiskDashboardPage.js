@@ -15,7 +15,7 @@ import {
 
 const SEVERITY_STYLES = {
   high: { border: 'border-red-200', bg: 'bg-red-50', text: 'text-red-800', icon: 'text-red-600', badge: 'bg-red-100 text-red-700', label: 'High' },
-  medium: { border: 'border-amber-200', bg: 'bg-amber-50', text: 'text-amber-800', icon: 'text-amber-600', badge: 'bg-amber-100 text-amber-700', label: 'Medium' },
+  medium: { border: 'border-warning/20', bg: 'bg-warning/5', text: 'text-warning', icon: 'text-warning', badge: 'bg-warning/10 text-warning', label: 'Medium' },
   low: { border: 'border-slate-200', bg: 'bg-slate-50', text: 'text-slate-700', icon: 'text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Low' },
 };
 
@@ -55,7 +55,7 @@ export default function RiskDashboardPage() {
   const getColor = (a) => {
     switch (a) {
       case 'critical': return 'text-red-700';
-      case 'elevated': return 'text-amber-700';
+      case 'elevated': return 'text-warning';
       case 'caution': return 'text-slate-700';
       case 'healthy': return 'text-emerald-700';
       default: return 'text-slate-700';
@@ -65,7 +65,7 @@ export default function RiskDashboardPage() {
   const getBg = (a) => {
     switch (a) {
       case 'critical': return 'bg-red-100 border-red-200';
-      case 'elevated': return 'bg-amber-100 border-amber-200';
+      case 'elevated': return 'bg-warning/10 border-warning/20';
       case 'caution': return 'bg-slate-100 border-slate-200';
       case 'healthy': return 'bg-emerald-100 border-emerald-200';
       default: return 'bg-slate-100 border-slate-200';
@@ -78,7 +78,7 @@ export default function RiskDashboardPage() {
         <Sidebar />
         <div className="md:pl-64 pb-20 md:pb-0">
           <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
               <Shield className="w-12 h-12 text-slate-400 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
               <p className="text-sm text-neutral-600">Choose a trust to view the Risk Dashboard.</p>
@@ -122,7 +122,7 @@ export default function RiskDashboardPage() {
 
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-16 bg-white border border-neutral-200 rounded-lg animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-16 bg-white border border-neutral-200 rounded animate-pulse"/>)}
             </div>
           ) : (
             <>
@@ -132,7 +132,7 @@ export default function RiskDashboardPage() {
                   {assessment === 'healthy' ? (
                     <CheckCircle2 className="w-10 h-10 text-emerald-600" />
                   ) : (
-                    <AlertTriangle className="w-10 h-10 text-amber-600" />
+                    <AlertTriangle className="w-10 h-10 text-warning" />
                   )}
                   <div>
                     <p className={"text-xs font-mono uppercase tracking-wider " + getColor(assessment)}>Overall Risk Assessment</p>
@@ -156,7 +156,7 @@ export default function RiskDashboardPage() {
                     <p className="text-[10px] text-neutral-500 uppercase">High</p>
                   </CardContent></Card>
                   <Card><CardContent className="p-3 text-center">
-                    <p className="text-2xl font-bold text-amber-600">{data.medium_count}</p>
+                    <p className="text-2xl font-bold text-warning">{data.medium_count}</p>
                     <p className="text-[10px] text-neutral-500 uppercase">Medium</p>
                   </CardContent></Card>
                   <Card><CardContent className="p-3 text-center">
@@ -191,7 +191,7 @@ export default function RiskDashboardPage() {
               {/* Risk List */}
               <div className="space-y-3">
                 {filteredRisks().length === 0 && (data?.risk_count || 0) === 0 ? (
-                  <div className="bg-emerald-50 border border-emerald-200 p-12 text-center rounded-lg">
+                  <div className="bg-emerald-50 border border-emerald-200 p-12 text-center rounded">
                     <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-3"/>
                     <p className="text-lg font-semibold text-emerald-800">All Clear</p>
                     <p className="text-sm text-emerald-700">No risk items detected. Your trust governance is in good shape.</p>
@@ -203,7 +203,7 @@ export default function RiskDashboardPage() {
                     const style = SEVERITY_STYLES[r.severity] || SEVERITY_STYLES.low;
                     const Icon = r.severity === 'high' ? AlertOctagon : r.severity === 'medium' ? AlertTriangle : AlertCircle;
                     return (
-                      <div key={i} className={"flex items-start gap-3 bg-white border rounded-lg p-4 " + style.border}>
+                      <div key={i} className={"flex items-start gap-3 bg-white border rounded p-4 " + style.border}>
                         <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + style.bg}>
                           <Icon className={"w-4 h-4 " + style.icon} />
                         </div>

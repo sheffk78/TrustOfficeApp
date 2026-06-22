@@ -109,9 +109,9 @@ export default function ContactPage() {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="bg-white border border-navy/10 rounded-lg p-8 text-center shadow-sm">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className="bg-white border border-navy/10 rounded p-8 text-center shadow-sm">
+            <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-8 h-8 text-success" />
             </div>
             
             <h1 className="font-serif text-2xl text-navy mb-3">Message Sent!</h1>
@@ -183,7 +183,7 @@ export default function ContactPage() {
           </a>
 
           {/* Contact Form Card */}
-          <div className="bg-white border border-navy/10 rounded-lg shadow-sm">
+          <div className="bg-white border border-navy/10 rounded shadow-sm">
             <div className="p-6 border-b border-navy/10">
               <h1 className="font-serif text-2xl text-navy mb-2">Contact Us</h1>
               <p className="text-muted-foreground">

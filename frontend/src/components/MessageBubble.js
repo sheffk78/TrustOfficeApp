@@ -75,8 +75,8 @@ const MessageBubble = ({ message, onActionApprove, onActionEdit, onActionDiscard
         {/* Caveat */}
         {message.caveat && (
           <div className="mt-2 flex items-start gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="font-mono text-[11px] text-amber-600/70 leading-relaxed">{message.caveat}</p>
+            <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0 mt-0.5" />
+            <p className="font-mono text-[11px] text-warning/70 leading-relaxed">{message.caveat}</p>
           </div>
         )}
 

@@ -45,7 +45,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { HeartHandshake } from 'lucide-react';
+import { HeartHandshake, FolderTree } from 'lucide-react';
 
 const NAV_GROUPS = [
   // ═══ HERO ITEMS — gold-tinted standout links ═══
@@ -190,6 +190,21 @@ export const Sidebar = () => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+          </div>
+        )}
+
+        {/* Manage Trusts quick link */}
+        {trusts.length > 0 && (
+          <div className="px-4 pb-3 border-b border-white/10">
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-2 text-white/60 hover:text-gold transition-colors text-xs font-mono uppercase tracking-widest"
+              onClick={() => { setMobileOpen(false); }}
+              data-testid="nav-manage-trusts"
+            >
+              <FolderTree className="w-3.5 h-3.5" />
+              Manage Trusts
+            </Link>
           </div>
         )}
 

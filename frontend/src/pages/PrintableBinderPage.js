@@ -157,7 +157,7 @@ const PrintableBinderPage = () => {
   return (
     <>
       <style>{PRINT_STYLES}</style>
-      <div className="no-print min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
+      <div className="no-print min-h-screen bg-subtle-bg dark:bg-slate-900 p-4 md:p-8">
         {/* Header */}
         <div className="max-w-5xl mx-auto">
           <button
@@ -178,10 +178,10 @@ const PrintableBinderPage = () => {
           {/* COVER SHEET SECTION */}
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-amber-600" />
+              <FileText className="w-5 h-5 text-gold" />
               Binder Cover Sheet
             </h2>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
               {loading ? (
                 <div className="animate-pulse space-y-3">
                   <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
@@ -207,7 +207,7 @@ const PrintableBinderPage = () => {
                     </div>
                     <button
                       onClick={() => handlePrint('cover')}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium shadow-sm transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
                     >
                       <Printer className="w-4 h-4" /> Print Cover Sheet
                     </button>
@@ -231,20 +231,20 @@ const PrintableBinderPage = () => {
                 return (
                   <div
                     key={section.id}
-                    className="flex items-start gap-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm hover:shadow-md transition-shadow"
+                    className="flex items-start gap-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 shadow-sm hover:shadow-md transition-shadow"
                   >
-                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-amber-600" />
+                    <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-gold" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-amber-600">Section {section.number}</span>
+                        <span className="text-xs font-bold text-gold">Section {section.number}</span>
                         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{section.title}</h3>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{section.description}</p>
                       <button
                         onClick={() => handlePrint(`tab-${section.id}`)}
-                        className="mt-2 flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400 transition-colors"
+                        className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
                       >
                         <Printer className="w-3 h-3" /> Print Divider
                       </button>
@@ -258,17 +258,17 @@ const PrintableBinderPage = () => {
           {/* REFERENCE CARD */}
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-amber-600" />
+              <BookOpen className="w-5 h-5 text-gold" />
               Trustee Quick Reference Card
             </h2>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                 A single-page cheat sheet covering your fiduciary duties, decision filter, signing rules, and emergency protocols.
                 Print this and keep it at the front of your binder.
               </p>
               <button
                 onClick={() => handlePrint('quick-ref')}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium shadow-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
               >
                 <Printer className="w-4 h-4" /> Print Reference Card
               </button>
@@ -278,17 +278,17 @@ const PrintableBinderPage = () => {
           {/* RESOLUTION TEMPLATE */}
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-              <FilePen className="w-5 h-5 text-amber-600" />
+              <FilePen className="w-5 h-5 text-gold" />
               Resolution Template
             </h2>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                 A blank WHEREAS/BE IT RESOLVED template with signature, witness, and notary blocks.
                 Print a fresh copy each time you need to record a formal trust resolution.
               </p>
               <button
                 onClick={() => handlePrint('resolution')}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium shadow-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
               >
                 <Printer className="w-4 h-4" /> Print Resolution Template
               </button>
@@ -304,31 +304,31 @@ const PrintableBinderPage = () => {
               Step-by-step checklists for transferring specific asset types into or out of your trust. Print when you're ready to start a transfer.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-start gap-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
-                  <Home className="w-5 h-5 text-amber-600" />
+              <div className="flex items-start gap-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
+                  <Home className="w-5 h-5 text-gold" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Real Estate Transfer</h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Deed recording, insurance, mortgage, and tax steps.</p>
                   <button
                     onClick={() => handlePrint('checklist-real-estate')}
-                    className="mt-2 flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400 transition-colors"
+                    className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
                   </button>
                 </div>
               </div>
-              <div className="flex items-start gap-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
-                  <Car className="w-5 h-5 text-amber-600" />
+              <div className="flex items-start gap-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
+                  <Car className="w-5 h-5 text-gold" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vehicle Transfer</h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Title transfer, DMV, insurance, and registration steps.</p>
                   <button
                     onClick={() => handlePrint('checklist-vehicle')}
-                    className="mt-2 flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400 transition-colors"
+                    className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
                   </button>
@@ -345,10 +345,10 @@ const PrintableBinderPage = () => {
         {/* COVER SHEET */}
         {activePrint === 'cover' && (
           <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '1in' }}>
-            <div className="text-center border-2 border-gray-300 rounded-lg p-12" style={{ minHeight: '8in' }}>
+            <div className="text-center border-2 border-gray-300 rounded p-12" style={{ minHeight: '8in' }}>
               <div className="mb-8 pt-4">
                 <div className="text-xs tracking-widest text-gray-400 uppercase mb-2">Trust Governance Workspace</div>
-                <div className="w-16 h-0.5 bg-amber-600 mx-auto mb-6"></div>
+                <div className="w-16 h-0.5 bg-gold mx-auto mb-6"></div>
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{ fontSize: '28pt' }}>
                 TRUST COMPLIANCE BINDER
@@ -384,7 +384,7 @@ const PrintableBinderPage = () => {
                 <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontSize: '28pt' }}>
                   {section.title}
                 </h1>
-                <div className="w-32 h-0.5 bg-amber-600 mb-6"></div>
+                <div className="w-32 h-0.5 bg-gold mb-6"></div>
                 <p className="text-gray-500 text-center max-w-md" style={{ fontSize: '12pt', lineHeight: 1.6 }}>
                   {section.description}
                 </p>
@@ -406,11 +406,11 @@ const PrintableBinderPage = () => {
               <h1 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontSize: '18pt' }}>
                 Trustee Quick Reference
               </h1>
-              <div className="w-16 h-0.5 bg-amber-600 mb-6 mt-2"></div>
+              <div className="w-16 h-0.5 bg-gold mb-6 mt-2"></div>
 
               <h2 className="text-lg font-semibold text-gray-900 mb-3" style={{ fontSize: '13pt' }}>Fiduciary Duties</h2>
               {QUICK_REFERENCE.duties.map((d, i) => (
-                <div key={i} className="mb-3 pl-3 border-l-2 border-amber-500">
+                <div key={i} className="mb-3 pl-3 border-l-2 border-warning">
                   <div className="font-semibold text-gray-900" style={{ fontSize: '11pt' }}>{d.title}</div>
                   <div className="text-gray-600" style={{ fontSize: '10pt' }}>{d.text}</div>
                 </div>
@@ -422,7 +422,7 @@ const PrintableBinderPage = () => {
               </p>
               {QUICK_REFERENCE.decisionFilter.map((q, i) => (
                 <div key={i} className="flex items-start gap-2 mb-1">
-                  <span className="text-amber-600 font-bold" style={{ fontSize: '10pt' }}>✓</span>
+                  <span className="text-gold font-bold" style={{ fontSize: '10pt' }}>✓</span>
                   <span className="text-gray-700" style={{ fontSize: '10pt' }}>{q}</span>
                 </div>
               ))}
@@ -431,7 +431,7 @@ const PrintableBinderPage = () => {
               </p>
 
               <h2 className="text-lg font-semibold text-gray-900 mb-2 mt-6" style={{ fontSize: '13pt' }}>Signing Rule</h2>
-              <p className="text-gray-700 bg-gray-50 rounded p-3" style={{ fontSize: '10pt' }}>
+              <p className="text-gray-700 bg-subtle-bg p-3" style={{ fontSize: '10pt' }}>
                 {QUICK_REFERENCE.signingRule}
               </p>
 
@@ -554,7 +554,7 @@ const PrintableBinderPage = () => {
               <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>
                 {coverData?.trust_name || 'Trust Name: _______________'}
               </p>
-              <div className="w-16 h-0.5 bg-amber-600 mb-6"></div>
+              <div className="w-16 h-0.5 bg-gold mb-6"></div>
 
               {[
                 'Obtain certified copy of the Trust Agreement',
@@ -573,7 +573,7 @@ const PrintableBinderPage = () => {
                 </div>
               ))}
 
-              <div className="mt-8 p-3 bg-gray-50 rounded text-gray-500" style={{ fontSize: '9pt' }}>
+              <div className="mt-8 p-3 bg-subtle-bg text-gray-500" style={{ fontSize: '9pt' }}>
                 <strong>Note:</strong> Requirements vary by state. Some states require specific deed forms or have transfer tax exemptions for trusts. Consult your attorney before recording.
               </div>
               <div className="mt-4 text-center text-xs text-gray-400">TrustOffice — trustoffice.app</div>
@@ -591,7 +591,7 @@ const PrintableBinderPage = () => {
               <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>
                 {coverData?.trust_name || 'Trust Name: _______________'}
               </p>
-              <div className="w-16 h-0.5 bg-amber-600 mb-6"></div>
+              <div className="w-16 h-0.5 bg-warning mb-6"></div>
 
               {[
                 'Obtain Certification of Trust',
@@ -608,7 +608,7 @@ const PrintableBinderPage = () => {
                 </div>
               ))}
 
-              <div className="mt-8 p-3 bg-gray-50 rounded text-gray-500" style={{ fontSize: '9pt' }}>
+              <div className="mt-8 p-3 bg-subtle-bg text-gray-500" style={{ fontSize: '9pt' }}>
                 <strong>Note:</strong> Some states require the trust name to appear on the title exactly as stated in the trust document. Contact your DMV for specific requirements.
               </div>
               <div className="mt-4 text-center text-xs text-gray-400">TrustOffice — trustoffice.app</div>

@@ -391,7 +391,7 @@ export default function StatsPage() {
                               </span>
                             </td>
                             <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                              <span className="px-2 py-0.5 text-xs bg-success/10 text-success dark:bg-success/20 dark:text-success">
                                 {tx.status}
                               </span>
                             </td>

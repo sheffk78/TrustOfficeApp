@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import PageHelpButton from '@/components/PageHelpButton';
 import { useAuth } from '@/context/AuthContext';

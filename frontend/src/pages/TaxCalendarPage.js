@@ -30,7 +30,7 @@ function statusBadge(status, overdue) {
     return <Badge variant="success" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Filed</Badge>;
   }
   if (status === 'extended') {
-    return <Badge variant="outline" className="border-amber-500 text-amber-700">Extended</Badge>;
+    return <Badge variant="outline" className="border-warning text-warning">Extended</Badge>;
   }
   if (overdue) {
     return <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-200">Overdue</Badge>;
@@ -137,7 +137,7 @@ export default function TaxCalendarPage() {
         <Sidebar />
         <div className="md:pl-64 pb-20 md:pb-0">
           <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
               <CalendarDays className="w-12 h-12 text-slate-400 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
               <p className="text-sm text-neutral-600">Choose a trust from the sidebar to view its tax calendar.</p>
@@ -178,7 +178,7 @@ export default function TaxCalendarPage() {
               <select
                 value={year}
                 onChange={e => setYear(Number(e.target.value))}
-                className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+                className="border border-neutral-300 rounded px-3 py-2 text-sm bg-white"
                 aria-label="Tax year"
               >
                 {[year - 1, year, year + 1].map(y => (
@@ -229,7 +229,7 @@ export default function TaxCalendarPage() {
                     EIN: <b>{trustProfile.ein}</b> · {' '}
                     {trustProfile.isFiscalYear ? 'Fiscal year ends' : 'Tax year ends'}: {' '}
                     <b>{trustProfile.taxYearEndMonth}/{trustProfile.taxYearEndDay}</b>
-                    {trustProfile.isFiscalYear && <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Fiscal</span>}
+                    {trustProfile.isFiscalYear && <span className="ml-2 text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded">Fiscal</span>}
                   </>
                 ) : (
                   <>Set your trust EIN and tax year end in <b>Settings → Trust Profile</b> for accurate deadlines.</>
@@ -241,10 +241,10 @@ export default function TaxCalendarPage() {
           {/* Entries */}
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-20 bg-white border border-neutral-200 rounded-lg animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-20 bg-white border border-neutral-200 rounded animate-pulse"/>)}
             </div>
           ) : entries.length === 0 ? (
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
               <CalendarDays className="w-12 h-12 text-slate-300 mb-3"/>
               <h2 className="text-lg font-semibold text-navy mb-1">No tax calendar yet</h2>
               <p className="text-sm text-neutral-600 mb-4 max-w-md text-center">
@@ -265,7 +265,7 @@ export default function TaxCalendarPage() {
                       const overdue = entry.is_overdue && entry.filing_status === 'pending';
                       const due = parseISO(entry.due_date);
                       return (
-                        <div key={entry.entry_id} className={`flex items-start gap-3 bg-white border ${overdue ? 'border-red-200' : 'border-neutral-200'} rounded-lg p-4`}>
+                        <div key={entry.entry_id} className={`flex items-start gap-3 bg-white border ${overdue ? 'border-red-200' : 'border-neutral-200'} rounded p-4`}>
                           <div className="flex flex-col items-center min-w-[56px]">
                             <div className="text-xs font-medium text-neutral-500 uppercase">{format(due, 'MMM')}</div>
                             <div className={`text-xl font-bold ${overdue ? 'text-red-600' : 'text-navy'}`}>{format(due, 'd')}</div>
@@ -291,7 +291,7 @@ export default function TaxCalendarPage() {
                                 Due {Math.abs(entry.days_remaining)} days ago
                               </div>
                             ) : entry.days_remaining !== null && entry.days_remaining <= 30 && entry.filing_status === 'pending' ? (
-                              <div className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                              <div className="text-xs text-warning mt-2 flex items-center gap-1">
                                 <Clock className="w-3.5 h-3.5"/>
                                 Due in {entry.days_remaining} days
                               </div>

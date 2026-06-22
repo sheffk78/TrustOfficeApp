@@ -367,6 +367,81 @@ export default function BillingPage() {
             <div className="card-trust">
               <div className="skeleton h-32 w-full"></div>
             </div>
+          ) : !subscription ? (
+            /* Designed empty state — no subscription data loaded, show plans below */
+            <>
+            <div className="card-trust corner-mark" data-testid="billing-empty-state">
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-16 h-16 flex items-center justify-center bg-navy/5 mb-4">
+                  <CreditCard className="w-8 h-8 text-navy/40" />
+                </div>
+                <h2 className="font-serif text-2xl text-navy mb-2">No Billing Information Yet</h2>
+                <p className="text-sm text-muted-foreground max-w-md mb-6">
+                  You don't have a subscription or billing history yet. Choose a plan below to unlock
+                  full access to TrustOffice's trust governance tools, priority support, and PDF generation.
+                </p>
+                <Button
+                  onClick={() => {
+                    const plansSection = document.querySelector('[data-testid="plan-card-monthly"]');
+                    if (plansSection) plansSection.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="btn-primary"
+                  data-testid="view-plans-btn"
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  View Plans
+                </Button>
+              </div>
+            </div>
+            {/* Pricing Plans for no-subscription state */}
+            <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {PLANS.map(plan => (
+                <div
+                  key={plan.id}
+                  className={`card-trust relative ${plan.id === 'annual' ? 'border-gold/30 bg-gold/5' : ''}`}
+                  data-testid={`plan-card-${plan.id}`}
+                >
+                  {plan.savings && (
+                    <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
+                      {plan.savings}
+                    </div>
+                  )}
+                  <h3 className="font-serif text-xl text-navy mb-2">{plan.name}</h3>
+                  <div className="flex items-baseline gap-1 mb-4">
+                    <span className="font-mono text-4xl text-navy">${plan.price}</span>
+                    <span className="text-muted-foreground">/{plan.period}</span>
+                  </div>
+                  <ul className="space-y-3 mb-6">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm">
+                        <Check className="w-4 h-4 text-success flex-shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    onClick={() => handleSubscribe(plan.id)}
+                    className={`w-full ${plan.id === 'annual' ? 'btn-primary' : 'btn-secondary'}`}
+                    disabled={processing}
+                    data-testid={`subscribe-${plan.id}-btn`}
+                  >
+                    {processing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Subscribe to {plan.name}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+            </>
           ) : (
             <>
               {/* Current Subscription Status */}

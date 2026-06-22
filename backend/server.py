@@ -52,6 +52,8 @@ from routers.compensation import router as compensation_router
 from routers.subscriptions import router as subscriptions_router
 from routers.benevolence import router as benevolence_router
 from routers.exports import router as exports_router
+from routers.expenses import router as expenses_router
+from routers.calendar import router as calendar_router
 from routers.trust_units import router as trust_units_router
 from routers.trusts import router as trusts_router
 from routers.entities import router as entities_router
@@ -303,6 +305,8 @@ app.include_router(compensation_router, prefix="/api")
 app.include_router(governance_router, prefix="/api")
 app.include_router(subscriptions_router, prefix="/api")
 app.include_router(exports_router, prefix="/api")
+app.include_router(expenses_router, prefix="/api")
+app.include_router(calendar_router, prefix="/api")
 app.include_router(preferences_router, prefix="/api")
 app.include_router(email_router, prefix="/api")
 app.include_router(background_jobs_router, prefix="/api")
@@ -500,6 +504,10 @@ async def startup_event():
         
         # Personal vendor index for separation alerts
         await db.personal_vendors.create_index("user_id")
+        
+        # Expenses indexes
+        await db.expenses.create_index([("trust_id", 1), ("user_id", 1), ("date", -1)])
+        await db.expenses.create_index("expense_id", unique=True)
         
         logger.info("Database indexes created/verified successfully")
         

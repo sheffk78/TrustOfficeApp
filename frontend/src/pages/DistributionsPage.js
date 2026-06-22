@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
@@ -667,7 +667,7 @@ export default function DistributionsPage() {
                       </td>
                       <td className="text-center">
                         {dist.minutes_record_id ? (
-                          <span className="flex items-center justify-center gap-1 text-xs text-green-600 dark:text-green-400">
+                          <span className="flex items-center justify-center gap-1 text-xs text-success dark:text-success">
                             <Link2 className="w-3 h-3" />
                             Linked
                           </span>

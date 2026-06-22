@@ -23,11 +23,11 @@ const severityConfig = {
   },
   yellow: {
     icon: AlertTriangle,
-    bg: 'bg-amber-50 dark:bg-amber-950/30',
-    border: 'border-amber-200 dark:border-amber-800',
-    badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
+    bg: 'bg-warning/10 dark:bg-warning/20',
+    border: 'border-warning/20 dark:border-warning/30',
+    badge: 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning',
     label: 'Needs Attention',
-    dot: 'bg-amber-500'
+    dot: 'bg-warning'
   }
 };
 
@@ -163,8 +163,8 @@ export function SeparationAlertsPanel({ entityId = null, compact = false }) {
                 </span>
               )}
               {counts.yellow_count > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300" data-testid="yellow-alert-badge">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {counts.yellow_count}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning" data-testid="yellow-alert-badge">
+                  <span className="w-1.5 h-1.5 rounded-full bg-warning" /> {counts.yellow_count}
                 </span>
               )}
             </div>
@@ -187,7 +187,7 @@ export function SeparationAlertsPanel({ entityId = null, compact = false }) {
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       ) : alerts.length === 0 ? (
-        <div className="text-center py-8 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" data-testid="no-alerts">
+        <div className="text-center py-8 rounded border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" data-testid="no-alerts">
           <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
           <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">No Active Alerts</p>
           <p className="text-xs text-muted-foreground mt-1">All clear — no commingling risks detected</p>
@@ -213,7 +213,7 @@ export function SeparationAlertsPanel({ entityId = null, compact = false }) {
           </DialogHeader>
           {resolveAlert && (
             <div className="space-y-4 mt-2">
-              <div className={`p-3 rounded-lg ${severityConfig[resolveAlert.severity]?.bg} ${severityConfig[resolveAlert.severity]?.border} border`}>
+              <div className={`p-3 rounded ${severityConfig[resolveAlert.severity]?.bg} ${severityConfig[resolveAlert.severity]?.border} border`}>
                 <p className="text-sm font-medium text-foreground">{resolveAlert.title}</p>
                 <p className="text-xs text-muted-foreground mt-1">{resolveAlert.description}</p>
               </div>
@@ -261,7 +261,7 @@ export function SeparationAlertsPanel({ entityId = null, compact = false }) {
               {history.map(a => {
                 const cfg = severityConfig[a.severity] || severityConfig.yellow;
                 return (
-                  <div key={a.alert_id} className={`p-3 rounded-lg border ${a.status === 'resolved' ? 'border-border bg-muted/30 opacity-75' : `${cfg.border} ${cfg.bg}`}`}>
+                  <div key={a.alert_id} className={`p-3 rounded border ${a.status === 'resolved' ? 'border-border bg-muted/30 opacity-75' : `${cfg.border} ${cfg.bg}`}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -300,9 +300,9 @@ function AlertCard({ alert, onResolve }) {
   const Icon = cfg.icon;
 
   return (
-    <div className={`p-3 rounded-lg border ${cfg.border} ${cfg.bg} transition-colors`} data-testid={`alert-card-${alert.alert_id}`}>
+    <div className={`p-3 rounded border ${cfg.border} ${cfg.bg} transition-colors`} data-testid={`alert-card-${alert.alert_id}`}>
       <div className="flex items-start gap-3">
-        <Icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${alert.severity === 'red' ? 'text-red-500' : 'text-amber-500'}`} />
+        <Icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${alert.severity === 'red' ? 'text-red-500' : 'text-warning'}`} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${cfg.badge}`}>{cfg.label}</span>
@@ -344,7 +344,7 @@ export function AlertCountBadge({ trustId }) {
         </span>
       )}
       {counts.yellow_count > 0 && (
-        <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+        <span className="w-5 h-5 rounded-full bg-warning text-white text-[10px] font-bold flex items-center justify-center">
           {counts.yellow_count}
         </span>
       )}

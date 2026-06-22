@@ -59,7 +59,7 @@ export const MobileBottomNav = () => {
                 <span>{item.label}</span>
               </button>
               {openMenu === item.label && (
-                <div className="absolute bottom-full mb-2 bg-white border border-neutral-200 shadow-lg rounded-lg overflow-hidden min-w-[160px] z-50">
+                <div className="absolute bottom-full mb-2 bg-white border border-neutral-200 shadow-lg rounded overflow-hidden min-w-[160px] z-50">
                   {item.subMenu.map((sub) => {
                     const SubIcon = sub.icon;
                     const subActive = location.pathname === sub.path;

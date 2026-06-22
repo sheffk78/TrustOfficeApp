@@ -165,3 +165,42 @@ async def export_tasks_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=tasks_export_{datetime.now().strftime('%Y%m%d')}.csv"}
     )
+
+
+@router.get("/export/expenses")
+async def export_expenses_csv(
+    trust_id: Optional[str] = None, 
+    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+):
+    """Export expense records as CSV (Premium feature)"""
+    query = {"user_id": user["user_id"]}
+    if trust_id:
+        query["trust_id"] = trust_id
+    
+    expenses = await db.expenses.find(query, {"_id": 0}).sort("date", -1).to_list(10000)
+    
+    # Get trust names for lookup
+    trust_ids = list(set(e["trust_id"] for e in expenses)) if expenses else []
+    trusts = await db.trusts.find({"trust_id": {"$in": trust_ids}}, {"_id": 0}).to_list(100) if trust_ids else []
+    trust_map = {t["trust_id"]: t["name"] for t in trusts}
+    
+    # Build CSV
+    csv_lines = ["Trust Name,Date,Payee,Category,Amount,Status,Notes"]
+    for e in expenses:
+        trust_name = trust_map.get(e["trust_id"], "Unknown").replace(",", ";")
+        date = e.get("date", "")[:10]
+        payee = e.get("payee", "").replace(",", ";")
+        category = e.get("category", "").replace(",", ";")
+        amount = e.get("amount", 0)
+        status = e.get("status", "")
+        notes = e.get("notes", "").replace(",", ";").replace("\n", " ")[:200] if e.get("notes") else ""
+        
+        csv_lines.append(f'"{trust_name}","{date}","{payee}","{category}",{amount},"{status}","{notes}"')
+    
+    csv_content = "\n".join(csv_lines)
+    
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=expenses_export_{datetime.now().strftime('%Y%m%d')}.csv"}
+    )

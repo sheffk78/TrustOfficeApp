@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, Lock, Eye, EyeOff, User, Gift } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, Gift, AlertCircle } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -50,6 +50,7 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [signupError, setSignupError] = useState('');
   
   // Referral code from URL params (e.g., /signup?ref=ABCD1234)
   const [referralCode, setReferralCode] = useState('');
@@ -148,29 +149,41 @@ export default function SignUpPage() {
     // Prevent double submission
     if (loading) return;
     
+    setSignupError('');
+    
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = name.trim();
     
     if (!trimmedEmail || !trimmedName || !password) {
-      toast.error('Please fill in all fields');
+      const msg = 'Please fill in all fields';
+      setSignupError(msg);
+      toast.error(msg);
       return;
     }
     
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
+      const msg = 'Passwords do not match';
+      setSignupError(msg);
+      toast.error(msg);
       return;
     }
 
     if (password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+      const msg = 'Password must be at least 8 characters';
+      setSignupError(msg);
+      toast.error(msg);
       return;
     }
     if (!/[A-Za-z]/.test(password)) {
-      toast.error('Password must contain at least one letter');
+      const msg = 'Password must contain at least one letter';
+      setSignupError(msg);
+      toast.error(msg);
       return;
     }
     if (!/\d/.test(password)) {
-      toast.error('Password must contain at least one number');
+      const msg = 'Password must contain at least one number';
+      setSignupError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -212,7 +225,9 @@ export default function SignUpPage() {
       navigate('/onboarding');
     } catch (error) {
       console.error('Signup error:', error);
-      toast.error(error.message || 'Failed to create account');
+      const msg = error.message || 'Failed to create account';
+      setSignupError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -259,15 +274,15 @@ export default function SignUpPage() {
           <div className="card-trust corner-mark relative">
             {/* Coupon banner */}
             {couponInfo && !isWingPoint && !referralInfo && (
-              <div className="bg-gradient-to-r from-green-500/20 to-emerald-100 dark:from-green-500/30 dark:to-emerald-900/30 -mx-6 -mt-6 px-6 py-4 mb-6 border-b border-green-500/30">
+              <div className="bg-gradient-to-r from-gold/20 to-gold/10 -mx-6 -mt-6 px-6 py-4 mb-6 border-b border-gold/30">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xl">🎉</span>
-                  <span className="font-medium text-navy dark:text-white">Special Offer Applied!</span>
+                  <span className="font-medium text-navy">Special Offer Applied!</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-green-600 dark:text-green-400">{couponInfo.description}</span>
+                  <span className="font-semibold text-gold">{couponInfo.description}</span>
                   {' '}(regularly {couponInfo.regularPrice}). 
-                  <span className="text-navy dark:text-white"> Applied at checkout.</span>
+                  <span className="text-navy"> Applied at checkout.</span>
                 </p>
               </div>
             )}
@@ -288,7 +303,7 @@ export default function SignUpPage() {
                   </p>
                 )}
                 {couponInfo && (
-                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                  <p className="text-sm text-gold mt-1">
                     ✦ {couponInfo.description} — applied at checkout
                   </p>
                 )}
@@ -339,6 +354,16 @@ export default function SignUpPage() {
             {/* Email sign up form */}
             <form onSubmit={handleSignUp}>
               <div className="space-y-4">
+                {/* Error state */}
+                {signupError && (
+                  <div className="p-3 bg-error/10 border border-error/20 flex items-start gap-2" data-testid="signup-error">
+                    <AlertCircle className="w-4 h-4 text-error flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-error">Unable to create account</p>
+                      <p className="text-xs text-error/80 mt-0.5">{signupError}</p>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                     Full Name
@@ -397,6 +422,24 @@ export default function SignUpPage() {
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
+                  </div>
+                  {/* Password requirements */}
+                  <div className="mt-2 space-y-1">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Password must contain:</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      <span className={`text-xs flex items-center gap-1 ${password.length >= 8 ? 'text-success' : 'text-muted-foreground'}`}>
+                        <span className={`w-3 h-3 flex items-center justify-center ${password.length >= 8 ? 'text-success' : 'text-muted-foreground/50'}`}>{password.length >= 8 ? '✓' : '○'}</span>
+                        8+ characters
+                      </span>
+                      <span className={`text-xs flex items-center gap-1 ${/[A-Za-z]/.test(password) ? 'text-success' : 'text-muted-foreground'}`}>
+                        <span className={`w-3 h-3 flex items-center justify-center ${/[A-Za-z]/.test(password) ? 'text-success' : 'text-muted-foreground/50'}`}>{/[A-Za-z]/.test(password) ? '✓' : '○'}</span>
+                        1 letter
+                      </span>
+                      <span className={`text-xs flex items-center gap-1 ${/\d/.test(password) ? 'text-success' : 'text-muted-foreground'}`}>
+                        <span className={`w-3 h-3 flex items-center justify-center ${/\d/.test(password) ? 'text-success' : 'text-muted-foreground/50'}`}>{/\d/.test(password) ? '✓' : '○'}</span>
+                        1 number
+                      </span>
+                    </div>
                   </div>
                 </div>
 

@@ -308,7 +308,7 @@ export default function VaultPage() {
         <Sidebar />
         <div className="md:pl-64 pb-20 md:pb-0">
           <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
               <FolderOpen className="w-12 h-12 text-slate-400 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
               <p className="text-sm text-neutral-600">Choose a trust to view document vault.</p>
@@ -384,7 +384,7 @@ export default function VaultPage() {
             <select
               value={activeCategory}
               onChange={e => { setActiveCategory(e.target.value); }}
-              className="border border-neutral-300 rounded-md px-3 py-2 text-sm bg-white"
+              className="border border-neutral-300 rounded px-3 py-2 text-sm bg-white"
             >
               <option value="">All Categories</option>
               {Object.entries(categories).map(([k, v]) => (
@@ -401,7 +401,7 @@ export default function VaultPage() {
                 <div className="flex gap-2 mb-4">
                   <button
                     onClick={() => setAddMode('upload')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${
                       addMode === 'upload' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
@@ -409,7 +409,7 @@ export default function VaultPage() {
                   </button>
                   <button
                     onClick={() => setAddMode('link')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${
                       addMode === 'link' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
@@ -427,7 +427,7 @@ export default function VaultPage() {
                     {!uploadFile ? (
                       <label
                         htmlFor="vault-file-upload"
-                        className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:border-navy hover:bg-gray-50 transition-colors"
+                        className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded p-8 cursor-pointer hover:border-navy hover:bg-subtle-bg transition-colors"
                       >
                         <CloudUpload className="w-10 h-10 text-gray-400 mb-2"/>
                         <p className="text-sm font-medium text-gray-700">Click to upload or drag and drop</p>
@@ -442,7 +442,7 @@ export default function VaultPage() {
                         />
                       </label>
                     ) : (
-                      <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center gap-3 bg-subtle-bg border border-gray-200 rounded p-3">
                         <File className="w-8 h-8 text-navy"/>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{uploadFile.name}</p>
@@ -465,7 +465,7 @@ export default function VaultPage() {
                 {/* Common Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                   <Input placeholder="Document title *" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-                  <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="border border-neutral-300 rounded-md px-3 py-2 text-sm">
+                  <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="border border-neutral-300 rounded px-3 py-2 text-sm">
                     {Object.entries(categories).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <Input type="date" placeholder="Document date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
@@ -476,7 +476,7 @@ export default function VaultPage() {
                 {addMode === 'link' && (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                      <select value={form.storage_provider} onChange={e => setForm({ ...form, storage_provider: e.target.value })} className="border border-neutral-300 rounded-md px-3 py-2 text-sm">
+                      <select value={form.storage_provider} onChange={e => setForm({ ...form, storage_provider: e.target.value })} className="border border-neutral-300 rounded px-3 py-2 text-sm">
                         <option value="google_drive">Google Drive</option>
                         <option value="dropbox">Dropbox</option>
                         <option value="onedrive">OneDrive</option>
@@ -492,7 +492,7 @@ export default function VaultPage() {
                   </>
                 )}
 
-                <textarea placeholder="Description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm mb-3" rows={2} />
+                <textarea placeholder="Description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border border-neutral-300 rounded px-3 py-2 text-sm mb-3" rows={2} />
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <Input type="date" placeholder="Expires on" value={form.expiration_date} onChange={e => setForm({ ...form, expiration_date: e.target.value })} />
                   <div className="flex items-center gap-2">
@@ -503,7 +503,7 @@ export default function VaultPage() {
 
                 {/* Upload progress */}
                 {uploadProgress && (
-                  <p className="text-sm text-amber-600 mb-2">{uploadProgress}</p>
+                  <p className="text-sm text-warning mb-2">{uploadProgress}</p>
                 )}
 
                 <div className="flex gap-2">
@@ -529,10 +529,10 @@ export default function VaultPage() {
           {/* Document Grid by Category */}
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-20 bg-white border border-neutral-200 rounded-lg animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-20 bg-white border border-neutral-200 rounded animate-pulse"/>)}
             </div>
           ) : Object.keys(byCategory).length === 0 ? (
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
               <FolderOpen className="w-12 h-12 text-slate-300 mb-3"/>
               <h2 className="text-lg font-semibold text-navy mb-1">Vault is empty</h2>
               <p className="text-sm text-neutral-600 mb-4">Upload your trust documents or link to files stored externally.</p>
@@ -550,7 +550,7 @@ export default function VaultPage() {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {data.documents.map((doc) => (
-                        <div key={doc.doc_id} className="bg-white border border-neutral-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                        <div key={doc.doc_id} className="bg-white border border-neutral-200 rounded p-4 hover:shadow-sm transition-shadow">
                           <div className="flex items-start justify-between mb-2">
                             <p className="font-semibold text-navy text-sm line-clamp-2">{doc.title}</p>
                             <button onClick={() => deleteDocument(doc.doc_id)} className="text-neutral-400 hover:text-red-500 ml-2 flex-shrink-0">
@@ -620,7 +620,7 @@ export default function VaultPage() {
                             </span>
                           </div>
                           {doc.needs_renewal && doc.expiration_date && (
-                            <div className="mt-2 text-[10px] text-amber-600 bg-amber-50 border border-amber-100 rounded px-2 py-1">
+                            <div className="mt-2 text-[10px] text-warning bg-warning/5 border border-warning/10 rounded px-2 py-1">
                               Renews {format(parseISO(doc.expiration_date), 'MMM d, yyyy')}
                             </div>
                           )}

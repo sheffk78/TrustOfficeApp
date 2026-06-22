@@ -101,7 +101,7 @@ export default function AffiliatePage() {
             href="https://trustoffice.partneroapp.com/program" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-gold text-navy px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gold/90 transition-colors"
+            className="inline-flex items-center gap-2 bg-gold text-navy px-8 py-4 rounded font-semibold text-lg hover:bg-gold/90 transition-colors"
             data-testid="affiliate-signup-hero-btn"
           >
             Become an Affiliate
@@ -124,9 +124,9 @@ export default function AffiliatePage() {
             {benefits.map((benefit, index) => (
               <div 
                 key={index} 
-                className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 hover:shadow-lg transition-shadow"
+                className="bg-white dark:bg-slate-900 p-6 rounded border border-slate-200 dark:border-slate-800 hover:shadow-lg transition-shadow"
               >
-                <div className="w-12 h-12 bg-navy/10 rounded-lg flex items-center justify-center mb-4">
+                <div className="w-12 h-12 bg-navy/10 rounded flex items-center justify-center mb-4">
                   <benefit.icon className="w-6 h-6 text-navy" />
                 </div>
                 <h3 className="font-semibold text-navy text-lg mb-2">{benefit.title}</h3>
@@ -172,7 +172,7 @@ export default function AffiliatePage() {
               <ul className="space-y-3">
                 {idealPartners.map((partner, index) => (
                   <li key={index} className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                    <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
                     <span className="text-navy font-medium">{partner}</span>
                   </li>
                 ))}
@@ -188,7 +188,7 @@ export default function AffiliatePage() {
                 href="https://trustoffice.partneroapp.com/program" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-gold text-navy px-6 py-3 rounded-lg font-semibold hover:bg-gold/90 transition-colors"
+                className="inline-flex items-center gap-2 bg-gold text-navy px-6 py-3 rounded font-semibold hover:bg-gold/90 transition-colors"
                 data-testid="affiliate-signup-card-btn"
               >
                 Get Started
@@ -212,7 +212,7 @@ export default function AffiliatePage() {
             href="https://trustoffice.partneroapp.com/program" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-gold text-navy px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gold/90 transition-colors"
+            className="inline-flex items-center gap-2 bg-gold text-navy px-8 py-4 rounded font-semibold text-lg hover:bg-gold/90 transition-colors"
             data-testid="affiliate-signup-cta-btn"
           >
             Join the Affiliate Program

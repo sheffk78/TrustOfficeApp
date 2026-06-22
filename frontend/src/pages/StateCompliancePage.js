@@ -16,7 +16,7 @@ import {
 
 const SEVERITY_STYLES = {
   high: 'bg-red-100 text-red-700 border-red-200',
-  medium: 'bg-amber-100 text-amber-700 border-amber-200',
+  medium: 'bg-warning/10 text-warning border-warning/20',
   low: 'bg-slate-100 text-slate-600 border-slate-200',
 };
 
@@ -64,7 +64,7 @@ export default function StateCompliancePage() {
         <Sidebar />
         <div className="md:pl-64 pb-20 md:pb-0">
           <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded-lg">
+            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
               <MapPin className="w-12 h-12 text-slate-400 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
               <p className="text-sm text-neutral-600">Choose a trust to view state compliance requirements.</p>
@@ -108,7 +108,7 @@ export default function StateCompliancePage() {
 
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-24 bg-white border border-neutral-200 rounded-lg animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-24 bg-white border border-neutral-200 rounded animate-pulse"/>)}
             </div>
           ) : stateData?.state_code === null ? (
             <Card className="border border-neutral-200">
@@ -182,10 +182,10 @@ export default function StateCompliancePage() {
                       {requirements.map((req, i) => {
                         const Icon = CATEGORY_ICONS[req.category] || Shield;
                         return (
-                          <div key={i} className="flex gap-4 p-4 bg-white border border-neutral-200 rounded-lg">
+                          <div key={i} className="flex gap-4 p-4 bg-white border border-neutral-200 rounded">
                             <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 rounded ${
                               req.severity === 'high' ? 'bg-red-100 text-red-600' :
-                              req.severity === 'medium' ? 'bg-amber-100 text-amber-600' :
+                              req.severity === 'medium' ? 'bg-warning/10 text-warning' :
                               'bg-slate-100 text-slate-500'
                             }`}>
                               <Icon className="w-5 h-5"/>

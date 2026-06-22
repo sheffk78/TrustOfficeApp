@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
 
 const API = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -12,12 +12,23 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Clear previous errors
+    setFormError('');
+    
     if (!email) {
-      toast.error('Please enter your email address');
+      setFormError('Please enter your email address to continue.');
+      return;
+    }
+    
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setFormError('Please enter a valid email address (e.g., you@example.com).');
       return;
     }
     
@@ -33,10 +44,14 @@ export default function ForgotPasswordPage() {
       if (response.ok) {
         setSubmitted(true);
       } else {
-        const data = await response.json();
-        toast.error(data.detail || 'Something went wrong');
+        const data = await response.json().catch(() => ({}));
+        const msg = data.detail || 'Unable to process your request. Please try again or contact support.';
+        setFormError(msg);
+        toast.error(msg);
       }
     } catch (error) {
+      const msg = 'Network error — please check your internet connection and try again.';
+      setFormError(msg);
       toast.error('Failed to send reset email. Please try again.');
     } finally {
       setLoading(false);
@@ -86,6 +101,24 @@ export default function ForgotPasswordPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Inline error state */}
+                {formError && (
+                  <div className="p-3 bg-error/10 border border-error/20 flex items-start gap-2" data-testid="forgot-password-error">
+                    <AlertCircle className="w-4 h-4 text-error flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-error">Unable to send reset link</p>
+                      <p className="text-xs text-error/80 mt-0.5">{formError}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormError('')}
+                      className="text-error/60 hover:text-error flex-shrink-0"
+                      aria-label="Dismiss error"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="email" className="label-trust">Email Address</Label>
                   <div className="relative">
@@ -94,9 +127,9 @@ export default function ForgotPasswordPage() {
                       id="email"
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => { setEmail(e.target.value); if (formError) setFormError(''); }}
                       placeholder="you@example.com"
-                      className="input-trust pl-10"
+                      className={`input-trust pl-10 ${formError ? 'border-error/40' : ''}`}
                       disabled={loading}
                       data-testid="forgot-email-input"
                     />

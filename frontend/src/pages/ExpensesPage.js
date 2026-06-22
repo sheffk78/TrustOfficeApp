@@ -170,7 +170,7 @@ export default function ExpensesPage() {
     switch (status) {
       case 'approved': return 'badge-success';
       case 'review': return 'badge-warning';
-      case 'declined': return 'badge-error';
+      case 'rejected': return 'badge-error';
       default: return '';
     }
   };
@@ -305,7 +305,7 @@ export default function ExpensesPage() {
                         <SelectContent>
                           <SelectItem value="review">Pending Review</SelectItem>
                           <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="declined">Declined</SelectItem>
+                          <SelectItem value="rejected">Declined</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -366,7 +366,7 @@ export default function ExpensesPage() {
                 />
               </div>
               <div className="flex gap-2">
-                {['all', 'approved', 'review', 'declined'].map((status) => (
+                {['all', 'approved', 'review', 'rejected'].map((status) => (
                   <button
                     key={status}
                     onClick={() => setFilterStatus(status)}
@@ -440,7 +440,7 @@ export default function ExpensesPage() {
                               <Check className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleUpdateStatus(expense.expense_id, 'declined')}
+                              onClick={() => handleUpdateStatus(expense.expense_id, 'rejected')}
                               className="p-1 hover:bg-error/10 text-error"
                               title="Decline"
                               data-testid={`decline-${expense.expense_id}`}
