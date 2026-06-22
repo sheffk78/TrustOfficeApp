@@ -86,6 +86,7 @@ from routers.external import router as external_router
 from routers.external_trust_docs import router as external_trust_docs_router
 from routers.courses import router as courses_router
 from routers.leads import router as leads_router
+from routers.assessments import router as assessments_router
 from routers.chat import router as chat_router  # Trust Assistant
 
 # Import security middleware
@@ -152,6 +153,8 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/courses/trustee-101/enroll",
     "/api/courses/trustee-101",
     "/api/courses/trustee-101/curriculum",
+    # Assessment routes (public — no subscription needed)
+    "/api/assessments/fiduciary-compliance/submit",
 }
 
 # HTTP methods that modify data (write operations)
@@ -338,6 +341,8 @@ app.include_router(external_trust_docs_router)
 app.include_router(courses_router, prefix="/api")
 # Lead management (admin)
 app.include_router(leads_router, prefix="/api")
+# Fiduciary assessment (public)
+app.include_router(assessments_router, prefix="/api")
 # Trust Assistant conversational AI
 app.include_router(chat_router, prefix="/api")
 
@@ -508,6 +513,11 @@ async def startup_event():
         # Expenses indexes
         await db.expenses.create_index([("trust_id", 1), ("user_id", 1), ("date", -1)])
         await db.expenses.create_index("expense_id", unique=True)
+
+        # Fiduciary assessment indexes
+        await db.fiduciary_assessments.create_index("email")
+        await db.fiduciary_assessments.create_index("assessment_id", unique=True)
+        await db.fiduciary_assessments.create_index([("lead_id", 1), ("created_at", -1)])
         
         logger.info("Database indexes created/verified successfully")
         
