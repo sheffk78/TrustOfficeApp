@@ -19,6 +19,7 @@ from database import db
 from routers.admin import require_admin
 from discord_service import notify_new_lead, notify_lead_stage_change
 from email_service import email_service
+from routers.notifications import create_notification
 
 logger = logging.getLogger(__name__)
 
@@ -475,6 +476,17 @@ async def capture_lead(lead: LeadCapture):
         logger.warning(f"Failed to send welcome email to {email}: {e}")
 
     logger.info(f"Lead captured: {lead_id} — {email} via {source}")
+
+    # Create in-app notification
+    await create_notification(
+        type="new_lead",
+        title=f"New lead: {name}",
+        body=f"Source: {source} · Score: 50",
+        lead_id=lead_id,
+        lead_email=email,
+        lead_name=name,
+    )
+
     return {
         "success": True,
         "lead_id": lead_id,
@@ -567,6 +579,18 @@ async def tidycal_webhook(request: Request):
     )
 
     logger.info(f"Lead created from TidyCal booking: {lead_id} — {email}")
+    
+    # Create in-app notification
+    await create_notification(
+        type="booked_call",
+        title=f"Discovery call booked: {name}",
+        body=f"Booked a TrustOffice Discovery Call",
+        lead_id=lead_id,
+        lead_email=email,
+        lead_name=name,
+        priority="high",
+    )
+
     return {"success": True, "lead_id": lead_id, "is_returning": False}
 
 
@@ -954,6 +978,15 @@ async def update_lead(
                 new_stage=update.stage,
                 details=update.notes
             )
+            # Create in-app notification for stage change
+            await create_notification(
+                type="lead_stage_change",
+                title=f"Lead stage changed: {lead.get('name', '')}",
+                body=f"{old_stage} → {update.stage}",
+                lead_id=lead_id,
+                lead_email=lead.get("email", ""),
+                lead_name=lead.get("name", ""),
+            )
 
         if update.notes:
             await _log_activity(lead_id, "note_added", update.notes)
@@ -1027,6 +1060,15 @@ async def mark_lead_as_subscribed(email: str, user_id: str):
             old_stage=old_stage or "unknown",
             new_stage="converted",
             details="Subscribed to TrustOffice"
+        )
+        # Create in-app notification for conversion
+        await create_notification(
+            type="lead_converted",
+            title=f"Lead converted: {lead.get('name', '')}",
+            body=f"Subscribed to TrustOffice (was: {old_stage})",
+            lead_id=lead["lead_id"],
+            lead_email=email,
+            lead_name=lead.get("name", ""),
         )
 
     logger.info(f"Lead {lead['lead_id']} marked as subscribed — {email}")

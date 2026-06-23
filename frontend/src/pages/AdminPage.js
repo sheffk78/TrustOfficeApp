@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import PageHelpButton from '@/components/PageHelpButton';
+import LeadTriageView from '@/components/LeadTriageView';
+import LeadFollowUpModal from '@/components/LeadFollowUpModal';
 import { 
   Users, 
   Shield, 
@@ -142,6 +144,13 @@ export default function AdminPage() {
   const [showBulkLeadStageDialog, setShowBulkLeadStageDialog] = useState(false);
   const [bulkLeadStage, setBulkLeadStage] = useState('new');
   const [bulkLeadActionLoading, setBulkLeadActionLoading] = useState(false);
+  
+  // Lead triage view state
+  const [showTriageView, setShowTriageView] = useState(true);
+  
+  // Follow-up email modal state
+  const [followUpLead, setFollowUpLead] = useState(null);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   
   // Check if user is admin - first check from user object, then verify with API
   const [isAdmin, setIsAdmin] = useState(false);
@@ -1633,6 +1642,14 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="font-serif text-xl text-navy dark:text-white">Leads</h2>
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowTriageView(!showTriageView)}
+                      title={showTriageView ? 'Switch to table view' : 'Switch to triage view'}
+                    >
+                      <Target className="w-4 h-4 mr-2" />
+                      {showTriageView ? 'Table View' : 'Triage View'}
+                    </Button>
                     <Button variant="outline" onClick={exportLeadsCsv} title="Export all leads as CSV">
                       <FileText className="w-4 h-4 mr-2" />
                       Export
@@ -1643,209 +1660,212 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Stage filter pills */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {[
-                    { key: 'all', label: 'All', count: leadsStageCounts.all },
-                    { key: 'new', label: 'New', count: leadsStageCounts.new },
-                    { key: 'engaged', label: 'Engaged', count: leadsStageCounts.engaged },
-                    { key: 'warm', label: 'Warm', count: leadsStageCounts.warm },
-                    { key: 'converted', label: 'Converted', count: leadsStageCounts.converted },
-                    { key: 'lost', label: 'Lost', count: leadsStageCounts.lost },
-                  ].map((s) => (
-                    <button
-                      key={s.key}
-                      onClick={() => { setLeadsStageFilter(s.key); setLeadsPage(1); }}
-                      className={`px-3 py-1.5 text-sm transition-colors ${
-                        leadsStageFilter === s.key
-                          ? 'bg-navy text-white dark:bg-gold dark:text-navy'
-                          : 'bg-navy/5 dark:bg-white/5 text-navy dark:text-white hover:bg-navy/10 dark:hover:bg-white/10'
-                      }`}
-                    >
-                      {s.label}
-                      {s.count !== undefined && (
-                        <span className="ml-1.5 text-xs opacity-70">({s.count})</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Search */}
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search leads by name or email..."
-                    value={leadsSearch}
-                    onChange={(e) => setLeadsSearch(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { setLeadsPage(1); fetchLeads(); } }}
-                    className="w-full pl-10 pr-4 py-2 border border-navy/10 dark:border-white/10 bg-transparent text-navy dark:text-white text-sm focus:outline-none focus:border-gold"
+                {showTriageView ? (
+                  <LeadTriageView
+                    onViewLead={(leadId) => {
+                      setShowTriageView(false);
+                      fetchLeadDetail(leadId);
+                    }}
+                    onFollowUp={(lead) => {
+                      setFollowUpLead(lead);
+                      setShowFollowUpModal(true);
+                    }}
                   />
-                </div>
-
-                {leadsLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <RefreshCw className="w-8 h-8 animate-spin text-navy dark:text-white" />
-                  </div>
-                ) : leads.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No leads found</p>
                 ) : (
-                  <>
-                    {/* Bulk Action Bar */}
-                    {selectedLeadIds.size > 0 && (
-                      <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
-                        <div className="flex items-center gap-3">
-                          <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
-                          <span className="font-medium text-navy dark:text-white">
-                            {selectedLeadIds.size} lead{selectedLeadIds.size !== 1 ? 's' : ''} selected
-                          </span>
-                          <Button variant="ghost" size="sm" onClick={clearLeadSelection}>
-                            Clear
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleBulkLeadExport}
-                          >
-                            <FileText className="w-4 h-4 mr-1" />
-                            Export
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowBulkLeadStageDialog(true)}
-                          >
-                            <Activity className="w-4 h-4 mr-1" />
-                            Change Stage
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-navy/10 dark:border-white/10">
-                            <th className="w-10 py-3 px-2">
-                              <Checkbox
-                                checked={leads.length > 0 && selectedLeadIds.size === leads.length}
-                                onCheckedChange={toggleSelectAllLeads}
-                                aria-label="Select all leads"
-                              />
-                            </th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Name</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Email</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Stage</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Score</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Next Action</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Source</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Created</th>
-                            <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {leads.map((lead) => (
-                            <tr key={lead.lead_id} className={`border-b border-navy/5 dark:border-white/5 hover:bg-navy/5 dark:hover:bg-white/5 ${selectedLeadIds.has(lead.lead_id) ? 'bg-navy/10 dark:bg-white/10' : ''}`}>
-                              <td className="py-3 px-2">
-                                <Checkbox
-                                  checked={selectedLeadIds.has(lead.lead_id)}
-                                  onCheckedChange={() => toggleSelectLead(lead.lead_id)}
-                                  aria-label={`Select ${lead.name || lead.email}`}
-                                />
-                              </td>
-                              <td className="py-3 px-4">
-                                <p className="font-medium text-navy dark:text-white">{lead.name || '—'}</p>
-                              </td>
-                              <td className="py-3 px-4 text-sm text-muted-foreground">{lead.email}</td>
-                              <td className="py-3 px-4">
-                                <Badge className={
-                                  lead.stage === 'new' ? 'bg-blue-100 text-blue-800' :
-                                  lead.stage === 'engaged' ? 'bg-purple-100 text-purple-800' :
-                                  lead.stage === 'warm' ? 'bg-warning/10 text-warning' :
-                                  lead.stage === 'converted' ? 'bg-success/10 text-success' :
-                                  'bg-gray-100 text-gray-800'
-                                }>
-                                  {lead.stage_label || lead.stage}
-                                </Badge>
-                              </td>
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${
-                                        lead.score >= 70 ? 'bg-success' :
-                                        lead.score >= 40 ? 'bg-warning' :
-                                        'bg-rust'
-                                      }`}
-                                      style={{ width: `${lead.score}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">{lead.score}</span>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-xs text-muted-foreground max-w-[200px] truncate">
-                                {lead.next_action || '—'}
-                              </td>
-                              <td className="py-3 px-4 text-sm text-muted-foreground">{lead.source || '—'}</td>
-                              <td className="py-3 px-4 text-sm text-muted-foreground">
-                                {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
-                              </td>
-                              <td className="py-3 px-4">
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={() => fetchLeadDetail(lead.lead_id)}
-                                    className="p-1.5 text-muted-foreground hover:text-navy dark:hover:text-white transition-colors"
-                                    title="View details"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                  <select
-                                    value={lead.stage}
-                                    onChange={(e) => updateLeadStage(lead.lead_id, e.target.value)}
-                                    className="text-xs border border-navy/20 dark:border-white/20 bg-transparent rounded px-1 py-0.5"
-                                    title="Change stage"
-                                  >
-                                    <option value="new">New</option>
-                                    <option value="engaged">Engaged</option>
-                                    <option value="warm">Warm</option>
-                                    <option value="converted">Converted</option>
-                                    <option value="lost">Lost</option>
-                                  </select>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  <div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {[
+                        { key: 'all', label: 'All', count: leadsStageCounts.all },
+                        { key: 'new', label: 'New', count: leadsStageCounts.new },
+                        { key: 'engaged', label: 'Engaged', count: leadsStageCounts.engaged },
+                        { key: 'warm', label: 'Warm', count: leadsStageCounts.warm },
+                        { key: 'converted', label: 'Converted', count: leadsStageCounts.converted },
+                        { key: 'lost', label: 'Lost', count: leadsStageCounts.lost },
+                      ].map((s) => (
+                        <button
+                          key={s.key}
+                          onClick={() => { setLeadsStageFilter(s.key); setLeadsPage(1); }}
+                          className={`px-3 py-1.5 text-sm transition-colors ${
+                            leadsStageFilter === s.key
+                              ? 'bg-navy text-white dark:bg-gold dark:text-navy'
+                              : 'bg-navy/5 dark:bg-white/5 text-navy dark:text-white hover:bg-navy/10 dark:hover:bg-white/10'
+                          }`}
+                        >
+                          {s.label}
+                          {s.count !== undefined && (
+                            <span className="ml-1.5 text-xs opacity-70">({s.count})</span>
+                          )}
+                        </button>
+                      ))}
                     </div>
 
-                    {/* Pagination */}
-                    {leadsTotal > 20 && (
-                      <div className="flex items-center justify-between mt-4">
-                        <p className="text-sm text-muted-foreground">
-                          Showing {((leadsPage - 1) * 20) + 1}-{Math.min(leadsPage * 20, leadsTotal)} of {leadsTotal}
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => { setLeadsPage(p => Math.max(1, p - 1)); }}
-                            disabled={leadsPage === 1}
-                            className="p-2 text-muted-foreground hover:text-navy dark:hover:text-white disabled:opacity-30"
-                          >
-                            <ChevronLeft className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => { setLeadsPage(p => p + 1); }}
-                            disabled={leadsPage * 20 >= leadsTotal}
-                            className="p-2 text-muted-foreground hover:text-navy dark:hover:text-white disabled:opacity-30"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                    <div className="relative mb-4">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search leads by name or email..."
+                        value={leadsSearch}
+                        onChange={(e) => setLeadsSearch(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { setLeadsPage(1); fetchLeads(); } }}
+                        className="w-full pl-10 pr-4 py-2 border border-navy/10 dark:border-white/10 bg-transparent text-navy dark:text-white text-sm focus:outline-none focus:border-gold"
+                      />
+                    </div>
+
+                    {leadsLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <RefreshCw className="w-8 h-8 animate-spin text-navy dark:text-white" />
+                      </div>
+                    ) : leads.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No leads found</p>
+                    ) : (
+                      <div>
+                        {selectedLeadIds.size > 0 && (
+                          <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
+                            <div className="flex items-center gap-3">
+                              <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
+                              <span className="font-medium text-navy dark:text-white">
+                                {selectedLeadIds.size} lead{selectedLeadIds.size !== 1 ? 's' : ''} selected
+                              </span>
+                              <Button variant="ghost" size="sm" onClick={clearLeadSelection}>
+                                Clear
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm" onClick={handleBulkLeadExport}>
+                                <FileText className="w-4 h-4 mr-1" />
+                                Export
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => setShowBulkLeadStageDialog(true)}>
+                                <Activity className="w-4 h-4 mr-1" />
+                                Change Stage
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b border-navy/10 dark:border-white/10">
+                                <th className="w-10 py-3 px-2">
+                                  <Checkbox
+                                    checked={leads.length > 0 && selectedLeadIds.size === leads.length}
+                                    onCheckedChange={toggleSelectAllLeads}
+                                    aria-label="Select all leads"
+                                  />
+                                </th>
+                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Name</th>
+                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Email</th>
+                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Stage</th>
+                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Score</th>
+                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Next Action</th>
+                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Source</th>
+                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Created</th>
+                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {leads.map((lead) => (
+                                <tr key={lead.lead_id} className={`border-b border-navy/5 dark:border-white/5 hover:bg-navy/5 dark:hover:bg-white/5 ${selectedLeadIds.has(lead.lead_id) ? 'bg-navy/10 dark:bg-white/10' : ''}`}>
+                                  <td className="py-3 px-2">
+                                    <Checkbox
+                                      checked={selectedLeadIds.has(lead.lead_id)}
+                                      onCheckedChange={() => toggleSelectLead(lead.lead_id)}
+                                      aria-label={`Select ${lead.name || lead.email}`}
+                                    />
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <p className="font-medium text-navy dark:text-white">{lead.name || '—'}</p>
+                                  </td>
+                                  <td className="py-3 px-4 text-sm text-muted-foreground">{lead.email}</td>
+                                  <td className="py-3 px-4">
+                                    <Badge className={
+                                      lead.stage === 'new' ? 'bg-blue-100 text-blue-800' :
+                                      lead.stage === 'engaged' ? 'bg-purple-100 text-purple-800' :
+                                      lead.stage === 'warm' ? 'bg-warning/10 text-warning' :
+                                      lead.stage === 'converted' ? 'bg-success/10 text-success' :
+                                      'bg-gray-100 text-gray-800'
+                                    }>
+                                      {lead.stage_label || lead.stage}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full ${
+                                            lead.score >= 70 ? 'bg-success' :
+                                            lead.score >= 40 ? 'bg-warning' :
+                                            'bg-rust'
+                                          }`}
+                                          style={{ width: `${lead.score}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs text-muted-foreground">{lead.score}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-xs text-muted-foreground max-w-[200px] truncate">
+                                    {lead.next_action || '—'}
+                                  </td>
+                                  <td className="py-3 px-4 text-sm text-muted-foreground">{lead.source || '—'}</td>
+                                  <td className="py-3 px-4 text-sm text-muted-foreground">
+                                    {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => fetchLeadDetail(lead.lead_id)}
+                                        className="p-1.5 text-muted-foreground hover:text-navy dark:hover:text-white transition-colors"
+                                        title="View details"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </button>
+                                      <select
+                                        value={lead.stage}
+                                        onChange={(e) => updateLeadStage(lead.lead_id, e.target.value)}
+                                        className="text-xs border border-navy/20 dark:border-white/20 bg-transparent rounded px-1 py-0.5"
+                                        title="Change stage"
+                                      >
+                                        <option value="new">New</option>
+                                        <option value="engaged">Engaged</option>
+                                        <option value="warm">Warm</option>
+                                        <option value="converted">Converted</option>
+                                        <option value="lost">Lost</option>
+                                      </select>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
+
+                        {leadsTotal > 20 && (
+                          <div className="flex items-center justify-between mt-4">
+                            <p className="text-sm text-muted-foreground">
+                              Showing {((leadsPage - 1) * 20) + 1}-{Math.min(leadsPage * 20, leadsTotal)} of {leadsTotal}
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => { setLeadsPage(p => Math.max(1, p - 1)); }}
+                                disabled={leadsPage === 1}
+                                className="p-2 text-muted-foreground hover:text-navy dark:hover:text-white disabled:opacity-30"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => { setLeadsPage(p => p + 1); }}
+                                disabled={leadsPage * 20 >= leadsTotal}
+                                className="p-2 text-muted-foreground hover:text-navy dark:hover:text-white disabled:opacity-30"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </TabsContent>
@@ -2754,6 +2774,19 @@ export default function AdminPage() {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Follow-up email modal */}
+        <LeadFollowUpModal
+          lead={followUpLead}
+          open={showFollowUpModal}
+          onClose={() => {
+            setShowFollowUpModal(false);
+            setFollowUpLead(null);
+          }}
+          onSent={() => {
+            fetchLeads();
+          }}
+        />
       </main>
       <MobileBottomNav />
     </div>
