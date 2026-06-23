@@ -492,6 +492,22 @@ ACTION_EXECUTION_MAP = {
             "criterion_name": "criterion_name",
         },
     },
+    "class_beneficiary_preview": {
+        "endpoint_type": "class_beneficiary",
+        "field_map": {
+            "class_type": "class_type",
+            "description": "description",
+            "percentage": "percentage",
+            "notes": "notes",
+        },
+    },
+    "class_beneficiary_removal_preview": {
+        "endpoint_type": "class_beneficiary_removal",
+        "field_map": {
+            "class_type": "class_type",
+            "reason": "reason",
+        },
+    },
 }
 
 
@@ -836,6 +852,47 @@ async def _execute_approved_action(
                 upsert=True
             )
             return {"success": True, "endpoint": "insights", "action": "dismissed", "criterion": criterion}
+
+        elif endpoint_type == "class_beneficiary":
+            cb_id = f"cb_{uuid.uuid4().hex[:16]}"
+            class_type = mapped_data.get("class_type", "custom")
+            class_type_label = {
+                "children": "Children (including after-born)",
+                "descendants": "Descendants",
+                "issue": "Issue (lineal descendants)",
+                "heirs": "Heirs",
+                "heirs_at_law": "Heirs at Law",
+                "blood_relatives": "Blood Relatives",
+                "per_stirpes": "Per Stirpes (by branch)",
+                "per_capita": "Per Capita (by head)",
+                "custom": "Custom Class",
+            }.get(class_type, class_type)
+
+            cb_doc = {
+                "class_beneficiary_id": cb_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "class_type": class_type,
+                "class_type_label": class_type_label,
+                "description": mapped_data.get("description", ""),
+                "percentage": float(mapped_data.get("percentage", 0)),
+                "notes": mapped_data.get("notes", ""),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.class_beneficiaries.insert_one(cb_doc)
+            return {"success": True, "record_id": cb_id, "endpoint": "class-beneficiaries", "action": "created"}
+
+        elif endpoint_type == "class_beneficiary_removal":
+            class_type = mapped_data.get("class_type", "")
+            existing = await db.class_beneficiaries.find_one({
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "class_type": class_type,
+            })
+            if not existing:
+                return {"success": False, "error": f"Class beneficiary '{class_type}' not found for this trust."}
+            await db.class_beneficiaries.delete_one({"class_beneficiary_id": existing["class_beneficiary_id"]})
+            return {"success": True, "record_id": existing["class_beneficiary_id"], "endpoint": "class-beneficiaries", "action": "removed"}
 
         return {"success": False, "error": f"Unhandled endpoint type: {endpoint_type}"}
 

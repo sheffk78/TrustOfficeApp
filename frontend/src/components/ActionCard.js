@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Pencil, X, AlertTriangle, FileText, DollarSign, Building2, Users, Loader2 } from 'lucide-react';
+import { Check, Pencil, X, AlertTriangle, FileText, DollarSign, Building2, Users, UsersRound, Loader2 } from 'lucide-react';
 
 const TYPE_CONFIG = {
   minutes_preview: { icon: FileText, label: 'Minutes', color: 'bg-navy/10 text-navy' },
   distribution_preview: { icon: DollarSign, label: 'Distribution', color: 'bg-gold/10 text-gold' },
   asset_preview: { icon: Building2, label: 'Asset', color: 'bg-blue-500/10 text-blue-600' },
   beneficiary_preview: { icon: Users, label: 'Beneficiary', color: 'bg-emerald-500/10 text-emerald-600' },
+  class_beneficiary_preview: { icon: UsersRound, label: 'Class Beneficiary', color: 'bg-purple-500/10 text-purple-600' },
+  class_beneficiary_removal_preview: { icon: UsersRound, label: 'Remove Class', color: 'bg-red-500/10 text-red-600' },
   // Also support short names
   minutes: { icon: FileText, label: 'Minutes', color: 'bg-navy/10 text-navy' },
   distribution: { icon: DollarSign, label: 'Distribution', color: 'bg-gold/10 text-gold' },

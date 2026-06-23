@@ -404,15 +404,29 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
     # 6. Active beneficiaries
     beneficiaries = await db.trust_unit_certificates.find(
         {"trust_id": trust_id, "status": "active"},
-        {"_id": 0, "holder_name": 1, "unit_count": 1, "allocation_pct": 1}
+        {"_id": 0, "holder_name": 1, "units": 1}
     ).to_list(20)
     context["beneficiaries"] = [
         {
             "name": b.get("holder_name", "Unknown"),
-            "units": b.get("unit_count", 0),
-            "allocation": b.get("allocation_pct", 0),
+            "units": b.get("units", 0),
         }
         for b in beneficiaries
+    ]
+
+    # 6b. Class beneficiaries
+    class_bens = await db.class_beneficiaries.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "class_type": 1, "class_type_label": 1, "percentage": 1, "description": 1}
+    ).to_list(20)
+    context["class_beneficiaries"] = [
+        {
+            "class_type": cb.get("class_type", ""),
+            "label": cb.get("class_type_label", cb.get("class_type", "")),
+            "percentage": cb.get("percentage", 0),
+            "description": cb.get("description", ""),
+        }
+        for cb in class_bens
     ]
 
     # 7. Tax calendar
@@ -481,6 +495,9 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/100 ({ctx.get
 
 ## Active Beneficiaries
 {json.dumps(ctx.get('beneficiaries', []), indent=2)}
+
+## Class Beneficiaries
+{json.dumps(ctx.get('class_beneficiaries', []), indent=2)}
 
 ## Tax Deadlines
 {json.dumps(ctx.get('tax_deadlines', []), indent=2)}

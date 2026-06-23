@@ -169,6 +169,8 @@ function _deriveTitle(actionCard) {
   if (!actionCard || !actionCard.data) return '';
   const d = actionCard.data;
   const type = actionCard.type || '';
+  if (type.includes('class_beneficiary_removal')) return `Remove Class: ${d.class_type || 'Class'}`;
+  if (type.includes('class_beneficiary')) return `Class Beneficiary: ${d.class_type || 'Class'}`;
   if (type.includes('distribution')) return `Distribution: $${(d.amount || 0).toLocaleString()} to ${d.beneficiary_name || 'beneficiary'}`;
   if (type.includes('asset')) return `New Asset: ${d.description || d.asset_type || 'Asset'}`;
   if (type.includes('minutes')) return `Minutes: ${d.minutes_type || 'Meeting'} — ${d.meeting_date || ''}`;
@@ -181,6 +183,8 @@ function _deriveSummary(actionCard) {
   if (!actionCard || !actionCard.data) return '';
   const d = actionCard.data;
   const type = actionCard.type || '';
+  if (type.includes('class_beneficiary_removal')) return `Remove ${d.class_type || 'class'} beneficiary designation`;
+  if (type.includes('class_beneficiary')) return `${d.class_type || 'Class'}${d.percentage ? ` — ${d.percentage}% allocation` : ''}${d.description ? `: ${d.description}` : ''}`;
   if (type.includes('distribution')) return `${d.purpose || 'Distribution'} of $${(d.amount || 0).toLocaleString()} to ${d.beneficiary_name || 'beneficiary'} on ${d.date || 'TBD'}`;
   if (type.includes('asset')) return `${d.asset_type || 'Asset'}: ${d.description || ''} (Value: $${(d.value || 0).toLocaleString()})`;
   if (type.includes('minutes')) return `${d.minutes_type || ''} meeting on ${d.meeting_date || 'TBD'} with ${(d.participants || []).join(', ') || 'participants TBD'}`;
