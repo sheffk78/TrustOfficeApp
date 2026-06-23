@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import PageHelpButton from '@/components/PageHelpButton';
+import NotificationCenter from '@/components/NotificationCenter';
 import LeadTriageView from '@/components/LeadTriageView';
 import LeadFollowUpModal from '@/components/LeadFollowUpModal';
 import { 
@@ -907,14 +908,21 @@ export default function AdminPage() {
               </h1>
               <p className="page-subtitle">Customer management and system administration</p>
             </div>
-            <PageHelpButton
-              items={[
-                { text: 'Manage customers, subscriptions, and system administration' },
-                { text: 'View and manage leads, extend trials, and gift subscriptions' },
-                { text: 'Access revenue data and customer details' },
-              ]}
-              taPrompt="Walk me through the Admin panel"
-            />
+            <div className="flex items-center gap-2">
+              <NotificationCenter onNotificationClick={(n) => {
+                if (n.lead_id) {
+                  setActiveTab('leads');
+                }
+              }} />
+              <PageHelpButton
+                items={[
+                  { text: 'Manage customers, subscriptions, and system administration' },
+                  { text: 'View and manage leads, extend trials, and gift subscriptions' },
+                  { text: 'Access revenue data and customer details' },
+                ]}
+                taPrompt="Walk me through the Admin panel"
+              />
+            </div>
           </div>
 
           {/* Stats Cards */}

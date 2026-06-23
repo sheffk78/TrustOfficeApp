@@ -46,7 +46,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { HeartHandshake, FolderTree } from 'lucide-react';
-import NotificationCenter from '@/components/NotificationCenter';
 
 const NAV_GROUPS = [
   // ═══ HERO ITEMS — gold-tinted standout links ═══
@@ -351,17 +350,7 @@ export const Sidebar = () => {
 
         {/* User section */}
         <div className="p-4 border-t border-white/10">
-          {/* Notification center for admins */}
-          {isAdmin && (
-            <div className="mb-3">
-              <NotificationCenter onNotificationClick={(n) => {
-                // Navigate to admin leads tab when clicking a lead notification
-                if (n.lead_id) {
-                  window.location.href = '/admin';
-                }
-              }} />
-            </div>
-          )}
+          {/* Notification center moved to Admin page */}
           <div className="flex items-center gap-3 mb-4">
             {user?.picture ? (
               <img src={user.picture} alt={user.name} className="w-10 h-10 object-cover" />
