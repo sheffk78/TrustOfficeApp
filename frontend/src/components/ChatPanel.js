@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Paperclip, Loader2, AlertCircle, X } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 
@@ -35,18 +35,54 @@ const ChatPanel = ({
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const textareaRef = useRef(null);
+  const prevMessageCountRef = useRef(0);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages — uses container scrollTop, not scrollIntoView
+  // This prevents the page-level scroll jump that was disrupting conversation visibility
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const messageCount = messages.length;
+    // Only auto-scroll when new messages arrive (not on every render)
+    if (messageCount > prevMessageCountRef.current) {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
     }
-  }, [messages, loading]);
+    prevMessageCountRef.current = messageCount;
+  }, [messages]);
+
+  // Also scroll on loading state changes (e.g. when loading finishes and response appears)
+  useEffect(() => {
+    if (!loading && messages.length > 0) {
+      const container = messagesContainerRef.current;
+      if (container) {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight;
+        });
+      }
+    }
+  }, [loading]);
+
+  // Auto-resize textarea as user types
+  const autoResizeTextarea = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
+  }, []);
 
   const handleSend = () => {
     const text = input.trim();
     if (!text || loading) return;
     setInput('');
+    // Reset textarea height after send
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     onSendMessage(text);
   };
 
@@ -55,6 +91,11 @@ const ChatPanel = ({
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+    autoResizeTextarea();
   };
 
   const handleChipClick = (message) => {
@@ -137,26 +178,28 @@ const ChatPanel = ({
 
       {/* Input bar — always visible */}
       <div className="chat-input-bar border-t border-navy/10 bg-background">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
+        <div className="max-w-3xl mx-auto flex items-end gap-3">
           <button
-            className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors flex-shrink-0"
+            className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors flex-shrink-0 mb-1"
             title="Attach file"
           >
             <Paperclip className="w-5 h-5" />
           </button>
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your trust..."
             disabled={loading}
-            className="input-trust flex-1 placeholder:text-muted-foreground/50 disabled:opacity-50"
+            rows={1}
+            className="input-trust flex-1 placeholder:text-muted-foreground/50 disabled:opacity-50 resize-none overflow-y-auto py-2.5 leading-5 min-h-[40px] max-h-[160px]"
+            style={{ height: 'auto' }}
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || loading}
-            className="btn-primary p-2 flex-shrink-0"
+            className="btn-primary p-2 flex-shrink-0 mb-1"
             title="Send message"
           >
             <Send className="w-4 h-4" />
