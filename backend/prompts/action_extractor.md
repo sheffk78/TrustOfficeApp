@@ -11,6 +11,7 @@ Only extract when the user is clearly making a request that would create, update
 - A minutes request → extract meeting date, participants, decisions, trust name
 - An asset request → extract asset type, value, description, date acquired
 - A new beneficiary request → extract name, contact info
+- A class beneficiary request → extract class_type (children/descendants/issue/heirs/blood_relatives/etc.), description, percentage, notes
 - A compensation plan request → extract trustee name, amount, frequency, effective date
 - A task request → extract task type, description, due date, priority
 - A transaction request → extract type (income/expense), amount, category, date, description

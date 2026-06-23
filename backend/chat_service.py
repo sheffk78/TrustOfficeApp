@@ -247,7 +247,7 @@ async def extract_action_data(
 ) -> dict:
     """
     Extract structured data from the user message for creating records.
-    Only called for write-intents (add_asset, log_minutes, create_distribution, create_beneficiary).
+    Only called for write-intents (add_asset, log_minutes, create_distribution, create_beneficiary, create_class_beneficiary, remove_class_beneficiary).
     """
     from ai_client import ai_draft
 

@@ -87,6 +87,8 @@ Classify each user message into exactly one of these intents:
 - `log_minutes` — User wants to draft or record meeting minutes
 - `create_distribution` — User wants to make a distribution to a beneficiary
 - `create_beneficiary` — User wants to add a new beneficiary
+- `create_class_beneficiary` — User wants to add a class beneficiary designation (children, descendants, blood relatives, etc.) that automatically covers future members
+- `remove_class_beneficiary` — User wants to remove a class beneficiary designation
 - `update_beneficiary` — User wants to change existing beneficiary info
 - `remove_beneficiary` — User wants to delete a beneficiary
 - `cancel_distribution` — User wants to undo or delete a distribution

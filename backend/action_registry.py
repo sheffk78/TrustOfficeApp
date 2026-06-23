@@ -97,6 +97,30 @@ ACTION_REGISTRY = {
             {"name": "notes", "type": "string", "required": False, "description": "Any additional notes about the beneficiary"},
         ],
     },
+    "create_class_beneficiary": {
+        "type": "class_beneficiary_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Add a class beneficiary designation (e.g., children, descendants, blood relatives) that automatically covers future members",
+        "api_endpoint": "POST /api/beneficiaries/class-beneficiaries",
+        "fields": [
+            {"name": "class_type", "type": "string", "required": True, "description": "Class type: children, descendants, issue, heirs, heirs_at_law, blood_relatives, per_stirpes, per_capita, or custom"},
+            {"name": "description", "type": "string", "required": False, "description": "Description of the class and how it's defined"},
+            {"name": "percentage", "type": "number", "required": False, "description": "Allocation percentage for this class (0-100)"},
+            {"name": "notes", "type": "string", "required": False, "description": "Additional notes about the class beneficiary designation"},
+        ],
+    },
+    "remove_class_beneficiary": {
+        "type": "class_beneficiary_removal_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Remove a class beneficiary designation",
+        "api_endpoint": "DELETE /api/beneficiaries/class-beneficiaries/{class_beneficiary_id}",
+        "fields": [
+            {"name": "class_type", "type": "string", "required": True, "description": "The class type to remove (e.g., children, descendants, blood_relatives)"},
+            {"name": "reason", "type": "string", "required": False, "description": "Reason for removal"},
+        ],
+    },
     "update_beneficiary": {
         "type": "beneficiary_update_preview",
         "requires_write": True,
