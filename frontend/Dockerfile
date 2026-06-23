@@ -1,11 +1,14 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 # Build cache bust
-ARG CACHE_BUST=2
+ARG CACHE_BUST=9
 RUN echo "Cache bust: $CACHE_BUST"
+RUN echo "Build timestamp: $(date -u +%s)"
+RUN echo "Unique: $(date +%s%N)"
 COPY package.json yarn.lock ./
 RUN npm install --force
 COPY . .
+RUN echo "Source files: $(find . -name '*.js' -path '*/src/*' | wc -l)"
 
 ARG REACT_APP_BACKEND_URL
 ARG REACT_APP_GOOGLE_CLIENT_ID

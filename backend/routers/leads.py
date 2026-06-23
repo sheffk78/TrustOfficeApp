@@ -988,10 +988,49 @@ async def update_lead(
                 lead_name=lead.get("name", ""),
             )
 
+            # Create in-app notification for stage change
+            from routers.notifications import create_notification
+            await create_notification(
+                type="lead_stage_change",
+                title=f"Lead stage changed: {lead.get('name', '')}",
+                body=f"{old_stage} → {update.stage}",
+                lead_id=lead_id,
+                lead_email=lead.get("email"),
+                lead_name=lead.get("name"),
+            )
+
         if update.notes:
             await _log_activity(lead_id, "note_added", update.notes)
 
     return {"success": True, "lead_id": lead_id}
+
+
+@router.post("/{lead_id}/course-progress")
+async def set_lead_course_progress(
+    lead_id: str,
+    body: dict,
+    admin: dict = Depends(require_admin)
+):
+    """Set a lead's course progress. Auto-advances stage from new → engaged."""
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    lessons_watched = body.get("lessons_watched", 0)
+    email = lead.get("email")
+    if email:
+        await update_lead_course_progress(email, lessons_watched)
+    else:
+        # Fallback: update directly
+        await db.leads.update_one(
+            {"lead_id": lead_id},
+            {"$set": {
+                "lessons_watched": lessons_watched,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+
+    return {"success": True, "lead_id": lead_id, "lessons_watched": lessons_watched}
 
 
 @router.post("/{lead_id}/notes")

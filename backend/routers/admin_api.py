@@ -862,7 +862,7 @@ async def fix_subscription(
     )
     
     logger.info(f"API: Fixed subscription for {user['email']}: {list(update_fields.keys())}")
-    
+
     return {
         "success": True,
         "message": f"Subscription updated for {user.get('email')}",
@@ -871,3 +871,96 @@ async def fix_subscription(
         "updated_fields": list(body.dict(exclude_none=True).keys()),
         "subscription": updated_subscription
     }
+
+
+# ==================== LEAD ENRICHMENT ====================
+
+
+@router.post("/leads/{lead_id}/enrich")
+async def enrich_lead(
+    lead_id: str,
+    body: dict,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """Enrich a lead with course progress, booked_call, stage, etc."""
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    update_fields = {}
+    now = datetime.now(timezone.utc)
+
+    if "lessons_watched" in body:
+        update_fields["lessons_watched"] = body["lessons_watched"]
+    if "booked_call" in body:
+        update_fields["booked_call"] = body["booked_call"]
+    if "booked_call_at" in body:
+        update_fields["booked_call_at"] = body["booked_call_at"]
+    if "last_login" in body:
+        update_fields["last_login"] = body["last_login"]
+    if "stage" in body:
+        update_fields["stage"] = body["stage"]
+    if "score" in body:
+        update_fields["score"] = body["score"]
+    if "notes" in body:
+        update_fields["notes"] = body["notes"]
+
+    if update_fields:
+        update_fields["updated_at"] = now.isoformat()
+        await db.leads.update_one({"lead_id": lead_id}, {"$set": update_fields})
+
+    # Add activity log entry if provided
+    if body.get("activity"):
+        await db.lead_activities.insert_one({
+            "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+            "lead_id": lead_id,
+            "action_type": body["activity"].get("type", "system"),
+            "content": body["activity"]["content"],
+            "created_at": body["activity"].get("created_at", now.isoformat()),
+        })
+
+    await log_api_action(
+        action="enrich_lead",
+        details={"lead_id": lead_id, "updated_fields": list(update_fields.keys())},
+        ip_address=get_client_ip(request),
+    )
+
+    logger.info(f"API: Enriched lead {lead_id}: {list(update_fields.keys())}")
+    return {"success": True, "lead_id": lead_id, "updated_fields": list(update_fields.keys())}
+
+
+# ==================== ADMIN PASSWORD RESET ====================
+
+
+@router.post("/users/{user_id}/reset-password")
+async def reset_admin_password(
+    user_id: str,
+    body: dict,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """Reset a user's password. Requires admin API key."""
+    import bcrypt
+
+    new_password = body.get("password")
+    if not new_password or len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    hashed = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    result = await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"password_hash": hashed}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await log_api_action(
+        action="reset_password",
+        details={"target_user_id": user_id},
+        ip_address=get_client_ip(request),
+    )
+
+    logger.info(f"API: Password reset for user {user_id}")
+    return {"success": True, "message": "Password reset successfully"}
