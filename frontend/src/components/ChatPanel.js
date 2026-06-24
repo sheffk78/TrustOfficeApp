@@ -178,7 +178,7 @@ const ChatPanel = ({
 
       {/* Input bar — always visible */}
       <div className="chat-input-bar border-t border-navy/10 bg-background">
-        <div className="flex items-end gap-3">
+        <div className="w-full flex items-end gap-3">
           <button
             className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors flex-shrink-0 mb-1"
             title="Attach file"
@@ -193,7 +193,7 @@ const ChatPanel = ({
             placeholder="Ask about your trust..."
             disabled={loading}
             rows={1}
-            className="input-trust flex-1 placeholder:text-muted-foreground/50 disabled:opacity-50 resize-none overflow-y-auto py-3 leading-6 min-h-[48px] max-h-[240px]"
+            className="input-trust flex-1 placeholder:text-muted-foreground/50 disabled:opacity-50 resize-none overflow-y-hidden py-3 leading-6 min-h-[48px] max-h-[240px]"
             style={{ height: 'auto' }}
           />
           <button
