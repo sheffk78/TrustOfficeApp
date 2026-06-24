@@ -1671,7 +1671,6 @@ export default function AdminPage() {
                 {showTriageView ? (
                   <LeadTriageView
                     onViewLead={(leadId) => {
-                      setShowTriageView(false);
                       fetchLeadDetail(leadId);
                     }}
                     onFollowUp={(lead) => {

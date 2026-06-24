@@ -591,6 +591,15 @@ async def gift_subscription(
         status = "forever_free"
         current_period_end = None
         plan = "forever_free"
+        # Forever free should not show the gifted banner — it's permanent, not time-limited
+        subscription_data = {
+            "status": status,
+            "plan": plan,
+            "plan_type": plan,
+            "activated_at": now.isoformat(),
+            "current_period_end": None,
+            "updated_at": now.isoformat()
+        }
     elif body.plan_type == "monthly":
         status = "active"
         current_period_end = (now + timedelta(days=30)).isoformat()
@@ -599,20 +608,23 @@ async def gift_subscription(
         status = "active"
         current_period_end = (now + timedelta(days=365)).isoformat()
         plan = "annual"
-    
+
     # Update or create subscription
     subscription = await db.subscriptions.find_one({"user_id": user_id})
-    
-    subscription_data = {
-        "status": status,
-        "plan": plan,
-        "activated_at": now.isoformat(),
-        "current_period_end": current_period_end,
-        "gifted": True,
-        "gift_reason": body.reason,
-        "gifted_at": now.isoformat(),
-        "updated_at": now.isoformat()
-    }
+
+    # Build subscription_data for non-forever_free plans (includes gifted fields)
+    if body.plan_type != "forever_free":
+        subscription_data = {
+            "status": status,
+            "plan": plan,
+            "plan_type": plan,
+            "activated_at": now.isoformat(),
+            "current_period_end": current_period_end,
+            "gifted": True,
+            "gift_reason": body.reason,
+            "gifted_at": now.isoformat(),
+            "updated_at": now.isoformat()
+        }
     
     if subscription:
         await db.subscriptions.update_one(

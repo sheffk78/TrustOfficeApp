@@ -26,8 +26,12 @@ export const GiftedBanner = () => {
   // ADMIN BYPASS: Never show for admins
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
   
+  // SKIP for forever-free users — no time-limited gift to show
+  const isForeverFree = subscription?.plan_type === 'forever_free';
+  
   // Only show for gifted users with active subscription
   const showBanner = !isAdmin && 
+                     !isForeverFree &&
                      subscription?.is_gifted && 
                      subscription?.is_active && 
                      !dismissed;

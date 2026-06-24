@@ -24,6 +24,7 @@ TRIAL_DAYS = 14  # Legacy — existing trial users still have this period. New s
 FOREVER_FREE_EMAILS = {
     "admin@wingpointtrusts.com",
     "contact@trustoffice.app",
+    "jeff@socialize.video",
 }
 
 security = HTTPBearer(auto_error=False)
