@@ -1,0 +1,139 @@
+"""
+Trust Document Analysis API — endpoints for retrieving and triggering
+trust document intelligence extraction.
+"""
+from fastapi import APIRouter, HTTPException, Depends
+from datetime import datetime, timezone
+import logging
+import asyncio
+
+from database import db
+from dependencies import get_current_user
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["trust_doc_analysis"])
+
+
+@router.get("/trusts/{trust_id}/document-analysis")
+async def get_analysis(trust_id: str, user: dict = Depends(get_current_user)):
+    """Get the latest completed trust document analysis for a trust."""
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    # Try to find a complete analysis
+    analysis = await db.trust_document_analysis.find_one(
+        {"trust_id": trust_id, "status": "complete"},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+
+    if analysis:
+        return {
+            "status": "complete",
+            "extracted_fields": analysis.get("extracted_fields", {}),
+            "vault_document_id": analysis.get("vault_document_id"),
+            "created_at": analysis.get("created_at"),
+        }
+
+    # Check if there's a pending/analyzing one
+    pending = await db.trust_document_analysis.find_one(
+        {"trust_id": trust_id, "status": {"$in": ["pending", "analyzing"]}},
+        {"_id": 0, "status": 1, "created_at": 1},
+        sort=[("created_at", -1)]
+    )
+    if pending:
+        return {
+            "status": pending["status"],
+            "extracted_fields": None,
+            "created_at": pending.get("created_at"),
+        }
+
+    # Check if there's a failed one (so frontend can show retry)
+    failed = await db.trust_document_analysis.find_one(
+        {"trust_id": trust_id, "status": "failed"},
+        {"_id": 0, "status": 1, "error_message": 1, "created_at": 1},
+        sort=[("created_at", -1)]
+    )
+    if failed:
+        return {
+            "status": "failed",
+            "error_message": failed.get("error_message"),
+            "extracted_fields": None,
+            "created_at": failed.get("created_at"),
+        }
+
+    return {"status": "none", "extracted_fields": None}
+
+
+@router.get("/trusts/{trust_id}/document-analysis/status")
+async def get_analysis_status(trust_id: str, user: dict = Depends(get_current_user)):
+    """Lightweight status check for polling."""
+    analysis = await db.trust_document_analysis.find_one(
+        {"trust_id": trust_id},
+        {"_id": 0, "status": 1, "error_message": 1},
+        sort=[("created_at", -1)]
+    )
+    if not analysis:
+        return {"status": "none"}
+    return {
+        "status": analysis["status"],
+        "error_message": analysis.get("error_message"),
+    }
+
+
+@router.post("/trusts/{trust_id}/document-analysis/reanalyze")
+async def reanalyze(trust_id: str, user: dict = Depends(get_current_user)):
+    """
+    Re-trigger analysis from the existing trust instrument in the vault.
+    Used by the "Re-analyze" button in the UI, or by users who want to
+    retry after a failure.
+    """
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    # Find the most recent trust instrument in the vault with file content
+    doc = await db.vault_documents.find_one(
+        {
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "category": {"$in": ["trust_instrument", "amendment"]},
+            "file_content": {"$exists": True, "$ne": None},
+        },
+        sort=[("created_at", -1)]
+    )
+
+    if not doc:
+        raise HTTPException(
+            status_code=404,
+            detail="No trust instrument found in vault. Please upload your trust document first."
+        )
+
+    file_content = doc.get("file_content")
+    if not file_content:
+        raise HTTPException(
+            status_code=400,
+            detail="Trust instrument has no file content. The document may be a reference-only entry."
+        )
+
+    is_amendment = doc.get("category") == "amendment"
+
+    # Trigger analysis async (non-blocking)
+    from trust_doc_analyzer import analyze_trust_document
+    asyncio.create_task(
+        analyze_trust_document(
+            trust_id, user["user_id"], doc["doc_id"], file_content,
+            is_amendment=is_amendment
+        )
+    )
+
+    return {
+        "message": "Re-analysis started",
+        "status": "pending",
+        "doc_id": doc["doc_id"],
+    }

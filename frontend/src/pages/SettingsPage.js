@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
+import TrustDocumentSummary from '@/components/TrustDocumentSummary';
 import { 
   User,
   Building2,
@@ -1231,6 +1232,13 @@ export default function SettingsPage() {
                   </Dialog>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Trust Document Intelligence — extracted provisions from uploaded trust document */}
+          {selectedTrust && (
+            <div className="mb-8">
+              <TrustDocumentSummary trustId={selectedTrust.trust_id} />
             </div>
           )}
 

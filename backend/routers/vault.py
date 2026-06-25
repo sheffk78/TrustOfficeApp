@@ -7,11 +7,13 @@ from typing import Optional
 import re
 import uuid
 import base64
+import logging
 
 from database import db
 from dependencies import get_current_user
 from routers.compensation import auto_update_onboarding
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["vault"])
 
 DOC_CATEGORIES = {
@@ -170,6 +172,21 @@ async def upload_document(
         await auto_update_onboarding(user["user_id"], trust_id)
     except Exception:
         pass
+
+    # Trigger trust document analysis if this is a trust instrument or amendment
+    if category in ("trust_instrument", "amendment") and file_content:
+        try:
+            from trust_doc_analyzer import analyze_trust_document
+            import asyncio
+            asyncio.create_task(
+                analyze_trust_document(
+                    trust_id, user["user_id"], doc_id, file_content,
+                    is_amendment=(category == "amendment")
+                )
+            )
+            logger.info(f"Triggered trust doc analysis for trust {trust_id}, doc {doc_id}")
+        except Exception as e:
+            logger.warning(f"Failed to trigger trust doc analysis: {e}")
 
     # Return without file_content in the response
     response = {k: v for k, v in record.items() if k != "file_content"}

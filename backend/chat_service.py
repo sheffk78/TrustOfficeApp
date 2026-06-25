@@ -446,6 +446,30 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
         for t in upcoming_tax
     ]
 
+    # 8. Trust Document Analysis (if available)
+    analysis = await db.trust_document_analysis.find_one(
+        {"trust_id": trust_id, "status": "complete"},
+        {"_id": 0, "extracted_fields": 1},
+        sort=[("created_at", -1)]
+    )
+    if analysis:
+        fields = analysis.get("extracted_fields", {})
+        dist_std = fields.get("distribution_standard", {})
+        context["trust_document"] = {
+            "grantor": fields.get("grantor_name", ""),
+            "trust_type": fields.get("trust_type", ""),
+            "distribution_standard": dist_std.get("exact_language", ""),
+            "distribution_standard_type": dist_std.get("type", ""),
+            "distribution_article": dist_std.get("article_reference", ""),
+            "trustee_powers": [
+                {"power": p.get("power", ""), "article": p.get("article_reference", "")}
+                for p in fields.get("trustee_powers", [])
+            ],
+            "removal_provisions": fields.get("removal_provisions", {}).get("summary", ""),
+            "termination_rules": fields.get("termination_rules", {}).get("summary", ""),
+            "beneficiary_names": fields.get("beneficiary_names", []),
+        }
+
     return context
 
 

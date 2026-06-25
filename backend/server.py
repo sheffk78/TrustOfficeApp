@@ -89,6 +89,7 @@ from routers.leads import router as leads_router
 from routers.notifications import router as notifications_router
 from routers.assessments import router as assessments_router
 from routers.chat import router as chat_router  # Trust Assistant
+from routers.trust_doc_analysis import router as trust_doc_analysis_router
 
 # Import security middleware
 from security import (
@@ -353,6 +354,8 @@ app.include_router(notifications_router, prefix="/api")
 app.include_router(assessments_router, prefix="/api")
 # Trust Assistant conversational AI
 app.include_router(chat_router, prefix="/api")
+# Trust Document Intelligence — AI extraction from trust documents
+app.include_router(trust_doc_analysis_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -535,6 +538,12 @@ async def startup_event():
         # Expenses indexes
         await db.expenses.create_index([("trust_id", 1), ("user_id", 1), ("date", -1)])
         await db.expenses.create_index("expense_id", unique=True)
+        
+        # Trust document analysis indexes (Trust Document Intelligence)
+        await db.trust_document_analysis.create_index([("trust_id", 1), ("status", 1)])
+        await db.trust_document_analysis.create_index("analysis_id", unique=True)
+        await db.trust_document_analysis.create_index([("trust_id", 1), ("created_at", -1)])
+        await db.trust_document_analysis.create_index("vault_document_id")
 
         # Fiduciary assessment indexes
         await db.fiduciary_assessments.create_index("email")

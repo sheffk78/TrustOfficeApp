@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import PageHelpButton from '@/components/PageHelpButton';
+import AnalysisStatusBadge from '@/components/AnalysisStatusBadge';
 
 const CATEGORY_ICONS = {
   trust_instrument: Shield,
@@ -573,6 +574,14 @@ export default function VaultPage() {
                             {doc.tags?.map((tag, i) => (
                               <span key={i} className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{tag}</span>
                             ))}
+                          </div>
+                          {/* Analysis status badge for trust instruments and amendments */}
+                          <div className="mb-2">
+                            <AnalysisStatusBadge
+                              trustId={selectedTrust?.trust_id}
+                              docId={doc.doc_id}
+                              category={doc.category}
+                            />
                           </div>
                           <div className="flex items-center justify-between">
                             {doc.storage_provider === 'trustoffice' ? (

@@ -684,14 +684,21 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
         if trust.get("ein"):
             updates["ein_entered"] = True
     
-    # Check document uploads in vault
+    # Check document uploads in vault (fixed: was checking wrong category names)
     trust_doc_count = await db.vault_documents.count_documents({
         "trust_id": trust_id,
         "user_id": user_id,
-        "category": {"$in": ["trust_document", "declaration_of_trust"]}
+        "category": {"$in": ["trust_instrument", "amendment"]}
     })
     if trust_doc_count > 0:
         updates["trust_doc_uploaded"] = True
+    
+    # Check if trust document has been analyzed by AI
+    analysis_count = await db.trust_document_analysis.count_documents({
+        "trust_id": trust_id, "status": "complete"
+    })
+    if analysis_count > 0:
+        updates["trust_doc_analyzed"] = True
     
     ein_doc_count = await db.vault_documents.count_documents({
         "trust_id": trust_id,
