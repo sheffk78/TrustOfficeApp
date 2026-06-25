@@ -1,7 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 # Build cache bust
-ARG CACHE_BUST=100
+ARG CACHE_BUST=101
 RUN echo "Cache bust: $CACHE_BUST"
 RUN echo "Build timestamp: $(date -u +%s)"
 RUN echo "Unique: $(date +%s%N)"
