@@ -57,11 +57,12 @@ Dives into the practical mechanics of trust administration: reading the trust do
 - **Key topics:** Commingling as the #1 trustee trap, UTC 802 (duty of loyalty), UTC 810 (duty to keep property separate), 6 separation rules (bank accounts, credit cards, bookkeeping, tax IDs, physical property, records), presumption of wrongdoing, 6 real commingling cases, tracing, constructive trusts, the Simple Separation Rule, documentation protocol for temporary transfers, TrustOffice Transaction Ledger, Separation Alerts, Governance Health Score
 - **When to recommend:** User asks about commingling, mixing trust and personal funds, "can I use my personal account?", separation rules, trust bank accounts, presumption of wrongdoing, tracing, constructive trusts, or how TrustOffice helps prevent commingling
 
-### Lesson 6: Recordkeeping That Holds Up in Court
-- **Status:** Pending upload
-- **Duration:** 5:45
-- **Key topics:** What records to keep, for how long, the difference between good recordkeeping and defensible recordkeeping, what a court will ask for during a challenge
-- **When to recommend:** User asks about recordkeeping, documentation, "what records do I need to keep?", "how long should I keep trust records?", audit preparation
+### Lesson 6: Trust Taxes in Plain English
+- **Status:** Produced and deployed (GUID: 80134112-c35b-4c83-802d-362e42cc1ad2)
+- **Duration:** ~12:52
+- **Key topics:** Form 1041, Schedule K-1, pass-through taxation, compressed trust tax brackets, simple vs complex trusts, trust deductions, five real tax mistakes (missed deadline, wrong EIN, missing K-1s, state tax trap, NIIT surprise), trustee's tax calendar with seven checkpoints, 65-day rule (Section 663(b)), personal liability under IRC 3467, seven-year record retention, TrustOffice Tax Calendar, Governance Tasks, Document Vault
+- **When to recommend:** User asks about trust taxes, Form 1041, K-1s, tax deadlines, "does a trust file taxes?", trust tax brackets, pass-through taxation, the 65-day rule, or tax-related trustee mistakes
+- **Key insight:** Trust taxes are a system, not a mystery. The trustees who panic are the ones who wait until April. The ones who stay protected set up the system in January and follow it all year.
 
 ---
 
@@ -260,7 +261,8 @@ When a user asks a question that maps to a course topic, the Trust Assistant sho
 | Getting started / first steps | 1 | 3 | ✅ |
 | Trust document interpretation | 2 | 4 | ❌ |
 | Commingling / bank accounts | 2 | 5 | ❌ |
-| Recordkeeping | 2 | 6 | ❌ |
+| Trust taxes / 1041 | 6 | 6 | ❌ |
+| Recordkeeping | 2 | 5 | ❌ |
 | Beneficiaries / HEMS | 3 | 7 | ❌ |
 | Beneficiary communication | 3 | 8 | ❌ |
 | Beneficiary disputes | 3 | 9 | ❌ |
