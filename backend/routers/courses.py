@@ -35,9 +35,9 @@ CURRICULUM = [
     },
     {
         "lesson": 2,
-        "title": "The Trustee's Role & Duties",
+        "title": "Should You Accept?",
         "video_guid": "670222ba-cde6-4772-b3af-dac84fd91db0",
-        "duration": "~8 min",
+        "duration": "~6 min",
         "free": True,
         "pdf_url": None,
         "status": "ready",
