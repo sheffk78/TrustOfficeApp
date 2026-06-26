@@ -45,11 +45,11 @@ The foundational module that every trustee starts with. Covers what a trustee is
 
 Dives into the practical mechanics of trust administration: reading the trust document, separating finances, and keeping defensible records.
 
-### Lesson 4: Understanding the Trust Document
-- **Status:** Pending upload
-- **Duration:** 5:30
-- **Key topics:** How to read and interpret the trust document, key clauses, beneficiary designations, trustee powers, what happens when language is ambiguous
-- **When to recommend:** User asks about interpreting trust terms, understanding clauses, ambiguous language, trustee powers, "what does my trust document mean?"
+### Lesson 4: HEMS Decoded
+- **Video ID:** `41982ee9-6c8a-4fe7-babd-29671b44a82c`
+- **Duration:** 10:14
+- **Key topics:** HEMS standard (Health, Education, Maintenance, Support), what's in and out for each category, five real HEMS mistakes that ended in lawsuits, 4-question test, TrustOffice HEMS distribution template
+- **When to recommend:** User asks "what does HEMS mean?", "can I approve this distribution?", "what counts as health/education/maintenance/support?", "HEMS category selection"
 
 ### Lesson 5: Separating Personal and Trust Finances
 - **Status:** Pending upload

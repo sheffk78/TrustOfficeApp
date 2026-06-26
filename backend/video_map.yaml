@@ -57,18 +57,20 @@ videos:
   # ============================================================
   # Module 2: Trust Administration Basics (Lessons 4-6) — SUBSCRIPTION
   # ============================================================
-  - id: "pending-module2-lesson4"
-    title: "Understanding the Trust Document"
+  - id: "41982ee9-6c8a-4fe7-babd-29671b44a82c"
+    title: "HEMS Decoded"
     lesson: 4
-    module: 2
-    module_title: "Trust Administration Basics"
+    module: 4
+    module_title: "Who Gets What"
     library: 609821
-    duration: "5:30"
+    duration: "10:00"
     free: false
     description: >
-      How to read and interpret the trust document — the single most important
-      document in your trustee life. Covers key clauses, beneficiary designations,
-      trustee powers, and what happens when the language is ambiguous.
+      Health, Education, Maintenance, Support — the four-letter word that
+      governs every distribution. Covers what's in and what's out for each
+      category, five real HEMS mistakes that ended in lawsuits, and the
+      4-question test to run before approving any distribution. Includes
+      HEMS Decision Framework and Quick Reference Card downloadables.
 
   - id: "pending-module2-lesson5"
     title: "Separating Personal and Trust Finances"

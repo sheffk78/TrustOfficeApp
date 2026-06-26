@@ -55,7 +55,7 @@ CURRICULUM = [
         "lesson": 4,
         "title": "HEMS Decoded",
         "video_guid": "41982ee9-6c8a-4fe7-babd-29671b44a82c",
-        "duration": "~16 min",
+        "duration": "~10 min",
         "free": False,
         "pdf_url": "/pdfs/hems-decision-framework.pdf",
         "status": "ready",
