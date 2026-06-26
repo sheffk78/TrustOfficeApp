@@ -72,18 +72,21 @@ videos:
       4-question test to run before approving any distribution. Includes
       HEMS Decision Framework and Quick Reference Card downloadables.
 
-  - id: "pending-module2-lesson5"
-    title: "Separating Personal and Trust Finances"
+  - id: "module5-lesson5"
+    title: "The Commingling Trap"
     lesson: 5
-    module: 2
-    module_title: "Trust Administration Basics"
+    module: 5
+    module_title: "The Commingling Trap"
     library: 609821
-    duration: "6:00"
+    video_guid: "27edf118-8dc1-41b8-b32a-0c5057a55fec"
+    duration: "~12 min"
     free: false
     description: >
-      Why commingling funds is the number one way trustees get into trouble.
-      Covers opening trust bank accounts, EIN requirements, the prudent investor
-      standard, and how to document every financial decision.
+      Six real cases of trustees who mixed trust money with personal money and
+      what it cost them. Covers UTC 802 (duty of loyalty), UTC 810 (duty to keep
+      property separate), the presumption of wrongdoing, tracing, constructive
+      trusts, and the Simple Separation Rule. Features TrustOffice's Transaction
+      Ledger, Separation Alerts, and Governance Health Score.
 
   - id: "pending-module2-lesson6"
     title: "Recordkeeping That Holds Up in Court"

@@ -51,11 +51,11 @@ Dives into the practical mechanics of trust administration: reading the trust do
 - **Key topics:** HEMS standard (Health, Education, Maintenance, Support), what's in and out for each category, five real HEMS mistakes that ended in lawsuits, 4-question test, TrustOffice HEMS distribution template
 - **When to recommend:** User asks "what does HEMS mean?", "can I approve this distribution?", "what counts as health/education/maintenance/support?", "HEMS category selection"
 
-### Lesson 5: Separating Personal and Trust Finances
-- **Status:** Pending upload
-- **Duration:** 6:00
-- **Key topics:** Why commingling is the #1 way trustees get into trouble, opening trust bank accounts, EIN requirements (revocable vs. irrevocable), the prudent investor standard, documenting financial decisions
-- **When to recommend:** User asks about commingling, trust bank accounts, EIN, "can I use my personal account?", "how do I separate trust money from mine?"
+### Lesson 5: The Commingling Trap
+- **Status:** Produced and deployed (GUID: 27edf118-8dc1-41b8-b32a-0c5057a55fec)
+- **Duration:** ~12:00
+- **Key topics:** Commingling as the #1 trustee trap, UTC 802 (duty of loyalty), UTC 810 (duty to keep property separate), 6 separation rules (bank accounts, credit cards, bookkeeping, tax IDs, physical property, records), presumption of wrongdoing, 6 real commingling cases, tracing, constructive trusts, the Simple Separation Rule, documentation protocol for temporary transfers, TrustOffice Transaction Ledger, Separation Alerts, Governance Health Score
+- **When to recommend:** User asks about commingling, mixing trust and personal funds, "can I use my personal account?", separation rules, trust bank accounts, presumption of wrongdoing, tracing, constructive trusts, or how TrustOffice helps prevent commingling
 
 ### Lesson 6: Recordkeeping That Holds Up in Court
 - **Status:** Pending upload

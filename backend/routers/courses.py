@@ -64,7 +64,7 @@ CURRICULUM = [
         "lesson": 5,
         "title": "The Commingling Trap",
         "video_guid": "27edf118-8dc1-41b8-b32a-0c5057a55fec",
-        "duration": "~15 min",
+        "duration": "~12 min",
         "free": False,
         "pdf_url": "/pdfs/separation-checklist.pdf",
         "status": "ready",
