@@ -99,7 +99,7 @@ CURRICULUM = [
     {
         "lesson": 9,
         "title": "Family Trusts and Sibling Dynamics",
-        "video_guid": "4a9c7291-43ba-4231-9772-8832b232c97a",
+        "video_guid": "22c897ff-4cae-47b1-b263-1bfac8f801b4",
         "duration": "~12 min",
         "free": False,
         "pdf_url": "/pdfs/family-governance-framework-l9.pdf",

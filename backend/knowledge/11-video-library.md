@@ -66,9 +66,9 @@ Dives into the practical mechanics of trust administration: reading the trust do
 
 ---
 
-## Module 3: Beneficiary Relations (Lessons 8–9) — SUBSCRIPTION
+## Module 7: Invest and Delegate (Lesson 7) — SUBSCRIPTION
 
-Covers understanding who your beneficiaries are, how to communicate with them, and how to handle disagreements.
+Covers the Uniform Prudent Investor Act, delegation rules, and trustee compensation.
 
 ### Lesson 7: Prudent Investor Rule
 - **Status:** Produced and deployed (GUID: d9b23903-e21f-4696-87c9-582be96c5867)
@@ -77,17 +77,30 @@ Covers understanding who your beneficiaries are, how to communicate with them, a
 - **When to recommend:** User asks about investing trust assets, UPIA, prudent investor rule, diversification, delegation, "should I hire a financial advisor?", investment mistakes, trustee compensation, IPS, or how TrustOffice helps track investments
 - **Key insight:** Prudent investing is about process, not picking winners. The trustees who get surcharged are the ones who skip the process — no IPS, no diversification, no reviews, no documentation.
 
+---
+
+## Module 8: Communication and Transparency (Lesson 8) — SUBSCRIPTION
+
+Covers the UTC 813 notification requirement and why proactive communication prevents disputes.
+
 ### Lesson 8: Beneficiary Communication
 - **Status:** Produced and deployed (GUID: b4d048a2-40d6-4435-bcfe-de41a9744305)
 - **Duration:** ~13:29
 - **Key topics:** UTC 813 notification requirements, duty to inform and report, five communication failures (silent trustee, vague denial, delayed accounting, selective transparency, wrong medium), the 4-pillar communication system (notify, report, respond, explain denials), setting boundaries with demanding beneficiaries, TrustOffice Communication Log, Document Vault, Governance Health Score (7 criteria), Risk Dashboard
 - **When to recommend:** User asks about beneficiary communication, notification requirements, "do I have to tell beneficiaries?", "what am I required to disclose?", accounting to beneficiaries, communication log, duty to inform
 
-### Lesson 9: Handling Beneficiary Disputes
-- **Status:** Pending upload
-- **Duration:** 6:15
-- **Key topics:** Common dispute triggers, mediation, formal accounting, when to involve legal counsel, de-escalation strategies
-- **When to recommend:** User asks about beneficiary conflicts, disputes, "my beneficiary is threatening to sue", "how do I handle a disagreement?"
+---
+
+## Module 9: Family and Relationships (Lesson 9) — SUBSCRIPTION
+
+Covers family trusts and sibling dynamics: the two-hat problem, four family trust traps, the 5 Rules for Family Trustees, and co-trustee agreements.
+
+### Lesson 9: Family Trusts and Sibling Dynamics
+- **Status:** Produced and deployed (GUID: 22c897ff-4cae-47b1-b263-1bfac8f801b4)
+- **Duration:** ~12:01
+- **Key topics:** Two-hat problem (family member vs fiduciary), no "family exception" to fiduciary duty, four family trust traps (favored child $15,500 surcharge, grudge trustee $8,000 surcharge + removal, informal promise relational breach, co-trustee deadlock $34,000 surcharge), 5 Rules for Family Trustees (no verbal promises, equal information, document with care, neutral third party, Letter of Wishes), co-trustee agreements, TrustOffice Distribution Records, Communication Log, Document Vault, Governance Health Score (7 criteria)
+- **When to recommend:** User asks about family trusts, sibling dynamics, "my sister wants money from the trust", co-trustee conflicts, favoritism accusations, verbal distribution promises, family relationship preservation, Letter of Wishes, or how TrustOffice helps family trustees
+- **Key insight:** Legal compliance and relationship preservation are the same thing done right. Fairness feels like love; inconsistency feels like betrayal. The trustees who protect both build systems that separate legal decisions from emotional conversations.
 
 ---
 
@@ -266,7 +279,7 @@ When a user asks a question that maps to a course topic, the Trust Assistant sho
 | Recordkeeping | 2 | 5 | ❌ |
 | Beneficiaries / HEMS | 3 | 7 | ❌ |
 | Beneficiary communication | 3 | 8 | ❌ |
-| Beneficiary disputes | 3 | 9 | ❌ |
+| Beneficiary disputes | 9 | 9 | ❌ |
 | Assets / Schedule A | 4 | 10 | ❌ |
 | Investments / UPIA | 4 | 11 | ❌ |
 | Real property | 4 | 12 | ❌ |
