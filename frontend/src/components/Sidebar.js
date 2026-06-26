@@ -37,7 +37,8 @@ import {
   BookOpen,
   NotebookTabs,
   BarChart3,
-  Bot
+  Bot,
+  GraduationCap
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -51,6 +52,9 @@ const NAV_GROUPS = [
   // ═══ HERO ITEMS — gold-tinted standout links ═══
   { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', items: [], standout: true },
   { key: 'trust-assistant', icon: Bot, label: 'Trust Assistant', items: [], standout: true, badge: 'NEW' },
+
+  // ═══ LEARNING ═══
+  { key: 'course', icon: GraduationCap, label: 'Trustee 101', items: [], standout: true },
 
   // ═══ CORE SECTIONS ═══
   { key: 'governance', icon: BookOpen, label: 'Governance', items: [
@@ -219,8 +223,9 @@ export const Sidebar = () => {
               const path = group.key === 'dashboard' ? '/dashboard' 
                 : group.key === 'score' ? '/governance' 
                 : group.key === 'trust-assistant' ? '/trust-assistant'
+                : group.key === 'course' ? '/course'
                 : '/settings';
-              const isActive = location.pathname === path;
+              const isActive = location.pathname === path || (path === '/course' && location.pathname.startsWith('/course'));
               
               return (
                 <div key={group.key}>

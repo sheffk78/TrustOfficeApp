@@ -47,6 +47,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
+import CoursePage from "@/pages/CoursePage";
 
 // GA4 page view tracking for SPA navigation
 const useGA4PageTracking = () => {
@@ -311,8 +312,8 @@ const AppRouter = () => {
           <TrustAssistantPage />
         </SubscriptionProtectedRoute>
       } />
-<Route path="/course" element={<Navigate to="https://trustoffice.app/trustee-101" replace />} />
-      <Route path="/course/lesson/:lessonNumber" element={<Navigate to="https://trustoffice.app/trustee-101" replace />} />
+<Route path="/course" element={<ProtectedRoute><CoursePage /></ProtectedRoute>} />
+      <Route path="/course/lesson/:lessonNumber" element={<ProtectedRoute><CoursePage /></ProtectedRoute>} />
       <Route path="/binder" element={
         <SubscriptionProtectedRoute>
           <PrintableBinderPage />
