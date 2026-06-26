@@ -296,7 +296,7 @@ def _get_landing_page_html() -> str:
 async def _send_lesson_1_access_email(email: str, name: str) -> Dict:
     """Send Lesson 1 access email via Postmark with video embed and lesson info."""
 
-    embed_url = "https://iframe.mediadelivery.net/embed/609821/a5361b44-4f64-4ff9-954b-8ccd89ffb614"
+    embed_url = "https://iframe.mediadelivery.net/embed/609821/b095719e-96c6-4a0a-a845-5f003777ff2f"
     pdf_url = "https://api.trustoffice.app/static/trustees-first-7-days-checklist.pdf"
     subscribe_url = "https://app.trustoffice.app/subscription"
 
