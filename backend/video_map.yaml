@@ -130,18 +130,19 @@ videos:
   # ============================================================
   # Module 3: Beneficiary Relations (Lessons 8-9) — SUBSCRIPTION
   # ============================================================
-  - id: "pending-module3-lesson8"
-    title: "Communication and Transparency"
+  - id: "b4d048a2-40d6-4435-bcfe-de41a9744305"
+    title: "Beneficiary Communication"
     lesson: 8
-    module: 3
-    module_title: "Beneficiary Relations"
+    module: 8
+    module_title: "Communication and Transparency"
     library: 609821
-    duration: "6:00"
+    duration: "~13 min"
     free: false
     description: >
-      The UTC §813 notification requirement and why proactive communication
+      The UTC 813 notification requirement and why proactive communication
       prevents disputes. Covers what to share, when to share it, and how to
-      document that you've met your duty to inform.
+      document that you've met your duty to inform. Features TrustOffice's
+      Communication Log, Document Vault, and Governance Health Score.
 
   - id: "pending-module3-lesson9"
     title: "Handling Beneficiary Disputes"

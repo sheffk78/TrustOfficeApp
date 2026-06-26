@@ -77,11 +77,11 @@ Covers understanding who your beneficiaries are, how to communicate with them, a
 - **When to recommend:** User asks about investing trust assets, UPIA, prudent investor rule, diversification, delegation, "should I hire a financial advisor?", investment mistakes, trustee compensation, IPS, or how TrustOffice helps track investments
 - **Key insight:** Prudent investing is about process, not picking winners. The trustees who get surcharged are the ones who skip the process — no IPS, no diversification, no reviews, no documentation.
 
-### Lesson 8: Communication and Transparency
-- **Status:** Pending upload
-- **Duration:** 6:00
-- **Key topics:** UTC §813 notification requirements, proactive communication, what to share and when, documenting that you've met your duty to inform
-- **When to recommend:** User asks about beneficiary communication, notification requirements, "do I have to tell beneficiaries?", "what am I required to disclose?"
+### Lesson 8: Beneficiary Communication
+- **Status:** Produced and deployed (GUID: b4d048a2-40d6-4435-bcfe-de41a9744305)
+- **Duration:** ~13:29
+- **Key topics:** UTC 813 notification requirements, duty to inform and report, five communication failures (silent trustee, vague denial, delayed accounting, selective transparency, wrong medium), the 4-pillar communication system (notify, report, respond, explain denials), setting boundaries with demanding beneficiaries, TrustOffice Communication Log, Document Vault, Governance Health Score (7 criteria), Risk Dashboard
+- **When to recommend:** User asks about beneficiary communication, notification requirements, "do I have to tell beneficiaries?", "what am I required to disclose?", accounting to beneficiaries, communication log, duty to inform
 
 ### Lesson 9: Handling Beneficiary Disputes
 - **Status:** Pending upload
