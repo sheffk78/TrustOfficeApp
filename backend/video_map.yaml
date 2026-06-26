@@ -111,15 +111,21 @@ videos:
   - id: "d9b23903-e21f-4696-87c9-582be96c5867"
     title: "Prudent Investor Rule"
     lesson: 7
-    module: 3
-    module_title: "Beneficiary Relations"
+    module: 7
+    module_title: "Invest and Delegate"
     library: 609821
-    duration: "5:30"
+    duration: "~12 min"
     free: false
     description: >
-      Understanding beneficiary types, the HEMS standard, and why treating
-      all beneficiaries "fairly" doesn't mean treating them equally. Covers
-      the difference between income beneficiaries and remainder beneficiaries.
+      The Uniform Prudent Investor Act, the three principles every trustee
+      must follow, and the exact moment to delegate to a professional advisor.
+      Covers diversification, ongoing review duty, delegation vs abdication
+      under UPIA Section 9, four real investment mistakes with surcharges
+      ranging from $42K to $120K, the 5-step investment process (IPS,
+      allocation, diversify, review, document), when to hire a fiduciary
+      advisor, and trustee compensation rules. Features TrustOffice
+      Investment Tracking and Document Vault. Includes downloadable
+      IPS Template and Prudent Investor Checklist.
 
   - id: "pending-module3-lesson8"
     title: "Communication and Transparency"

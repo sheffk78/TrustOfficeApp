@@ -70,11 +70,12 @@ Dives into the practical mechanics of trust administration: reading the trust do
 
 Covers understanding who your beneficiaries are, how to communicate with them, and how to handle disagreements.
 
-### Lesson 7: Who Your Beneficiaries Really Are
-- **Status:** Pending upload
-- **Duration:** 5:30
-- **Key topics:** Beneficiary types, the HEMS standard (Health, Education, Maintenance, Support), income vs. remainder beneficiaries, why "fair" doesn't mean "equal"
-- **When to recommend:** User asks about beneficiaries, HEMS, "who are the beneficiaries?", "what does HEMS mean?", distribution standards
+### Lesson 7: Prudent Investor Rule
+- **Status:** Produced and deployed (GUID: d9b23903-e21f-4696-87c9-582be96c5867)
+- **Duration:** ~12:22
+- **Key topics:** Uniform Prudent Investor Act (UPIA), three principles (trust document as mandate, diversify, review and adjust), UPIA Section 2(b) portfolio-as-a-whole standard, UPIA Section 9 delegation rules, delegation vs abdication, four real investment mistakes (cash hoard $42K surcharge, hot stock $120K surcharge, ignored portfolio $45K surcharge, DIY advisor $78K + removal), 5-step investment process (IPS, allocation, diversify, review/rebalance, document), when to delegate vs DIY, fiduciary advisor vs broker-dealer, trustee compensation models (hourly, percentage, flat fee), TrustOffice Investment Tracking and Document Vault
+- **When to recommend:** User asks about investing trust assets, UPIA, prudent investor rule, diversification, delegation, "should I hire a financial advisor?", investment mistakes, trustee compensation, IPS, or how TrustOffice helps track investments
+- **Key insight:** Prudent investing is about process, not picking winners. The trustees who get surcharged are the ones who skip the process — no IPS, no diversification, no reviews, no documentation.
 
 ### Lesson 8: Communication and Transparency
 - **Status:** Pending upload
