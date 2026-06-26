@@ -44,9 +44,9 @@ CURRICULUM = [
     },
     {
         "lesson": 3,
-        "title": "The Trustee's First Seven Days",
-        "video_guid": "c34cbf6b-fc5d-4c5e-bd33-cb5e6c84b422",
-        "duration": "~5 min",
+        "title": "Meeting Minutes Are Not Optional",
+        "video_guid": "9a645c14-7506-4b3d-81fa-ac17f17741cc",
+        "duration": "~8 min",
         "free": True,
         "pdf_url": "/pdfs/minute-templates-l3.pdf",
         "status": "ready",

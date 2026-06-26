@@ -32,11 +32,11 @@ The foundational module that every trustee starts with. Covers what a trustee is
 - **When to recommend:** User asks about fiduciary duty, loyalty, prudence, impartiality, "what are my obligations?", "what happens if I make a mistake?"
 - **Key insight:** The lesson emphasizes that the duty of loyalty is absolute — even when nobody got hurt. Self-dealing is prohibited regardless of outcome.
 
-### Lesson 3: Getting Organized
-- **Video ID:** `c34cbf6b-fc5d-4c5e-bd33-cb5e6c84b422`
-- **Duration:** 7:00
-- **Key topics:** The first seven days as a trustee, gathering trust documents, identifying beneficiaries, locating assets, setting up systems, the Trustee's First 7 Days checklist
-- **When to recommend:** User asks "where do I start?", "how do I get organized?", "what should I do first as a trustee?", "I just became a trustee"
+### Lesson 3: Meeting Minutes Are Not Optional
+- **Video ID:** `9a645c14-7506-4b3d-81fa-ac17f17741cc`
+- **Duration:** 8:01
+- **Key topics:** UTC §703, Florida trustee $12,500 surcharge, 5-Minute Minute system, TrustOffice AI Minutes Builder, auto-stored/timestamped minutes
+- **When to recommend:** User asks "do I need meeting minutes?", "how do I document trustee decisions?", "what if a beneficiary challenges me?", "how does TrustOffice help with minutes?"
 - **Key insight:** This lesson includes a concrete day-by-day action checklist — not abstract advice but specific steps to take in the first week.
 
 ---
