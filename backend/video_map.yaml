@@ -106,7 +106,7 @@ videos:
       Calendar PDF.
 
   # ============================================================
-  # Module 3: Beneficiary Relations (Lessons 7-9) — SUBSCRIPTION
+  # Module 7: Invest and Delegate (Lesson 7) — SUBSCRIPTION
   # ============================================================
   - id: "d9b23903-e21f-4696-87c9-582be96c5867"
     title: "Prudent Investor Rule"
@@ -127,6 +127,9 @@ videos:
       Investment Tracking and Document Vault. Includes downloadable
       IPS Template and Prudent Investor Checklist.
 
+  # ============================================================
+  # Module 3: Beneficiary Relations (Lessons 8-9) — SUBSCRIPTION
+  # ============================================================
   - id: "pending-module3-lesson8"
     title: "Communication and Transparency"
     lesson: 8

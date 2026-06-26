@@ -66,7 +66,7 @@ Dives into the practical mechanics of trust administration: reading the trust do
 
 ---
 
-## Module 3: Beneficiary Relations (Lessons 7–9) — SUBSCRIPTION
+## Module 3: Beneficiary Relations (Lessons 8–9) — SUBSCRIPTION
 
 Covers understanding who your beneficiaries are, how to communicate with them, and how to handle disagreements.
 
