@@ -77,8 +77,9 @@ MAX_TEXT_LENGTH = 50000  # Truncate very long documents for AI context
 
 def extract_text_from_pdf(file_content: bytes) -> Optional[str]:
     """
-    Extract text from a PDF using PyMuPDF.
-    Returns None if the PDF is scanned (no text layer) or extraction fails.
+    Extract text from a document using PyMuPDF.
+    Handles PDF, DOCX, DOC, and TXT files.
+    Returns None if extraction fails or document is scanned (no text layer).
     """
     try:
         import fitz  # PyMuPDF
@@ -98,6 +99,62 @@ def extract_text_from_pdf(file_content: bytes) -> Optional[str]:
     except Exception as e:
         logger.error(f"PDF text extraction failed: {e}")
         return None
+
+
+def extract_text_from_docx(file_content: bytes) -> Optional[str]:
+    """Extract text from a .docx file using python-docx."""
+    try:
+        from docx import Document
+        import io
+        doc = Document(io.BytesIO(file_content))
+        text = "\n".join(para.text for para in doc.paragraphs if para.text.strip())
+        return text if text else None
+    except ImportError:
+        logger.error("python-docx not installed. Install with: pip install python-docx")
+        return None
+    except Exception as e:
+        logger.error(f"DOCX text extraction failed: {e}")
+        return None
+
+
+def extract_text_from_txt(file_content: bytes) -> Optional[str]:
+    """Extract text from a plain text file."""
+    try:
+        # Try UTF-8 first, fall back to latin-1
+        for encoding in ("utf-8", "latin-1"):
+            try:
+                text = file_content.decode(encoding).strip()
+                if text:
+                    return text
+            except UnicodeDecodeError:
+                continue
+        return None
+    except Exception as e:
+        logger.error(f"TXT extraction failed: {e}")
+        return None
+
+
+def extract_text(file_content: bytes, filename: str = "") -> Optional[str]:
+    """
+    Extract text from any supported file format.
+    Detects format by file signature (magic bytes) first, falls back to filename extension.
+    """
+    if not file_content:
+        return None
+
+    # Detect by magic bytes
+    if file_content[:4] == b'%PDF':
+        return extract_text_from_pdf(file_content)
+    elif file_content[:2] == b'PK':
+        # ZIP-based format (DOCX, ODT)
+        return extract_text_from_docx(file_content)
+    else:
+        # Try as plain text
+        text = extract_text_from_txt(file_content)
+        if text:
+            return text
+        # Last resort: try PDF (some files have weird headers)
+        return extract_text_from_pdf(file_content)
 
 
 def _clean_json_response(response: str) -> str:
@@ -234,18 +291,18 @@ async def analyze_trust_document(
     })
 
     try:
-        # Step 1: Extract text from PDF
-        text = extract_text_from_pdf(file_content)
+        # Step 1: Extract text from document (supports PDF, DOCX, TXT)
+        text = extract_text(file_content)
         if not text:
             await db.trust_document_analysis.update_one(
                 {"analysis_id": analysis_id},
                 {"$set": {
                     "status": "failed",
-                    "error_message": "Could not extract text from PDF. The document may be scanned or image-only. Please upload a text-based PDF.",
+                    "error_message": "Could not extract text from the document. The file may be scanned, image-only, or in an unsupported format. Please upload a text-based PDF or Word document.",
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
-            return {"status": "failed", "error": "Text extraction failed — likely scanned PDF"}
+            return {"status": "failed", "error": "Text extraction failed — likely scanned or unsupported format"}
 
         # Step 2: Update status to analyzing
         await db.trust_document_analysis.update_one(
@@ -264,7 +321,7 @@ async def analyze_trust_document(
         response = await ai_sonnet(
             system_prompt=ANALYSIS_PROMPT,
             user_content=text_for_ai,
-            max_tokens=2000,
+            max_tokens=4000,
             temperature=0.1
         )
 
