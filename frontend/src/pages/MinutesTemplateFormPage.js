@@ -2642,19 +2642,38 @@ export default function MinutesTemplateFormPage() {
                     <div className="mt-6 border border-navy/10 p-4">
                       <h3 className="font-serif text-lg text-navy mb-3 pb-2 border-b border-navy/10">AI Evaluation Result</h3>
                       {evalResult.message && (
-                        <div className="text-sm text-navy whitespace-pre-wrap mb-4">{evalResult.message}</div>
+                        <div className="text-sm text-navy whitespace-pre-wrap mb-4">
+                          {typeof evalResult.message === 'string' 
+                            ? evalResult.message 
+                            : evalResult.message.content || JSON.stringify(evalResult.message)}
+                        </div>
                       )}
-                      {evalResult.citation_note && (
+                      {evalResult.message?.citation_note && (
+                        <div className="text-xs text-muted-foreground border-t border-navy/10 pt-3 mt-3">
+                          <span className="font-semibold">Basis: </span>{evalResult.message.citation_note}
+                        </div>
+                      )}
+                      {evalResult.message?.unknown_note && (
+                        <div className="text-xs text-muted-foreground pt-2">
+                          <span className="font-semibold">Unknowns: </span>{evalResult.message.unknown_note}
+                        </div>
+                      )}
+                      {evalResult.message?.caveat && (
+                        <div className="text-xs text-gold pt-2">
+                          <span className="font-semibold">Caveat: </span>{evalResult.message.caveat}
+                        </div>
+                      )}
+                      {evalResult.citation_note && !evalResult.message?.citation_note && (
                         <div className="text-xs text-muted-foreground border-t border-navy/10 pt-3 mt-3">
                           <span className="font-semibold">Basis: </span>{evalResult.citation_note}
                         </div>
                       )}
-                      {evalResult.unknown_note && (
+                      {evalResult.unknown_note && !evalResult.message?.unknown_note && (
                         <div className="text-xs text-muted-foreground pt-2">
                           <span className="font-semibold">Unknowns: </span>{evalResult.unknown_note}
                         </div>
                       )}
-                      {evalResult.caveat && (
+                      {evalResult.caveat && !evalResult.message?.caveat && (
                         <div className="text-xs text-gold pt-2">
                           <span className="font-semibold">Caveat: </span>{evalResult.caveat}
                         </div>
