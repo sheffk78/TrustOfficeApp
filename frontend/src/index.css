@@ -821,6 +821,34 @@
   opacity: 1;
 }
 
+/* ===== File Upload Card ===== */
+.file-upload-card {
+  margin-bottom: 20px;
+}
+
+.file-drop-zone {
+  display: block;
+  border: 2px dashed rgba(1, 0, 121, 0.15);
+  border-radius: 8px;
+  background: rgba(1, 0, 121, 0.02);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.file-drop-zone:hover {
+  border-color: rgba(1, 0, 121, 0.25);
+  background: rgba(1, 0, 121, 0.04);
+}
+
+.file-drop-zone-active {
+  border-color: var(--gold, #d4af37);
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.file-selected-preview {
+  /* No special styling needed, children handle their own borders */
+}
+
 /* ===== Scroll-to-Bottom Button ===== */
 .chat-scroll-btn {
   position: absolute;

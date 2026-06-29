@@ -218,6 +218,28 @@ const TrustAssistantPage = () => {
     if (textarea) textarea.focus();
   }, [resetConversation]);
 
+  // Handle file uploaded to vault from chat
+  const handleFileUploaded = useCallback((result) => {
+    // Add a system message to the chat confirming the upload
+    const categoryLabel = result.category
+      ? result.category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      : 'Documents';
+    const confirmationMessage = {
+      id: `upload-${Date.now()}`,
+      role: 'assistant',
+      content: `**Document uploaded to vault.**\n\n**${result.title}** has been saved to ${categoryLabel}. You can view and manage it in the [Vault](/vault).\n\nIs there anything you'd like me to help you with regarding this document?`,
+      timestamp: new Date().toISOString(),
+      action_cards: [],
+      video_cards: [],
+      citations: [],
+      caveat: null,
+    };
+    setMessages(prev => [...prev, confirmationMessage]);
+
+    // Refresh conversation list in case the context changed
+    fetchConversations();
+  }, [setMessages, fetchConversations]);
+
   return (
     <div className="main-layout" data-testid="trust-assistant-page">
       <Sidebar />
@@ -269,6 +291,8 @@ const TrustAssistantPage = () => {
               onActionDiscard={handleActionDiscard}
               onVideoClick={handleVideoClick}
               loadingConversation={loadingConversation}
+              trustId={selectedTrust?.trust_id}
+              onFileUploaded={handleFileUploaded}
             />
           </div>
         </div>

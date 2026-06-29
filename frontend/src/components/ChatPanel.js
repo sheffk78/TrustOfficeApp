@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Paperclip, Loader2, AlertCircle, X, Square, Plus, ArrowDown } from 'lucide-react';
 import MessageBubble from './MessageBubble';
+import FileUploadCard from './FileUploadCard';
 
 const QUICK_CHIPS = [
   { label: 'Check Deadlines', message: 'What deadlines are coming up for my trust?' },
@@ -35,8 +36,11 @@ const ChatPanel = ({
   onActionDiscard,
   onVideoClick,
   loadingConversation,
+  trustId,
+  onFileUploaded,
 }) => {
   const [input, setInput] = useState('');
+  const [showUploadCard, setShowUploadCard] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
@@ -208,6 +212,18 @@ const ChatPanel = ({
                 />
               ))}
 
+              {/* File upload card — shown when user clicks paperclip */}
+              {showUploadCard && trustId && (
+                <FileUploadCard
+                  trustId={trustId}
+                  onUploadComplete={(result) => {
+                    setShowUploadCard(false);
+                    if (onFileUploaded) onFileUploaded(result);
+                  }}
+                  onCancel={() => setShowUploadCard(false)}
+                />
+              )}
+
               {/* Loading indicator — shown when streaming but no assistant message yet */}
               {loading && !messages.some(m => m.isStreaming) && (
                 <div className="chat-message-row chat-message-ai">
@@ -276,10 +292,12 @@ const ChatPanel = ({
             </button>
           )}
 
-          {/* Paperclip — decorative for now */}
+          {/* Paperclip — opens file upload card */}
           <button
-            className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors flex-shrink-0 mb-1"
-            title="Attach file"
+            onClick={() => setShowUploadCard(!showUploadCard)}
+            className={`p-2 transition-colors flex-shrink-0 mb-1 ${showUploadCard ? 'text-gold bg-gold/10' : 'text-muted-foreground hover:text-navy hover:bg-navy/5'}`}
+            title="Upload a document to the vault"
+            disabled={loading}
           >
             <Paperclip className="w-5 h-5" />
           </button>
