@@ -162,6 +162,21 @@ const ChatPanel = ({
     }
   }, [loading]);
 
+  // Scroll to bottom when upload card is shown, so it's visible
+  useEffect(() => {
+    if (showUploadCard) {
+      const container = messagesContainerRef.current;
+      if (container) {
+        requestAnimationFrame(() => {
+          container.scrollTo({
+            top: container.scrollHeight,
+            behavior: 'smooth',
+          });
+        });
+      }
+    }
+  }, [showUploadCard]);
+
   const displayMessages = [GREETING_MESSAGE, ...messages];
   const hasUserMessages = messages.some(m => m.role === 'user');
   const showQuickChips = !hasUserMessages && !loading;

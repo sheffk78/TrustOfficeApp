@@ -794,6 +794,8 @@
   color: var(--navy, #010079);
   text-decoration: underline;
   text-decoration-color: rgba(1, 0, 121, 0.3);
+  cursor: pointer;
+  transition: text-decoration-color 0.15s ease;
 }
 
 .markdown-body a:hover {

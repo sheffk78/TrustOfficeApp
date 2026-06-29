@@ -235,10 +235,7 @@ const TrustAssistantPage = () => {
       caveat: null,
     };
     setMessages(prev => [...prev, confirmationMessage]);
-
-    // Refresh conversation list in case the context changed
-    fetchConversations();
-  }, [setMessages, fetchConversations]);
+  }, [setMessages]);
 
   return (
     <div className="main-layout" data-testid="trust-assistant-page">

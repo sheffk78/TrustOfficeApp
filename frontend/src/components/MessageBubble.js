@@ -1,9 +1,25 @@
 import React, { useState, memo } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, AlertTriangle, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ActionCard from './ActionCard';
 import VideoCard from './VideoCard';
+
+// Custom link renderer for ReactMarkdown — uses React Router for internal links
+const MarkdownLink = ({ href, children }) => {
+  // Internal links (starting with /) use React Router
+  if (href && href.startsWith('/')) {
+    return <Link to={href}>{children}</Link>;
+  }
+  // External links use regular <a> with target=_blank
+  return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
+};
+
+// Components mapping for ReactMarkdown
+const markdownComponents = {
+  a: MarkdownLink,
+};
 
 const TypingCursor = () => (
   <span className="typing-cursor" aria-hidden="true" />
@@ -98,7 +114,7 @@ const MessageBubble = ({ message, onActionApprove, onActionEdit, onActionDiscard
           ) : (
             <>
               <div className="markdown-body text-sm leading-relaxed text-foreground">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                   {message.content || ''}
                 </ReactMarkdown>
                 {isStreaming && <TypingCursor />}
