@@ -32,6 +32,19 @@ from the trust document text below. Return ONLY valid JSON with these exact fiel
     "type": "HEMS | sole_discretion | ascertainable_standard | other",
     "article_reference": "string — article and section number where this appears"
   },
+  "distribution_rules": {
+    "specific_purposes": ["array of strings — specific permitted purposes like education, medical, housing, support"],
+    "amount_guidance": "string — any specific dollar amounts, formulas, or guidance about distribution amounts (e.g., 'reasonable amounts', 'up to $50,000 per year', 'tuition and reasonable living expenses')",
+    "needs_based_factors": ["array of strings — factors the trustee should consider like 'beneficiary's other resources', 'beneficiary's needs', 'standard of living'"],
+    "equal_treatment_requirement": "string — whether the trust requires equal treatment, equitable treatment, or allows differential treatment. Include exact language if present",
+    "article_reference": "string — article and section where distribution rules appear"
+  },
+  "trustee_powers_detail": {
+    "investment_powers": "string — specific investment powers granted",
+    "discretion_powers": "string — the scope of trustee discretion in distributions (sole discretion, reasonable discretion, etc.)",
+    "spendthrift_provisions": "string — any spendthrift clause language that restricts beneficiary access to distributions",
+    "article_reference": "string"
+  },
   "trustee_powers": [
     {"power": "string — what the trustee can do", "article_reference": "string — article/section"}
   ],

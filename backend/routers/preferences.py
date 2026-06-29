@@ -83,7 +83,8 @@ async def get_user_preferences(user: dict = Depends(get_current_user)):
     if not prefs:
         return {
             "user_id": user["user_id"],
-            "hide_watermark": False
+            "hide_watermark": False,
+            "admin_access_locked": False
         }
     
     return prefs

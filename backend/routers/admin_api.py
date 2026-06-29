@@ -135,6 +135,23 @@ class FixSubscriptionRequest(BaseModel):
     current_period_end: Optional[str] = None
 
 
+# ==================== USER ACCESS GUARD ====================
+
+async def check_admin_access_locked(user_id: str):
+    """Check if a user has admin_access_locked enabled in their preferences.
+    Raises HTTPException(403) if the user has locked admin access.
+    """
+    locked_pref = await db.user_preferences.find_one(
+        {"user_id": user_id},
+        {"_id": 0, "admin_access_locked": 1}
+    )
+    if locked_pref and locked_pref.get("admin_access_locked") is True:
+        raise HTTPException(
+            status_code=403,
+            detail="This user has locked admin access to their account. They must disable the lock in Settings before admin access is granted."
+        )
+
+
 # ==================== STATS ENDPOINTS ====================
 
 @router.get("/stats/daily")
@@ -438,6 +455,9 @@ async def get_user(
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if user has locked admin access
+    await check_admin_access_locked(user_id)
     
     # Get subscription
     subscription = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})

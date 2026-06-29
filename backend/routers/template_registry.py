@@ -526,6 +526,68 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
     },
 
+    "beneficiary_distribution_notice": {
+        "display_name": "Beneficiary Distribution Notice",
+        "description": "Notify a beneficiary of an approved distribution with formal documentation",
+        "icon": "mail",
+        "category": "distributions",
+        "fields": [
+            {"name": "beneficiary_name", "label": "Beneficiary Name", "type": "text", "required": True,
+             "placeholder": "Jane Smith"},
+            {"name": "distribution_amount", "label": "Distribution Amount", "type": "text", "required": True,
+             "placeholder": "$15,000"},
+            {"name": "distribution_purpose", "label": "Purpose", "type": "textarea", "required": True,
+             "placeholder": "Education expenses for fall semester tuition"},
+            {"name": "distribution_date", "label": "Distribution Date", "type": "text", "required": False,
+             "placeholder": "YYYY-MM-DD"},
+            {"name": "trustee_name", "label": "Trustee Name", "type": "text", "required": False,
+             "placeholder": "Your name"},
+        ],
+        "ai_prompt_template": (
+            "Generate a formal beneficiary distribution notice for {trust_name}. "
+            "Beneficiary: {beneficiary_name}. Amount: {distribution_amount}. "
+            "Purpose: {distribution_purpose}. Date: {distribution_date}. "
+            "Trustee: {trustee_name}. Meeting date: {meeting_date}. "
+            "Additional context: {additional_context}. "
+            "This is a formal notification to the beneficiary documenting the approved distribution. "
+            "Include the trust name, distribution amount, purpose, HEMS category reference if applicable, "
+            "and a statement that this distribution was made in accordance with the trust's distribution "
+            "standards and the trustee's fiduciary duty. Format as a formal letter."
+        ),
+    },
+
+    "evaluate_distribution": {
+        "display_name": "Evaluate Distribution Request",
+        "description": "Get an AI evaluation of whether a distribution request complies with your trust document and trust law",
+        "icon": "scale",
+        "category": "distributions",
+        "fields": [
+            {"name": "beneficiary_name", "label": "Beneficiary Name", "type": "text", "required": True,
+             "placeholder": "John Smith Jr."},
+            {"name": "requested_amount", "label": "Requested Amount", "type": "text", "required": True,
+             "placeholder": "$50,000"},
+            {"name": "request_purpose", "label": "Purpose", "type": "textarea", "required": False,
+             "placeholder": "Fall semester tuition"},
+            {"name": "hems_category", "label": "HEMS Category", "type": "select", "required": True,
+             "placeholder": "education"},
+            {"name": "beneficiary_financial_situation", "label": "Beneficiary Financial Situation", "type": "textarea", "required": False,
+             "placeholder": "Annual income, savings, other assets"},
+            {"name": "beneficiary_other_resources", "label": "Other Resources", "type": "text", "required": False,
+             "placeholder": "Scholarships, parental support"},
+            {"name": "past_distributions_note", "label": "Past Distributions Notes", "type": "textarea", "required": False,
+             "placeholder": "Previous distributions for equity reference"},
+        ],
+        "ai_prompt_template": (
+            "Evaluate a distribution request for {trust_name}. "
+            "Beneficiary: {beneficiary_name}. Requested amount: {requested_amount}. "
+            "Purpose: {request_purpose}. HEMS category: {hems_category}. "
+            "Beneficiary financial situation: {beneficiary_financial_situation}. "
+            "Other resources: {beneficiary_other_resources}. "
+            "Past distributions: {past_distributions_note}. "
+            "Additional context: {additional_context}."
+        ),
+    },
+
     # ─── Benevolence ─────────────────────────────────────────
     "benevolence_approval": {
         "display_name": "Benevolence Assistance",

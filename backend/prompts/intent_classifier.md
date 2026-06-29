@@ -14,6 +14,7 @@ Given a user message in a trust administration context, classify it into exactly
 | `log_minutes` | "I had a meeting yesterday", "I need to record a decision", "Draft minutes for..." | Create or draft meeting minutes |
 | `add_asset` | "I bought a property", "I need to add a car to the trust", "New asset to log" | Log an asset on Schedule A |
 | `create_distribution` | "I need to give money to John", "Distribution to my daughter", "Pay for medical expenses" | Create a distribution record |
+| `evaluate_distribution` | "Can I approve this request?", "Should I give money for tuition?", "Evaluate this distribution request" | Evaluate whether a distribution request complies with trust documents and recommend approval/denial |
 | `create_beneficiary` | "I have a new beneficiary", "Add someone to the trust", "New beneficiary to add" | Add a new beneficiary |
 | `create_class_beneficiary` | "Add a class of beneficiaries", "Blood prosperity as beneficiaries", "Children and after-born", "Descendants as a class", "Set up a class for future children" | Add a class beneficiary designation that automatically covers future members (children, descendants, blood relatives, etc.) |
 | `remove_class_beneficiary` | "Remove the class beneficiary", "Delete the children class", "Take off the blood relatives class" | Remove a class beneficiary designation |
@@ -39,6 +40,7 @@ Given a user message in a trust administration context, classify it into exactly
 - IMPORTANT: Distinguish between `create_beneficiary` (individual person) vs `create_class_beneficiary` (a class like children, descendants, blood relatives). If the user mentions a class or group (children, descendants, blood relatives, heirs, after-born, future members), prefer `create_class_beneficiary`. If they mention a specific named person, prefer `create_beneficiary`.
 - IMPORTANT: Distinguish between `create_beneficiary` (new person) vs `update_beneficiary` (modifying an existing person). If the user mentions an existing name and says "change" or "update" or "modify", prefer `update_beneficiary`. If they say "add" or "new" without modification language, prefer `create_beneficiary`.
 - IMPORTANT: Distinguish between `remove_beneficiary` (delete) and `update_beneficiary` (modify) — "remove", "delete", "take off" = remove; "change", "update", "modify" = update.
+- IMPORTANT: Distinguish between `create_distribution` (making a distribution) vs `evaluate_distribution` (asking whether to approve/evaluate). If the user asks "can I", "should I", or "evaluate" regarding a distribution, classify as `evaluate_distribution` rather than `create_distribution`. Use `create_distribution` only when the user clearly wants to make/record a distribution.
 
 ## Output Format
 ```json

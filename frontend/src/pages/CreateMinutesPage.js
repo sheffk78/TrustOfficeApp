@@ -52,6 +52,7 @@ import {
   XCircle,
   HandCoins,
   UserMinus,
+  Mail,
   ClipboardList,
 } from 'lucide-react';
 
@@ -93,6 +94,7 @@ const ICONS = {
   'x-circle': XCircle,
   'hand-coins': HandCoins,
   'user-minus': UserMinus,
+  'mail': Mail,
 };
 
 /** Category display order and labels for the template grid */
@@ -113,6 +115,7 @@ const RECOMMENDED_TYPES = new Set([
   'quarterly_review',
   'annual_review',
   'distribution_to_beneficiaries',
+  'evaluate_distribution',
 ]);
 
 /** Mapping from backend category key → our display categories */

@@ -40,7 +40,9 @@ import {
   Copy,
   Check,
   DollarSign,
-  Shield
+  Shield,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
@@ -71,7 +73,7 @@ export default function SettingsPage() {
     weekly_digest: false
   });
   const [notificationLoading, setNotificationLoading] = useState(false);
-  const [userPrefs, setUserPrefs] = useState({ hide_watermark: false });
+  const [userPrefs, setUserPrefs] = useState({ hide_watermark: false, admin_access_locked: false });
   const [userPrefsLoading, setUserPrefsLoading] = useState(false);
   
   // Demo data management state
@@ -288,6 +290,30 @@ export default function SettingsPage() {
       if (response.ok) {
         setUserPrefs({ ...userPrefs, hide_watermark: checked });
         toast.success(checked ? 'Watermark hidden' : 'Watermark enabled');
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to update preference');
+      }
+    } catch (error) {
+      toast.error('Failed to update preference');
+    } finally {
+      setUserPrefsLoading(false);
+    }
+  };
+
+  const handleAdminAccessLockToggle = async () => {
+    const newValue = !userPrefs.admin_access_locked;
+    try {
+      setUserPrefsLoading(true);
+      const response = await fetchWithAuth('/user/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_access_locked: newValue })
+      });
+
+      if (response.ok) {
+        setUserPrefs({ ...userPrefs, admin_access_locked: newValue });
+        toast.success(newValue ? 'Admin access locked' : 'Admin access unlocked');
       } else {
         const error = await response.json();
         toast.error(error.detail || 'Failed to update preference');
@@ -1797,6 +1823,40 @@ export default function SettingsPage() {
             </p>
 
             <div className="space-y-4">
+              {/* Admin Access Lock */}
+              <div className="flex items-center justify-between p-4 border border-navy/10">
+                <div className="flex items-start gap-3">
+                  {userPrefs.admin_access_locked ? (
+                    <Lock className="w-5 h-5 text-success mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <Unlock className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  )}
+                  <div>
+                    <p className="font-medium text-navy">Admin Access Lock</p>
+                    <p className="text-sm text-muted-foreground">
+                      When enabled, TrustOffice administrators cannot access your account or view your trust data. You can still contact support for help.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={userPrefs.admin_access_locked}
+                  disabled={userPrefsLoading}
+                  onClick={handleAdminAccessLockToggle}
+                  data-testid="admin-access-lock-toggle"
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                    userPrefs.admin_access_locked ? 'bg-success' : 'bg-navy/10'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      userPrefs.admin_access_locked ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
               {/* Two-factor info */}
               <div className="flex items-center justify-between p-4 border border-navy/10">
                 <div>

@@ -755,6 +755,17 @@ async def impersonate_user(
     if target_user.get("email", "").lower() == "contact@trustoffice.app":
         raise HTTPException(status_code=403, detail="Cannot impersonate primary admin")
     
+    # Check if user has locked admin access to their account
+    locked_pref = await db.user_preferences.find_one(
+        {"user_id": target_user["user_id"]},
+        {"_id": 0, "admin_access_locked": 1}
+    )
+    if locked_pref and locked_pref.get("admin_access_locked") is True:
+        raise HTTPException(
+            status_code=403,
+            detail="This user has locked admin access to their account. They must disable the lock in Settings before admin access is granted."
+        )
+    
     # Generate token for target user
     impersonation_token = create_jwt_token(target_user["user_id"], target_user["email"])
     

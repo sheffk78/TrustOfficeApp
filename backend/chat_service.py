@@ -469,6 +469,8 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
             "termination_rules": fields.get("termination_rules", {}).get("summary", ""),
             "beneficiary_names": fields.get("beneficiary_names", []),
         }
+        context["trust_document"]["distribution_rules"] = fields.get("distribution_rules", {})
+        context["trust_document"]["trustee_powers_detail"] = fields.get("trustee_powers_detail", {})
 
     return context
 

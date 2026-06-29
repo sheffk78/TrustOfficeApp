@@ -58,7 +58,9 @@ const TEMPLATE_TITLES = {
   'trustee_resignation': 'Trustee Resignation/Removal',
   'beneficiary_request_denial': 'Beneficiary Request Denial',
   'hems_distribution': 'HEMS Distribution',
+  'beneficiary_distribution_notice': 'Beneficiary Distribution Notice',
   'beneficiary_loan': 'Loan to Beneficiary',
+  'evaluate_distribution': 'Evaluate Distribution Request',
   // Batch 2 templates
   'trust_amendment': 'Trust Amendment',
   'power_of_attorney': 'Power of Attorney Authorization',
@@ -296,6 +298,28 @@ export default function MinutesTemplateFormPage() {
     recurring: false,
     recurring_frequency: 'monthly'
   });
+
+  // Beneficiary distribution notice fields
+  const [distributionNoticeData, setDistributionNoticeData] = useState({
+    beneficiary_name: '',
+    distribution_amount: '',
+    distribution_purpose: '',
+    distribution_date: format(new Date(), 'MMMM d, yyyy'),
+    trustee_name: ''
+  });
+
+  // Distribution evaluation fields
+  const [evalData, setEvalData] = useState({
+    beneficiary_name: '',
+    requested_amount: '',
+    request_purpose: '',
+    hems_category: 'education',
+    beneficiary_financial_situation: '',
+    beneficiary_other_resources: '',
+    past_distributions_note: ''
+  });
+  const [evalResult, setEvalResult] = useState(null);
+  const [evalLoading, setEvalLoading] = useState(false);
 
   // Beneficiary loan fields
   const [beneficiaryLoanData, setBeneficiaryLoanData] = useState({
@@ -863,7 +887,17 @@ export default function MinutesTemplateFormPage() {
           recurring: hemsData.recurring,
           recurring_frequency: hemsData.recurring_frequency
         };
-      
+
+      case 'beneficiary_distribution_notice':
+        return {
+          ...baseData,
+          beneficiary_name: distributionNoticeData.beneficiary_name,
+          distribution_amount: parseFloat(distributionNoticeData.distribution_amount) || 0,
+          distribution_purpose: distributionNoticeData.distribution_purpose,
+          distribution_date: distributionNoticeData.distribution_date,
+          trustee_name: distributionNoticeData.trustee_name
+        };
+
       case 'beneficiary_loan':
         return {
           ...baseData,
@@ -996,6 +1030,45 @@ export default function MinutesTemplateFormPage() {
             effective_date: r.effective_date
           }))
         };
+    }
+  };
+
+  const handleEvaluateDistribution = async () => {
+    if (!selectedTrust) {
+      toast.error('Please select a trust');
+      return;
+    }
+    if (!evalData.beneficiary_name || !evalData.requested_amount) {
+      toast.error('Beneficiary name and requested amount are required');
+      return;
+    }
+
+    setEvalLoading(true);
+    setEvalResult(null);
+    try {
+      const message = `I need to evaluate a distribution request. Beneficiary: ${evalData.beneficiary_name}. Requested amount: $${evalData.requested_amount}. Purpose: ${evalData.request_purpose || 'Not specified'}. HEMS category: ${evalData.hems_category}. Beneficiary's financial situation: ${evalData.beneficiary_financial_situation || 'Not specified'}. Beneficiary's other resources: ${evalData.beneficiary_other_resources || 'Not specified'}. Note on past distributions: ${evalData.past_distributions_note || 'None'}. Should I approve this distribution?`;
+
+      const response = await fetchWithAuth('/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message,
+          trust_id: selectedTrust.trust_id
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setEvalResult(result);
+        toast.success('Evaluation complete');
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to evaluate distribution');
+      }
+    } catch (error) {
+      toast.error('Failed to evaluate distribution');
+    } finally {
+      setEvalLoading(false);
     }
   };
 
@@ -2483,6 +2556,114 @@ export default function MinutesTemplateFormPage() {
                 </div>
               )}
 
+              {/* BENEFICIARY DISTRIBUTION NOTICE TEMPLATE */}
+              {templateType === 'beneficiary_distribution_notice' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Distribution Notice Details</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Beneficiary Name</Label>
+                      <Input value={distributionNoticeData.beneficiary_name} onChange={(e) => setDistributionNoticeData({ ...distributionNoticeData, beneficiary_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith Jr." />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Distribution Amount ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(distributionNoticeData.distribution_amount)} onChange={(e) => setDistributionNoticeData({ ...distributionNoticeData, distribution_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$15,000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Distribution Date</Label>
+                      <Input value={distributionNoticeData.distribution_date} onChange={(e) => setDistributionNoticeData({ ...distributionNoticeData, distribution_date: e.target.value })} className="mt-1 input-trust" placeholder="February 15, 2026" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Trustee Name</Label>
+                      <Input value={distributionNoticeData.trustee_name} onChange={(e) => setDistributionNoticeData({ ...distributionNoticeData, trustee_name: e.target.value })} className="mt-1 input-trust" placeholder="Your name" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Distribution Purpose</Label>
+                      <Textarea value={distributionNoticeData.distribution_purpose} onChange={(e) => setDistributionNoticeData({ ...distributionNoticeData, distribution_purpose: e.target.value })} className="mt-1" rows={2} placeholder="Education expenses for fall semester tuition" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* EVALUATE DISTRIBUTION REQUEST TEMPLATE */}
+              {templateType === 'evaluate_distribution' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Distribution Request Details</h2>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Enter the details of a beneficiary's distribution request. The AI assistant will evaluate it against your trust document and trust law, then provide a recommendation.
+                  </p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Beneficiary Name</Label>
+                      <Input value={evalData.beneficiary_name} onChange={(e) => setEvalData({ ...evalData, beneficiary_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith Jr." />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Requested Amount ($)</Label>
+                      <Input type="text" inputMode="numeric" value={formatCurrency(evalData.requested_amount)} onChange={(e) => setEvalData({ ...evalData, requested_amount: parseCurrencyInput(e.target.value) })} className="mt-1 input-trust" placeholder="$50,000" />
+                    </div>
+                    <div>
+                      <Label className="label-trust">HEMS Category</Label>
+                      <Select value={evalData.hems_category} onValueChange={(v) => setEvalData({ ...evalData, hems_category: v })}>
+                        <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="health">Health (Medical)</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="maintenance">Maintenance</SelectItem>
+                          <SelectItem value="support">Support</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Purpose of Request</Label>
+                      <Textarea value={evalData.request_purpose} onChange={(e) => setEvalData({ ...evalData, request_purpose: e.target.value })} className="mt-1" rows={2} placeholder="Fall semester tuition at State University" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Beneficiary's Financial Situation (optional)</Label>
+                      <Textarea value={evalData.beneficiary_financial_situation} onChange={(e) => setEvalData({ ...evalData, beneficiary_financial_situation: e.target.value })} className="mt-1" rows={2} placeholder="Annual income, savings, other assets, dependents" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Other Resources Available to Beneficiary (optional)</Label>
+                      <Input value={evalData.beneficiary_other_resources} onChange={(e) => setEvalData({ ...evalData, beneficiary_other_resources: e.target.value })} className="mt-1 input-trust" placeholder="Scholarships, parental support, personal savings" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Notes on Past Distributions (optional)</Label>
+                      <Textarea value={evalData.past_distributions_note} onChange={(e) => setEvalData({ ...evalData, past_distributions_note: e.target.value })} className="mt-1" rows={2} placeholder="Previous distributions to this beneficiary or others for equity reference" />
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <Button className="btn-gold" onClick={handleEvaluateDistribution} disabled={evalLoading}>
+                      {evalLoading ? 'Evaluating...' : 'Evaluate Request'}
+                    </Button>
+                  </div>
+
+                  {evalResult && (
+                    <div className="mt-6 border border-navy/10 p-4">
+                      <h3 className="font-serif text-lg text-navy mb-3 pb-2 border-b border-navy/10">AI Evaluation Result</h3>
+                      {evalResult.message && (
+                        <div className="text-sm text-navy whitespace-pre-wrap mb-4">{evalResult.message}</div>
+                      )}
+                      {evalResult.citation_note && (
+                        <div className="text-xs text-muted-foreground border-t border-navy/10 pt-3 mt-3">
+                          <span className="font-semibold">Basis: </span>{evalResult.citation_note}
+                        </div>
+                      )}
+                      {evalResult.unknown_note && (
+                        <div className="text-xs text-muted-foreground pt-2">
+                          <span className="font-semibold">Unknowns: </span>{evalResult.unknown_note}
+                        </div>
+                      )}
+                      {evalResult.caveat && (
+                        <div className="text-xs text-gold pt-2">
+                          <span className="font-semibold">Caveat: </span>{evalResult.caveat}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* BENEFICIARY LOAN TEMPLATE */}
               {templateType === 'beneficiary_loan' && (
                 <div className="card-trust corner-mark p-6">
@@ -3114,10 +3295,12 @@ export default function MinutesTemplateFormPage() {
                 <Button variant="outline" onClick={() => navigate(searchParams.get('source') === 'onboarding' ? '/dashboard' : searchParams.get('from') === 'create' ? '/minutes/create' : '/minutes/templates')}>
                   Cancel
                 </Button>
-                <Button className="btn-primary" onClick={handleGeneratePreview} disabled={loading || trustEntityLoading}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  {loading ? 'Generating...' : 'Generate Preview'}
-                </Button>
+                {templateType !== 'evaluate_distribution' && (
+                  <Button className="btn-primary" onClick={handleGeneratePreview} disabled={loading || trustEntityLoading}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    {loading ? 'Generating...' : 'Generate Preview'}
+                  </Button>
+                )}
               </div>
             </div>
           )}

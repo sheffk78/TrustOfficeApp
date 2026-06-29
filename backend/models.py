@@ -96,6 +96,8 @@ class MinutesTemplateType(str, Enum):
     bank_account_authorization = "bank_account_authorization"
     change_of_situs = "change_of_situs"
     benevolence_approval = "benevolence_approval"
+    beneficiary_distribution_notice = "beneficiary_distribution_notice"
+    evaluate_distribution = "evaluate_distribution"
     # New templates added (batch 1)
     investment_policy = "investment_policy"
     loan_authorization = "loan_authorization"
@@ -199,9 +201,11 @@ class NotificationPreferencesUpdate(BaseModel):
 
 class UserPreferences(BaseModel):
     hide_watermark: bool = False
+    admin_access_locked: bool = False
 
 class UserPreferencesUpdate(BaseModel):
     hide_watermark: Optional[bool] = None
+    admin_access_locked: Optional[bool] = None
 
 
 # ==================== PASSWORD RESET MODELS ====================
