@@ -1,16 +1,72 @@
 import { useState, useCallback, useRef } from 'react';
 import { fetchWithAuth, getErrorMessage } from '@/utils/api';
 
+/**
+ * Parse SSE events from a ReadableStream reader.
+ * Handles \r\n and \n line endings, multi-line data fields, and event types.
+ * This is a standalone function, not recreated per render.
+ */
+async function parseSSEStream(reader, onEvent) {
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Split on double newline (SSE event delimiter).
+    // Handle both \n\n and \r\n\r\n since HTTP responses may use either.
+    // Normalize \r\n to \n first so we only need to split on \n\n.
+    const normalized = buffer.replace(/\r\n/g, '\n');
+    const events = normalized.split('\n\n');
+    buffer = events.pop() || ''; // Keep incomplete event in buffer
+
+    for (const eventStr of events) {
+      if (!eventStr.trim()) continue;
+
+      let eventType = 'message';
+      let dataStr = '';
+
+      for (const line of eventStr.split('\n')) {
+        // Handle lines that may have trailing \r
+        const cleanLine = line.replace(/\r$/, '');
+        if (cleanLine.startsWith('event: ')) {
+          eventType = cleanLine.slice(7).trim();
+        } else if (cleanLine.startsWith('data: ')) {
+          dataStr += cleanLine.slice(6);
+        }
+      }
+
+      if (dataStr) {
+        try {
+          const data = JSON.parse(dataStr);
+          onEvent(eventType, data);
+        } catch (e) {
+          console.warn('[useChatStream] Failed to parse SSE data:', dataStr, e);
+        }
+      }
+    }
+  }
+}
+
 export const useChatStream = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [conversationId, setConversationId] = useState(null);
   const [trustContext, setTrustContext] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamPhase, setStreamPhase] = useState(null); // 'thinking' | 'generating' | null
   const abortRef = useRef(null);
+  const onDoneCallbackRef = useRef(null);
 
-  const sendMessage = useCallback(async (text, currentConversationId = null, currentMessages = []) => {
+  const sendMessage = useCallback(async (text, currentConversationId = null, currentMessages = [], onDone = null) => {
     if (!text.trim()) return;
+
+    // Store the onDone callback for when the 'done' event arrives
+    onDoneCallbackRef.current = onDone;
 
     const userMessage = {
       id: `user-${Date.now()}`,
@@ -23,7 +79,33 @@ export const useChatStream = () => {
     const updatedMessages = [...currentMessages, userMessage];
     setMessages(updatedMessages);
     setLoading(true);
+    setIsStreaming(true);
+    setStreamPhase('thinking');
     setError(null);
+
+    // Create abort controller for this request
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Create a placeholder assistant message that we'll update as tokens stream in
+    const assistantMessageId = `ai-${Date.now()}`;
+    const placeholderAssistant = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+      action_cards: [],
+      video_cards: [],
+      citations: [],
+      caveat: null,
+      isStreaming: true,
+    };
+
+    setMessages(prev => [...prev, placeholderAssistant]);
+
+    // Track whether we've received the 'done' event
+    let doneReceived = false;
+    let streamEnded = false;
 
     try {
       const body = {
@@ -33,9 +115,10 @@ export const useChatStream = () => {
         body.conversation_id = currentConversationId || conversationId;
       }
 
-      const response = await fetchWithAuth('/ai/chat', {
+      const response = await fetchWithAuth('/ai/chat/stream', {
         method: 'POST',
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -43,67 +126,169 @@ export const useChatStream = () => {
         throw new Error(errMsg);
       }
 
-      const data = await response.json();
+      // Read the SSE stream
+      const reader = response.body.getReader();
+      let fullText = '';
+      let newConvId = null;
+      let actionCardData = null;
+      let citationNote = null;
+      let unknownNote = null;
+      let caveatText = null;
 
-      // Update conversation id if new
-      const newConvId = data.conversation_id || conversationId;
-      if (newConvId && !conversationId) {
-        setConversationId(newConvId);
-      }
+      await parseSSEStream(reader, (eventType, data) => {
+        switch (eventType) {
+          case 'meta':
+            newConvId = data.conversation_id;
+            if (newConvId) {
+              setConversationId(newConvId);
+            }
+            break;
 
-      // Update trust context if returned
-      if (data.trust_context_summary) {
-        setTrustContext(data.trust_context_summary);
-      }
+          case 'status':
+            // Backend tells us what phase it's in (thinking, generating, etc.)
+            setStreamPhase(data.phase || 'thinking');
+            break;
 
-      // Parse the ChatResponse structure:
-      // Backend returns: { message: { role, content, action_card, citation_note, unknown_note, caveat, timestamp }, conversation_id, ... }
-      const msg = data.message || {};
-      const actionCard = msg.action_card || null;
+          case 'token':
+            fullText += data.text;
+            setStreamPhase('generating');
+            // Update the assistant message content incrementally
+            setMessages(prev => prev.map(msg => {
+              if (msg.id !== assistantMessageId) return msg;
+              return { ...msg, content: fullText };
+            }));
+            break;
 
-      // Build action_cards array (backend uses singular action_card, frontend expects array)
-      const actionCards = actionCard ? [{
-        id: `action-${Date.now()}`,
-        type: actionCard.type || '',
-        data: actionCard.data || {},
-        status: actionCard.confirmation_status || 'pending',
-        requires_confirmation: actionCard.requires_confirmation ?? true,
-        warning: actionCard.warning_summary || null,
-        // Derive display fields from action data
-        title: _deriveTitle(actionCard),
-        summary: _deriveSummary(actionCard),
-        amount: actionCard.data?.amount || null,
-        message_index: null, // will be set by the message count
-      }] : [];
+          case 'done':
+            doneReceived = true;
+            actionCardData = data.action_card;
+            citationNote = data.citation_note;
+            unknownNote = data.unknown_note;
+            caveatText = data.caveat;
 
-      // Add AI response
-      const aiMessage = {
-        id: data.message_id || `ai-${Date.now()}`,
-        role: 'assistant',
-        content: msg.content || data.response || '',
-        timestamp: msg.timestamp || new Date().toISOString(),
-        action_cards: actionCards,
-        video_cards: data.video_cards || [],
-        citations: _buildCitations(msg.citation_note, msg.unknown_note),
-        caveat: msg.caveat || null,
-      };
+            // Finalize the assistant message with metadata
+            const actionCards = actionCardData ? [{
+              id: `action-${Date.now()}`,
+              type: actionCardData.type || '',
+              data: actionCardData.data || {},
+              status: actionCardData.confirmation_status || 'pending',
+              requires_confirmation: actionCardData.requires_confirmation ?? true,
+              warning: actionCardData.warning_summary || null,
+              title: _deriveTitle(actionCardData),
+              summary: _deriveSummary(actionCardData),
+              amount: actionCardData.data?.amount || null,
+              message_index: null,
+            }] : [];
 
-      // Set message_index on action cards (they belong to this message)
-      const totalMessages = updatedMessages.length; // next index will be this
-      aiMessage.action_cards.forEach(card => {
-        card.message_index = totalMessages;
+            const citations = _buildCitations(citationNote, unknownNote);
+
+            setMessages(prev => {
+              const updated = prev.map(msg => {
+                if (msg.id !== assistantMessageId) return msg;
+                const finalActionCards = actionCards.map(card => ({
+                  ...card,
+                  message_index: prev.indexOf(msg),
+                }));
+                return {
+                  ...msg,
+                  content: fullText,
+                  action_cards: finalActionCards,
+                  citations,
+                  caveat: caveatText,
+                  isStreaming: false,
+                };
+              });
+              return updated;
+            });
+
+            // Call the onDone callback if provided (e.g., to refresh conversation list)
+            if (onDoneCallbackRef.current) {
+              try {
+                onDoneCallbackRef.current({ conversationId: newConvId, isNew: data.is_new });
+              } catch (e) {
+                // Ignore callback errors
+              }
+              onDoneCallbackRef.current = null;
+            }
+            break;
+
+          case 'error':
+            setError(data.message || 'An error occurred during streaming');
+            // Finalize the placeholder
+            setMessages(prev => prev.map(msg => {
+              if (msg.id !== assistantMessageId) return msg;
+              if (!fullText) {
+                return {
+                  ...msg,
+                  content: 'I encountered an error while generating this response. Please try again.',
+                  isStreaming: false,
+                };
+              }
+              return { ...msg, isStreaming: false };
+            }));
+            break;
+        }
       });
 
-      setMessages(prev => [...prev, aiMessage]);
-      return { conversationId: newConvId, messages: [...updatedMessages, aiMessage] };
+      streamEnded = true;
+
+      // Safety net: if the stream ended but we never got a 'done' event
+      // (e.g., connection dropped), finalize the message anyway
+      if (!doneReceived) {
+        console.warn('[useChatStream] Stream ended without done event, finalizing');
+        setMessages(prev => prev.map(msg => {
+          if (msg.id !== assistantMessageId) return msg;
+          return {
+            ...msg,
+            isStreaming: false,
+            content: fullText || 'The connection was interrupted. Please try again.',
+          };
+        }));
+      }
+
+      return { conversationId: newConvId, messages: [...updatedMessages, { id: assistantMessageId, content: fullText }] };
     } catch (err) {
-      console.error('[useChatStream] Error:', err);
-      setError(err.message || 'Failed to send message');
+      if (err.name === 'AbortError') {
+        // User stopped the generation — keep partial response
+        setMessages(prev => prev.map(msg => {
+          if (msg.id !== assistantMessageId) return msg;
+          return {
+            ...msg,
+            isStreaming: false,
+            content: msg.content + (msg.content ? '\n\n*[Stopped]*' : '*[Stopped]*'),
+          };
+        }));
+      } else {
+        console.error('[useChatStream] Error:', err);
+        setError(err.message || 'Failed to send message');
+        // Clean up placeholder
+        setMessages(prev => prev.map(msg => {
+          if (msg.id !== assistantMessageId) return msg;
+          if (!msg.content) {
+            return {
+              ...msg,
+              content: 'I encountered an error. Please try again.',
+              isStreaming: false,
+            };
+          }
+          return { ...msg, isStreaming: false };
+        }));
+      }
       return null;
     } finally {
       setLoading(false);
+      setIsStreaming(false);
+      setStreamPhase(null);
+      abortRef.current = null;
+      onDoneCallbackRef.current = null;
     }
   }, [conversationId]);
+
+  const stopStreaming = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+  }, []);
 
   const loadConversation = useCallback((conv) => {
     setConversationId(conv.conversation_id);
@@ -140,10 +325,14 @@ export const useChatStream = () => {
   }, []);
 
   const resetConversation = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
     setConversationId(null);
     setMessages([]);
     setTrustContext(null);
     setError(null);
+    setStreamPhase(null);
   }, []);
 
   const clearError = useCallback(() => {
@@ -156,7 +345,10 @@ export const useChatStream = () => {
     error,
     conversationId,
     trustContext,
+    isStreaming,
+    streamPhase,
     sendMessage,
+    stopStreaming,
     loadConversation,
     resetConversation,
     clearError,

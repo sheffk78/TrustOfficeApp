@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from dependencies import get_current_user
@@ -20,8 +21,11 @@ from chat_service import (
     extract_action_data,
     build_trust_context,
     generate_response,
+    generate_response_stream,
+    generate_action_card,
+    build_citation_notes,
 )
-from action_registry import requires_confirmation
+from action_registry import requires_confirmation, get_action, ACTION_REGISTRY
 
 router = APIRouter(prefix="/ai", tags=["ai", "chat"])
 logger = logging.getLogger(__name__)
@@ -1022,5 +1026,187 @@ async def chat_status(user: dict = Depends(get_current_user)):
             "user_id": user["user_id"],
         }),
         "max_message_length": MAX_MESSAGE_LENGTH,
-        "streaming": False,  # Sprint 1: batch mode only
+        "streaming": True,
     }
+
+
+# ==================== SSE STREAMING ENDPOINT ====================
+
+async def _sse_event(event_type: str, data: dict) -> str:
+    """Format a Server-Sent Event."""
+    return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+
+
+async def _chat_stream_generator(
+    user_id: str,
+    message: str,
+    conversation_id: Optional[str],
+    trust_id: Optional[str],
+):
+    """
+    Generator that yields SSE events for a streaming chat response.
+
+    Event types:
+    - meta: conversation_id, trust_context (sent first)
+    - token: text chunk (sent as AI generates)
+    - done: final metadata (action_card, citations, caveat)
+    - error: error message
+    """
+    try:
+        # 1. Get active trust
+        trust_id_resolved, trust_name = await _get_active_trust(user_id, trust_id)
+        if not trust_id_resolved:
+            yield await _sse_event("error", {"message": "No trust found. Create a trust first to use the Trust Assistant."})
+            return
+
+        # 2. Get or create conversation
+        conv_id, is_new = await _get_or_create_conversation(
+            conversation_id, user_id, trust_id_resolved, message
+        )
+
+        # 3. Load conversation history
+        conversation = await db.chat_conversations.find_one(
+            {"conversation_id": conv_id, "user_id": user_id}
+        )
+        messages = conversation.get("messages", []) if conversation else []
+        history_for_ai = [{"role": m.get("role"), "content": m.get("content")} for m in messages[-20:]]
+
+        # 4. Send meta event with conversation_id
+        yield await _sse_event("meta", {
+            "conversation_id": conv_id,
+            "is_new": is_new,
+        })
+
+        # 4b. Send status event so frontend knows we're processing
+        yield await _sse_event("status", {"phase": "thinking"})
+
+        # 5. Classify intent (non-streamed, fast)
+        intent_result = await classify_intent(message, None)
+        intent = intent_result.get("intent", "general_chat")
+        entities = intent_result.get("entities", {})
+
+        # 6. Build trust context (DB queries, fast)
+        trust_context = await build_trust_context(user_id, trust_id_resolved)
+
+        # 7. Stream the response tokens
+        full_response_text = ""
+        async for chunk in generate_response_stream(
+            intent=intent,
+            entities=entities,
+            user_message=message,
+            trust_context=trust_context,
+            conversation_history=history_for_ai,
+            ai_client_module=None,
+        ):
+            full_response_text += chunk
+            yield await _sse_event("token", {"text": chunk})
+
+        # 8. Generate action card if needed (post-stream)
+        action_card = None
+        try:
+            action_card = await generate_action_card(
+                intent, entities, message, trust_context, full_response_text
+            )
+        except Exception as e:
+            logger.warning(f"Action card generation failed: {e}")
+
+        # 9. Build citations
+        citation_note, unknown_note = build_citation_notes(trust_context, intent)
+
+        # 10. Determine caveat
+        caveat = None
+        action_def = get_action(intent) if intent else None
+        if action_card or (action_def and action_def.get("requires_write")):
+            caveat = "This proposed action should be reviewed with your legal or tax professional before execution."
+
+        # 11. Send done event with metadata
+        yield await _sse_event("done", {
+            "action_card": action_card,
+            "citation_note": citation_note,
+            "unknown_note": unknown_note,
+            "caveat": caveat,
+            "intent": intent,
+        })
+
+        # 12. Save messages to DB
+        user_msg_doc = ChatMessage(role="user", content=message)
+
+        action_card_for_db = None
+        if action_card:
+            action_card_for_db = ChatAction(
+                type=action_card.get("type", f"{intent}_preview"),
+                data=action_card.get("data", {}),
+                requires_confirmation=action_card.get("requires_confirmation", True),
+                confirmation_status="pending",
+            )
+
+        assistant_msg_doc = ChatMessage(
+            role="assistant",
+            content=full_response_text,
+            action_card=action_card_for_db,
+            citation_note=citation_note,
+            unknown_note=unknown_note,
+            caveat=caveat,
+        )
+
+        now = datetime.now(timezone.utc).isoformat()
+        await db.chat_conversations.update_one(
+            {"conversation_id": conv_id, "user_id": user_id},
+            {
+                "$push": {
+                    "messages": {
+                        "$each": [
+                            user_msg_doc.model_dump(),
+                            assistant_msg_doc.model_dump(),
+                        ]
+                    }
+                },
+                "$set": {"updated_at": now},
+                "$inc": {"message_count": 2},
+            }
+        )
+
+        logger.info(f"CHAT_STREAM | user={user_id} | conversation={conv_id} | intent={intent} | response_len={len(full_response_text)}")
+
+    except Exception as e:
+        logger.error(f"Chat stream error: {type(e).__name__}: {e}", exc_info=True)
+        yield await _sse_event("error", {"message": f"An error occurred while generating the response: {str(e)}"})
+
+
+@router.post("/chat/stream")
+async def chat_stream(
+    request: ChatRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Streaming chat endpoint using Server-Sent Events (SSE).
+
+    Returns a text/event-stream with:
+    - event: meta  (conversation_id)
+    - event: token (text chunk)
+    - event: done  (action_card, citations, caveat)
+    - event: error (error message)
+    """
+    user_id = user["user_id"]
+
+    # Validate message
+    if not request.message or not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    if len(request.message) > MAX_MESSAGE_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Message exceeds maximum length of {MAX_MESSAGE_LENGTH} characters")
+
+    return StreamingResponse(
+        _chat_stream_generator(
+            user_id=user_id,
+            message=request.message,
+            conversation_id=request.conversation_id,
+            trust_id=request.trust_id,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable Nginx buffering
+        },
+    )

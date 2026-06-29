@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, Loader2, AlertCircle, X } from 'lucide-react';
+import { Send, Paperclip, Loader2, AlertCircle, X, Square, Plus, ArrowDown } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 
 const QUICK_CHIPS = [
@@ -12,7 +12,7 @@ const QUICK_CHIPS = [
 const GREETING_MESSAGE = {
   id: 'greeting',
   role: 'assistant',
-  content: "Hi! I'm your Trust Assistant. Ask me about your trust, deadlines, or what to do next.",
+  content: "Hi! I'm your Trust Assistant. Ask me about your trust, deadlines, or what to do next.\n\nYou can ask me to:\n- **Check upcoming deadlines** for your trust\n- **Draft meeting minutes** from a recent trustee meeting\n- **Prepare a distribution** to a beneficiary\n- **Assess your trust's health** and defensibility score\n- **Get guidance** on fiduciary duties and best practices",
   timestamp: new Date().toISOString(),
   action_cards: [],
   video_cards: [],
@@ -24,8 +24,12 @@ const ChatPanel = ({
   messages,
   loading,
   error,
+  isStreaming,
+  streamPhase,
   onSendMessage,
+  onStopStreaming,
   onClearError,
+  onNewChat,
   onActionApprove,
   onActionEdit,
   onActionDiscard,
@@ -37,35 +41,68 @@ const ChatPanel = ({
   const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
   const prevMessageCountRef = useRef(0);
+  const prevContentLengthRef = useRef(0);
+  const isUserScrolledUpRef = useRef(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  // Auto-scroll to bottom on new messages — uses container scrollTop, not scrollIntoView
-  // This prevents the page-level scroll jump that was disrupting conversation visibility
+  // Track whether user has scrolled up (so we don't auto-scroll while they're reading history)
+  const handleScroll = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const scrolledUp = distanceFromBottom > 150;
+    isUserScrolledUpRef.current = scrolledUp;
+    setShowScrollBtn(scrolledUp && messages.length > 2);
+  }, [messages.length]);
+
+  // Smooth auto-scroll to bottom on new messages or streaming tokens
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
 
     const messageCount = messages.length;
-    // Only auto-scroll when new messages arrive (not on every render)
-    if (messageCount > prevMessageCountRef.current) {
-      // Use requestAnimationFrame to ensure DOM has updated
+    const lastMsg = messages[messages.length - 1];
+    const contentLength = lastMsg?.content?.length || 0;
+    const hasNewMessage = messageCount > prevMessageCountRef.current;
+    const hasNewContent = contentLength > prevContentLengthRef.current;
+
+    // Auto-scroll if:
+    // 1. New message arrived (user or AI), OR
+    // 2. Streaming content is growing AND user hasn't scrolled up
+    if (hasNewMessage || (hasNewContent && !isUserScrolledUpRef.current)) {
       requestAnimationFrame(() => {
-        container.scrollTop = container.scrollHeight;
+        const targetScroll = container.scrollHeight;
+        const currentScroll = container.scrollTop;
+        const distance = targetScroll - currentScroll;
+
+        // For small distances (streaming tokens), use smooth scroll
+        // For large distances (new message), jump directly
+        if (distance > 0 && distance < 300) {
+          container.scrollTo({
+            top: targetScroll,
+            behavior: 'smooth',
+          });
+        } else if (distance > 0) {
+          container.scrollTop = targetScroll;
+        }
       });
     }
+
     prevMessageCountRef.current = messageCount;
+    prevContentLengthRef.current = contentLength;
   }, [messages]);
 
-  // Also scroll on loading state changes (e.g. when loading finishes and response appears)
+  // Reset scroll tracking when conversation changes
   useEffect(() => {
-    if (!loading && messages.length > 0) {
-      const container = messagesContainerRef.current;
-      if (container) {
-        requestAnimationFrame(() => {
-          container.scrollTop = container.scrollHeight;
-        });
-      }
+    isUserScrolledUpRef.current = false;
+    setShowScrollBtn(false);
+    prevMessageCountRef.current = 0;
+    prevContentLengthRef.current = 0;
+    // Scroll to top when loading a conversation
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = 0;
     }
-  }, [loading]);
+  }, [loadingConversation]);
 
   // Auto-resize textarea as user types
   const autoResizeTextarea = useCallback(() => {
@@ -103,13 +140,36 @@ const ChatPanel = ({
     onSendMessage(message);
   };
 
+  const scrollToBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'smooth',
+    });
+    isUserScrolledUpRef.current = false;
+    setShowScrollBtn(false);
+  }, []);
+
+  // Focus textarea on mount and after loading completes
+  useEffect(() => {
+    if (textareaRef.current && !loading) {
+      textareaRef.current.focus();
+    }
+  }, [loading]);
+
   const displayMessages = [GREETING_MESSAGE, ...messages];
+  const hasUserMessages = messages.some(m => m.role === 'user');
+  const showQuickChips = !hasUserMessages && !loading;
+
+  // Determine the loading indicator text
+  const loadingText = streamPhase === 'thinking' ? 'Thinking...' : 'Generating...';
 
   return (
     <div className="chat-panel flex flex-col h-full">
       {/* Error banner */}
       {error && (
-        <div className="bg-rust/10 border-b border-rust/20 px-4 py-3 flex items-center gap-3">
+        <div className="chat-error-banner">
           <AlertCircle className="w-4 h-4 text-rust flex-shrink-0" />
           <p className="flex-1 text-xs text-rust">{error}</p>
           <button
@@ -122,8 +182,12 @@ const ChatPanel = ({
       )}
 
       {/* Messages area — scrollable, constrained */}
-      <div className="chat-messages flex-1 overflow-y-auto px-6 py-4" ref={messagesContainerRef}>
-        <div className="max-w-3xl mx-auto">
+      <div
+        className="chat-messages"
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+      >
+        <div className="max-w-3xl mx-auto px-1">
           {loadingConversation ? (
             <div className="flex justify-center py-12">
               <div className="flex items-center gap-2">
@@ -144,47 +208,83 @@ const ChatPanel = ({
                 />
               ))}
 
-              {/* Loading indicator */}
-              {loading && (
-                <div className="flex justify-start mb-4">
-                  <div className="message-bubble-ai border border-navy/5 flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Thinking...</span>
+              {/* Loading indicator — shown when streaming but no assistant message yet */}
+              {loading && !messages.some(m => m.isStreaming) && (
+                <div className="chat-message-row chat-message-ai">
+                  <div className="chat-avatar chat-avatar-ai">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
+                      <path d="M12 6v6l4 2" />
+                    </svg>
+                  </div>
+                  <div className="chat-bubble chat-bubble-ai chat-bubble-streaming">
+                    <div className="flex items-center gap-1.5 py-1">
+                      <span className="typing-dot" />
+                      <span className="typing-dot" style={{ animationDelay: '0.15s' }} />
+                      <span className="typing-dot" style={{ animationDelay: '0.3s' }} />
+                      <span className="text-[11px] text-muted-foreground ml-1">{loadingText}</span>
+                    </div>
                   </div>
                 </div>
               )}
             </>
           )}
-
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Quick-action chips */}
-      <div className="px-6 pb-2 pt-1">
-        <div className="max-w-3xl mx-auto flex flex-wrap gap-2">
-          {QUICK_CHIPS.map((chip) => (
-            <button
-              key={chip.label}
-              onClick={() => handleChipClick(chip.message)}
-              disabled={loading}
-              className="text-[10px] uppercase tracking-wider px-3 py-1.5 border border-navy/10 bg-navy/5 text-navy hover:bg-gold/10 hover:border-gold/30 hover:text-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {chip.label}
-            </button>
-          ))}
+      {/* Scroll-to-bottom button — appears when user scrolls up during conversation */}
+      {showScrollBtn && (
+        <button
+          onClick={scrollToBottom}
+          className="chat-scroll-btn"
+          title="Scroll to latest"
+        >
+          <ArrowDown className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Quick-action chips — only show before first user message */}
+      {showQuickChips && (
+        <div className="px-6 pb-2 pt-1">
+          <div className="max-w-3xl mx-auto flex flex-wrap gap-2">
+            {QUICK_CHIPS.map((chip) => (
+              <button
+                key={chip.label}
+                onClick={() => handleChipClick(chip.message)}
+                disabled={loading}
+                className="text-[10px] uppercase tracking-wider px-3 py-1.5 border border-navy/10 bg-navy/5 text-navy hover:bg-gold/10 hover:border-gold/30 hover:text-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Input bar — always visible */}
       <div className="chat-input-bar border-t border-navy/10 bg-background">
-        <div className="w-full flex items-end gap-3">
+        <div className="chat-input-wrapper max-w-3xl mx-auto w-full flex items-end gap-3">
+          {/* New chat button — only show when there's an active conversation */}
+          {hasUserMessages && !loading && onNewChat && (
+            <button
+              onClick={onNewChat}
+              className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors flex-shrink-0 mb-1"
+              title="Start new chat"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Paperclip — decorative for now */}
           <button
             className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors flex-shrink-0 mb-1"
             title="Attach file"
           >
             <Paperclip className="w-5 h-5" />
           </button>
+
+          {/* Textarea */}
           <textarea
             ref={textareaRef}
             value={input}
@@ -196,14 +296,26 @@ const ChatPanel = ({
             className="input-trust flex-1 placeholder:text-muted-foreground/50 disabled:opacity-50 resize-none overflow-y-hidden py-3 leading-6 min-h-[48px] max-h-[240px]"
             style={{ height: 'auto' }}
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || loading}
-            className="btn-primary p-2 flex-shrink-0 mb-1"
-            title="Send message"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+
+          {/* Send / Stop button */}
+          {isStreaming ? (
+            <button
+              onClick={onStopStreaming}
+              className="chat-stop-btn flex-shrink-0 mb-1"
+              title="Stop generating"
+            >
+              <Square className="w-4 h-4" fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || loading}
+              className="btn-primary p-2 flex-shrink-0 mb-1"
+              title="Send message"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -608,6 +608,161 @@ def _is_garbled(text: str) -> bool:
     if not text or not text.strip():
         return True
     stripped = text.strip()
-    if stripped in ("o", "```", "<|endoftext|>", "</s>", "[DONE]", ""):
+    if stripped in ("o", "```", "```", "</s>", "[DONE]", ""):
         return True
     return False
+
+
+async def generate_response_stream(
+    intent: str,
+    entities: dict,
+    user_message: str,
+    trust_context: dict,
+    conversation_history: list,
+    ai_client_module,
+):
+    """
+    Streaming version of generate_response.
+    Yields text chunks for the user-facing response.
+    After streaming completes, returns metadata (action_card, citations, caveat)
+    via a final non-streaming extraction step.
+
+    Yields:
+        str: Text chunks of the AI response
+    """
+    from ai_client import ai_draft_stream
+
+    action_def = get_action(intent) or ACTION_REGISTRY.get("general_chat", {})
+    requires_write = action_def.get("requires_write", False)
+
+    ctx = trust_context
+    trust_info = ctx.get("trust", {})
+    knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
+
+    # For streaming mode: ask the AI to respond in natural markdown (no JSON wrapper).
+    # Action card data is extracted separately if needed.
+    system_prompt = f"""{CHAT_SYSTEM_PROMPT}
+
+## Current Trust Context
+Trust: {trust_info.get('name', 'Unknown')}
+Type: {trust_info.get('type', 'Not specified')}
+Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
+State: {trust_info.get('state_code', 'Not specified')}
+Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
+Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/100 ({ctx.get('health_score', {}).get('color', 'red')})
+
+## Upcoming Deadlines (next 14 days)
+{json.dumps(ctx.get('upcoming_deadlines', []), indent=2)}
+
+## Pending Items
+{json.dumps(ctx.get('pending_items', []), indent=2)}
+
+## Recent Activity (last 30 days)
+{json.dumps(ctx.get('recent_activity', []), indent=2)}
+
+## Active Beneficiaries
+{json.dumps(ctx.get('beneficiaries', []), indent=2)}
+
+## Class Beneficiaries
+{json.dumps(ctx.get('class_beneficiaries', []), indent=2)}
+
+## Tax Deadlines
+{json.dumps(ctx.get('tax_deadlines', []), indent=2)}
+
+## Knowledge Base
+{knowledge_context[:9500] if knowledge_context else "No knowledge base available."}
+
+## Conversation History (recent)
+{json.dumps(conversation_history[-5:] if conversation_history else [], indent=2)}
+
+## Current Intent
+Intent: {intent}
+Requires write: {requires_write}
+
+Respond as the Trust Assistant directly to the user. Write your response in clear, well-formatted markdown. Use headings (##), bullet points, bold text, and numbered lists where appropriate. Be conversational but professional.
+
+If you are proposing an action (distribution, minutes, adding a beneficiary, etc.), describe what you would do in your response text. The system will generate a separate action card for the user to review.
+
+Do NOT wrap your response in JSON. Do NOT include code blocks around your entire response. Write naturally.
+"""
+
+    user_content = f"User message: {user_message}"
+
+    async for chunk in ai_draft_stream(
+        system_prompt=system_prompt,
+        user_content=user_content,
+        max_tokens=2000,
+        temperature=0.3,
+    ):
+        yield chunk
+
+
+async def generate_action_card(
+    intent: str,
+    entities: dict,
+    user_message: str,
+    trust_context: dict,
+    response_text: str,
+) -> Optional[dict]:
+    """
+    After streaming response completes, extract action card data if the intent
+    requires a write operation. Uses the action extractor prompt.
+    """
+    from ai_client import ai_draft
+
+    action_def = get_action(intent) or ACTION_REGISTRY.get("general_chat", {})
+    requires_write = action_def.get("requires_write", False)
+
+    if not requires_write:
+        return None
+
+    # Use the existing action extractor to get structured data
+    extracted = await extract_action_data(user_message, intent, entities, None)
+
+    if extracted and extracted.get("extracted"):
+        return {
+            "type": f"{intent}_preview",
+            "data": extracted.get("extracted", {}),
+            "requires_confirmation": action_def.get("confirmation_required", True),
+        }
+
+    return None
+
+
+def build_citation_notes(trust_context: dict, intent: str) -> tuple:
+    """
+    Build citation_note and unknown_note from the trust context.
+    Returns (citation_note, unknown_note).
+    """
+    ctx = trust_context
+    citations = []
+    unknowns = []
+
+    trust_info = ctx.get("trust", {})
+    if trust_info.get("name") and trust_info.get("name") != "Unknown Trust":
+        citations.append(f"Trust profile for {trust_info['name']}")
+
+    health = ctx.get("health_score", {})
+    if health.get("total", 0) > 0:
+        citations.append(f"Defensibility score: {health['total']}/100")
+
+    deadlines = ctx.get("upcoming_deadlines", [])
+    if deadlines:
+        citations.append(f"{len(deadlines)} upcoming deadline(s) in the next 14 days")
+
+    beneficiaries = ctx.get("beneficiaries", [])
+    if beneficiaries:
+        citations.append(f"{len(beneficiaries)} active beneficiary record(s)")
+
+    # Unknowns
+    if not trust_info.get("jurisdiction"):
+        unknowns.append("Trust jurisdiction is not specified")
+    if not trust_info.get("beneficiary_standard"):
+        unknowns.append("Distribution standard (HEMS vs discretionary) is not specified")
+    if health.get("total", 0) == 0:
+        unknowns.append("No defensibility score has been calculated yet")
+
+    return (
+        "; ".join(citations) if citations else None,
+        "; ".join(unknowns) if unknowns else None,
+    )

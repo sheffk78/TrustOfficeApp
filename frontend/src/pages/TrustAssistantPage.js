@@ -38,7 +38,10 @@ const TrustAssistantPage = () => {
     error,
     conversationId,
     trustContext,
+    isStreaming,
+    streamPhase,
     sendMessage,
+    stopStreaming,
     loadConversation,
     resetConversation,
     clearError,
@@ -71,14 +74,19 @@ const TrustAssistantPage = () => {
     const prompt = searchParams.get('prompt');
     if (prompt && !promptSent.current && messages.length === 0 && !loading) {
       promptSent.current = true;
-      sendMessage(prompt, conversationId, messages);
+      sendMessage(prompt, conversationId, messages, () => {
+        fetchConversations();
+      });
     }
-  }, [searchParams, messages.length, loading, sendMessage, conversationId, messages]);
+  }, [searchParams, messages.length, loading, sendMessage, conversationId, messages, fetchConversations]);
 
   // Handle sending a message through the chat
   const handleSendMessage = useCallback(async (text) => {
-    await sendMessage(text, conversationId, messages);
-  }, [sendMessage, conversationId, messages]);
+    await sendMessage(text, conversationId, messages, () => {
+      // Refresh conversation list after streaming completes
+      fetchConversations();
+    });
+  }, [sendMessage, conversationId, messages, fetchConversations]);
 
   // Handle selecting a conversation from history
   const handleConversationSelect = useCallback(async (conv) => {
@@ -202,6 +210,14 @@ const TrustAssistantPage = () => {
     console.log('[TrustAssistant] Video clicked:', card);
   }, []);
 
+  // Start a new chat — resets conversation state
+  const handleNewChat = useCallback(() => {
+    resetConversation();
+    // Refocus the textarea
+    const textarea = document.querySelector('.input-trust');
+    if (textarea) textarea.focus();
+  }, [resetConversation]);
+
   return (
     <div className="main-layout" data-testid="trust-assistant-page">
       <Sidebar />
@@ -242,8 +258,12 @@ const TrustAssistantPage = () => {
               messages={messages}
               loading={loading}
               error={error}
+              isStreaming={isStreaming}
+              streamPhase={streamPhase}
               onSendMessage={handleSendMessage}
+              onStopStreaming={stopStreaming}
               onClearError={clearError}
+              onNewChat={handleNewChat}
               onActionApprove={handleActionApprove}
               onActionEdit={handleActionEdit}
               onActionDiscard={handleActionDiscard}

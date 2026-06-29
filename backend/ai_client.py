@@ -219,6 +219,38 @@ async def ai_haiku(
     raise AIClientError(f"All AI providers failed. Errors: {'; '.join(errors)}")
 
 
+async def ai_draft_stream(
+    system_prompt: str,
+    user_content: str,
+    max_tokens: int = 2000,
+    temperature: float = 0.3,
+):
+    """
+    Streaming version of ai_draft.
+    Yields content text chunks as they arrive from the AI model.
+    Tries OpenRouter (Gemini) first, falls back to non-streaming if needed.
+    """
+    if OPENROUTER_AVAILABLE and OPENROUTER_API_KEY:
+        try:
+            from openrouter_client import call_openrouter_sonnet_stream
+            async for chunk in call_openrouter_sonnet_stream(
+                system_prompt, user_content, max_tokens, temperature
+            ):
+                yield chunk
+            return
+        except Exception as e:
+            logger.warning(f"OpenRouter streaming failed: {e}, falling back to batch")
+
+    # Fallback: non-streaming, yield the whole response at once
+    try:
+        result = await ai_sonnet(system_prompt, user_content, max_tokens, temperature)
+        if result:
+            yield result
+    except AIClientError as e:
+        logger.error(f"All AI providers failed for streaming: {e}")
+        yield "I'm having trouble connecting to my AI backend. Please try again."
+
+
 # Aliases for ai_service.py
 async def ai_draft(
     system_prompt: str,
