@@ -472,7 +472,160 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
         context["trust_document"]["distribution_rules"] = fields.get("distribution_rules", {})
         context["trust_document"]["trustee_powers_detail"] = fields.get("trustee_powers_detail", {})
 
+    # 9. Vault document metadata (titles, categories, descriptions — no file content)
+    # This is queried for every request but only injected into the prompt when relevant
+    # (see _should_include_vault_context). Keeping it in the context dict is cheap because
+    # we exclude file_content — just metadata.
+    vault_docs = await db.vault_documents.find(
+        {"trust_id": trust_id},
+        {
+            "_id": 0,
+            "file_content": 0,
+            "file_content_type": 0,
+            "file_size_bytes": 0,
+            "storage_path": 0,
+        },
+    ).sort("created_at", -1).to_list(50)
+
+    context["vault_documents"] = [
+        {
+            "doc_id": d.get("doc_id", ""),
+            "title": d.get("title", "Untitled"),
+            "category": d.get("category", "other"),
+            "category_label": d.get("category_label", "Other"),
+            "date": d.get("date", ""),
+            "description": d.get("description", ""),
+            "tags": d.get("tags", []),
+            "file_name": d.get("file_name", ""),
+        }
+        for d in vault_docs
+    ]
+
     return context
+
+
+# ---------------------------------------------------------------------------
+# Vault context relevance gate
+# ---------------------------------------------------------------------------
+# Intents that inherently need vault document awareness
+VAULT_RELEVANT_INTENTS = {
+    "evaluate_distribution",
+    "review_document",
+    "create_distribution",
+    "upload_document",
+    "log_minutes",
+    "add_asset",
+    "check_deadlines",
+    "health_check",
+    "recommend_action",
+    "create_beneficiary",
+    "update_beneficiary",
+}
+
+# Keywords that signal a general/ knowledge question is actually about
+# the user's own trust documents
+VAULT_TRIGGER_KEYWORDS = [
+    "trust document", "trust declaration", "trust instrument",
+    "vault", "my documents", "certificate", "ein letter",
+    "declaration", "amendment", "schedule a",
+    "does my trust", "what does my trust", "according to my trust",
+    "my trust say", "trust document say", "beneficiary request",
+    "distribution request", "the trust document", "my declaration",
+    "trust certificate", "cp575", "binder kit",
+]
+
+
+def _should_include_vault_context(intent: str, user_message: str) -> bool:
+    """Decide whether vault document metadata should be injected into the prompt.
+
+    Returns True if:
+    - The intent is inherently document-relevant (evaluate_distribution, review_document, etc.)
+    - OR the user message contains trigger keywords suggesting they're asking about their own docs
+
+    Returns False for:
+    - general_chat (greetings, casual)
+    - ask_knowledge about abstract concepts with no document references
+    """
+    if intent in VAULT_RELEVANT_INTENTS:
+        return True
+    msg_lower = user_message.lower()
+    return any(kw in msg_lower for kw in VAULT_TRIGGER_KEYWORDS)
+
+
+def _format_vault_context(vault_docs: list, trust_document: dict | None) -> str:
+    """Format vault document metadata + trust document analysis into a prompt section.
+
+    Tier 1: Trust document analysis (always included when available — it's already extracted
+            structured data, just a few hundred tokens).
+    Tier 2: Vault document list (titles, categories, descriptions — no file content).
+    """
+    sections = []
+
+    # --- Tier 1: AI-extracted trust document analysis ---
+    if trust_document:
+        td_lines = ["## Trust Document Analysis (AI-Extracted)"]
+        if trust_document.get("grantor"):
+            td_lines.append(f"Grantor: {trust_document['grantor']}")
+        if trust_document.get("trust_type"):
+            td_lines.append(f"Trust Type: {trust_document['trust_type']}")
+        if trust_document.get("distribution_standard"):
+            td_lines.append(f"Distribution Standard: {trust_document['distribution_standard']}")
+        if trust_document.get("distribution_standard_type"):
+            td_lines.append(f"Distribution Standard Type: {trust_document['distribution_standard_type']}")
+        if trust_document.get("distribution_article"):
+            td_lines.append(f"Distribution Article: {trust_document['distribution_article']}")
+        if trust_document.get("beneficiary_names"):
+            td_lines.append(f"Named Beneficiaries: {', '.join(trust_document['beneficiary_names'])}")
+        if trust_document.get("removal_provisions"):
+            td_lines.append(f"Trustee Removal: {trust_document['removal_provisions']}")
+        if trust_document.get("termination_rules"):
+            td_lines.append(f"Termination Rules: {trust_document['termination_rules']}")
+
+        dist_rules = trust_document.get("distribution_rules", {})
+        if dist_rules:
+            if dist_rules.get("specific_purposes"):
+                td_lines.append(f"Permitted Distribution Purposes: {', '.join(dist_rules['specific_purposes'])}")
+            if dist_rules.get("amount_guidance"):
+                td_lines.append(f"Amount Guidance: {dist_rules['amount_guidance']}")
+            if dist_rules.get("needs_based_factors"):
+                td_lines.append(f"Needs-Based Factors: {', '.join(dist_rules['needs_based_factors'])}")
+            if dist_rules.get("equal_treatment_requirement"):
+                td_lines.append(f"Equal Treatment: {dist_rules['equal_treatment_requirement']}")
+            if dist_rules.get("article_reference"):
+                td_lines.append(f"Distribution Rules Article: {dist_rules['article_reference']}")
+
+        powers = trust_document.get("trustee_powers", [])
+        if powers:
+            td_lines.append("Trustee Powers:")
+            for p in powers[:10]:
+                td_lines.append(f"  - {p.get('power', '')} ({p.get('article', '')})")
+
+        powers_detail = trust_document.get("trustee_powers_detail", {})
+        if powers_detail:
+            if powers_detail.get("investment_powers"):
+                td_lines.append(f"Investment Powers: {powers_detail['investment_powers']}")
+            if powers_detail.get("discretion_powers"):
+                td_lines.append(f"Discretion Powers: {powers_detail['discretion_powers']}")
+            if powers_detail.get("spendthrift_provisions"):
+                td_lines.append(f"Spendthrift Provisions: {powers_detail['spendthrift_provisions']}")
+
+        sections.append("\n".join(td_lines))
+
+    # --- Tier 2: Vault document metadata ---
+    if vault_docs:
+        vault_lines = ["## Vault Documents"]
+        for d in vault_docs:
+            parts = [f"- **{d.get('title', 'Untitled')}**"]
+            if d.get("category_label"):
+                parts.append(f" [{d['category_label']}]")
+            if d.get("date"):
+                parts.append(f" ({d['date']})")
+            if d.get("description"):
+                parts.append(f" — {d['description']}")
+            vault_lines.append("".join(parts))
+        sections.append("\n".join(vault_lines))
+
+    return "\n\n".join(sections) if sections else ""
 
 
 async def generate_response(
@@ -500,6 +653,19 @@ async def generate_response(
     # Build the system prompt with context
     knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
 
+    # --- Intelligent vault context gate ---
+    # Only include vault documents when the intent or message suggests relevance.
+    # This avoids bloating every prompt with document metadata for casual/abstract questions.
+    vault_section = ""
+    trust_doc = ctx.get("trust_document")
+    if _should_include_vault_context(intent, user_message):
+        vault_docs = ctx.get("vault_documents", [])
+        vault_section = _format_vault_context(vault_docs, trust_doc)
+    elif trust_doc:
+        # Even for non-document intents, include the trust document analysis if available.
+        # It's small structured data and gives the AI baseline awareness of the trust instrument.
+        vault_section = _format_vault_context([], trust_doc)
+
     system_prompt = f"""{CHAT_SYSTEM_PROMPT}
 
 ## Current Trust Context
@@ -509,6 +675,8 @@ Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/100 ({ctx.get('health_score', {}).get('color', 'red')})
+
+{vault_section}
 
 ## Upcoming Deadlines (next 14 days)
 {json.dumps(ctx.get('upcoming_deadlines', []), indent=2)}
@@ -543,6 +711,10 @@ Respond as the Trust Assistant. Include:
 1. "What I'm basing this on" — cite specific data from the context above
 2. "What I don't know" — call out information gaps
 3. Caveat language for any action proposals
+
+When referencing trust document details, cite the specific article/section if available
+(e.g., "According to your trust instrument, Article 4, Section 4.2...").
+If vault documents are listed, reference them by title when relevant to the user's question.
 
 Format your response as JSON:
 {{
@@ -641,6 +813,15 @@ async def generate_response_stream(
     trust_info = ctx.get("trust", {})
     knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
 
+    # --- Intelligent vault context gate (same logic as non-streaming) ---
+    vault_section = ""
+    trust_doc = ctx.get("trust_document")
+    if _should_include_vault_context(intent, user_message):
+        vault_docs = ctx.get("vault_documents", [])
+        vault_section = _format_vault_context(vault_docs, trust_doc)
+    elif trust_doc:
+        vault_section = _format_vault_context([], trust_doc)
+
     # For streaming mode: ask the AI to respond in natural markdown (no JSON wrapper).
     # Action card data is extracted separately if needed.
     system_prompt = f"""{CHAT_SYSTEM_PROMPT}
@@ -652,6 +833,8 @@ Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/100 ({ctx.get('health_score', {}).get('color', 'red')})
+
+{vault_section}
 
 ## Upcoming Deadlines (next 14 days)
 {json.dumps(ctx.get('upcoming_deadlines', []), indent=2)}
@@ -682,6 +865,10 @@ Intent: {intent}
 Requires write: {requires_write}
 
 Respond as the Trust Assistant directly to the user. Write your response in clear, well-formatted markdown. Use headings (##), bullet points, bold text, and numbered lists where appropriate. Be conversational but professional.
+
+When referencing trust document details, cite the specific article/section if available
+(e.g., "According to your trust instrument, Article 4, Section 4.2...").
+If vault documents are listed, reference them by title when relevant to the user's question.
 
 If you are proposing an action (distribution, minutes, adding a beneficiary, etc.), describe what you would do in your response text. The system will generate a separate action card for the user to review.
 
@@ -756,13 +943,32 @@ def build_citation_notes(trust_context: dict, intent: str) -> tuple:
     if beneficiaries:
         citations.append(f"{len(beneficiaries)} active beneficiary record(s)")
 
+    # Trust document analysis citations
+    trust_doc = ctx.get("trust_document", {})
+    if trust_doc:
+        if trust_doc.get("distribution_standard"):
+            citations.append(f"Trust instrument: {trust_doc.get('distribution_standard_type', 'distribution standard')} standard")
+        if trust_doc.get("distribution_article"):
+            citations.append(f"Distribution provisions: {trust_doc['distribution_article']}")
+        if trust_doc.get("beneficiary_names"):
+            citations.append(f"Named beneficiaries from trust instrument: {', '.join(trust_doc['beneficiary_names'][:5])}")
+
+    # Vault document citations (only when vault context was relevant)
+    vault_docs = ctx.get("vault_documents", [])
+    if vault_docs and _should_include_vault_context(intent, ctx.get("_user_message", "")):
+        doc_titles = [d.get("title", "") for d in vault_docs if d.get("title")]
+        if doc_titles:
+            citations.append(f"Vault documents referenced: {', '.join(doc_titles[:5])}")
+
     # Unknowns
     if not trust_info.get("jurisdiction"):
         unknowns.append("Trust jurisdiction is not specified")
-    if not trust_info.get("beneficiary_standard"):
+    if not trust_info.get("beneficiary_standard") and not trust_doc.get("distribution_standard"):
         unknowns.append("Distribution standard (HEMS vs discretionary) is not specified")
     if health.get("total", 0) == 0:
         unknowns.append("No defensibility score has been calculated yet")
+    if not trust_doc:
+        unknowns.append("No trust instrument has been uploaded and analyzed yet")
 
     return (
         "; ".join(citations) if citations else None,
