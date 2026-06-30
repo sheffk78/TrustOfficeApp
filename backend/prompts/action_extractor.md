@@ -25,6 +25,9 @@ Only extract when the user is clearly making a request that would create, update
 - A beneficiary removal → extract beneficiary name, reason
 - A distribution cancellation → extract beneficiary name, amount, date
 
+### Send Requests
+- A certificate email request → extract beneficiary_name (required), optional override email and notes. If the user does not specify an email, leave it null, the system will use the email on file.
+
 ## Do Not Extract
 - General questions (ask_knowledge, general_chat, emergency)
 - Deadline checks (no data to create)
@@ -86,3 +89,29 @@ Only extract when the user is clearly making a request that would create, update
 ```
 
 The `missing_required` field lists fields that are needed but not provided by the user. The `suggested_clarification` is a natural language follow-up question to fill in the gap.
+
+## Output Format (Send)
+```json
+{
+  "action_type": "send_certificate",
+  "extracted": {
+    "beneficiary_name": "Jane Smith",
+    "email": null,
+    "notes": null
+  },
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+
+For `send_certificate`, the only required field is `beneficiary_name`. Email is optional (system uses the email on file). If the user says "email Jane her certificate" and Jane is a known beneficiary, that's sufficient, no clarification needed.
+
+## Strong Clarification Rules
+When `missing_required` is non-empty, the `suggested_clarification` MUST be a natural, conversational question, not a technical field request:
+- Good: "What's Jane's email address?" or "How many units should Jane receive?"
+- Bad: "Missing field: email" or "Please provide the required field: allocation_pct"
+
+For `create_beneficiary` specifically:
+- `name` is required. If the user says "add a beneficiary" without a name, ask "What's the beneficiary's full name?"
+- `email` and `allocation_pct` are NOT required for the action card to be created. The system can create a beneficiary with just a name. If they're missing, mention them as optional in the clarification but do not block the card.
+- If the user provides a name only, generate the card and say: "I can add Jane Smith as a beneficiary. If you'd like, you can also provide her email address and allocation percentage, or you can add those later. Want me to go ahead with just the name?"

@@ -801,7 +801,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <Link 
-                      to="/tax-calendar" 
+                      to="/calendar" 
                       className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
                     >
                       View All <ArrowRight className="w-3 h-3" />
@@ -816,7 +816,7 @@ export default function DashboardPage() {
                   ) : taxDeadlines.length === 0 ? (
                     <div className="p-6 bg-navy/5 border border-navy/10 text-center rounded">
                       <p className="text-sm text-muted-foreground mb-3">No tax calendar generated yet.</p>
-                      <Link to="/tax-calendar">
+                      <Link to="/calendar?type=tax">
                         <Button size="sm" className="btn-secondary">
                           <CalendarDays className="w-4 h-4 mr-2" />
                           Set Up Tax Calendar

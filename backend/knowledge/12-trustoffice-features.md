@@ -93,6 +93,7 @@ On mobile (≤1024px), a bottom navigation bar replaces the sidebar with 6 items
 - Trust unit certificates: create with unit count, class, beneficiary allocation, vesting schedule, transfer restrictions
 - Trust unit transfers: record transfers between beneficiaries with approval tracking
 - Beneficiary dashboard showing counts, unit totals, and allocation overview
+- Email certificate to beneficiary: sends a branded certificate notice showing the beneficiary's unit allocation, certificate number, and percentage of total. Logged automatically to Communications.
 
 ### Vault (Document Storage)
 - Upload documents (file upload or URL link from Google Drive/Dropbox)
@@ -185,6 +186,7 @@ On mobile (≤1024px), a bottom navigation bar replaces the sidebar with 6 items
 | "I need to add a new beneficiary" | Beneficiaries page (`/beneficiaries`) | `create_beneficiary` intent |
 | "Change Jane's email" | Beneficiaries page | `update_beneficiary` intent |
 | "Remove this beneficiary" | Beneficiaries page | `remove_beneficiary` intent |
+| "Email Jane her certificate" | Beneficiaries page | `send_certificate` intent |
 | "Record a distribution" | Distributions page (`/distributions`) | `create_distribution` intent |
 | "Cancel a distribution" | Distributions page | `cancel_distribution` intent |
 | "I bought a new asset" | Schedule A (`/schedule-a`) | `add_asset` intent |
@@ -205,7 +207,7 @@ If a user asks about these, suggest navigating to the page directly or acknowled
 
 - Creating/editing entities (structures)
 - Editing the tax calendar
-- Managing trust unit certificates
+- Trust unit certificate creation (use the Beneficiaries page for now; the assistant can email existing certificates but cannot create new ones via chat)
 - Risk dashboard alerts
 - State compliance settings
 - Binder tools

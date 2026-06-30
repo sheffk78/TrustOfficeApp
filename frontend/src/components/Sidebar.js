@@ -14,7 +14,6 @@ import {
   X,
   ChevronDown,
   Calendar,
-  CalendarDays,
   Network,
   Wallet,
   Package,
@@ -60,7 +59,6 @@ const NAV_GROUPS = [
   { key: 'governance', icon: BookOpen, label: 'Governance', items: [
     { path: '/calendar', icon: Calendar, label: 'Calendar' },
     { path: '/minutes', icon: FilePen, label: 'Minutes' },
-    { path: '/tax-calendar', icon: CalendarDays, label: 'Tax Calendar' },
   ]},
   { key: 'money', icon: Coins, label: 'Money', items: [
     { path: '/distributions', icon: Send, label: 'Distributions' },

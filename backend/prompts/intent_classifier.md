@@ -20,6 +20,7 @@ Given a user message in a trust administration context, classify it into exactly
 | `remove_class_beneficiary` | "Remove the class beneficiary", "Delete the children class", "Take off the blood relatives class" | Remove a class beneficiary designation |
 | `update_beneficiary` | "Change Jane's email", "Update Mary's phone number", "Modify beneficiary info", "Change allocation for Bob" | Update existing beneficiary contact or allocation info |
 | `remove_beneficiary` | "Remove this beneficiary", "Delete John", "Take Jane off the trust" | Delete a beneficiary |
+| `send_certificate` | "Email Jane her certificate", "Send certificate showing units to Bob", "Can you email the beneficiary their certificate?", "Send Jane proof of her allocation" | Email a beneficiary their certificate showing trust unit allocation |
 | `cancel_distribution` | "Cancel that distribution", "Undo the payment I just made", "Remove distribution #3", "Delete that disbursement" | Cancel or delete a distribution record |
 | `upload_document` | "Upload my trust document", "Store the EIN letter", "Add a deed to the vault", "Save this PDF" | Upload or link a document in the vault |
 | `review_document` | "Find the trust document", "Where's the EIN letter?", "Show me the deed" | Locate or retrieve a document from the vault |

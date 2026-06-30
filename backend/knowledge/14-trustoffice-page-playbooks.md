@@ -198,10 +198,11 @@ Trust Assistant can:
 - Add beneficiary (`create_beneficiary`).
 - Update beneficiary (`update_beneficiary`).
 - Remove beneficiary after confirmation (`remove_beneficiary`).
+- Email beneficiary their certificate showing unit allocation (`send_certificate`).
 
 Related pages:
 - Minutes for substantive changes.
-- Communications for beneficiary interactions.
+- Communications for beneficiary interactions (certificate emails are logged here automatically).
 - Vault for legal/source documents.
 
 ## Schedule A (`/schedule-a`)

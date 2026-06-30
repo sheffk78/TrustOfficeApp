@@ -5,6 +5,7 @@ Postmark integration for transactional emails
 
 import os
 import logging
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 from postmarker.core import PostmarkClient
 from email_templates import render_template, TEMPLATES
@@ -634,6 +635,39 @@ Amount: ${amount}
             name=name,
             step=1,
             download_url=download_url,
+        )
+
+    async def send_certificate_notice(
+        self,
+        to_email: str,
+        beneficiary_name: str,
+        trust_name: str,
+        certificate_number: str,
+        units: int,
+        unit_label: str = "Certificate Unit",
+        percentage: float = 0,
+        issue_date: str = None,
+        notes: str = None,
+        from_user_name: str = None
+    ) -> Dict[str, Any]:
+        """Send certificate of trust units notice to a beneficiary"""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="certificate_notice",
+            template_data={
+                "beneficiary_name": beneficiary_name,
+                "trust_name": trust_name,
+                "certificate_number": certificate_number,
+                "units": units,
+                "unit_label": unit_label,
+                "percentage": percentage,
+                "issue_date": issue_date or datetime.now().strftime("%Y-%m-%d"),
+                "notes": notes,
+                "sender_name": from_user_name or "Trustee"
+            },
+            to_name=beneficiary_name,
+            tag="certificate_notice",
+            metadata={"email_type": "certificate_notice"}
         )
 
     async def send_distribution_notice_to_beneficiary(

@@ -145,6 +145,18 @@ ACTION_REGISTRY = {
             {"name": "reason", "type": "string", "required": False, "description": "Reason for removal"},
         ],
     },
+    "send_certificate": {
+        "type": "certificate_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Email a beneficiary their certificate showing trust unit allocation",
+        "api_endpoint": "POST /api/beneficiaries/send-certificate",
+        "fields": [
+            {"name": "beneficiary_name", "type": "string", "required": True, "description": "Name of the beneficiary to email (used to look up their certificate record)"},
+            {"name": "email", "type": "string", "required": False, "description": "Override email address; if not provided, uses the email on file for the beneficiary"},
+            {"name": "notes", "type": "string", "required": False, "description": "Optional personal note to include in the certificate email"},
+        ],
+    },
     "cancel_distribution": {
         "type": "distribution_cancel_preview",
         "requires_write": True,

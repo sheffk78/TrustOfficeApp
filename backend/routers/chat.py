@@ -438,6 +438,14 @@ ACTION_EXECUTION_MAP = {
             "reason": "reason",
         },
     },
+    "certificate_preview": {
+        "endpoint_type": "send_certificate",
+        "field_map": {
+            "beneficiary_name": "holder_name",
+            "email": "email",
+            "notes": "notes",
+        },
+    },
     "distribution_cancel_preview": {
         "endpoint_type": "distribution_cancel",
         "field_map": {
@@ -735,6 +743,85 @@ async def _execute_approved_action(
                 {"$set": {"status": "inactive", "deactivated_at": datetime.now(timezone.utc).isoformat()}}
             )
             return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "removed"}
+
+        elif endpoint_type == "send_certificate":
+            # Look up the beneficiary's active certificate(s) and email them
+            holder_name = mapped_data.get("holder_name", "")
+            override_email = mapped_data.get("email", "")
+
+            # Find active certificates for this holder
+            certs = await db.trust_unit_certificates.find(
+                {
+                    "trust_id": trust_id,
+                    "holder_name": {"$regex": f"^{holder_name}$", "$options": "i"},
+                    "status": "active",
+                },
+                {"_id": 0}
+            ).to_list(100)
+
+            if not certs:
+                return {"success": False, "error": f"No active certificate found for beneficiary '{holder_name}'. Add them as a beneficiary first."}
+
+            # Aggregate units across all certificates for this holder
+            total_units = sum(c.get("units", 0) for c in certs)
+            first_cert = certs[0]
+            cert_number = first_cert.get("certificate_number", "N/A")
+            cert_email = override_email or first_cert.get("email", "")
+
+            if not cert_email:
+                return {"success": False, "error": f"No email address on file for '{holder_name}'. Provide an email address or update the beneficiary record first."}
+
+            # Get trust name and unit settings
+            trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "name": 1})
+            trust_name = trust.get("name", "Your Trust") if trust else "Your Trust"
+
+            settings = await db.trust_unit_settings.find_one({"trust_id": trust_id})
+            total_authorized = settings.get("total_authorized_units", 0) if settings else 0
+            unit_label = settings.get("unit_label", "Certificate Unit") if settings else "Certificate Unit"
+            percentage = (total_units / total_authorized * 100) if total_authorized > 0 else 0
+
+            # Get trustee name (the user's name)
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1})
+            from_name = user_doc.get("name", "Trustee") if user_doc else "Trustee"
+
+            # Send the certificate email
+            import email_service
+            result = await email_service.send_certificate_notice(
+                to_email=cert_email,
+                beneficiary_name=holder_name,
+                trust_name=trust_name,
+                certificate_number=cert_number,
+                units=total_units,
+                unit_label=unit_label,
+                percentage=percentage,
+                issue_date=first_cert.get("issue_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                notes=mapped_data.get("notes"),
+                from_user_name=from_name,
+            )
+
+            # Log the communication
+            comm_doc = {
+                "communication_id": f"comm_{uuid.uuid4().hex[:12]}",
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "type": "email",
+                "subject": f"Certificate of Trust Units — {trust_name}",
+                "participants": [holder_name],
+                "notes": f"Certificate notice emailed to {holder_name} at {cert_email}. Certificate #{cert_number}, {total_units} units ({percentage:.2f}%).",
+                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.communications.insert_one(comm_doc)
+
+            return {
+                "success": True,
+                "record_id": first_cert["certificate_id"],
+                "endpoint": "certificate_notice",
+                "action": "emailed",
+                "email_sent_to": cert_email,
+                "units": total_units,
+                "percentage": round(percentage, 2),
+            }
 
         elif endpoint_type == "distribution_cancel":
             # Find matching distribution

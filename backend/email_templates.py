@@ -898,6 +898,52 @@ The TrustOffice Team
         """
     },
 
+    # Certificate Notice to Beneficiary
+    "certificate_notice": {
+        "subject": lambda data: f"Certificate of Trust Units — {data.get('trust_name', 'Your Trust')}",
+        "html": lambda data: _base_template(f"""
+            <h2>Certificate of Trust Units</h2>
+            <p>Dear {data.get('beneficiary_name', 'Beneficiary')},</p>
+            <p>This certificate confirms your unit allocation in the <strong>{data.get('trust_name', 'Trust')}</strong>.</p>
+
+            <div class="task-card">
+                <h3>Certificate Details</h3>
+                <p><span class="label">Certificate Number:</span> <span class="value">{data.get('certificate_number', 'N/A')}</span></p>
+                <p><span class="label">Holder:</span> <span class="value">{data.get('beneficiary_name', 'N/A')}</span></p>
+                <p><span class="label">Units Allocated:</span> <span class="value">{data.get('units', 'N/A'):,}</span></p>
+                <p><span class="label">Unit Label:</span> <span class="value">{data.get('unit_label', 'Certificate Unit')}</span></p>
+                <p><span class="label">Percentage of Total:</span> <span class="value">{data.get('percentage', 0):.2f}%</span></p>
+                <p><span class="label">Issue Date:</span> <span class="value">{data.get('issue_date', 'N/A')}</span></p>
+                {f'<p><span class="label">Notes:</span> <span class="value">{data.get("notes", "")}</span></p>' if data.get('notes') else ''}
+            </div>
+
+            <p>This certificate was issued by the trustee of the trust. If you have questions about your unit allocation, please contact the trustee directly.</p>
+
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Certificate of Trust Units — {data.get('trust_name', 'Your Trust')}
+
+Dear {data.get('beneficiary_name', 'Beneficiary')},
+
+This certificate confirms your unit allocation in the {data.get('trust_name', 'Trust')}.
+
+Certificate Details:
+- Certificate Number: {data.get('certificate_number', 'N/A')}
+- Holder: {data.get('beneficiary_name', 'N/A')}
+- Units Allocated: {data.get('units', 0):,}
+- Unit Label: {data.get('unit_label', 'Certificate Unit')}
+- Percentage of Total: {data.get('percentage', 0):.2f}%
+- Issue Date: {data.get('issue_date', 'N/A')}
+{'- Notes: ' + data.get('notes', '') if data.get('notes') else ''}
+
+This certificate was issued by the trustee of the trust. If you have questions about your unit allocation, please contact the trustee directly.
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
     # Distribution Notice to Beneficiary
     "distribution_notice": {
         "subject": lambda data: f"Distribution Notice — {data.get('trust_name', 'Your Trust')}",

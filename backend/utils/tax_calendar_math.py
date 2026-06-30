@@ -135,11 +135,6 @@ def _days_remaining(due_date_str: str) -> int:
         return 999
 
 
-# Rule constants for import compatibility
-CALENDAR_RULES = {}
-FISCAL_RULES = {}
-
-
 def _mock_uuid():
     """Deterministic uuid for tests."""
     import uuid as _uuid

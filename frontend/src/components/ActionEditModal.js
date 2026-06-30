@@ -36,6 +36,11 @@ const FIELD_DEFS = {
     { key: 'beneficiary_name', label: 'Beneficiary Name', type: 'text' },
     { key: 'reason', label: 'Reason for Removal', type: 'text' },
   ],
+  certificate_preview: [
+    { key: 'beneficiary_name', label: 'Beneficiary Name', type: 'text' },
+    { key: 'email', label: 'Email (leave blank to use email on file)', type: 'email' },
+    { key: 'notes', label: 'Personal Note (optional)', type: 'textarea' },
+  ],
   distribution_cancel_preview: [
     { key: 'beneficiary_name', label: 'Beneficiary Name', type: 'text' },
     { key: 'amount', label: 'Amount', type: 'number' },
@@ -145,6 +150,7 @@ const ActionEditModal = ({ card, onSave, onCancel }) => {
     switch (card.type) {
       case 'beneficiary_update_preview': return 'Update Beneficiary';
       case 'beneficiary_removal_preview': return 'Remove Beneficiary';
+      case 'certificate_preview': return 'Send Certificate';
       case 'distribution_cancel_preview': return 'Cancel Distribution';
       case 'document_upload_preview': return 'Upload Document';
       case 'compensation_plan_preview': return 'Set Up Compensation';

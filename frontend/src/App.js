@@ -19,7 +19,7 @@ import ExpensesPage from "@/pages/ExpensesPage";
 import GovernancePage from "@/pages/GovernancePage";
 import SettingsPage from "@/pages/SettingsPage";
 import OnboardingPage from "@/pages/OnboardingPage";
-import CalendarPage from "@/pages/CalendarPage";
+import TrustCalendarPage from "@/pages/TrustCalendarPage";
 import EntityDetailPage from "@/pages/EntityDetailPage";
 import StructuresPage from "@/pages/StructuresPage";
 import CompensationPage from "@/pages/CompensationPage";
@@ -33,7 +33,6 @@ import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
 import StatsPage from "@/pages/StatsPage";
-import TaxCalendarPage from "@/pages/TaxCalendarPage";
 import StateCompliancePage from "@/pages/StateCompliancePage";
 import InvestmentsPage from "@/pages/InvestmentsPage";
 import CommunicationsPage from "@/pages/CommunicationsPage";
@@ -183,7 +182,7 @@ const AppRouter = () => {
       } />
       <Route path="/calendar" element={
         <SubscriptionProtectedRoute>
-          <CalendarPage />
+          <TrustCalendarPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/minutes" element={
@@ -278,9 +277,7 @@ const AppRouter = () => {
         </SubscriptionProtectedRoute>
       } />
       <Route path="/tax-calendar" element={
-        <SubscriptionProtectedRoute>
-          <TaxCalendarPage />
-        </SubscriptionProtectedRoute>
+        <Navigate to="/calendar" replace />
       } />
       <Route path="/state-compliance" element={
         <SubscriptionProtectedRoute>
