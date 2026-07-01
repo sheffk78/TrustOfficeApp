@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
+import { Sidebar } from '@/components/Sidebar';
 import {
   FileText, Shield, HeartPulse, Landmark, Building2, Users,
   ClipboardList, Mail, BookOpen, FilePen, Home, Car,
-  Printer, ChevronDown, ChevronUp, ArrowLeft, Download
+  Printer
 } from 'lucide-react';
 
 // ==================== SECTION DATA ====================
@@ -118,7 +118,6 @@ const PRINT_STYLES = `
 
 const PrintableBinderPage = () => {
   const { user, selectedTrust } = useAuth();
-  const navigate = useNavigate();
   const [coverData, setCoverData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePrint, setActivePrint] = useState(null);
@@ -153,19 +152,13 @@ const PrintableBinderPage = () => {
   return (
     <>
       <style>{PRINT_STYLES}</style>
-      <div className="no-print min-h-screen bg-subtle-bg dark:bg-slate-900 p-4 md:p-8">
-        {/* Header */}
-        <div className="max-w-5xl mx-auto">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="mb-4 flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Dashboard
-          </button>
-
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Printable Binder Tools
-          </h1>
+      <div className="main-layout">
+        <Sidebar />
+        <main className="main-content no-print">
+          <div className="page-container max-w-5xl mx-auto">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Printable Binder Tools
+            </h1>
           <div className="flex items-center gap-2 mb-2">
             <PageHelpButton
               items={[
@@ -343,6 +336,7 @@ const PrintableBinderPage = () => {
             </div>
           </div>
         </div>
+      </main>
       </div>
 
       {/* ==================== PRINTABLE AREAS ==================== */}
