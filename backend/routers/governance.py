@@ -21,6 +21,78 @@ from routers.tasks import CHECKLIST_TEMPLATES
 router = APIRouter(tags=["governance"])
 
 
+# ==================== CRITERIA CONFIG ====================
+
+CRITERIA_CONFIG = {
+    "Quarterly Minutes": {
+        "max_points": 15,
+        "insight_type": "warning",
+        "insight_title": "Missing Q Minutes",
+        "insight_desc": "Generate minutes this quarter to earn +{max_points} points",
+        "action_path": "/minutes/new",
+        "action_label": "Record Now",
+    },
+    "Task Compliance": {
+        "max_points": 15,
+        "insight_type": "error",
+        "insight_title": "Overdue Tasks",
+        "insight_desc": "Complete overdue tasks to earn +{max_points} points",
+        "action_path": "/calendar",
+        "action_label": "View Tasks",
+    },
+    "Compensation Alignment": {
+        "max_points": 15,
+        "insight_type": "error",
+        "insight_title": "Compensation Over Plan",
+        "insight_desc": "YTD compensation exceeds approved amount",
+        "action_path": "/compensation",
+        "action_label": "Review",
+    },
+    "Distribution Documentation": {
+        "max_points": 15,
+        "insight_type": "warning",
+        "insight_title": "Distribution Documentation",
+        "insight_desc": "Log distributions and document benevolence details",
+        "action_path": "/distributions",
+        "action_label": "Review Distributions",
+    },
+    "Annual Review": {
+        "max_points": 10,
+        "insight_type": "warning",
+        "insight_title": "Annual Review Due",
+        "insight_desc": "Complete annual review for +{max_points} points",
+        "action_path": "/calendar",
+        "action_label": "Schedule Review",
+    },
+    "Asset Valuation Freshness": {
+        "max_points": 15,
+        "insight_type": "warning",
+        "insight_title": "Asset Re-Valuation Needed",
+        "insight_desc": "Update asset valuations to earn +{max_points} points",
+        "action_path": "/schedule-a",
+        "action_label": "Update Assets",
+    },
+    "Transaction Classification": {
+        "max_points": 15,
+        "insight_type": "warning",
+        "insight_title": "Classify Transactions",
+        "insight_desc": "Classify untagged transactions to earn +{max_points} points",
+        "action_path": "/transactions",
+        "action_label": "Review Transactions",
+    },
+    "Separation Alert Health": {
+        "max_points": 15,
+        "insight_type": "error",
+        "insight_title": "Active Separation Alerts",
+        "insight_desc": "Review and resolve separation alerts to earn +{max_points} points",
+        "action_path": "/risk",
+        "action_label": "View Alerts",
+    },
+}
+
+TOTAL_MAX_POINTS = sum(c["max_points"] for c in CRITERIA_CONFIG.values())  # 115
+
+
 # ==================== HELPER FUNCTIONS ====================
 
 def get_quarter_start(dt: datetime) -> datetime:
@@ -79,35 +151,22 @@ async def ensure_transaction_review_task(trust_id: str, user_id: str):
             })
 
 
-async def calculate_health_score(trust_id: str, user_id: str) -> dict:
-    """
-    Calculate governance health score using 6 criteria:
-    """
-    # Ensure monthly transaction review task exists for this trust
-    await ensure_transaction_review_task(trust_id, user_id)
-    
+async def _gather_score_data(trust_id: str, user_id: str) -> dict:
+    """Async: gather all raw DB data needed for health score. Returns dict of raw metrics."""
     now = datetime.now(timezone.utc)
-    criteria = []
-    total_score = 0
-    
-    # 1. Quarterly Minutes (+20)
     quarter_start = get_quarter_start(now)
+    year_start = get_year_start(now)
+    one_year_ago = (now - timedelta(days=365))
+    twelve_months_ago = one_year_ago
+
+    # 1. Quarterly Minutes
     quarterly_minutes = await db.minutes_records.count_documents({
         "trust_id": trust_id,
         "user_id": user_id,
         "created_at": {"$gte": quarter_start.isoformat()}
     })
-    quarterly_achieved = quarterly_minutes > 0
-    q_points = 20 if quarterly_achieved else 0
-    criteria.append(HealthScoreCriterion(
-        name="Quarterly Minutes",
-        description="Minutes generated this quarter",
-        points=q_points,
-        achieved=quarterly_achieved
-    ))
-    total_score += q_points
-    
-    # 2. Task Compliance (+20)
+
+    # 2. Task Compliance
     total_tasks = await db.governance_tasks.count_documents({
         "trust_id": trust_id,
         "user_id": user_id
@@ -118,31 +177,16 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         "completed_at": None,
         "due_date": {"$lt": now.isoformat()}
     })
-    
-    if total_tasks > 0:
-        task_compliance = overdue_tasks == 0
-        task_points = 20 if task_compliance else max(0, 20 - (overdue_tasks * 4))
-    else:
-        task_compliance = None
-        task_points = 0
-    
-    criteria.append(HealthScoreCriterion(
-        name="Task Compliance",
-        description="No overdue governance tasks" if total_tasks > 0 else "No governance tasks tracked yet",
-        points=task_points,
-        achieved=task_compliance if task_compliance is not None else False,
-        no_data=total_tasks == 0
-    ))
-    total_score += task_points
-    
-    # 3. Compensation Alignment (+20)
-    year_start = get_year_start(now)
+
+    # 3. Compensation Alignment
     comp_plan = await db.compensation_plans.find_one(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0},
         sort=[("effective_date", -1)]
     )
-    
+    ytd_payments = []
+    ytd_total = 0
+    approved_amount = 0
     if comp_plan:
         ytd_payments = await db.compensation_payments.find(
             {"trust_id": trust_id, "user_id": user_id, "date": {"$gte": year_start.isoformat()}},
@@ -150,42 +194,143 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         ).to_list(1000)
         ytd_total = sum(p.get("amount", 0) for p in ytd_payments)
         approved_amount = comp_plan.get("annual_approved_amount") or comp_plan.get("annual_fee") or comp_plan.get("annual_amount", 0)
-        comp_aligned = ytd_total <= approved_amount
-        comp_points = 20 if comp_aligned else 0
-    else:
-        comp_aligned = None
-        comp_points = 0
-    
-    criteria.append(HealthScoreCriterion(
-        name="Compensation Alignment",
-        description="YTD compensation within approved plan" if comp_plan else "No compensation plan set up yet",
-        points=comp_points,
-        achieved=comp_aligned if comp_aligned is not None else False,
-        no_data=comp_plan is None
-    ))
-    total_score += comp_points
-    
-    # 4. Distribution Documentation (+20)
+
+    # 4. Distribution Documentation
     dist_count = await db.distribution_records.count_documents({
         "trust_id": trust_id,
         "user_id": user_id
     })
-    
     benevolence_dists = await db.distribution_records.find({
         "trust_id": trust_id,
         "user_id": user_id,
         "is_benevolence": True
     }, {"_id": 0}).to_list(1000)
-    
+
+    # 5. Annual Review
+    annual_review = await db.governance_tasks.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "task_type": "annual_review",
+        "completed_at": {"$gte": one_year_ago.isoformat()}
+    }, {"_id": 0})
+
+    # 6. Asset Valuation Freshness
+    active_assets = await db.schedule_a_items.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active"
+    }, {"_id": 0, "description": 1, "last_valued_date": 1, "date_conveyed": 1}).to_list(1000)
+
+    # 7. Transaction Classification
+    total_txns = await db.transactions.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    classified_txns = 0
+    if total_txns > 0:
+        classified_txns = await db.transactions.count_documents({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "classification": {"$exists": True, "$ne": None, "$ne": ""}
+        })
+
+    # 8. Separation Alert Health
+    active_alert_count = await db.separation_alerts.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active"
+    })
+
+    return {
+        "now": now,
+        "quarterly_minutes": quarterly_minutes,
+        "total_tasks": total_tasks,
+        "overdue_tasks": overdue_tasks,
+        "comp_plan": comp_plan,
+        "ytd_total": ytd_total,
+        "approved_amount": approved_amount,
+        "dist_count": dist_count,
+        "benevolence_dists": benevolence_dists,
+        "annual_review": annual_review,
+        "active_assets": active_assets,
+        "twelve_months_ago": twelve_months_ago,
+        "total_txns": total_txns,
+        "classified_txns": classified_txns,
+        "active_alert_count": active_alert_count,
+    }
+
+
+def _compute_health_score(data: dict) -> dict:
+    """Pure sync: compute criteria, points, color from gathered data. No DB calls."""
+    now = data["now"]
+    criteria = []
+    total_score = 0
+
+    # 1. Quarterly Minutes (+15)
+    mp = CRITERIA_CONFIG["Quarterly Minutes"]["max_points"]
+    quarterly_achieved = data["quarterly_minutes"] > 0
+    q_points = mp if quarterly_achieved else 0
+    criteria.append(HealthScoreCriterion(
+        name="Quarterly Minutes",
+        description="Minutes generated this quarter",
+        points=q_points,
+        max_points=mp,
+        achieved=quarterly_achieved,
+        no_data=False
+    ))
+    total_score += q_points
+
+    # 2. Task Compliance (+15)
+    mp = CRITERIA_CONFIG["Task Compliance"]["max_points"]
+    total_tasks = data["total_tasks"]
+    overdue_tasks = data["overdue_tasks"]
+    if total_tasks > 0:
+        task_compliance = overdue_tasks == 0
+        task_points = mp if task_compliance else max(0, mp - (overdue_tasks * 3))
+    else:
+        task_compliance = None
+        task_points = 0
+    criteria.append(HealthScoreCriterion(
+        name="Task Compliance",
+        description="No overdue governance tasks" if total_tasks > 0 else "No governance tasks tracked yet",
+        points=task_points,
+        max_points=mp,
+        achieved=task_compliance if task_compliance is not None else False,
+        no_data=total_tasks == 0
+    ))
+    total_score += task_points
+
+    # 3. Compensation Alignment (+15)
+    mp = CRITERIA_CONFIG["Compensation Alignment"]["max_points"]
+    comp_plan = data["comp_plan"]
+    if comp_plan:
+        comp_aligned = data["ytd_total"] <= data["approved_amount"]
+        comp_points = mp if comp_aligned else 0
+    else:
+        comp_aligned = None
+        comp_points = 0
+    criteria.append(HealthScoreCriterion(
+        name="Compensation Alignment",
+        description="YTD compensation within approved plan" if comp_plan else "No compensation plan set up yet",
+        points=comp_points,
+        max_points=mp,
+        achieved=comp_aligned if comp_aligned is not None else False,
+        no_data=comp_plan is None
+    ))
+    total_score += comp_points
+
+    # 4. Distribution Documentation (+15)
+    mp = CRITERIA_CONFIG["Distribution Documentation"]["max_points"]
+    dist_count = data["dist_count"]
+    benevolence_dists = data["benevolence_dists"]
     benevolence_count = len(benevolence_dists)
     incomplete_benevolence = 0
-    
     for bd in benevolence_dists:
         if not bd.get("benevolence_recipient_name") or not bd.get("benevolence_need_description"):
             incomplete_benevolence += 1
         elif not bd.get("approved_at") and not bd.get("minutes_record_id"):
             incomplete_benevolence += 1
-    
+
     if dist_count == 0:
         dist_documented = False
         dist_points = 0
@@ -193,53 +338,46 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     elif benevolence_count > 0 and incomplete_benevolence > 0:
         dist_documented = True
         completeness_ratio = (benevolence_count - incomplete_benevolence) / benevolence_count
-        dist_points = int(20 * (0.5 + 0.5 * completeness_ratio))
+        dist_points = int(mp * (0.5 + 0.5 * completeness_ratio))
         dist_description = f"Distributions logged; {incomplete_benevolence}/{benevolence_count} benevolence distributions need documentation"
     else:
         dist_documented = True
-        dist_points = 20
+        dist_points = mp
         if benevolence_count > 0:
             dist_description = f"All distributions documented ({benevolence_count} benevolence distributions fully documented)"
         else:
             dist_description = "Distributions logged"
-    
     criteria.append(HealthScoreCriterion(
         name="Distribution Documentation",
         description=dist_description,
         points=dist_points,
-        achieved=dist_documented
+        max_points=mp,
+        achieved=dist_documented,
+        no_data=dist_count == 0
     ))
     total_score += dist_points
-    
-    # 5. Annual Review (+20)
-    one_year_ago = (now - timedelta(days=365)).isoformat()
-    annual_review = await db.governance_tasks.find_one({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "task_type": "annual_review",
-        "completed_at": {"$gte": one_year_ago}
-    }, {"_id": 0})
-    annual_done = annual_review is not None
-    annual_points = 20 if annual_done else 0
+
+    # 5. Annual Review (+10)
+    mp = CRITERIA_CONFIG["Annual Review"]["max_points"]
+    annual_done = data["annual_review"] is not None
+    annual_points = mp if annual_done else 0
     criteria.append(HealthScoreCriterion(
         name="Annual Review",
         description="Annual review completed in last 12 months",
         points=annual_points,
-        achieved=annual_done
+        max_points=mp,
+        achieved=annual_done,
+        no_data=False
     ))
     total_score += annual_points
-    
-    # 6. Asset Valuation Freshness (+20) - all active Schedule A assets have recent valuations
-    twelve_months_ago = (now - timedelta(days=365))
-    active_assets = await db.schedule_a_items.find({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "status": "active"
-    }, {"_id": 0, "description": 1, "last_valued_date": 1, "date_conveyed": 1}).to_list(1000)
 
+    # 6. Asset Valuation Freshness (+15)
+    mp = CRITERIA_CONFIG["Asset Valuation Freshness"]["max_points"]
+    active_assets = data["active_assets"]
+    twelve_months_ago = data["twelve_months_ago"]
     total_assets = len(active_assets)
     if total_assets == 0:
-        av_points = 10
+        av_points = 0
         av_achieved = False
         av_desc = "No assets on Schedule A yet"
         av_no_data = True
@@ -257,28 +395,115 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
                 continue
             if valuation_ref < twelve_months_ago:
                 stale_count += 1
-
         fresh_count = total_assets - stale_count
         if stale_count == 0:
-            av_points = 20
+            av_points = mp
             av_achieved = True
         else:
-            av_points = int(20 * fresh_count / total_assets)
+            av_points = int(mp * fresh_count / total_assets)
             av_achieved = False
         av_desc = f"{stale_count} of {total_assets} asset(s) need re-valuation (last valued >12 months ago)"
         av_no_data = False
-
     criteria.append(HealthScoreCriterion(
         name="Asset Valuation Freshness",
         description=av_desc,
         points=av_points,
+        max_points=mp,
         achieved=av_achieved,
         no_data=av_no_data
     ))
     total_score += av_points
-    
+
+    # 7. Transaction Classification (+15)
+    mp = CRITERIA_CONFIG["Transaction Classification"]["max_points"]
+    total_txns = data["total_txns"]
+    classified_txns = data["classified_txns"]
+    if total_txns == 0:
+        tc_points = 0
+        tc_achieved = False
+        tc_desc = "No transactions to classify yet"
+        tc_no_data = True
+    else:
+        classified_ratio = classified_txns / total_txns
+        tc_points = int(mp * classified_ratio)
+        tc_achieved = classified_ratio >= 1.0
+        tc_desc = f"{classified_txns}/{total_txns} transactions classified"
+        tc_no_data = False
+    criteria.append(HealthScoreCriterion(
+        name="Transaction Classification",
+        description=tc_desc,
+        points=tc_points,
+        max_points=mp,
+        achieved=tc_achieved,
+        no_data=tc_no_data
+    ))
+    total_score += tc_points
+
+    # 8. Separation Alert Health (+15)
+    mp = CRITERIA_CONFIG["Separation Alert Health"]["max_points"]
+    total_txns = data["total_txns"]
+    active_alert_count = data["active_alert_count"]
+    if total_txns == 0:
+        sa_points = 0
+        sa_achieved = False
+        sa_desc = "No transactions to monitor for separation yet"
+        sa_no_data = True
+    elif active_alert_count == 0:
+        sa_points = mp
+        sa_achieved = True
+        sa_desc = "No active separation alerts"
+        sa_no_data = False
+    else:
+        sa_points = max(0, mp - active_alert_count * 3)
+        sa_achieved = False
+        sa_desc = f"{active_alert_count} active separation alert(s)"
+        sa_no_data = False
+    criteria.append(HealthScoreCriterion(
+        name="Separation Alert Health",
+        description=sa_desc,
+        points=sa_points,
+        max_points=mp,
+        achieved=sa_achieved,
+        no_data=sa_no_data
+    ))
+    total_score += sa_points
+
+    # Determine color (96/72 thresholds as absolute values)
+    if total_score >= 96:
+        color = HealthColor.green
+    elif total_score >= 72:
+        color = HealthColor.yellow
+    else:
+        color = HealthColor.red
+
+    return {
+        "criteria": criteria,
+        "total_score": total_score,
+        "max_score": TOTAL_MAX_POINTS,
+        "color": color,
+        "now": now,
+    }
+
+
+async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: bool = True) -> dict:
+    """
+    Calculate governance health score using 8 criteria.
+    Orchestrator: gathers data, computes score, optionally saves snapshot.
+    """
+    # Ensure monthly transaction review task exists for this trust
+    await ensure_transaction_review_task(trust_id, user_id)
+
+    # Gather all DB data
+    data = await _gather_score_data(trust_id, user_id)
+
+    # Compute score (pure, no DB)
+    result = _compute_health_score(data)
+    criteria = result["criteria"]
+    total_score = result["total_score"]
+    color = result["color"]
+    now = result["now"]
+
     # Auto-clear dismissals for criteria that are now achieved
-    # (Natural restore when user completes the action)
     achieved_names = [c.name for c in criteria if c.achieved]
     if achieved_names:
         await db.dismissed_insights.delete_many({
@@ -286,30 +511,24 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
             "user_id": user_id,
             "criterion_name": {"$in": achieved_names}
         })
-    
-    # Determine color
-    if total_score >= 96:
-        color = HealthColor.green
-    elif total_score >= 72:
-        color = HealthColor.yellow
-    else:
-        color = HealthColor.red
-    
-    # Save snapshot
-    snapshot = {
-        "snapshot_id": f"health_{uuid.uuid4().hex[:12]}",
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "score_value": total_score,
-        "color": color.value,
-        "calculated_at": now.isoformat()
-    }
-    await db.health_score_snapshots.insert_one(snapshot)
-    
+
+    # Save snapshot only when requested (governance endpoint only)
+    if save_snapshot:
+        snapshot = {
+            "snapshot_id": f"health_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "score_value": total_score,
+            "color": color.value,
+            "criteria_summary": {c.name: c.achieved for c in criteria},
+            "calculated_at": now.isoformat()
+        }
+        await db.health_score_snapshots.insert_one(snapshot)
+
     return {
         "trust_id": trust_id,
         "total_score": total_score,
-        "max_score": 120,
+        "max_score": TOTAL_MAX_POINTS,
         "color": color.value,
         "criteria": [c.model_dump() for c in criteria],
         "calculated_at": now.isoformat()
@@ -321,79 +540,40 @@ def generate_governance_insights(criteria: List[dict]) -> List[GovernanceInsight
     insights = []
     
     for c in criteria:
-        if not c["achieved"]:
-            if c["name"] == "Quarterly Minutes":
-                insights.append(GovernanceInsight(
-                    type="warning",
-                    criterion_name="Quarterly Minutes",
-                    title="Missing Q Minutes",
-                    description="Generate minutes this quarter to earn +20 points",
-                    action_path="/minutes/new",
-                    action_label="Record Now",
-                    points=20
-                ))
-            elif c["name"] == "Task Compliance":
-                insights.append(GovernanceInsight(
-                    type="error",
-                    criterion_name="Task Compliance",
-                    title="Overdue Tasks",
-                    description="Complete overdue tasks to earn +20 points",
-                    action_path="/calendar",
-                    action_label="View Tasks",
-                    points=20
-                ))
-            elif c["name"] == "Compensation Alignment":
-                insights.append(GovernanceInsight(
-                    type="error",
-                    criterion_name="Compensation Alignment",
-                    title="Compensation Over Plan",
-                    description="YTD compensation exceeds approved amount",
-                    action_path="/compensation",
-                    action_label="Review",
-                    points=20
-                ))
-            elif c["name"] == "Distribution Documentation":
+        if not c["achieved"] and not c.get("no_data", False):
+            cfg = CRITERIA_CONFIG.get(c["name"])
+            if not cfg:
+                continue
+            max_points = cfg["max_points"]
+            recoverable = max_points - c.get("points", 0)
+            if recoverable <= 0:
+                continue
+            
+            # Special cases with custom descriptions
+            if c["name"] == "Distribution Documentation":
                 desc = c.get("description", "")
                 if "benevolence" in desc.lower():
-                    insights.append(GovernanceInsight(
-                        type="warning",
-                        criterion_name="Distribution Documentation",
-                        title="Benevolence Documentation Needed",
-                        description=desc,
-                        action_path="/benevolence/log",
-                        action_label="Review Benevolence",
-                        points=c.get("max_points", 20) - c.get("points", 0)
-                    ))
+                    description = desc
                 else:
-                    insights.append(GovernanceInsight(
-                        type="info",
-                        criterion_name="Distribution Documentation",
-                        title="No Distributions Logged",
-                        description="Log your first distribution to earn +20 points",
-                        action_path="/distributions",
-                        action_label="Add Distribution",
-                        points=20
-                    ))
-            elif c["name"] == "Annual Review":
-                insights.append(GovernanceInsight(
-                    type="warning",
-                    criterion_name="Annual Review",
-                    title="Annual Review Due",
-                    description="Complete annual review for +20 points",
-                    action_path="/calendar",
-                    action_label="Schedule Review",
-                    points=20
-                ))
+                    description = f"Log your first distribution to earn +{max_points} points"
             elif c["name"] == "Asset Valuation Freshness":
-                insights.append(GovernanceInsight(
-                    type="warning",
-                    criterion_name="Asset Valuation Freshness",
-                    title="Asset Re-Valuation Needed",
-                    description=c.get("description", "Update asset valuations to earn +20 points"),
-                    action_path="/schedule-a",
-                    action_label="Update Assets",
-                    points=20
-                ))
+                description = c.get("description", cfg["insight_desc"].format(max_points=max_points))
+            elif c["name"] == "Transaction Classification":
+                description = c.get("description", cfg["insight_desc"].format(max_points=max_points))
+            elif c["name"] == "Separation Alert Health":
+                description = c.get("description", cfg["insight_desc"].format(max_points=max_points))
+            else:
+                description = cfg["insight_desc"].format(max_points=max_points)
+            
+            insights.append(GovernanceInsight(
+                type=cfg["insight_type"],
+                criterion_name=c["name"],
+                title=cfg["insight_title"],
+                description=description,
+                action_path=cfg["action_path"],
+                action_label=cfg["action_label"],
+                points=recoverable
+            ))
     
     return insights
 
@@ -570,19 +750,7 @@ async def get_governance_health(trust_id: str, user: dict = Depends(get_current_
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
-    health = await calculate_health_score(trust_id, user["user_id"])
-    
-    # Store snapshot for history tracking
-    snapshot_id = f"snap_{uuid.uuid4().hex[:12]}"
-    await db.health_score_snapshots.insert_one({
-        "snapshot_id": snapshot_id,
-        "trust_id": trust_id,
-        "user_id": user["user_id"],
-        "score_value": health["total_score"],
-        "color": health["color"],
-        "criteria_summary": {c["name"]: c["achieved"] for c in health["criteria"]},
-        "calculated_at": datetime.now(timezone.utc).isoformat()
-    })
+    health = await calculate_health_score(trust_id, user["user_id"], save_snapshot=True)
     
     return HealthScoreResponse(**health)
 
@@ -756,7 +924,7 @@ async def get_dashboard(
     trust_id = trust["trust_id"]
     trust_name = trust.get("name", "Unnamed Trust")
     
-    health_data = await calculate_health_score(trust_id, user_id)
+    health_data = await calculate_health_score(trust_id, user_id, save_snapshot=False)
     health_score = HealthScoreResponse(**health_data)
     
     onboarding_state = await get_onboarding_state(user_id, trust_id)

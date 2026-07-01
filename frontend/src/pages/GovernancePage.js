@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -15,8 +16,11 @@ import {
   TrendingUp,
   TrendingDown,
   AlertCircle,
+  AlertTriangle,
   RefreshCw,
-  Package
+  Package,
+  ArrowRight,
+  ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
@@ -96,7 +100,7 @@ export default function GovernancePage() {
   // Calculate chart dimensions
   const chartHeight = 120;
   const chartWidth = 100;
-  const maxScore = 120;
+  const maxScore = 115;
 
   // Generate chart points
   const getChartPoints = () => {
@@ -194,7 +198,7 @@ export default function GovernancePage() {
                           {governance?.total_score || 0}
                         </span>
                         <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
-                          / 120
+                          / 115
                         </span>
                       </div>
                       <div className="mt-4 flex items-center justify-center gap-2">
@@ -327,7 +331,7 @@ export default function GovernancePage() {
                       
                       {/* Score labels */}
                       <div className="absolute right-2 top-8 text-[10px] text-muted-foreground font-mono flex flex-col justify-between h-32">
-                        <span>120</span>
+                        <span>115</span>
                         <span>60</span>
                         <span>0</span>
                       </div>
@@ -335,6 +339,110 @@ export default function GovernancePage() {
                   )}
                 </div>
               </div>
+
+              {/* Risk Overview */}
+              {governance?.criteria && (() => {
+                const atRisk = governance.criteria.filter(c => !c.achieved && !c.no_data);
+                const missingPoints = governance.criteria.reduce((sum, c) => sum + ((c.max_points || 15) - c.points), 0);
+                const criticalCount = atRisk.filter(c => c.points === 0).length;
+                const partialCount = atRisk.filter(c => c.points > 0 && c.points < (c.max_points || 15)).length;
+
+                if (atRisk.length === 0) {
+                  return (
+                    <div className="card-trust mb-8 border-l-4 border-l-success">
+                      <div className="flex items-center gap-3 p-4">
+                        <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
+                        <div>
+                          <h3 className="font-serif text-lg text-navy">Risk Overview</h3>
+                          <p className="text-sm text-success">
+                            All criteria are met. Your trust is in good standing across all 6 areas.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="card-trust mb-8" data-testid="risk-overview">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-error/10 flex items-center justify-center">
+                          <ShieldAlert className="w-5 h-5 text-error" />
+                        </div>
+                        <div>
+                          <h3 className="font-serif text-lg text-navy">Risk Overview</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {missingPoints} points missing across {atRisk.length} area{atRisk.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {criticalCount > 0 && (
+                          <div className="text-center">
+                            <p className="font-mono text-2xl text-error">{criticalCount}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Critical</p>
+                          </div>
+                        )}
+                        {partialCount > 0 && (
+                          <div className="text-center">
+                            <p className="font-mono text-2xl text-warning">{partialCount}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Partial</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {atRisk
+                        .sort((a, b) => ((b.max_points || 15) - b.points) - ((a.max_points || 15) - a.points))
+                        .map((criterion, index) => {
+                          const pointsLost = (criterion.max_points || 15) - criterion.points;
+                          const isCritical = criterion.points === 0;
+                          return (
+                            <div
+                              key={index}
+                              className={`flex items-center justify-between p-3 border ${
+                                isCritical ? 'border-error/20 bg-error/5' : 'border-warning/20 bg-warning/5'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                {isCritical ? (
+                                  <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
+                                ) : (
+                                  <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0" />
+                                )}
+                                <div>
+                                  <p className={`font-medium text-sm ${isCritical ? 'text-navy' : 'text-navy'}`}>
+                                    {criterion.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">{criterion.description}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                <span className={`font-mono text-sm ${isCritical ? 'text-error' : 'text-warning'}`}>
+                                  -{pointsLost} pts
+                                </span>
+                                <span className="font-mono text-xs text-muted-foreground">
+                                  {criterion.points}/{criterion.max_points || 15}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-navy/10">
+                      <Link
+                        to="/risk"
+                        className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                      >
+                        View Full Risk Dashboard <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Scoring Guide */}
               <div className="card-trust">
@@ -414,7 +522,7 @@ export default function GovernancePage() {
                   <div className="flex gap-6">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-success"></div>
-                      <span className="text-sm">96-120: Excellent</span>
+                      <span className="text-sm">96-115: Excellent</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-warning"></div>

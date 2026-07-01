@@ -193,7 +193,7 @@ async def get_risk_dashboard(trust_id: str, user: dict = Depends(get_current_use
             })
 
     # === SEPARATION ALERTS (existing) ===
-    alert_count = await db.alerts.count_documents({"trust_id": trust_id, "status": "active"})
+    alert_count = await db.separation_alerts.count_documents({"trust_id": trust_id, "status": "active"})
     if alert_count > 0:
         risks.append({
             "type": "separation_alert",

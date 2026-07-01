@@ -391,12 +391,12 @@ class TestGovernanceHealthScoreBenevolence:
                 dist_criterion = criterion
                 break
         
-        # Points should be between 0 and 20
-        assert 0 <= dist_criterion["points"] <= 20
+        # Points should be between 0 and 15 (Distribution Documentation max_points)
+        assert 0 <= dist_criterion["points"] <= 15
         
         # If there are incomplete benevolence distributions, points should be reduced
-        print(f"PASS: Distribution Documentation points: {dist_criterion['points']}/20")
-        if dist_criterion["points"] < 20:
+        print(f"PASS: Distribution Documentation points: {dist_criterion['points']}/15")
+        if dist_criterion["points"] < 15:
             print(f"  - Points reduced due to incomplete documentation")
         else:
             print(f"  - Full points - all documentation complete")

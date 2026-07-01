@@ -165,13 +165,13 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
                 <span className={`font-serif text-4xl font-bold ${scoreColor(healthData.total_score ?? 0)}`}>
                   {healthData.total_score ?? '—'}
                 </span>
-                <span className="text-xs text-muted-foreground">/{healthData.max_score || 120}</span>
+                <span className="text-xs text-muted-foreground">/{healthData.max_score || 115}</span>
               </div>
               {/* Score bar */}
               <div className="w-full h-2 bg-navy/10 dark:bg-white/10 mb-3">
                 <div
                   className={`h-full ${scoreBarColor(healthData.total_score ?? 0)} transition-all duration-500`}
-                  style={{ width: `${Math.min(100, ((healthData.total_score ?? 0) / (healthData.max_score || 120)) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((healthData.total_score ?? 0) / (healthData.max_score || 115)) * 100)}%` }}
                 />
               </div>
               {/* Criteria breakdown */}

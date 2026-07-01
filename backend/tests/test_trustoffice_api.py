@@ -649,7 +649,7 @@ class TestOnboarding:
 
 
 class TestGovernanceHealthScore:
-    """Test 5-criteria governance health score"""
+    """Test 8-criteria governance health score"""
     
     @pytest.fixture(scope="class")
     def auth_session(self):
@@ -670,25 +670,25 @@ class TestGovernanceHealthScore:
             return trusts[0]["trust_id"]
         pytest.skip("No trusts available for testing")
     
-    def test_get_governance_health_returns_5_criteria(self, auth_session, trust_id):
-        """Governance health endpoint returns 5 criteria with scores"""
+    def test_get_governance_health_returns_8_criteria(self, auth_session, trust_id):
+        """Governance health endpoint returns 8 criteria with scores"""
         response = auth_session.get(f"{BASE_URL}/api/governance/{trust_id}")
         assert response.status_code == 200, f"Get governance failed: {response.text}"
         
         data = response.json()
         
-        # Verify 5-criteria response structure
+        # Verify 8-criteria response structure
         assert "trust_id" in data
         assert "total_score" in data
         assert "max_score" in data
-        assert data["max_score"] == 120, "Max score should be 120"
+        assert data["max_score"] == 115, "Max score should be 115"
         assert "color" in data
         assert data["color"] in ["red", "yellow", "green"]
         assert "criteria" in data
         
-        # Verify we have 5 criteria
+        # Verify we have 8 criteria
         criteria = data["criteria"]
-        assert len(criteria) == 6, f"Expected 6 criteria, got {len(criteria)}"
+        assert len(criteria) == 8, f"Expected 8 criteria, got {len(criteria)}"
         
         # Verify each criterion has correct structure
         expected_criteria_names = [
@@ -696,7 +696,10 @@ class TestGovernanceHealthScore:
             "Task Compliance",
             "Compensation Alignment",
             "Distribution Documentation",
-            "Annual Review"
+            "Annual Review",
+            "Asset Valuation Freshness",
+            "Transaction Classification",
+            "Separation Alert Health"
         ]
         
         for criterion in criteria:
@@ -705,7 +708,7 @@ class TestGovernanceHealthScore:
             assert "points" in criterion
             assert "max_points" in criterion
             assert "achieved" in criterion
-            assert criterion["max_points"] == 20, f"Each criterion should have max 20 points"
+            assert criterion["max_points"] in (10, 15), f"max_points should be 10 or 15, got {criterion['max_points']}"
             assert criterion["name"] in expected_criteria_names, f"Unexpected criterion: {criterion['name']}"
         
         print(f"Governance health score: {data['total_score']}/{data['max_score']} ({data['color']})")

@@ -256,7 +256,7 @@ class TestGovernanceInsightsBenevolenceRouting:
         
         print(f"PASS: Distribution Documentation criterion found")
         print(f"      Description: {description}")
-        print(f"      Points: {points}/20, Achieved: {achieved}")
+        print(f"      Points: {points}/15, Achieved: {achieved}")
 
 
 class TestCategoriesEndpoint:

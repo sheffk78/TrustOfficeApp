@@ -888,14 +888,14 @@ class HealthScoreCriterion(BaseModel):
     name: str
     description: str
     points: int
-    max_points: int = 20
+    max_points: int = 15
     achieved: bool
     no_data: bool = False  # True when there's nothing to measure yet
 
 class HealthScoreResponse(BaseModel):
     trust_id: str
     total_score: int
-    max_score: int = 120
+    max_score: int = 115
     color: str
     criteria: List[HealthScoreCriterion]
     calculated_at: str
@@ -910,7 +910,7 @@ class GovernanceInsight(BaseModel):
     description: str
     action_path: str
     action_label: str
-    points: int = 20
+    points: int = 15
 
 class DismissedInsightCreate(BaseModel):
     trust_id: str

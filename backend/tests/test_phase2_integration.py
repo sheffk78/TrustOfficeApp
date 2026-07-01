@@ -77,9 +77,9 @@ class TestGovernanceHealthScore:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["max_score"] == 120, f"Expected max_score=120, got {data['max_score']}"
-        assert 0 <= data["total_score"] <= 120, f"Score {data['total_score']} out of range"
-        print(f"PASS: Health score total={data['total_score']}/120, color={data['color']}")
+        assert data["max_score"] == 115, f"Expected max_score=115, got {data['max_score']}"
+        assert 0 <= data["total_score"] <= 115, f"Score {data['total_score']} out of range"
+        print(f"PASS: Health score total={data['total_score']}/115, color={data['color']}")
     
     def test_transaction_classification_criterion_exists(self, auth_headers):
         """Transaction Classification criterion should exist with proper structure"""

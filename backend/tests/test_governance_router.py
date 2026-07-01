@@ -2,12 +2,15 @@
 Test suite for governance router endpoints migrated from server.py to routers/governance.py
 Tests: Health score, History, Dashboard, Onboarding, Activity endpoints
 
-Health score criteria (6 criteria, 20 points each = 120 max):
-1. Quarterly Minutes - minutes generated this quarter
-2. Task Compliance - no overdue tasks
-3. Compensation Alignment - YTD ≤ approved annual
-4. Distribution Documentation - at least 1 distribution logged
-5. Annual Review - annual_review task completed in last 12 months
+Health score criteria (8 criteria, variable max_points = 115 max):
+1. Quarterly Minutes - minutes generated this quarter (15)
+2. Task Compliance - no overdue tasks (15)
+3. Compensation Alignment - YTD <= approved annual (15)
+4. Distribution Documentation - at least 1 distribution logged (15)
+5. Annual Review - annual_review task completed in last 12 months (10)
+6. Asset Valuation Freshness - active Schedule A assets have recent valuations (15)
+7. Transaction Classification - transactions have classification field set (15)
+8. Separation Alert Health - no active separation alerts (15)
 """
 
 import pytest
@@ -69,28 +72,31 @@ class TestGovernanceHealthScore:
         
         print(f"✓ Health score response has all required fields")
     
-    def test_health_score_has_5_criteria(self, auth_session):
-        """Test that health score returns exactly 5 criteria (20 points each)"""
+    def test_health_score_has_8_criteria(self, auth_session):
+        """Test that health score returns exactly 8 criteria"""
         response = auth_session.get(f"{BASE_URL}/api/governance/{TRUST_ID}")
         assert response.status_code == 200
         
         data = response.json()
         criteria = data.get("criteria", [])
         
-        assert len(criteria) == 5, f"Expected 5 criteria, got {len(criteria)}"
+        assert len(criteria) == 8, f"Expected 8 criteria, got {len(criteria)}"
         
         expected_criteria_names = {
             "Quarterly Minutes",
             "Task Compliance",
             "Compensation Alignment",
             "Distribution Documentation",
-            "Annual Review"
+            "Annual Review",
+            "Asset Valuation Freshness",
+            "Transaction Classification",
+            "Separation Alert Health"
         }
         
         actual_names = {c.get("name") for c in criteria}
         assert actual_names == expected_criteria_names, f"Expected {expected_criteria_names}, got {actual_names}"
         
-        print(f"✓ Health score has 5 criteria: {actual_names}")
+        print(f"✓ Health score has 8 criteria: {actual_names}")
     
     def test_health_score_criteria_structure(self, auth_session):
         """Test each criterion has required fields"""
@@ -110,14 +116,14 @@ class TestGovernanceHealthScore:
         
         print(f"✓ All criteria have required fields")
     
-    def test_health_score_max_score_is_120(self, auth_session):
-        """Test max_score is 120"""
+    def test_health_score_max_score_is_115(self, auth_session):
+        """Test max_score is 115"""
         response = auth_session.get(f"{BASE_URL}/api/governance/{TRUST_ID}")
         assert response.status_code == 200
         
         data = response.json()
-        assert data.get("max_score") == 120, f"max_score should be 120, got {data.get('max_score')}"
-        print(f"✓ max_score is 120")
+        assert data.get("max_score") == 115, f"max_score should be 115, got {data.get('max_score')}"
+        print(f"✓ max_score is 115")
     
     def test_health_score_color_valid(self, auth_session):
         """Test color is one of red/yellow/green"""

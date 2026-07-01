@@ -559,6 +559,7 @@ class TestHealthScore:
             "Compensation Alignment",
             "Distribution Documentation",
             "Annual Review",
+            "Asset Valuation Freshness",
             "Transaction Classification",
             "Separation Alert Health"
         ]
@@ -566,8 +567,8 @@ class TestHealthScore:
         for expected in expected_criteria:
             assert expected in criteria_names, f"Missing criterion: {expected}"
         
-        assert len(data["criteria"]) == 7, f"Should have exactly 7 criteria, got {len(data['criteria'])}"
-        assert data["max_score"] == 120, "Max score should be 120"
+        assert len(data["criteria"]) == 8, f"Should have exactly 8 criteria, got {len(data['criteria'])}"
+        assert data["max_score"] == 115, "Max score should be 115"
     
     def test_red_alerts_decrease_score(self, api_client):
         """HEALTH SCORE - Red alerts decrease score: Active red alerts → Separation Alert Health = 0pts"""

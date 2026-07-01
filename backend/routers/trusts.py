@@ -101,7 +101,7 @@ async def get_trusts(user: dict = Depends(get_current_user)):
     
     result = []
     for trust in trusts:
-        health = await calculate_health_score(trust["trust_id"], user["user_id"])
+        health = await calculate_health_score(trust["trust_id"], user["user_id"], save_snapshot=False)
         result.append(TrustResponse(**trust, governance_score=health["total_score"]))
     
     return result
@@ -117,7 +117,7 @@ async def get_trust(trust_id: str, user: dict = Depends(get_current_user)):
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
-    health = await calculate_health_score(trust_id, user["user_id"])
+    health = await calculate_health_score(trust_id, user["user_id"], save_snapshot=False)
     return TrustResponse(**trust, governance_score=health["total_score"])
 
 
@@ -153,7 +153,7 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
         await db.trusts.update_one({"trust_id": trust_id}, {"$set": update_data})
     
     updated = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
-    health = await calculate_health_score(trust_id, user["user_id"])
+    health = await calculate_health_score(trust_id, user["user_id"], save_snapshot=False)
     return TrustResponse(**updated, governance_score=health["total_score"])
 
 
@@ -179,6 +179,6 @@ async def delete_trust(trust_id: str, user: dict = Depends(require_write_access)
     await db.transactions.delete_many({"trust_id": trust_id})
     await db.communications.delete_many({"trust_id": trust_id})
     await db.vault_documents.delete_many({"trust_id": trust_id})
-    await db.alerts.delete_many({"trust_id": trust_id})
+    await db.separation_alerts.delete_many({"trust_id": trust_id})
     
     return {"message": "Trust deleted"}

@@ -27,7 +27,6 @@ import {
   Sparkles,
   ChevronRight,
   Loader2,
-  Bot,
   CalendarDays,
   Clock,
   CalendarCheck,
@@ -107,12 +106,6 @@ export default function DashboardPage() {
   const [taxDeadlines, setTaxDeadlines] = useState([]);
   const [taxDeadlinesLoading, setTaxDeadlinesLoading] = useState(false);
   
-  // AI Suggestions state
-  const [aiSuggestions, setAiSuggestions] = useState([]);
-  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
-  const [aiSuggestionsError, setAiSuggestionsError] = useState(false);
-  const [aiSuggestionsFallback, setAiSuggestionsFallback] = useState(false); // True when using static fallback
-
   // Show welcome toast after successful purchase
   useEffect(() => {
     if (searchParams.get('welcome') === 'true') {
@@ -130,7 +123,6 @@ export default function DashboardPage() {
     if (trustsLoading) return;
     if (selectedTrust) {
       loadDashboardData();
-      loadAiSuggestions();
       loadTaxDeadlines();
     } else {
       // No trust selected — stop loading to prevent blank screen
@@ -175,61 +167,6 @@ export default function DashboardPage() {
       console.error('Failed to load tax deadlines:', error);
     } finally {
       setTaxDeadlinesLoading(false);
-    }
-  };
-
-  // Load AI-generated governance suggestions with fallback to static insights
-  const loadAiSuggestions = async () => {
-    if (!selectedTrust) return;
-    
-    setAiSuggestionsLoading(true);
-    setAiSuggestionsError(false);
-    setAiSuggestionsFallback(false);
-    
-    try {
-      const response = await fetchWithAuth('/ai/governance-suggestions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trust_id: selectedTrust.trust_id })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setAiSuggestions(data.suggestions || []);
-        setAiSuggestionsFallback(false);
-      } else {
-        // AI failed - use static governance insights as fallback
-        console.error('AI suggestions unavailable, using static fallback');
-        applyFallbackSuggestions();
-      }
-    } catch (error) {
-      console.error('Failed to load AI suggestions:', error);
-      // AI failed - use static governance insights as fallback
-      applyFallbackSuggestions();
-    } finally {
-      setAiSuggestionsLoading(false);
-    }
-  };
-
-  // Fallback to static governance insights when AI is unavailable
-  const applyFallbackSuggestions = () => {
-    // Use the existing governance_insights from dashboard data as fallback
-    const insights = dashboard?.governance_insights || [];
-    const fallbackSuggestions = insights.slice(0, 4).map(insight => ({
-      title: insight.title,
-      description: insight.description,
-      route: insight.action_path,
-      estimated_points_gain: insight.points
-    }));
-    
-    if (fallbackSuggestions.length > 0) {
-      setAiSuggestions(fallbackSuggestions);
-      setAiSuggestionsFallback(true);
-      setAiSuggestionsError(false);
-    } else {
-      // No fallback data available either
-      setAiSuggestionsError(true);
-      setAiSuggestions([]);
     }
   };
 
@@ -601,37 +538,49 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* What's Next Card - Using governance_insights from /api/dashboard */}
-              {insights.length > 0 && (
-                <div className="mb-8 card-trust corner-mark" data-testid="whats-next-card">
+              {/* Today's Focus Card - Top 3 prioritized governance actions */}
+              {insights.length > 0 && (() => {
+                const typePriority = { error: 0, warning: 1, info: 2 };
+                const sortedInsights = [...insights].sort((a, b) => {
+                  const typeDiff = (typePriority[a.type] ?? 3) - (typePriority[b.type] ?? 3);
+                  if (typeDiff !== 0) return typeDiff;
+                  return b.points - a.points;
+                });
+                const topInsights = sortedInsights.slice(0, 3);
+                const remainingCount = sortedInsights.length - topInsights.length;
+
+                return (
+                <div className="mb-8 card-trust corner-mark" data-testid="todays-focus-card">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-gold/20 to-navy/10 flex items-center justify-center">
                         <Sparkles className="w-5 h-5 text-gold" />
                       </div>
                       <div>
-                        <h3 className="font-serif text-lg text-navy">What's Next</h3>
+                        <h3 className="font-serif text-lg text-navy">Today's Focus</h3>
                         <p className="text-sm text-muted-foreground">
-                          {insights.length} action{insights.length !== 1 ? 's' : ''} to boost your score by +{insights.reduce((sum, i) => sum + i.points, 0)} points
+                          {sortedInsights.length} action{sortedInsights.length !== 1 ? 's' : ''} to boost your score by +{sortedInsights.reduce((sum, i) => sum + i.points, 0)} points
                         </p>
                       </div>
                     </div>
-                    <Link 
-                      to="/governance" 
-                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
-                    >
-                      Full Report <ArrowRight className="w-3 h-3" />
-                    </Link>
+                    {remainingCount > 0 && (
+                      <Link
+                        to="/governance"
+                        className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                      >
+                        View All ({remainingCount} more) <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    )}
                   </div>
-                  
+
                   <div className="space-y-3">
-                    {insights.slice(0, 5).map((insight, index) => {
+                    {topInsights.map((insight, index) => {
                       const InsightIcon = INSIGHT_ICONS[insight.criterion_name] || AlertCircle;
                       const isError = insight.type === 'error';
                       const isWarning = insight.type === 'warning';
-                      
+
                       return (
-                        <div 
+                        <div
                           key={index}
                           className={`relative flex items-center justify-between p-4 border transition-all hover:shadow-sm ${
                             isError ? 'border-error/30 bg-error/5 hover:border-error/50' :
@@ -650,6 +599,11 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
+                                <span className={`font-mono text-xs ${
+                                  isError ? 'text-error' : isWarning ? 'text-warning' : 'text-muted-foreground'
+                                }`}>
+                                  #{index + 1}
+                                </span>
                                 <h4 className="font-medium text-navy">{insight.title}</h4>
                                 <span className={`px-2 py-0.5 text-xs font-mono ${
                                   isError ? 'bg-error/20 text-error' :
@@ -671,7 +625,7 @@ export default function DashboardPage() {
                             >
                               <X className="w-4 h-4" />
                             </button>
-                            <Button 
+                            <Button
                               onClick={() => navigate(insight.action_path)}
                               size="sm"
                               className={`${
@@ -689,8 +643,8 @@ export default function DashboardPage() {
                       );
                     })}
                   </div>
-                  
-                  {healthScore?.total_score === (healthScore?.max_score || 120) && (
+
+                  {healthScore?.total_score === (healthScore?.max_score || 115) && (
                     <div className="mt-4 p-4 bg-success/10 border border-success/20 flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
                       <p className="text-sm text-success font-medium">
@@ -699,94 +653,8 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* AI-Generated Suggestions Card */}
-              <div className="mb-8 card-trust corner-mark" data-testid="ai-suggestions-card">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-gold/30 to-gold/10 flex items-center justify-center">
-                      <Bot className="w-5 h-5 text-gold" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-lg text-navy">AI Recommendations</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Personalized suggestions to improve governance
-                      </p>
-                    </div>
-                  </div>
-                  {!aiSuggestionsLoading && !aiSuggestionsError && (
-                    <button
-                      onClick={loadAiSuggestions}
-                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
-                    >
-                      Refresh <Sparkles className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-                
-                {aiSuggestionsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-gold mr-2" />
-                    <span className="text-sm text-muted-foreground">Generating suggestions...</span>
-                  </div>
-                ) : aiSuggestionsError ? (
-                  <div className="p-4 bg-muted/50 border border-muted text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Unable to load AI suggestions. 
-                      <button 
-                        onClick={loadAiSuggestions} 
-                        className="text-navy hover:text-gold ml-1 underline"
-                      >
-                        Try again
-                      </button>
-                    </p>
-                  </div>
-                ) : aiSuggestions.length > 0 ? (
-                  <div className="space-y-3">
-                    {aiSuggestions.slice(0, 4).map((suggestion, index) => (
-                      <div 
-                        key={index}
-                        className="flex items-center justify-between p-4 border border-gold/20 bg-gold/5 hover:border-gold/40 transition-all hover:shadow-sm"
-                        data-testid={`ai-suggestion-${index}`}
-                      >
-                        <div className="flex-1 mr-4">
-                          <h4 className="font-medium text-navy text-sm mb-1">{suggestion.title}</h4>
-                          <p className="text-xs text-muted-foreground line-clamp-2">{suggestion.description}</p>
-                          {suggestion.estimated_points_gain && (
-                            <span className="inline-block mt-1 px-2 py-0.5 text-xs font-mono bg-success/20 text-success">
-                              +{suggestion.estimated_points_gain} pts
-                            </span>
-                          )}
-                        </div>
-                        <Button 
-                          onClick={() => navigate(suggestion.route)}
-                          size="sm"
-                          className="btn-secondary flex-shrink-0"
-                          data-testid={`ai-suggestion-action-${index}`}
-                        >
-                          Go
-                          <ChevronRight className="w-4 h-4 ml-1" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-success/10 border border-success/20 text-center">
-                    <p className="text-sm text-success">
-                      No additional suggestions. Your governance practices look good!
-                    </p>
-                  </div>
-                )}
-                
-                <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1 font-mono">
-                  <Sparkles className="w-3 h-3" />
-                  {aiSuggestionsFallback 
-                    ? 'Showing governance insights. AI suggestions unavailable.'
-                    : 'AI-generated suggestions. You decide which actions to take.'
-                  }
-                </p>
-              </div>
+                );
+              })()}
 
               {/* Tax Calendar Widget */}
               {selectedTrust && (
@@ -906,13 +774,13 @@ export default function DashboardPage() {
                             </span>
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-2 bg-navy/10">
-                                <div 
-                                  className={`h-full ${criterion.achieved ? 'bg-success' : 'bg-navy/20'}`} 
-                                  style={{ width: `${(criterion.points / 20) * 100}%` }}
+                                <div
+                                  className={`h-full ${criterion.achieved ? 'bg-success' : 'bg-navy/20'}`}
+                                  style={{ width: `${(criterion.points / (criterion.max_points || 15)) * 100}%` }}
                                 ></div>
                               </div>
                               <span className={`font-mono text-xs w-8 ${criterion.achieved ? 'text-success' : 'text-muted-foreground'}`}>
-                                {criterion.points}/20
+                                {criterion.points}/{criterion.max_points || 15}
                               </span>
                             </div>
                           </div>
@@ -925,7 +793,7 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {healthScore?.total_score < 72 && healthScore?.total_score >= 48 && (
+                  {healthScore?.total_score < 96 && healthScore?.total_score >= 72 && (
                     <div className="mt-6 p-4 bg-warning/10 border border-warning/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
                       <p className="text-sm text-warning">
@@ -934,7 +802,7 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {healthScore?.total_score < 48 && (
+                  {healthScore?.total_score < 72 && (
                     <div className="mt-6 p-4 bg-error/10 border border-error/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
                       <p className="text-sm text-error">
