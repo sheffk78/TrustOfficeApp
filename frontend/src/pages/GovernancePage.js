@@ -15,7 +15,8 @@ import {
   TrendingUp,
   TrendingDown,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Package
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
@@ -61,14 +62,14 @@ export default function GovernancePage() {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 80) return 'text-success';
-    if (score >= 60) return 'text-warning';
+    if (score >= 96) return 'text-success';
+    if (score >= 72) return 'text-warning';
     return 'text-error';
   };
 
   const getScoreBgColor = (score) => {
-    if (score >= 80) return 'bg-success';
-    if (score >= 60) return 'bg-warning';
+    if (score >= 96) return 'bg-success';
+    if (score >= 72) return 'bg-warning';
     return 'bg-error';
   };
 
@@ -79,6 +80,7 @@ export default function GovernancePage() {
       case 'Compensation Alignment': return <Wallet className="w-5 h-5" />;
       case 'Distribution Documentation': return <DollarSign className="w-5 h-5" />;
       case 'Annual Review': return <TrendingUp className="w-5 h-5" />;
+      case 'Asset Valuation Freshness': return <Package className="w-5 h-5" />;
       default: return <Shield className="w-5 h-5" />;
     }
   };
@@ -94,7 +96,7 @@ export default function GovernancePage() {
   // Calculate chart dimensions
   const chartHeight = 120;
   const chartWidth = 100;
-  const maxScore = 100;
+  const maxScore = 120;
 
   // Generate chart points
   const getChartPoints = () => {
@@ -145,13 +147,13 @@ export default function GovernancePage() {
             <div>
               <h1 className="page-title">Trust Health</h1>
               <p className="page-subtitle">
-                Assess trust health across 7 criteria — track defensibility, compliance, and overall governance quality
+                Assess trust health across 6 criteria — track defensibility, compliance, and overall governance quality
               </p>
             </div>
             <div className="flex items-center gap-2">
               <PageHelpButton
                 items={[
-                  { text: 'Assess trust health across 7 criteria including defensibility and compliance' },
+                  { text: 'Assess trust health across 6 criteria including defensibility and compliance' },
                   { text: 'Track your trust governance quality score over time' },
                   { text: 'Identify areas that need attention to improve your trust health' },
                 ]}
@@ -192,7 +194,7 @@ export default function GovernancePage() {
                           {governance?.total_score || 0}
                         </span>
                         <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
-                          / 100
+                          / 120
                         </span>
                       </div>
                       <div className="mt-4 flex items-center justify-center gap-2">
@@ -213,7 +215,7 @@ export default function GovernancePage() {
 
                     {/* Criteria List */}
                     <div className="flex-1 w-full">
-                      <h3 className="font-serif text-lg text-navy mb-4">7-Criteria Assessment</h3>
+                      <h3 className="font-serif text-lg text-navy mb-4">6-Criteria Assessment</h3>
                       <div className="space-y-3">
                         {governance?.criteria?.map((criterion, index) => (
                           <div 
@@ -325,8 +327,8 @@ export default function GovernancePage() {
                       
                       {/* Score labels */}
                       <div className="absolute right-2 top-8 text-[10px] text-muted-foreground font-mono flex flex-col justify-between h-32">
-                        <span>100</span>
-                        <span>50</span>
+                        <span>120</span>
+                        <span>60</span>
                         <span>0</span>
                       </div>
                     </>
@@ -347,7 +349,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Generate meeting minutes each quarter
                     </p>
-                    <span className="badge-trust">15 points</span>
+                    <span className="badge-trust">20 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -358,7 +360,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Complete governance tasks before due dates
                     </p>
-                    <span className="badge-trust">15 points</span>
+                    <span className="badge-trust">20 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -369,7 +371,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Stay within approved plan amounts
                     </p>
-                    <span className="badge-trust">15 points</span>
+                    <span className="badge-trust">20 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -380,7 +382,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Log and fully document distributions
                     </p>
-                    <span className="badge-trust">15 points</span>
+                    <span className="badge-trust">20 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -391,29 +393,18 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Complete annual trust review
                     </p>
-                    <span className="badge-trust">10 points</span>
+                    <span className="badge-trust">20 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
                     <div className="flex items-center gap-2 mb-2">
-                      <ArrowUpDown className="w-5 h-5 text-navy" />
-                      <h4 className="font-medium text-sm">Transaction Classification</h4>
+                      <Package className="w-5 h-5 text-navy" />
+                      <h4 className="font-medium text-sm">Asset Valuation Freshness</h4>
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Properly classify ≥90% of trust transactions
+                      Keep Schedule A asset valuations current (within 12 months)
                     </p>
-                    <span className="badge-trust">15 points</span>
-                  </div>
-
-                  <div className="p-4 border border-navy/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Shield className="w-5 h-5 text-navy" />
-                      <h4 className="font-medium text-sm">Separation Alert Health</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Resolve personal/trust separation alerts promptly
-                    </p>
-                    <span className="badge-trust">15 points</span>
+                    <span className="badge-trust">20 points</span>
                   </div>
                 </div>
 
@@ -423,15 +414,15 @@ export default function GovernancePage() {
                   <div className="flex gap-6">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-success"></div>
-                      <span className="text-sm">80-100: Excellent</span>
+                      <span className="text-sm">96-120: Excellent</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-warning"></div>
-                      <span className="text-sm">60-79: Needs Attention</span>
+                      <span className="text-sm">72-95: Needs Attention</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-error"></div>
-                      <span className="text-sm">Below 60: Critical</span>
+                      <span className="text-sm">Below 72: Critical</span>
                     </div>
                   </div>
                 </div>

@@ -895,7 +895,7 @@ class HealthScoreCriterion(BaseModel):
 class HealthScoreResponse(BaseModel):
     trust_id: str
     total_score: int
-    max_score: int = 100
+    max_score: int = 120
     color: str
     criteria: List[HealthScoreCriterion]
     calculated_at: str

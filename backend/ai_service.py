@@ -164,7 +164,7 @@ class RecentActivity(BaseModel):
 
 class GovernanceSuggestionsRequest(BaseModel):
     """Request model for AI-powered governance suggestions"""
-    health_score: float = Field(..., description="Current governance health score (0-100)")
+    health_score: float = Field(..., description="Current governance health score (0-120)")
     criteria: List[GovernanceCriterion] = Field(..., description="Governance health criteria breakdown")
     recent_activity: List[RecentActivity] = Field(default_factory=list, description="Recent trust activity")
     trust_name: str = Field(..., description="Name of the trust")
@@ -245,7 +245,7 @@ async def generate_governance_suggestions(req: GovernanceSuggestionsRequest) -> 
     user_content = f"""Please provide governance improvement suggestions for this trust:
 
 TRUST: {req.trust_name}
-CURRENT HEALTH SCORE: {req.health_score:.0f}/100
+CURRENT HEALTH SCORE: {req.health_score:.0f}/120
 
 {criteria_summary}
 {activity_summary}

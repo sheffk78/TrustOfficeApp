@@ -36,7 +36,7 @@ TrustOffice has a sidebar with these sections:
 - **Binder Tools** (`/binder`) — Generate printable audit defense binders. Cover sheets, minutes summaries, asset lists.
 
 ### Standalone Links
-- **Trust Health** (`/governance`) — 7-criteria defensibility score. Shows score chart, criteria breakdown (Quarterly Minutes, Task Compliance, Compensation, Distributions, Annual Review, Transaction Classification, Separation Alerts), scoring guide, and hidden insights management.
+- **Trust Health** (`/governance`) — 6-criteria defensibility score. Shows score chart, criteria breakdown (Quarterly Minutes, Task Compliance, Compensation, Distributions, Annual Review, Asset Valuation Freshness), scoring guide, and hidden insights management.
 - **Settings** (`/settings`) — Trust profile settings. Edit trust name, formation date, EIN, jurisdiction, state code, notification preferences.
 
 ### Admin (visible only to admin users)
@@ -48,8 +48,8 @@ On mobile (≤1024px), a bottom navigation bar replaces the sidebar with 6 items
 ## Key Features by Domain
 
 ### Trust Health & Score
-- 7-criteria defensibility scoring system
-- Health score from 0-100 with color-coded ranges (green 80+, amber 60-79, red <60)
+- 6-criteria defensibility scoring system
+- Health score from 0-120 with color-coded ranges (green 96+, amber 72-95, red <72)
 - Historical score chart (30-day trend)
 - Criteria breakdown with per-criterion points and max scores
 - Actionable governance insights with dismiss/restore functionality

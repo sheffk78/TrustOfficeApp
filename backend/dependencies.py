@@ -776,6 +776,16 @@ async def create_initial_governance_tasks(trust_id: str, user_id: str):
             "completed_at": None,
             "description": "Review trustee compensation arrangements",
             "created_at": now.isoformat()
+        },
+        {
+            "task_id": f"task_{uuid.uuid4().hex[:12]}",
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "task_type": "asset_revaluation",
+            "due_date": (now + timedelta(days=365)).isoformat(),
+            "completed_at": None,
+            "description": "Annual re-valuation of all Schedule A assets",
+            "created_at": now.isoformat()
         }
     ]
     
@@ -789,12 +799,13 @@ from models import HealthColor, HealthScoreCriterion
 
 async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     """
-    Calculate governance health score using 5 criteria (20 points each):
+    Calculate governance health score using 6 criteria (20 points each, 120 max):
     1. Quarterly Minutes - minutes generated this quarter
     2. Task Compliance - no overdue tasks
-    3. Compensation Alignment - YTD ≤ approved annual
+    3. Compensation Alignment - YTD <= approved annual
     4. Distribution Documentation - at least 1 distribution logged
     5. Annual Review - annual_review task completed in last 12 months
+    6. Asset Valuation Freshness - all Schedule A assets valued within last 12 months
     """
     now = datetime.now(timezone.utc)
     criteria = []
@@ -932,11 +943,58 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     if annual_done:
         total_score += 20
-    
-    # Determine color
-    if total_score >= 80:
+
+    # 6. Asset Valuation Freshness (+20)
+    # Check if all active Schedule A assets have been valued within the last 12 months
+    twelve_months_ago = (now - timedelta(days=365)).isoformat()
+    active_assets = await db.schedule_a_items.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active"
+    }, {"_id": 0}).to_list(1000)
+
+    total_assets = len(active_assets)
+    if total_assets == 0:
+        # No assets logged - neutral, give partial credit to avoid penalizing new trusts
+        asset_fresh = False
+        asset_points = 10
+        asset_description = "No assets logged on Schedule A yet"
+    else:
+        # An asset is "fresh" if it has last_valued_date within 12 months,
+        # or if date_conveyed is within 12 months (newer assets don't need re-valuation yet)
+        stale_assets = []
+        for asset in active_assets:
+            last_valued = asset.get("last_valued_date")
+            date_conveyed = asset.get("date_conveyed", "")
+            # Use last_valued_date if available, otherwise fall back to date_conveyed
+            valuation_ref = last_valued or date_conveyed
+            if not valuation_ref or valuation_ref < twelve_months_ago:
+                stale_assets.append(asset.get("description", "Unknown asset"))
+
+        stale_count = len(stale_assets)
+        if stale_count == 0:
+            asset_fresh = True
+            asset_points = 20
+            asset_description = f"All {total_assets} asset(s) valued within last 12 months"
+        else:
+            asset_fresh = False
+            # Partial credit: proportional to how many are fresh
+            fresh_count = total_assets - stale_count
+            asset_points = int(20 * fresh_count / total_assets)
+            asset_description = f"{stale_count} of {total_assets} asset(s) need re-valuation (last valued >12 months ago)"
+
+    criteria.append(HealthScoreCriterion(
+        name="Asset Valuation Freshness",
+        description=asset_description,
+        points=asset_points,
+        achieved=asset_fresh
+    ))
+    total_score += asset_points
+
+    # Determine color (adjusted for 120 max: green >=96, yellow >=72, red <72)
+    if total_score >= 96:
         color = HealthColor.green
-    elif total_score >= 60:
+    elif total_score >= 72:
         color = HealthColor.yellow
     else:
         color = HealthColor.red
@@ -955,7 +1013,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     return {
         "trust_id": trust_id,
         "total_score": total_score,
-        "max_score": 100,
+        "max_score": 120,
         "color": color.value,
         "criteria": [c.model_dump() for c in criteria],
         "calculated_at": now.isoformat()

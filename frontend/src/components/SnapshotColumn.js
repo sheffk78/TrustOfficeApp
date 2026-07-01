@@ -41,13 +41,10 @@ const CRITERION_SUGGESTIONS = {
     label: 'Complete annual review',
     prompt: 'Help me complete the annual trust review',
   },
-  'Transaction Classification': {
-    label: 'Classify transactions',
-    prompt: 'Help me review and classify recent transactions',
-  },
-  'Separation Alert Health': {
-    label: 'Resolve separation alerts',
-    prompt: 'What separation alerts do I have and how do I fix them?',
+  'Asset Valuation Freshness': {
+    label: 'Update asset valuations',
+    prompt: 'Help me update the values of my Schedule A assets',
+    action: '/schedule-a'
   },
 };
 
@@ -104,14 +101,14 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
 
   // Brand-consistent color functions using gold/navy/rust tokens
   const scoreColor = (score) => {
-    if (score >= 80) return 'text-gold';
-    if (score >= 60) return 'text-gold/80';
+    if (score >= 96) return 'text-gold';
+    if (score >= 72) return 'text-gold/80';
     return 'text-rust';
   };
 
   const scoreBarColor = (score) => {
-    if (score >= 80) return 'bg-gold';
-    if (score >= 60) return 'bg-gold/60';
+    if (score >= 96) return 'bg-gold';
+    if (score >= 72) return 'bg-gold/60';
     return 'bg-rust';
   };
 
@@ -168,13 +165,13 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
                 <span className={`font-serif text-4xl font-bold ${scoreColor(healthData.total_score ?? 0)}`}>
                   {healthData.total_score ?? '—'}
                 </span>
-                <span className="text-xs text-muted-foreground">/100</span>
+                <span className="text-xs text-muted-foreground">/{healthData.max_score || 120}</span>
               </div>
               {/* Score bar */}
               <div className="w-full h-2 bg-navy/10 dark:bg-white/10 mb-3">
                 <div
                   className={`h-full ${scoreBarColor(healthData.total_score ?? 0)} transition-all duration-500`}
-                  style={{ width: `${healthData.total_score ?? 0}%` }}
+                  style={{ width: `${Math.min(100, ((healthData.total_score ?? 0) / (healthData.max_score || 120)) * 100)}%` }}
                 />
               </div>
               {/* Criteria breakdown */}

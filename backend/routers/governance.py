@@ -81,7 +81,7 @@ async def ensure_transaction_review_task(trust_id: str, user_id: str):
 
 async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     """
-    Calculate governance health score using 7 criteria:
+    Calculate governance health score using 6 criteria:
     """
     # Ensure monthly transaction review task exists for this trust
     await ensure_transaction_review_task(trust_id, user_id)
@@ -90,7 +90,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     criteria = []
     total_score = 0
     
-    # 1. Quarterly Minutes (+15)
+    # 1. Quarterly Minutes (+20)
     quarter_start = get_quarter_start(now)
     quarterly_minutes = await db.minutes_records.count_documents({
         "trust_id": trust_id,
@@ -98,7 +98,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         "created_at": {"$gte": quarter_start.isoformat()}
     })
     quarterly_achieved = quarterly_minutes > 0
-    q_points = 15 if quarterly_achieved else 0
+    q_points = 20 if quarterly_achieved else 0
     criteria.append(HealthScoreCriterion(
         name="Quarterly Minutes",
         description="Minutes generated this quarter",
@@ -107,7 +107,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += q_points
     
-    # 2. Task Compliance (+15)
+    # 2. Task Compliance (+20)
     total_tasks = await db.governance_tasks.count_documents({
         "trust_id": trust_id,
         "user_id": user_id
@@ -121,7 +121,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     
     if total_tasks > 0:
         task_compliance = overdue_tasks == 0
-        task_points = 15 if task_compliance else max(0, 15 - (overdue_tasks * 4))
+        task_points = 20 if task_compliance else max(0, 20 - (overdue_tasks * 4))
     else:
         task_compliance = None
         task_points = 0
@@ -135,7 +135,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += task_points
     
-    # 3. Compensation Alignment (+15)
+    # 3. Compensation Alignment (+20)
     year_start = get_year_start(now)
     comp_plan = await db.compensation_plans.find_one(
         {"trust_id": trust_id, "user_id": user_id},
@@ -151,7 +151,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         ytd_total = sum(p.get("amount", 0) for p in ytd_payments)
         approved_amount = comp_plan.get("annual_approved_amount") or comp_plan.get("annual_fee") or comp_plan.get("annual_amount", 0)
         comp_aligned = ytd_total <= approved_amount
-        comp_points = 15 if comp_aligned else 0
+        comp_points = 20 if comp_aligned else 0
     else:
         comp_aligned = None
         comp_points = 0
@@ -165,7 +165,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += comp_points
     
-    # 4. Distribution Documentation (+15)
+    # 4. Distribution Documentation (+20)
     dist_count = await db.distribution_records.count_documents({
         "trust_id": trust_id,
         "user_id": user_id
@@ -193,11 +193,11 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     elif benevolence_count > 0 and incomplete_benevolence > 0:
         dist_documented = True
         completeness_ratio = (benevolence_count - incomplete_benevolence) / benevolence_count
-        dist_points = int(15 * (0.5 + 0.5 * completeness_ratio))
+        dist_points = int(20 * (0.5 + 0.5 * completeness_ratio))
         dist_description = f"Distributions logged; {incomplete_benevolence}/{benevolence_count} benevolence distributions need documentation"
     else:
         dist_documented = True
-        dist_points = 15
+        dist_points = 20
         if benevolence_count > 0:
             dist_description = f"All distributions documented ({benevolence_count} benevolence distributions fully documented)"
         else:
@@ -211,7 +211,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += dist_points
     
-    # 5. Annual Review (+10)
+    # 5. Annual Review (+20)
     one_year_ago = (now - timedelta(days=365)).isoformat()
     annual_review = await db.governance_tasks.find_one({
         "trust_id": trust_id,
@@ -220,7 +220,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         "completed_at": {"$gte": one_year_ago}
     }, {"_id": 0})
     annual_done = annual_review is not None
-    annual_points = 10 if annual_done else 0
+    annual_points = 20 if annual_done else 0
     criteria.append(HealthScoreCriterion(
         name="Annual Review",
         description="Annual review completed in last 12 months",
@@ -229,77 +229,53 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     ))
     total_score += annual_points
     
-    # 6. Transaction Classification (+15) - % of transactions not classified as "Other"
-    total_txns = await db.transactions.count_documents({
+    # 6. Asset Valuation Freshness (+20) - all active Schedule A assets have recent valuations
+    twelve_months_ago = (now - timedelta(days=365))
+    active_assets = await db.schedule_a_items.find({
         "trust_id": trust_id,
-        "user_id": user_id
-    })
-    if total_txns > 0:
-        other_txns = await db.transactions.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "governance_classification": "Other"
-        })
-        classified_pct = ((total_txns - other_txns) / total_txns) * 100
-        if classified_pct >= 90:
-            txn_points = 15
-        elif classified_pct >= 70:
-            txn_points = 10
-        elif classified_pct >= 50:
-            txn_points = 5
+        "user_id": user_id,
+        "status": "active"
+    }, {"_id": 0, "description": 1, "last_valued_date": 1, "date_conveyed": 1}).to_list(1000)
+
+    total_assets = len(active_assets)
+    if total_assets == 0:
+        av_points = 10
+        av_achieved = False
+        av_desc = "No assets on Schedule A yet"
+        av_no_data = True
+    else:
+        stale_count = 0
+        for asset in active_assets:
+            valuation_ref_str = asset.get("last_valued_date") or asset.get("date_conveyed")
+            if not valuation_ref_str:
+                stale_count += 1
+                continue
+            try:
+                valuation_ref = datetime.fromisoformat(valuation_ref_str.replace("Z", "+00:00")) if "T" in valuation_ref_str else datetime.fromisoformat(valuation_ref_str).replace(tzinfo=timezone.utc)
+            except (ValueError, TypeError):
+                stale_count += 1
+                continue
+            if valuation_ref < twelve_months_ago:
+                stale_count += 1
+
+        fresh_count = total_assets - stale_count
+        if stale_count == 0:
+            av_points = 20
+            av_achieved = True
         else:
-            txn_points = 0
-        txn_achieved = classified_pct >= 90
-        txn_desc = f"{classified_pct:.0f}% of transactions properly classified"
-    else:
-        txn_points = 0
-        txn_achieved = False
-        txn_desc = "No transactions logged yet"
-    
+            av_points = int(20 * fresh_count / total_assets)
+            av_achieved = False
+        av_desc = f"{stale_count} of {total_assets} asset(s) need re-valuation (last valued >12 months ago)"
+        av_no_data = False
+
     criteria.append(HealthScoreCriterion(
-        name="Transaction Classification",
-        description=txn_desc,
-        points=txn_points,
-        achieved=txn_achieved,
-        no_data=total_txns == 0
+        name="Asset Valuation Freshness",
+        description=av_desc,
+        points=av_points,
+        achieved=av_achieved,
+        no_data=av_no_data
     ))
-    total_score += txn_points
-    
-    # 7. Separation Alert Health (+15) - no unresolved red alerts
-    red_alerts = await db.separation_alerts.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "status": "active",
-        "severity": "red"
-    })
-    yellow_alerts = await db.separation_alerts.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "status": "active",
-        "severity": "yellow"
-    })
-    
-    if red_alerts == 0 and yellow_alerts == 0:
-        alert_points = 15
-        alert_achieved = True
-        alert_desc = "No active separation alerts"
-    elif red_alerts == 0:
-        alert_points = max(0, 15 - (yellow_alerts * 2))
-        alert_achieved = yellow_alerts <= 2
-        alert_desc = f"{yellow_alerts} yellow alert(s) — needs attention"
-    else:
-        alert_points = 0
-        alert_achieved = False
-        alert_desc = f"{red_alerts} red alert(s) — immediate risk"
-    
-    criteria.append(HealthScoreCriterion(
-        name="Separation Alert Health",
-        description=alert_desc,
-        points=alert_points,
-        achieved=alert_achieved,
-        no_data=total_txns == 0
-    ))
-    total_score += alert_points
+    total_score += av_points
     
     # Auto-clear dismissals for criteria that are now achieved
     # (Natural restore when user completes the action)
@@ -312,9 +288,9 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
         })
     
     # Determine color
-    if total_score >= 80:
+    if total_score >= 96:
         color = HealthColor.green
-    elif total_score >= 60:
+    elif total_score >= 72:
         color = HealthColor.yellow
     else:
         color = HealthColor.red
@@ -333,7 +309,7 @@ async def calculate_health_score(trust_id: str, user_id: str) -> dict:
     return {
         "trust_id": trust_id,
         "total_score": total_score,
-        "max_score": 100,
+        "max_score": 120,
         "color": color.value,
         "criteria": [c.model_dump() for c in criteria],
         "calculated_at": now.isoformat()
@@ -406,6 +382,16 @@ def generate_governance_insights(criteria: List[dict]) -> List[GovernanceInsight
                     description="Complete annual review for +20 points",
                     action_path="/calendar",
                     action_label="Schedule Review",
+                    points=20
+                ))
+            elif c["name"] == "Asset Valuation Freshness":
+                insights.append(GovernanceInsight(
+                    type="warning",
+                    criterion_name="Asset Valuation Freshness",
+                    title="Asset Re-Valuation Needed",
+                    description=c.get("description", "Update asset valuations to earn +20 points"),
+                    action_path="/schedule-a",
+                    action_label="Update Assets",
                     points=20
                 ))
     

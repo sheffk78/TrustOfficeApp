@@ -681,14 +681,14 @@ class TestGovernanceHealthScore:
         assert "trust_id" in data
         assert "total_score" in data
         assert "max_score" in data
-        assert data["max_score"] == 100, "Max score should be 100"
+        assert data["max_score"] == 120, "Max score should be 120"
         assert "color" in data
         assert data["color"] in ["red", "yellow", "green"]
         assert "criteria" in data
         
         # Verify we have 5 criteria
         criteria = data["criteria"]
-        assert len(criteria) == 5, f"Expected 5 criteria, got {len(criteria)}"
+        assert len(criteria) == 6, f"Expected 6 criteria, got {len(criteria)}"
         
         # Verify each criterion has correct structure
         expected_criteria_names = [
@@ -944,7 +944,7 @@ class TestGovernanceHistory:
                 assert "date" in item, "Each history item should have date"
                 assert "score" in item, "Each history item should have score"
                 assert "color" in item, "Each history item should have color"
-                assert 0 <= item["score"] <= 100, "Score should be 0-100"
+                assert 0 <= item["score"] <= 120, "Score should be 0-120"
                 assert item["color"] in ["red", "yellow", "green"]
         
         print(f"✅ Governance history: {len(history)} days of data, current score: {data['current_score']}")

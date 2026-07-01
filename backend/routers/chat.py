@@ -6,6 +6,7 @@ Non-streaming batch response for Sprint 1 (SSE streaming deferred).
 """
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
@@ -14,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from dependencies import get_current_user
+from dependencies import get_current_user, get_subscription_state
 from database import db
 from chat_service import (
     classify_intent,
@@ -403,6 +404,16 @@ ACTION_EXECUTION_MAP = {
             "ownership_pct": "notes",
         },
     },
+    "asset_update_preview": {
+        "endpoint_type": "asset_update",
+        "field_map": {
+            "asset_description": "asset_description",
+            "new_value": "new_value",
+            "new_description": "new_description",
+            "valuation_date": "valuation_date",
+            "notes": "notes",
+        },
+    },
     "minutes_preview": {
         "endpoint_type": "minutes",
         "field_map": {
@@ -466,10 +477,33 @@ ACTION_EXECUTION_MAP = {
         "endpoint_type": "compensation_plan",
         "field_map": {
             "trustee_name": "trustee_name",
-            "amount": "amount",
-            "frequency": "frequency",
+            "annual_amount": "annual_amount",
+            "fee_type": "fee_type",
             "effective_date": "effective_date",
             "role": "role",
+        },
+    },
+    "compensation_payment_preview": {
+        "endpoint_type": "compensation_payment",
+        "field_map": {
+            "trustee_name": "trustee_name",
+            "amount": "amount",
+            "date": "date",
+            "classification_text": "classification_text",
+        },
+    },
+    "investment_preview": {
+        "endpoint_type": "investment",
+        "field_map": {
+            "asset_name": "asset_name",
+            "asset_type": "asset_type",
+            "cost_basis": "cost_basis",
+            "purchase_date": "purchase_date",
+            "current_value": "current_value",
+            "quantity": "quantity",
+            "unit": "unit",
+            "custodian": "custodian",
+            "notes": "notes",
         },
     },
     "task_preview": {
@@ -535,9 +569,18 @@ async def _execute_approved_action(
     card_type = action_card.get("type", "")
     action_data = action_card.get("data", {})
     
+    # Write-access gate: check subscription state before executing any action
+    sub_state = await get_subscription_state(user_id)
+    if sub_state.is_read_only:
+        return {"success": False, "error": "Read-only mode: your subscription does not allow write actions."}
+    
     # Normalize: intent classifier sends log_minutes → log_minutes_preview
     TYPE_ALIASES = {
         "log_minutes_preview": "minutes_preview",
+        "create_distribution_preview": "distribution_preview",
+        "record_compensation_payment_preview": "compensation_payment_preview",
+        "setup_compensation_preview": "compensation_plan_preview",
+        "add_investment_preview": "investment_preview",
     }
     card_type = TYPE_ALIASES.get(card_type, card_type)
     
@@ -625,6 +668,55 @@ async def _execute_approved_action(
             }
             await db.schedule_a_items.insert_one(asset_doc)
             return {"success": True, "record_id": item_id, "endpoint": "schedule-a"}
+
+        elif endpoint_type == "asset_update":
+            # Look up the existing asset by description (fuzzy match)
+            asset_desc = mapped_data.get("asset_description", "")
+            if not asset_desc:
+                return {"success": False, "error": "Asset description is required to identify which asset to update."}
+
+            # Try exact match first, then partial match
+            existing = await db.schedule_a_items.find_one({
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "status": "active",
+                "description": {"$regex": re.escape(asset_desc), "$options": "i"}
+            })
+
+            if not existing:
+                # Try broader partial match
+                existing = await db.schedule_a_items.find_one({
+                    "trust_id": trust_id,
+                    "user_id": user_id,
+                    "status": "active",
+                    "description": {"$regex": re.escape(asset_desc.split()[0]), "$options": "i"}
+                })
+
+            if not existing:
+                return {"success": False, "error": f"Could not find an active asset matching '{asset_desc}'. Please check the description and try again."}
+
+            # Build update document
+            update_fields = {}
+            if mapped_data.get("new_value") is not None:
+                update_fields["approximate_value"] = float(mapped_data["new_value"])
+            if mapped_data.get("new_description"):
+                update_fields["description"] = mapped_data["new_description"]
+            if mapped_data.get("notes"):
+                update_fields["notes"] = mapped_data["notes"]
+
+            # Always record the valuation date and updated_at timestamp
+            valuation_date = mapped_data.get("valuation_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            update_fields["last_valued_date"] = valuation_date
+            update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+            if not update_fields:
+                return {"success": False, "error": "No update fields provided."}
+
+            await db.schedule_a_items.update_one(
+                {"item_id": existing["item_id"]},
+                {"$set": update_fields}
+            )
+            return {"success": True, "record_id": existing["item_id"], "endpoint": "schedule-a"}
 
         elif endpoint_type == "minutes":
             from models import MinutesType
@@ -859,20 +951,174 @@ async def _execute_approved_action(
 
         elif endpoint_type == "compensation_plan":
             plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+            # Derive year from effective_date
+            effective_date = mapped_data.get("effective_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+            try:
+                year = int(effective_date[:4])
+            except (ValueError, TypeError, IndexError):
+                year = datetime.now(timezone.utc).year
+            
+            annual_amount = float(mapped_data.get("annual_amount", 0))
+            trustee_name = mapped_data.get("trustee_name", "")
+            role = mapped_data.get("role", "")
+            
+            # Auto-determine is_primary: True if no trustee_name/role and no existing primary for this year
+            existing_primary = await db.compensation_plans.find_one(
+                {"trust_id": trust_id, "user_id": user_id, "year": year, "is_primary": True},
+                {"_id": 0}
+            )
+            if not trustee_name and not role:
+                is_primary = not existing_primary
+            else:
+                is_primary = False
+            
+            # If setting as primary, demote any existing primary
+            if is_primary:
+                await db.compensation_plans.update_many(
+                    {"trust_id": trust_id, "user_id": user_id, "year": year, "is_primary": True},
+                    {"$set": {"is_primary": False}}
+                )
+            
             plan_doc = {
                 "plan_id": plan_id,
                 "trust_id": trust_id,
                 "user_id": user_id,
-                "trustee_name": mapped_data.get("trustee_name", "Trustee"),
-                "amount": float(mapped_data.get("amount", 0)),
-                "frequency": mapped_data.get("frequency", "monthly"),
-                "effective_date": mapped_data.get("effective_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                "role": mapped_data.get("role", ""),
-                "status": "active",
+                "trustee_name": trustee_name,
+                "role": role,
+                "annual_fee": annual_amount,
+                "annual_amount": annual_amount,
+                "annual_approved_amount": annual_amount,
+                "fee_type": mapped_data.get("fee_type", "fixed"),
+                "effective_date": effective_date,
+                "year": year,
+                "is_primary": is_primary,
+                "notes": "",
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             await db.compensation_plans.insert_one(plan_doc)
             return {"success": True, "record_id": plan_id, "endpoint": "compensation-plans", "action": "created"}
+
+        elif endpoint_type == "compensation_payment":
+            payment_id = f"payment_{uuid.uuid4().hex[:12]}"
+            payment_date = mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+            payment_amount = float(mapped_data.get("amount", 0))
+            trustee_name = mapped_data.get("trustee_name", "")
+            
+            # Derive year from payment date
+            try:
+                payment_year = int(payment_date[:4])
+            except (ValueError, TypeError, IndexError):
+                payment_year = datetime.now(timezone.utc).year
+            
+            # Get primary plan for this year (port from compensation.py L26-65)
+            primary_plan = await db.compensation_plans.find_one(
+                {"trust_id": trust_id, "user_id": user_id, "year": payment_year, "is_primary": True},
+                {"_id": 0}
+            )
+            if not primary_plan:
+                # Fallback: any plan for this year
+                primary_plan = await db.compensation_plans.find_one(
+                    {"trust_id": trust_id, "user_id": user_id,
+                     "$or": [{"year": payment_year}, {"effective_date": {"$regex": f"^{payment_year}"}}]},
+                    {"_id": 0},
+                    sort=[("is_primary", -1), ("effective_date", -1)]
+                )
+            
+            # Compute YTD total and check if payment exceeds plan
+            exceeds_plan = False
+            if primary_plan:
+                year_start = f"{payment_year}-01-01"
+                year_end = f"{payment_year}-12-31"
+                existing_payments = await db.compensation_payments.find(
+                    {"trust_id": trust_id, "user_id": user_id, "date": {"$gte": year_start, "$lte": year_end}},
+                    {"_id": 0}
+                ).to_list(1000)
+                ytd_total = sum(p.get("amount", 0) for p in existing_payments) + payment_amount
+                approved_amount = primary_plan.get("annual_approved_amount") or primary_plan.get("annual_fee") or primary_plan.get("annual_amount", 0)
+                exceeds_plan = ytd_total > approved_amount
+            
+            payment_doc = {
+                "payment_id": payment_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "amount": payment_amount,
+                "date": payment_date,
+                "classification_text": mapped_data.get("classification_text", ""),
+                "trustee_name": trustee_name,
+                "exceeds_plan_flag": exceeds_plan,
+                "plan_id": primary_plan.get("plan_id") if primary_plan else None,
+                "minutes_record_id": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.compensation_payments.insert_one(payment_doc)
+            
+            # Auto-update onboarding (port from compensation.py L67-131)
+            onboarding_updates = {}
+            trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+            if trust:
+                if trust.get("start_date"):
+                    onboarding_updates["formation_date_added"] = True
+                if trust.get("ein"):
+                    onboarding_updates["ein_entered"] = True
+            doc_count = await db.vault_documents.count_documents({
+                "trust_id": trust_id, "user_id": user_id,
+                "category": {"$in": ["trust_instrument", "trust_document", "declaration_of_trust"]}
+            })
+            if doc_count > 0:
+                onboarding_updates["trust_doc_uploaded"] = True
+            ein_doc_count = await db.vault_documents.count_documents({
+                "trust_id": trust_id, "user_id": user_id,
+                "category": {"$in": ["ein_letter", "irs_notice"]}
+            })
+            if ein_doc_count > 0:
+                onboarding_updates["ein_doc_uploaded"] = True
+            beneficiary_count = await db.beneficiaries.count_documents({"trust_id": trust_id, "user_id": user_id})
+            if beneficiary_count > 0:
+                onboarding_updates["beneficiaries_added"] = True
+            entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
+            if entity_count > 0:
+                onboarding_updates["assets_added"] = True
+            task_count = await db.governance_tasks.count_documents({
+                "trust_id": trust_id, "user_id": user_id, "task_type": {"$ne": "custom"}
+            })
+            if task_count > 0:
+                onboarding_updates["calendar_set"] = True
+            minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
+            if minutes_count > 0:
+                onboarding_updates["minutes_generated"] = True
+            if onboarding_updates:
+                onboarding_updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+                await db.user_onboarding.update_one(
+                    {"user_id": user_id}, {"$set": onboarding_updates}, upsert=True
+                )
+            
+            return {"success": True, "record_id": payment_id, "endpoint": "compensation-payments", "action": "created"}
+
+        elif endpoint_type == "investment":
+            investment_id = f"inv_{uuid.uuid4().hex[:12]}"
+            cost_basis = float(mapped_data.get("cost_basis", 0))
+            current_value = float(mapped_data.get("current_value", 0)) if mapped_data.get("current_value") else cost_basis
+            investment_doc = {
+                "investment_id": investment_id,
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "asset_name": mapped_data.get("asset_name", ""),
+                "asset_type": mapped_data.get("asset_type", "other"),
+                "purchase_date": mapped_data.get("purchase_date"),
+                "cost_basis": cost_basis,
+                "current_value": current_value,
+                "quantity": float(mapped_data.get("quantity", 1)) if mapped_data.get("quantity") else 1,
+                "unit": mapped_data.get("unit", "shares"),
+                "custodian": mapped_data.get("custodian"),
+                "notes": mapped_data.get("notes"),
+                "documents": [],
+                "performance_snapshot": None,
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.investments.insert_one(investment_doc)
+            return {"success": True, "record_id": investment_id, "endpoint": "investments", "action": "created"}
 
         elif endpoint_type == "task":
             task_id = f"task_{uuid.uuid4().hex[:12]}"

@@ -2,7 +2,7 @@
 Test suite for governance router endpoints migrated from server.py to routers/governance.py
 Tests: Health score, History, Dashboard, Onboarding, Activity endpoints
 
-Health score criteria (5 criteria, 20 points each = 100 max):
+Health score criteria (6 criteria, 20 points each = 120 max):
 1. Quarterly Minutes - minutes generated this quarter
 2. Task Compliance - no overdue tasks
 3. Compensation Alignment - YTD ≤ approved annual
@@ -110,14 +110,14 @@ class TestGovernanceHealthScore:
         
         print(f"✓ All criteria have required fields")
     
-    def test_health_score_max_score_is_100(self, auth_session):
-        """Test max_score is 100"""
+    def test_health_score_max_score_is_120(self, auth_session):
+        """Test max_score is 120"""
         response = auth_session.get(f"{BASE_URL}/api/governance/{TRUST_ID}")
         assert response.status_code == 200
         
         data = response.json()
-        assert data.get("max_score") == 100, f"max_score should be 100, got {data.get('max_score')}"
-        print(f"✓ max_score is 100")
+        assert data.get("max_score") == 120, f"max_score should be 120, got {data.get('max_score')}"
+        print(f"✓ max_score is 120")
     
     def test_health_score_color_valid(self, auth_session):
         """Test color is one of red/yellow/green"""

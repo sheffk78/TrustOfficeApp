@@ -12,7 +12,9 @@ Only extract when the user is clearly making a request that would create, update
 - An asset request → extract asset type, value, description, date acquired
 - A new beneficiary request → extract name, contact info
 - A class beneficiary request → extract class_type (children/descendants/issue/heirs/blood_relatives/etc.), description, percentage, notes
-- A compensation plan request → extract trustee name, amount, frequency, effective date
+- A compensation plan request → extract trustee name, annual amount, fee type, effective date
+- A compensation payment request → extract trustee name, payment amount, date, description/purpose
+- An investment request → extract asset name/ticker, asset type, cost basis, purchase date, current value, quantity, unit, custodian, notes
 - A task request → extract task type, description, due date, priority
 - A transaction request → extract type (income/expense), amount, category, date, description
 - A document upload request → extract title, category, notes
@@ -20,6 +22,7 @@ Only extract when the user is clearly making a request that would create, update
 ### Update Requests
 - A beneficiary update → extract current name, new email/phone/notes
 - A trust settings change → extract field name and new value
+- An asset value update → extract asset_description (required, to identify which asset), new_value, new_description, valuation_date, notes
 
 ### Delete Requests
 - A beneficiary removal → extract beneficiary name, reason
@@ -59,6 +62,59 @@ Only extract when the user is clearly making a request that would create, update
   "suggested_clarification": "I need to know the purpose of this distribution (HEMS category) to create the record."
 }
 ```
+
+## Output Format (Compensation Payment)
+```json
+{
+  "action_type": "record_compensation_payment",
+  "extracted": {
+    "trustee_name": "Bob",
+    "amount": 2000.00,
+    "date": "2026-06-30",
+    "classification_text": "Monthly trustee compensation for June"
+  },
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+
+## Output Format (Investment)
+```json
+{
+  "action_type": "add_investment",
+  "extracted": {
+    "asset_name": "VTI",
+    "asset_type": "stock",
+    "cost_basis": 18000.00,
+    "purchase_date": "2026-06-15",
+    "current_value": null,
+    "quantity": 100,
+    "unit": "shares",
+    "custodian": null,
+    "notes": null
+  },
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+
+## Output Format (Asset Update)
+```json
+{
+  "action_type": "update_asset",
+  "extracted": {
+    "asset_description": "House at 123 Main St",
+    "new_value": 850000.00,
+    "new_description": null,
+    "valuation_date": "2026-06-30",
+    "notes": "Updated appraisal"
+  },
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+
+For `update_asset`, the `asset_description` is required (used to look up the existing asset). If the user says "update my property value to 850k" without clearly identifying which property, ask "Which asset would you like to update?" If only one asset matches the description, proceed. The `new_value` is the primary reason for the update but is technically optional (user might just want to update the description).
 
 ## Output Format (Update)
 ```json

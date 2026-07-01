@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Pencil, X, AlertTriangle, FileText, DollarSign, Building2, Users, UsersRound, Loader2, FolderOpen, Mail } from 'lucide-react';
+import { Check, Pencil, X, AlertTriangle, FileText, DollarSign, Building2, Users, UsersRound, Loader2, FolderOpen, Mail, TrendingUp, Receipt } from 'lucide-react';
 
 const TYPE_CONFIG = {
   minutes_preview: { icon: FileText, label: 'Minutes', color: 'bg-navy/10 text-navy' },
@@ -11,6 +11,9 @@ const TYPE_CONFIG = {
   class_beneficiary_preview: { icon: UsersRound, label: 'Class Beneficiary', color: 'bg-purple-500/10 text-purple-600' },
   class_beneficiary_removal_preview: { icon: UsersRound, label: 'Remove Class', color: 'bg-red-500/10 text-red-600' },
   document_upload_preview: { icon: FolderOpen, label: 'Vault Upload', color: 'bg-navy/10 text-navy' },
+  compensation_plan_preview: { icon: Receipt, label: 'Comp Plan', color: 'bg-emerald-500/10 text-emerald-600' },
+  compensation_payment_preview: { icon: DollarSign, label: 'Payment', color: 'bg-emerald-500/10 text-emerald-600' },
+  investment_preview: { icon: TrendingUp, label: 'Investment', color: 'bg-blue-500/10 text-blue-600' },
   // Also support short names
   minutes: { icon: FileText, label: 'Minutes', color: 'bg-navy/10 text-navy' },
   distribution: { icon: DollarSign, label: 'Distribution', color: 'bg-gold/10 text-gold' },
@@ -18,6 +21,47 @@ const TYPE_CONFIG = {
   beneficiary: { icon: Users, label: 'Beneficiary', color: 'bg-emerald-500/10 text-emerald-600' },
   document_upload: { icon: FolderOpen, label: 'Vault Upload', color: 'bg-navy/10 text-navy' },
 };
+
+const FIELD_LABELS = {
+  // Distribution fields
+  beneficiary_name: 'Beneficiary',
+  amount: 'Amount',
+  purpose: 'Purpose',
+  distribution_date: 'Date',
+  distribution_type: 'Type',
+  // Compensation plan fields
+  trustee_name: 'Trustee',
+  annual_amount: 'Annual Amount',
+  fee_type: 'Fee Type',
+  effective_date: 'Effective Date',
+  role: 'Role',
+  year: 'Year',
+  // Compensation payment fields
+  date: 'Date',
+  classification_text: 'Description',
+  // Investment fields
+  asset_name: 'Asset',
+  asset_type: 'Asset Type',
+  cost_basis: 'Cost Basis',
+  purchase_date: 'Purchase Date',
+  current_value: 'Current Value',
+  quantity: 'Quantity',
+  unit: 'Unit',
+  custodian: 'Custodian',
+  notes: 'Notes',
+  // General
+  description: 'Description',
+  frequency: 'Frequency',
+  category: 'Category',
+  title: 'Title',
+  task_type: 'Task Type',
+  due_date: 'Due Date',
+  priority: 'Priority',
+};
+
+function getFieldLabel(key) {
+  return FIELD_LABELS[key] || key.replace(/_/g, ' ');
+}
 
 const ActionCard = ({ card, onApprove, onEdit, onDiscard, disabled }) => {
   const config = TYPE_CONFIG[card.type] || TYPE_CONFIG.minutes;
@@ -70,7 +114,7 @@ const ActionCard = ({ card, onApprove, onEdit, onDiscard, disabled }) => {
             {Object.entries(card.data).slice(0, 5).map(([key, value]) => (
               <div key={key} className="flex items-baseline gap-2">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground min-w-[80px]">
-                  {key.replace(/_/g, ' ')}
+                  {getFieldLabel(key)}
                 </span>
                 <span className="font-mono text-xs text-foreground">
                   {Array.isArray(value) ? value.join(', ') : String(value)}
@@ -105,15 +149,53 @@ const ActionCard = ({ card, onApprove, onEdit, onDiscard, disabled }) => {
             }
           </p>
           {card.execution_result.success && card.execution_result.record_id && (
-            (card.type === 'minutes_preview' || card.type?.startsWith('minutes')) && (
-              <Link
-                to={`/minutes/${card.execution_result.record_id}`}
-                className="inline-flex items-center gap-1 mt-1.5 text-gold hover:underline font-mono text-xs"
-              >
-                <FileText className="w-3 h-3" />
-                View in Minutes
-              </Link>
-            )
+            <>
+              {(card.type === 'minutes_preview' || card.type?.startsWith('minutes')) && (
+                <Link
+                  to={`/minutes/${card.execution_result.record_id}`}
+                  className="inline-flex items-center gap-1 mt-1.5 text-gold hover:underline font-mono text-xs"
+                >
+                  <FileText className="w-3 h-3" />
+                  View in Minutes
+                </Link>
+              )}
+              {(card.type === 'distribution_preview' || card.type === 'distribution') && (
+                <Link
+                  to="/distributions"
+                  className="inline-flex items-center gap-1 mt-1.5 text-gold hover:underline font-mono text-xs"
+                >
+                  <DollarSign className="w-3 h-3" />
+                  View in Distributions
+                </Link>
+              )}
+              {(card.type === 'compensation_plan_preview' || card.type === 'compensation_plan') && (
+                <Link
+                  to="/compensation"
+                  className="inline-flex items-center gap-1 mt-1.5 text-gold hover:underline font-mono text-xs"
+                >
+                  <Receipt className="w-3 h-3" />
+                  View in Compensation
+                </Link>
+              )}
+              {(card.type === 'compensation_payment_preview' || card.type === 'compensation_payment') && (
+                <Link
+                  to="/compensation"
+                  className="inline-flex items-center gap-1 mt-1.5 text-gold hover:underline font-mono text-xs"
+                >
+                  <DollarSign className="w-3 h-3" />
+                  View in Compensation
+                </Link>
+              )}
+              {(card.type === 'investment_preview' || card.type === 'investment') && (
+                <Link
+                  to="/investments"
+                  className="inline-flex items-center gap-1 mt-1.5 text-gold hover:underline font-mono text-xs"
+                >
+                  <TrendingUp className="w-3 h-3" />
+                  View in Investments
+                </Link>
+              )}
+            </>
           )}
         </div>
       )}

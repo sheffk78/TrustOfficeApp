@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -87,11 +87,16 @@ const NAV_GROUPS = [
 // Flat list for easy lookup
 const ALL_ITEMS = NAV_GROUPS.flatMap(g => g.items);
 
+const SIDEBAR_SCROLL_KEY = 'sidebar-scroll';
+const SIDEBAR_GROUPS_KEY = 'sidebar-expanded-groups';
+
 export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, trusts, selectedTrust, setSelectedTrust, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navRef = useRef(null);
+  const scrollTimer = useRef(null);
   
   // Determine which group should be expanded based on current route
   const activeGroup = NAV_GROUPS.find(g => 
@@ -103,14 +108,69 @@ export const Sidebar = () => {
     )
   )?.key || null;
   
+  // Initialize expandedGroups from sessionStorage (survives remount) or fall back to active group
   const [expandedGroups, setExpandedGroups] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(SIDEBAR_GROUPS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
     const initial = {};
     if (activeGroup) initial[activeGroup] = true;
     return initial;
   });
 
+  // Persist expandedGroups to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(expandedGroups));
+    } catch (e) { /* ignore */ }
+  }, [expandedGroups]);
+
+  // Restore scroll position before paint to avoid visible jump
+  useLayoutEffect(() => {
+    if (!navRef.current) return;
+    try {
+      const saved = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+      if (saved != null) {
+        navRef.current.scrollTop = parseInt(saved, 10) || 0;
+      }
+    } catch (e) { /* ignore */ }
+  }, []);
+
+  // Throttled scroll handler — save scroll position to sessionStorage
+  const handleNavScroll = () => {
+    if (scrollTimer.current) return;
+    scrollTimer.current = setTimeout(() => {
+      if (navRef.current) {
+        try {
+          sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
+        } catch (e) { /* ignore */ }
+      }
+      scrollTimer.current = null;
+    }, 150);
+  };
+
+  // Clean up any pending scroll timer on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimer.current) {
+        clearTimeout(scrollTimer.current);
+        scrollTimer.current = null;
+      }
+    };
+  }, []);
+
   const toggleGroup = (key) => {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Save scroll position immediately (used on link clicks before navigation)
+  const saveScrollPosition = () => {
+    if (navRef.current) {
+      try {
+        sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
+      } catch (e) { /* ignore */ }
+    }
   };
   
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
@@ -201,7 +261,7 @@ export const Sidebar = () => {
             <Link
               to="/dashboard"
               className="flex items-center gap-2 text-white/60 hover:text-gold transition-colors text-xs font-mono uppercase tracking-widest"
-              onClick={() => { setMobileOpen(false); }}
+              onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
               data-testid="nav-manage-trusts"
             >
               <FolderTree className="w-3.5 h-3.5" />
@@ -211,7 +271,7 @@ export const Sidebar = () => {
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 overflow-y-auto">
+        <nav ref={navRef} onScroll={handleNavScroll} className="flex-1 py-4 overflow-y-auto">
           {NAV_GROUPS.map((group) => {
             const GroupIcon = group.icon;
             const isExpanded = expandedGroups[group.key];
@@ -230,7 +290,7 @@ export const Sidebar = () => {
                   <Link
                     to={path}
                     className={`sidebar-item ${group.standout ? 'sidebar-item-standout' : ''} ${isActive ? 'active' : ''}`}
-                    onClick={() => setMobileOpen(false)}
+                    onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
                     data-testid={`nav-${group.key}`}
                   >
                     <GroupIcon className={`w-5 h-5 ${group.standout ? 'text-gold' : ''}`} />
@@ -293,7 +353,7 @@ export const Sidebar = () => {
                             key={item.path}
                             to={item.path}
                             className={`sidebar-item pl-6 py-2 ${isActive ? 'active' : ''}`}
-                            onClick={() => setMobileOpen(false)}
+                            onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
                             data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                           >
                             <ItemIcon className="w-4 h-4" />
@@ -319,7 +379,7 @@ export const Sidebar = () => {
             <Link
               to="/admin"
               className={`sidebar-item ${location.pathname === '/admin' ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
               data-testid="nav-admin"
             >
               <Crown className="w-5 h-5" />
@@ -337,7 +397,7 @@ export const Sidebar = () => {
             <Link
               to="/stats"
               className={`sidebar-item ${location.pathname === '/stats' ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
               data-testid="nav-stats"
             >
               <BarChart3 className="w-5 h-5" />

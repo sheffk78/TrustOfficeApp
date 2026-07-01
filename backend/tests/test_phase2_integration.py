@@ -68,8 +68,8 @@ class TestGovernanceHealthScore:
             assert name in criteria_names, f"Missing criterion: {name}"
         print(f"PASS: Health score has 7 criteria: {criteria_names}")
     
-    def test_health_score_total_is_100(self, auth_headers):
-        """Health score max should still be 100"""
+    def test_health_score_total_is_120(self, auth_headers):
+        """Health score max should be 120"""
         response = requests.get(
             f"{BASE_URL}/api/governance/{TEST_TRUST_ID}",
             headers=auth_headers
@@ -77,9 +77,9 @@ class TestGovernanceHealthScore:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["max_score"] == 100, f"Expected max_score=100, got {data['max_score']}"
-        assert 0 <= data["total_score"] <= 100, f"Score {data['total_score']} out of range"
-        print(f"PASS: Health score total={data['total_score']}/100, color={data['color']}")
+        assert data["max_score"] == 120, f"Expected max_score=120, got {data['max_score']}"
+        assert 0 <= data["total_score"] <= 120, f"Score {data['total_score']} out of range"
+        print(f"PASS: Health score total={data['total_score']}/120, color={data['color']}")
     
     def test_transaction_classification_criterion_exists(self, auth_headers):
         """Transaction Classification criterion should exist with proper structure"""

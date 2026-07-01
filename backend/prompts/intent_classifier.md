@@ -13,6 +13,7 @@ Given a user message in a trust administration context, classify it into exactly
 | `recommend_action` | "What should I do next?", "What's the most important thing?", "Where do I start?" | Prioritized next steps |
 | `log_minutes` | "I had a meeting yesterday", "I need to record a decision", "Draft minutes for..." | Create or draft meeting minutes |
 | `add_asset` | "I bought a property", "I need to add a car to the trust", "New asset to log" | Log an asset on Schedule A |
+| `update_asset` | "Update my property value to 850k", "Revalue the brokerage account", "The house is now worth more", "Change the value of my VTI holdings" | Update the value or details of an existing Schedule A asset |
 | `create_distribution` | "I need to give money to John", "Distribution to my daughter", "Pay for medical expenses" | Create a distribution record |
 | `evaluate_distribution` | "Can I approve this request?", "Should I give money for tuition?", "Evaluate this distribution request" | Evaluate whether a distribution request complies with trust documents and recommend approval/denial |
 | `create_beneficiary` | "I have a new beneficiary", "Add someone to the trust", "New beneficiary to add" | Add a new beneficiary |
@@ -25,6 +26,8 @@ Given a user message in a trust administration context, classify it into exactly
 | `upload_document` | "Upload my trust document", "Store the EIN letter", "Add a deed to the vault", "Save this PDF" | Upload or link a document in the vault |
 | `review_document` | "Find the trust document", "Where's the EIN letter?", "Show me the deed" | Locate or retrieve a document from the vault |
 | `setup_compensation` | "Set up trustee compensation", "I need to pay myself as trustee", "Create a compensation plan" | Create a trustee compensation plan |
+| `record_compensation_payment` | "Record a compensation payment", "Pay Bob $2,000 for trustee work", "Log a trustee payment", "I paid the trustee this month" | Record a compensation payment that was already made |
+| `add_investment` | "I bought 100 shares of VTI", "Record a new holding", "Add an investment to the trust", "We purchased real estate for the trust" | Record an investment holding that was already purchased |
 | `dismiss_alert` | "Dismiss this insight", "Hide that recommendation", "I already did that" | Dismiss a governance insight or alert |
 | `schedule_task` | "Schedule a quarterly review", "Remind me to file taxes", "Create a task for annual review" | Create a governance task with due date |
 | `add_transaction` | "I paid the insurance", "Record trust income", "Log a bank fee", "Add a transaction" | Log a trust income or expense transaction |
@@ -42,6 +45,8 @@ Given a user message in a trust administration context, classify it into exactly
 - IMPORTANT: Distinguish between `create_beneficiary` (new person) vs `update_beneficiary` (modifying an existing person). If the user mentions an existing name and says "change" or "update" or "modify", prefer `update_beneficiary`. If they say "add" or "new" without modification language, prefer `create_beneficiary`.
 - IMPORTANT: Distinguish between `remove_beneficiary` (delete) and `update_beneficiary` (modify) — "remove", "delete", "take off" = remove; "change", "update", "modify" = update.
 - IMPORTANT: Distinguish between `create_distribution` (making a distribution) vs `evaluate_distribution` (asking whether to approve/evaluate). If the user asks "can I", "should I", or "evaluate" regarding a distribution, classify as `evaluate_distribution` rather than `create_distribution`. Use `create_distribution` only when the user clearly wants to make/record a distribution.
+- IMPORTANT: Distinguish between `setup_compensation` (creating a plan for future payments) vs `record_compensation_payment` (logging a payment that already happened). "Set up compensation", "create a compensation plan" = setup_compensation. "Pay Bob $2,000", "record a payment", "I paid the trustee" = record_compensation_payment. A plan is the annual cap; a payment is an actual disbursement.
+- IMPORTANT: Distinguish between `add_investment` (recording a completed purchase) vs `ask_knowledge` (asking for investment advice). "I bought 100 shares of VTI", "Record a new holding", "We purchased real estate" = add_investment. "Should I buy Apple?", "Is crypto a good investment?", "What should I invest in?" = ask_knowledge with financial advisor referral. Recording a completed purchase = add_investment. Asking for investment advice = ask_knowledge.
 
 ## Output Format
 ```json

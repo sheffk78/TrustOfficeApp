@@ -88,14 +88,14 @@ class TestUnifiedDashboard:
         # Verify score value types
         assert isinstance(health_score["total_score"], int), "total_score should be int"
         assert isinstance(health_score["max_score"], int), "max_score should be int"
-        assert health_score["max_score"] == 100, "max_score should be 100"
+        assert health_score["max_score"] == 120, "max_score should be 120"
         
         # Verify color is valid
         assert health_score["color"] in ["red", "yellow", "green"], f"Invalid color: {health_score['color']}"
         
         # Verify criteria is a list with proper structure
         assert isinstance(health_score["criteria"], list), "criteria should be a list"
-        assert len(health_score["criteria"]) == 5, "Should have 5 criteria"
+        assert len(health_score["criteria"]) == 6, "Should have 6 criteria"
         
         for criterion in health_score["criteria"]:
             assert "name" in criterion, "Criterion missing name"

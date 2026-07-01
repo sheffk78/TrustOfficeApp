@@ -645,6 +645,7 @@ async def generate_response(
     action_def = get_action(intent) or ACTION_REGISTRY.get("general_chat", {})
     requires_write = action_def.get("requires_write", False)
     needs_confirm = action_def.get("confirmation_required", False)
+    action_type_value = action_def.get("type", f"{intent}_preview")
 
     # Format trust context
     ctx = trust_context
@@ -674,7 +675,7 @@ Type: {trust_info.get('type', 'Not specified')}
 Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
-Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/100 ({ctx.get('health_score', {}).get('color', 'red')})
+Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get('health_score', {}).get('color', 'red')})
 
 {vault_section}
 
@@ -720,7 +721,7 @@ Format your response as JSON:
 {{
   "message": "Your main response text to the user",
   "action_card": {{
-    "type": "{intent}_preview" if requires_write else null,
+    "type": "{action_type_value}" if requires_write else null,
     "data": {{...extracted action fields}},
     "requires_confirmation": {str(needs_confirm).lower()}
   }} or null,
@@ -832,7 +833,7 @@ Type: {trust_info.get('type', 'Not specified')}
 Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
-Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/100 ({ctx.get('health_score', {}).get('color', 'red')})
+Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get('health_score', {}).get('color', 'red')})
 
 {vault_section}
 
@@ -910,7 +911,7 @@ async def generate_action_card(
 
     if extracted and extracted.get("extracted"):
         return {
-            "type": f"{intent}_preview",
+            "type": action_def.get("type", f"{intent}_preview"),
             "data": extracted.get("extracted", {}),
             "requires_confirmation": action_def.get("confirmation_required", True),
         }
@@ -933,7 +934,7 @@ def build_citation_notes(trust_context: dict, intent: str) -> tuple:
 
     health = ctx.get("health_score", {})
     if health.get("total", 0) > 0:
-        citations.append(f"Defensibility score: {health['total']}/100")
+        citations.append(f"Defensibility score: {health['total']}/120")
 
     deadlines = ctx.get("upcoming_deadlines", [])
     if deadlines:

@@ -8,12 +8,15 @@ const QUICK_CHIPS = [
   { label: 'Trust Health', message: 'How healthy is my trust right now?' },
   { label: "What's Next", message: 'What should I do next for my trust?' },
   { label: 'Log Minutes', message: 'Help me log minutes for a recent meeting' },
+  { label: 'Record Payment', message: 'Record a compensation payment to a trustee' },
+  { label: 'Log Investment', message: "I need to record a new investment for the trust" },
+  { label: 'Money Summary', message: 'Give me a summary of all money activity for my trust' },
 ];
 
 const GREETING_MESSAGE = {
   id: 'greeting',
   role: 'assistant',
-  content: "Hi! I'm your Trust Assistant. Ask me about your trust, deadlines, or what to do next.\n\nYou can ask me to:\n- **Check upcoming deadlines** for your trust\n- **Draft meeting minutes** from a recent trustee meeting\n- **Prepare a distribution** to a beneficiary\n- **Assess your trust's health** and defensibility score\n- **Get guidance** on fiduciary duties and best practices",
+  content: "Hi! I'm your Trust Assistant. Ask me about your trust, deadlines, or what to do next.\n\nYou can ask me to:\n- **Check upcoming deadlines** for your trust\n- **Draft meeting minutes** from a recent trustee meeting\n- **Prepare a distribution** to a beneficiary\n- **Set up a compensation plan** for a trustee\n- **Record a compensation payment** to a trustee\n- **Log an investment** holding in the trust\n- **Assess your trust's health** and defensibility score\n- **Get guidance** on fiduciary duties and best practices",
   timestamp: new Date().toISOString(),
   action_cards: [],
   video_cards: [],

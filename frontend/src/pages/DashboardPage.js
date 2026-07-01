@@ -92,7 +92,8 @@ const INSIGHT_ICONS = {
   'Task Compliance': Calendar,
   'Compensation Alignment': Wallet,
   'Distribution Documentation': DollarSign,
-  'Annual Review': TrendingUp
+  'Annual Review': TrendingUp,
+  'Asset Valuation Freshness': Package
 };
 
 export default function DashboardPage() {
@@ -287,8 +288,8 @@ export default function DashboardPage() {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 70) return 'score-good';
-    if (score >= 40) return 'score-warning';
+    if (score >= 96) return 'score-good';
+    if (score >= 72) return 'score-warning';
     return 'score-critical';
   };
 
@@ -689,7 +690,7 @@ export default function DashboardPage() {
                     })}
                   </div>
                   
-                  {healthScore?.total_score === 100 && (
+                  {healthScore?.total_score === (healthScore?.max_score || 120) && (
                     <div className="mt-4 p-4 bg-success/10 border border-success/20 flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
                       <p className="text-sm text-success font-medium">
@@ -924,7 +925,7 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {healthScore?.total_score < 60 && healthScore?.total_score >= 40 && (
+                  {healthScore?.total_score < 72 && healthScore?.total_score >= 48 && (
                     <div className="mt-6 p-4 bg-warning/10 border border-warning/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
                       <p className="text-sm text-warning">
@@ -933,7 +934,7 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {healthScore?.total_score < 40 && (
+                  {healthScore?.total_score < 48 && (
                     <div className="mt-6 p-4 bg-error/10 border border-error/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
                       <p className="text-sm text-error">

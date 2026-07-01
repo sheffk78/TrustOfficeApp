@@ -567,7 +567,7 @@ class TestHealthScore:
             assert expected in criteria_names, f"Missing criterion: {expected}"
         
         assert len(data["criteria"]) == 7, f"Should have exactly 7 criteria, got {len(data['criteria'])}"
-        assert data["max_score"] == 100, "Max score should be 100"
+        assert data["max_score"] == 120, "Max score should be 120"
     
     def test_red_alerts_decrease_score(self, api_client):
         """HEALTH SCORE - Red alerts decrease score: Active red alerts → Separation Alert Health = 0pts"""
