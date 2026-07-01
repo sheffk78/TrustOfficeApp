@@ -285,8 +285,8 @@ export const Sidebar = () => {
                       )}
                     </span>
                   </Link>
-                  {/* Divider after Trust Assistant separates hero items from core nav */}
-                  {group.key === 'trust-assistant' && (
+                  {/* Divider after Trustee 101 separates hero items from core nav */}
+                  {group.key === 'course' && (
                     <div className="sidebar-section-divider" />
                   )}
                 </div>
