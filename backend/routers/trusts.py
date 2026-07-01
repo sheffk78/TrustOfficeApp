@@ -72,15 +72,23 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
         "tax_year_end_month": trust.tax_year_end_month,
         "tax_year_end_day": trust.tax_year_end_day,
         "is_fiscal_year": trust.tax_year_end_month is not None and trust.tax_year_end_day is not None and (trust.tax_year_end_month != 12 or trust.tax_year_end_day != 31),
+        "description": trust.description,
+        "review_cadence": trust.review_cadence,
+        "benevolence_enabled": False,
+        "tax_status": "private",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.trusts.insert_one(trust_doc)
     
-    # Create initial governance tasks
-    await create_initial_governance_tasks(trust_id, user["user_id"])
+    # Create initial governance tasks — compensate (rollback trust) on failure
+    try:
+        await create_initial_governance_tasks(trust_id, user["user_id"])
+    except Exception:
+        await db.trusts.delete_one({"trust_id": trust_id})
+        raise HTTPException(status_code=500, detail="Failed to create governance tasks. Please try again.")
     
-    # Auto-generate tax deadlines for the current tax year
+    # Auto-generate tax deadlines — compensate (rollback trust + tasks) on failure
     from datetime import date, datetime, timezone
     current_tax_year = date.today().year
     existing_count = await db.tax_calendar.count_documents({
@@ -102,7 +110,12 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
                         entry["notes"] = "Not applicable — trust created after this deadline"
                 except (ValueError, TypeError):
                     pass
-            await db.tax_calendar.insert_many(tax_entries)
+            try:
+                await db.tax_calendar.insert_many(tax_entries)
+            except Exception:
+                # Tax calendar is non-critical — log warning but don't fail
+                # (can be regenerated later). Trust + tasks are already created.
+                print(f"Warning: Failed to create tax calendar entries for trust {trust_id}")
     
     return TrustResponse(**trust_doc, governance_score=0)
 

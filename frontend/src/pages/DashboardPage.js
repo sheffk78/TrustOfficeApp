@@ -347,6 +347,13 @@ export default function DashboardPage() {
   const activities = dashboard?.recent_activity || [];
   const onboarding = dashboard?.onboarding_state;
 
+  // Determine if this is a new trust (less than 14 days old)
+  const trustCreatedAt = selectedTrust?.created_at;
+  const trustAgeDays = trustCreatedAt
+    ? Math.floor((Date.now() - new Date(trustCreatedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+  const isNewTrust = trustAgeDays < 14;
+
   // Empty state - no trusts
   if (!loading && trusts.length === 0) {
     return (
@@ -476,7 +483,6 @@ export default function DashboardPage() {
                               if (step.done) return;
                               navigate(step.action);
                             }}
-                            disabled={step.done}
                             className={`p-4 border text-left transition-colors ${
                               step.done 
                                 ? 'border-success/30 bg-success/5 cursor-default' 
@@ -494,6 +500,11 @@ export default function DashboardPage() {
                               <span className={`font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy'}`}>
                                 {step.label}
                               </span>
+                              {step.done && (
+                                <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-success/60">
+                                  Done
+                                </span>
+                              )}
                             </div>
                             <p className={`text-xs leading-relaxed ${step.done ? 'text-success/60' : 'text-muted-foreground'}`}>
                               {step.description}
@@ -517,7 +528,6 @@ export default function DashboardPage() {
                               if (step.done) return;
                               navigate(step.action);
                             }}
-                            disabled={step.done}
                             className={`p-4 border text-left transition-colors ${
                               step.done 
                                 ? 'border-success/30 bg-success/5 cursor-default' 
@@ -535,6 +545,11 @@ export default function DashboardPage() {
                               <span className={`font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy'}`}>
                                 {step.label}
                               </span>
+                              {step.done && (
+                                <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-success/60">
+                                  Done
+                                </span>
+                              )}
                             </div>
                             <p className={`text-xs leading-relaxed ${step.done ? 'text-success/60' : 'text-muted-foreground'}`}>
                               {step.description}
@@ -829,7 +844,7 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {healthScore?.total_score < 96 && healthScore?.total_score >= 72 && (
+                  {healthScore?.total_score < 96 && healthScore?.total_score >= 72 && !isNewTrust && (
                     <div className="mt-6 p-4 bg-warning/10 border border-warning/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
                       <p className="text-sm text-warning">
@@ -838,12 +853,26 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {healthScore?.total_score < 72 && (
+                  {healthScore?.total_score < 72 && !isNewTrust && (
                     <div className="mt-6 p-4 bg-error/10 border border-error/20 flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
                       <p className="text-sm text-error">
                         Urgent: Your trust requires immediate attention. Complete pending tasks to improve your score.
                       </p>
+                    </div>
+                  )}
+
+                  {healthScore?.total_score < 72 && isNewTrust && (
+                    <div className="mt-6 p-4 bg-gold/10 border border-gold/20 flex items-start gap-3">
+                      <Sparkles className="w-5 h-5 text-gold flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-navy font-medium">
+                          Welcome! You're just getting started.
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Your score will build as you complete the steps below. Don't worry about the number right now, just follow the Getting Started checklist at your own pace.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -233,6 +233,8 @@ class TrustCreate(BaseModel):
     tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
     tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
     is_fiscal_year: Optional[bool] = None
+    description: Optional[str] = None
+    review_cadence: Optional[str] = "quarterly"
 
     @model_validator(mode="after")
     def validate_tax_fields(self):
@@ -271,6 +273,8 @@ class TrustUpdate(BaseModel):
     tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
     tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
     is_fiscal_year: Optional[bool] = None
+    description: Optional[str] = None
+    review_cadence: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_tax_fields(self):
@@ -311,6 +315,8 @@ class TrustResponse(BaseModel):
     tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
     tax_year_end_day: Optional[int] = Field(None, ge=1, le=31)
     is_fiscal_year: Optional[bool] = None
+    description: Optional[str] = None
+    review_cadence: Optional[str] = "quarterly"
 
 
 # ==================== ENTITY MODELS ====================
