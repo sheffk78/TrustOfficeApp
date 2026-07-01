@@ -1,6 +1,6 @@
 # Tasks router - handles governance task management
 from fastapi import APIRouter, HTTPException, Depends
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import uuid
 
@@ -47,6 +47,12 @@ CHECKLIST_TEMPLATES = {
         {"text": "Classify any untagged transactions", "completed": False},
         {"text": "Review separation alerts", "completed": False},
         {"text": "Document review findings in minutes", "completed": False},
+    ],
+    "asset_revaluation": [
+        {"text": "Review current valuations for all Schedule A assets", "completed": False},
+        {"text": "Update market values for publicly traded assets", "completed": False},
+        {"text": "Obtain appraisals for non-liquid assets if stale", "completed": False},
+        {"text": "Document valuation methodology and date", "completed": False},
     ],
     "tax_filing_1041": [
         {"text": "Gather all income and deduction records", "completed": False},
@@ -124,7 +130,7 @@ async def get_tasks(trust_id: Optional[str] = None, user: dict = Depends(get_cur
 
 @router.patch("/tasks/{task_id}/complete")
 async def complete_task(task_id: str, user: dict = Depends(require_write_access)):
-    """Mark a task as complete"""
+    """Mark a task as complete and auto-create the next recurring cycle if applicable"""
     task = await db.governance_tasks.find_one(
         {"task_id": task_id, "user_id": user["user_id"]},
         {"_id": 0}
@@ -137,6 +143,53 @@ async def complete_task(task_id: str, user: dict = Depends(require_write_access)
         {"task_id": task_id},
         {"$set": {"completed_at": completed_at}}
     )
+    
+    # Auto-create next cycle for recurring task types
+    RECURRING_TASK_TYPES = {
+        "annual_review": 365,
+        "quarterly_review": 90,
+        "compensation_review": 180,
+        "asset_revaluation": 365,
+    }
+    
+    task_type = task.get("task_type")
+    if task_type in RECURRING_TASK_TYPES:
+        # Check if a future task of the same type already exists (avoid duplicates)
+        cycle_days = RECURRING_TASK_TYPES[task_type]
+        original_due = task.get("due_date")
+        if original_due:
+            try:
+                from datetime import datetime as dt
+                orig_due_dt = dt.fromisoformat(original_due.replace("Z", "+00:00"))
+                next_due = (orig_due_dt + timedelta(days=cycle_days)).isoformat()
+            except (ValueError, TypeError):
+                next_due = (datetime.now(timezone.utc) + timedelta(days=cycle_days)).isoformat()
+        else:
+            next_due = (datetime.now(timezone.utc) + timedelta(days=cycle_days)).isoformat()
+        
+        existing_future = await db.governance_tasks.count_documents({
+            "trust_id": task["trust_id"],
+            "user_id": user["user_id"],
+            "task_type": task_type,
+            "completed_at": None,
+            "due_date": {"$gte": next_due}
+        })
+        
+        if existing_future == 0:
+            new_task_id = f"task_{uuid.uuid4().hex[:12]}"
+            checklist_template = CHECKLIST_TEMPLATES.get(task_type, [])
+            new_task = {
+                "task_id": new_task_id,
+                "trust_id": task["trust_id"],
+                "user_id": user["user_id"],
+                "task_type": task_type,
+                "due_date": next_due,
+                "completed_at": None,
+                "description": task.get("description", ""),
+                "checklist_items": [item.copy() for item in checklist_template],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.governance_tasks.insert_one(new_task)
     
     return {"message": "Task completed", "completed_at": completed_at}
 

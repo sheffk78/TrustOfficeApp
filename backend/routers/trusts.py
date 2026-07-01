@@ -12,6 +12,7 @@ from dependencies import (
     PREMIUM_FEATURE_ERROR_MESSAGE, PREMIUM_FEATURE_ERROR_CODE
 )
 from models import TrustCreate, TrustUpdate, TrustResponse
+from utils.tax_calendar_math import _generate_entries
 
 router = APIRouter(tags=["trusts"])
 
@@ -78,6 +79,17 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
     
     # Create initial governance tasks
     await create_initial_governance_tasks(trust_id, user["user_id"])
+    
+    # Auto-generate tax deadlines for the current tax year
+    from datetime import date
+    current_tax_year = date.today().year
+    existing_count = await db.tax_calendar.count_documents({
+        "trust_id": trust_id, "tax_year": current_tax_year
+    })
+    if existing_count == 0:
+        tax_entries = _generate_entries(trust_doc, current_tax_year)
+        if tax_entries:
+            await db.tax_calendar.insert_many(tax_entries)
     
     return TrustResponse(**trust_doc, governance_score=0)
 

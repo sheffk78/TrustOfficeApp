@@ -724,7 +724,11 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
         "user_id": user_id,
         "task_type": {"$ne": "custom"}
     })
-    if task_count > 0:
+    # Also check that tax deadlines have been generated
+    tax_count = await db.tax_calendar.count_documents({
+        "trust_id": trust_id
+    })
+    if task_count > 0 and tax_count > 0:
         updates["calendar_set"] = True
     
     # Check minutes (both records from unified flow and templates from template form)
