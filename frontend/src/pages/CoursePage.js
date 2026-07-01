@@ -61,7 +61,7 @@ export default function CoursePage() {
     return (
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 flex items-center justify-center min-h-screen">
+        <main className="flex-1 flex items-center justify-center min-h-screen lg:ml-64 pt-16 lg:pt-0">
           <Loader2 className="w-8 h-8 animate-spin text-navy" />
         </main>
       </div>
@@ -72,7 +72,7 @@ export default function CoursePage() {
     return (
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 flex items-center justify-center min-h-screen">
+        <main className="flex-1 flex items-center justify-center min-h-screen lg:ml-64 pt-16 lg:pt-0">
           <p className="text-muted-foreground">Unable to load course. Please try again later.</p>
         </main>
       </div>
@@ -85,7 +85,7 @@ export default function CoursePage() {
   return (
     <div className="flex">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0">
+      <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0 lg:ml-64 pt-16 lg:pt-0">
         {/* Header */}
         <div className="bg-navy text-white px-6 py-8 md:py-12">
           <div className="max-w-5xl mx-auto">
