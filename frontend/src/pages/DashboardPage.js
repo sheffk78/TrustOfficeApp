@@ -34,7 +34,8 @@ import {
   FileUp,
   Upload,
   Users,
-  ClipboardList
+  ClipboardList,
+  GraduationCap
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import PageHelpButton from '@/components/PageHelpButton';
@@ -443,6 +444,25 @@ export default function DashboardPage() {
                     </button>
                   </div>
                   
+                  {/* Start Here - Trustee 101 */}
+                  <div className="mb-4">
+                    <h4 className="font-mono text-xs uppercase tracking-widest text-gold mb-2">Start Here</h4>
+                    <button
+                      onClick={() => navigate('/course')}
+                      className="w-full p-4 border-2 border-gold/30 bg-gold/5 hover:border-gold hover:bg-gold/10 transition-all text-left flex items-center gap-4 group"
+                      data-testid="onboarding-step-trustee-101"
+                    >
+                      <div className="w-10 h-10 bg-gold/20 flex items-center justify-center group-hover:bg-gold/30 transition-colors flex-shrink-0">
+                        <GraduationCap className="w-5 h-5 text-gold" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-mono text-xs font-medium text-navy">Watch Trustee 101 First</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">9 short video lessons (6-12 min each) that explain what a trust is, your duties, and how to avoid common traps. Start here before anything else.</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-gold opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  </div>
+                  
                   {/* Profile Completion Section */}
                   <div className="mb-4">
                     <h4 className="font-mono text-xs uppercase tracking-widest text-navy/60 mb-2">Complete Your Trust Profile</h4>
@@ -452,7 +472,10 @@ export default function DashboardPage() {
                         return (
                           <button
                             key={step.id}
-                            onClick={() => !step.done && navigate(step.action)}
+                            onClick={() => {
+                              if (step.done) return;
+                              navigate(step.action);
+                            }}
                             disabled={step.done}
                             className={`p-4 border text-left transition-colors ${
                               step.done 
@@ -490,7 +513,10 @@ export default function DashboardPage() {
                         return (
                           <button
                             key={step.id}
-                            onClick={() => !step.done && navigate(step.action)}
+                            onClick={() => {
+                              if (step.done) return;
+                              navigate(step.action);
+                            }}
                             disabled={step.done}
                             className={`p-4 border text-left transition-colors ${
                               step.done 
@@ -692,6 +718,14 @@ export default function DashboardPage() {
                         </Button>
                       </Link>
                     </div>
+                  ) : taxDeadlines.every(d => d.filing_status === 'not_required') ? (
+                    <div className="p-6 bg-navy/5 border border-navy/10 text-center rounded">
+                      <p className="text-sm text-muted-foreground mb-1">Your next tax deadlines are in {(() => {
+                        const upcoming = taxDeadlines.find(d => d.filing_status !== 'not_required' && d.filing_status !== 'filed');
+                        return upcoming ? format(parseISO(upcoming.due_date), 'MMMM yyyy') : 'the upcoming tax year';
+                      })()}.</p>
+                      <p className="text-xs text-muted-foreground">Past deadlines before your trust was created are marked as not applicable.</p>
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       {taxDeadlines.slice(0, 5).map((d) => {
@@ -763,14 +797,16 @@ export default function DashboardPage() {
                     {healthScore?.criteria ? (
                       <div className="flex-1 space-y-3">
                         {healthScore.criteria.map((criterion, i) => (
-                          <div key={i} className="flex items-center justify-between">
+                          <div key={i} className="flex items-center justify-between" title={criterion.description || criterion.name}>
                             <span className="text-sm text-muted-foreground flex items-center gap-2">
                               {criterion.achieved ? (
                                 <CheckCircle2 className="w-4 h-4 text-success" />
                               ) : (
                                 <Circle className="w-4 h-4 text-navy/30" />
                               )}
-                              {criterion.name}
+                              <span className="cursor-help border-b border-dotted border-muted-foreground/40" onClick={(e) => { e.preventDefault(); toast.info(criterion.name, { description: criterion.description }); }}>
+                                {criterion.name}
+                              </span>
                             </span>
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-2 bg-navy/10">

@@ -81,7 +81,7 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
     await create_initial_governance_tasks(trust_id, user["user_id"])
     
     # Auto-generate tax deadlines for the current tax year
-    from datetime import date
+    from datetime import date, datetime, timezone
     current_tax_year = date.today().year
     existing_count = await db.tax_calendar.count_documents({
         "trust_id": trust_id, "tax_year": current_tax_year
@@ -89,6 +89,19 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(require_write_ac
     if existing_count == 0:
         tax_entries = _generate_entries(trust_doc, current_tax_year)
         if tax_entries:
+            # Mark deadlines that already passed before the trust was created as not_required
+            # so new trustees don't see false "overdue" items for a trust that didn't exist yet
+            now_utc = datetime.now(timezone.utc)
+            for entry in tax_entries:
+                try:
+                    due = datetime.fromisoformat(entry["due_date"].replace('Z', '+00:00'))
+                    if due.tzinfo is None:
+                        due = due.replace(tzinfo=timezone.utc)
+                    if due < now_utc:
+                        entry["filing_status"] = "not_required"
+                        entry["notes"] = "Not applicable — trust created after this deadline"
+                except (ValueError, TypeError):
+                    pass
             await db.tax_calendar.insert_many(tax_entries)
     
     return TrustResponse(**trust_doc, governance_score=0)

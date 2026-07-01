@@ -279,6 +279,9 @@ const AppRouter = () => {
       <Route path="/tax-calendar" element={
         <Navigate to="/calendar" replace />
       } />
+      <Route path="/trust-health" element={
+        <Navigate to="/governance" replace />
+      } />
       <Route path="/state-compliance" element={
         <SubscriptionProtectedRoute>
           <StateCompliancePage />

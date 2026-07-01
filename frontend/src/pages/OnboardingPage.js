@@ -144,6 +144,10 @@ export default function OnboardingPage() {
       toast.error('Please enter your trust name');
       return;
     }
+    if (!trustData.jurisdiction) {
+      toast.error('Please select your state');
+      return;
+    }
 
     const month = Number(trustData.tax_year_end_month);
     const day = Number(trustData.tax_year_end_day);
@@ -477,7 +481,7 @@ export default function OnboardingPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="label-trust text-sm">State</Label>
+                    <Label className="label-trust text-sm">State <span className="text-warning">*</span></Label>
                     <Select
                       value={trustData.jurisdiction}
                       onValueChange={(v) => setTrustData({ ...trustData, jurisdiction: v })}
@@ -618,7 +622,7 @@ export default function OnboardingPage() {
                 <Button
                   onClick={handleCreateTrust}
                   className="w-full btn-primary h-12 text-base"
-                  disabled={loading || !trustData.name.trim()}
+                  disabled={loading || !trustData.name.trim() || !trustData.jurisdiction}
                   data-testid="create-trust-btn"
                 >
                   {loading ? (
