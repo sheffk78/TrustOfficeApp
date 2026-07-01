@@ -798,5 +798,8 @@ async def create_initial_governance_tasks(trust_id: str, user_id: str):
 
 
 # calculate_health_score has been moved to routers/governance.py
-# This re-export preserves backwards compatibility for callers importing from dependencies
-from routers.governance import calculate_health_score  # noqa: F401
+# This wrapper preserves backwards compatibility for callers importing from dependencies.
+# We use a lazy import to avoid a circular dependency (governance.py imports from dependencies).
+async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: bool = True) -> dict:
+    from routers.governance import calculate_health_score as _calc
+    return await _calc(trust_id, user_id, save_snapshot=save_snapshot)
