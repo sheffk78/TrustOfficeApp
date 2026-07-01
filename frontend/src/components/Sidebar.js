@@ -45,7 +45,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { HeartHandshake, FolderTree } from 'lucide-react';
+import { HeartHandshake } from 'lucide-react';
 
 const NAV_GROUPS = [
   // ═══ HERO ITEMS — gold-tinted standout links ═══
@@ -221,19 +221,16 @@ export const Sidebar = () => {
               data-testid="logo-home-link"
             />
           </Link>
-          <p className="font-mono text-[9px] uppercase tracking-widest text-white/40 mt-2">
-            TrustOffice
-          </p>
         </div>
 
         {/* Trust selector */}
         {trusts.length > 0 && (
-          <div className="p-4 border-b border-white/10">
+          <div className="sidebar-trust-selector">
             <p className="font-mono text-[9px] uppercase tracking-widest text-white/40 mb-2">
               Active Trust
             </p>
             <DropdownMenu>
-              <DropdownMenuTrigger className="w-full text-left p-3 bg-white/5 hover:bg-white/10 flex items-center justify-between" data-testid="trust-selector">
+              <DropdownMenuTrigger className="w-full text-left p-3 bg-white/5 hover:bg-white/10 flex items-center justify-between border border-white/15" data-testid="trust-selector">
                 <span className="font-mono text-sm text-white truncate">
                   {selectedTrust?.name || 'Select Trust'}
                 </span>
@@ -252,21 +249,6 @@ export const Sidebar = () => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        )}
-
-        {/* Manage Trusts quick link */}
-        {trusts.length > 0 && (
-          <div className="px-4 pb-3 border-b border-white/10">
-            <Link
-              to="/dashboard"
-              className="flex items-center gap-2 text-white/60 hover:text-gold transition-colors text-xs font-mono uppercase tracking-widest"
-              onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
-              data-testid="nav-manage-trusts"
-            >
-              <FolderTree className="w-3.5 h-3.5" />
-              Manage Trusts
-            </Link>
           </div>
         )}
 

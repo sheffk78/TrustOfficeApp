@@ -278,6 +278,106 @@
     @apply bg-slate-900 border-slate-700;
 }
 
+/* Trust selector section — stronger background to visually separate from logo/nav */
+.sidebar-trust-selector {
+    @apply p-4 border-b border-white/10;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dark .sidebar-trust-selector {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Navigation section — light background to visually separate from dark top/bottom */
+.sidebar-trust nav {
+    background-color: #f7f5f0;
+}
+
+.sidebar-trust nav .sidebar-item {
+    @apply text-navy/80 hover:text-navy;
+}
+
+.sidebar-trust nav .sidebar-item:hover {
+    background-color: rgba(1, 0, 121, 0.06);
+    border-left-color: var(--gold);
+}
+
+.sidebar-trust nav .sidebar-item.active {
+    @apply text-navy font-medium;
+    background-color: rgba(1, 0, 121, 0.08);
+    border-left-color: var(--gold);
+}
+
+/* Standout items in light nav */
+.sidebar-trust nav .sidebar-item-standout {
+    @apply text-navy mb-1;
+}
+
+.sidebar-trust nav .sidebar-item-standout:hover {
+    background-color: rgba(213, 173, 54, 0.12);
+    border-left-color: var(--gold);
+}
+
+.sidebar-trust nav .sidebar-item-standout.active {
+    background-color: rgba(213, 173, 54, 0.15);
+    border-left-color: var(--gold);
+    @apply font-semibold text-navy;
+}
+
+.sidebar-trust nav .sidebar-item-standout .lucide {
+    color: var(--gold);
+}
+
+/* Divider in light nav */
+.sidebar-trust nav .sidebar-section-divider {
+    @apply mx-6 my-2;
+    border-color: rgba(1, 0, 121, 0.08);
+}
+
+/* Accordion sub-items in light nav */
+.sidebar-trust nav .border-l {
+    border-color: rgba(1, 0, 121, 0.08) !important;
+}
+
+/* Dark mode: keep nav dark */
+.dark .sidebar-trust nav {
+    background-color: transparent;
+}
+
+.dark .sidebar-trust nav .sidebar-item {
+    @apply text-white/80 hover:text-white;
+}
+
+.dark .sidebar-trust nav .sidebar-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-left-color: var(--gold);
+}
+
+.dark .sidebar-trust nav .sidebar-item.active {
+    @apply bg-white/10 text-white font-medium;
+    border-left-color: var(--gold);
+}
+
+.dark .sidebar-trust nav .sidebar-item-standout {
+    @apply text-white;
+}
+
+.dark .sidebar-trust nav .sidebar-item-standout:hover {
+    background-color: rgba(213, 173, 54, 0.12);
+}
+
+.dark .sidebar-trust nav .sidebar-item-standout.active {
+    background-color: rgba(213, 173, 54, 0.18);
+}
+
+.dark .sidebar-trust nav .sidebar-section-divider {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .sidebar-trust nav .border-l {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
 .sidebar-item {
     @apply flex items-center gap-3 px-6 py-3 text-sm font-sans text-white/80 hover:text-white border-l-2 border-transparent;
     transition: background-color 0.15s ease, border-color 0.15s ease;

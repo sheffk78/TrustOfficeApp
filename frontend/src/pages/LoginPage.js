@@ -137,9 +137,6 @@ export default function LoginPage() {
           <p className="text-white/80 font-mono text-xs uppercase tracking-widest text-center max-w-md">
             Trust Governance Workspace
           </p>
-          <div className="mt-16 text-white/60 font-mono text-[10px] uppercase tracking-widest">
-            TrustOffice
-          </div>
         </div>
       </div>
 
