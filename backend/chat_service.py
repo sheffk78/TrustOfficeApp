@@ -305,16 +305,18 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
     # 2. Defensibility Score
     health = await db.health_score_snapshots.find_one(
         {"trust_id": trust_id},
-        {"_id": 0, "total_score": 1, "score_color": 1, "criteria": 1},
+        {"_id": 0, "score_value": 1, "color": 1, "base_score": 1, "risk_penalty": 1},
         sort=[("calculated_at", -1)]
     )
     if health:
         context["health_score"] = {
-            "total": health.get("total_score", 0),
-            "color": health.get("score_color", "red"),
+            "total": health.get("score_value", 0),
+            "color": health.get("color", "red"),
+            "base_score": health.get("base_score", health.get("score_value", 0)),
+            "risk_penalty": health.get("risk_penalty", 0),
         }
     else:
-        context["health_score"] = {"total": 0, "color": "red"}
+        context["health_score"] = {"total": 0, "color": "red", "base_score": 0, "risk_penalty": 0}
 
     # 3. Upcoming deadlines (next 14 days)
     now = datetime.now(timezone.utc)

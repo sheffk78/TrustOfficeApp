@@ -100,7 +100,7 @@ export default function GovernancePage() {
   // Calculate chart dimensions
   const chartHeight = 120;
   const chartWidth = 100;
-  const maxScore = 115;
+  const maxScore = governance?.max_score || 115;
 
   // Generate chart points
   const getChartPoints = () => {
@@ -151,13 +151,13 @@ export default function GovernancePage() {
             <div>
               <h1 className="page-title">Trust Health</h1>
               <p className="page-subtitle">
-                Assess trust health across 6 criteria — track defensibility, compliance, and overall governance quality
+                Assess trust health across 8 criteria — track defensibility, compliance, and overall governance quality
               </p>
             </div>
             <div className="flex items-center gap-2">
               <PageHelpButton
                 items={[
-                  { text: 'Assess trust health across 6 criteria including defensibility and compliance' },
+                  { text: 'Assess trust health across 8 criteria including defensibility and compliance' },
                   { text: 'Track your trust governance quality score over time' },
                   { text: 'Identify areas that need attention to improve your trust health' },
                 ]}
@@ -215,11 +215,21 @@ export default function GovernancePage() {
                            `${trend.direction === 'up' ? '+' : '-'}${trend.change} pts (30d)`}
                         </span>
                       </div>
+                      {governance?.risk_penalty < 0 && (
+                        <div className="text-xs text-muted-foreground mt-2 text-center">
+                          Governance: {governance?.base_score}/{governance?.max_score || 115}
+                          {governance?.has_critical_risk && (
+                            <span className="text-error font-medium block mt-1">
+                              Critical risk found, score capped at 50
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Criteria List */}
                     <div className="flex-1 w-full">
-                      <h3 className="font-serif text-lg text-navy mb-4">6-Criteria Assessment</h3>
+                      <h3 className="font-serif text-lg text-navy mb-4">Governance Score</h3>
                       <div className="space-y-3">
                         {governance?.criteria?.map((criterion, index) => (
                           <div 
@@ -355,7 +365,7 @@ export default function GovernancePage() {
                         <div>
                           <h3 className="font-serif text-lg text-navy">Risk Overview</h3>
                           <p className="text-sm text-success">
-                            All criteria are met. Your trust is in good standing across all 6 areas.
+                            All criteria are met. Your trust is in good standing across all 8 areas.
                           </p>
                         </div>
                       </div>
@@ -444,6 +454,85 @@ export default function GovernancePage() {
                 );
               })()}
 
+              {/* Areas Needing Attention (Risk Findings) */}
+              {governance?.risk_findings?.length > 0 && (
+                <div className="card-trust mb-8" data-testid="risk-findings-section">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-error/10 flex items-center justify-center">
+                        <ShieldAlert className="w-5 h-5 text-error" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-lg text-navy">Areas Needing Attention</h3>
+                        <p className="text-sm text-muted-foreground">
+                          These items from your Risk Dashboard are affecting your score.
+                          Resolve them to recover points.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono text-lg text-error">{governance.risk_penalty}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Penalty</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {governance.risk_findings
+                      .sort((a, b) => {
+                        const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+                        return (sevOrder[a.severity] ?? 4) - (sevOrder[b.severity] ?? 4);
+                      })
+                      .map((risk, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-center justify-between p-3 border ${
+                          risk.severity === 'critical' ? 'border-error/20 bg-error/5' :
+                          risk.severity === 'high' ? 'border-error/10 bg-error/5' :
+                          risk.severity === 'medium' ? 'border-warning/20 bg-warning/5' :
+                          'border-navy/10'
+                        }`}
+                        data-testid={`risk-finding-${i}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`text-lg font-mono ${
+                            risk.severity === 'critical' ? 'text-error' :
+                            risk.severity === 'high' ? 'text-error' :
+                            risk.severity === 'medium' ? 'text-warning' :
+                            'text-muted-foreground'
+                          }`}>
+                            {risk.severity === 'critical' || risk.severity === 'high' ? '!' : '\u2022'}
+                          </span>
+                          <div>
+                            <p className="text-sm text-navy font-medium">{risk.title}</p>
+                            <p className="text-xs text-muted-foreground">{risk.detail}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className="font-mono text-xs text-error">
+                            {risk.penalty || 0} pts
+                          </span>
+                          <Link
+                            to={risk.deeplink}
+                            className="text-gold text-sm hover:underline font-mono uppercase tracking-wider"
+                          >
+                            Resolve
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-navy/10">
+                    <Link
+                      to="/risk"
+                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                    >
+                      View Full Risk Dashboard <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               {/* Scoring Guide */}
               <div className="card-trust">
                 <h3 className="font-serif text-xl text-navy mb-6">How Scoring Works</h3>
@@ -457,7 +546,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Generate meeting minutes each quarter
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -468,7 +557,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Complete governance tasks before due dates
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -479,7 +568,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Stay within approved plan amounts
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -490,7 +579,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Log and fully document distributions
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -501,7 +590,7 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Complete annual trust review
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
                   </div>
 
                   <div className="p-4 border border-navy/10">
@@ -512,7 +601,56 @@ export default function GovernancePage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Keep Schedule A asset valuations current (within 12 months)
                     </p>
-                    <span className="badge-trust">20 points</span>
+                    <span className="badge-trust">15 points</span>
+                  </div>
+
+                  <div className="p-4 border border-navy/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-5 h-5 text-navy" />
+                      <h4 className="font-medium text-sm">Transaction Classification</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Classify all trust transactions by category
+                    </p>
+                    <span className="badge-trust">10 points</span>
+                  </div>
+
+                  <div className="p-4 border border-navy/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ShieldAlert className="w-5 h-5 text-navy" />
+                      <h4 className="font-medium text-sm">Separation Alert Health</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      No active separation of trust assets detected
+                    </p>
+                    <span className="badge-trust">15 points</span>
+                  </div>
+                </div>
+
+                {/* Risk Penalty explanation */}
+                <div className="mt-6 pt-6 border-t border-navy/10">
+                  <p className="label-trust mb-3">Risk Adjustments</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Your governance score is adjusted by risk findings from your Risk Dashboard.
+                    Penalties are capped by severity tier, and critical findings impose a hard floor of 50.
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-2 border border-error/20 bg-error/5 text-center">
+                      <p className="font-mono text-sm text-error">-20 pts</p>
+                      <p className="text-xs text-muted-foreground">Critical (per finding)</p>
+                    </div>
+                    <div className="p-2 border border-error/10 bg-error/5 text-center">
+                      <p className="font-mono text-sm text-error">-12 pts</p>
+                      <p className="text-xs text-muted-foreground">High (capped at -25)</p>
+                    </div>
+                    <div className="p-2 border border-warning/20 bg-warning/5 text-center">
+                      <p className="font-mono text-sm text-warning">-5 pts</p>
+                      <p className="text-xs text-muted-foreground">Medium (capped at -15)</p>
+                    </div>
+                    <div className="p-2 border border-navy/10 text-center">
+                      <p className="font-mono text-sm text-muted-foreground">-2 pts</p>
+                      <p className="text-xs text-muted-foreground">Low (capped at -10)</p>
+                    </div>
                   </div>
                 </div>
 

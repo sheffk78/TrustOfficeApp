@@ -892,12 +892,33 @@ class HealthScoreCriterion(BaseModel):
     achieved: bool
     no_data: bool = False  # True when there's nothing to measure yet
 
+class RiskFinding(BaseModel):
+    type: str
+    severity: str  # critical, high, medium, low
+    module: str
+    title: str
+    detail: str = ""
+    action: str = ""
+    deeplink: str = ""
+    penalty: int = 0  # per-finding penalty (negative)
+
+class RiskPenaltyBreakdown(BaseModel):
+    critical: dict  # {"count": int, "penalty": int}
+    high: dict
+    medium: dict
+    low: dict
+
 class HealthScoreResponse(BaseModel):
     trust_id: str
     total_score: int
     max_score: int = 115
     color: str
+    base_score: int = 0
+    risk_penalty: int = 0
+    has_critical_risk: bool = False
     criteria: List[HealthScoreCriterion]
+    risk_findings: List[RiskFinding] = []
+    risk_penalty_breakdown: Optional[RiskPenaltyBreakdown] = None
     calculated_at: str
 
 

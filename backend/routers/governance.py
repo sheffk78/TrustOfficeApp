@@ -17,6 +17,7 @@ from models import (
     DismissedInsightCreate, DismissedInsightResponse
 )
 from routers.tasks import CHECKLIST_TEMPLATES
+from services.risk_gathering import gather_risk_findings, compute_risk_penalty
 
 router = APIRouter(tags=["governance"])
 
@@ -57,7 +58,7 @@ CRITERIA_CONFIG = {
         "action_label": "Review Distributions",
     },
     "Annual Review": {
-        "max_points": 10,
+        "max_points": 15,
         "insight_type": "warning",
         "insight_title": "Annual Review Due",
         "insight_desc": "Complete annual review for +{max_points} points",
@@ -73,7 +74,7 @@ CRITERIA_CONFIG = {
         "action_label": "Update Assets",
     },
     "Transaction Classification": {
-        "max_points": 15,
+        "max_points": 10,
         "insight_type": "warning",
         "insight_title": "Classify Transactions",
         "insight_desc": "Classify untagged transactions to earn +{max_points} points",
@@ -151,8 +152,10 @@ async def ensure_transaction_review_task(trust_id: str, user_id: str):
             })
 
 
-async def _gather_score_data(trust_id: str, user_id: str) -> dict:
-    """Async: gather all raw DB data needed for health score. Returns dict of raw metrics."""
+async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = False) -> dict:
+    """Async: gather all raw DB data needed for health score. Returns dict of raw metrics.
+    If use_cache=True, tries to load risk findings from TTL cache (5 min) before gathering fresh.
+    """
     now = datetime.now(timezone.utc)
     quarter_start = get_quarter_start(now)
     year_start = get_year_start(now)
@@ -241,6 +244,30 @@ async def _gather_score_data(trust_id: str, user_id: str) -> dict:
         "status": "active"
     })
 
+    # 9. Risk findings (for penalty computation, excludes separation alerts)
+    trust_doc = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0}) or {}
+    today = now.date()
+
+    risk_findings = None
+    if use_cache:
+        cached = await db.risk_findings_cache.find_one({
+            "trust_id": trust_id,
+            "cached_at": {"$gte": (now - timedelta(minutes=5)).isoformat()}
+        })
+        if cached:
+            risk_findings = cached.get("findings")
+
+    if risk_findings is None:
+        risk_findings = await gather_risk_findings(
+            trust_id, trust_doc, db, today, include_separation_alerts=False
+        )
+        if use_cache:
+            await db.risk_findings_cache.update_one(
+                {"trust_id": trust_id},
+                {"$set": {"findings": risk_findings, "cached_at": now.isoformat()}},
+                upsert=True
+            )
+
     return {
         "now": now,
         "quarterly_minutes": quarterly_minutes,
@@ -257,6 +284,7 @@ async def _gather_score_data(trust_id: str, user_id: str) -> dict:
         "total_txns": total_txns,
         "classified_txns": classified_txns,
         "active_alert_count": active_alert_count,
+        "risk_findings": risk_findings,
     }
 
 
@@ -468,40 +496,66 @@ def _compute_health_score(data: dict) -> dict:
     ))
     total_score += sa_points
 
-    # Determine color (96/72 thresholds as absolute values)
-    if total_score >= 96:
+    # --- Risk Penalty (separate from criteria) ---
+    risk_findings = data.get("risk_findings", [])
+    penalty_result = compute_risk_penalty(risk_findings)
+    total_penalty = penalty_result["total_penalty"]
+    has_critical = penalty_result["has_critical"]
+    breakdown = penalty_result["breakdown"]
+    findings_with_penalty = penalty_result["findings_with_penalty"]
+
+    base_score = sum(c["points"] for c in [cr.model_dump() for cr in criteria])
+
+    # --- Final Score with Hard Floor ---
+    if has_critical:
+        final_score = max(50, base_score + total_penalty)
+    else:
+        final_score = max(0, base_score + total_penalty)
+
+    # Color from final_score
+    if final_score >= 96:
         color = HealthColor.green
-    elif total_score >= 72:
+    elif final_score >= 72:
         color = HealthColor.yellow
     else:
         color = HealthColor.red
 
     return {
         "criteria": criteria,
-        "total_score": total_score,
+        "base_score": base_score,
+        "risk_penalty": total_penalty,
+        "has_critical_risk": has_critical,
+        "total_score": final_score,
         "max_score": TOTAL_MAX_POINTS,
         "color": color,
+        "risk_findings": findings_with_penalty,
+        "risk_penalty_breakdown": breakdown,
         "now": now,
     }
 
 
 async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: bool = True) -> dict:
     """
-    Calculate governance health score using 8 criteria.
+    Calculate governance health score using 8 criteria + risk penalty.
     Orchestrator: gathers data, computes score, optionally saves snapshot.
     """
     # Ensure monthly transaction review task exists for this trust
     await ensure_transaction_review_task(trust_id, user_id)
 
-    # Gather all DB data
-    data = await _gather_score_data(trust_id, user_id)
+    # Gather all DB data (use cache for dashboard loads, fresh for snapshots)
+    data = await _gather_score_data(trust_id, user_id, use_cache=not save_snapshot)
 
     # Compute score (pure, no DB)
     result = _compute_health_score(data)
     criteria = result["criteria"]
+    base_score = result["base_score"]
+    risk_penalty = result["risk_penalty"]
+    has_critical_risk = result["has_critical_risk"]
     total_score = result["total_score"]
     color = result["color"]
     now = result["now"]
+    risk_findings = result["risk_findings"]
+    risk_penalty_breakdown = result["risk_penalty_breakdown"]
 
     # Auto-clear dismissals for criteria that are now achieved
     achieved_names = [c.name for c in criteria if c.achieved]
@@ -512,16 +566,52 @@ async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: boo
             "criterion_name": {"$in": achieved_names}
         })
 
-    # Save snapshot only when requested (governance endpoint only)
+    # Score-change notification: detect 5+ point drop from new risk findings
+    if save_snapshot:
+        prev = await db.health_score_snapshots.find_one(
+            {"trust_id": trust_id},
+            sort=[("calculated_at", -1)],
+            projection={"_id": 0, "score_value": 1}
+        )
+        if prev and prev.get("score_value", 100) - total_score >= 5:
+            new_findings = [r for r in risk_findings if r.get("severity") in ("critical", "high")]
+            if new_findings:
+                await db.notifications.insert_one({
+                    "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+                    "user_id": user_id,
+                    "trust_id": trust_id,
+                    "type": "score_drop",
+                    "title": "Your Trust Health Score changed",
+                    "message": f"Your score is now {total_score}/{TOTAL_MAX_POINTS}. "
+                               f"{len(new_findings)} new risk{'s' if len(new_findings) > 1 else ''} "
+                               f"affecting your score. Review and resolve to recover points.",
+                    "action_path": "/governance",
+                    "created_at": now.isoformat(),
+                    "read": False
+                })
+
+    # Save snapshot (schema v2)
     if save_snapshot:
         snapshot = {
             "snapshot_id": f"health_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user_id,
+            "schema_version": 2,
+            "base_score": base_score,
+            "risk_penalty": risk_penalty,
             "score_value": total_score,
             "color": color.value,
-            "criteria_summary": {c.name: c.achieved for c in criteria},
-            "calculated_at": now.isoformat()
+            "calculated_at": now.isoformat(),
+            "criteria_breakdown": [
+                {"name": c.name, "points": c.points, "max_points": c.max_points, "achieved": c.achieved}
+                for c in criteria
+            ],
+            "risk_findings_count": {
+                "critical": risk_penalty_breakdown["critical"]["count"],
+                "high": risk_penalty_breakdown["high"]["count"],
+                "medium": risk_penalty_breakdown["medium"]["count"],
+                "low": risk_penalty_breakdown["low"]["count"],
+            }
         }
         await db.health_score_snapshots.insert_one(snapshot)
 
@@ -530,7 +620,12 @@ async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: boo
         "total_score": total_score,
         "max_score": TOTAL_MAX_POINTS,
         "color": color.value,
+        "base_score": base_score,
+        "risk_penalty": risk_penalty,
+        "has_critical_risk": has_critical_risk,
         "criteria": [c.model_dump() for c in criteria],
+        "risk_findings": risk_findings,
+        "risk_penalty_breakdown": risk_penalty_breakdown,
         "calculated_at": now.isoformat()
     }
 

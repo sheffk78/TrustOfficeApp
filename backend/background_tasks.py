@@ -499,91 +499,12 @@ class BackgroundTaskRunner:
             return 0
     
     async def _calculate_health_score_internal(self, trust_id: str, user_id: str) -> dict:
-        """Internal method to calculate health score (duplicated from server to avoid circular imports)"""
-        import uuid
-        
-        now = datetime.now(timezone.utc)
-        total_score = 0
-        
-        # 1. Quarterly Minutes (+20)
-        quarter = (now.month - 1) // 3
-        quarter_start = datetime(now.year, quarter * 3 + 1, 1, tzinfo=timezone.utc)
-        quarterly_minutes = await self.db.minutes_records.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "created_at": {"$gte": quarter_start.isoformat()}
-        })
-        if quarterly_minutes > 0:
-            total_score += 20
-        
-        # 2. Task Compliance (+20)
-        overdue_tasks = await self.db.governance_tasks.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "completed_at": None,
-            "due_date": {"$lt": now.isoformat()}
-        })
-        if overdue_tasks == 0:
-            total_score += 20
-        
-        # 3. Compensation Alignment (+20)
-        year_start = datetime(now.year, 1, 1, tzinfo=timezone.utc)
-        comp_plan = await self.db.compensation_plans.find_one(
-            {"trust_id": trust_id, "user_id": user_id},
-            {"_id": 0},
-            sort=[("effective_date", -1)]
-        )
-        
-        if comp_plan:
-            ytd_payments = await self.db.compensation_payments.find(
-                {"trust_id": trust_id, "user_id": user_id, "date": {"$gte": year_start.isoformat()}},
-                {"_id": 0}
-            ).to_list(1000)
-            ytd_total = sum(p.get("amount", 0) for p in ytd_payments)
-            if ytd_total <= comp_plan.get("annual_approved_amount", 0):
-                total_score += 20
-        else:
-            total_score += 20
-        
-        # 4. Distribution Documentation (+20)
-        dist_count = await self.db.distribution_records.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id
-        })
-        if dist_count > 0:
-            total_score += 20
-        
-        # 5. Annual Review (+20)
-        one_year_ago = (now - timedelta(days=365)).isoformat()
-        annual_review = await self.db.governance_tasks.find_one({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "task_type": "annual_review",
-            "completed_at": {"$gte": one_year_ago}
-        }, {"_id": 0})
-        if annual_review:
-            total_score += 20
-        
-        # Determine color
-        if total_score >= 80:
-            color = "green"
-        elif total_score >= 60:
-            color = "yellow"
-        else:
-            color = "red"
-        
-        # Save snapshot
-        snapshot = {
-            "snapshot_id": f"health_{uuid.uuid4().hex[:12]}",
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "score_value": total_score,
-            "color": color,
-            "calculated_at": now.isoformat()
-        }
-        await self.db.health_score_snapshots.insert_one(snapshot)
-        
-        return {"total_score": total_score, "color": color}
+        """Wrapper that calls the real scoring function from governance.py.
+        Uses late import to avoid circular dependency."""
+        from routers.governance import calculate_health_score
+
+        result = await calculate_health_score(trust_id, user_id, save_snapshot=True)
+        return result
     
     async def _log_audit(
         self,
