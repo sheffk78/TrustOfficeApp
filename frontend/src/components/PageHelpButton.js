@@ -13,6 +13,7 @@ import {
  * Props:
  *   items: Array of { text: string } — 2-3 bullet points about what to do on this page
  *   taPrompt: string — prompt sent to Trust Assistant when user clicks "Ask TA"
+ *   contextAlerts: Array of { text: string, prompt: string } — proactive alerts shown at top of popover
  *
  * Usage:
  *   <PageHelpButton
@@ -21,9 +22,12 @@ import {
  *       { text: 'Use Quick Actions to jump to common tasks' },
  *     ]}
  *     taPrompt="Walk me through the Dashboard"
+ *     contextAlerts={[
+ *       { text: 'You have 2 high-severity risks', prompt: 'Help me prioritize my risks' },
+ *     ]}
  *   />
  */
-const PageHelpButton = ({ items = [], taPrompt = '' }) => {
+const PageHelpButton = ({ items = [], taPrompt = '', contextAlerts = [] }) => {
   const taPath = taPrompt
     ? `/trust-assistant?prompt=${encodeURIComponent(taPrompt)}`
     : '/trust-assistant';
@@ -42,6 +46,20 @@ const PageHelpButton = ({ items = [], taPrompt = '' }) => {
       <PopoverContent className="w-80 p-0" align="end" sideOffset={8}>
         <div className="p-5">
           <h4 className="font-serif text-lg text-navy mb-3">About this page</h4>
+          {contextAlerts.length > 0 && (
+            <div className="mb-3 pb-3 border-b border-navy/10">
+              <p className="text-xs font-mono uppercase tracking-wider text-gold mb-2">Trust Assistant noticed</p>
+              {contextAlerts.map((alert, i) => (
+                <Link
+                  key={i}
+                  to={`/trust-assistant?prompt=${encodeURIComponent(alert.prompt)}`}
+                  className="block text-sm text-navy hover:text-gold py-1"
+                >
+                  {alert.text}
+                </Link>
+              ))}
+            </div>
+          )}
           {items.length > 0 && (
             <ul className="space-y-2.5 text-sm text-muted-foreground">
               {items.map((item, i) => (

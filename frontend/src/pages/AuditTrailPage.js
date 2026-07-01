@@ -16,9 +16,11 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
+import { toast } from 'sonner';
 
 const EVENT_ICONS = {
   minutes_created: FileText,
@@ -63,6 +65,7 @@ export default function AuditTrailPage() {
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [downloading, setDownloading] = useState(false);
   const PAGE_SIZE = 25;
 
   useEffect(() => {
@@ -232,6 +235,29 @@ export default function AuditTrailPage() {
     }
   };
 
+  const handleExport = async () => {
+    if (!selectedTrust) return;
+    setDownloading(true);
+    try {
+      const res = await fetchWithAuth(`/exports/audit-defense/${selectedTrust.trust_id}?days=365`);
+      if (!res.ok) throw new Error('Failed to generate report');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit_defense_${selectedTrust.trust_id}_${new Date().toISOString().slice(0,10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Audit Defense Report downloaded');
+    } catch (e) {
+      toast.error(e.message || 'Failed to generate report');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const paginatedEvents = events.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const filterOptions = [
@@ -280,12 +306,19 @@ export default function AuditTrailPage() {
                 items={[
                   { text: 'View a complete log of all trust administration actions' },
                   { text: 'Track changes, access, and decisions for compliance and transparency' },
-                  { text: 'Export audit logs for review or regulatory purposes' },
+                  { text: 'Filter events by type to focus on minutes, distributions, or alerts' },
+                  { text: 'Export a court-ready Audit Defense PDF with the Export button' },
                 ]}
                 taPrompt="Walk me through the Audit Trail and what gets logged"
+                contextAlerts={events.length < 5 ? [
+                  { text: 'Your audit trail is sparse. Regular activity (minutes, distributions) builds a stronger compliance record.', prompt: 'What should I be doing to build a strong audit trail for my trust?' }
+                ] : []}
               />
               <Button variant="outline" size="sm" onClick={loadAuditTrail}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExport} disabled={downloading}>
+                <Download className="w-4 h-4 mr-1" /> {downloading ? 'Generating...' : 'Export'}
               </Button>
             </div>
           </div>

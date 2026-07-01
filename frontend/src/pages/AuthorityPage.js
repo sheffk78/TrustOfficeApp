@@ -163,16 +163,19 @@ export default function AuthorityPage() {
           <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Authority Management</h1>
-              <p className="page-subtitle">Define and manage trustee authorities, signing powers, and delegation of duties</p>
+              <p className="page-subtitle">View trustee authorities, signing powers, and delegation structure as defined in your trust agreement</p>
             </div>
             <div className="flex items-center gap-2">
               <PageHelpButton
                 items={[
-                  { text: 'Define and manage trustee authorities and signing powers' },
-                  { text: 'Delegate duties and document who can act on behalf of the trust' },
-                  { text: 'Maintain a clear record of authorized decision-makers' },
+                  { text: 'View who has authority to act on behalf of the trust' },
+                  { text: 'See authority levels (full, limited, none) for each role' },
+                  { text: 'Click any person card to see their authority clause reference' },
                 ]}
                 taPrompt="Help me understand the Authority Management page"
+                contextAlerts={people.length === 0 ? [
+                  { text: 'No authority records found. Add trustees in Entity Management to see authority relationships.', prompt: 'I need to set up authority records for my trust. Where do I start?' }
+                ] : []}
               />
               <Button variant="outline" size="sm" onClick={loadData}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Refresh

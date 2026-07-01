@@ -13,11 +13,8 @@ import {
   CheckCircle2, ArrowUpRight, Activity
 } from 'lucide-react';
 
-const SEVERITY_STYLES = {
-  high: { border: 'border-red-200', bg: 'bg-red-50', text: 'text-red-800', icon: 'text-red-600', badge: 'bg-red-100 text-red-700', label: 'High' },
-  medium: { border: 'border-warning/20', bg: 'bg-warning/5', text: 'text-warning', icon: 'text-warning', badge: 'bg-warning/10 text-warning', label: 'Medium' },
-  low: { border: 'border-slate-200', bg: 'bg-slate-50', text: 'text-slate-700', icon: 'text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Low' },
-};
+import { SEVERITY_STYLES } from '@/utils/severityStyles';
+import ComplianceSummaryCard from '@/components/ComplianceSummaryCard';
 
 export default function RiskDashboardPage() {
   const { selectedTrust } = useAuth();
@@ -112,6 +109,9 @@ export default function RiskDashboardPage() {
                   { text: 'Track high, medium, and low risk items by category' },
                 ]}
                 taPrompt="Walk me through the Risk Dashboard and how to address flagged risks"
+                contextAlerts={data?.high_count > 0 ? [
+                  { text: `You have ${data.high_count} high-severity risk(s). Want help prioritizing?`, prompt: `I have ${data.high_count} high-severity risks on my Risk Dashboard. Help me prioritize which to address first.` }
+                ] : []}
               />
               <Button variant="outline" onClick={loadData} disabled={loading}>
                 <Activity className="w-4 h-4 mr-2"/>
@@ -126,6 +126,15 @@ export default function RiskDashboardPage() {
             </div>
           ) : (
             <>
+              {/* Compliance Summary */}
+              {data?.compliance_summary && (
+                <ComplianceSummaryCard
+                  score={data.compliance_summary.score}
+                  alertActive={data.compliance_summary.alert_active}
+                  nextDeadline={data.compliance_summary.next_deadline}
+                />
+              )}
+
               {/* Overall Assessment */}
               <Card className={"mb-6 border " + getBg(assessment)}>
                 <CardContent className="p-5 flex items-center gap-4">

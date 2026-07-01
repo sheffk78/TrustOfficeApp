@@ -244,6 +244,32 @@ async def get_risk_dashboard(trust_id: str, user: dict = Depends(get_current_use
             by_module[mod] = []
         by_module[mod].append(r)
 
+    # === COMPLIANCE SUMMARY (for Risk Dashboard card) ===
+    compliance_summary = None
+    if state_code:
+        compliance = await db.trust_state_compliance.find_one(
+            {"trust_id": trust_id, "state_code": state_code.upper()}, {"_id": 0}
+        )
+        if compliance:
+            next_deadline = None
+            for field in ['notice_next_due', 'accounting_next_due']:
+                val = compliance.get(field)
+                if val:
+                    if not next_deadline or val < next_deadline:
+                        next_deadline = val
+            compliance_summary = {
+                "score": compliance.get("compliance_score", 100),
+                "alert_active": compliance.get("alert_active", False),
+                "next_deadline": next_deadline,
+            }
+        else:
+            # No compliance record yet — show defaults so the card always renders
+            compliance_summary = {
+                "score": 100,
+                "alert_active": False,
+                "next_deadline": None,
+            }
+
     return {
         "trust_id": trust_id,
         "trust_name": trust.get("name"),
@@ -255,4 +281,5 @@ async def get_risk_dashboard(trust_id: str, user: dict = Depends(get_current_use
         "low_count": low,
         "risks": risks,
         "by_module": by_module,
+        "compliance_summary": compliance_summary,
     }

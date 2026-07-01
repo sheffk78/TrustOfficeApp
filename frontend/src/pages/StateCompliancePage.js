@@ -8,17 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
+import InfoTooltip from '@/components/InfoTooltip';
 import { toast } from 'sonner';
 import {
   MapPin, AlertTriangle, Shield, CheckCircle2, Clock,
   FileText, ChevronRight, BookOpen, Scale, Gavel
 } from 'lucide-react';
 
-const SEVERITY_STYLES = {
-  high: 'bg-red-100 text-red-700 border-red-200',
-  medium: 'bg-warning/10 text-warning border-warning/20',
-  low: 'bg-slate-100 text-slate-600 border-slate-200',
-};
+import { SEVERITY_STYLES_FLAT as SEVERITY_STYLES } from '@/utils/severityStyles';
 
 const CATEGORY_ICONS = {
   utc_gap: Scale,
@@ -27,6 +24,44 @@ const CATEGORY_ICONS = {
   accounting: Clock,
   spendthrift: Shield,
 };
+
+const JARGON_TOOLTIPS = {
+  utc_gap: 'The Uniform Trust Code is a model law that standardizes trust rules. States that adopt it give trustees clearer guidelines and more predictable outcomes.',
+  utc_partial: 'The Uniform Trust Code is a model law that standardizes trust rules. States that adopt it give trustees clearer guidelines and more predictable outcomes.',
+  notice: 'Most states require trustees to notify beneficiaries at least annually about trust status, assets, and administration. Some states require more frequent updates.',
+  accounting: 'An accounting is a formal financial report to beneficiaries showing income, expenses, distributions, and remaining assets. Some states require it annually, others only on demand.',
+  spendthrift: 'A spendthrift clause prevents beneficiaries\' creditors from reaching trust assets before they\'re distributed.',
+};
+
+const CATEGORY_PLAIN_ENGLISH = {
+  utc_gap: 'Your state uses older trust laws instead of the modern Uniform Trust Code',
+  utc_partial: 'Your state partially adopted the Uniform Trust Code',
+  notice: 'Your state requires you to keep beneficiaries informed on a schedule',
+  accounting: 'Your state requires you to send regular financial reports to beneficiaries',
+  spendthrift: 'Your state does not automatically protect trust assets from creditors',
+};
+
+function DeadlineRow({ label, lastSent, nextDue, onMarkSent }) {
+  const overdue = nextDue && new Date(nextDue) < new Date();
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-neutral-600">{label}</span>
+      <div className="text-right">
+        {nextDue ? (
+          <span className={overdue ? 'text-red-600 font-medium' : 'text-navy'}>
+            {overdue ? 'Overdue: ' : 'Due: '}{new Date(nextDue).toLocaleDateString()}
+          </span>
+        ) : (
+          <span className="text-neutral-400">Not scheduled</span>
+        )}
+        {lastSent && (
+          <p className="text-xs text-neutral-400">Last: {new Date(lastSent).toLocaleDateString()}</p>
+        )}
+        <button onClick={onMarkSent} className="text-xs text-gold hover:underline ml-2">Mark as sent</button>
+      </div>
+    </div>
+  );
+}
 
 export default function StateCompliancePage() {
   const { selectedTrust } = useAuth();
@@ -55,6 +90,34 @@ export default function StateCompliancePage() {
       toast.error(e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const markNoticeSent = async () => {
+    try {
+      await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notice_last_sent: new Date().toISOString() }),
+      });
+      toast.success('Beneficiary notice marked as sent');
+      loadData();
+    } catch (e) {
+      toast.error('Failed to update notice status');
+    }
+  };
+
+  const markAccountingSent = async () => {
+    try {
+      await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accounting_last_sent: new Date().toISOString() }),
+      });
+      toast.success('Accounting marked as sent');
+      loadData();
+    } catch (e) {
+      toast.error('Failed to update accounting status');
     }
   };
 
@@ -99,6 +162,9 @@ export default function StateCompliancePage() {
                   { text: 'Ensure your trust administration complies with local law' },
                 ]}
                 taPrompt="Walk me through the State Compliance page for my state"
+                contextAlerts={compliance?.alert_active ? [
+                  { text: compliance.alert_reason || 'Compliance alert active', prompt: `My state compliance alert says: ${compliance.alert_reason}. What should I do?` }
+                ] : []}
               />
               <Link to="/settings">
                 <Button variant="outline">Edit Trust Profile</Button>
@@ -149,6 +215,9 @@ export default function StateCompliancePage() {
                     {profile?.utc_adoption_date && (
                       <p className="text-xs text-neutral-500 mt-1">As of {profile.utc_adoption_date}</p>
                     )}
+                    <div className="mt-1">
+                      <InfoTooltip text="The Uniform Trust Code is a model law that standardizes trust rules. States that adopt it give trustees clearer guidelines and more predictable outcomes." />
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -159,9 +228,49 @@ export default function StateCompliancePage() {
                       <p className="text-xs font-mono uppercase tracking-wider text-neutral-500">Trustee Removal</p>
                     </div>
                     <p className="text-sm font-medium text-navy capitalize">{profile?.trustee_removal_standard}</p>
+                    <div className="mt-1">
+                      <InfoTooltip text="The legal standard required to remove a trustee. 'Breach of trust' is harder to prove than 'reasonable grounds.'" />
+                    </div>
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Compliance Status Cards */}
+              {compliance && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Compliance Score Card */}
+                  <Card className="border border-neutral-200">
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-mono uppercase tracking-wider text-neutral-500">Compliance Score</p>
+                        <span className={`text-2xl font-bold ${compliance.compliance_score >= 80 ? 'text-emerald-600' : compliance.compliance_score >= 50 ? 'text-warning' : 'text-red-600'}`}>
+                          {compliance.compliance_score}
+                        </span>
+                      </div>
+                      {compliance.alert_active && (
+                        <div className="flex items-center gap-2 text-sm text-red-600">
+                          <AlertTriangle className="w-4 h-4" />
+                          {compliance.alert_reason || 'Compliance alert active'}
+                        </div>
+                      )}
+                      {!compliance.alert_active && (
+                        <p className="text-sm text-neutral-500">
+                          {compliance.compliance_score >= 80 ? 'On track' : compliance.compliance_score >= 50 ? 'Needs attention' : 'Critical, take action'}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Deadline Tracking Card */}
+                  <Card className="border border-neutral-200">
+                    <CardContent className="p-5 space-y-2">
+                      <p className="text-xs font-mono uppercase tracking-wider text-neutral-500 mb-2">Deadline Tracking</p>
+                      <DeadlineRow label="Beneficiary Notice" lastSent={compliance.notice_last_sent} nextDue={compliance.notice_next_due} onMarkSent={markNoticeSent} />
+                      <DeadlineRow label="Accounting" lastSent={compliance.accounting_last_sent} nextDue={compliance.accounting_next_due} onMarkSent={markAccountingSent} />
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
 
               {/* Requirements List */}
               <Card className="border border-neutral-200">
@@ -193,10 +302,16 @@ export default function StateCompliancePage() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h3 className="font-semibold text-navy text-sm">{req.title}</h3>
+                                {JARGON_TOOLTIPS[req.category] && (
+                                  <InfoTooltip text={JARGON_TOOLTIPS[req.category]} />
+                                )}
                                 <span className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${SEVERITY_STYLES[req.severity]}`}>
                                   {req.severity}
                                 </span>
                               </div>
+                              {CATEGORY_PLAIN_ENGLISH[req.category] && (
+                                <p className="text-xs text-neutral-400 italic mb-1">{CATEGORY_PLAIN_ENGLISH[req.category]}</p>
+                              )}
                               <p className="text-sm text-neutral-600 mb-2">{req.description}</p>
                               <p className="text-xs text-neutral-500 flex items-center gap-1">
                                 <ChevronRight className="w-3 h-3"/>

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { fetchWithAuth } from '@/utils/api';
+import PageHelpButton from '@/components/PageHelpButton';
 import {
   FileText, Shield, HeartPulse, Landmark, Building2, Users,
   ClipboardList, Mail, BookOpen, FilePen, Home, Car,
   Printer, ChevronDown, ChevronUp, ArrowLeft, Download
 } from 'lucide-react';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api';
 
 // ==================== SECTION DATA ====================
 
@@ -117,20 +117,16 @@ const PRINT_STYLES = `
 // ==================== COMPONENT ====================
 
 const PrintableBinderPage = () => {
-  const { user, selectedTrust, getToken } = useAuth();
+  const { user, selectedTrust } = useAuth();
   const navigate = useNavigate();
   const [coverData, setCoverData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePrint, setActivePrint] = useState(null);
 
-  const token = getToken ? getToken() : localStorage.getItem('auth_token');
-
   useEffect(() => {
     const fetchCoverData = async () => {
       try {
-        const response = await fetch(`${API}/binder/cover-sheet-data`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await fetchWithAuth('/binder/cover-sheet-data');
         if (response.ok) {
           const data = await response.json();
           setCoverData(data);
@@ -142,7 +138,7 @@ const PrintableBinderPage = () => {
       }
     };
     fetchCoverData();
-  }, [token]);
+  }, []);
 
   const handlePrint = (sectionId) => {
     setActivePrint(sectionId);
@@ -170,6 +166,16 @@ const PrintableBinderPage = () => {
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Printable Binder Tools
           </h1>
+          <div className="flex items-center gap-2 mb-2">
+            <PageHelpButton
+              items={[
+                { text: 'Print cover sheets, tab dividers, and reference cards for your physical trust binder' },
+                { text: 'Use a 3-ring binder with tab dividers for best results' },
+                { text: 'Print on standard letter-size paper' },
+              ]}
+              taPrompt="How do I set up a physical trust compliance binder?"
+            />
+          </div>
           <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-2xl">
             Organize your trust documents with these printable inserts. Print on standard letter-size paper.
             Use a 3-ring binder with tab dividers for best results.
