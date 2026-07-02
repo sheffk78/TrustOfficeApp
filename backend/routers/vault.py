@@ -267,6 +267,9 @@ async def download_document(doc_id: str, user: dict = Depends(get_current_user))
         # This is a reference-only doc (no uploaded file) — redirect to external URL
         storage_url = doc.get("storage_url")
         if storage_url:
+            # Runtime validation: only redirect to HTTPS URLs (defense-in-depth for legacy records)
+            if not storage_url.startswith("https://"):
+                raise HTTPException(status_code=400, detail="Stored URL is not a valid HTTPS redirect")
             from fastapi.responses import RedirectResponse
             return RedirectResponse(url=storage_url)
         raise HTTPException(status_code=404, detail="No file content available")

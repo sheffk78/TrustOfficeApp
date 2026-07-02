@@ -517,14 +517,23 @@ async def provision_trustoffice(
             existing = await db.external_provisions.find_one({"idem_key": idem_key}, {"_id": 0})
             if existing:
                 logger.info(f"Idempotent replay for idem_key={idem_key} (race resolved)")
-                # Don't return here — fall through to email/provision completion below
-                # The existing record may be pending or complete
+                # Return the existing provision whether pending or complete.
+                # Do NOT fall through — that would create a duplicate trust and send a duplicate email.
                 if existing.get("status") == "complete":
                     return {
                         "status": "already_exists",
                         "provision": existing,
                         "message": "Trust already provisioned"
                     }
+                else:
+                    # Pending means another request is mid-flight. Return it as-is.
+                    return {
+                        "status": "in_progress",
+                        "provision": existing,
+                        "message": "Trust provisioning already in progress"
+                    }
+            # If existing is None (record was deleted between error and re-fetch), re-raise
+            raise
         else:
             raise
 
