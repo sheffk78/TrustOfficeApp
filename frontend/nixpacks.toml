@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs-18_x", "npm-9_x"]
 
 [phases.install]
-cmds = ["npm install --legacy-peer-deps"]
+cmds = ["echo 'Using pre-built bundle'"]
 
 [phases.build]
-cmds = ["npx craco build --reset-cache"]
+cmds = ["echo 'Skipping build - using pre-built bundle'"]
 
 [start]
 cmd = "npx serve -s build -l ${PORT:-3000}"
