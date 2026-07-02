@@ -485,7 +485,7 @@ export default function OnboardingPage() {
                     <select
                       value={trustData.jurisdiction}
                       onChange={(e) => setTrustData({ ...trustData, jurisdiction: e.target.value })}
-                      className="mt-1.5 input-trust h-11 text-sm w-full rounded-md border border-input bg-background px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="mt-1.5 input-trust h-11 text-sm w-full rounded border border-input bg-background px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
                       data-testid="jurisdiction-input"
                     >
                       <option value="" disabled>Select state</option>

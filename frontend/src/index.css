@@ -257,7 +257,7 @@
 }
 
 .badge-warning {
-    @apply border-amber-600 text-amber-700 bg-amber-50/50;
+    @apply border-warning text-warning bg-warning/5;
 }
 
 .badge-error {

@@ -21,7 +21,7 @@ function FilingStatusBadge({ filingStatus, overdue }) {
     return <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">Filed</span>;
   }
   if (filingStatus === 'extended') {
-    return <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold border border-amber-500 text-amber-600">Extended</span>;
+    return <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold border border-warning text-warning">Extended</span>;
   }
   if (overdue) {
     return <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700">Overdue</span>;
@@ -99,14 +99,14 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
                     Due: {format(due, 'MMM d, yyyy')}
                   </span>
                   {event.is_fiscal_year && (
-                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5">Fiscal Year</span>
+                    <span className="text-xs bg-warning/10 text-warning px-1.5 py-0.5">Fiscal Year</span>
                   )}
                 </div>
               )}
 
               {/* Days remaining countdown */}
               {typeof event.days_remaining === 'number' && filingStatus === 'pending' && (
-                <div className={`text-xs mt-1.5 flex items-center gap-1 ${overdue ? 'text-red-600' : event.days_remaining <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                <div className={`text-xs mt-1.5 flex items-center gap-1 ${overdue ? 'text-red-600' : event.days_remaining <= 30 ? 'text-warning' : 'text-muted-foreground'}`}>
                   {overdue ? (
                     <><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> Due {Math.abs(event.days_remaining)} days ago</>
                   ) : (
@@ -139,7 +139,7 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
                   size="sm"
                   variant="outline"
                   onClick={() => setShowConfirm('extended')}
-                  className="border-amber-500 text-amber-600 hover:bg-amber-50"
+                  className="border-warning text-warning hover:bg-warning/5"
                   data-testid={`mark-extended-${event.entry_id}`}
                 >
                   Extend

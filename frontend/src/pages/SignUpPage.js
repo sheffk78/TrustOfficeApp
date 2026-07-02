@@ -312,7 +312,7 @@ export default function SignUpPage() {
             
             {/* Referral banner */}
             {referralInfo && (
-              <div className="bg-gradient-to-r from-gold/20 to-amber-100 dark:from-gold/30 dark:to-amber-900/30 -mx-6 -mt-6 px-6 py-4 mb-6 border-b border-gold/30">
+              <div className="bg-gradient-to-r from-gold/20 to-warning/10 dark:from-gold/30 dark:to-warning/30 -mx-6 -mt-6 px-6 py-4 mb-6 border-b border-gold/30">
                 <div className="flex items-center gap-2 mb-1">
                   <Gift className="w-5 h-5 text-gold" />
                   <span className="font-medium text-navy">You've been referred!</span>

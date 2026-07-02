@@ -178,7 +178,7 @@ export default function AffiliatePage() {
                 ))}
               </ul>
             </div>
-            <div className="bg-gradient-to-br from-navy to-navy/80 text-white p-8 rounded-2xl">
+            <div className="bg-gradient-to-br from-navy to-navy/80 text-white p-8 rounded">
               <Users className="w-12 h-12 text-gold mb-4" />
               <h3 className="font-serif text-2xl mb-4">Join Our Partner Community</h3>
               <p className="text-white/80 mb-6">

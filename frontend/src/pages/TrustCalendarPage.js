@@ -98,6 +98,14 @@ export default function TrustCalendarPage() {
     }
   }, [selectedTrust, loadEvents]);
 
+  const formatDate = (dateString) => {
+    try {
+      return format(parseISO(dateString), 'MMM d, yyyy');
+    } catch {
+      return dateString;
+    }
+  };
+
   // ── Year filtering: filter ALL events by due_date calendar year ──
   const yearEvents = useMemo(() => {
     return events.filter(e => {
@@ -420,7 +428,7 @@ export default function TrustCalendarPage() {
                         <Button size="sm" className="btn-primary" onClick={() => setNextUpConfirm({ action: 'filed', entryId: nextUp.entry_id, label: nextUp.title || nextUp.deadline_type, taxYear: nextUp.tax_year })}>
                           Mark Filed
                         </Button>
-                        <Button size="sm" variant="outline" className="border-amber-500 text-amber-600" onClick={() => setNextUpConfirm({ action: 'extended', entryId: nextUp.entry_id, label: nextUp.title || nextUp.deadline_type, taxYear: nextUp.tax_year })}>
+                        <Button size="sm" variant="outline" className="border-warning text-warning" onClick={() => setNextUpConfirm({ action: 'extended', entryId: nextUp.entry_id, label: nextUp.title || nextUp.deadline_type, taxYear: nextUp.tax_year })}>
                           Extend
                         </Button>
                       </>
@@ -438,8 +446,8 @@ export default function TrustCalendarPage() {
 
           {/* ── Tax Setup Banner ────────────────────────────── */}
           {!loading && !hasTaxCalendar && (
-            <div className="mb-4 flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 px-4 py-3" data-testid="tax-setup-banner">
-              <div className="text-sm text-amber-800">
+            <div className="mb-4 flex items-center justify-between gap-3 bg-warning/5 border border-warning/20 px-4 py-3" data-testid="tax-setup-banner">
+              <div className="text-sm text-warning">
                 Tax deadlines not set up for {year}.
               </div>
               <Button size="sm" onClick={generateTaxCalendar} className="btn-primary" data-testid="generate-tax-banner-btn">
@@ -556,7 +564,7 @@ export default function TrustCalendarPage() {
                     {trustProfile.isFiscalYear ? 'Fiscal year ends' : 'Tax year ends'}: {' '}
                     <b className="text-navy">{trustProfile.taxYearEndMonth}/{trustProfile.taxYearEndDay}</b>
                     {trustProfile.isFiscalYear && (
-                      <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5">Fiscal</span>
+                      <span className="ml-2 text-xs bg-warning/10 text-warning px-1.5 py-0.5">Fiscal</span>
                     )}
                   </>
                 ) : (
