@@ -812,21 +812,43 @@ async def fire_activation_webhook(user_id: str, event_type: str):
                         content=payload_json,
                         headers=headers,
                     )
-                    logger.info(
-                        f"Webhook {event_type} delivered for user {user_id}: "
-                        f"HTTP {resp.status_code} (attempt {attempt + 1})"
-                    )
-                    # Record the delivery
-                    await db.external_api_audit.insert_one({
-                        "action": f"webhook_{event_type}",
-                        "partner_id": partner_id,
-                        "user_id": user_id,
-                        "wingpoint_ref": provision.get("wingpoint_ref"),
-                        "webhook_url": webhook_url,
-                        "response_status": resp.status_code,
-                        "timestamp": now.isoformat(),
-                    })
-                    return  # Success
+
+                    if 200 <= resp.status_code < 300:
+                        # Success — log and record delivery
+                        logger.info(
+                            f"Webhook {event_type} delivered for user {user_id}: "
+                            f"HTTP {resp.status_code} (attempt {attempt + 1})"
+                        )
+                        await db.external_api_audit.insert_one({
+                            "action": f"webhook_{event_type}",
+                            "partner_id": partner_id,
+                            "user_id": user_id,
+                            "wingpoint_ref": provision.get("wingpoint_ref"),
+                            "webhook_url": webhook_url,
+                            "response_status": resp.status_code,
+                            "timestamp": now.isoformat(),
+                        })
+                        return  # Success
+                    else:
+                        # Non-2xx response — not delivered, retry if attempts remain
+                        logger.warning(
+                            f"Webhook {event_type} got HTTP {resp.status_code} for user {user_id}: "
+                            f"not delivered (attempt {attempt + 1})"
+                        )
+                        if attempt < 2:
+                            await asyncio.sleep(1 * (attempt + 1))
+                            continue
+                        # Last attempt failed — record as failed delivery
+                        await db.external_api_audit.insert_one({
+                            "action": f"webhook_{event_type}_failed",
+                            "partner_id": partner_id,
+                            "user_id": user_id,
+                            "wingpoint_ref": provision.get("wingpoint_ref"),
+                            "webhook_url": webhook_url,
+                            "response_status": resp.status_code,
+                            "timestamp": now.isoformat(),
+                        })
+                        return
                 except httpx.RequestError as e:
                     logger.warning(
                         f"Webhook {event_type} delivery failed (attempt {attempt + 1}): {e}"

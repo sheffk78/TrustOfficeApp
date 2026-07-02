@@ -179,7 +179,14 @@ async def upload_document(
                 detail=f"File type '{content_type}' is not supported. Supported types: PDF, images, Word docs, Excel, and text files."
             )
 
-    # Read and validate file size
+    # Pre-read size check using Content-Length (prevents memory exhaustion)
+    if file.size is not None and file.size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is 16MB. Your file is {file.size / (1024*1024):.1f}MB."
+        )
+
+    # Read and validate actual file size (defense-in-depth: Content-Length can be missing or spoofed)
     file_content = await file.read()
     if len(file_content) > MAX_FILE_SIZE:
         raise HTTPException(
