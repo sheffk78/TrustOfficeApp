@@ -5,7 +5,7 @@ nixPkgs = ["nodejs-18_x", "npm-9_x"]
 cmds = ["npm install --legacy-peer-deps"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["rm -rf node_modules/.cache && npm run build"]
 
 [start]
 cmd = "npx serve -s build -l ${PORT:-3000}"
