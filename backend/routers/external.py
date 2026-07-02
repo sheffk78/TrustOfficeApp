@@ -254,7 +254,7 @@ async def provision_trustoffice(
 
     # ---- IDEMPOTENCY CHECK ----
     existing_provision = await db.external_provisions.find_one(
-        {"wingpoint_ref": request.wingpoint_ref},
+        {"idem_key": idem_key},
         {"_id": 0}
     )
 
@@ -384,40 +384,41 @@ async def provision_trustoffice(
             else:
                 raise
 
-        # Create free subscription for new user
-        await db.subscriptions.insert_one({
-            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
-            "user_id": user_id,
-            "plan_type": "free",
-            "status": "active",
-            "trial_start_date": None,
-            "trial_end_date": None,
-            "stripe_customer_id": None,
-            "stripe_subscription_id": None,
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat(),
-            "notes": "Free individual trustee account — WingPoint provisioned",
-            "coupon_code": request.coupon_code,
-            "source": "wingpoint",
-            "wingpoint_ref": request.wingpoint_ref,
-        })
+        # Create free subscription for new user (only if we actually created the user)
+        if is_new_user:
+            await db.subscriptions.insert_one({
+                "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+                "user_id": user_id,
+                "plan_type": "free",
+                "status": "active",
+                "trial_start_date": None,
+                "trial_end_date": None,
+                "stripe_customer_id": None,
+                "stripe_subscription_id": None,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "Free individual trustee account — WingPoint provisioned",
+                "coupon_code": request.coupon_code,
+                "source": "wingpoint",
+                "wingpoint_ref": request.wingpoint_ref,
+            })
 
-        # Initialize onboarding checklist
-        onboarding_doc = {
-            "user_id": user_id,
-            "formation_date_added": request.trust_formation_date is not None,
-            "ein_entered": request.ein is not None,
-            "trust_doc_uploaded": False,
-            "ein_doc_uploaded": request.has_irs_confirmation is True,
-            "beneficiaries_added": False,
-            "assets_added": False,
-            "minutes_generated": False,
-            "calendar_set": False,
-            "checklist_dismissed": False,
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
-        }
-        await db.user_onboarding.insert_one(onboarding_doc)
+            # Initialize onboarding checklist
+            onboarding_doc = {
+                "user_id": user_id,
+                "formation_date_added": request.trust_formation_date is not None,
+                "ein_entered": request.ein is not None,
+                "trust_doc_uploaded": False,
+                "ein_doc_uploaded": request.has_irs_confirmation is True,
+                "beneficiaries_added": False,
+                "assets_added": False,
+                "minutes_generated": False,
+                "calendar_set": False,
+                "checklist_dismissed": False,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat()
+            }
+            await db.user_onboarding.insert_one(onboarding_doc)
 
         logger.info(f"Provision: Created new user {user_id} ({email}) via WingPoint")
 
@@ -481,23 +482,15 @@ async def provision_trustoffice(
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
     set_password_url = f"{frontend_url}/reset-password?token={set_password_token}"
 
-    # ---- SEND WELCOME EMAIL ----
-    user_name = display_name or email.split("@")[0]
-    email_result = await email_service.send_welcome_set_password_email(
-        to_email=email,
-        user_name=user_name,
-        set_password_url=set_password_url
-    )
-
-    email_status = email_result.get("status", "unknown")
-    if email_status == "failed":
-        logger.error(f"Provision: Welcome email failed for {email}: {email_result.get('error')}")
-    elif email_status == "skipped":
-        logger.warning(f"Provision: Email service not configured — welcome email skipped for {email}")
-
-    # ---- RECORD PROVISION ----
+    # ---- INSERT PROVISION RECORD EARLY (pending status) ----
+    # Inserted before email send so retries find an existing anchor even if
+    # a later step fails.  Updated to "complete" after the email step succeeds.
+    # NOTE: A unique index on idem_key should be created in server.py:
+    #   await db.external_provisions.create_index("idem_key", unique=True)
+    provision_id = f"prov_{uuid.uuid4().hex[:12]}"
     provision_record = {
-        "provision_id": f"prov_{uuid.uuid4().hex[:12]}",
+        "provision_id": provision_id,
+        "idem_key": idem_key,
         "wingpoint_ref": request.wingpoint_ref,
         "partner_id": partner_id,
         "user_id": user_id,
@@ -507,7 +500,8 @@ async def provision_trustoffice(
         "is_new_user": is_new_user,
         "set_password_url": set_password_url,
         "set_password_expires": expires_at.isoformat(),
-        "email_status": email_status,
+        "email_status": "pending",
+        "status": "pending",
         "coupon_code": request.coupon_code,
         "source_package": request.source_package,
         "use_wingpoint_trustee": request.use_wingpoint_trustee,
@@ -515,7 +509,53 @@ async def provision_trustoffice(
         "created_at": now.isoformat()
     }
 
-    await db.external_provisions.insert_one(provision_record)
+    try:
+        await db.external_provisions.insert_one(provision_record)
+    except Exception as e:
+        if "duplicate key" in str(e).lower() or "E11000" in str(e):
+            # Concurrent request with same idem_key already provisioned — return existing
+            existing = await db.external_provisions.find_one({"idem_key": idem_key}, {"_id": 0})
+            if existing:
+                logger.info(f"Idempotent replay for idem_key={idem_key} (race resolved)")
+                # Don't return here — fall through to email/provision completion below
+                # The existing record may be pending or complete
+                if existing.get("status") == "complete":
+                    return {
+                        "status": "already_exists",
+                        "provision": existing,
+                        "message": "Trust already provisioned"
+                    }
+        else:
+            raise
+
+    # ---- SEND WELCOME EMAIL (wrapped so it can't block the provision record) ----
+    user_name = display_name or email.split("@")[0]
+    try:
+        email_result = await email_service.send_welcome_set_password_email(
+            to_email=email,
+            user_name=user_name,
+            set_password_url=set_password_url
+        )
+        email_status = email_result.get("status", "unknown")
+    except Exception as e:
+        email_result = {"status": "failed", "error": str(e)}
+        email_status = "failed"
+        logger.error(f"Provision: Welcome email raised exception for {email}: {e}")
+
+    if email_status == "failed":
+        logger.error(f"Provision: Welcome email failed for {email}: {email_result.get('error')}")
+    elif email_status == "skipped":
+        logger.warning(f"Provision: Email service not configured — welcome email skipped for {email}")
+
+    # ---- UPDATE PROVISION RECORD TO COMPLETE ----
+    await db.external_provisions.update_one(
+        {"idem_key": idem_key},
+        {"$set": {
+            "status": "complete",
+            "email_status": email_status,
+            "completed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
 
     # ---- AUDIT LOG ----
     await log_audit(

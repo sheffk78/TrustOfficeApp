@@ -3,11 +3,14 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
 from fastapi.responses import Response
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 import re
 import uuid
 import base64
 import logging
+from urllib.parse import quote
+
+from pydantic import BaseModel, field_validator
 
 from database import db
 from dependencies import get_current_user
@@ -54,8 +57,66 @@ ALLOWED_MIME_TYPES = {
 MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB BSON limit
 
 
+# --- Pydantic models for request validation ---
+
+
+class DocumentCreate(BaseModel):
+    """Validated payload for adding a document reference to the vault."""
+    title: str
+    category: str = "other"
+    date: Optional[str] = None
+    description: Optional[str] = None
+    storage_provider: str = "google_drive"
+    storage_url: Optional[str] = None
+    storage_path: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size: Optional[str] = None
+    tags: List[str] = []
+    expiration_date: Optional[str] = None
+    needs_renewal: bool = False
+
+    @field_validator("storage_provider")
+    @classmethod
+    def validate_storage_provider(cls, v: str) -> str:
+        if v not in STORAGE_PROVIDERS:
+            raise ValueError(f"Invalid storage provider. Must be one of: {', '.join(STORAGE_PROVIDERS)}")
+        return v
+
+    @field_validator("storage_url")
+    @classmethod
+    def validate_storage_url(cls, v: Optional[str]) -> Optional[str]:
+        if v and not v.startswith("https://"):
+            raise ValueError("storage_url must start with 'https://'")
+        return v
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v: str) -> str:
+        if v not in DOC_CATEGORIES:
+            raise ValueError(f"Invalid category. Must be one of: {', '.join(DOC_CATEGORIES.keys())}")
+        return v
+
+
+class DocumentUpdate(BaseModel):
+    """Validated payload for updating a vault document record. Only allowlisted fields are accepted."""
+    title: Optional[str] = None
+    category: Optional[str] = None
+    date: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[List[str]] = None
+    expiration_date: Optional[str] = None
+    needs_renewal: Optional[bool] = None
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in DOC_CATEGORIES:
+            raise ValueError(f"Invalid category. Must be one of: {', '.join(DOC_CATEGORIES.keys())}")
+        return v
+
+
 @router.post("/trusts/{trust_id}/vault/documents")
-async def add_document(trust_id: str, doc: dict, user: dict = Depends(get_current_user)):
+async def add_document(trust_id: str, doc: DocumentCreate, user: dict = Depends(get_current_user)):
     """Add a document reference to the vault."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
@@ -66,19 +127,19 @@ async def add_document(trust_id: str, doc: dict, user: dict = Depends(get_curren
         "doc_id": f"doc_{uuid.uuid4().hex[:12]}",
         "trust_id": trust_id,
         "user_id": user["user_id"],
-        "title": doc["title"],
-        "category": doc.get("category", "other"),
-        "category_label": DOC_CATEGORIES.get(doc.get("category", "other"), "Other"),
-        "date": doc.get("date"),
-        "description": doc.get("description"),
-        "storage_provider": doc.get("storage_provider", "google_drive"),
-        "storage_url": doc.get("storage_url"),
-        "storage_path": doc.get("storage_path"),
-        "file_name": doc.get("file_name"),
-        "file_size": doc.get("file_size"),
-        "tags": doc.get("tags", []),
-        "expiration_date": doc.get("expiration_date"),
-        "needs_renewal": doc.get("needs_renewal", False),
+        "title": doc.title,
+        "category": doc.category,
+        "category_label": DOC_CATEGORIES.get(doc.category, "Other"),
+        "date": doc.date,
+        "description": doc.description,
+        "storage_provider": doc.storage_provider,
+        "storage_url": doc.storage_url,
+        "storage_path": doc.storage_path,
+        "file_name": doc.file_name,
+        "file_size": doc.file_size,
+        "tags": doc.tags,
+        "expiration_date": doc.expiration_date,
+        "needs_renewal": doc.needs_renewal,
         "created_at": now,
         "updated_at": now,
     }
@@ -197,13 +258,8 @@ async def upload_document(
 @router.get("/vault/documents/{doc_id}/download")
 async def download_document(doc_id: str, user: dict = Depends(get_current_user)):
     """Download a file from the vault."""
-    doc = await db.vault_documents.find_one({"doc_id": doc_id}, {"_id": 0})
+    doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    # Verify ownership
-    trust = await db.trusts.find_one({"trust_id": doc["trust_id"], "user_id": user["user_id"]})
-    if not trust:
         raise HTTPException(status_code=404, detail="Document not found")
 
     file_content = doc.get("file_content")
@@ -218,11 +274,16 @@ async def download_document(doc_id: str, user: dict = Depends(get_current_user))
     content_type = doc.get("file_content_type", "application/octet-stream")
     filename = doc.get("file_name", "document")
 
+    # Sanitize filename to prevent header injection — strip CR/LF and quotes
+    safe_filename = re.sub(r'[\r\n"\\]', '', filename)
+    # RFC 5987 encoded filename for non-ASCII / special characters
+    encoded_filename = quote(safe_filename, safe='')
+
     return Response(
         content=file_content,
         media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
+            "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{encoded_filename}"
         }
     )
 
@@ -278,17 +339,13 @@ async def list_documents(
 
 
 @router.patch("/vault/documents/{doc_id}")
-async def update_document(doc_id: str, update: dict, user: dict = Depends(get_current_user)):
+async def update_document(doc_id: str, update: DocumentUpdate, user: dict = Depends(get_current_user)):
     """Update a vault document record."""
-    doc = await db.vault_documents.find_one({"doc_id": doc_id}, {"_id": 0})
+    doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    trust = await db.trusts.find_one({"trust_id": doc["trust_id"], "user_id": user["user_id"]})
-    if not trust:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    update_data = {k: v for k, v in update.items() if v is not None}
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     # Update category_label if category changed
@@ -302,15 +359,11 @@ async def update_document(doc_id: str, update: dict, user: dict = Depends(get_cu
 @router.delete("/vault/documents/{doc_id}")
 async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
     """Remove a document from vault (and its file content)."""
-    doc = await db.vault_documents.find_one({"doc_id": doc_id}, {"_id": 0})
+    doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    trust = await db.trusts.find_one({"trust_id": doc["trust_id"], "user_id": user["user_id"]})
-    if not trust:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    await db.vault_documents.delete_one({"doc_id": doc_id})
+    await db.vault_documents.delete_one({"doc_id": doc_id, "user_id": user["user_id"]})
     return {"message": "Document removed from vault"}
 
 

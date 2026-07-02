@@ -10,6 +10,8 @@ import os
 import httpx
 import re
 import urllib.parse
+from collections import defaultdict
+from time import time
 
 from database import db
 from dependencies import get_current_user, hash_password, verify_password, create_jwt_token, JWT_EXPIRATION_HOURS
@@ -21,6 +23,46 @@ from mailercloud_service import add_to_trial_list
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
+
+
+# ==================== RATE LIMITING ====================
+# NOTE: This is a simple in-memory rate limiter that works within a single
+# process. It does NOT work across multiple workers/processes. For production
+# with multiple uvicorn/gunicorn workers, use a Redis-backed limiter (e.g.
+# slowapi with a Redis storage backend) so that rate limit state is shared
+# across all workers.
+_rate_limit_store: defaultdict = defaultdict(list)
+
+
+def rate_limit(max_requests: int, window_seconds: int = 60):
+    """
+    FastAPI dependency that enforces per-IP, per-endpoint rate limiting.
+    Raises HTTP 429 when the limit is exceeded.
+    """
+    async def _check_rate_limit(request: Request):
+        client_ip = request.client.host if request.client else "unknown"
+        # Honour X-Forwarded-For for proxied requests
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            # Use rightmost IP (set by closest trusted proxy) — leftmost is client-spoofable
+            client_ip = forwarded.split(",")[-1].strip()
+
+        now = time()
+        key = f"{client_ip}:{request.url.path}"
+
+        # Clean expired entries
+        _rate_limit_store[key] = [
+            t for t in _rate_limit_store[key] if t > now - window_seconds
+        ]
+
+        if len(_rate_limit_store[key]) >= max_requests:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many requests. Try again in {window_seconds} seconds.",
+            )
+        _rate_limit_store[key].append(now)
+
+    return _check_rate_limit
 
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
@@ -66,7 +108,7 @@ def sanitize_name(name: str) -> str:
 # ==================== REGISTRATION & LOGIN ====================
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register(user: UserCreate, background_tasks: BackgroundTasks):
+async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(5, 60))):
     """Register a new user with email/password"""
     
     # Validate email format
@@ -151,7 +193,7 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks):
 
 
 @router.post("/auth/login")
-async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks):
+async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(10, 60))):
     """Login with email/password"""
     # Validate email format
     if not validate_email_format(user.email):
@@ -240,7 +282,7 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
 # ==================== PASSWORD RESET ====================
 
 @router.post("/auth/forgot-password")
-async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks):
+async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(3, 60))):
     """Request a password reset email"""
     user = await db.users.find_one({"email": request.email}, {"_id": 0})
     
@@ -282,7 +324,7 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
 
 
 @router.post("/auth/reset-password")
-async def reset_password(request: PasswordResetConfirm, background_tasks: BackgroundTasks):
+async def reset_password(request: PasswordResetConfirm, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(5, 60))):
     """Reset password using token"""
     # Find valid reset token
     reset_record = await db.password_resets.find_one({"token": request.token}, {"_id": 0})

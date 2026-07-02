@@ -473,6 +473,7 @@ async def startup_event():
         # External API indexes (WingPoint integration)
         await db.external_provisions.create_index("wingpoint_ref", unique=True)
         await db.external_provisions.create_index("user_id")
+        await db.external_provisions.create_index("idem_key", unique=True)
         await db.external_provisions.create_index("email")
         await db.external_api_audit.create_index([("partner_id", 1), ("timestamp", 1)])
         await db.external_api_audit.create_index("timestamp", expireAfterSeconds=7776000)  # 90 days TTL
@@ -549,6 +550,9 @@ async def startup_event():
         await db.fiduciary_assessments.create_index("email")
         await db.fiduciary_assessments.create_index("assessment_id", unique=True)
         await db.fiduciary_assessments.create_index([("lead_id", 1), ("created_at", -1)])
+        
+        # Webhook event idempotency index (prevents duplicate event processing)
+        await db.webhook_events.create_index("event_id", unique=True)
         
         logger.info("Database indexes created/verified successfully")
         

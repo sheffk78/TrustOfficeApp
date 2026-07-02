@@ -21,6 +21,7 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
 import re
+import secrets
 from typing import Optional, List
 import os
 import logging
@@ -55,19 +56,21 @@ async def verify_api_key(request: Request, api_key: str = Depends(api_key_header
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing API key. Use X-Admin-API-Key header.")
     
-    if api_key != ADMIN_API_KEY:
+    # Rate limit BEFORE key check (prevents brute-force + DB flooding)
+    client_ip = get_client_ip(request)
+    if check_rate_limit(client_ip):
+        logger.warning(f"Admin API rate limit exceeded for IP: {client_ip}")
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Max 100 requests per minute.")
+    
+    # Check the key with constant-time comparison (prevents timing attacks)
+    if not secrets.compare_digest(api_key, ADMIN_API_KEY):
         # Log failed attempt
         await log_api_action(
             action="auth_failed",
             details={"reason": "invalid_api_key"},
-            ip_address=get_client_ip(request)
+            ip_address=client_ip
         )
         raise HTTPException(status_code=401, detail="Invalid API key")
-    
-    # Rate limiting
-    client_ip = get_client_ip(request)
-    if check_rate_limit(client_ip):
-        raise HTTPException(status_code=429, detail="Rate limit exceeded. Max 100 requests per minute.")
     
     return api_key
 
@@ -509,6 +512,9 @@ async def extend_trial(
     if body.days < 1 or body.days > 365:
         raise HTTPException(status_code=400, detail="Days must be between 1 and 365")
     
+    # Check if user has locked admin access
+    await check_admin_access_locked(user_id)
+    
     # Find user
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
@@ -598,6 +604,9 @@ async def gift_subscription(
     valid_plans = ["monthly", "annual", "forever_free"]
     if body.plan_type not in valid_plans:
         raise HTTPException(status_code=400, detail=f"Invalid plan_type. Must be one of: {', '.join(valid_plans)}")
+    
+    # Check if user has locked admin access
+    await check_admin_access_locked(user_id)
     
     # Find user
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
@@ -793,6 +802,9 @@ async def grant_stats_access(
     
     Sets is_stats_user: true and stats_granted_at on the user document.
     """
+    # Check if user has locked admin access
+    await check_admin_access_locked(user_id)
+    
     # Verify user exists
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
@@ -846,6 +858,9 @@ async def fix_subscription(
     - status: subscription status
     - current_period_end: ISO date string
     """
+    # Check if user has locked admin access
+    await check_admin_access_locked(user_id)
+    
     # Verify user exists
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
@@ -974,6 +989,9 @@ async def reset_admin_password(
 ):
     """Reset a user's password. Requires admin API key."""
     import bcrypt
+
+    # Check if target user has locked admin access
+    await check_admin_access_locked(user_id)
 
     new_password = body.get("password")
     if not new_password or len(new_password) < 8:

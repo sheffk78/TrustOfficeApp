@@ -380,12 +380,26 @@ async def make_admin(
         }}
     )
     
+    # Cancel any existing paid Stripe subscription before granting free admin access
+    existing_sub = await db.subscriptions.find_one({"user_id": user_id})
+    if existing_sub and existing_sub.get("stripe_subscription_id"):
+        # User has a paid Stripe subscription — cancel it before granting free admin access
+        try:
+            stripe.Subscription.modify(
+                existing_sub["stripe_subscription_id"],
+                cancel_at_period_end=True
+            )
+            logger.info(f"Cancelled paid subscription {existing_sub['stripe_subscription_id']} for user {user_id} before granting admin access")
+        except stripe.StripeError as e:
+            logger.warning(f"Failed to cancel paid subscription for {user_id}: {e}")
+
     # Give them forever_free subscription
     await db.subscriptions.update_one(
         {"user_id": user_id},
         {"$set": {
             "plan_type": "forever_free",
             "status": "active",
+            "stripe_subscription_id": None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "notes": f"Admin access granted by {admin['email']}"
         }},
@@ -429,16 +443,24 @@ async def remove_admin(
         }}
     )
     
-    # Revert to expired state (they'll need to subscribe)
-    await db.subscriptions.update_one(
-        {"user_id": user_id},
-        {"$set": {
-            "plan_type": "free",
-            "status": "expired",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "notes": f"Admin access removed by {admin['email']}"
-        }}
-    )
+    # Check for an active paid Stripe subscription before overwriting it
+    existing_sub = await db.subscriptions.find_one({"user_id": user_id})
+    if existing_sub and existing_sub.get("stripe_subscription_id"):
+        # User has a paid Stripe subscription — don't overwrite it, just remove admin role
+        # Don't touch the subscription record at all
+        pass
+    else:
+        # Only update subscription if there's no paid sub to preserve
+        await db.subscriptions.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "plan_type": "free",
+                "status": "expired",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "notes": f"Admin access removed by {admin['email']}"
+            }},
+            upsert=True
+        )
     
     logger.info(f"Admin {admin['email']} removed admin access from {user['email']}")
     
@@ -570,6 +592,30 @@ async def delete_customer(
     if user_id == admin["user_id"]:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
     
+    # Cancel Stripe subscription before deleting DB records
+    user = await db.users.find_one({"user_id": user_id})
+    if user:
+        stripe_sub_id = None
+        sub = await db.subscriptions.find_one({"user_id": user_id})
+        if sub:
+            stripe_sub_id = sub.get("stripe_subscription_id")
+        
+        if stripe_sub_id:
+            try:
+                stripe.Subscription.modify(stripe_sub_id, cancel_at_period_end=True)
+                logger.info(f"Cancelled Stripe subscription {stripe_sub_id} for deleted user {user_id}")
+            except stripe.StripeError as e:
+                logger.warning(f"Failed to cancel Stripe subscription {stripe_sub_id} for user {user_id}: {e}")
+                # Don't block deletion — but log prominently
+        
+        stripe_customer_id = user.get("stripe_customer_id")
+        if stripe_customer_id:
+            try:
+                stripe.Customer.delete(stripe_customer_id)
+                logger.info(f"Deleted Stripe customer {stripe_customer_id} for user {user_id}")
+            except stripe.StripeError as e:
+                logger.warning(f"Failed to delete Stripe customer {stripe_customer_id}: {e}")
+
     # Delete all user data
     collections_to_clean = [
         "trusts",
@@ -701,6 +747,29 @@ async def bulk_delete_customers(
     
     for user_data in users_to_delete:
         user_id = user_data["user_id"]
+        
+        # Cancel Stripe subscription before deleting DB records
+        bulk_user = await db.users.find_one({"user_id": user_id})
+        if bulk_user:
+            stripe_sub_id = None
+            bulk_sub = await db.subscriptions.find_one({"user_id": user_id})
+            if bulk_sub:
+                stripe_sub_id = bulk_sub.get("stripe_subscription_id")
+            
+            if stripe_sub_id:
+                try:
+                    stripe.Subscription.modify(stripe_sub_id, cancel_at_period_end=True)
+                    logger.info(f"Cancelled Stripe subscription {stripe_sub_id} for deleted user {user_id}")
+                except stripe.StripeError as e:
+                    logger.warning(f"Failed to cancel Stripe subscription {stripe_sub_id} for user {user_id}: {e}")
+            
+            stripe_customer_id = bulk_user.get("stripe_customer_id")
+            if stripe_customer_id:
+                try:
+                    stripe.Customer.delete(stripe_customer_id)
+                    logger.info(f"Deleted Stripe customer {stripe_customer_id} for user {user_id}")
+                except stripe.StripeError as e:
+                    logger.warning(f"Failed to delete Stripe customer {stripe_customer_id}: {e}")
         
         # Delete all user data from collections
         for collection in collections_to_clean:
