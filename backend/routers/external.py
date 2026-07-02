@@ -762,6 +762,11 @@ async def fire_activation_webhook(user_id: str, event_type: str):
     if not webhook_url:
         # No webhook configured for this partner — skip silently
         return
+
+    # Validate webhook URL is HTTPS to prevent SSRF
+    if not webhook_url.startswith("https://"):
+        logger.warning(f"Webhook URL for partner {partner_id} is not HTTPS — skipping delivery: {webhook_url[:50]}")
+        return
     
     # Build the webhook payload
     now = datetime.now(timezone.utc)
@@ -856,6 +861,16 @@ async def fire_activation_webhook(user_id: str, event_type: str):
                     if attempt < 2:
                         await asyncio.sleep(1 * (attempt + 1))  # Backoff: 1s, 2s
                     continue
+            # All retries exhausted via RequestError path — record failure
+            await db.external_api_audit.insert_one({
+                "action": f"webhook_{event_type}_failed",
+                "partner_id": partner_id,
+                "user_id": user_id,
+                "wingpoint_ref": provision.get("wingpoint_ref"),
+                "webhook_url": webhook_url,
+                "error": "max retries exceeded (network errors)",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
     except Exception as e:
         logger.error(f"Webhook {event_type} delivery failed after retries for user {user_id}: {e}")
         # Record the failure
