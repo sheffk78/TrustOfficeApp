@@ -77,7 +77,7 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
         {/* Thin gold accent border for tax cards */}
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-gold/30" />
 
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="flex items-start gap-4 flex-1">
             <div className="flex items-center justify-center w-10 h-10 bg-gold/10 shrink-0">
               <DollarSign className="w-5 h-5 text-gold" aria-hidden="true" />
@@ -193,7 +193,7 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
       className={`card-trust border-l-4 ${statusBorderClass(status)} transition-shadow hover:shadow-md`}
       data-testid={`task-card-${event.id}`}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div className="flex items-start gap-4 flex-1">
           <div className="flex items-center justify-center w-10 h-10 bg-navy/5 shrink-0">
             <Shield className="w-5 h-5 text-navy" aria-hidden="true" />
@@ -286,7 +286,7 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 ml-4">
+        <div className="flex items-center gap-2 sm:ml-4">
           {status !== 'completed' ? (
             <Button
               onClick={() => onComplete(event.id)}

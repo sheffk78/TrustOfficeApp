@@ -493,7 +493,7 @@ export default function BeneficiariesPage() {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <main className="lg:pl-64 pt-16 lg:pt-0">
+      <main className="lg:pl-64 pt-16 lg:pt-0 mobile-layout-offset">
         <div className="p-4 lg:p-8">
           {/* Header */}
           <div className="page-header flex items-center justify-between">
@@ -519,7 +519,7 @@ export default function BeneficiariesPage() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="mb-6 bg-muted/50">
+            <TabsList className="mb-6 bg-muted/50 flex flex-wrap gap-1">
               <TabsTrigger value="overview" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-overview">
                 <PieChart className="w-4 h-4 mr-2" />
                 Overview

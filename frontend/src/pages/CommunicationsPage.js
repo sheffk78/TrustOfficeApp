@@ -136,7 +136,7 @@ export default function CommunicationsPage() {
   return (
     <div className="min-h-screen bg-subtle-bg">
       <Sidebar />
-      <div className="md:pl-64 pb-20 md:pb-0">
+      <div className="md:pl-64 pb-20 md:pb-0 mobile-layout-offset">
         <div className="pt-16 md:pt-8 ml-4 mr-4">
 
           <div className="page-header flex items-center justify-between">

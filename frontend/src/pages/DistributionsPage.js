@@ -598,7 +598,7 @@ export default function DistributionsPage() {
                   data-testid="search-distributions"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {['all', 'approved', 'review', 'declined'].map((status) => (
                   <button
                     key={status}

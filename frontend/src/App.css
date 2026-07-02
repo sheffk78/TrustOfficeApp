@@ -206,14 +206,18 @@
     padding-left: 60px !important;
   }
   
-  .page-title {
-    margin-left: 48px;
-  }
-  
   /* Main content area padding for mobile */
   .main-content {
     padding: 16px !important;
     padding-top: 70px !important;
+  }
+  
+  /* Pages using Tailwind md:pl-64 pattern need the same mobile offsets */
+  .mobile-layout-offset {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    padding-top: 70px !important;
+    padding-bottom: 80px !important;
   }
   
   /* Reduce card padding on mobile */
@@ -242,6 +246,17 @@
   [role="button"] {
     min-height: 44px;
     min-width: 44px;
+  }
+  
+  /* Exempt small icon-only buttons in tables from 44px rule */
+  .table-action-btn,
+  .table-action-btn button,
+  td button[size="sm"],
+  td button[variant="ghost"],
+  td .p-1,
+  td .p-1\.5 {
+    min-height: auto !important;
+    min-width: auto !important;
   }
   
   /* Larger tap targets for nav items */
@@ -313,10 +328,12 @@
   gap: 4px;
   color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
-  padding: 8px 16px;
+  padding: 8px 4px;
   border-radius: 8px;
   transition: all 0.2s ease;
-  min-width: 64px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .mobile-bottom-nav-item:hover,

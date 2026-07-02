@@ -93,7 +93,7 @@ export default function RiskDashboardPage() {
   return (
     <div className="min-h-screen bg-subtle-bg">
       <Sidebar />
-      <div className="md:pl-64 pb-20 md:pb-0">
+      <div className="md:pl-64 pb-20 md:pb-0 mobile-layout-offset">
         <div className="pt-16 md:pt-8 ml-4 mr-4">
 
           <div className="page-header flex items-center justify-between">
@@ -155,7 +155,7 @@ export default function RiskDashboardPage() {
 
               {/* Summary Cards */}
               {data && (
-                <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                   <Card><CardContent className="p-3 text-center">
                     <p className="text-2xl font-bold text-navy">{data.risk_count}</p>
                     <p className="text-[10px] text-neutral-500 uppercase">Total Risks</p>

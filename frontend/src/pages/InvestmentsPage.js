@@ -145,7 +145,7 @@ export default function InvestmentsPage() {
   return (
     <div className="min-h-screen bg-subtle-bg">
       <Sidebar />
-      <div className="md:pl-64 pb-20 md:pb-0">
+      <div className="md:pl-64 pb-20 md:pb-0 mobile-layout-offset">
         <div className="pt-16 md:pt-8 ml-4 mr-4">
 
           {/* Header */}
@@ -172,7 +172,7 @@ export default function InvestmentsPage() {
 
           {/* Summary Cards */}
           {summary && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
               <Card><CardContent className="p-4">
                 <div className="text-2xl font-bold text-navy">
                   ${(summary.total_current_value || 0).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}

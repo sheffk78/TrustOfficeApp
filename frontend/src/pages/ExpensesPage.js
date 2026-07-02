@@ -365,7 +365,7 @@ export default function ExpensesPage() {
                   data-testid="search-expenses"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {['all', 'approved', 'review', 'rejected'].map((status) => (
                   <button
                     key={status}

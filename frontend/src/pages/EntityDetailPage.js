@@ -158,17 +158,17 @@ export default function EntityDetailPage() {
           </Button>
 
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
+          <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-navy/10 flex items-center justify-center text-navy">
+              <div className="w-12 h-12 bg-navy/10 flex items-center justify-center text-navy flex-shrink-0">
                 {getEntityIcon(entity?.entity_type)}
               </div>
-              <div>
-                <h1 className="page-title">{entity?.name}</h1>
+              <div className="min-w-0">
+                <h1 className="page-title truncate">{entity?.name}</h1>
                 <p className="page-subtitle">View and manage entity details — update information, track relationships, and maintain accurate trust records</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <PageHelpButton
                 items={[
                   { text: 'View and manage entity details including type, status, and relationships' },

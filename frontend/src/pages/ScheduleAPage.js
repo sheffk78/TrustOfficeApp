@@ -353,7 +353,7 @@ export default function ScheduleAPage() {
   return (
     <div className="min-h-screen bg-background" data-testid="schedule-a-page">
       <Sidebar />
-      <main className="lg:pl-64 pt-16 lg:pt-0">
+      <main className="lg:pl-64 pt-16 lg:pt-0 mobile-layout-offset">
         
         <div className="p-4 lg:p-8">
           {/* Header */}
