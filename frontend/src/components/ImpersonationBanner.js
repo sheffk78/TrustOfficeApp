@@ -30,7 +30,11 @@ export const ImpersonationBanner = () => {
         setImpersonationData(data);
       } catch (e) {
         console.error('Failed to parse impersonation data:', e);
+        setImpersonationData(null);
       }
+    } else {
+      // No impersonation data — clear the banner
+      setImpersonationData(null);
     }
   }, [user]);
 
