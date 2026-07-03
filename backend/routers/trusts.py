@@ -167,11 +167,12 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
             from discord_service import notify_alert
             await notify_alert(
                 title="Trust Creation Failed",
-                message=f"User: {user.get('email', 'unknown')}\nError: {str(e)[:500]}",
+                message=f"User: {user.get('email', 'unknown')}\\nError: {str(e)[:500]}\\nType: {type(e).__name__}",
             )
         except Exception:
             pass  # Don't fail the response if alerting fails
-        raise HTTPException(status_code=500, detail="Something went wrong on our end while creating the trust. Our team has been notified. If this continues, contact support@trustoffice.app.")
+        # TEMP DEBUG: include actual error so we can diagnose remotely
+        raise HTTPException(status_code=500, detail=f"[DEBUG] {type(e).__name__}: {str(e)[:300]}")
 
 
 @router.get("/trusts", response_model=List[TrustResponse])
