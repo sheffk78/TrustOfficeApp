@@ -1,6 +1,6 @@
 # Trusts router - handles trust CRUD operations
 from fastapi import APIRouter, HTTPException, Depends
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List
 from enum import Enum
 import uuid
@@ -97,7 +97,6 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
             raise HTTPException(status_code=500, detail="Failed to create governance tasks. Please try again. If this persists, contact support@trustoffice.app.")
         
         # Auto-generate tax deadlines — compensate (rollback trust + tasks) on failure
-        from datetime import date, datetime, timezone
         current_tax_year = date.today().year
         existing_count = await db.tax_calendar.count_documents({
             "trust_id": trust_id, "tax_year": current_tax_year
@@ -171,8 +170,7 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
             )
         except Exception:
             pass  # Don't fail the response if alerting fails
-        # TEMP DEBUG: include actual error so we can diagnose remotely
-        raise HTTPException(status_code=500, detail=f"[DEBUG] {type(e).__name__}: {str(e)[:300]}")
+        raise HTTPException(status_code=500, detail="Something went wrong on our end while creating the trust. Our team has been notified. If this continues, contact support@trustoffice.app.")
 
 
 @router.get("/trusts", response_model=List[TrustResponse])
