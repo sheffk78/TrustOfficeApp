@@ -105,7 +105,7 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
     
     # If no subscription exists, create one (free plan for all individual trustees)
     if not sub:
-# All new users get the 'free' plan — individual trustees are free
+        # Free plan is read-only — users must upgrade to a paid plan for write access
         sub = {
             "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
             "user_id": user_id,
@@ -160,7 +160,7 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
             trial_days_remaining=None,
             is_trial=True,
             is_active=True,
-            is_read_only=False,
+            is_read_only=True,
             stripe_customer_id=sub.get("stripe_customer_id"),
             stripe_subscription_id=sub.get("stripe_subscription_id"),
             current_period_end=sub.get("current_period_end"),
