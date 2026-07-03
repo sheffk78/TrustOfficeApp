@@ -332,12 +332,22 @@ async def verify_payment(session_id: str, user: dict = Depends(get_current_user)
             # Update subscription
             await db.subscriptions.update_one(
                 {"user_id": user["user_id"]},
-                {"$set": {
-                    "plan_type": plan_type,
-                    "status": "active",
-                    "stripe_subscription_id": session.subscription,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }}
+                {
+                    "$set": {
+                        "plan_type": plan_type,
+                        "status": "active",
+                        "stripe_subscription_id": session.subscription,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    },
+                    "$unset": {
+                        "gifted": "",
+                        "gift_type": "",
+                        "gift_start_date": "",
+                        "gift_end_date": "",
+                        "gifted_at": ""
+                    }
+                },
+                upsert=True
             )
             
             # Update transaction
@@ -564,12 +574,22 @@ async def stripe_webhook(request: Request):
                 # Update subscription status
                 await db.subscriptions.update_one(
                     {"user_id": user_id},
-                    {"$set": {
-                        "plan_type": plan_type,
-                        "status": "active",
-                        "stripe_subscription_id": session.get("subscription"),
-                        "updated_at": datetime.now(timezone.utc).isoformat()
-                    }}
+                    {
+                        "$set": {
+                            "plan_type": plan_type,
+                            "status": "active",
+                            "stripe_subscription_id": session.get("subscription"),
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        },
+                        "$unset": {
+                            "gifted": "",
+                            "gift_type": "",
+                            "gift_start_date": "",
+                            "gift_end_date": "",
+                            "gifted_at": ""
+                        }
+                    },
+                    upsert=True
                 )
 
                 # Update payment transaction

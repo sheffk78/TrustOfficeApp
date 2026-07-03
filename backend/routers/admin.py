@@ -554,12 +554,21 @@ async def grant_access(
         # Grant paid plan access (direct, not gifted)
         await db.subscriptions.update_one(
             {"user_id": user_id},
-            {"$set": {
-                "plan_type": request.plan_type,
-                "status": "active",
-                "updated_at": now.isoformat(),
-                "notes": f"Access granted by admin {admin['email']}"
-            }},
+            {
+                "$set": {
+                    "plan_type": request.plan_type,
+                    "status": "active",
+                    "updated_at": now.isoformat(),
+                    "notes": f"Access granted by admin {admin['email']}"
+                },
+                "$unset": {
+                    "gifted": "",
+                    "gift_type": "",
+                    "gift_start_date": "",
+                    "gift_end_date": "",
+                    "gifted_at": ""
+                }
+            },
             upsert=True
         )
         
