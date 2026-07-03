@@ -770,7 +770,7 @@ export default function SettingsPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="label-trust">Your Role</Label>
+                    <Label className="label-trust">Your Role in This Trust</Label>
                     <Select 
                       value={newTrustData.role} 
                       onValueChange={(v) => setNewTrustData({ ...newTrustData, role: v })}
@@ -985,9 +985,69 @@ export default function SettingsPage() {
                   />
                 </div>
 
+                {/* Trustees Management - shown first, auto-populated with account creator's name */}
+                <div className="p-4 border-2 border-navy/20 bg-navy/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-navy" />
+                        <Label className="label-trust">Trustees</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        We auto-filled your name from your account. Update it or add co-trustees. These names appear in meeting minutes.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const current = trustData.trustees || '';
+                        const names = current.split(',').map(t => t.trim()).filter(t => t);
+                        names.push('');
+                        setTrustData({ ...trustData, trustees: names.join(', ') });
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Trustee
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {(trustData.trustees || '').split(',').map(t => t.trim()).filter(t => t || true).map((trustee, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={trustee}
+                          onChange={(e) => {
+                            const names = (trustData.trustees || '').split(',').map(t => t.trim());
+                            names[index] = e.target.value;
+                            setTrustData({ ...trustData, trustees: names.join(', ') });
+                          }}
+                          className="input-trust"
+                          placeholder={index === 0 ? "Your name (as trustee)" : "Co-trustee name"}
+                        />
+                        {(trustData.trustees || '').split(',').map(t => t.trim()).filter(t => t).length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                              const names = (trustData.trustees || '').split(',').map(t => t.trim());
+                              const filtered = names.filter((_, i) => i !== index);
+                              setTrustData({ ...trustData, trustees: filtered.join(', ') });
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="label-trust">Your Role</Label>
+                    <Label className="label-trust">Your Role in This Trust</Label>
                     <Select 
                       value={trustData.role} 
                       onValueChange={(value) => setTrustData({ ...trustData, role: value })}
@@ -1019,63 +1079,6 @@ export default function SettingsPage() {
                         <SelectItem value="annual">Annual</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
-
-                {/* Trustees Management */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <Label className="label-trust">Trustees</Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        These names are automatically added to meeting minutes. You can edit or remove them there.
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const current = trustData.trustees || '';
-                        const names = current.split(',').map(t => t.trim()).filter(t => t);
-                        names.push('');
-                        setTrustData({ ...trustData, trustees: names.join(', ') });
-                      }}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Trustee
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {(trustData.trustees || '').split(',').map(t => t.trim()).filter(t => t || true).map((trustee, index) => (
-                      <div key={index} className="flex gap-2">
-                        <Input
-                          value={trustee}
-                          onChange={(e) => {
-                            const names = (trustData.trustees || '').split(',').map(t => t.trim());
-                            names[index] = e.target.value;
-                            setTrustData({ ...trustData, trustees: names.join(', ') });
-                          }}
-                          className="input-trust"
-                          placeholder="Trustee name"
-                        />
-                        {(trustData.trustees || '').split(',').map(t => t.trim()).filter(t => t).length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
-                            onClick={() => {
-                              const names = (trustData.trustees || '').split(',').map(t => t.trim());
-                              const filtered = names.filter((_, i) => i !== index);
-                              setTrustData({ ...trustData, trustees: filtered.join(', ') });
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
                   </div>
                 </div>
 

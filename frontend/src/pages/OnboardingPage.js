@@ -154,7 +154,7 @@ export default function OnboardingPage() {
     if (user?.name && trusteeNames[0] === '') {
       setTrusteeNames([user.name]);
     }
-  }, [user]);
+  }, [user?.name]);
 
   if (checkingTrusts) {
     return (
@@ -572,10 +572,15 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                {/* Trustee Name(s) - auto-filled with user's name, add/remove for multiple trustees */}
-                <div>
-                  <Label className="label-trust text-sm">Trustee Name(s)</Label>
-                  <p className="text-xs text-muted-foreground mt-1 mb-2">We've pre-filled your name from your account. Update it or add co-trustees if your trust has multiple trustees.</p>
+                {/* Trustee Name(s) - auto-filled with user's name, prominent section */}
+                <div className="p-4 border-2 border-navy/20 bg-navy/5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4 text-navy" />
+                    <Label className="label-trust text-sm">Trustee Name(s)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    We've pre-filled your name from your account as the trustee. Update it if needed, or add co-trustees if your trust has multiple trustees.
+                  </p>
                   <div className="space-y-2">
                     {trusteeNames.map((name, idx) => (
                       <div key={idx} className="flex items-center gap-2">

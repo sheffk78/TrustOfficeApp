@@ -64,6 +64,12 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
         if state_code and not jurisdiction:
             jurisdiction = state_code.upper()
         
+        # Auto-populate trustees with the account creator's name if not provided
+        # (assumption: the person creating the trust is the trustee)
+        trustees = trust.trustees
+        if not trustees or not trustees.strip():
+            trustees = user.get("name", "")
+        
         trust_doc = {
             "trust_id": trust_id,
             "user_id": user["user_id"],
@@ -72,7 +78,7 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
             "jurisdiction": jurisdiction,
             "role": trust.role or "Trustee",
             "start_date": trust.start_date,
-            "trustees": trust.trustees,
+            "trustees": trustees,
             "authority_clause": trust.authority_clause,
             "ein": trust.ein,
             "state_code": state_code,
@@ -137,7 +143,7 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
             "formation_date": trust.start_date,
             "governing_law": jurisdiction or "",
             "ein": trust.ein,
-            "trustee_names": trust.trustees or "",
+            "trustee_names": trustees or "",
             "beneficiary_standard": "",
             "article_ref_distribution": "",
             "article_ref_compensation": "",
