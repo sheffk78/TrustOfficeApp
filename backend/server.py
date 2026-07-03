@@ -17,9 +17,11 @@ This file contains only:
 - Database index creation
 - Background task lifecycle
 """
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException as FastAPIHTTPException
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -130,12 +132,23 @@ app = FastAPI(title="TrustOffice API")
 
 # ==================== GLOBAL EXCEPTION HANDLER ====================
 # Catches ALL unhandled exceptions (500s), logs with full context, and sends a
-# deduped Discord alert via error_alerting.report_error. This must be
-# registered before middleware/routers are added so FastAPI's exception
-# dispatch routes uncaught exceptions here.
+# deduped Discord alert via error_alerting.report_error.
+#
+# IMPORTANT: HTTPException and RequestValidationError are FastAPI's built-in
+# error responses (4xx with structured detail). They must NOT be swallowed by
+# the global handler — otherwise legitimate 402/403/404/422 responses get
+# converted to generic 500s, hiding the real error from the user.
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Catch all unhandled exceptions, alert Discord, and return a generic 500."""
+    """Catch all unhandled exceptions, alert Discord, and return a generic 500.
+
+    HTTPException (FastAPI and Starlette) and RequestValidationError are
+    re-raised so FastAPI's default handlers format them correctly with the
+    original status code and detail.
+    """
+    # Let FastAPI/Starlette handle HTTP exceptions (404, 402, 403, 422, etc.)
+    if isinstance(exc, (FastAPIHTTPException, StarletteHTTPException, RequestValidationError)):
+        raise exc
     return await ErrorReporter.handle_uncaught(request, exc)
 
 # ==================== SUBSCRIPTION MIDDLEWARE ====================

@@ -59,6 +59,7 @@ const xhrRequest = (method, url, data = null, token = null) => {
               }
             }
             // Surface the backend's error detail, not a generic "Request failed"
+            const detail = response.detail || response.message || response.msg;
             const msg = typeof detail === 'string'
               ? detail
               : (detail?.message || detail?.msg || (detail && detail !== '{}' ? JSON.stringify(detail) : null) || 'We couldn\'t complete this action. Please try again, or contact support@trustoffice.app for help.');
