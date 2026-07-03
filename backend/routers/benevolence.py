@@ -27,10 +27,10 @@ async def create_benevolence_record(record: BenevolenceRecordCreate, user: dict 
     """Create a new benevolence record"""
     trust = await db.trusts.find_one({"trust_id": record.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     if not trust.get("benevolence_enabled"):
-        raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust")
+        raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust. Enable it in the trust settings or upgrade your plan at trustoffice.app/settings/billing.")
     
     record_id = f"ben_{uuid.uuid4().hex[:12]}"
     record_doc = {
@@ -95,7 +95,7 @@ async def get_benevolence_record(record_id: str, user: dict = Depends(get_curren
         {"_id": 0}
     )
     if not record:
-        raise HTTPException(status_code=404, detail="Benevolence record not found")
+        raise HTTPException(status_code=404, detail="Benevolence record not found. It may have been deleted. Please refresh the page and try again.")
     return BenevolenceRecordResponse(**record)
 
 
@@ -107,7 +107,7 @@ async def update_benevolence_record(record_id: str, update: BenevolenceRecordUpd
         {"_id": 0}
     )
     if not record:
-        raise HTTPException(status_code=404, detail="Benevolence record not found")
+        raise HTTPException(status_code=404, detail="Benevolence record not found. It may have been deleted. Please refresh the page and try again.")
     
     update_data = {k: v for k, v in update.dict().items() if v is not None}
     if "purpose" in update_data and hasattr(update_data["purpose"], "value"):
@@ -141,11 +141,11 @@ async def attach_minutes_to_benevolence(
         {"_id": 0}
     )
     if not record:
-        raise HTTPException(status_code=404, detail="Benevolence record not found")
+        raise HTTPException(status_code=404, detail="Benevolence record not found. It may have been deleted. Please refresh the page and try again.")
     
     minutes_record_id = request.get("minutes_record_id")
     if not minutes_record_id:
-        raise HTTPException(status_code=400, detail="minutes_record_id is required")
+        raise HTTPException(status_code=400, detail="minutes_record_id is required. Please select a minutes record to link this benevolence record to.")
     
     # Verify the minutes record exists and belongs to the user
     minutes = await db.minutes_records.find_one(
@@ -153,7 +153,7 @@ async def attach_minutes_to_benevolence(
         {"_id": 0}
     )
     if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes record not found")
+        raise HTTPException(status_code=404, detail="Minutes record not found. It may have been deleted. Please refresh the page and try again.")
     
     await db.benevolence_records.update_one(
         {"record_id": record_id},
@@ -174,7 +174,7 @@ async def delete_benevolence_record(record_id: str, user: dict = Depends(require
         {"record_id": record_id, "user_id": user["user_id"]}
     )
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Benevolence record not found")
+        raise HTTPException(status_code=404, detail="Benevolence record not found. It may have been already deleted. Please refresh the page and try again.")
     return {"message": "Benevolence record deleted"}
 
 
@@ -185,7 +185,7 @@ async def get_benevolence_summary(trust_id: str, user: dict = Depends(get_curren
     """Get benevolence summary with totals by period and purpose"""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     records = await db.benevolence_records.find(
         {"trust_id": trust_id, "user_id": user["user_id"]},
@@ -274,10 +274,10 @@ async def export_benevolence_pdf(
     """Generate a styled PDF export of Benevolence Report"""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     if not trust.get("benevolence_enabled"):
-        raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust")
+        raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust. Enable it in the trust settings or upgrade your plan at trustoffice.app/settings/billing.")
     
     # Check if watermark should be shown (soft gating based on subscription)
     show_watermark = await should_show_watermark(user["user_id"])

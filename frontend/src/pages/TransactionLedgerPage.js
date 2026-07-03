@@ -280,8 +280,8 @@ export default function TransactionLedgerPage() {
       setBulkMemo('');
       setBulkOtherNote('');
       loadData();
-    } catch {
-      toast.error('Bulk classify failed');
+    } catch (error) {
+      showError(toast, error, { operation: 'bulk_classify', page: 'TransactionLedger' });
     }
   };
 

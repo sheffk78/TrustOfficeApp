@@ -18,7 +18,7 @@ async def create_entity(entity: EntityCreate, user: dict = Depends(require_write
     """Create a new entity"""
     trust = await db.trusts.find_one({"trust_id": entity.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     entity_id = f"entity_{uuid.uuid4().hex[:12]}"
     entity_doc = {
@@ -54,7 +54,7 @@ async def get_entity(entity_id: str, user: dict = Depends(get_current_user)):
         {"_id": 0}
     )
     if not entity:
-        raise HTTPException(status_code=404, detail="Entity not found")
+        raise HTTPException(status_code=404, detail="Entity not found. It may have been deleted. Please refresh the page and try again.")
     
     return EntityResponse(**entity)
 
@@ -67,7 +67,7 @@ async def update_entity(entity_id: str, updates: dict, user: dict = Depends(requ
         {"_id": 0}
     )
     if not entity:
-        raise HTTPException(status_code=404, detail="Entity not found")
+        raise HTTPException(status_code=404, detail="Entity not found. It may have been deleted. Please refresh the page and try again.")
     
     # Filter only allowed fields
     allowed_fields = [
@@ -90,7 +90,7 @@ async def delete_entity(entity_id: str, user: dict = Depends(require_write_acces
     """Delete an entity and its relationships"""
     result = await db.entities.delete_one({"entity_id": entity_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Entity not found")
+        raise HTTPException(status_code=404, detail="Entity not found. It may have been already deleted. Please refresh the page and try again.")
     
     # Delete related relationships
     await db.entity_relationships.delete_many({"$or": [
@@ -139,6 +139,6 @@ async def delete_relationship(relationship_id: str, user: dict = Depends(require
         "user_id": user["user_id"]
     })
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Relationship not found")
+        raise HTTPException(status_code=404, detail="Relationship not found. It may have been already deleted. Please refresh the page and try again.")
     
     return {"message": "Relationship deleted"}

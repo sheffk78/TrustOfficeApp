@@ -26,7 +26,7 @@ async def create_distribution(
     """Create a new distribution record"""
     trust = await db.trusts.find_one({"trust_id": dist.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     # Validate benevolence fields if is_benevolence is true
     if dist.is_benevolence:
@@ -132,7 +132,7 @@ async def update_distribution(
         {"_id": 0}
     )
     if not dist:
-        raise HTTPException(status_code=404, detail="Distribution not found")
+        raise HTTPException(status_code=404, detail="Distribution not found. It may have been deleted. Please refresh the page and try again.")
     
     # Build update dict with only provided fields
     update_data = {}
@@ -188,13 +188,13 @@ async def approve_distribution(
         {"_id": 0}
     )
     if not dist:
-        raise HTTPException(status_code=404, detail="Distribution not found")
+        raise HTTPException(status_code=404, detail="Distribution not found. It may have been deleted. Please refresh the page and try again.")
     
     if not approval.solvency_confirmed:
-        raise HTTPException(status_code=400, detail="Solvency must be confirmed to approve distribution")
+        raise HTTPException(status_code=400, detail="Solvency must be confirmed to approve the distribution. Please review the trust's financial position and check the solvency confirmation box.")
     
     if not approval.recusal_acknowledged:
-        raise HTTPException(status_code=400, detail="Recusal must be acknowledged")
+        raise HTTPException(status_code=400, detail="Recusal must be acknowledged. Please confirm that no trustee has a conflict of interest before approving.")
     
     approval_time = datetime.now(timezone.utc).isoformat()
     
@@ -239,14 +239,14 @@ async def patch_distribution_status(
     status = status_update.status
     
     if status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        raise HTTPException(status_code=400, detail=f"Invalid status '{status}'. Must be one of: {valid_statuses}. Please select a valid status from the dropdown.")
     
     distribution = await db.distribution_records.find_one(
         {"distribution_id": distribution_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
     if not distribution:
-        raise HTTPException(status_code=404, detail="Distribution not found")
+        raise HTTPException(status_code=404, detail="Distribution not found. It may have been deleted. Please refresh the page and try again.")
     
     update_fields = {
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -280,14 +280,14 @@ async def update_distribution_status(
     """Update distribution status - DEPRECATED, use PATCH /status"""
     valid_statuses = ['review', 'declined', 'pending']
     if status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        raise HTTPException(status_code=400, detail=f"Invalid status '{status}'. Must be one of: {valid_statuses}. Please select a valid status from the dropdown.")
     
     distribution = await db.distribution_records.find_one(
         {"distribution_id": distribution_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
     if not distribution:
-        raise HTTPException(status_code=404, detail="Distribution not found")
+        raise HTTPException(status_code=404, detail="Distribution not found. It may have been deleted. Please refresh the page and try again.")
     
     update_fields = {
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -332,11 +332,11 @@ async def attach_minutes_to_distribution(
         {"_id": 0}
     )
     if not dist:
-        raise HTTPException(status_code=404, detail="Distribution not found")
+        raise HTTPException(status_code=404, detail="Distribution not found. It may have been deleted. Please refresh the page and try again.")
     
     minutes_record_id = request.get("minutes_record_id")
     if not minutes_record_id:
-        raise HTTPException(status_code=400, detail="minutes_record_id is required")
+        raise HTTPException(status_code=400, detail="minutes_record_id is required. Please select a minutes record to link this distribution to.")
     
     # Verify the minutes record exists and belongs to the user
     minutes = await db.minutes_records.find_one(
@@ -344,7 +344,7 @@ async def attach_minutes_to_distribution(
         {"_id": 0}
     )
     if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes record not found")
+        raise HTTPException(status_code=404, detail="Minutes record not found. It may have been deleted. Please refresh the page and try again.")
     
     await db.distribution_records.update_one(
         {"distribution_id": distribution_id},
@@ -369,7 +369,7 @@ async def delete_distribution(distribution_id: str, user: dict = Depends(require
         "user_id": user["user_id"]
     })
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Distribution not found")
+        raise HTTPException(status_code=404, detail="Distribution not found. It may have been already deleted. Please refresh the page and try again.")
     return {"message": "Distribution deleted"}
 
 
@@ -398,7 +398,7 @@ async def get_benevolence_log(
             {"_id": 0}
         )
         if not trust:
-            raise HTTPException(status_code=404, detail="Trust not found")
+            raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     else:
         trust = await db.trusts.find_one(
             {"user_id": user_id},
@@ -406,7 +406,7 @@ async def get_benevolence_log(
             sort=[("created_at", -1)]
         )
         if not trust:
-            raise HTTPException(status_code=404, detail="No trust found")
+            raise HTTPException(status_code=404, detail="No trust found for your account. Please create a trust first.")
     
     trust_id = trust["trust_id"]
     trust_name = trust.get("name", "Unnamed Trust")
@@ -500,7 +500,7 @@ async def send_distribution_notice(
         {"_id": 0}
     )
     if not dist:
-        raise HTTPException(status_code=404, detail="Distribution not found")
+        raise HTTPException(status_code=404, detail="Distribution not found. It may have been deleted. Please refresh the page and try again.")
     
     # Get trust info
     trust = await db.trusts.find_one(

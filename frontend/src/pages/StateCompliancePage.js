@@ -104,7 +104,7 @@ export default function StateCompliancePage() {
       toast.success('Beneficiary notice marked as sent');
       loadData();
     } catch (e) {
-      showError(toast, e, { operation: 'update', page: 'StateCompliance' });
+      showError(toast, e, { operation: 'mark_notice_sent', page: 'StateCompliance' });
     }
   };
 
@@ -118,7 +118,7 @@ export default function StateCompliancePage() {
       toast.success('Accounting marked as sent');
       loadData();
     } catch (e) {
-      showError(toast, e, { operation: 'update', page: 'StateCompliance' });
+      showError(toast, e, { operation: 'mark_accounting_sent', page: 'StateCompliance' });
     }
   };
 
