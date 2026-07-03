@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { fetchWithAuth, API } from '@/utils/api';
 import { 
   Plus, 
@@ -128,7 +129,7 @@ export default function ExpensesPage() {
       });
       loadExpenses();
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'create_expense', page: 'Expenses' });
     } finally {
       setFormLoading(false);
     }
@@ -147,7 +148,7 @@ export default function ExpensesPage() {
       toast.success(`Status updated to ${newStatus}`);
       loadExpenses();
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'update_expense_status', page: 'Expenses' });
     }
   };
 

@@ -21,6 +21,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { format, parseISO } from 'date-fns';
 
 export default function EntityDetailPage() {
@@ -82,10 +83,10 @@ export default function EntityDetailPage() {
         const data = await response.json();
         setEntity(data);
       } else {
-        toast.error('Failed to save entity');
+        showError(toast, error, { operation: 'save', page: 'EntityDetail' });
       }
     } catch (error) {
-      toast.error('Failed to save entity');
+      showError(toast, error, { operation: 'save', page: 'EntityDetail' });
     } finally {
       setSaving(false);
     }
@@ -103,10 +104,10 @@ export default function EntityDetailPage() {
         toast.success('Entity deleted');
         navigate('/entities');
       } else {
-        toast.error('Failed to delete entity');
+        showError(toast, error, { operation: 'delete', page: 'EntityDetail' });
       }
     } catch (error) {
-      toast.error('Failed to delete entity');
+      showError(toast, error, { operation: 'delete', page: 'EntityDetail' });
     }
   };
 
@@ -152,7 +153,7 @@ export default function EntityDetailPage() {
           <Button 
             onClick={() => navigate('/entities')}
             variant="ghost"
-            className="mb-4 text-navy hover:text-gold"
+            className="mb-4 text-navy hover:text-navy/70"
           >
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Entities
           </Button>

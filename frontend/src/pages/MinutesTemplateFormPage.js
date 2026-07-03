@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { 
   ArrowLeft,
   Plus,
@@ -99,20 +100,20 @@ export default function MinutesTemplateFormPage() {
   // Common fields
   const [formData, setFormData] = useState({
     minute_number: `${new Date().getFullYear()}-001`,
-    meeting_date: format(new Date(), 'MMMM d, yyyy'),
-    meeting_time: '10:00 AM',
+    meeting_date: format(new Date(), 'yyyy-MM-dd'),
+    meeting_time: '10:00',
     meeting_type: 'unanimous_written_consent',
     meeting_location: '',
     trustees_present: [],
     trust_formation_date: '',
-    adjournment_time: '10:30 AM'
+    adjournment_time: '10:30'
   });
 
   // Distribution fields
   const [distributionData, setDistributionData] = useState({
     distribution_total: '',
     distribution_items: [{ beneficiary_name: '', amount: '', percentage: '' }],
-    distribution_date: format(new Date(), 'MMMM d, yyyy'),
+    distribution_date: format(new Date(), 'yyyy-MM-dd'),
     distribution_characterization: 'income'
   });
 
@@ -304,7 +305,7 @@ export default function MinutesTemplateFormPage() {
     beneficiary_name: '',
     distribution_amount: '',
     distribution_purpose: '',
-    distribution_date: format(new Date(), 'MMMM d, yyyy'),
+    distribution_date: format(new Date(), 'yyyy-MM-dd'),
     trustee_name: ''
   });
 
@@ -509,17 +510,18 @@ export default function MinutesTemplateFormPage() {
           
           // Auto-populate trust_formation_date from entity formation date
           if (mainTrust.formation_date) {
-            const formattedDate = format(new Date(mainTrust.formation_date), 'MMMM d, yyyy');
+            // Use ISO format for type="date" input (avoids timezone off-by-one)
+            const isoDate = mainTrust.formation_date.slice(0, 10);
             setFormData(prev => ({
               ...prev,
-              trust_formation_date: formattedDate
+              trust_formation_date: isoDate
             }));
           } else if (selectedTrust?.start_date) {
             // Fallback: use trust.start_date from auth context
-            const formattedDate = format(new Date(selectedTrust.start_date), 'MMMM d, yyyy');
+            const isoDate = selectedTrust.start_date.slice(0, 10);
             setFormData(prev => ({
               ...prev,
-              trust_formation_date: formattedDate
+              trust_formation_date: isoDate
             }));
           }
           
@@ -553,10 +555,10 @@ export default function MinutesTemplateFormPage() {
         } else {
           // No Trust entity exists yet — fall back to trust data from auth context
           if (selectedTrust?.start_date) {
-            const formattedDate = format(new Date(selectedTrust.start_date), 'MMMM d, yyyy');
+            const isoDate = selectedTrust.start_date.slice(0, 10);
             setFormData(prev => ({
               ...prev,
-              trust_formation_date: formattedDate
+              trust_formation_date: isoDate
             }));
           }
           if (selectedTrust?.trustees) {
@@ -1063,10 +1065,10 @@ export default function MinutesTemplateFormPage() {
         toast.success('Evaluation complete');
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to evaluate distribution');
+        showError(toast, new Error(error.detail || 'Failed to evaluate distribution'), { operation: 'evaluate', page: 'MinutesTemplateForm' });
       }
     } catch (error) {
-      toast.error('Failed to evaluate distribution');
+      showError(toast, error, { operation: 'evaluate', page: 'MinutesTemplateForm' });
     } finally {
       setEvalLoading(false);
     }
@@ -1100,10 +1102,10 @@ export default function MinutesTemplateFormPage() {
         toast.success('Minutes generated');
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to generate minutes');
+        showError(toast, new Error(error.detail || 'Failed to generate minutes'), { operation: 'generate', page: 'MinutesTemplateForm' });
       }
     } catch (error) {
-      toast.error('Failed to generate minutes');
+      showError(toast, error, { operation: 'generate', page: 'MinutesTemplateForm' });
     } finally {
       setLoading(false);
     }
@@ -1128,10 +1130,10 @@ export default function MinutesTemplateFormPage() {
         const fromOnboarding = searchParams.get('source') === 'onboarding';
         navigate(fromOnboarding ? '/dashboard' : '/minutes');
       } else {
-        toast.error('Failed to save minutes');
+        toast.error('Failed to save minutes. Please try again. If the problem continues, contact support@trustoffice.app.');
       }
     } catch (error) {
-      toast.error('Failed to save minutes');
+      showError(toast, error, { operation: 'save', page: 'MinutesTemplateForm' });
     } finally {
       setLoading(false);
     }
@@ -1151,7 +1153,7 @@ export default function MinutesTemplateFormPage() {
         toast.success('PDF downloaded');
       }
     } catch (error) {
-      toast.error('Failed to download PDF');
+      showError(toast, error, { operation: 'download', page: 'MinutesTemplateForm' });
     }
   };
 
@@ -1241,21 +1243,24 @@ export default function MinutesTemplateFormPage() {
                   <div>
                     <Label className="label-trust">Meeting Date</Label>
                     <Input
+                      type="date"
                       value={formData.meeting_date}
                       onChange={(e) => setFormData({ ...formData, meeting_date: e.target.value })}
                       className="mt-1 input-trust"
-                      placeholder="e.g., February 23, 2024"
                     />
                   </div>
-                  <div>
-                    <Label className="label-trust">Meeting Time</Label>
-                    <Input
-                      value={formData.meeting_time}
-                      onChange={(e) => setFormData({ ...formData, meeting_time: e.target.value })}
-                      className="mt-1 input-trust"
-                      placeholder="e.g., 10:00 AM"
-                    />
-                  </div>
+                  {/* Show time in common fields only for non-initial templates that have their own time field */}
+                  {templateType !== 'initial_trustee_meeting' && (
+                    <div>
+                      <Label className="label-trust">Meeting Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.meeting_time}
+                        onChange={(e) => setFormData({ ...formData, meeting_time: e.target.value })}
+                        className="mt-1 input-trust"
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label className="label-trust">Meeting Type</Label>
                     <Select value={formData.meeting_type} onValueChange={(v) => setFormData({ ...formData, meeting_type: v })}>
@@ -1283,10 +1288,10 @@ export default function MinutesTemplateFormPage() {
                   <div className="md:col-span-2">
                     <Label className="label-trust">Trust Formation Date</Label>
                     <Input
+                      type="date"
                       value={formData.trust_formation_date}
                       onChange={(e) => setFormData({ ...formData, trust_formation_date: e.target.value })}
                       className="mt-1 input-trust"
-                      placeholder="January 1, 2020"
                     />
                   </div>
                 </div>
@@ -3105,9 +3110,45 @@ export default function MinutesTemplateFormPage() {
               {templateType === 'initial_trustee_meeting' && (
                 <div className="space-y-6">
                   <div className="card-trust corner-mark p-6">
-                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Initial Meeting Details</h2>
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Meeting Details</h2>
                     <p className="text-sm text-muted-foreground mb-6">
-                      This is your trust's first organizational meeting. It covers one-time actions — accepting trusteeship, opening bank accounts, confirming your EIN, and establishing the trust's foundation.
+                      This is your trust's first organizational meeting. It covers one-time actions, accepting trusteeship, confirming your EIN, and establishing the trust's foundation.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="label-trust">Meeting Location</Label>
+                        <Input
+                          value={formData.meeting_location || ''}
+                          onChange={(e) => setFormData({ ...formData, meeting_location: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="e.g., Portland, Oregon"
+                        />
+                      </div>
+                      <div>
+                        <Label className="label-trust">Meeting Time</Label>
+                        <Input
+                          type="time"
+                          value={formData.meeting_time || ''}
+                          onChange={(e) => setFormData({ ...formData, meeting_time: e.target.value })}
+                          className="mt-1 input-trust"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="label-trust">Principal Place of Administration</Label>
+                        <Input
+                          value={formData.principal_place || ''}
+                          onChange={(e) => setFormData({ ...formData, principal_place: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="Defaults to meeting location if blank"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="card-trust corner-mark p-6">
+                    <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Bank Information</h2>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      The trust will open its bank account and accept the initial deposit at this meeting.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -3126,33 +3167,6 @@ export default function MinutesTemplateFormPage() {
                           onChange={(e) => setFormData({ ...formData, initial_deposit: e.target.value })}
                           className="mt-1 input-trust"
                           placeholder="e.g., $10,000"
-                        />
-                      </div>
-                      <div>
-                        <Label className="label-trust">Meeting Location</Label>
-                        <Input
-                          value={formData.meeting_location || ''}
-                          onChange={(e) => setFormData({ ...formData, meeting_location: e.target.value })}
-                          className="mt-1 input-trust"
-                          placeholder="e.g., Portland, Oregon"
-                        />
-                      </div>
-                      <div>
-                        <Label className="label-trust">Meeting Time</Label>
-                        <Input
-                          value={formData.meeting_time || ''}
-                          onChange={(e) => setFormData({ ...formData, meeting_time: e.target.value })}
-                          className="mt-1 input-trust"
-                          placeholder="e.g., 10:00 AM"
-                        />
-                      </div>
-                      <div>
-                        <Label className="label-trust">Principal Place of Administration</Label>
-                        <Input
-                          value={formData.principal_place || ''}
-                          onChange={(e) => setFormData({ ...formData, principal_place: e.target.value })}
-                          className="mt-1 input-trust"
-                          placeholder="Defaults to meeting location if blank"
                         />
                       </div>
                     </div>

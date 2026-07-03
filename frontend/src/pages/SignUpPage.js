@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { reportErrorToBackend } from '@/utils/errors';
 import { Mail, Lock, Eye, EyeOff, User, Gift, AlertCircle } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -155,33 +156,33 @@ export default function SignUpPage() {
     const trimmedName = name.trim();
     
     if (!trimmedEmail || !trimmedName || !password) {
-      const msg = 'Please fill in all fields';
+      const msg = 'Please fill in all fields to create your account.';
       setSignupError(msg);
       toast.error(msg);
       return;
     }
-    
+
     if (password !== confirmPassword) {
-      const msg = 'Passwords do not match';
+      const msg = 'Passwords do not match. Please re-enter your password in both fields.';
       setSignupError(msg);
       toast.error(msg);
       return;
     }
 
     if (password.length < 8) {
-      const msg = 'Password must be at least 8 characters';
+      const msg = 'Password must be at least 8 characters long for your account security.';
       setSignupError(msg);
       toast.error(msg);
       return;
     }
     if (!/[A-Za-z]/.test(password)) {
-      const msg = 'Password must contain at least one letter';
+      const msg = 'Password must contain at least one letter.';
       setSignupError(msg);
       toast.error(msg);
       return;
     }
     if (!/\d/.test(password)) {
-      const msg = 'Password must contain at least one number';
+      const msg = 'Password must contain at least one number.';
       setSignupError(msg);
       toast.error(msg);
       return;
@@ -225,9 +226,10 @@ export default function SignUpPage() {
       navigate('/onboarding');
     } catch (error) {
       console.error('Signup error:', error);
-      const msg = error.message || 'Failed to create account';
+      const msg = error.message || 'Could not create your account. Please try again or contact support@trustoffice.app for help.';
       setSignupError(msg);
       toast.error(msg);
+      reportErrorToBackend(error, { operation: 'signup', page: 'SignUp' });
     } finally {
       setLoading(false);
     }
@@ -475,7 +477,7 @@ export default function SignUpPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Already have an account?{' '}
-                <Link to="/" className="text-navy font-medium hover:text-gold" data-testid="login-link">
+                <Link to="/" className="text-navy font-medium hover:text-navy/70" data-testid="login-link">
                   Sign In
                 </Link>
               </p>

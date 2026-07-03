@@ -121,7 +121,7 @@ function FilterChip({ label, active, onClick, onClear }) {
       {label}
       {active && onClear && (
         <X
-          className="w-3 h-3 hover:text-gold"
+          className="w-3 h-3 hover:text-navy/70"
           onClick={(e) => {
             e.stopPropagation();
             onClear();
@@ -172,7 +172,7 @@ function TrustCard({
             </span>
           </div>
           <h3
-            className="font-serif text-lg text-navy truncate cursor-pointer hover:text-gold transition-colors"
+            className="font-serif text-lg text-navy truncate cursor-pointer hover:text-navy/70 transition-colors"
             onClick={() => onSelect(trust)}
           >
             {trust.name}
@@ -780,7 +780,7 @@ export const TrustManager = ({ embedded = false }) => {
             <div className="ml-auto flex items-center gap-2">
               <button
                 onClick={toggleSelectAll}
-                className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-navy hover:text-gold transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-navy hover:text-navy/70 transition-colors"
                 data-testid="trust-select-all"
               >
                 {selectedIds.size === filteredTrusts.length && selectedIds.size > 0 ? (

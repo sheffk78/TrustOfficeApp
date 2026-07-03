@@ -247,7 +247,7 @@ async def extract_action_data(
 ) -> dict:
     """
     Extract structured data from the user message for creating records.
-    Only called for write-intents (add_asset, log_minutes, create_distribution, create_beneficiary, create_class_beneficiary, remove_class_beneficiary).
+    Only called for write-intents (add_asset, log_minutes, create_distribution, create_beneficiary, create_class_beneficiary, remove_class_beneficiary, create_entity).
     """
     from ai_client import ai_draft
 
@@ -429,6 +429,28 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
             "description": cb.get("description", ""),
         }
         for cb in class_bens
+    ]
+
+    # 6c. Entities (Structures) — so the AI knows what structures exist
+    entities = await db.entities.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "entity_id": 1, "name": 1, "entity_type": 1, "legal_name": 1,
+         "governing_law": 1, "ein": 1, "formation_date": 1, "trustee_names": 1,
+         "member_names": 1, "manager_names": 1}
+    ).to_list(20)
+    context["entities"] = [
+        {
+            "name": e.get("name", ""),
+            "entity_type": e.get("entity_type", ""),
+            "legal_name": e.get("legal_name", ""),
+            "governing_law": e.get("governing_law", ""),
+            "ein": e.get("ein"),
+            "formation_date": e.get("formation_date"),
+            "trustee_names": e.get("trustee_names", ""),
+            "member_names": e.get("member_names", ""),
+            "manager_names": e.get("manager_names", ""),
+        }
+        for e in entities
     ]
 
     # 7. Tax calendar
@@ -696,6 +718,9 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get
 ## Class Beneficiaries
 {json.dumps(ctx.get('class_beneficiaries', []), indent=2)}
 
+## Entities (Structures)
+{json.dumps(ctx.get('entities', []), indent=2)}
+
 ## Tax Deadlines
 {json.dumps(ctx.get('tax_deadlines', []), indent=2)}
 
@@ -853,6 +878,9 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get
 
 ## Class Beneficiaries
 {json.dumps(ctx.get('class_beneficiaries', []), indent=2)}
+
+## Entities (Structures)
+{json.dumps(ctx.get('entities', []), indent=2)}
 
 ## Tax Deadlines
 {json.dumps(ctx.get('tax_deadlines', []), indent=2)}

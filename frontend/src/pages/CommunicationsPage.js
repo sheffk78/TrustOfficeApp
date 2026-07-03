@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import {
   MessageSquare, Phone, Mail, Video, FileText, Bell,
   TrendingUp, Plus, CheckCircle2, Clock, AlertTriangle,
@@ -77,7 +78,7 @@ export default function CommunicationsPage() {
       const sData = await sumRes.json();
       if (sumRes.ok) setSummary(sData);
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'load_communications', page: 'Communications' });
     } finally {
       setLoading(false);
     }
@@ -97,7 +98,7 @@ export default function CommunicationsPage() {
       setForm({ comm_type: 'email', subject: '', content: '', direction: 'outbound', action_required: false, action_due: '', parties: [{ role: 'trustee', name: '' }] });
       loadData();
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'create_communication', page: 'Communications' });
     }
   };
 
@@ -111,7 +112,7 @@ export default function CommunicationsPage() {
       toast.success('Action marked complete');
       loadData();
     } catch (e) {
-      toast.error('Failed');
+      showError(toast, e, { operation: 'complete_action', page: 'Communications' });
     }
   };
 

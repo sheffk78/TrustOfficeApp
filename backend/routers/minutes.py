@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTasks, user: dict = Depends(require_write_access)):
     trust = await db.trusts.find_one({"trust_id": minutes.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     minutes_id = f"minutes_{uuid.uuid4().hex[:12]}"
     minutes_doc = {
@@ -157,7 +157,7 @@ async def create_minutes_draft(
         {"_id": 0}
     )
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     # Get entity-level details for beneficiary standard
     entity = await db.entities.find_one(
@@ -178,7 +178,7 @@ async def create_minutes_draft(
         # ── Template mode: use template-specific prompt ──
         template_def = get_template_definition(request.template_type)
         if not template_def:
-            raise HTTPException(status_code=400, detail=f"Unknown template type: {request.template_type}")
+            raise HTTPException(status_code=400, detail=f"Unknown template type '{request.template_type}'. Please select a valid template from the minutes wizard.")
         ai_context = {
             "trust_name": trust_name,
             "meeting_date": request.meeting_date,
@@ -235,7 +235,7 @@ async def create_minutes_draft(
             raise
         except Exception as e:
             logger.error(f"Error generating template minutes draft: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again.")
+            raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again. If this continues, contact support@trustoffice.app.")
     else:
         # ── Quick minutes / bullet-point mode ──
         decisions_outline = []
@@ -296,7 +296,7 @@ async def create_minutes_draft(
             raise
         except Exception as e:
             logger.error(f"Error generating minutes draft: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again.")
+            raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again. If this continues, contact support@trustoffice.app.")
     
     return MinutesDraftResponse(
         suggested_title=ai_response.suggested_title,
@@ -332,7 +332,7 @@ async def autosave_minutes(
         {"_id": 0}
     )
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     now = datetime.now(timezone.utc).isoformat()
     
@@ -343,7 +343,7 @@ async def autosave_minutes(
             {"_id": 0}
         )
         if not existing:
-            raise HTTPException(status_code=404, detail="Draft minutes not found")
+            raise HTTPException(status_code=404, detail="Draft minutes not found. It may have been deleted. Please start a new draft.")
         
         update_doc = {
             "minutes_type": request.minutes_type,
@@ -449,7 +449,7 @@ async def get_minutes_context(
         )
     
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     # Get trustees from trust document or from entities
     # trustees is stored as comma-separated string in MongoDB, must parse it
@@ -496,7 +496,7 @@ async def get_minutes_by_id(minutes_id: str, user: dict = Depends(get_current_us
         {"_id": 0}
     )
     if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes not found")
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     return MinutesResponse(**minutes)
 
 
@@ -515,7 +515,7 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
     
     if not update_data:
-        raise HTTPException(status_code=400, detail="No valid fields to update")
+        raise HTTPException(status_code=400, detail="No valid fields to update. Please provide at least one field to update (e.g., decisions_text, participants_text, meeting_date).")
     
     update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
     
@@ -525,7 +525,7 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
     )
     
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Minutes not found")
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     
     return {"message": "Minutes updated", "updated_fields": list(update_data.keys())}
 
@@ -534,7 +534,7 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
 async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_access)):
     result = await db.minutes_records.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Minutes not found")
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
     return {"message": "Minutes deleted"}
 
 def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = False) -> bytes:
@@ -877,7 +877,7 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
         {"_id": 0}
     )
     if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes not found")
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     
     trust = await db.trusts.find_one(
         {"trust_id": minutes["trust_id"], "user_id": user["user_id"]},
@@ -919,6 +919,36 @@ def generate_template_document(trust: dict, template_type: str, template_data: d
     meeting_type = template_data.get("meeting_type", "unanimous_written_consent")
     trustees_present = template_data.get("trustees_present", trustee_names)
     trust_formation_date = template_data.get("trust_formation_date") or template_data.get("trust_indenture_date", "[Date of Trust Formation]")
+    
+    # Format ISO dates (yyyy-MM-dd) to human-readable for the document
+    def _fmt_date(d):
+        if not d or d == "[Date of Trust Formation]":
+            return d
+        try:
+            from datetime import datetime as _dt
+            return _dt.strptime(d[:10], "%Y-%m-%d").strftime("%B %d, %Y")
+        except (ValueError, TypeError):
+            return d
+    
+    meeting_date = _fmt_date(meeting_date)
+    trust_formation_date = _fmt_date(trust_formation_date)
+    
+    # Format time from 24h (HH:MM) to 12h with AM/PM
+    def _fmt_time(t):
+        if not t:
+            return t
+        try:
+            h, m = t.split(":")
+            h = int(h)
+            suffix = "AM" if h < 12 else "PM"
+            h12 = h if h <= 12 else h - 12
+            if h12 == 0:
+                h12 = 12
+            return f"{h12}:{m} {suffix}"
+        except (ValueError, TypeError):
+            return t
+    
+    meeting_time = _fmt_time(meeting_time)
     
     meeting_type_text = {
         "in_person": f"In person at {template_data.get('meeting_location', '[Location]')}",
@@ -1034,7 +1064,7 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
 
 ADJOURNMENT
 
-There being no further business to come before the Board of Trustees, the meeting was adjourned at {template_data.get('adjournment_time', meeting_time)}.
+There being no further business to come before the Board of Trustees, the meeting was adjourned at {_fmt_time(template_data.get('adjournment_time', meeting_time))}.
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1085,7 +1115,10 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
         trustees = []
     trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
     jurisdiction = trust.get("jurisdiction") or trust.get("state_code") or "[State]"
-    start_date = trust.get("start_date", "[Date of Trust Formation]")
+    # Use the trust_formation_date from the form data (which comes from the entity's
+    # formation_date, the same source Settings uses) instead of trust.start_date
+    # which may be stale or different. Falls back to trust.start_date if form data is empty.
+    start_date = data.get("trust_formation_date") or trust.get("start_date", "[Date of Trust Formation]")
     ein = trust.get("ein", "")
     trust_address = ""
     if trust.get("address_line1"):
@@ -1114,6 +1147,36 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     ratify_prior_actions = data.get("ratify_prior_actions", True)
     
     meeting_date = data.get("meeting_date", "[Date]")
+    
+    # Format ISO dates to human-readable
+    def _fmt_date_iso(d):
+        if not d or d.startswith("["):
+            return d
+        try:
+            from datetime import datetime as _dt
+            return _dt.strptime(d[:10], "%Y-%m-%d").strftime("%B %d, %Y")
+        except (ValueError, TypeError):
+            return d
+    
+    start_date = _fmt_date_iso(start_date)
+    meeting_date = _fmt_date_iso(meeting_date)
+    
+    # Format time from 24h to 12h with AM/PM
+    def _fmt_time_12h(t):
+        if not t:
+            return t
+        try:
+            h, m = t.split(":")
+            h = int(h)
+            suffix = "AM" if h < 12 else "PM"
+            h12 = h if h <= 12 else h - 12
+            if h12 == 0:
+                h12 = 12
+            return f"{h12}:{m} {suffix}"
+        except (ValueError, TypeError):
+            return t
+    
+    meeting_time = _fmt_time_12h(meeting_time)
     
     content = f"""FIRST ORGANIZATIONAL MEETING MINUTES
 {trust_name}
@@ -3564,7 +3627,7 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
     """Create minutes from a template"""
     trust = await db.trusts.find_one({"trust_id": template.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     minutes_id = f"min_{uuid.uuid4().hex[:12]}"
     
@@ -3673,7 +3736,7 @@ async def get_minutes_template(minutes_id: str, user: dict = Depends(get_current
         {"_id": 0}
     )
     if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes not found")
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     return minutes
 
 class MinutesTemplateUpdate(BaseModel):
@@ -3689,7 +3752,7 @@ async def update_minutes_template(minutes_id: str, update_data: MinutesTemplateU
         {"_id": 0}
     )
     if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes not found")
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     
     # Track the update
     update_fields = {
@@ -3727,7 +3790,7 @@ async def delete_minutes_template(minutes_id: str, user: dict = Depends(require_
         {"minutes_id": minutes_id, "user_id": user["user_id"]}
     )
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Minutes not found")
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
     return {"message": "Minutes deleted"}
 
 @router.get("/minutes-templates/{minutes_id}/pdf")
@@ -3738,7 +3801,7 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
         {"_id": 0}
     )
     if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes not found")
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     
     # Generate PDF from the document text
     buffer = io.BytesIO()

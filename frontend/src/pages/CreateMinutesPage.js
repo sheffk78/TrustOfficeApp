@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
 import {
   ArrowLeft,
@@ -185,7 +186,7 @@ export default function CreateMinutesPage() {
       })
       .catch((err) => {
         console.error('Error loading template options:', err);
-        if (!cancelled) toast.error('Failed to load templates');
+        if (!cancelled) toast.error('Failed to load templates. Please try again. If the problem continues, contact support@trustoffice.app.');
       })
       .finally(() => {
         if (!cancelled) setTemplatesLoading(false);
@@ -313,7 +314,7 @@ export default function CreateMinutesPage() {
                 — This action is being drafted from Money. Ask Trust Assistant to complete it.
                 <button
                   onClick={() => navigate('/trust-assistant?prompt=I+need+to+document+a+recent+meeting')}
-                  className="ml-1 text-gold hover:text-gold/80 font-semibold underline underline-offset-2"
+                  className="ml-1 text-gold hover:text-navy/60 font-semibold underline underline-offset-2"
                 >
                   Go to Trust Assistant →
                 </button>

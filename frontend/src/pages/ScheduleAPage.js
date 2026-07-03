@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
 import { 
@@ -155,10 +156,10 @@ export default function ScheduleAPage() {
         loadSummary();
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to save asset');
+        showError(toast, new Error(error.detail || 'Failed to save asset'), { operation: 'save', page: 'ScheduleA' });
       }
     } catch (error) {
-      toast.error('Failed to save asset');
+      showError(toast, error, { operation: 'save', page: 'ScheduleA' });
     }
   };
 
@@ -173,7 +174,7 @@ export default function ScheduleAPage() {
         loadSummary();
       }
     } catch (error) {
-      toast.error('Failed to delete asset');
+      showError(toast, error, { operation: 'delete', page: 'ScheduleA' });
     }
   };
 
@@ -250,10 +251,10 @@ export default function ScheduleAPage() {
           loadSummary();
         } else {
           const error = await response.json();
-          toast.error(error.detail || 'Failed to dispose asset');
+          showError(toast, new Error(error.detail || 'Failed to dispose asset'), { operation: 'dispose', page: 'ScheduleA' });
         }
       } catch (error) {
-        toast.error('Failed to dispose asset');
+        showError(toast, error, { operation: 'dispose', page: 'ScheduleA' });
       }
     }
   };
@@ -313,11 +314,11 @@ export default function ScheduleAPage() {
         document.body.removeChild(link);
         toast.success('Schedule A PDF downloaded');
       } else {
-        toast.error('Failed to generate PDF');
+        toast.error('Failed to generate PDF. Please try again. If the problem continues, contact support@trustoffice.app.');
       }
     } catch (error) {
       console.error('Failed to export PDF:', error);
-      toast.error('Failed to export PDF');
+      showError(toast, error, { operation: 'export', page: 'ScheduleA' });
     } finally {
       setExporting(false);
     }

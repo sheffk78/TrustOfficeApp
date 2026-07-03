@@ -532,6 +532,20 @@ ACTION_EXECUTION_MAP = {
             "value": "value",
         },
     },
+    "entity_preview": {
+        "endpoint_type": "entity",
+        "field_map": {
+            "name": "name",
+            "entity_type": "entity_type",
+            "legal_name": "legal_name",
+            "governing_law": "governing_law",
+            "ein": "ein",
+            "formation_date": "formation_date",
+            "trustee_names": "trustee_names",
+            "member_names": "member_names",
+            "manager_names": "manager_names",
+        },
+    },
     "alert_dismiss": {
         "endpoint_type": "alert_dismiss",
         "field_map": {
@@ -1151,6 +1165,45 @@ async def _execute_approved_action(
             }
             await db.transactions.insert_one(txn_doc)
             return {"success": True, "record_id": txn_id, "endpoint": "transactions", "action": "created"}
+
+        elif endpoint_type == "entity":
+            # Validate entity_type — must be one of the allowed values
+            raw_type = mapped_data.get("entity_type", "Trust")
+            valid_types = {"Trust", "Holding LLC", "Operating LLC"}
+            # Try to match case-insensitively
+            matched_type = None
+            for vt in valid_types:
+                if raw_type and raw_type.lower() == vt.lower():
+                    matched_type = vt
+                    break
+            if not matched_type:
+                matched_type = "Trust"  # default to Trust if unrecognized
+
+            entity_id = f"entity_{uuid.uuid4().hex[:12]}"
+            entity_doc = {
+                "entity_id": entity_id,
+                "user_id": user_id,
+                "trust_id": trust_id,
+                "name": mapped_data.get("name", ""),
+                "entity_type": matched_type,
+                "legal_name": mapped_data.get("legal_name", mapped_data.get("name", "")),
+                "formation_date": mapped_data.get("formation_date"),
+                "governing_law": mapped_data.get("governing_law", ""),
+                "ein": mapped_data.get("ein"),
+                "trustee_names": mapped_data.get("trustee_names", ""),
+                "beneficiary_standard": "",
+                "article_ref_distribution": "",
+                "article_ref_compensation": "",
+                "article_ref_amendment": "",
+                "oversight_required": False,
+                "member_names": mapped_data.get("member_names", ""),
+                "manager_names": mapped_data.get("manager_names", ""),
+                "article_ref_authority": "",
+                "article_ref_profit_distribution": "",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.entities.insert_one(entity_doc)
+            return {"success": True, "record_id": entity_id, "endpoint": "entities", "action": "created"}
 
         elif endpoint_type == "settings_update":
             field = mapped_data.get("field", "")

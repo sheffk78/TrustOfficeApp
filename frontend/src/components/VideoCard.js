@@ -12,7 +12,7 @@ const VideoCard = ({ card, onClick }) => {
       <div className="flex items-start gap-3">
         {/* Play icon */}
         <div className="flex-shrink-0 w-10 h-10 bg-navy/5 border border-navy/10 flex items-center justify-center group-hover:bg-gold/10 group-hover:border-gold/30 transition-colors">
-          <Play className="w-4 h-4 text-navy group-hover:text-gold transition-colors" />
+          <Play className="w-4 h-4 text-navy group-hover:text-navy/70 transition-colors" />
         </div>
 
         <div className="flex-1 min-w-0">

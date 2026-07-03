@@ -32,6 +32,7 @@ Given a user message in a trust administration context, classify it into exactly
 | `schedule_task` | "Schedule a quarterly review", "Remind me to file taxes", "Create a task for annual review" | Create a governance task with due date |
 | `add_transaction` | "I paid the insurance", "Record trust income", "Log a bank fee", "Add a transaction" | Log a trust income or expense transaction |
 | `change_settings` | "Change my EIN", "Update the trust name", "Change my state", "Modify formation date" | Update trust profile settings |
+| `create_entity` | "Add a holding LLC", "I need to set up an operating LLC", "Add an entity to my trust", "Create a new structure", "Add an LLC under my trust" | Create a new entity (Trust, Holding LLC, or Operating LLC) in the Structures section |
 | `general_chat` | "Hello", "Thanks", "What can you do?", "Tell me a joke" | Greeting, casual, off-topic |
 | `emergency` | "I'm worried I messed up", "I think I missed a deadline", "I need help urgently" | Distress, concern, anxiety about trust duties |
 

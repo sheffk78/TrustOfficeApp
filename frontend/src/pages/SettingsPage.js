@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
 import TrustDocumentSummary from '@/components/TrustDocumentSummary';
@@ -117,12 +118,18 @@ export default function SettingsPage() {
     start_date: selectedTrust?.start_date || '',
     tax_year_end_month: selectedTrust?.tax_year_end_month?.toString() || '',
     tax_year_end_day: selectedTrust?.tax_year_end_day?.toString() || '',
-    is_fiscal_year: selectedTrust?.is_fiscal_year || false
+    is_fiscal_year: selectedTrust?.is_fiscal_year || false,
+    trustees: selectedTrust?.trustees || ''
   });
 
   // Re-sync trustData when selectedTrust changes (e.g., after initial load)
   useEffect(() => {
     if (selectedTrust) {
+      // Auto-populate trustees from the account creator's name if not set
+      let trustees = selectedTrust.trustees || '';
+      if (!trustees && user?.name) {
+        trustees = user.name;
+      }
       setTrustData({
         name: selectedTrust.name || '',
         role: selectedTrust.role || 'Trustee',
@@ -135,10 +142,11 @@ export default function SettingsPage() {
         start_date: selectedTrust.start_date || '',
         tax_year_end_month: selectedTrust.tax_year_end_month?.toString() || '',
         tax_year_end_day: selectedTrust.tax_year_end_day?.toString() || '',
-        is_fiscal_year: selectedTrust.is_fiscal_year || false
+        is_fiscal_year: selectedTrust.is_fiscal_year || false,
+        trustees: trustees
       });
     }
-  }, [selectedTrust?.trust_id]);
+  }, [selectedTrust?.trust_id, user?.name]);
 
   // Load notification preferences on mount
   useEffect(() => {
@@ -184,7 +192,7 @@ export default function SettingsPage() {
       });
       setTimeout(() => setLinkCopied(false), 3000);
     } catch (error) {
-      toast.error('Failed to copy link');
+      showError(toast, error, { operation: 'copy', page: 'Settings' });
     }
   };
 
@@ -221,10 +229,10 @@ export default function SettingsPage() {
         }
       } else {
         const error = await response.json().catch(() => ({}));
-        toast.error(error.detail || 'Failed to seed demo data');
+        showError(toast, new Error(error.detail || 'Failed to seed demo data'), { operation: 'seed', page: 'Settings' });
       }
     } catch (error) {
-      toast.error('Failed to seed demo data');
+      showError(toast, error, { operation: 'seed', page: 'Settings' });
     } finally {
       setDemoLoading(false);
     }
@@ -245,10 +253,10 @@ export default function SettingsPage() {
         setSelectedTrust(null);
       } else {
         const error = await response.json().catch(() => ({}));
-        toast.error(error.detail || 'Failed to delete data');
+        showError(toast, new Error(error.detail || 'Failed to delete data'), { operation: 'delete', page: 'Settings' });
       }
     } catch (error) {
-      toast.error('Failed to delete data');
+      showError(toast, error, { operation: 'delete', page: 'Settings' });
     } finally {
       setDemoLoading(false);
     }
@@ -292,10 +300,10 @@ export default function SettingsPage() {
         toast.success(checked ? 'Watermark hidden' : 'Watermark enabled');
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to update preference');
+        showError(toast, error, { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
-      toast.error('Failed to update preference');
+      showError(toast, error, { operation: 'update', page: 'Settings' });
     } finally {
       setUserPrefsLoading(false);
     }
@@ -316,10 +324,10 @@ export default function SettingsPage() {
         toast.success(newValue ? 'Admin access locked' : 'Admin access unlocked');
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to update preference');
+        showError(toast, error, { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
-      toast.error('Failed to update preference');
+      showError(toast, error, { operation: 'update', page: 'Settings' });
     } finally {
       setUserPrefsLoading(false);
     }
@@ -340,11 +348,11 @@ export default function SettingsPage() {
       if (!response.ok) {
         // Revert on error — use functional updater to avoid stale closure
         setNotificationPrefs(prev => ({ ...prev, [key]: !value }));
-        toast.error('Failed to update preference');
+        showError(toast, error, { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
       setNotificationPrefs(prev => ({ ...prev, [key]: !value }));
-      toast.error('Failed to update preference');
+      showError(toast, error, { operation: 'update', page: 'Settings' });
     } finally {
       setNotificationLoading(false);
     }
@@ -370,10 +378,10 @@ export default function SettingsPage() {
         toast.success('Profile updated');
       } else {
         const error = await response.json().catch(() => ({}));
-        toast.error(error.detail || 'Failed to update profile');
+        showError(toast, error, { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
-      toast.error('Failed to update profile');
+      showError(toast, error, { operation: 'update', page: 'Settings' });
     } finally {
       setLoading(false);
     }
@@ -407,7 +415,7 @@ export default function SettingsPage() {
         toast.error('Export failed');
       }
     } catch (error) {
-      toast.error('Export failed');
+      showError(toast, error, { operation: 'export', page: 'Settings' });
     } finally {
       setExportLoading(null);
     }
@@ -441,7 +449,7 @@ export default function SettingsPage() {
       await loadTrusts();
       toast.success('Trust updated');
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'update_trust', page: 'Settings' });
     } finally {
       setLoading(false);
     }
@@ -466,7 +474,7 @@ export default function SettingsPage() {
       await loadTrusts();
       navigate('/dashboard');
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'delete_trust', page: 'Settings' });
     } finally {
       setLoading(false);
     }
@@ -537,7 +545,7 @@ export default function SettingsPage() {
       await loadTrusts();
       setSelectedTrust(createdTrust);
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'create_trust', page: 'Settings' });
     } finally {
       setCreateTrustLoading(false);
     }
@@ -1011,6 +1019,63 @@ export default function SettingsPage() {
                         <SelectItem value="annual">Annual</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                {/* Trustees Management */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <Label className="label-trust">Trustees</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        These names are automatically added to meeting minutes. You can edit or remove them there.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const current = trustData.trustees || '';
+                        const names = current.split(',').map(t => t.trim()).filter(t => t);
+                        names.push('');
+                        setTrustData({ ...trustData, trustees: names.join(', ') });
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Trustee
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {(trustData.trustees || '').split(',').map(t => t.trim()).filter(t => t || true).map((trustee, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={trustee}
+                          onChange={(e) => {
+                            const names = (trustData.trustees || '').split(',').map(t => t.trim());
+                            names[index] = e.target.value;
+                            setTrustData({ ...trustData, trustees: names.join(', ') });
+                          }}
+                          className="input-trust"
+                          placeholder="Trustee name"
+                        />
+                        {(trustData.trustees || '').split(',').map(t => t.trim()).filter(t => t).length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                              const names = (trustData.trustees || '').split(',').map(t => t.trim());
+                              const filtered = names.filter((_, i) => i !== index);
+                              setTrustData({ ...trustData, trustees: filtered.join(', ') });
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1905,7 +1970,7 @@ export default function SettingsPage() {
                 <Button
                   onClick={() => window.open('https://trustoffice.app/privacy', '_blank')}
                   variant="ghost"
-                  className="text-navy hover:text-gold"
+                  className="text-navy hover:text-navy/70"
                   data-testid="privacy-policy-link"
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
@@ -1924,7 +1989,7 @@ export default function SettingsPage() {
                 <Button
                   onClick={() => window.open('https://trustoffice.app/terms', '_blank')}
                   variant="ghost"
-                  className="text-navy hover:text-gold"
+                  className="text-navy hover:text-navy/70"
                   data-testid="terms-of-service-link"
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />

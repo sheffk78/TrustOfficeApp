@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, addDays } from 'date-fns';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import PageHelpButton from '@/components/PageHelpButton';
 import TrustCalendarCard from '@/components/TrustCalendarCard';
 
@@ -76,7 +77,7 @@ export default function TrustCalendarPage() {
       setEvents(data.events || []);
     } catch (e) {
       console.error('Failed to load calendar events:', e);
-      toast.error('Failed to load calendar');
+      showError(toast, e, { operation: 'load', page: 'TrustCalendar' });
       setEvents([]);
     } finally {
       setLoading(false);
@@ -205,7 +206,7 @@ export default function TrustCalendarPage() {
       toast.success(`Generated ${data.entries_created} tax deadlines for ${year}`);
       loadEvents();
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'generate_tax_calendar', page: 'TrustCalendar' });
     }
   };
 
@@ -223,7 +224,7 @@ export default function TrustCalendarPage() {
       toast.success('Marked as filed');
       loadEvents();
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'mark_filed', page: 'TrustCalendar' });
     }
   };
 
@@ -241,7 +242,7 @@ export default function TrustCalendarPage() {
       toast.success('Marked as extended');
       loadEvents();
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'mark_extended', page: 'TrustCalendar' });
     }
   };
 
@@ -264,7 +265,7 @@ export default function TrustCalendarPage() {
         loadEvents();
       }
     } catch (e) {
-      toast.error('Failed to create task');
+      showError(toast, e, { operation: 'create', page: 'TrustCalendar' });
     }
   };
 
@@ -276,7 +277,7 @@ export default function TrustCalendarPage() {
         loadEvents();
       }
     } catch (e) {
-      toast.error('Failed to complete task');
+      showError(toast, e, { operation: 'complete', page: 'TrustCalendar' });
     }
   };
 
@@ -288,7 +289,7 @@ export default function TrustCalendarPage() {
         loadEvents();
       }
     } catch (e) {
-      toast.error('Failed to update task');
+      showError(toast, e, { operation: 'update', page: 'TrustCalendar' });
     }
   };
 
@@ -301,7 +302,7 @@ export default function TrustCalendarPage() {
         loadEvents();
       }
     } catch (e) {
-      toast.error('Failed to delete task');
+      showError(toast, e, { operation: 'delete', page: 'TrustCalendar' });
     }
   };
 
@@ -316,7 +317,7 @@ export default function TrustCalendarPage() {
       });
       if (res.ok) loadEvents();
     } catch (e) {
-      toast.error('Failed to update checklist');
+      showError(toast, e, { operation: 'update', page: 'TrustCalendar' });
     }
   };
 
@@ -669,7 +670,7 @@ export default function TrustCalendarPage() {
           <div className="bg-white p-6 w-full max-w-md corner-mark" onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') setShowModal(false); }} role="dialog" aria-modal="true" aria-label="Create task" data-testid="create-task-modal">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-serif text-xl text-navy">Create Task</h2>
-              <button onClick={() => setShowModal(false)} className="text-navy hover:text-gold" aria-label="Close dialog">
+              <button onClick={() => setShowModal(false)} className="text-navy hover:text-navy/70" aria-label="Close dialog">
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>

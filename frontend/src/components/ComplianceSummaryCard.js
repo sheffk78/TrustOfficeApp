@@ -60,7 +60,7 @@ export default function ComplianceSummaryCard({
           </div>
           <Link
             to="/state-compliance"
-            className="text-xs text-navy hover:text-gold flex items-center gap-1 flex-shrink-0"
+            className="text-xs text-navy hover:text-navy/70 flex items-center gap-1 flex-shrink-0"
           >
             View details
             <ArrowUpRight className="w-3 h-3" />

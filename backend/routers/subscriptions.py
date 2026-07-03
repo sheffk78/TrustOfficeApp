@@ -199,7 +199,7 @@ async def get_subscription_features(user: dict = Depends(get_current_user)):
 async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depends(get_current_user)):
     """Create a Stripe checkout session for subscription"""
     if checkout.plan_type not in ["monthly", "annual"]:
-        raise HTTPException(status_code=400, detail="Invalid plan type")
+        raise HTTPException(status_code=400, detail="Invalid plan type. Please choose either 'monthly' or 'annual'.")
     
     price_id = STRIPE_MONTHLY_PRICE_ID if checkout.plan_type == "monthly" else STRIPE_ANNUAL_PRICE_ID
     
@@ -310,7 +310,7 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         
     except stripe.StripeError as e:
         logger.error(f"Stripe error: {e}")
-        raise HTTPException(status_code=500, detail="Payment service unavailable")
+        raise HTTPException(status_code=500, detail="Payment service is currently unavailable. Please try again in a few minutes. If this continues, contact support@trustoffice.app.")
 
 
 @router.get("/subscription/verify-payment")
@@ -362,7 +362,7 @@ async def verify_payment(session_id: str, user: dict = Depends(get_current_user)
         
     except stripe.StripeError as e:
         logger.error(f"Stripe verification error: {e}")
-        raise HTTPException(status_code=500, detail="Payment verification failed")
+        raise HTTPException(status_code=500, detail="Payment verification failed. Please try again. If the charge appears on your card, contact support@trustoffice.app.")
 
 
 @router.post("/subscription/create-portal")
@@ -381,7 +381,7 @@ async def create_customer_portal(portal: PortalRequest, user: dict = Depends(get
         return {"portal_url": session.url}
     except stripe.StripeError as e:
         logger.error(f"Stripe portal error: {e}")
-        raise HTTPException(status_code=500, detail="Could not create billing portal")
+        raise HTTPException(status_code=500, detail="Could not open the billing portal. Please try again. If this continues, contact support@trustoffice.app.")
 
 
 @router.post("/subscription/cancel")
@@ -390,8 +390,8 @@ async def cancel_subscription(user: dict = Depends(get_current_user)):
     sub = await get_or_create_subscription(user["user_id"])
     
     if not sub.get("stripe_subscription_id"):
-        raise HTTPException(status_code=400, detail="No active subscription found")
-    
+        raise HTTPException(status_code=400, detail="No active subscription found. Please subscribe to a plan first at trustoffice.app/settings/billing.")
+
     try:
         # Cancel at period end (user keeps access until subscription ends)
         stripe_sub = stripe.Subscription.modify(
@@ -426,7 +426,7 @@ async def cancel_subscription(user: dict = Depends(get_current_user)):
         }
     except stripe.StripeError as e:
         logger.error(f"Stripe cancel error: {e}")
-        raise HTTPException(status_code=500, detail="Could not cancel subscription")
+        raise HTTPException(status_code=500, detail="Could not cancel subscription. Please try again. If this continues, contact support@trustoffice.app.")
 
 
 @router.post("/subscription/reactivate")
@@ -435,7 +435,7 @@ async def reactivate_subscription(user: dict = Depends(get_current_user)):
     sub = await get_or_create_subscription(user["user_id"])
     
     if not sub.get("stripe_subscription_id"):
-        raise HTTPException(status_code=400, detail="No subscription found")
+        raise HTTPException(status_code=400, detail="No subscription found. Please subscribe to a plan first at trustoffice.app/settings/billing.")
     
     try:
         stripe.Subscription.modify(
@@ -454,7 +454,7 @@ async def reactivate_subscription(user: dict = Depends(get_current_user)):
         }
     except stripe.StripeError as e:
         logger.error(f"Stripe reactivate error: {e}")
-        raise HTTPException(status_code=500, detail="Could not reactivate subscription")
+        raise HTTPException(status_code=500, detail="Could not reactivate subscription. Please try again. If this continues, contact support@trustoffice.app.")
 
 
 @router.post("/subscription/upgrade")
@@ -463,10 +463,10 @@ async def upgrade_subscription(user: dict = Depends(get_current_user)):
     sub = await get_or_create_subscription(user["user_id"])
     
     if not sub.get("stripe_subscription_id"):
-        raise HTTPException(status_code=400, detail="No active subscription found")
-    
+        raise HTTPException(status_code=400, detail="No active subscription found. Please subscribe to a plan first at trustoffice.app/settings/billing.")
+
     if sub.get("plan_type") == "annual":
-        raise HTTPException(status_code=400, detail="Already on annual plan")
+        raise HTTPException(status_code=400, detail="You are already on the annual plan. No upgrade needed.")
     
     try:
         # Get current subscription
@@ -509,7 +509,7 @@ async def upgrade_subscription(user: dict = Depends(get_current_user)):
         }
     except stripe.StripeError as e:
         logger.error(f"Stripe upgrade error: {e}")
-        raise HTTPException(status_code=500, detail="Could not upgrade subscription")
+        raise HTTPException(status_code=500, detail="Could not upgrade subscription. Please try again. If this continues, contact support@trustoffice.app.")
 
 
 # ==================== STRIPE WEBHOOK ====================
@@ -523,9 +523,9 @@ async def stripe_webhook(request: Request):
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload")
+        raise HTTPException(status_code=400, detail="Invalid webhook payload. This endpoint is for Stripe webhooks only.")
     except stripe.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature. The request could not be verified as coming from Stripe.")
 
     # Check if this event was already processed
     event_id = event.get("id")

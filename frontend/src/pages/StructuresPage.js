@@ -32,6 +32,7 @@ import {
   FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 
 const ENTITY_TYPES = [
   { value: 'Trust', label: 'Trust', icon: Landmark },
@@ -141,7 +142,7 @@ export default function StructuresPage() {
       URL.revokeObjectURL(url);
       toast.success('Audit Defense Report downloaded');
     } catch (e) {
-      toast.error(e.message || 'Failed to generate report');
+      showError(toast, e, { operation: 'download_audit_report', page: 'Structures' });
     } finally {
       setDownloading(false);
     }
@@ -174,10 +175,10 @@ export default function StructuresPage() {
         loadData();
       } else {
         const error = await response.json().catch(() => ({}));
-        toast.error(error.detail || 'Failed to create entity');
+        showError(toast, new Error(error.detail || 'Failed to create entity'), { operation: 'create', page: 'Structures' });
       }
     } catch (error) {
-      toast.error('Failed to create entity');
+      showError(toast, error, { operation: 'create', page: 'Structures' });
     } finally {
       setFormLoading(false);
     }
@@ -219,10 +220,10 @@ export default function StructuresPage() {
         loadData();
       } else {
         const error = await response.json().catch(() => ({}));
-        toast.error(error.detail || 'Failed to create relationship');
+        showError(toast, new Error(error.detail || 'Failed to create relationship'), { operation: 'create', page: 'Structures' });
       }
     } catch (error) {
-      toast.error('Failed to create relationship');
+      showError(toast, error, { operation: 'create', page: 'Structures' });
     } finally {
       setFormLoading(false);
     }
@@ -239,7 +240,7 @@ export default function StructuresPage() {
         loadData();
       }
     } catch (error) {
-      toast.error('Failed to delete relationship');
+      showError(toast, error, { operation: 'delete', page: 'Structures' });
     }
   };
 

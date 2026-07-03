@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import { showError } from '@/utils/errors';
 import {
   FolderOpen, Plus, FileText, Calendar, Link as LinkIcon,
   Search, AlertTriangle, CheckCircle2, ExternalLink,
@@ -146,17 +147,17 @@ export default function VaultPage() {
       resetForm();
       loadData();
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'add_external_link', page: 'Vault' });
     }
   };
 
   const handleUpload = async () => {
     if (!uploadFile) {
-      toast.error('Please select a file to upload');
+      toast.error('Please select a file to upload first.');
       return;
     }
     if (!form.title.trim()) {
-      toast.error('Please enter a document title');
+      toast.error('Please enter a document title so you can identify it later.');
       return;
     }
 
@@ -180,7 +181,8 @@ export default function VaultPage() {
 
       let res;
       try {
-        res = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api'}/trusts/${selectedTrust.trust_id}/vault/upload`, {
+        const API_BASE = (process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app') + '/api';
+      res = await fetch(`${API_BASE}/trusts/${selectedTrust.trust_id}/vault/upload`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: formData,
@@ -228,7 +230,7 @@ export default function VaultPage() {
         errorMsg = 'Network error — please check your connection and try again. If the file is large, it may have timed out.';
       }
       console.error('Vault upload error:', e);
-      toast.error(errorMsg);
+      showError(toast, e, { operation: 'upload_vault_file', page: 'Vault' });
     } finally {
       setUploading(false);
     }
@@ -274,17 +276,18 @@ export default function VaultPage() {
         loadData();
       } else {
         const errData = await res.json().catch(() => ({}));
-        toast.error(errData.detail || 'Failed to delete document');
+        showError(toast, new Error(errData.detail || 'Could not delete document. Please try again or contact support@trustoffice.app.'), { operation: 'delete_vault_doc', page: 'Vault' });
       }
     } catch (e) {
-      toast.error('Failed to delete document');
+      showError(toast, e, { operation: 'delete_vault_doc', page: 'Vault' });
     }
   };
 
   const downloadDocument = async (docId, fileName) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api'}/vault/documents/${docId}/download`, {
+      const API_BASE = (process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app') + '/api';
+      const res = await fetch(`${API_BASE}/vault/documents/${docId}/download`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Download failed');
@@ -299,7 +302,7 @@ export default function VaultPage() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (e) {
-      toast.error('Download failed');
+      showError(toast, e, { operation: 'download_vault_doc', page: 'Vault' });
     }
   };
 
@@ -398,20 +401,24 @@ export default function VaultPage() {
           {showAdd && (
             <Card className="mb-6 border border-neutral-200">
               <CardContent className="p-4">
-                {/* Mode Toggle */}
-                <div className="flex gap-2 mb-4">
+                {/* Mode Toggle - styled as tabs, not action buttons */}
+                <div className="flex border-b border-neutral-200 mb-4">
                   <button
                     onClick={() => setAddMode('upload')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${
-                      addMode === 'upload' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                      addMode === 'upload'
+                        ? 'border-navy text-navy'
+                        : 'border-transparent text-neutral-500 hover:text-neutral-800'
                     }`}
                   >
                     <Upload className="w-4 h-4"/> Upload File
                   </button>
                   <button
                     onClick={() => setAddMode('link')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${
-                      addMode === 'link' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                      addMode === 'link'
+                        ? 'border-navy text-navy'
+                        : 'border-transparent text-neutral-500 hover:text-neutral-800'
                     }`}
                   >
                     <Link2 className="w-4 h-4"/> Link External
@@ -494,12 +501,24 @@ export default function VaultPage() {
                 )}
 
                 <textarea placeholder="Description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border border-neutral-300 rounded px-3 py-2 text-sm mb-3" rows={2} />
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <Input type="date" placeholder="Expires on" value={form.expiration_date} onChange={e => setForm({ ...form, expiration_date: e.target.value })} />
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={form.needs_renewal} onChange={e => setForm({ ...form, needs_renewal: e.target.checked })} id="renew" />
-                    <label htmlFor="renew" className="text-sm text-neutral-600">Requires periodic renewal</label>
+                {/* Expiration / Renewal - only relevant for documents that expire */}
+                <div className="mb-3">
+                  <label className="text-sm font-medium text-neutral-700 block mb-1.5">Expiration / Renewal Date (optional)</label>
+                  <p className="text-xs text-neutral-500 mb-2">
+                    For documents that have an expiration or renewal date, such as insurance policies, certifications, or licenses. Trust instruments and most legal documents do not expire, so you can skip this.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Input type="date" placeholder="Expires on" value={form.expiration_date} onChange={e => setForm({ ...form, expiration_date: e.target.value })} />
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" checked={form.needs_renewal} onChange={e => setForm({ ...form, needs_renewal: e.target.checked })} id="renew" />
+                    <label htmlFor="renew" className="text-sm text-neutral-600">Remind me to renew before this date</label>
                   </div>
+                </div>
+                {form.needs_renewal && form.expiration_date && (
+                  <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1.5 mb-3">
+                    You will receive a reminder email 30 days before this document expires.
+                  </p>
+                )}
                 </div>
 
                 {/* Upload progress */}
@@ -587,13 +606,13 @@ export default function VaultPage() {
                             {doc.storage_provider === 'trustoffice' ? (
                               <button
                                 onClick={() => downloadDocument(doc.doc_id, doc.file_name)}
-                                className="text-xs text-navy hover:text-gold flex items-center gap-1"
+                                className="text-xs text-navy hover:text-navy/70 flex items-center gap-1"
                               >
                                 <Download className="w-3 h-3"/> Download
                               </button>
                             ) : doc.storage_url ? (
                               <div className="flex items-center gap-3">
-                                <a href={doc.storage_url} target="_blank" rel="noopener noreferrer" className="text-xs text-navy hover:text-gold flex items-center gap-1">
+                                <a href={doc.storage_url} target="_blank" rel="noopener noreferrer" className="text-xs text-navy hover:text-navy/70 flex items-center gap-1">
                                   <ExternalLink className="w-3 h-3"/> Open
                                 </a>
                                 <button
@@ -607,10 +626,10 @@ export default function VaultPage() {
                                       toast.success('Link copied to clipboard');
                                       copyTimeoutRef.current = setTimeout(() => setCopiedLinkId(null), 2000);
                                     }).catch(() => {
-                                      toast.error('Failed to copy link');
+                                      toast.error('Could not copy link to clipboard. Please try copying it manually.');
                                     });
                                   }}
-                                  className="text-xs text-navy hover:text-gold flex items-center gap-1"
+                                  className="text-xs text-navy hover:text-navy/70 flex items-center gap-1"
                                   title="Copy external link"
                                   data-testid={`copy-link-${doc.doc_id}`}
                                 >

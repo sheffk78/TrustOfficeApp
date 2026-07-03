@@ -122,7 +122,7 @@ export default function TrustDocumentSummary({ trustId }) {
             <button
               onClick={handleReanalyze}
               disabled={reanalyzing}
-              className="text-xs font-mono uppercase tracking-widest text-navy hover:text-gold flex items-center gap-1"
+              className="text-xs font-mono uppercase tracking-widest text-navy hover:text-navy/70 flex items-center gap-1"
             >
               {reanalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
               Retry Analysis
@@ -160,7 +160,7 @@ export default function TrustDocumentSummary({ trustId }) {
         <button
           onClick={handleReanalyze}
           disabled={reanalyzing}
-          className="text-xs font-mono uppercase tracking-widest text-navy hover:text-gold flex items-center gap-1"
+          className="text-xs font-mono uppercase tracking-widest text-navy hover:text-navy/70 flex items-center gap-1"
         >
           {reanalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
           Re-analyze
@@ -264,7 +264,7 @@ export default function TrustDocumentSummary({ trustId }) {
       {/* Collapsible: Removal & Termination */}
       <button
         onClick={() => setShowDetails(!showDetails)}
-        className="flex items-center gap-1 text-xs font-mono uppercase tracking-widest text-navy hover:text-gold"
+        className="flex items-center gap-1 text-xs font-mono uppercase tracking-widest text-navy hover:text-navy/70"
       >
         {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         Removal & Termination Provisions

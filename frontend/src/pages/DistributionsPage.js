@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import PageHelpButton from '@/components/PageHelpButton';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { fetchWithAuth, API } from '@/utils/api';
 import { 
   Plus, 
@@ -204,7 +205,7 @@ export default function DistributionsPage() {
       });
       loadDistributions();
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'create_distribution', page: 'Distributions' });
     } finally {
       setFormLoading(false);
     }
@@ -237,7 +238,7 @@ export default function DistributionsPage() {
       toast.success(`Distribution ${statusMessage}`);
       loadDistributions();
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'update_distribution_status', page: 'Distributions' });
     }
   };
 
@@ -267,7 +268,7 @@ export default function DistributionsPage() {
       setApprovalModal(null);
       loadDistributions();
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'approve_distribution', page: 'Distributions' });
     } finally {
       setApprovalLoading(false);
     }
@@ -345,11 +346,11 @@ export default function DistributionsPage() {
         toast.success(`Notice sent to ${data.recipient_email}`);
         setSendNoticeResult(prev => ({ ...prev, [dist.distribution_id]: 'sent' }));
       } else {
-        toast.error(data.detail || 'Failed to send notice');
+        showError(toast, new Error(data.detail || 'Failed to send notice'), { operation: 'send', page: 'Distributions' });
         setSendNoticeResult(prev => ({ ...prev, [dist.distribution_id]: 'error' }));
       }
     } catch (error) {
-      toast.error('Failed to send notice');
+      showError(toast, error, { operation: 'send', page: 'Distributions' });
       setSendNoticeResult(prev => ({ ...prev, [dist.distribution_id]: 'error' }));
     } finally {
       setSendingNotice(prev => ({ ...prev, [dist.distribution_id]: false }));
@@ -762,7 +763,7 @@ export default function DistributionsPage() {
               <h2 className="font-serif text-xl text-navy">Approve Distribution</h2>
               <button 
                 onClick={() => setApprovalModal(null)} 
-                className="text-navy hover:text-gold"
+                className="text-navy hover:text-navy/70"
                 data-testid="close-approval-modal"
               >
                 <X className="w-5 h-5" />

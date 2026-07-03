@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
 import { format, parseISO } from 'date-fns';
 import { 
@@ -66,12 +67,12 @@ export default function MinutesDetailPage() {
         setEditedParticipants(data.participants_text || '');
         setEditedOtherAttendees(data.other_attendees_text || '');
       } else {
-        toast.error('Failed to load minutes');
+        toast.error('Failed to load minutes. Please try again. If the problem continues, contact support@trustoffice.app.');
         navigate('/minutes');
       }
     } catch (error) {
       console.error('Failed to load minutes:', error);
-      toast.error('Failed to load minutes');
+      showError(toast, error, { operation: 'load', page: 'MinutesDetail' });
     } finally {
       setLoading(false);
     }
@@ -98,10 +99,10 @@ export default function MinutesDetailPage() {
         setIsEditing(false);
         loadMinutes();
       } else {
-        toast.error('Failed to save changes');
+        toast.error('Failed to save changes. Please try again. If the problem continues, contact support@trustoffice.app.');
       }
     } catch (error) {
-      toast.error('Failed to save changes');
+      showError(toast, error, { operation: 'save', page: 'MinutesDetail' });
     } finally {
       setSaving(false);
     }
@@ -115,11 +116,11 @@ export default function MinutesDetailPage() {
         const data = await response.json();
         setPdfPreview({ show: true, loading: false, data: data.pdf_base64, filename: data.filename });
       } else {
-        toast.error('Failed to generate PDF');
+        showError(toast, error, { operation: 'generate', page: 'MinutesDetail' });
         setPdfPreview({ show: false, loading: false, data: null, filename: '' });
       }
     } catch (error) {
-      toast.error('Failed to generate PDF');
+      showError(toast, error, { operation: 'generate', page: 'MinutesDetail' });
       setPdfPreview({ show: false, loading: false, data: null, filename: '' });
     }
   };

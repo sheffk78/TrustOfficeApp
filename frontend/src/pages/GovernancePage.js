@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { format, parseISO, subDays } from 'date-fns';
 
 export default function GovernancePage() {
@@ -445,7 +446,7 @@ export default function GovernancePage() {
                     <div className="mt-4 pt-4 border-t border-navy/10">
                       <Link
                         to="/risk"
-                        className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                        className="text-navy hover:text-navy/70 font-mono text-xs uppercase tracking-widest flex items-center gap-1"
                       >
                         View Full Risk Dashboard <ArrowRight className="w-3 h-3" />
                       </Link>
@@ -525,7 +526,7 @@ export default function GovernancePage() {
                   <div className="mt-4 pt-4 border-t border-navy/10">
                     <Link
                       to="/risk"
-                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                      className="text-navy hover:text-navy/70 font-mono text-xs uppercase tracking-widest flex items-center gap-1"
                     >
                       View Full Risk Dashboard <ArrowRight className="w-3 h-3" />
                     </Link>
@@ -730,11 +731,11 @@ function HiddenInsightsPanel({ trustId }) {
         setDismissed(prev => prev.filter(d => d.criterion_name !== criterionName));
       } else {
         const data = await response.json();
-        toast.error(data.detail || 'Failed to restore');
+        showError(toast, new Error(data.detail || 'Failed to restore'), { operation: 'restore', page: 'Governance' });
       }
     } catch (error) {
       console.error('Failed to restore insight:', error);
-      toast.error('Failed to restore recommendation');
+      showError(toast, error, { operation: 'restore', page: 'Governance' });
     }
   };
 

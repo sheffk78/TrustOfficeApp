@@ -53,7 +53,7 @@ const PageHelpButton = ({ items = [], taPrompt = '', contextAlerts = [] }) => {
                 <Link
                   key={i}
                   to={`/trust-assistant?prompt=${encodeURIComponent(alert.prompt)}`}
-                  className="block text-sm text-navy hover:text-gold py-1"
+                  className="block text-sm text-navy hover:text-navy/70 py-1"
                 >
                   {alert.text}
                 </Link>
@@ -73,7 +73,7 @@ const PageHelpButton = ({ items = [], taPrompt = '', contextAlerts = [] }) => {
           <div className="mt-4 pt-4 border-t border-navy/10">
             <Link
               to={taPath}
-              className="flex items-center gap-2 text-sm text-gold hover:text-gold/80 font-medium transition-colors"
+              className="flex items-center gap-2 text-sm text-gold hover:text-navy/60 font-medium transition-colors"
             >
               <Bot className="w-4 h-4" />
               Ask Trust Assistant about this page

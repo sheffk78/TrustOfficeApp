@@ -120,7 +120,7 @@ async def add_document(trust_id: str, doc: DocumentCreate, user: dict = Depends(
     """Add a document reference to the vault."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
     now = datetime.now(timezone.utc).isoformat()
     record = {
@@ -167,7 +167,7 @@ async def upload_document(
     """Upload a file to the vault. Stores file content as BSON binary."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
     # Validate MIME type
     content_type = file.content_type or "application/octet-stream"
@@ -267,7 +267,7 @@ async def download_document(doc_id: str, user: dict = Depends(get_current_user))
     """Download a file from the vault."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Document not found. It may have been deleted. Please refresh the vault and try again.")
 
     file_content = doc.get("file_content")
     if not file_content:
@@ -279,7 +279,7 @@ async def download_document(doc_id: str, user: dict = Depends(get_current_user))
                 raise HTTPException(status_code=400, detail="Stored URL is not a valid HTTPS redirect")
             from fastapi.responses import RedirectResponse
             return RedirectResponse(url=storage_url)
-        raise HTTPException(status_code=404, detail="No file content available")
+        raise HTTPException(status_code=400, detail="No file content available for this document. If this is a reference-only document, please provide a storage URL.")
 
     content_type = doc.get("file_content_type", "application/octet-stream")
     filename = doc.get("file_name", "document")
@@ -309,7 +309,7 @@ async def list_documents(
     """List vault documents with filtering. Excludes file_content from responses."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
     query = {"trust_id": trust_id}
     if category:
@@ -353,7 +353,7 @@ async def update_document(doc_id: str, update: DocumentUpdate, user: dict = Depe
     """Update a vault document record."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Document not found. It may have been deleted. Please refresh the vault and try again.")
 
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -371,7 +371,7 @@ async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
     """Remove a document from vault (and its file content)."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Document not found. It may have been already deleted. Please refresh the vault and try again.")
 
     await db.vault_documents.delete_one({"doc_id": doc_id, "user_id": user["user_id"]})
     return {"message": "Document removed from vault"}
@@ -382,7 +382,7 @@ async def vault_summary(trust_id: str, user: dict = Depends(get_current_user)):
     """Dashboard summary for Trust Document Vault."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
     total = await db.vault_documents.count_documents({"trust_id": trust_id})
 

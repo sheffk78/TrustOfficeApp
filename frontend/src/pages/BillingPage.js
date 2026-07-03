@@ -20,6 +20,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { showError } from '@/utils/errors';
 import PageHelpButton from '@/components/PageHelpButton';
 
 const PLANS = [
@@ -128,11 +129,11 @@ export default function BillingPage() {
         const data = await response.json();
         window.location.href = data.checkout_url;
       } else {
-        toast.error('Failed to start checkout');
+        showError(toast, new Error('Checkout session could not be started. Please try again or contact support@trustoffice.app.'), { operation: 'create_checkout', page: 'Billing' });
         setProcessing(false);
       }
     } catch (error) {
-      toast.error('Failed to start checkout');
+      showError(toast, error, { operation: 'create_checkout', page: 'Billing' });
       setProcessing(false);
     }
   };
@@ -151,10 +152,10 @@ export default function BillingPage() {
         loadSubscription();
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to cancel subscription');
+        showError(toast, new Error(error.detail || 'Could not cancel subscription. Please try again or contact support@trustoffice.app.'), { operation: 'cancel_subscription', page: 'Billing' });
       }
     } catch (error) {
-      toast.error('Failed to cancel subscription');
+      showError(toast, error, { operation: 'cancel_subscription', page: 'Billing' });
     } finally {
       setActionLoading(null);
     }
@@ -170,10 +171,10 @@ export default function BillingPage() {
         loadSubscription();
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to reactivate subscription');
+        showError(toast, new Error(error.detail || 'Could not reactivate subscription. Please try again or contact support@trustoffice.app.'), { operation: 'reactivate_subscription', page: 'Billing' });
       }
     } catch (error) {
-      toast.error('Failed to reactivate subscription');
+      showError(toast, error, { operation: 'reactivate_subscription', page: 'Billing' });
     } finally {
       setActionLoading(null);
     }
@@ -193,10 +194,10 @@ export default function BillingPage() {
         loadSubscription();
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to upgrade subscription');
+        showError(toast, new Error(error.detail || 'Could not upgrade subscription. Please try again or contact support@trustoffice.app.'), { operation: 'upgrade_subscription', page: 'Billing' });
       }
     } catch (error) {
-      toast.error('Failed to upgrade subscription');
+      showError(toast, error, { operation: 'upgrade_subscription', page: 'Billing' });
     } finally {
       setActionLoading(null);
     }
@@ -218,10 +219,10 @@ export default function BillingPage() {
         window.location.href = data.portal_url;
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to open billing portal');
+        showError(toast, new Error(error.detail || 'Could not open billing portal. Please try again or contact support@trustoffice.app.'), { operation: 'billing_portal', page: 'Billing' });
       }
     } catch (error) {
-      toast.error('Failed to open billing portal');
+      showError(toast, error, { operation: 'billing_portal', page: 'Billing' });
     } finally {
       setActionLoading(null);
     }
@@ -339,7 +340,7 @@ export default function BillingPage() {
           <Button 
             onClick={() => navigate('/settings')}
             variant="ghost"
-            className="mb-4 text-navy hover:text-gold"
+            className="mb-4 text-navy hover:text-navy/70"
             data-testid="back-to-settings-btn"
           >
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Settings
@@ -683,7 +684,7 @@ export default function BillingPage() {
               <div className="mt-8 text-center text-sm text-muted-foreground">
                 <p>
                   Questions about billing?{' '}
-                  <a href="mailto:support@trustoffice.com" className="text-navy hover:text-gold">
+                  <a href="mailto:support@trustoffice.com" className="text-navy hover:text-navy/70">
                     Contact support
                   </a>
                 </p>

@@ -50,8 +50,8 @@ async def send_task_reminders(background_tasks: BackgroundTasks, user: dict = De
     if not email_service.is_configured:
         raise HTTPException(status_code=503, detail="Email service not configured")
     
-    # Get all user's trusts
-    trusts = await db.trusts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
+    # Get all user's trusts — exclude demo trusts
+    trusts = await db.trusts.find({"user_id": user["user_id"], "is_demo": {"$ne": True}}, {"_id": 0}).to_list(100)
     
     emails_queued = 0
     now = datetime.now(timezone.utc).date()
@@ -62,7 +62,8 @@ async def send_task_reminders(background_tasks: BackgroundTasks, user: dict = De
         tasks = await db.governance_tasks.find({
             "trust_id": trust["trust_id"],
             "user_id": user["user_id"],
-            "completed_at": None  # Only incomplete tasks
+            "completed_at": None,  # Only incomplete tasks
+            "is_demo": {"$ne": True}  # Exclude demo tasks
         }, {"_id": 0}).to_list(100)
         
         for task in tasks:

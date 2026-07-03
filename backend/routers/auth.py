@@ -113,14 +113,14 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
     
     # Validate email format
     if not validate_email_format(user.email):
-        raise HTTPException(status_code=400, detail="Invalid email format")
+        raise HTTPException(status_code=400, detail="Please enter a valid email address (e.g., name@example.com).")
     
     # Sanitize and validate inputs
     email = user.email.lower().strip()
     name = sanitize_name(user.name)
     
     if not name:
-        raise HTTPException(status_code=400, detail="Name is required")
+        raise HTTPException(status_code=400, detail="Name is required. Please enter your full name and try again.")
     
     # Validate password strength
     is_valid, error_msg = validate_password_strength(user.password)
@@ -129,7 +129,7 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
     
     existing = await db.users.find_one({"email": email}, {"_id": 0})
     if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=400, detail="Email already registered. Please log in instead, or use a different email address.")
     
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     user_doc = {
@@ -383,14 +383,14 @@ async def verify_reset_token(token: str):
     reset_record = await db.password_resets.find_one({"token": token}, {"_id": 0})
     
     if not reset_record:
-        raise HTTPException(status_code=400, detail="Invalid reset token")
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token. Please request a new password reset link.")
     
     expires_at = datetime.fromisoformat(reset_record["expires_at"].replace('Z', '+00:00'))
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     
     if expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Reset token has expired")
+        raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new password reset link.")
     
     return {"valid": True}
 
@@ -408,7 +408,7 @@ async def exchange_session(request: Request, response: Response):
     code = body.get("code")
     
     if not code:
-        raise HTTPException(status_code=400, detail="code required")
+        raise HTTPException(status_code=400, detail="Authorization code is required. Please restart the login flow from the beginning.")
     
     # Look up the auth code
     auth_record = await db.oauth_auth_codes.find_one({"code": code})
@@ -422,7 +422,7 @@ async def exchange_session(request: Request, response: Response):
     
     if expires_at < datetime.now(timezone.utc):
         await db.oauth_auth_codes.delete_one({"code": code})
-        raise HTTPException(status_code=400, detail="Authorization code has expired")
+        raise HTTPException(status_code=400, detail="Authorization code has expired. Please restart the login flow from the beginning.")
     
     # Delete the code (one-time use)
     await db.oauth_auth_codes.delete_one({"code": code})
@@ -430,7 +430,7 @@ async def exchange_session(request: Request, response: Response):
     # Return the JWT and user info
     user_doc = await db.users.find_one({"user_id": auth_record["user_id"]}, {"_id": 0})
     if not user_doc:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="User account not found. The account may have been deleted. Please contact support@trustoffice.app if this is unexpected.")
     
     jwt_token = auth_record["jwt_token"]
     
@@ -487,11 +487,11 @@ async def update_profile(profile: ProfileUpdate, user: dict = Depends(get_curren
     
     if profile.name is not None:
         if len(profile.name.strip()) < 1:
-            raise HTTPException(status_code=400, detail="Name cannot be empty")
+            raise HTTPException(status_code=400, detail="Name cannot be empty. Please enter a name and try again.")
         update_fields["name"] = profile.name.strip()
     
     if not update_fields:
-        raise HTTPException(status_code=400, detail="No fields to update")
+        raise HTTPException(status_code=400, detail="Please provide at least one field to update (e.g., name).")
     
     await db.users.update_one(
         {"user_id": user["user_id"]},
@@ -533,7 +533,7 @@ async def google_login(request: Request):
     Redirects user to Google's consent screen with TrustOffice branding.
     """
     if not GOOGLE_CLIENT_ID or not GOOGLE_REDIRECT_URI:
-        raise HTTPException(status_code=500, detail="Google OAuth not configured")
+        raise HTTPException(status_code=500, detail="Google OAuth is not configured. Please contact support@trustoffice.app.")
     
     # Get the redirect URL from query params (where to go after successful auth)
     redirect_after = request.query_params.get("redirect", "/onboarding")

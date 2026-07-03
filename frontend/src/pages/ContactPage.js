@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { 
   Send, 
   CheckCircle, 
@@ -85,12 +86,12 @@ export default function ContactPage() {
             description: 'Please wait a moment before submitting again.'
           });
         } else {
-          toast.error(data.detail || 'Failed to send message');
+          showError(toast, new Error(data.detail || 'Failed to send message'), { operation: 'send', page: 'Contact' });
         }
       }
     } catch (error) {
       console.error('Contact form error:', error);
-      toast.error('Failed to send message. Please try again.');
+      showError(toast, error, { operation: 'send', page: 'Contact' });
     } finally {
       setLoading(false);
     }
@@ -136,7 +137,7 @@ export default function ContactPage() {
               
               <a
                 href="https://trustoffice.app"
-                className="flex items-center justify-center gap-2 text-sm text-navy hover:text-gold transition-colors"
+                className="flex items-center justify-center gap-2 text-sm text-navy hover:text-navy/70 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to trustoffice.app
@@ -293,7 +294,7 @@ export default function ContactPage() {
           <div className="mt-8 text-center text-sm text-muted-foreground">
             <p>
               You can also reach us directly at{' '}
-              <a href="mailto:contact@trustoffice.app" className="text-navy hover:text-gold transition-colors">
+              <a href="mailto:contact@trustoffice.app" className="text-navy hover:text-navy/70 transition-colors">
                 contact@trustoffice.app
               </a>
             </p>

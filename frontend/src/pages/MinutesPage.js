@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 
 // Debounce hook
 function useDebounce(value, delay) {
@@ -128,10 +129,10 @@ export default function MinutesPage() {
           minutesId
         });
       } else {
-        toast.error('Failed to generate PDF');
+        toast.error('Failed to generate PDF. Please try again. If the problem continues, contact support@trustoffice.app.');
       }
     } catch (error) {
-      toast.error('Failed to generate PDF');
+      showError(toast, error, { operation: 'generate', page: 'Minutes' });
     } finally {
       setPdfLoading(false);
     }
@@ -426,7 +427,7 @@ export default function MinutesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div className="cursor-pointer" onClick={() => navigate(`/minutes/${entry.minutes_id}`)}>
-                          <h3 className="font-serif text-lg text-navy mb-1 hover:text-gold transition-colors">{summary}</h3>
+                          <h3 className="font-serif text-lg text-navy mb-1 hover:text-navy/70 transition-colors">{summary}</h3>
                           <p className="text-sm text-muted-foreground line-clamp-2">{details}</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">

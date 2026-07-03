@@ -425,7 +425,7 @@ export default function CalendarPage() {
           <div className="bg-white p-6 w-full max-w-md corner-mark" data-testid="create-task-modal">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-serif text-xl text-navy">Create Task</h2>
-              <button onClick={() => setShowModal(false)} className="text-navy hover:text-gold">
+              <button onClick={() => setShowModal(false)} className="text-navy hover:text-navy/70">
                 <X className="w-5 h-5" />
               </button>
             </div>

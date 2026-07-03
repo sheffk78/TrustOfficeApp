@@ -158,7 +158,7 @@ export default function CoursePage() {
                             href={`https://trustoffice.app${selectedLesson.pdf_url}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-navy hover:text-gold transition-colors"
+                            className="flex items-center gap-1 text-navy hover:text-navy/70 transition-colors"
                           >
                             <Download className="w-3.5 h-3.5" />
                             Download PDF

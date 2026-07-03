@@ -46,7 +46,12 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
+import { installGlobalErrorHandlers } from "@/utils/errors";
 import CoursePage from "@/pages/CoursePage";
+
+// Install global uncaught error handlers once at app load
+// Reports to /api/report-error -> Discord alert (see utils/errors.js)
+installGlobalErrorHandlers();
 
 // GA4 page view tracking for SPA navigation
 const useGA4PageTracking = () => {

@@ -6,6 +6,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { 
   FileText, 
   DollarSign,
@@ -199,11 +200,11 @@ export default function DashboardPage() {
         await loadDashboardData();
       } else {
         const data = await response.json();
-        toast.error(data.detail || 'Failed to dismiss');
+        showError(toast, new Error(data.detail || 'Failed to dismiss'), { operation: 'dismiss', page: 'Dashboard' });
       }
     } catch (error) {
       console.error('Failed to dismiss insight:', error);
-      toast.error('Failed to dismiss recommendation');
+      showError(toast, error, { operation: 'dismiss', page: 'Dashboard' });
     }
   };
 
@@ -219,7 +220,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Failed to create demo:', error);
-      toast.error('Failed to create demo data');
+      showError(toast, error, { operation: 'create', page: 'Dashboard' });
     } finally {
       setLoading(false);
     }
@@ -310,8 +311,8 @@ export default function DashboardPage() {
       },
       { 
         id: 'assets', 
-        label: 'Open a Trust Bank Account',
-        description: 'The most important first step — a trust needs its own bank account before anything else. We\'ll help you set it up.',
+        label: 'Set Up Your Trust Structure',
+        description: 'Add your trust entity to the Structures section. This is where you manage your trust and any related LLCs.',
         done: onboarding.assets_added,
         icon: Package,
         action: '/structures'
@@ -607,7 +608,7 @@ export default function DashboardPage() {
                     {remainingCount > 0 && (
                       <Link
                         to="/governance"
-                        className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                        className="text-navy hover:text-navy/70 font-mono text-xs uppercase tracking-widest flex items-center gap-1"
                       >
                         View All ({remainingCount} more) <ArrowRight className="w-3 h-3" />
                       </Link>
@@ -712,7 +713,7 @@ export default function DashboardPage() {
                     </div>
                     <Link 
                       to="/calendar" 
-                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                      className="text-navy hover:text-navy/70 font-mono text-xs uppercase tracking-widest flex items-center gap-1"
                     >
                       View All <ArrowRight className="w-3 h-3" />
                     </Link>
@@ -791,7 +792,7 @@ export default function DashboardPage() {
                     </div>
                     <Link 
                       to="/governance" 
-                      className="text-navy hover:text-gold font-mono text-xs uppercase tracking-widest flex items-center gap-1"
+                      className="text-navy hover:text-navy/70 font-mono text-xs uppercase tracking-widest flex items-center gap-1"
                       data-testid="view-governance-link"
                     >
                       View Details <ArrowRight className="w-3 h-3" />
@@ -901,7 +902,7 @@ export default function DashboardPage() {
                           <div className={`w-8 h-8 ${action.color} flex items-center justify-center mb-2`}>
                             <Icon className="w-4 h-4" />
                           </div>
-                          <p className="font-medium text-sm text-navy group-hover:text-gold transition-colors">
+                          <p className="font-medium text-sm text-navy group-hover:text-navy/70 transition-colors">
                             {action.title}
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">

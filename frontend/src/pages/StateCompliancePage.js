@@ -10,6 +10,7 @@ import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
 import InfoTooltip from '@/components/InfoTooltip';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import {
   MapPin, AlertTriangle, Shield, CheckCircle2, Clock,
   FileText, ChevronRight, BookOpen, Scale, Gavel
@@ -87,7 +88,7 @@ export default function StateCompliancePage() {
       const rData = await reqRes.json();
       if (reqRes.ok) setRequirements(rData.requirements || []);
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'load_state_compliance', page: 'StateCompliance' });
     } finally {
       setLoading(false);
     }
@@ -103,7 +104,7 @@ export default function StateCompliancePage() {
       toast.success('Beneficiary notice marked as sent');
       loadData();
     } catch (e) {
-      toast.error('Failed to update notice status');
+      showError(toast, e, { operation: 'update', page: 'StateCompliance' });
     }
   };
 
@@ -117,7 +118,7 @@ export default function StateCompliancePage() {
       toast.success('Accounting marked as sent');
       loadData();
     } catch (e) {
-      toast.error('Failed to update accounting status');
+      showError(toast, e, { operation: 'update', page: 'StateCompliance' });
     }
   };
 

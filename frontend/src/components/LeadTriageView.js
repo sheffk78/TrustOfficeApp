@@ -99,7 +99,7 @@ export default function LeadTriageView({ onViewLead, onFollowUp }) {
       <div className="flex items-center gap-1 ml-2 flex-shrink-0">
         <button
           onClick={(e) => { e.stopPropagation(); onFollowUp && onFollowUp(lead); }}
-          className="p-1.5 text-navy/40 hover:text-gold transition-colors"
+          className="p-1.5 text-navy/40 hover:text-navy/70 transition-colors"
           title="Send follow-up email"
         >
           <Mail className="w-3.5 h-3.5" />

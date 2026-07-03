@@ -77,7 +77,7 @@ async def create_task(task: GovernanceTaskCreate, user: dict = Depends(require_w
     """Create a new governance task"""
     trust = await db.trusts.find_one({"trust_id": task.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     task_id = f"task_{uuid.uuid4().hex[:12]}"
     
@@ -136,7 +136,7 @@ async def complete_task(task_id: str, user: dict = Depends(require_write_access)
         {"_id": 0}
     )
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found. It may have been deleted. Please refresh the task list and try again.")
     
     completed_at = datetime.now(timezone.utc).isoformat()
     await db.governance_tasks.update_one(
@@ -202,7 +202,7 @@ async def uncomplete_task(task_id: str, user: dict = Depends(require_write_acces
         {"$set": {"completed_at": None}}
     )
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found. It may have been deleted. Please refresh the task list and try again.")
     
     return {"message": "Task marked incomplete"}
 
@@ -212,7 +212,7 @@ async def delete_task(task_id: str, user: dict = Depends(require_write_access)):
     """Delete a task"""
     result = await db.governance_tasks.delete_one({"task_id": task_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found. It may have been already deleted. Please refresh the task list and try again.")
     
     return {"message": "Task deleted"}
 
@@ -230,15 +230,15 @@ async def update_checklist_item(
         {"_id": 0}
     )
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found. It may have been deleted. Please refresh the task list and try again.")
     
     checklist_items = task.get("checklist_items", [])
     if item_index < 0 or item_index >= len(checklist_items):
-        raise HTTPException(status_code=404, detail="Checklist item index out of range")
+        raise HTTPException(status_code=404, detail=f"Checklist item index {item_index} is out of range. The task has {len(checklist_items)} items (0–{len(checklist_items) - 1}).")
     
     completed = update.get("completed")
     if completed is None:
-        raise HTTPException(status_code=400, detail="completed field is required")
+        raise HTTPException(status_code=400, detail="The 'completed' field is required. Send {\"completed\": true} or {\"completed\": false}.")
     
     checklist_items[item_index]["completed"] = completed
     

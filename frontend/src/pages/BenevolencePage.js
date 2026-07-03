@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
 import { 
@@ -171,7 +172,7 @@ export default function BenevolencePage() {
       }
     } catch (error) {
       console.error('Failed to load benevolence data:', error);
-      toast.error('Failed to load benevolence records');
+      showError(toast, error, { operation: 'load', page: 'Benevolence' });
     } finally {
       setLoading(false);
     }
@@ -288,10 +289,10 @@ export default function BenevolencePage() {
         loadAllData();
       } else {
         const error = await response.json().catch(() => ({}));
-        toast.error(error.detail || 'Failed to create record');
+        showError(toast, new Error(error.detail || 'Failed to create record'), { operation: 'create', page: 'Benevolence' });
       }
     } catch (error) {
-      toast.error('Failed to create record');
+      showError(toast, error, { operation: 'create', page: 'Benevolence' });
     } finally {
       setFormLoading(false);
     }

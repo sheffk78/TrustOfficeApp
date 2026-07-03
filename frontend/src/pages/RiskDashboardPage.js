@@ -226,7 +226,7 @@ export default function RiskDashboardPage() {
                           <p className="text-sm text-neutral-600 mb-2">{r.detail}</p>
                           <div className="flex items-center gap-3">
                             <p className="text-xs text-neutral-500">Action: {r.action}</p>
-                            <Link to={r.deeplink} className="text-xs text-navy hover:text-gold flex items-center gap-1">
+                            <Link to={r.deeplink} className="text-xs text-navy hover:text-navy/70 flex items-center gap-1">
                               <ArrowUpRight className="w-3 h-3" />
                               Go to {r.module}
                             </Link>

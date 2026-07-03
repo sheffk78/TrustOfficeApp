@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 
 export default function CompensationPage() {
   const navigate = useNavigate();
@@ -144,10 +145,10 @@ export default function CompensationPage() {
         loadData();
       } else {
         const error = await response.json().catch(() => ({}));
-        toast.error(error.detail || 'Failed to save plan');
+        showError(toast, new Error(error.detail || 'Failed to save plan'), { operation: 'save', page: 'Compensation' });
       }
     } catch (error) {
-      toast.error('Failed to save plan');
+      showError(toast, error, { operation: 'save', page: 'Compensation' });
     }
   };
 
@@ -162,7 +163,7 @@ export default function CompensationPage() {
         loadData();
       }
     } catch (error) {
-      toast.error('Failed to delete plan');
+      showError(toast, error, { operation: 'delete', page: 'Compensation' });
     }
   };
 
@@ -194,7 +195,7 @@ export default function CompensationPage() {
         loadData();
       }
     } catch (error) {
-      toast.error('Failed to record payment');
+      showError(toast, error, { operation: 'record', page: 'Compensation' });
     }
   };
 
@@ -209,7 +210,7 @@ export default function CompensationPage() {
         loadData();
       }
     } catch (error) {
-      toast.error('Failed to delete payment');
+      showError(toast, error, { operation: 'delete', page: 'Compensation' });
     }
   };
 
@@ -378,7 +379,7 @@ export default function CompensationPage() {
                         variant="ghost" 
                         size="sm"
                         onClick={() => openEditPlan(primaryPlan)}
-                        className="text-navy hover:text-gold"
+                        className="text-navy hover:text-navy/70"
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import PageHelpButton from '@/components/PageHelpButton';
 import {
   TrendingUp, Plus, Wallet, Building2, Landmark,
@@ -79,7 +80,7 @@ export default function InvestmentsPage() {
         setSummary(prev => ({ ...prev, by_type: sumData.by_type }));
       }
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'load_investments', page: 'Investments' });
     } finally {
       setLoading(false);
     }
@@ -104,7 +105,7 @@ export default function InvestmentsPage() {
       setForm({ asset_name: '', asset_type: 'stock', cost_basis: '', current_value: '', quantity: '1', unit: 'shares', custodian: '', notes: '' });
       loadData();
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'create_investment', page: 'Investments' });
     }
   };
 
@@ -120,7 +121,7 @@ export default function InvestmentsPage() {
         loadData();
       }
     } catch (e) {
-      toast.error('Failed to remove');
+      showError(toast, e, { operation: 'remove', page: 'Investments' });
     }
   };
 

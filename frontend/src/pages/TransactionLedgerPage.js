@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
 import PageHelpButton from '@/components/PageHelpButton';
@@ -96,7 +97,7 @@ export default function TransactionLedgerPage() {
       if (txnRes.ok) setTransactions(await txnRes.json());
       if (entRes.ok) setEntities(await entRes.json());
     } catch (e) {
-      toast.error('Failed to load transaction data');
+      showError(toast, e, { operation: 'load', page: 'TransactionLedger' });
     } finally {
       setLoading(false);
     }
@@ -164,7 +165,7 @@ export default function TransactionLedgerPage() {
       loadData();
     } catch (e) {
       if (e.message?.includes('subscription') || e.message?.includes('402')) showUpgradeModal();
-      else toast.error(e.message);
+      showError(toast, e, { operation: 'create_transaction', page: 'TransactionLedger' });
     } finally {
       setCreating(false);
     }
@@ -179,7 +180,7 @@ export default function TransactionLedgerPage() {
       toast.success('Transaction deleted');
       loadData();
     } catch {
-      toast.error('Failed to delete');
+      showError(toast, e, { operation: 'delete', page: 'TransactionLedger' });
     }
   };
 
@@ -248,7 +249,7 @@ export default function TransactionLedgerPage() {
       setImportStep(1);
       loadData();
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'import_csv', page: 'TransactionLedger' });
     } finally {
       setImporting(false);
     }

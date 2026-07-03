@@ -18,6 +18,7 @@ Only extract when the user is clearly making a request that would create, update
 - A task request → extract task type, description, due date, priority
 - A transaction request → extract type (income/expense), amount, category, date, description
 - A document upload request → extract title, category, notes
+- An entity/structure creation request → extract name, entity_type (Trust/Holding LLC/Operating LLC), legal_name, governing_law (state code), ein, formation_date, trustee_names, member_names, manager_names
 
 ### Update Requests
 - A beneficiary update → extract current name, new email/phone/notes
@@ -161,6 +162,28 @@ The `missing_required` field lists fields that are needed but not provided by th
 ```
 
 For `send_certificate`, the only required field is `beneficiary_name`. Email is optional (system uses the email on file). If the user says "email Jane her certificate" and Jane is a known beneficiary, that's sufficient, no clarification needed.
+
+## Output Format (Create Entity)
+```json
+{
+  "action_type": "create_entity",
+  "extracted": {
+    "name": "Smith Holdings LLC",
+    "entity_type": "Holding LLC",
+    "legal_name": "Smith Holdings LLC",
+    "governing_law": "TX",
+    "ein": null,
+    "formation_date": null,
+    "trustee_names": null,
+    "member_names": "John Smith",
+    "manager_names": null
+  },
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+
+For `create_entity`, `name` and `entity_type` are required. `entity_type` must be one of: "Trust", "Holding LLC", "Operating LLC". If the user does not specify the entity type, ask "What type of entity would you like to create — Trust, Holding LLC, or Operating LLC?" Other fields are optional and can be left null. If the user mentions a state, map it to the 2-letter code for `governing_law`.
 
 ## Strong Clarification Rules
 When `missing_required` is non-empty, the `suggested_clarification` MUST be a natural, conversational question, not a technical field request:

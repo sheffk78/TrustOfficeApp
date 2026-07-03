@@ -182,7 +182,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
           </div>
           <button
             onClick={handleReset}
-            className="text-[10px] font-mono uppercase tracking-wider text-navy hover:text-gold transition-colors mt-2"
+            className="text-[10px] font-mono uppercase tracking-wider text-navy hover:text-navy/70 transition-colors mt-2"
           >
             Upload Another
           </button>

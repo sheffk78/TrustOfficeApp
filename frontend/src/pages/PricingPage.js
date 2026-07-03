@@ -136,11 +136,11 @@ export default function PricingPage() {
             />
           </Link>
           {user ? (
-            <Link to="/dashboard" className="text-sm hover:text-gold transition-colors">
+            <Link to="/dashboard" className="text-sm hover:text-navy/70 transition-colors">
               Go to Dashboard
             </Link>
           ) : (
-            <Link to="/login" className="text-sm hover:text-gold transition-colors">
+            <Link to="/login" className="text-sm hover:text-navy/70 transition-colors">
               Sign In
             </Link>
           )}

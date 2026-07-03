@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { showError, reportErrorToBackend } from '@/utils/errors';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, X } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -113,6 +114,10 @@ export default function LoginPage() {
       }
       setLoginError(friendlyMsg);
       toast.error(friendlyMsg);
+      // Report login errors to backend (except invalid credentials — too noisy)
+      if (!rawMsg.includes('401') && !rawMsg.toLowerCase().includes('invalid credentials')) {
+        reportErrorToBackend(error, { operation: 'login', page: 'Login' });
+      }
     } finally {
       setLoading(false);
     }
@@ -227,7 +232,7 @@ export default function LoginPage() {
                     </Label>
                     <Link 
                       to="/forgot-password" 
-                      className="text-xs text-navy hover:text-gold"
+                      className="text-xs text-navy hover:text-navy/70"
                       data-testid="forgot-password-link"
                     >
                       Forgot password?
@@ -268,7 +273,7 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{' '}
-                <Link to="/signup" className="text-navy font-medium hover:text-gold" data-testid="signup-link">
+                <Link to="/signup" className="text-navy font-medium hover:text-navy/70" data-testid="signup-link">
                   Create Account
                 </Link>
               </p>

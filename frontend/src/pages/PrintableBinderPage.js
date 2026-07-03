@@ -243,7 +243,7 @@ const PrintableBinderPage = () => {
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{section.description}</p>
                       <button
                         onClick={() => handlePrint(`tab-${section.id}`)}
-                        className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+                        className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
                       >
                         <Printer className="w-3 h-3" /> Print Divider
                       </button>
@@ -312,7 +312,7 @@ const PrintableBinderPage = () => {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Deed recording, insurance, mortgage, and tax steps.</p>
                   <button
                     onClick={() => handlePrint('checklist-real-estate')}
-                    className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+                    className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
                   </button>
@@ -327,7 +327,7 @@ const PrintableBinderPage = () => {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Title transfer, DMV, insurance, and registration steps.</p>
                   <button
                     onClick={() => handlePrint('checklist-vehicle')}
-                    className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+                    className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
                   </button>

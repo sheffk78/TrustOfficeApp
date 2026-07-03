@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
 import PageHelpButton from '@/components/PageHelpButton';
 import { format, parseISO } from 'date-fns';
@@ -258,7 +259,7 @@ export default function BeneficiariesPage() {
         loadOverviewData();
       }
     } catch (error) {
-      toast.error('Failed to save settings');
+      showError(toast, error, { operation: 'save', page: 'Beneficiaries' });
     }
   };
   const sanitizeOptional = (val) => {
@@ -305,10 +306,10 @@ export default function BeneficiariesPage() {
         loadOverviewData();
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to save certificate');
+        showError(toast, new Error(error.detail || 'Failed to save certificate'), { operation: 'save', page: 'Beneficiaries' });
       }
     } catch (error) {
-      toast.error('Failed to save certificate');
+      showError(toast, error, { operation: 'save', page: 'Beneficiaries' });
     }
   };
 
@@ -343,10 +344,10 @@ export default function BeneficiariesPage() {
         loadOverviewData();
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Transfer failed');
+        showError(toast, new Error(error.detail || 'Transfer failed'), { operation: 'transfer_certificate', page: 'Beneficiaries' });
       }
     } catch (error) {
-      toast.error('Transfer failed');
+      showError(toast, error, { operation: 'transfer_certificate', page: 'Beneficiaries' });
     }
   };
 
@@ -363,7 +364,7 @@ export default function BeneficiariesPage() {
         loadOverviewData();
       }
     } catch (error) {
-      toast.error('Failed to revoke certificate');
+      showError(toast, error, { operation: 'revoke', page: 'Beneficiaries' });
     }
   };
 
@@ -375,11 +376,11 @@ export default function BeneficiariesPage() {
         const data = await response.json();
         setPdfPreview({ show: true, loading: false, data: data.pdf_base64, filename: data.filename });
       } else {
-        toast.error('Failed to load PDF');
+        showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
         setPdfPreview({ show: false, loading: false, data: null, filename: '' });
       }
     } catch (error) {
-      toast.error('Failed to load PDF');
+      showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
       setPdfPreview({ show: false, loading: false, data: null, filename: '' });
     }
   };
@@ -408,10 +409,10 @@ export default function BeneficiariesPage() {
         loadOverviewData();
       } else {
         const error = await response.json();
-        toast.error(error.detail || 'Failed to add Class Beneficiary');
+        showError(toast, new Error(error.detail || 'Failed to add Class Beneficiary'), { operation: 'add', page: 'Beneficiaries' });
       }
     } catch (error) {
-      toast.error('Failed to add Class Beneficiary');
+      showError(toast, error, { operation: 'add', page: 'Beneficiaries' });
     }
   };
 
@@ -425,7 +426,7 @@ export default function BeneficiariesPage() {
         loadOverviewData();
       }
     } catch (error) {
-      toast.error('Failed to remove Class Beneficiary');
+      showError(toast, error, { operation: 'remove', page: 'Beneficiaries' });
     }
   };
 

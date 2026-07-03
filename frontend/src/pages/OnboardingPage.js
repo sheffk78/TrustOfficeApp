@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { showError, reportErrorToBackend } from '@/utils/errors';
 import {
   ArrowRight,
   ArrowLeft,
@@ -24,6 +25,8 @@ import {
   Loader2,
   FileCheck,
   ChevronDown,
+  Plus,
+  X,
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -46,10 +49,19 @@ const xhrRequest = (method, url, data = null, token = null) => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve(response);
           } else {
-            const detail = response.detail;
+            // Handle 403 subscription read-only errors
+            if (xhr.status === 403) {
+              const subStatus = xhr.getResponseHeader('X-Subscription-Status');
+              if (subStatus || response.is_read_only) {
+                window.dispatchEvent(new CustomEvent('subscription-readonly', {
+                  detail: { status: subStatus || response.subscription_status || 'expired' }
+                }));
+              }
+            }
+            // Surface the backend's error detail, not a generic "Request failed"
             const msg = typeof detail === 'string'
               ? detail
-              : (detail?.message || detail?.msg || JSON.stringify(detail) || 'Request failed');
+              : (detail?.message || detail?.msg || (detail && detail !== '{}' ? JSON.stringify(detail) : null) || 'We couldn\'t complete this action. Please try again, or contact support@trustoffice.app for help.');
             reject(new Error(msg));
           }
         } catch (e) {
@@ -69,7 +81,7 @@ const xhrRequest = (method, url, data = null, token = null) => {
 // Quick start tasks shown after trust creation + document upload
 const QUICK_START_TASKS = [
   { label: 'Set up beneficiaries', path: '/beneficiaries', icon: Users, description: 'Add the people who benefit from your trust' },
-  { label: 'Open a trust bank account', path: '/structures', icon: Package, description: 'A trust needs its own bank account before anything else' },
+  { label: 'Set up your trust structure', path: '/structures', icon: Package, description: 'Add your trust entity and any related LLCs or structures' },
   { label: 'Hold your first trustee meeting', path: '/minutes/create?type=initial_trustee_meeting&from=onboarding', icon: ClipboardList, description: 'Document your acceptance of trusteeship and initial decisions' },
   { label: 'Check your tax calendar', path: '/calendar', icon: Calendar, description: 'See your filing deadlines based on your trust setup' },
 ];
@@ -102,8 +114,13 @@ export default function OnboardingPage() {
     state_code: '',
     tax_year_end_month: '12',
     tax_year_end_day: '31',
-    is_fiscal_year: false
+    is_fiscal_year: false,
+    trustees: ''
   });
+
+  // Trustee names - auto-filled with the signed-up user's name, editable
+  // Multiple trustees can be added/removed for trusts with co-trustees
+  const [trusteeNames, setTrusteeNames] = useState(['']);
 
   const getToken = () => localStorage.getItem('auth_token');
 
@@ -131,6 +148,13 @@ export default function OnboardingPage() {
     }
   }, [checkingTrusts, trusts, navigate, isSubscriptionExpired]);
 
+  // Auto-fill first trustee name with the signed-up user's name
+  useEffect(() => {
+    if (user?.name && trusteeNames[0] === '') {
+      setTrusteeNames([user.name]);
+    }
+  }, [user]);
+
   if (checkingTrusts) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
@@ -141,11 +165,11 @@ export default function OnboardingPage() {
 
   const handleCreateTrust = async () => {
     if (!trustData.name.trim()) {
-      toast.error('Please enter your trust name');
+      toast.error('Please enter your trust name before continuing.');
       return;
     }
     if (!trustData.jurisdiction) {
-      toast.error('Please select your state');
+      toast.error('Please select your state so we can set up the correct compliance rules for your trust.');
       return;
     }
 
@@ -156,7 +180,10 @@ export default function OnboardingPage() {
     setLoading(true);
 
     try {
-      const payload = { ...trustData, is_fiscal_year: computedFiscalYear };
+      // Join trustee names into a comma-separated string for the backend
+      const filteredTrusteeNames = trusteeNames.filter(n => n.trim());
+      const trusteesString = filteredTrusteeNames.join(', ');
+      const payload = { ...trustData, trustees: trusteesString, is_fiscal_year: computedFiscalYear };
       const newTrust = await xhrRequest('POST', `${API_URL}/api/trusts`, payload, getToken());
 
       setSelectedTrust(newTrust);
@@ -168,7 +195,7 @@ export default function OnboardingPage() {
       setStep(2); // Go to document upload
     } catch (error) {
       console.error('Create trust error:', error);
-      toast.error(error.message || 'Failed to create trust');
+      showError(toast, error, { operation: 'create_trust', page: 'Onboarding' });
     } finally {
       setLoading(false);
     }
@@ -189,7 +216,7 @@ export default function OnboardingPage() {
       }
     } catch (error) {
       console.error('Seed demo error:', error);
-      toast.error(error.message || 'Failed to create demo data');
+      showError(toast, error, { operation: 'seed_demo_data', page: 'Onboarding' });
     } finally {
       setLoading(false);
     }
@@ -264,7 +291,7 @@ export default function OnboardingPage() {
       toast.success('Trust document uploaded! We are analyzing it now.');
     } catch (error) {
       console.error('Doc upload error:', error);
-      toast.error(error.message || 'Failed to upload document');
+      showError(toast, error, { operation: 'upload_trust_doc', page: 'Onboarding' });
       setUploadProgress('');
     } finally {
       setUploadingDoc(false);
@@ -542,6 +569,47 @@ export default function OnboardingPage() {
                       <option value="WY">Wyoming</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Trustee Name(s) - auto-filled with user's name, add/remove for multiple trustees */}
+                <div>
+                  <Label className="label-trust text-sm">Trustee Name(s)</Label>
+                  <p className="text-xs text-muted-foreground mt-1 mb-2">We've pre-filled your name from your account. Update it or add co-trustees if your trust has multiple trustees.</p>
+                  <div className="space-y-2">
+                    {trusteeNames.map((name, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          value={name}
+                          onChange={(e) => {
+                            const updated = [...trusteeNames];
+                            updated[idx] = e.target.value;
+                            setTrusteeNames(updated);
+                          }}
+                          className="input-trust h-11 text-base"
+                          placeholder={idx === 0 ? "Your name (as trustee)" : "Co-trustee name"}
+                        />
+                        {trusteeNames.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setTrusteeNames(trusteeNames.filter((_, i) => i !== idx))}
+                            className="flex-shrink-0 w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors"
+                            aria-label="Remove trustee"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTrusteeNames([...trusteeNames, ''])}
+                    className="flex items-center gap-1.5 text-sm text-navy hover:text-navy/80 mt-2 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add co-trustee</span>
+                  </button>
                 </div>
 
                 {/* Advanced settings - collapsible */}

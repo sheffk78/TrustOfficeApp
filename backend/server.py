@@ -91,6 +91,10 @@ from routers.assessments import router as assessments_router
 from routers.chat import router as chat_router  # Trust Assistant
 from routers.trust_doc_analysis import router as trust_doc_analysis_router
 
+# Error alerting: global exception handler + frontend error reporting endpoint
+from error_alerting import ErrorReporter
+from routers.error_reports import router as error_reports_router
+
 # Import security middleware
 from security import (
     RateLimitMiddleware,
@@ -123,6 +127,16 @@ logger = logging.getLogger(__name__)
 
 # Create the main app
 app = FastAPI(title="TrustOffice API")
+
+# ==================== GLOBAL EXCEPTION HANDLER ====================
+# Catches ALL unhandled exceptions (500s), logs with full context, and sends a
+# deduped Discord alert via error_alerting.report_error. This must be
+# registered before middleware/routers are added so FastAPI's exception
+# dispatch routes uncaught exceptions here.
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch all unhandled exceptions, alert Discord, and return a generic 500."""
+    return await ErrorReporter.handle_uncaught(request, exc)
 
 # ==================== SUBSCRIPTION MIDDLEWARE ====================
 
@@ -157,6 +171,8 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/courses/trustee-101/curriculum",
     # Assessment routes (public — no subscription needed)
     "/api/assessments/fiduciary-compliance/submit",
+    # Frontend error reporting (auth-optional, no subscription needed)
+    "/api/report-error",
     # Admin notification endpoints (admin-only, no subscription check needed)
     "/api/admin/notifications",
     "/api/admin/notifications/unread-count",
@@ -183,6 +199,8 @@ WRITE_EXEMPT_PATHS = {
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
     "/api/auth/profile",  # Allow profile updates
+    "/api/trusts",  # Allow trust creation — first trust is needed for onboarding; multiple-trust gate is enforced in the route handler
+    "/api/demo/seed",  # Allow demo data seeding — onboarding feature for new users
 }
 
 
@@ -356,6 +374,8 @@ app.include_router(assessments_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 # Trust Document Intelligence — AI extraction from trust documents
 app.include_router(trust_doc_analysis_router, prefix="/api")
+# Frontend error reporting endpoint (POST /api/report-error)
+app.include_router(error_reports_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"

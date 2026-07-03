@@ -203,9 +203,9 @@ class BackgroundTaskRunner:
                 user_email = user["email"]
                 user_name = user.get("name", "")
                 
-                # Get user's trusts
+                # Get user's trusts — exclude demo trusts so demo data never triggers emails
                 trusts = await self.db.trusts.find(
-                    {"user_id": user_id},
+                    {"user_id": user_id, "is_demo": {"$ne": True}},
                     {"_id": 0}
                 ).to_list(100)
                 
@@ -213,11 +213,12 @@ class BackgroundTaskRunner:
                     trust_id = trust["trust_id"]
                     trust_name = trust.get("name", "")
                     
-                    # Get incomplete tasks
+                    # Get incomplete tasks — exclude demo tasks
                     tasks = await self.db.governance_tasks.find({
                         "trust_id": trust_id,
                         "user_id": user_id,
-                        "completed_at": None
+                        "completed_at": None,
+                        "is_demo": {"$ne": True}
                     }, {"_id": 0}).to_list(100)
                     
                     for task in tasks:

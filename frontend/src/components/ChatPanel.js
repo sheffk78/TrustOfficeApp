@@ -287,7 +287,7 @@ const ChatPanel = ({
                 key={chip.label}
                 onClick={() => handleChipClick(chip.message)}
                 disabled={loading}
-                className="text-[10px] uppercase tracking-wider px-3 py-1.5 border border-navy/10 bg-navy/5 text-navy hover:bg-gold/10 hover:border-gold/30 hover:text-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-[10px] uppercase tracking-wider px-3 py-1.5 border border-navy/10 bg-navy/5 text-navy hover:bg-gold/10 hover:border-gold/30 hover:text-navy/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {chip.label}
               </button>

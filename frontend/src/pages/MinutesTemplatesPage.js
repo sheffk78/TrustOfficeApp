@@ -146,7 +146,7 @@ export default function MinutesTemplatesPage() {
                       <div className="w-12 h-12 bg-navy/10 flex items-center justify-center mb-4 group-hover:bg-gold/20 transition-colors">
                         <IconComponent className="w-6 h-6 text-navy" />
                       </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-gold transition-colors" />
+                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-navy/70 transition-colors" />
                     </div>
                     <h3 className="font-serif text-lg text-navy mb-2">{template.name}</h3>
                     <p className="text-sm text-muted-foreground">{template.description}</p>
