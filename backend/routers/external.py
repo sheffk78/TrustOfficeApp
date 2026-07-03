@@ -480,7 +480,9 @@ async def provision_trustoffice(
     )
 
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
-    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}"
+    # Include coupon code in set-password URL so WingPoint users are directed to pricing after password reset
+    coupon_param = f"&coupon={request.coupon_code}" if request.coupon_code else ""
+    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}{coupon_param}"
 
     # ---- INSERT PROVISION RECORD EARLY (pending status) ----
     # Inserted before email send so retries find an existing anchor even if
@@ -652,9 +654,10 @@ async def _resend_activation(provision: dict, partner: dict) -> dict:
     )
 
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
-    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}"
-
-    # Get user name for email
+    # Preserve coupon code from original provisioning in resend URL
+    coupon_code = provision.get("coupon_code") if provision else None
+    coupon_param = f"&coupon={coupon_code}" if coupon_code else ""
+    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}{coupon_param}"
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     user_name = user.get("name", email.split("@")[0]) if user else email.split("@")[0]
 

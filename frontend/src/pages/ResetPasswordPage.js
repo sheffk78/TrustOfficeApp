@@ -12,6 +12,7 @@ export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
+  const coupon = searchParams.get('coupon');
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -135,14 +136,17 @@ export default function ResetPasswordPage() {
             </div>
             <h2 className="font-serif text-xl text-navy mb-2">Password Reset Complete</h2>
             <p className="text-muted-foreground mb-6">
-              Your password has been successfully reset. You can now log in with your new password.
+              {coupon 
+                ? "Your password is set. Now choose your TrustOffice plan to activate your trust. Your $50 WingPoint discount will be applied at checkout."
+                : "Your password has been successfully reset. You can now log in with your new password."
+              }
             </p>
             <Button 
-              onClick={() => navigate('/')}
+              onClick={() => navigate(coupon ? `/pricing?coupon=${coupon}` : '/')}
               className="btn-primary w-full"
               data-testid="go-to-login-btn"
             >
-              Go to Login
+              {coupon ? 'Choose Your Plan' : 'Go to Login'}
             </Button>
           </div>
         </div>
