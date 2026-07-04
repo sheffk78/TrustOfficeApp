@@ -75,6 +75,7 @@ export default function VaultPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [copiedLinkId, setCopiedLinkId] = useState(null);
+  const [criticalDismissed, setCriticalDismissed] = useState(false);
   const fileInputRef = useRef(null);
   const copyTimeoutRef = useRef(null);
 
@@ -95,7 +96,10 @@ export default function VaultPage() {
   const [uploadFile, setUploadFile] = useState(null);
 
   useEffect(() => {
-    if (selectedTrust) loadData();
+    if (selectedTrust) {
+      setCriticalDismissed(false);
+      loadData();
+    }
   }, [selectedTrust, activeCategory]);
 
   const loadData = async () => {
@@ -363,12 +367,19 @@ export default function VaultPage() {
           </div>
 
           {/* Missing Critical Alert */}
-          {summary?.missing_critical && summary.missing_critical.length > 0 && (
+          {summary?.missing_critical && summary.missing_critical.length > 0 && !criticalDismissed && (
             <Card className="mb-6 border-red-200 bg-red-50">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-5 h-5 text-red-600"/>
                   <h3 className="font-semibold text-red-800">Critical Documents Missing</h3>
+                  <button
+                    onClick={() => setCriticalDismissed(true)}
+                    className="ml-auto p-1 text-red-400 hover:text-red-700 transition-colors"
+                    title="Dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
                 <ul className="text-sm text-red-700 space-y-1">
                   {summary.missing_critical.map((m, i) => (

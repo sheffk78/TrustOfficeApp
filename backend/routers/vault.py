@@ -401,7 +401,9 @@ async def vault_summary(trust_id: str, user: dict = Depends(get_current_user)):
         })
 
     missing_critical = []
-    critical_cats = ["trust_instrument", "schedule_a", "tax_return", "minutes"]
+    # Minutes are stored in the Minutes section of the app, not the vault.
+    # Only flag categories that genuinely belong in the vault as critical.
+    critical_cats = ["trust_instrument", "schedule_a", "tax_return"]
     present_cats = {c["category"] for c in by_category}
     for cat in critical_cats:
         if cat not in present_cats:
