@@ -729,16 +729,19 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
         await db.user_onboarding.insert_one(existing)
     
     # Auto-check based on actual data if trust_id provided
+    # Bidirectional: sets True when data exists, resets False when data is gone
     if trust_id:
         updates = {}
         
-        # Check trust profile completion
+        # Check trust profile completion (formation date + EIN)
         trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
         if trust:
-            if trust.get("start_date") and not existing.get("formation_date_added"):
-                updates["formation_date_added"] = True
-            if trust.get("ein") and not existing.get("ein_entered"):
-                updates["ein_entered"] = True
+            has_formation = bool(trust.get("start_date"))
+            has_ein = bool(trust.get("ein"))
+            if has_formation != existing.get("formation_date_added"):
+                updates["formation_date_added"] = has_formation
+            if has_ein != existing.get("ein_entered"):
+                updates["ein_entered"] = has_ein
         
         # Check document uploads in vault
         trust_doc_count = await db.vault_documents.count_documents({
@@ -746,41 +749,45 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
             "user_id": user_id,
             "category": {"$in": ["trust_instrument", "trust_document", "declaration_of_trust"]}
         })
-        if trust_doc_count > 0 and not existing.get("trust_doc_uploaded"):
-            updates["trust_doc_uploaded"] = True
+        if bool(trust_doc_count > 0) != existing.get("trust_doc_uploaded"):
+            updates["trust_doc_uploaded"] = trust_doc_count > 0
         
         ein_doc_count = await db.vault_documents.count_documents({
             "trust_id": trust_id,
             "user_id": user_id,
             "category": {"$in": ["ein_letter", "irs_notice"]}
         })
-        if ein_doc_count > 0 and not existing.get("ein_doc_uploaded"):
-            updates["ein_doc_uploaded"] = True
+        if bool(ein_doc_count > 0) != existing.get("ein_doc_uploaded"):
+            updates["ein_doc_uploaded"] = ein_doc_count > 0
         
         # Check beneficiaries
         beneficiary_count = await db.beneficiaries.count_documents({"trust_id": trust_id, "user_id": user_id})
-        if beneficiary_count > 0 and not existing.get("beneficiaries_added"):
-            updates["beneficiaries_added"] = True
+        if bool(beneficiary_count > 0) != existing.get("beneficiaries_added"):
+            updates["beneficiaries_added"] = beneficiary_count > 0
         
-        # Check assets (via entities)
+        # Check assets (via entities) — auto-created entity from trust creation counts
         entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
-        if entity_count > 0 and not existing.get("assets_added"):
-            updates["assets_added"] = True
+        if bool(entity_count > 0) != existing.get("assets_added"):
+            updates["assets_added"] = entity_count > 0
         
-        # Check governance tasks (calendar)
-        task_count = await db.governance_tasks.count_documents({
-            "trust_id": trust_id, 
+        # Check governance tasks (calendar) — only count tasks the USER created,
+        # NOT the auto-seeded ones from create_initial_governance_tasks
+        # (annual_review, quarterly_review, compensation_review, asset_revaluation)
+        auto_seeded_types = {"annual_review", "quarterly_review", "compensation_review", "asset_revaluation"}
+        user_task_count = await db.governance_tasks.count_documents({
+            "trust_id": trust_id,
             "user_id": user_id,
-            "task_type": {"$ne": "custom"}
+            "task_type": {"$nin": list(auto_seeded_types | {"custom"})}
         })
-        if task_count > 0 and not existing.get("calendar_set"):
-            updates["calendar_set"] = True
+        if bool(user_task_count > 0) != existing.get("calendar_set"):
+            updates["calendar_set"] = user_task_count > 0
         
         # Check minutes (both records from unified flow and templates from template form)
         minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
         templates_count = await db.minutes_templates.count_documents({"trust_id": trust_id, "user_id": user_id})
-        if (minutes_count > 0 or templates_count > 0) and not existing.get("minutes_generated"):
-            updates["minutes_generated"] = True
+        has_minutes = minutes_count > 0 or templates_count > 0
+        if has_minutes != existing.get("minutes_generated"):
+            updates["minutes_generated"] = has_minutes
         
         if updates:
             updates["updated_at"] = datetime.now(timezone.utc).isoformat()

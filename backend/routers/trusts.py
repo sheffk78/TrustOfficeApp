@@ -256,11 +256,12 @@ async def delete_trust(trust_id: str, user: dict = Depends(require_write_access)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
-    # Delete related data
+    # Delete related data (comprehensive cascade)
     await db.entities.delete_many({"trust_id": trust_id})
     await db.entity_relationships.delete_many({"trust_id": trust_id})
     await db.governance_tasks.delete_many({"trust_id": trust_id})
     await db.minutes_records.delete_many({"trust_id": trust_id})
+    await db.minutes_templates.delete_many({"trust_id": trust_id})
     await db.distribution_records.delete_many({"trust_id": trust_id})
     await db.compensation_plans.delete_many({"trust_id": trust_id})
     await db.compensation_payments.delete_many({"trust_id": trust_id})
@@ -272,5 +273,7 @@ async def delete_trust(trust_id: str, user: dict = Depends(require_write_access)
     await db.communications.delete_many({"trust_id": trust_id})
     await db.vault_documents.delete_many({"trust_id": trust_id})
     await db.separation_alerts.delete_many({"trust_id": trust_id})
+    await db.beneficiaries.delete_many({"trust_id": trust_id})
+    await db.schedule_a.delete_many({"trust_id": trust_id})
     
     return {"message": "Trust deleted"}
