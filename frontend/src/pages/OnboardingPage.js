@@ -58,6 +58,11 @@ const xhrRequest = (method, url, data = null, token = null) => {
                 }));
               }
             }
+            // Handle 401 auth errors with a clear message
+            if (xhr.status === 401) {
+              reject(new Error('Your session has expired. Please log in again.'));
+              return;
+            }
             // Surface the backend's error detail, not a generic "Request failed"
             const detail = response.detail || response.message || response.msg;
             const msg = typeof detail === 'string'
@@ -193,7 +198,7 @@ export default function OnboardingPage() {
       setCreatedTrustId(newTrust.trust_id);
 
       toast.success('Trust created');
-      setStep(2); // Go to document upload
+      setStep(3); // Go to document upload
     } catch (error) {
       console.error('Create trust error:', error);
       showError(toast, error, { operation: 'create_trust', page: 'Onboarding' });

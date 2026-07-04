@@ -754,23 +754,6 @@ export default function SettingsPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="label-trust">Your Role in This Trust</Label>
-                    <Select 
-                      value={newTrustData.role} 
-                      onValueChange={(v) => setNewTrustData({ ...newTrustData, role: v })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Trustee">Trustee</SelectItem>
-                        <SelectItem value="Co-Trustee">Co-Trustee</SelectItem>
-                        <SelectItem value="Successor Trustee">Successor Trustee</SelectItem>
-                        <SelectItem value="Trust Protector">Trust Protector</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
                     <Label className="label-trust">Trust Start Date</Label>
                     <Input
                       type="date"
@@ -1029,41 +1012,21 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="label-trust">Your Role in This Trust</Label>
-                    <Select 
-                      value={trustData.role} 
-                      onValueChange={(value) => setTrustData({ ...trustData, role: value })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust" data-testid="settings-role-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Trustee">Trustee</SelectItem>
-                        <SelectItem value="Co-Trustee">Co-Trustee</SelectItem>
-                        <SelectItem value="Successor Trustee">Successor Trustee</SelectItem>
-                        <SelectItem value="Trust Protector">Trust Protector</SelectItem>
-                        <SelectItem value="Beneficiary">Beneficiary</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Review Cadence</Label>
-                    <Select 
-                      value={trustData.review_cadence} 
-                      onValueChange={(value) => setTrustData({ ...trustData, review_cadence: value })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust" data-testid="settings-cadence-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="annual">Annual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div>
+                  <Label className="label-trust">Review Cadence</Label>
+                  <Select
+                    value={trustData.review_cadence}
+                    onValueChange={(value) => setTrustData({ ...trustData, review_cadence: value })}
+                  >
+                    <SelectTrigger className="mt-1 input-trust" data-testid="settings-cadence-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="annual">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
