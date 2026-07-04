@@ -60,8 +60,8 @@ CRITERIA_CONFIG = {
     "Annual Review": {
         "max_points": 15,
         "insight_type": "warning",
-        "insight_title": "Annual Review Due",
-        "insight_desc": "Complete annual review for +{max_points} points",
+        "insight_title": "Schedule Annual Review",
+        "insight_desc": "Schedule your annual review for +{max_points} points",
         "action_path": "/calendar",
         "action_label": "Schedule Review",
     },
@@ -217,6 +217,10 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "completed_at": {"$gte": one_year_ago.isoformat()}
     }, {"_id": 0})
 
+    # 5b. Trust creation date (to suppress Annual Review insight for new trusts)
+    trust_doc = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "created_at": 1})
+    trust_created_at = trust_doc.get("created_at") if trust_doc else None
+
     # 6. Asset Valuation Freshness
     active_assets = await db.schedule_a_items.find({
         "trust_id": trust_id,
@@ -279,6 +283,7 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "dist_count": dist_count,
         "benevolence_dists": benevolence_dists,
         "annual_review": annual_review,
+        "trust_created_at": trust_created_at,
         "active_assets": active_assets,
         "twelve_months_ago": twelve_months_ago,
         "total_txns": total_txns,
@@ -385,17 +390,26 @@ def _compute_health_score(data: dict) -> dict:
     ))
     total_score += dist_points
 
-    # 5. Annual Review (+10)
+    # 5. Annual Review (+15)
     mp = CRITERIA_CONFIG["Annual Review"]["max_points"]
     annual_done = data["annual_review"] is not None
     annual_points = mp if annual_done else 0
+    # Suppress insight for new trusts (created <90 days ago) — no annual review is due yet
+    trust_created_at = data.get("trust_created_at")
+    is_new_trust = False
+    if trust_created_at:
+        try:
+            created = datetime.fromisoformat(trust_created_at.replace("Z", "+00:00")) if "T" in trust_created_at else datetime.fromisoformat(trust_created_at).replace(tzinfo=timezone.utc)
+            is_new_trust = (now - created).days < 90
+        except (ValueError, TypeError):
+            pass
     criteria.append(HealthScoreCriterion(
         name="Annual Review",
-        description="Annual review completed in last 12 months",
+        description="Annual review completed in last 12 months" if not is_new_trust else "Annual review not due yet — schedule it for later",
         points=annual_points,
         max_points=mp,
         achieved=annual_done,
-        no_data=False
+        no_data=is_new_trust
     ))
     total_score += annual_points
 
