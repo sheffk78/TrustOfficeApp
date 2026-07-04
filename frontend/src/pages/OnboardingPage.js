@@ -210,7 +210,7 @@ export default function OnboardingPage() {
       if (result?.seeded) {
         await loadTrusts();
         toast.success('Demo data loaded!');
-        setStep(3); // Skip doc upload, go to welcome
+        setStep(4); // Skip doc upload, go to welcome
       } else {
         toast.info(result?.message || 'Demo data already exists');
         navigate('/dashboard');
@@ -325,8 +325,8 @@ export default function OnboardingPage() {
   };
 
   // Step names for progress indicator
-  const stepNames = ['Trust Details', 'Trust Document', 'Welcome'];
-  const totalSteps = 3;
+  const stepNames = ['Trust Details', 'Trustee', 'Trust Document', 'Welcome'];
+  const totalSteps = 4;
 
   return (
     <div className="min-h-screen bg-subtle-bg" data-testid="onboarding-page">
@@ -348,7 +348,7 @@ export default function OnboardingPage() {
       {step <= totalSteps && (
         <div className="max-w-3xl mx-auto px-8 pt-8">
           <div className="flex items-center gap-2 mb-2">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div
                 key={s}
                 className={`flex-1 h-1 rounded-full transition-colors ${
@@ -572,52 +572,6 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                {/* Trustee Name(s) - auto-filled with user's name, prominent section */}
-                <div className="p-4 border-2 border-navy/20 bg-navy/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users className="w-4 h-4 text-navy" />
-                    <Label className="label-trust text-sm">Trustee Name(s)</Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    We've pre-filled your name from your account as the trustee. Update it if needed, or add co-trustees if your trust has multiple trustees.
-                  </p>
-                  <div className="space-y-2">
-                    {trusteeNames.map((name, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Input
-                          type="text"
-                          value={name}
-                          onChange={(e) => {
-                            const updated = [...trusteeNames];
-                            updated[idx] = e.target.value;
-                            setTrusteeNames(updated);
-                          }}
-                          className="input-trust h-11 text-base"
-                          placeholder={idx === 0 ? "Your name (as trustee)" : "Co-trustee name"}
-                        />
-                        {trusteeNames.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setTrusteeNames(trusteeNames.filter((_, i) => i !== idx))}
-                            className="flex-shrink-0 w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors"
-                            aria-label="Remove trustee"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setTrusteeNames([...trusteeNames, ''])}
-                    className="flex items-center gap-1.5 text-sm text-navy hover:text-navy/80 mt-2 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add co-trustee</span>
-                  </button>
-                </div>
-
                 {/* Advanced settings - collapsible */}
                 <div>
                   <button
@@ -692,16 +646,12 @@ export default function OnboardingPage() {
                 </div>
 
                 <Button
-                  onClick={handleCreateTrust}
+                  onClick={() => setStep(2)}
                   className="w-full btn-primary h-12 text-base"
-                  disabled={loading || !trustData.name.trim() || !trustData.jurisdiction}
-                  data-testid="create-trust-btn"
+                  disabled={!trustData.name.trim() || !trustData.jurisdiction}
+                  data-testid="continue-to-trustee-btn"
                 >
-                  {loading ? (
-                    <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Creating...</>
-                  ) : (
-                    <>Continue <ArrowRight className="w-5 h-5 ml-2" /></>
-                  )}
+                  Continue <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </div>
 
@@ -725,11 +675,99 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 2: Trust Document Upload */}
+        {/* STEP 2: Trustee Review */}
         {step === 2 && (
           <div className="mt-8">
             <button
               onClick={() => setStep(1)}
+              className="flex items-center gap-2 text-muted-foreground hover:text-navy mb-6 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="font-mono text-xs uppercase tracking-widest">Back</span>
+            </button>
+
+            <div className="card-trust corner-mark mb-8">
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-6 h-6 text-navy" />
+                  <h1 className="font-serif text-3xl text-navy">
+                    Confirm Your Trustees
+                  </h1>
+                </div>
+                <p className="text-muted-foreground">
+                  We've pre-filled your name from your account as the trustee. Update it if needed, or add co-trustees if your trust has multiple trustees. These names will appear on meeting minutes and other documents.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 border-2 border-navy/20 bg-navy/5">
+                  <Label className="label-trust text-sm mb-3">Trustee Name(s)</Label>
+                  <div className="space-y-2">
+                    {trusteeNames.map((name, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          value={name}
+                          onChange={(e) => {
+                            const updated = [...trusteeNames];
+                            updated[idx] = e.target.value;
+                            setTrusteeNames(updated);
+                          }}
+                          className="input-trust h-11 text-base"
+                          placeholder={idx === 0 ? "Your name (as trustee)" : "Co-trustee name"}
+                          data-testid={`trustee-name-${idx}`}
+                        />
+                        {trusteeNames.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setTrusteeNames(trusteeNames.filter((_, i) => i !== idx))}
+                            className="flex-shrink-0 w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-red-500 transition-colors"
+                            aria-label="Remove trustee"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTrusteeNames([...trusteeNames, ''])}
+                    className="flex items-center gap-1.5 text-sm text-navy hover:text-navy/80 mt-3 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add co-trustee</span>
+                  </button>
+                </div>
+
+                <div className="bg-navy/5 border border-navy/10 p-4">
+                  <p className="text-xs text-muted-foreground">
+                    <strong className="text-navy">Note:</strong> The person creating this account is assumed to be the trustee. If you're managing this trust on someone else's behalf, update the name above. You can always change this later in Settings.
+                  </p>
+                </div>
+
+                <Button
+                  onClick={handleCreateTrust}
+                  className="w-full btn-primary h-12 text-base"
+                  disabled={loading || !trusteeNames.some(n => n.trim())}
+                  data-testid="create-trust-btn"
+                >
+                  {loading ? (
+                    <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Creating...</>
+                  ) : (
+                    <>Create Trust <ArrowRight className="w-5 h-5 ml-2" /></>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: Trust Document Upload */}
+        {step === 3 && (
+          <div className="mt-8">
+            <button
+              onClick={() => setStep(2)}
               className="flex items-center gap-2 text-muted-foreground hover:text-navy mb-6 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -817,7 +855,7 @@ export default function OnboardingPage() {
               {/* Skip option */}
               <div className="mt-6 pt-6 border-t border-navy/10">
                 <button
-                  onClick={() => setStep(3)}
+                  onClick={() => setStep(4)}
                   className="w-full text-center text-sm text-muted-foreground hover:text-navy transition-colors py-2"
                   data-testid="skip-doc-upload"
                 >
@@ -828,8 +866,8 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 3: Welcome / Quick Start */}
-        {step === 3 && (
+        {/* STEP 4: Welcome / Quick Start */}
+        {step === 4 && (
           <div className="mt-8">
             <div className="card-trust corner-mark text-center mb-8">
               <div className="w-16 h-16 bg-success/10 flex items-center justify-center mx-auto mb-6 rounded-full">
