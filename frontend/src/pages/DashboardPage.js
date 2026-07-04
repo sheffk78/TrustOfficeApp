@@ -272,7 +272,7 @@ export default function DashboardPage() {
         description: 'The IRS uses this to calculate your filing deadlines.',
         done: onboarding.formation_date_added,
         icon: CalendarCheck,
-        action: '/settings'
+        action: '/settings#formation-date'
       },
       { 
         id: 'ein', 
@@ -280,7 +280,7 @@ export default function DashboardPage() {
         description: 'Every trust needs an EIN for tax filing. Don\'t have one yet? Skip this for now.',
         done: onboarding.ein_entered,
         icon: FileCheck,
-        action: '/settings'
+        action: '/settings#ein'
       },
       { 
         id: 'trust_doc', 

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -58,6 +58,7 @@ export default function SettingsPage() {
   };
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, setUser, selectedTrust, setSelectedTrust, loadTrusts } = useAuth();
   const [loading, setLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(null);
@@ -121,6 +122,22 @@ export default function SettingsPage() {
     is_fiscal_year: selectedTrust?.is_fiscal_year || false,
     trustees: selectedTrust?.trustees || ''
   });
+
+  // Scroll to section from dashboard hash (e.g., /settings#ein, /settings#formation-date)
+  useEffect(() => {
+    if (location.hash) {
+      const targetId = location.hash.slice(1); // remove '#'
+      // Map hash to the data-section attribute on the wrapper div
+      const el = document.querySelector(`[data-section="${targetId}"]`);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-navy/30', 'rounded-lg');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-navy/30', 'rounded-lg'), 3000);
+        }, 300);
+      }
+    }
+  }, [location.hash]);
 
   // Re-sync trustData when selectedTrust changes (e.g., after initial load)
   useEffect(() => {
@@ -1092,7 +1109,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
+                    <div data-section="formation-date">
                       <Label className="label-trust">Formation Date</Label>
                       <Input
                         type="date"
@@ -1103,7 +1120,7 @@ export default function SettingsPage() {
                       />
                       <p className="text-xs text-muted-foreground mt-1">When the trust was established</p>
                     </div>
-                    <div>
+                    <div data-section="ein">
                       <Label className="label-trust">EIN</Label>
                       <Input
                         value={trustData.ein}

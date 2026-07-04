@@ -226,11 +226,11 @@ export default function VaultPage() {
       setUploadProgress('');
       // Provide more specific error messages for common failure modes
       let errorMsg = e.message || 'Upload failed';
-      if (errorMsg === 'Failed to fetch') {
-        errorMsg = 'Network error — please check your connection and try again. If the file is large, it may have timed out.';
+      if (errorMsg === 'Failed to fetch' || errorMsg.includes('Could not reach the server')) {
+        errorMsg = 'Could not reach the server. The file may be too large or your connection timed out. Please try again, or use "Link External" to store a link to the file instead.';
       }
       console.error('Vault upload error:', e);
-      showError(toast, e, { operation: 'upload_vault_file', page: 'Vault' });
+      toast.error(errorMsg);
     } finally {
       setUploading(false);
     }
@@ -265,6 +265,12 @@ export default function VaultPage() {
       setForm(f => ({ ...f, title: name, file_name: file.name }));
     } else {
       setForm(f => ({ ...f, file_name: file.name }));
+    }
+
+    // Auto-detect EIN Confirmation Letter (CP575) from filename
+    const lowerName = file.name.toLowerCase();
+    if (lowerName.includes('cp575') || lowerName.includes('ein') || lowerName.includes('ein_letter') || lowerName.includes('ein-confirmation') || lowerName.includes('irs') && lowerName.includes('letter')) {
+      setForm(f => ({ ...f, category: 'ein_letter' }));
     }
   };
 
