@@ -223,7 +223,7 @@ async def create_minutes_draft(
             ai_request = AiMinutesDraftRequest(
                 minutes_type=minutes_type,
                 meeting_date=request.meeting_date,
-                participants=request.participants or [trust.get("role", "Trustee")],
+                participants=request.participants or [t.strip() for t in (trust.get("trustees") or "").split(",") if t.strip()] or [trust.get("role", "Trustee")],
                 decisions_outline=[ai_prompt_text],
                 trust_name=trust_name,
                 jurisdiction=jurisdiction,
@@ -284,7 +284,7 @@ async def create_minutes_draft(
             ai_request = AiMinutesDraftRequest(
                 minutes_type=ai_minutes_type,
                 meeting_date=request.meeting_date,
-                participants=request.participants or [trust.get("role", "Trustee")],
+                participants=request.participants or [t.strip() for t in (trust.get("trustees") or "").split(",") if t.strip()] or [trust.get("role", "Trustee")],
                 decisions_outline=decisions_outline if decisions_outline else ["No specific decisions recorded"],
                 trust_name=trust_name,
                 jurisdiction=jurisdiction,

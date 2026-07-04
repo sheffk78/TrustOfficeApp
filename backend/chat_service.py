@@ -298,6 +298,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
             "beneficiary_standard": trust.get("beneficiary_standard", ""),
             "start_date": trust.get("start_date", ""),
             "status": trust.get("status", "active"),
+            "trustees": trust.get("trustees", ""),
         }
     else:
         context["trust"] = {"name": "Unknown Trust"}
@@ -698,6 +699,7 @@ Trust: {trust_info.get('name', 'Unknown')}
 Type: {trust_info.get('type', 'Not specified')}
 Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
+Trustees: {trust_info.get('trustees', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get('health_score', {}).get('color', 'red')})
 
@@ -859,6 +861,7 @@ Trust: {trust_info.get('name', 'Unknown')}
 Type: {trust_info.get('type', 'Not specified')}
 Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
+Trustees: {trust_info.get('trustees', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get('health_score', {}).get('color', 'red')})
 

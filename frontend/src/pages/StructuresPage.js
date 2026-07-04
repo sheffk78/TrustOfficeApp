@@ -465,6 +465,13 @@ export default function StructuresPage() {
                           </span>
                         )}
                       </div>
+                      
+                      {entity.trustee_names && (
+                        <div className="mt-3 pt-3 border-t border-navy/10">
+                          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Trustees</p>
+                          <p className="text-sm text-navy">{entity.trustee_names}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

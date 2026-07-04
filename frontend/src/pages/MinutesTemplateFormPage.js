@@ -590,6 +590,30 @@ export default function MinutesTemplateFormPage() {
     }));
   };
 
+  // Pre-fill trustee names in all minutes template forms when trustees_present is populated
+  useEffect(() => {
+    const trustees = formData.trustees_present.filter(t => t.trim());
+    if (trustees.length === 0) return;
+
+    // Trustee compensation: pre-fill first trustee name
+    setTrusteeCompData(prev => prev.trustee_name ? prev : { ...prev, trustee_name: trustees[0] });
+
+    // Trustee resignation: pre-fill remaining trustees (all except none, user picks who's departing)
+    setTrusteeResignData(prev => {
+      const current = prev.remaining_trustees.filter(t => t.trim());
+      return current.length > 0 ? prev : { ...prev, remaining_trustees: [...trustees] };
+    });
+
+    // Conflict of interest: pre-fill first trustee
+    setConflictData(prev => prev.trustee_name ? prev : { ...prev, trustee_name: trustees[0] });
+
+    // Emergency ratification: pre-fill first trustee
+    setEmergencyData(prev => prev.trustee_acting ? prev : { ...prev, trustee_acting: trustees[0] });
+
+    // Beneficiary distribution notice: pre-fill first trustee
+    setDistributionNoticeData(prev => prev.trustee_name ? prev : { ...prev, trustee_name: trustees[0] });
+  }, [formData.trustees_present]);
+
   const handleRemoveTrustee = (index) => {
     setFormData(prev => ({
       ...prev,

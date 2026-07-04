@@ -520,24 +520,8 @@ export default function SettingsPage() {
 
       const createdTrust = await response.json();
       
-      // Auto-create the trust as an entity in the Entities section
-      try {
-        await fetchWithAuth('/entities', {
-          method: 'POST',
-          body: JSON.stringify({
-            trust_id: createdTrust.trust_id,
-            name: newTrustData.name.trim(),
-            entity_type: 'trust',
-            jurisdiction: newTrustData.jurisdiction.trim(),
-            formation_date: newTrustData.start_date || new Date().toISOString().split('T')[0],
-            status: 'active',
-            ein: '',
-            notes: newTrustData.trustees ? `Trustees: ${newTrustData.trustees}` : ''
-          })
-        });
-      } catch (entityError) {
-        console.log('Entity creation optional, continuing...');
-      }
+      // Backend auto-creates the trust entity with trustee_names synced from trust.trustees
+      // No need to create a separate entity from the frontend
       
       toast.success('Trust created successfully!');
       setCreateTrustOpen(false);

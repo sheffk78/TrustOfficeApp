@@ -172,6 +172,7 @@ export default function DistributionsPage() {
         date: formData.date.toISOString().split('T')[0],
         purpose_classification: formData.category,
         notes: formData.notes || '',
+        trustee_name: selectedTrust?.trustees?.split(',')[0]?.trim() || '',
         is_benevolence: formData.is_benevolence,
         benevolence_recipient_name: formData.is_benevolence ? formData.benevolence_recipient_name : null,
         benevolence_need_description: formData.is_benevolence ? formData.benevolence_need_description : null,

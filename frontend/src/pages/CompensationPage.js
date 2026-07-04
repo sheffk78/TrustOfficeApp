@@ -629,13 +629,26 @@ export default function CompensationPage() {
             {!planForm.is_primary && (
               <div>
                 <Label className="label-trust">Trustee / Role Name *</Label>
-                <Input
+                <Select
                   value={planForm.trustee_name}
-                  onChange={(e) => setPlanForm({ ...planForm, trustee_name: e.target.value })}
-                  placeholder="e.g., John Smith or Executive Trustee"
-                  className="input-trust mt-1"
-                  data-testid="plan-trustee-name"
-                />
+                  onValueChange={(value) => setPlanForm({ ...planForm, trustee_name: value })}
+                >
+                  <SelectTrigger className="input-trust mt-1" data-testid="plan-trustee-name">
+                    <SelectValue placeholder="Select trustee..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trustees.length > 0 ? (
+                      trustees.map((trustee) => (
+                        <SelectItem key={trustee} value={trustee}>
+                          {trustee}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="__other__" disabled>No trustees found</SelectItem>
+                    )}
+                    <SelectItem value="__other__">Other (specify in notes)</SelectItem>
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   Identify which trustee or role this cap applies to
                 </p>

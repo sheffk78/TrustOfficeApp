@@ -42,6 +42,11 @@ async def create_distribution(
             )
     
     dist_id = f"dist_{uuid.uuid4().hex[:12]}"
+    # Auto-populate trustee_name from trust if not provided
+    trustee_name = dist.trustee_name
+    if not trustee_name:
+        trustee_name = trust.get("trustees", "").split(",")[0].strip() if trust.get("trustees") else ""
+    
     dist_doc = {
         "distribution_id": dist_id,
         "trust_id": dist.trust_id,
@@ -52,6 +57,7 @@ async def create_distribution(
         "purpose_classification": dist.purpose_classification.value,
         "authority_clause_ref": dist.authority_clause_ref,
         "notes": dist.notes,
+        "trustee_name": trustee_name,
         "solvency_confirmed": False,
         "recusal_acknowledged": False,
         "approved_by": None,

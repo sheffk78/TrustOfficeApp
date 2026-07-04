@@ -729,6 +729,7 @@ class DistributionCreate(BaseModel):
     purpose_classification: PurposeClassification
     authority_clause_ref: str = ""
     notes: str = ""
+    trustee_name: str = ""
     is_benevolence: bool = False
     benevolence_recipient_name: Optional[str] = None
     benevolence_need_description: Optional[str] = None
@@ -751,6 +752,7 @@ class DistributionResponse(BaseModel):
     recusal_acknowledged: bool
     approved_by: Optional[str] = None
     approved_at: Optional[str] = None
+    trustee_name: str = ""
     minutes_record_id: Optional[str] = None
     created_at: str
     is_benevolence: bool = False
