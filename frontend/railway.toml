@@ -1,8 +1,0 @@
-[build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
-
-[deploy]
-startCommand = "npx serve -s build -l ${PORT:-3000}"
-healthcheckPath = "/"
-healthcheckTimeout = 30

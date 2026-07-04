@@ -60,8 +60,7 @@
     "zod": "^3.24.4"
   },
   "scripts": {
-    "start": "serve -s build",
-    "dev": "craco start",
+    "start": "craco start",
     "build": "craco build",
     "test": "craco test"
   },
