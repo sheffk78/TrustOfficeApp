@@ -231,6 +231,9 @@ export default function VaultPage() {
       }
       console.error('Vault upload error:', e);
       toast.error(errorMsg);
+      // The backend may have saved the file before hitting a serialization error.
+      // Refresh the vault list so the user sees the uploaded file if it landed.
+      loadData();
     } finally {
       setUploading(false);
     }

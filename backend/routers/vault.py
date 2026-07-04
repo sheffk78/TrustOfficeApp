@@ -256,8 +256,10 @@ async def upload_document(
         except Exception as e:
             logger.warning(f"Failed to trigger trust doc analysis: {e}")
 
-    # Return without file_content in the response
-    response = {k: v for k, v in record.items() if k != "file_content"}
+    # Return without file_content or _id in the response
+    # _id is added by MongoDB insert_one and is an ObjectId, which is not JSON serializable
+    # FastAPI would throw 500 AFTER the file is already saved, causing the "error then success on refresh" bug
+    response = {k: v for k, v in record.items() if k not in ("file_content", "_id")}
     response["message"] = "File uploaded to vault"
     return response
 
