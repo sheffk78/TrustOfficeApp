@@ -87,7 +87,7 @@ export default function SettingsPage() {
   const [createTrustOpen, setCreateTrustOpen] = useState(false);
   const [newTrustData, setNewTrustData] = useState({
     name: '',
-    trust_type: 'family',
+    trust_type: 'revocable_living',
     jurisdiction: '',
     role: 'Trustee',
     start_date: '',
@@ -698,10 +698,19 @@ export default function SettingsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="family">Family Trust</SelectItem>
+                        <SelectItem value="revocable_living">Revocable Living Trust</SelectItem>
+                        <SelectItem value="irrevocable_family">Irrevocable Family Trust</SelectItem>
+                        <SelectItem value="family">Family Trust (Legacy)</SelectItem>
                         <SelectItem value="charitable">Charitable Trust</SelectItem>
+                        <SelectItem value="charitable_remainder">Charitable Remainder Trust</SelectItem>
                         <SelectItem value="business">Business Trust</SelectItem>
                         <SelectItem value="ecclesiastical">Ecclesiastical Trust</SelectItem>
+                        <SelectItem value="special_needs">Special Needs Trust</SelectItem>
+                        <SelectItem value="spendthrift">Spendthrift Trust</SelectItem>
+                        <SelectItem value="testamentary">Testamentary Trust</SelectItem>
+                        <SelectItem value="life_insurance">Life Insurance Trust</SelectItem>
+                        <SelectItem value="land">Land Trust</SelectItem>
+                        <SelectItem value="institutional">Institutional Trust</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>

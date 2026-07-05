@@ -9,11 +9,22 @@ import re
 # ==================== ENUMS ====================
 
 class TrustType(str, Enum):
+    # Legacy values (kept for backward compatibility with existing records)
     family = "family"
+    institutional = "institutional"
+    # Current options
+    revocable_living = "revocable_living"
+    irrevocable_family = "irrevocable_family"
     charitable = "charitable"
+    charitable_remainder = "charitable_remainder"
     business = "business"
     ecclesiastical = "ecclesiastical"
-    institutional = "institutional"
+    special_needs = "special_needs"
+    spendthrift = "spendthrift"
+    testamentary = "testamentary"
+    life_insurance = "life_insurance"
+    land = "land"
+    other = "other"
 
 class EntityType(str, Enum):
     trust = "Trust"

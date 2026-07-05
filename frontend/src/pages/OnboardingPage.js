@@ -111,13 +111,14 @@ export default function OnboardingPage() {
 
   const [trustData, setTrustData] = useState({
     name: '',
-    trust_type: 'family',
+    trust_type: 'revocable_living',
     jurisdiction: '',
     role: 'Trustee',
     review_cadence: 'quarterly',
     description: '',
     ein: '',
     state_code: '',
+    start_date: '',
     tax_year_end_month: '12',
     tax_year_end_day: '31',
     is_fiscal_year: false,
@@ -506,10 +507,20 @@ export default function OnboardingPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="family">Family</SelectItem>
-                        <SelectItem value="charitable">Charitable</SelectItem>
-                        <SelectItem value="business">Business</SelectItem>
-                        <SelectItem value="ecclesiastical">Ecclesiastical</SelectItem>
+                        <SelectItem value="revocable_living">Revocable Living Trust</SelectItem>
+                        <SelectItem value="irrevocable_family">Irrevocable Family Trust</SelectItem>
+                        <SelectItem value="family">Family Trust (Legacy)</SelectItem>
+                        <SelectItem value="charitable">Charitable Trust</SelectItem>
+                        <SelectItem value="charitable_remainder">Charitable Remainder Trust</SelectItem>
+                        <SelectItem value="business">Business Trust</SelectItem>
+                        <SelectItem value="ecclesiastical">Ecclesiastical Trust</SelectItem>
+                        <SelectItem value="special_needs">Special Needs Trust</SelectItem>
+                        <SelectItem value="spendthrift">Spendthrift Trust</SelectItem>
+                        <SelectItem value="testamentary">Testamentary Trust</SelectItem>
+                        <SelectItem value="life_insurance">Life Insurance Trust</SelectItem>
+                        <SelectItem value="land">Land Trust</SelectItem>
+                        <SelectItem value="institutional">Institutional Trust</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -585,11 +596,34 @@ export default function OnboardingPage() {
                     type="button"
                   >
                     <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-                    <span>Advanced settings (tax year end, description)</span>
+                    <span>Advanced settings (formation date, EIN, tax year end)</span>
                   </button>
 
                   {showAdvanced && (
                     <div className="mt-4 space-y-4 p-4 bg-navy/5 border border-navy/10">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="label-trust text-xs">Formation Date</Label>
+                          <Input
+                            type="date"
+                            value={trustData.start_date}
+                            onChange={(e) => setTrustData({ ...trustData, start_date: e.target.value })}
+                            className="mt-1 input-trust h-9 text-sm"
+                            data-testid="formation-date-input"
+                          />
+                        </div>
+                        <div>
+                          <Label className="label-trust text-xs">EIN (optional)</Label>
+                          <Input
+                            type="text"
+                            value={trustData.ein}
+                            onChange={(e) => setTrustData({ ...trustData, ein: e.target.value })}
+                            className="mt-1 input-trust h-9 text-sm"
+                            placeholder="XX-XXXXXXX"
+                            data-testid="ein-input"
+                          />
+                        </div>
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label className="label-trust text-xs">Tax Year End - Month</Label>
