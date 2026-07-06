@@ -2435,7 +2435,27 @@ export default function MinutesTemplateFormPage() {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Departing Trustee Name</Label>
-                      <Input value={trusteeResignData.departing_trustee_name} onChange={(e) => setTrusteeResignData({ ...trusteeResignData, departing_trustee_name: e.target.value })} className="mt-1 input-trust" placeholder="John Smith" />
+                      <Select
+                        value={trusteeResignData.departing_trustee_name}
+                        onValueChange={(value) => setTrusteeResignData({ ...trusteeResignData, departing_trustee_name: value })}
+                      >
+                        <SelectTrigger className="mt-1 input-trust" data-testid="resign-departing-trustee-select">
+                          <SelectValue placeholder="Select departing trustee..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {formData.trustees_present.filter(t => t.trim()).length > 0 ? (
+                            formData.trustees_present
+                              .filter(t => t.trim())
+                              .map((trustee) => (
+                                <SelectItem key={trustee} value={trustee}>
+                                  {trustee}
+                                </SelectItem>
+                              ))
+                          ) : (
+                            <SelectItem value="__none__" disabled>No trustees available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label className="label-trust">Departure Type</Label>

@@ -85,6 +85,7 @@ export default function DistributionsPage() {
     category: '',
     notes: '',
     status: 'review',
+    trustee_name: '',
     // Benevolence fields
     is_benevolence: false,
     benevolence_recipient_name: '',
@@ -172,7 +173,7 @@ export default function DistributionsPage() {
         date: formData.date.toISOString().split('T')[0],
         purpose_classification: formData.category,
         notes: formData.notes || '',
-        trustee_name: selectedTrust?.trustees?.split(',')[0]?.trim() || '',
+        trustee_name: formData.trustee_name || selectedTrust?.trustees?.split(',')[0]?.trim() || '',
         is_benevolence: formData.is_benevolence,
         benevolence_recipient_name: formData.is_benevolence ? formData.benevolence_recipient_name : null,
         benevolence_need_description: formData.is_benevolence ? formData.benevolence_need_description : null,
@@ -199,6 +200,7 @@ export default function DistributionsPage() {
         category: '',
         notes: '',
         status: 'review',
+        trustee_name: '',
         is_benevolence: false,
         benevolence_recipient_name: '',
         benevolence_need_description: '',
@@ -476,6 +478,57 @@ export default function DistributionsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div>
+                    <Label className="label-trust">Trustee</Label>
+                    {(() => {
+                      const trusteeList = (selectedTrust?.trustees || '')
+                        .split(',')
+                        .map(t => t.trim())
+                        .filter(t => t);
+                      if (trusteeList.length === 0) {
+                        return (
+                          <Input
+                            value=""
+                            readOnly
+                            className="mt-1 input-trust"
+                            placeholder="No trustees configured"
+                            data-testid="dist-trustee-input"
+                          />
+                        );
+                      }
+                      if (trusteeList.length === 1) {
+                        return (
+                          <Input
+                            value={trusteeList[0]}
+                            readOnly
+                            className="mt-1 input-trust"
+                            data-testid="dist-trustee-input"
+                          />
+                        );
+                      }
+                      return (
+                        <Select
+                          value={formData.trustee_name || trusteeList[0]}
+                          onValueChange={(value) => setFormData({ ...formData, trustee_name: value })}
+                        >
+                          <SelectTrigger className="mt-1 input-trust" data-testid="dist-trustee-select">
+                            <SelectValue placeholder="Select trustee..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {trusteeList.map((trustee) => (
+                              <SelectItem key={trustee} value={trustee}>
+                                {trustee}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Trustee responsible for authorizing this distribution
+                    </p>
                   </div>
 
                   <div>

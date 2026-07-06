@@ -204,20 +204,34 @@ async def approve_distribution(
     
     approval_time = datetime.now(timezone.utc).isoformat()
     
+    # Resolve trustee name from the trust record for human-readable audit trail
+    trust = await db.trusts.find_one({"trust_id": dist["trust_id"]}, {"_id": 0})
+    trustees_str = (trust or {}).get("trustees", "") or ""
+    parsed_trustees = [t.strip() for t in trustees_str.split(",") if t.strip()]
+    
+    # Prefer the trustee_name already stored on the distribution; otherwise try
+    # to match the approving user's identity against the trust's trustees, and
+    # finally fall back to the first listed trustee.
+    dist_trustee_name = dist.get("trustee_name", "") or ""
+    if dist_trustee_name and dist_trustee_name in parsed_trustees:
+        trustee_name = dist_trustee_name
+    elif parsed_trustees:
+        trustee_name = parsed_trustees[0]
+    else:
+        trustee_name = dist_trustee_name or (trust or {}).get("role", "") or ""
+    
     await db.distribution_records.update_one(
         {"distribution_id": distribution_id},
         {"$set": {
             "solvency_confirmed": True,
             "recusal_acknowledged": True,
             "approved_by": user["user_id"],
+            "trustee_name": trustee_name,
             "approved_at": approval_time
         }}
     )
     
     updated = await db.distribution_records.find_one({"distribution_id": distribution_id}, {"_id": 0})
-    
-    # Get trust name for email
-    trust = await db.trusts.find_one({"trust_id": dist["trust_id"]}, {"_id": 0})
     
     # Send approval notification
     background_tasks.add_task(

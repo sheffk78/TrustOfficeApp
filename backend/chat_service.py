@@ -699,8 +699,8 @@ Trust: {trust_info.get('name', 'Unknown')}
 Type: {trust_info.get('type', 'Not specified')}
 Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
-Trustees: {trust_info.get('trustees', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
+Trustees: {trust_info.get('trustees', 'Not specified')}
 Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get('health_score', {}).get('color', 'red')})
 
 {vault_section}
@@ -861,8 +861,8 @@ Trust: {trust_info.get('name', 'Unknown')}
 Type: {trust_info.get('type', 'Not specified')}
 Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
-Trustees: {trust_info.get('trustees', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
+Trustees: {trust_info.get('trustees', 'Not specified')}
 Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get('health_score', {}).get('color', 'red')})
 
 {vault_section}

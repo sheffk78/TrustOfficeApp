@@ -789,6 +789,11 @@ export default function DashboardPage() {
                     <div>
                       <p className="label-trust mb-1">Trust Health</p>
                       <h2 className="font-serif text-2xl text-navy">{dashboard?.trust_name || selectedTrust?.name}</h2>
+                      {selectedTrust?.trustees && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Trustees: {selectedTrust.trustees}
+                        </p>
+                      )}
                     </div>
                     <Link 
                       to="/governance" 

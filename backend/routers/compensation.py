@@ -173,11 +173,21 @@ async def create_comp_plan(plan: CompensationPlanCreate, user: dict = Depends(re
     plan_id = f"plan_{uuid.uuid4().hex[:12]}"
     approved_amount = plan.annual_approved_amount or plan.annual_amount or 0
     
+    # Auto-populate trustee_name from the trust record when omitted and the
+    # trust has exactly one trustee. Multi-trustee trusts require an explicit
+    # choice to avoid silently attributing the plan to the wrong person.
+    plan_trustee_name = plan.trustee_name or ""
+    if not plan_trustee_name:
+        trustees_str = (trust or {}).get("trustees", "") or ""
+        parsed_trustees = [t.strip() for t in trustees_str.split(",") if t.strip()]
+        if len(parsed_trustees) == 1:
+            plan_trustee_name = parsed_trustees[0]
+    
     plan_doc = {
         "plan_id": plan_id,
         "trust_id": plan.trust_id,
         "user_id": user["user_id"],
-        "trustee_name": plan.trustee_name or "",
+        "trustee_name": plan_trustee_name,
         "role": plan.role or "",
         "annual_fee": approved_amount,
         "annual_amount": approved_amount,
