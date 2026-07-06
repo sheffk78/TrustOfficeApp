@@ -132,8 +132,8 @@ export default function SettingsPage() {
       if (el) {
         setTimeout(() => {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('ring-2', 'ring-navy/30', 'rounded-lg');
-          setTimeout(() => el.classList.remove('ring-2', 'ring-navy/30', 'rounded-lg'), 3000);
+          el.classList.add('ring-2', 'ring-navy/30', 'rounded');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-navy/30', 'rounded'), 3000);
         }, 300);
       }
     }
