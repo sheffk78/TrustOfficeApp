@@ -397,3 +397,23 @@ async def export_audit_defense_pdf(trust_id: str, days: int = 365, user: dict = 
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
+
+
+@router.get("/audit-logs")
+async def get_user_audit_logs(
+    limit: int = 50,
+    offset: int = 0,
+    user: dict = Depends(get_current_user),
+):
+    """Fetch audit log entries for the authenticated user.
+    
+    Returns security and governance audit events (logins, password changes,
+    trust profile edits, vault actions, etc.) for the audit trail page.
+    """
+    cursor = db.audit_logs.find(
+        {"user_id": user["user_id"]},
+        {"_id": 0}
+    ).sort("timestamp", -1).skip(offset).limit(min(limit, 200))
+    
+    logs = await cursor.to_list(length=min(limit, 200))
+    return {"audit_logs": logs}

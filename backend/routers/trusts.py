@@ -14,6 +14,7 @@ from dependencies import (
 )
 from models import TrustCreate, TrustUpdate, TrustResponse
 from utils.tax_calendar_math import _generate_entries
+from utils.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["trusts"])
@@ -236,6 +237,11 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
     
     if update_data:
         await db.trusts.update_one({"trust_id": trust_id}, {"$set": update_data})
+    
+    # Log trust profile update for audit trail
+    changed_fields = list(update_data.keys())
+    if changed_fields:
+        await log_audit_event(user["user_id"], "trust_updated", "trust", trust_id, {"fields_changed": changed_fields})
     
     # Sync trustees to the entity's trustee_names field
     if "trustees" in update_data:

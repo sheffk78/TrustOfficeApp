@@ -214,6 +214,36 @@ export default function AuditTrailPage() {
         }
       } catch (e) { /* skip */ }
 
+      // Fetch security audit logs (logins, password changes, vault actions, trust edits)
+      try {
+        const auditRes = await fetchWithAuth(`/audit-logs?limit=100`);
+        if (auditRes.ok) {
+          const data = await auditRes.json();
+          const logs = data.audit_logs || [];
+          logs.forEach(a => {
+            // Map audit actions to display types
+            const actionLabels = {
+              'login': 'Login',
+              'login_failed': 'Failed Login',
+              'password_reset': 'Password Reset',
+              'trust_updated': 'Trust Profile Updated',
+              'vault_upload': 'Document Uploaded',
+              'vault_download': 'Document Downloaded',
+              'vault_delete': 'Document Deleted',
+            };
+            const label = actionLabels[a.action] || a.action;
+            allEvents.push({
+              id: a.audit_id,
+              type: a.action,
+              title: label,
+              description: a.details ? Object.entries(a.details).map(([k, v]) => `${k}: ${v}`).join(', ') : '',
+              date: a.timestamp,
+              source: 'audit_logs',
+            });
+          });
+        }
+      } catch (e) { /* skip */ }
+
       // Sort by date descending
       allEvents.sort((a, b) => {
         const dateA = a.date ? new Date(a.date) : new Date(0);
@@ -330,6 +360,7 @@ export default function AuditTrailPage() {
               { label: 'Minutes', value: events.filter(e => e.type.includes('minutes')).length, color: 'text-blue-600' },
               { label: 'Financial', value: events.filter(e => e.type.includes('distribution') || e.type.includes('compensation') || e.type.includes('transaction')).length, color: 'text-success' },
               { label: 'Alerts', value: events.filter(e => e.type.includes('alert')).length, color: 'text-warning' },
+              { label: 'Security', value: events.filter(e => ['login', 'login_failed', 'password_reset', 'trust_updated', 'vault_upload', 'vault_download', 'vault_delete'].includes(e.type)).length, color: 'text-purple-600' },
             ].map(stat => (
               <div key={stat.label} className="card-trust text-center">
                 <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>

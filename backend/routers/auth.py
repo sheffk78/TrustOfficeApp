@@ -19,6 +19,7 @@ from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, Pa
 from email_service import email_service
 from security import InputSanitizer
 from mailercloud_service import add_to_trial_list
+from utils.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,7 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
     if not verify_password(user.password, user_doc["password_hash"]):
         # Log failed login attempt (for security monitoring)
         logger.warning(f"Failed login attempt for email: {email}")
+        await log_audit_event(user_doc["user_id"], "login_failed", "user", user_doc["user_id"], {"email": email})
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Auto-grant admin status for primary admin email
@@ -246,6 +248,9 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         {"user_id": user_doc["user_id"]},
         {"$set": {"last_login": now_iso}}
     )
+    
+    # Log successful login for audit trail
+    await log_audit_event(user_doc["user_id"], "login", "user", user_doc["user_id"], {"email": email, "first_login": not previous_login})
     
     # Fire first_login webhook for WingPoint-provisioned users (only on first login)
     # A first login = no previous last_login timestamp
@@ -355,6 +360,9 @@ async def reset_password(request: PasswordResetConfirm, background_tasks: Backgr
     
     # Delete used token
     await db.password_resets.delete_one({"token": request.token})
+    
+    # Log password reset for audit trail
+    await log_audit_event(reset_record["user_id"], "password_reset", "user", reset_record["user_id"], {})
     
     # Invalidate all sessions for this user
     await db.user_sessions.delete_many({"user_id": reset_record["user_id"]})

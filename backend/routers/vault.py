@@ -15,6 +15,7 @@ from pydantic import BaseModel, field_validator
 from database import db
 from dependencies import get_current_user
 from routers.compensation import auto_update_onboarding
+from utils.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["vault"])
@@ -261,6 +262,10 @@ async def upload_document(
     # FastAPI would throw 500 AFTER the file is already saved, causing the "error then success on refresh" bug
     response = {k: v for k, v in record.items() if k not in ("file_content", "_id")}
     response["message"] = "File uploaded to vault"
+    
+    # Log vault upload for audit trail
+    await log_audit_event(user["user_id"], "vault_upload", "vault_document", doc_id, {"trust_id": trust_id, "title": title, "category": category, "file_name": record.get("file_name", "")})
+    
     return response
 
 
@@ -290,6 +295,9 @@ async def download_document(doc_id: str, user: dict = Depends(get_current_user))
     safe_filename = re.sub(r'[\r\n"\\]', '', filename)
     # RFC 5987 encoded filename for non-ASCII / special characters
     encoded_filename = quote(safe_filename, safe='')
+
+    # Log vault download for audit trail
+    await log_audit_event(user["user_id"], "vault_download", "vault_document", doc_id, {"file_name": safe_filename, "trust_id": doc.get("trust_id", "")})
 
     return Response(
         content=file_content,
@@ -376,6 +384,10 @@ async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Document not found. It may have been already deleted. Please refresh the vault and try again.")
 
     await db.vault_documents.delete_one({"doc_id": doc_id, "user_id": user["user_id"]})
+    
+    # Log vault deletion for audit trail
+    await log_audit_event(user["user_id"], "vault_delete", "vault_document", doc_id, {"title": doc.get("title", ""), "category": doc.get("category", ""), "trust_id": doc.get("trust_id", "")})
+    
     return {"message": "Document removed from vault"}
 
 
