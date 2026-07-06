@@ -5,6 +5,7 @@ trust document intelligence extraction.
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone
 import logging
+from typing import Optional
 import asyncio
 
 from database import db
@@ -69,11 +70,19 @@ async def get_analysis(trust_id: str, user: dict = Depends(get_current_user)):
 
 
 @router.get("/trusts/{trust_id}/document-analysis/status")
-async def get_analysis_status(trust_id: str, user: dict = Depends(get_current_user)):
-    """Lightweight status check for polling."""
+async def get_analysis_status(
+    trust_id: str,
+    doc_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Lightweight status check for polling. Filters by doc_id if provided."""
+    query = {"trust_id": trust_id}
+    if doc_id:
+        query["vault_document_id"] = doc_id
+
     analysis = await db.trust_document_analysis.find_one(
-        {"trust_id": trust_id},
-        {"_id": 0, "status": 1, "error_message": 1},
+        query,
+        {"_id": 0, "status": 1, "error_message": 1, "vault_document_id": 1},
         sort=[("created_at", -1)]
     )
     if not analysis:
@@ -81,6 +90,7 @@ async def get_analysis_status(trust_id: str, user: dict = Depends(get_current_us
     return {
         "status": analysis["status"],
         "error_message": analysis.get("error_message"),
+        "vault_document_id": analysis.get("vault_document_id"),
     }
 
 

@@ -259,9 +259,9 @@ export default function VaultPage() {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Client-side size check (16MB)
-    if (file.size > 16 * 1024 * 1024) {
-      toast.error(`File too large (${(file.size / (1024*1024)).toFixed(1)}MB). Maximum is 16MB.`);
+    // Client-side size check (50MB — backend compresses PDFs down to 16MB)
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error(`File too large (${(file.size / (1024*1024)).toFixed(1)}MB). Maximum is 50MB. PDFs are automatically compressed.`);
       return;
     }
 
@@ -459,7 +459,7 @@ export default function VaultPage() {
                       >
                         <CloudUpload className="w-10 h-10 text-gray-400 mb-2"/>
                         <p className="text-sm font-medium text-gray-700">Click to upload or drag and drop</p>
-                        <p className="text-xs text-gray-500 mt-1">PDF, images, Word, Excel — up to 16MB</p>
+                        <p className="text-xs text-gray-500 mt-1">PDF, images, Word, Excel — up to 50MB (PDFs auto-compressed)</p>
                         <input
                           id="vault-file-upload"
                           ref={fileInputRef}

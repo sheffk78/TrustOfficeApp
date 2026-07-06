@@ -58,6 +58,36 @@ ALLOWED_MIME_TYPES = {
 MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB BSON limit
 
 
+def compress_pdf(file_content: bytes) -> tuple[bytes, bool]:
+    """
+    Compress a PDF using PyMuPDF.
+    Returns (compressed_bytes, was_compressed).
+    Only compresses if the result is smaller than the original.
+    """
+    try:
+        import fitz  # PyMuPDF
+        doc = fitz.open(stream=file_content, filetype="pdf")
+
+        # Apply optimizations: garbage collect, deflate, clean
+        compressed = doc.tobytes(
+            garbage=4,        # Full garbage collection
+            deflate=True,      # Compress streams
+            clean=True         # Clean unused objects
+        )
+        doc.close()
+
+        # Only use compressed version if it's actually smaller
+        if len(compressed) < len(file_content):
+            logger.info(
+                f"PDF compressed: {len(file_content) / (1024*1024):.1f}MB -> {len(compressed) / (1024*1024):.1f}MB"
+            )
+            return compressed, True
+        return file_content, False
+    except Exception as e:
+        logger.warning(f"PDF compression failed (proceeding with original): {e}")
+        return file_content, False
+
+
 # --- Pydantic models for request validation ---
 
 
@@ -180,19 +210,26 @@ async def upload_document(
                 detail=f"File type '{content_type}' is not supported. Supported types: PDF, images, Word docs, Excel, and text files."
             )
 
-    # Pre-read size check using Content-Length (prevents memory exhaustion)
-    if file.size is not None and file.size > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is 16MB. Your file is {file.size / (1024*1024):.1f}MB."
-        )
-
-    # Read and validate actual file size (defense-in-depth: Content-Length can be missing or spoofed)
+    # Read file content
     file_content = await file.read()
+
+    # For PDFs, attempt compression before size check (may shrink large scanned docs)
+    # Skip the Content-Length pre-check for PDFs to allow compression to bring them under 16MB
+    if content_type == "application/pdf" or file_content[:4] == b'%PDF':
+        file_content, was_compressed = compress_pdf(file_content)
+        if was_compressed:
+            logger.info(
+                f"PDF compressed for upload: original {file.size / (1024*1024) if file.size else '?':.1f}MB -> {len(file_content) / (1024*1024):.1f}MB"
+            )
+
+    # Size check (post-compression for PDFs, direct for other types)
     if len(file_content) > MAX_FILE_SIZE:
+        orig_size = file.size or len(file_content)
         raise HTTPException(
             status_code=400,
-            detail=f"File too large. Maximum size is 16MB. Your file is {len(file_content) / (1024*1024):.1f}MB."
+            detail=f"File too large. Maximum size is 16MB. Your file is {orig_size / (1024*1024):.1f}MB"
+                  + (" even after compression." if content_type == "application/pdf" else ".")
+                  + " Please reduce the file size or use 'Link External' to reference it."
         )
 
     # Parse tags

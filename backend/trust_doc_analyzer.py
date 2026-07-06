@@ -101,6 +101,62 @@ def extract_text_from_pdf(file_content: bytes) -> Optional[str]:
         return None
 
 
+def ocr_pdf(file_content: bytes, max_pages: int = 30) -> Optional[str]:
+    """
+    Run OCR on a scanned PDF using Tesseract.
+    Renders each page to an image with PyMuPDF, then extracts text with pytesseract.
+    Limits to max_pages to prevent excessive processing time on large documents.
+
+    Args:
+        file_content: Raw PDF bytes
+        max_pages: Maximum number of pages to OCR (safety limit)
+
+    Returns:
+        Extracted text string, or None if OCR fails
+    """
+    try:
+        import fitz
+        import pytesseract
+        from PIL import Image
+        import io
+
+        doc = fitz.open(stream=file_content, filetype="pdf")
+        total_pages = len(doc)
+        pages_to_ocr = min(total_pages, max_pages)
+
+        logger.info(f"Starting OCR on {pages_to_ocr} of {total_pages} pages")
+
+        text_parts = []
+        for i in range(pages_to_ocr):
+            page = doc[i]
+            # Render at 200 DPI — good balance of accuracy and speed
+            pix = page.get_pixmap(dpi=200)
+            img_data = pix.tobytes("png")
+            image = Image.open(io.BytesIO(img_data))
+
+            # Run Tesseract OCR
+            page_text = pytesseract.image_to_string(image)
+            if page_text.strip():
+                text_parts.append(page_text.strip())
+
+        doc.close()
+
+        if not text_parts:
+            logger.warning("OCR completed but extracted no text")
+            return None
+
+        full_text = "\n".join(text_parts)
+        logger.info(f"OCR extracted {len(full_text)} characters from {pages_to_ocr} pages")
+        return full_text
+
+    except ImportError as e:
+        logger.error(f"OCR dependencies not installed: {e}. Need: pip install pytesseract Pillow")
+        return None
+    except Exception as e:
+        logger.error(f"OCR failed: {e}")
+        return None
+
+
 def extract_text_from_docx(file_content: bytes) -> Optional[str]:
     """Extract text from a .docx file using python-docx."""
     try:
@@ -293,6 +349,11 @@ async def analyze_trust_document(
     try:
         # Step 1: Extract text from document (supports PDF, DOCX, TXT)
         text = extract_text(file_content)
+        if not text:
+            # Fallback: try OCR for scanned PDFs (renders pages to images, runs Tesseract)
+            logger.info(f"Text extraction returned no text for doc {doc_id}, attempting OCR fallback")
+            text = ocr_pdf(file_content)
+
         if not text:
             await db.trust_document_analysis.update_one(
                 {"analysis_id": analysis_id},

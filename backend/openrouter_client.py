@@ -105,7 +105,7 @@ def _call_openrouter(
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=90) as resp:
             response_data = json.loads(resp.read().decode('utf-8'))
 
         if 'error' in response_data:
@@ -204,7 +204,7 @@ def _call_openrouter_stream(
     )
 
     try:
-        resp = urllib.request.urlopen(req, timeout=60)
+        resp = urllib.request.urlopen(req, timeout=120)
 
         for line in iter(resp.readline, b''):
             if not line:
