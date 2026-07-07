@@ -719,18 +719,22 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     await db.trust_unit_certificates.insert_many([
         {"certificate_id": cert1_id, "trust_id": trust1_id, "user_id": user["user_id"],
          "certificate_number": "CERT-001", "holder_name": "Emily Smith", "holder_identifier": "Beneficiary - Daughter",
+         "holder_type": "individual",
          "units": 25, "issue_date": "2020-01-15", "status": "active",
          "notes": "Primary beneficiary - 25% interest", "created_at": now.isoformat(), "is_demo": True},
         {"certificate_id": cert2_id, "trust_id": trust1_id, "user_id": user["user_id"],
          "certificate_number": "CERT-002", "holder_name": "Michael Smith", "holder_identifier": "Beneficiary - Son",
+         "holder_type": "individual",
          "units": 30, "issue_date": "2020-01-15", "status": "active",
          "notes": "Primary beneficiary - 30% interest", "created_at": now.isoformat(), "is_demo": True},
         {"certificate_id": cert3_id, "trust_id": trust1_id, "user_id": user["user_id"],
          "certificate_number": "CERT-003", "holder_name": "James Smith Jr.", "holder_identifier": "Beneficiary - Grandson",
+         "holder_type": "individual",
          "units": 15, "issue_date": "2022-06-01", "status": "active",
          "notes": "Contingent beneficiary - 15% interest", "created_at": now.isoformat(), "is_demo": True},
         {"certificate_id": cert4_id, "trust_id": trust1_id, "user_id": user["user_id"],
          "certificate_number": "CERT-004", "holder_name": "Sarah Smith", "holder_identifier": "Beneficiary - Spouse",
+         "holder_type": "individual",
          "units": 30, "issue_date": "2020-01-15", "status": "active",
          "notes": "Primary beneficiary - 30% interest", "created_at": now.isoformat(), "is_demo": True}
     ])

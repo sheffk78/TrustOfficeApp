@@ -221,6 +221,7 @@ async def create_unit_certificate(
         "user_id": user["user_id"],
         "holder_name": certificate.holder_name,
         "holder_identifier": certificate.holder_identifier,
+        "holder_type": certificate.holder_type,
         "email": certificate.email,
         "phone": certificate.phone,
         "units": units,
@@ -276,6 +277,8 @@ async def update_unit_certificate(
         update_fields["holder_name"] = update.holder_name
     if update.holder_identifier is not None:
         update_fields["holder_identifier"] = update.holder_identifier
+    if update.holder_type is not None:
+        update_fields["holder_type"] = update.holder_type
     if update.notes is not None:
         update_fields["notes"] = update.notes
     if update.email is not None:
@@ -357,6 +360,69 @@ async def list_unit_certificates(
     return result
 
 
+# ==================== REVOKE ====================
+
+class CertificateRevokeRequest(BaseModel):
+    trust_id: str
+    reason: str = ""
+    minutes_record_id: Optional[str] = None
+
+@router.post("/trust-units/certificates/{certificate_id}/revoke", response_model=TrustUnitCertificateResponse)
+async def revoke_unit_certificate(
+    certificate_id: str,
+    revoke: CertificateRevokeRequest,
+    user: dict = Depends(require_write_access)
+):
+    """Revoke a certificate, returning its units to the available pool."""
+    cert = await db.trust_unit_certificates.find_one(
+        {"certificate_id": certificate_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    
+    if cert["status"] != "active":
+        raise HTTPException(status_code=400, detail=f"Cannot revoke certificate with status '{cert['status']}'. Only active certificates can be revoked.")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    await db.trust_unit_certificates.update_one(
+        {"certificate_id": certificate_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancelled_at": now,
+            "cancelled_by": user.get("name", user.get("email", "Unknown")),
+            "cancelled_reason": revoke.reason,
+            "updated_at": now
+        }}
+    )
+    
+    # Record a transfer entry for audit trail
+    transfer_doc = {
+        "transfer_id": f"transfer_{uuid.uuid4().hex[:12]}",
+        "trust_id": revoke.trust_id,
+        "user_id": user["user_id"],
+        "from_holder": cert["holder_name"],
+        "to_holder": None,
+        "units": cert["units"],
+        "reason": f"Certificate revoked: {revoke.reason}" if revoke.reason else "Certificate revoked",
+        "minutes_record_id": revoke.minutes_record_id,
+        "created_at": now
+    }
+    await db.trust_unit_transfers.insert_one(transfer_doc)
+    
+    updated_cert = await db.trust_unit_certificates.find_one(
+        {"certificate_id": certificate_id},
+        {"_id": 0}
+    )
+    
+    settings = await get_or_create_units_settings(revoke.trust_id, user["user_id"])
+    total_authorized = settings["total_authorized_units"]
+    percentage = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+    
+    return TrustUnitCertificateResponse(**updated_cert, percentage=round(percentage, 4))
+
+
 # ==================== TRANSFERS ====================
 
 @router.post("/trust-units/transfers", response_model=TrustUnitTransferResponse)
@@ -415,6 +481,7 @@ async def create_unit_transfer(
                 "user_id": user["user_id"],
                 "holder_name": transfer.from_holder,
                 "holder_identifier": from_cert.get("holder_identifier"),
+                "holder_type": from_cert.get("holder_type", "individual"),
                 "email": from_cert.get("email"),
                 "phone": from_cert.get("phone"),
                 "units": remaining_units,
@@ -455,6 +522,7 @@ async def create_unit_transfer(
             "user_id": user["user_id"],
             "holder_name": transfer.to_holder,
             "holder_identifier": existing_to_cert.get("holder_identifier"),
+            "holder_type": existing_to_cert.get("holder_type", "individual"),
             "email": existing_to_cert.get("email"),
             "phone": existing_to_cert.get("phone"),
             "units": combined_units,
@@ -478,6 +546,7 @@ async def create_unit_transfer(
             "user_id": user["user_id"],
             "holder_name": transfer.to_holder,
             "holder_identifier": None,
+            "holder_type": "individual",
             "email": None,
             "phone": None,
             "units": units,
@@ -634,6 +703,23 @@ def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_water
     c.setFont('Times-Bold', 28)
     c.setFillColor(navy)
     c.drawCentredString(center_x, y_pos, holder_name)
+    
+    # Holder Type (if not individual)
+    holder_type = cert.get('holder_type', 'individual')
+    if holder_type and holder_type != 'individual':
+        holder_type_labels = {
+            'trust': 'Trust',
+            'llc': 'LLC',
+            'corporation': 'Corporation',
+            'charity': 'Charity / Nonprofit',
+            'estate': 'Estate',
+            'other': 'Entity',
+        }
+        type_label = holder_type_labels.get(holder_type, holder_type.title())
+        y_pos -= 22
+        c.setFont('Times-Italic', 12)
+        c.setFillColor(dark_grey)
+        c.drawCentredString(center_x, y_pos, type_label)
     
     # Identifier line
     holder_id = cert.get('holder_identifier', '')
@@ -840,6 +926,7 @@ async def create_certificates_from_beneficiary_designation(minutes_id: str, user
             "user_id": user_id,
             "holder_name": name,
             "holder_identifier": None,
+            "holder_type": "individual",
             "email": None,
             "phone": None,
             "units": units,
@@ -1011,6 +1098,7 @@ async def bootstrap_certificates_from_minutes(
             "user_id": user["user_id"],
             "holder_name": name,
             "holder_identifier": None,
+            "holder_type": "individual",
             "email": None,
             "phone": None,
             "units": units,

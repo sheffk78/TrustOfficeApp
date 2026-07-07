@@ -107,9 +107,11 @@ export default function BeneficiariesPage() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [editingCertificate, setEditingCertificate] = useState(null);
   const [showRevokeModal, setShowRevokeModal] = useState(null);
+  const [revokeReason, setRevokeReason] = useState('');
   const [certificateForm, setCertificateForm] = useState({
     holder_name: '',
     holder_identifier: '',
+    holder_type: 'individual',
     email: '',
     phone: '',
     units: '',
@@ -355,11 +357,12 @@ export default function BeneficiariesPage() {
     try {
       const response = await fetchWithAuth(`/trust-units/certificates/${certificate.certificate_id}/revoke`, {
         method: 'POST',
-        body: JSON.stringify({ trust_id: selectedTrust.trust_id })
+        body: JSON.stringify({ trust_id: selectedTrust.trust_id, reason: revokeReason || '' })
       });
       if (response.ok) {
         toast.success('Certificate revoked');
         setShowRevokeModal(null);
+        setRevokeReason('');
         loadCertificatesData();
         loadOverviewData();
       }
@@ -446,6 +449,7 @@ export default function BeneficiariesPage() {
     setCertificateForm({
       holder_name: '',
       holder_identifier: '',
+      holder_type: 'individual',
       email: '',
       phone: '',
       units: '',
@@ -460,6 +464,7 @@ export default function BeneficiariesPage() {
     setCertificateForm({
       holder_name: certificate.holder_name,
       holder_identifier: certificate.holder_identifier || '',
+      holder_type: certificate.holder_type || 'individual',
       email: certificate.email || '',
       phone: certificate.phone || '',
       units: certificate.units.toString(),
@@ -637,9 +642,9 @@ export default function BeneficiariesPage() {
                       ) : (
                         <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
                           {overviewData.beneficiaries.map((ben, index) => (
-                            <div key={ben.holder_name} data-testid={`beneficiary-row-${index}`}>
+                            <div key={`${ben.holder_name}-${ben.holder_identifier || ''}`} data-testid={`beneficiary-row-${index}`}>
                               <button
-                                onClick={() => setExpandedHolder(expandedHolder === ben.holder_name ? null : ben.holder_name)}
+                                onClick={() => setExpandedHolder(expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}` ? null : `${ben.holder_name}-${ben.holder_identifier || ''}`)}
                                 className="w-full p-4 flex items-center justify-between hover:bg-muted/20 transition-colors"
                               >
                                 <div className="flex items-center gap-4">
@@ -647,7 +652,14 @@ export default function BeneficiariesPage() {
                                     {index + 1}
                                   </div>
                                   <div className="text-left">
-                                    <p className="font-medium text-navy dark:text-foreground">{ben.holder_name}</p>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-medium text-navy dark:text-foreground">{ben.holder_name}</p>
+                                      {ben.holder_type && ben.holder_type !== 'individual' && (
+                                        <span className="px-2 py-0.5 text-xs font-mono bg-navy/10 dark:bg-gold/10 text-navy dark:text-gold rounded">
+                                          {ben.holder_type}
+                                        </span>
+                                      )}
+                                    </div>
                                     {ben.holder_identifier && (
                                       <p className="text-xs text-muted-foreground font-mono">{ben.holder_identifier}</p>
                                     )}
@@ -668,11 +680,11 @@ export default function BeneficiariesPage() {
                                     <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
                                     <p className="text-xs text-muted-foreground">ownership</p>
                                   </div>
-                                  {expandedHolder === ben.holder_name ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                  {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}` ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                                 </div>
                               </button>
                               
-                              {expandedHolder === ben.holder_name && (
+                              {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}` && (
                                 <div className="bg-muted/30 p-4 border-t border-border">
                                   <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
                                     {ben.certificate_count} Certificate{ben.certificate_count !== 1 ? 's' : ''}
@@ -713,8 +725,8 @@ export default function BeneficiariesPage() {
                       <SelectContent>
                         <SelectItem value="active">Active Only</SelectItem>
                         <SelectItem value="all">All Certificates</SelectItem>
-                        <SelectItem value="revoked">Revoked</SelectItem>
-                        <SelectItem value="transferred">Transferred</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="replaced">Replaced</SelectItem>
                       </SelectContent>
                     </Select>
                     
@@ -772,9 +784,14 @@ export default function BeneficiariesPage() {
                           <div>
                             <div className="flex items-center gap-2">
                               <p className="font-medium text-navy dark:text-foreground">{cert.holder_name}</p>
+                              {cert.holder_type && cert.holder_type !== 'individual' && (
+                                <span className="px-2 py-0.5 text-xs font-mono bg-navy/10 dark:bg-gold/10 text-navy dark:text-gold rounded">
+                                  {cert.holder_type}
+                                </span>
+                              )}
                               <span className={`px-2 py-0.5 text-xs font-mono ${
                                 cert.status === 'active' ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success' :
-                                cert.status === 'revoked' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                cert.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                                 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
                               }`}>
                                 {cert.status}
@@ -971,10 +988,30 @@ export default function BeneficiariesPage() {
               <Input
                 value={certificateForm.holder_name}
                 onChange={(e) => setCertificateForm({ ...certificateForm, holder_name: e.target.value })}
-                placeholder="John Smith"
+                placeholder="John Smith or Smith Family Trust"
                 className="mt-1"
                 data-testid="holder-name-input"
               />
+            </div>
+            <div>
+              <Label className="label-trust">Holder Type</Label>
+              <Select
+                value={certificateForm.holder_type}
+                onValueChange={(v) => setCertificateForm({ ...certificateForm, holder_type: v })}
+              >
+                <SelectTrigger className="mt-1" data-testid="holder-type-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="individual">Individual</SelectItem>
+                  <SelectItem value="trust">Trust</SelectItem>
+                  <SelectItem value="llc">LLC</SelectItem>
+                  <SelectItem value="corporation">Corporation</SelectItem>
+                  <SelectItem value="charity">Charity / Nonprofit</SelectItem>
+                  <SelectItem value="estate">Estate</SelectItem>
+                  <SelectItem value="other">Other Entity</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="label-trust">Holder Identifier (Optional)</Label>
@@ -1190,8 +1227,17 @@ export default function BeneficiariesPage() {
               This will return {showRevokeModal?.units} units to the available pool.
             </DialogDescription>
           </DialogHeader>
+          <div className="py-2">
+            <Label className="label-trust">Reason (Optional)</Label>
+            <Input
+              value={revokeReason}
+              onChange={(e) => setRevokeReason(e.target.value)}
+              placeholder="e.g., Beneficiary removed by trustee resolution"
+              className="mt-1"
+            />
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRevokeModal(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowRevokeModal(null); setRevokeReason(''); }}>Cancel</Button>
             <Button variant="destructive" onClick={() => handleRevoke(showRevokeModal)} data-testid="confirm-revoke-btn">Revoke Certificate</Button>
           </DialogFooter>
         </DialogContent>

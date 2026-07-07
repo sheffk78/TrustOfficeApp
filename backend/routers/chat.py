@@ -799,6 +799,7 @@ async def _execute_approved_action(
                 "user_id": user_id,
                 "holder_name": mapped_data.get("holder_name", "Unknown"),
                 "holder_identifier": "",
+                "holder_type": mapped_data.get("holder_type", "individual"),
                 "email": mapped_data.get("email", ""),
                 "phone": mapped_data.get("phone", ""),
                 "units": units,

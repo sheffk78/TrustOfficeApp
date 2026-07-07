@@ -473,6 +473,7 @@ class TrustUnitCertificateCreate(BaseModel):
     trust_id: str
     holder_name: str
     holder_identifier: Optional[str] = None
+    holder_type: str = "individual"  # "individual", "trust", "llc", "corporation", "charity", "estate", "other"
     units: float
     issue_date: str
     notes: str = ""
@@ -482,6 +483,7 @@ class TrustUnitCertificateCreate(BaseModel):
 class TrustUnitCertificateUpdate(BaseModel):
     holder_name: Optional[str] = None
     holder_identifier: Optional[str] = None
+    holder_type: Optional[str] = None
     units: Optional[float] = None
     status: Optional[CertificateStatus] = None
     notes: Optional[str] = None
@@ -493,6 +495,7 @@ class TrustUnitCertificateResponse(BaseModel):
     trust_id: str
     holder_name: str
     holder_identifier: Optional[str]
+    holder_type: str = "individual"
     units: float
     percentage: float
     issue_date: str
@@ -1057,6 +1060,7 @@ class OnboardingState(BaseModel):
 class BeneficiaryAllocation(BaseModel):
     holder_name: str
     holder_identifier: Optional[str] = None
+    holder_type: str = "individual"
     email: Optional[str] = None
     phone: Optional[str] = None
     total_units: float

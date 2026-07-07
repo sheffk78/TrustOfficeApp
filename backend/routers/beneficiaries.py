@@ -146,21 +146,23 @@ async def get_beneficiary_dashboard(
         {"_id": 0}
     ).to_list(1000)
     
-    # Aggregate by holder
+    # Aggregate by holder (use composite key to avoid merging different entities with same name)
     holder_map = {}
     for cert in certificates:
+        holder_key = (cert["holder_name"], cert.get("holder_identifier") or "")
         holder = cert["holder_name"]
-        if holder not in holder_map:
-            holder_map[holder] = {
+        if holder_key not in holder_map:
+            holder_map[holder_key] = {
                 "holder_name": holder,
                 "holder_identifier": cert.get("holder_identifier"),
+                "holder_type": cert.get("holder_type", "individual"),
                 "email": cert.get("email"),
                 "phone": cert.get("phone"),
                 "total_units": 0,
                 "certificates": []
             }
-        holder_map[holder]["total_units"] += cert["units"]
-        holder_map[holder]["certificates"].append({
+        holder_map[holder_key]["total_units"] += cert["units"]
+        holder_map[holder_key]["certificates"].append({
             "certificate_id": cert["certificate_id"],
             "certificate_number": cert["certificate_number"],
             "units": cert["units"],
@@ -179,6 +181,7 @@ async def get_beneficiary_dashboard(
         beneficiaries.append(BeneficiaryAllocation(
             holder_name=holder_data["holder_name"],
             holder_identifier=holder_data["holder_identifier"],
+            holder_type=holder_data.get("holder_type", "individual"),
             email=holder_data.get("email"),
             phone=holder_data.get("phone"),
             total_units=holder_data["total_units"],
