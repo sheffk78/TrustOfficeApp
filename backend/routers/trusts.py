@@ -250,6 +250,13 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
             {"$set": {"trustee_names": update_data["trustees"] or ""}}
         )
     
+    # If governance_settings changed (spending threshold), backfill alerts
+    if "governance_settings" in update_data:
+        try:
+            await _backfill_threshold_alerts(trust_id, user["user_id"])
+        except Exception as e:
+            logger.warning(f"Failed to backfill threshold alerts: {e}")
+    
     updated = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
     health = await calculate_health_score(trust_id, user["user_id"], save_snapshot=False)
     return TrustResponse(**updated, governance_score=health["total_score"])
@@ -283,3 +290,66 @@ async def delete_trust(trust_id: str, user: dict = Depends(require_write_access)
     await db.schedule_a.delete_many({"trust_id": trust_id})
     
     return {"message": "Trust deleted"}
+
+
+async def _backfill_threshold_alerts(trust_id: str, user_id: str):
+    """
+    Re-evaluate all outflow transactions when the spending threshold changes.
+    - Creates alerts for transactions now over threshold that weren't before.
+    - Resolves alerts for transactions no longer over threshold (if threshold raised).
+    """
+    from alert_detection import check_transaction_alerts, auto_resolve_alert_if_fixed
+
+    trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "governance_settings": 1})
+    gov_settings = trust.get("governance_settings") if trust else None
+
+    if not gov_settings or not gov_settings.get("spending_threshold"):
+        # Threshold was removed — resolve all existing threshold alerts
+        await db.separation_alerts.update_many(
+            {"trust_id": trust_id, "alert_type": "spending_threshold_exceeded", "status": "active"},
+            {"$set": {"status": "resolved", "resolution_type": "threshold_removed",
+                      "resolution_note": "Spending threshold was removed", "resolved_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return
+
+    threshold_config = gov_settings["spending_threshold"]
+    threshold_amount = threshold_config.get("amount", 0)
+    scope = threshold_config.get("scope_classifications", ["Operational Expense", "Other"])
+    requires_minutes = threshold_config.get("requires_minutes", True)
+
+    # Fetch all outflows for this trust
+    txns = await db.transactions.find(
+        {"trust_id": trust_id, "user_id": user_id, "direction": "outflow"},
+        {"_id": 0}
+    ).to_list(10000)
+
+    for txn in txns:
+        txn_id = txn["transaction_id"]
+        amount = txn.get("amount", 0)
+        classification = txn.get("governance_classification", "")
+        linked_minutes = txn.get("linked_minutes_id")
+
+        should_have_alert = (
+            threshold_amount > 0
+            and amount >= threshold_amount
+            and (not requires_minutes or classification in scope)
+            and not linked_minutes
+        )
+
+        existing_alert = await db.separation_alerts.find_one({
+            "transaction_id": txn_id,
+            "alert_type": "spending_threshold_exceeded",
+            "status": "active"
+        })
+
+        if should_have_alert and not existing_alert:
+            # Create alert for newly-over-threshold transaction
+            await check_transaction_alerts(txn)
+        elif not should_have_alert and existing_alert:
+            # Resolve alert — transaction no longer over threshold
+            await db.separation_alerts.update_one(
+                {"alert_id": existing_alert["alert_id"]},
+                {"$set": {"status": "resolved", "resolution_type": "threshold_changed",
+                          "resolution_note": "Threshold updated — transaction no longer exceeds limit",
+                          "resolved_at": datetime.now(timezone.utc).isoformat()}}
+            )

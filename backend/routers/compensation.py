@@ -117,6 +117,33 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
     if minutes_count > 0:
         updates["minutes_generated"] = True
     
+    # Check bank accounts
+    bank_account_count = await db.bank_accounts.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "is_archived": {"$ne": True}
+    })
+    if bank_account_count > 0:
+        updates["bank_account_added"] = True
+
+    # Check bank statements (completed or needs_review extraction)
+    bank_statement_count = await db.bank_statements.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "extraction_status": {"$in": ["completed", "needs_review"]}
+    })
+    if bank_statement_count > 0:
+        updates["bank_statement_uploaded"] = True
+
+    # Check spending threshold configured
+    trust_for_threshold = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "governance_settings": 1}
+    )
+    gov_settings = trust_for_threshold.get("governance_settings") if trust_for_threshold else None
+    if gov_settings and gov_settings.get("spending_threshold") and gov_settings["spending_threshold"].get("amount"):
+        updates["spending_threshold_set"] = True
+    
     if updates:
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.user_onboarding.update_one(

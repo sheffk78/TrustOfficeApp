@@ -531,9 +531,30 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
 
 @router.delete("/minutes/{minutes_id}")
 async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_access)):
+    # Get the minutes record before deleting (for cascade)
+    minutes = await db.minutes_records.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
     result = await db.minutes_records.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
+    
+    # Cascade: unlink any transactions that referenced these minutes
+    if minutes:
+        await db.transactions.update_many(
+            {"linked_minutes_id": minutes_id, "user_id": user["user_id"]},
+            {"$set": {"linked_minutes_id": None}}
+        )
+        # Re-activate spending threshold alerts for unlinked transactions
+        from alert_detection import check_transaction_alerts
+        affected_txns = await db.transactions.find(
+            {"trust_id": minutes.get("trust_id"), "user_id": user["user_id"], "linked_minutes_id": None},
+            {"_id": 0}
+        ).to_list(100)
+        for txn in affected_txns:
+            # Re-run alert checks (will re-create threshold alert if applicable)
+            await check_transaction_alerts(txn)
+    
     return {"message": "Minutes deleted"}
 
 def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = False) -> bytes:

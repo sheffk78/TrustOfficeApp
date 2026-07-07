@@ -27,6 +27,8 @@ import {
   ChevronDown,
   Plus,
   X,
+  Landmark,
+  ShieldCheck,
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -90,6 +92,9 @@ const QUICK_START_TASKS = [
   { label: 'Set up your trust structure', path: '/structures', icon: Package, description: 'Add your trust entity and any related LLCs or structures' },
   { label: 'Hold your first trustee meeting', path: '/minutes/create?type=initial_trustee_meeting&from=onboarding', icon: ClipboardList, description: 'Document your acceptance of trusteeship and initial decisions' },
   { label: 'Check your tax calendar', path: '/calendar', icon: Calendar, description: 'See your filing deadlines based on your trust setup' },
+  { label: 'Add a bank account', path: '/structures', icon: Landmark, description: 'Link a bank account to your trust entity for tracking' },
+  { label: 'Upload a bank statement', path: '/vault', icon: Upload, description: 'Upload a bank statement to start tracking balances and transactions' },
+  { label: 'Set a spending threshold', path: '/settings#governance', icon: ShieldCheck, description: 'Configure a spending threshold to flag large transactions for trustee approval' },
 ];
 
 export default function OnboardingPage() {

@@ -42,6 +42,11 @@ ALERT_RULES = {
         "severity": "yellow",
         "title": "Transfer Without Linked Governance Action",
         "description_template": "{classification} of ${amount} in {entity_name} is not linked to a {expected_link}."
+    },
+    "spending_threshold_exceeded": {
+        "severity": "yellow",
+        "title": "Spending Threshold Exceeded",
+        "description_template": "Outflow of ${amount} in {entity_name} exceeds the trust spending threshold of ${threshold}. Trustee approval in minutes is required."
     }
 }
 
@@ -151,6 +156,23 @@ async def check_transaction_alerts(txn_doc: dict):
         fmt["expected_link"] = "Compensation Resolution"
         await _create_alert(trust_id, entity_id, txn_id, "unlinked_governance", user_id, fmt)
 
+    # ---- Rule 4b: Spending threshold exceeded ----
+    # Check if this outflow exceeds the trust's configured spending threshold
+    if direction == "outflow" and not txn_doc.get("linked_minutes_id"):
+        trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "governance_settings": 1})
+        gov_settings = trust.get("governance_settings") if trust else None
+        if gov_settings and gov_settings.get("spending_threshold"):
+            threshold_config = gov_settings["spending_threshold"]
+            threshold_amount = threshold_config.get("amount", 0)
+            threshold_requires_minutes = threshold_config.get("requires_minutes", True)
+            scope = threshold_config.get("scope_classifications", ["Operational Expense", "Other"])
+
+            if (threshold_amount > 0
+                and amount >= threshold_amount
+                and (not threshold_requires_minutes or classification in scope)):
+                fmt["threshold"] = f"{threshold_amount:,.2f}"
+                await _create_alert(trust_id, entity_id, txn_id, "spending_threshold_exceeded", user_id, fmt)
+
 
 async def run_pattern_alerts(trust_id: str, user_id: str):
     """Run cross-transaction pattern detection. Called periodically or on-demand."""
@@ -242,6 +264,13 @@ async def auto_resolve_alert_if_fixed(txn_doc: dict):
         await db.separation_alerts.update_many(
             {"transaction_id": txn_id, "alert_type": "unlinked_governance", "status": "active"},
             {"$set": {"status": "resolved", "resolution_type": "linked", "resolution_note": "Governance action linked", "resolved_at": now}}
+        )
+
+    # If transaction now has linked minutes, resolve spending threshold alerts
+    if txn_doc.get("linked_minutes_id"):
+        await db.separation_alerts.update_many(
+            {"transaction_id": txn_id, "alert_type": "spending_threshold_exceeded", "status": "active"},
+            {"$set": {"status": "resolved", "resolution_type": "linked", "resolution_note": "Minutes document linked", "resolved_at": now}}
         )
 
     # If "Other" classification now has a memo, resolve aging/unexplained alerts

@@ -76,6 +76,7 @@ from routers.admin_api import router as admin_api_router
 from routers.stats import router as stats_router
 from routers.transactions import router as transactions_router
 from routers.alerts import router as alerts_router
+from routers.banking import router as banking_router
 from routers.audit_defense import router as audit_defense_router
 from routers.tax_calendar import router as tax_calendar_router
 from routers.state_compliance import router as state_compliance_router
@@ -364,6 +365,7 @@ app.include_router(admin_api_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
+app.include_router(banking_router, prefix="/api")
 app.include_router(audit_defense_router, prefix="/api")
 app.include_router(tax_calendar_router, prefix="/api")
 app.include_router(state_compliance_router, prefix="/api")
@@ -594,6 +596,17 @@ async def startup_event():
         await db.trust_admin_kits.create_index("kit_id", unique=True)
         await db.trust_admin_kits.create_index([("user_id", 1), ("trust_id", 1)])
         await db.trust_admin_kits.create_index([("user_id", 1), ("created_at", -1)])
+        
+        # Bank accounts indexes
+        await db.bank_accounts.create_index("account_id", unique=True)
+        await db.bank_accounts.create_index([("trust_id", 1), ("user_id", 1)])
+        await db.bank_accounts.create_index([("entity_id", 1), ("user_id", 1)])
+        
+        # Bank statements indexes
+        await db.bank_statements.create_index("statement_id", unique=True)
+        await db.bank_statements.create_index([("trust_id", 1), ("user_id", 1)])
+        await db.bank_statements.create_index([("account_id", 1), ("statement_period_end", -1)])
+        await db.bank_statements.create_index("vault_document_id")
         
         logger.info("Database indexes created/verified successfully")
         

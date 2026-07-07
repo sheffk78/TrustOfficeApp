@@ -123,6 +123,34 @@ export default function SettingsPage() {
     trustees: selectedTrust?.trustees || ''
   });
 
+  // Governance: Spending Threshold state (synced from selectedTrust.governance_settings)
+  const GOVERNANCE_CLASSIFICATIONS = [
+    'Distribution', 'Compensation', 'Inter-Entity Transfer',
+    'Operational Expense', 'Capital Contribution', 'Tax Payment', 'Other'
+  ];
+  const [spendingThreshold, setSpendingThreshold] = useState(() => {
+    const st = selectedTrust?.governance_settings?.spending_threshold;
+    return {
+      amount: st?.amount ?? '',
+      requires_minutes: st?.requires_minutes ?? false,
+      scope_classifications: st?.scope_classifications || ['Operational Expense', 'Other'],
+    };
+  });
+
+  const updateSpendingThreshold = (field, value) => {
+    setSpendingThreshold(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleScopeClassification = (cls) => {
+    setSpendingThreshold(prev => {
+      const current = prev.scope_classifications || [];
+      const next = current.includes(cls)
+        ? current.filter(c => c !== cls)
+        : [...current, cls];
+      return { ...prev, scope_classifications: next };
+    });
+  };
+
   // Scroll to section from dashboard hash (e.g., /settings#ein, /settings#formation-date)
   useEffect(() => {
     if (location.hash) {
@@ -161,6 +189,13 @@ export default function SettingsPage() {
         tax_year_end_day: selectedTrust.tax_year_end_day?.toString() || '',
         is_fiscal_year: selectedTrust.is_fiscal_year || false,
         trustees: trustees
+      });
+      // Sync spending threshold from trust governance_settings
+      const st = selectedTrust.governance_settings?.spending_threshold;
+      setSpendingThreshold({
+        amount: st?.amount ?? '',
+        requires_minutes: st?.requires_minutes ?? false,
+        scope_classifications: st?.scope_classifications || ['Operational Expense', 'Other'],
       });
     }
   }, [selectedTrust?.trust_id, user?.name]);
@@ -451,7 +486,16 @@ export default function SettingsPage() {
 
     setLoading(true);
     try {
-      const payload = { ...trustData, is_fiscal_year: computedFiscalYear };
+      // Merge spending threshold into governance_settings so it persists on save
+      const governance_settings = {
+        ...(selectedTrust.governance_settings || {}),
+        spending_threshold: {
+          amount: spendingThreshold.amount === '' ? null : Number(spendingThreshold.amount),
+          requires_minutes: spendingThreshold.requires_minutes ?? false,
+          scope_classifications: spendingThreshold.scope_classifications || [],
+        },
+      };
+      const payload = { ...trustData, is_fiscal_year: computedFiscalYear, governance_settings };
       const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}`, {
         method: 'PUT',
         body: JSON.stringify(payload)
@@ -1249,6 +1293,69 @@ export default function SettingsPage() {
                       Fiscal year — tax deadlines are calculated from this date.
                     </p>
                   )}
+                </div>
+
+                {/* Governance Settings — Spending Threshold */}
+                <div className="pt-4 border-t border-navy/10" data-section="governance">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield className="w-4 h-4 text-navy" />
+                    <Label className="label-trust">Governance Settings</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Set a spending threshold. Transactions above this amount trigger an alert that can be resolved by linking meeting minutes documenting the decision.
+                  </p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Spending Threshold Amount ($)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="e.g., 10000"
+                          value={spendingThreshold.amount ?? ''}
+                          onChange={(e) => updateSpendingThreshold('amount', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          className="mt-1 input-trust"
+                          data-testid="spending-threshold-amount"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 mt-6">
+                        <Switch
+                          checked={spendingThreshold.requires_minutes ?? false}
+                          onCheckedChange={(checked) => updateSpendingThreshold('requires_minutes', checked)}
+                        />
+                        <Label className="text-sm text-navy cursor-pointer" onClick={() => updateSpendingThreshold('requires_minutes', !spendingThreshold.requires_minutes)}>
+                          Requires meeting minutes documentation
+                        </Label>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">In-Scope Transaction Classifications</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {CLASSIFICATIONS.map(cls => {
+                          const selected = (spendingThreshold.scope_classifications || []).includes(cls);
+                          return (
+                            <button
+                              key={cls}
+                              type="button"
+                              onClick={() => toggleScopeClassification(cls)}
+                              className={`px-3 py-1.5 text-xs font-medium border transition-colors ${
+                                selected
+                                  ? 'bg-navy text-white border-navy'
+                                  : 'bg-white text-navy border-navy/30 hover:border-navy'
+                              }`}
+                              data-testid={`scope-classification-${cls.replace(/\s+/g, '-').toLowerCase()}`}
+                            >
+                              {cls}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Transactions classified as these types will be checked against the threshold.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-navy/10">

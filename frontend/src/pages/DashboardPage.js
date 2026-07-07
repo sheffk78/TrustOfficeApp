@@ -36,11 +36,14 @@ import {
   Upload,
   Users,
   ClipboardList,
-  GraduationCap
+  GraduationCap,
+  Shield,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import PageHelpButton from '@/components/PageHelpButton';
 import { TrustManager } from '@/components/TrustManager';
+import BankingSummaryCard from '@/components/BankingSummaryCard';
+import SpendingThresholdCard from '@/components/SpendingThresholdCard';
 
 const QUICK_ACTIONS = [
   {
@@ -303,7 +306,7 @@ export default function DashboardPage() {
     const setupSteps = [
       { 
         id: 'beneficiaries', 
-        label: 'Set Up Beneficiaries',
+        label: 'Set Up Beneficiaries', 
         description: 'Every distribution requires a named beneficiary. This is step one before you can record anything else.',
         done: onboarding.beneficiaries_added,
         icon: Users,
@@ -311,7 +314,7 @@ export default function DashboardPage() {
       },
       { 
         id: 'assets', 
-        label: 'Set Up Your Trust Structure',
+        label: 'Set Up Your Trust Structure', 
         description: 'Add your trust entity to the Structures section. This is where you manage your trust and any related LLCs.',
         done: onboarding.assets_added,
         icon: Package,
@@ -319,7 +322,7 @@ export default function DashboardPage() {
       },
       { 
         id: 'minutes', 
-        label: 'Hold Your First Trustee Meeting',
+        label: 'Hold Your First Trustee Meeting', 
         description: 'Trustees are legally required to document decisions. Your first meeting covers accepting trusteeship, opening bank accounts, and setting up the trust.',
         done: onboarding.minutes_generated,
         icon: ClipboardList,
@@ -327,11 +330,35 @@ export default function DashboardPage() {
       },
       { 
         id: 'calendar', 
-        label: 'Check Your Tax Calendar',
+        label: 'Check Your Tax Calendar', 
         description: 'Your trust has hard filing deadlines. We\'ve calculated yours based on your setup. Miss one and the IRS notices.',
         done: onboarding.calendar_set,
         icon: Calendar,
         action: '/calendar'
+      },
+      { 
+        id: 'bank_account', 
+        label: 'Add a Bank Account', 
+        description: 'Link a bank account to your trust entity. This unlocks balance tracking, statement uploads, and transaction reconciliation.',
+        done: onboarding.bank_account_added,
+        icon: Landmark,
+        action: '/structures'
+      },
+      { 
+        id: 'bank_statement', 
+        label: 'Upload a Bank Statement', 
+        description: 'Upload a bank statement to the Vault. We\'ll extract balances and transactions automatically so you can reconcile your ledger.',
+        done: onboarding.bank_statement_uploaded,
+        icon: Upload,
+        action: '/vault'
+      },
+      { 
+        id: 'spending_threshold', 
+        label: 'Set a Spending Threshold', 
+        description: 'Configure a per-transaction spending threshold in Settings. Transactions over the limit are flagged for trustee minutes.',
+        done: onboarding.spending_threshold_set,
+        icon: Shield,
+        action: '/settings#governance'
       }
     ];
     
@@ -711,8 +738,8 @@ export default function DashboardPage() {
                         <p className="text-sm text-muted-foreground">Upcoming filing deadlines</p>
                       </div>
                     </div>
-                    <Link 
-                      to="/calendar" 
+                    <Link
+                      to="/calendar"
                       className="text-navy hover:text-navy/70 font-mono text-xs uppercase tracking-widest flex items-center gap-1"
                     >
                       View All <ArrowRight className="w-3 h-3" />
@@ -765,10 +792,10 @@ export default function DashboardPage() {
                               </div>
                             </div>
                             <span className={`font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded ${
-                              d.filing_status === 'filed' || d.filing_status === 'not_required' 
-                                ? 'bg-emerald-100 text-emerald-700' 
-                                : overdue 
-                                  ? 'bg-red-100 text-red-700' 
+                              d.filing_status === 'filed' || d.filing_status === 'not_required'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : overdue
+                                  ? 'bg-red-100 text-red-700'
                                   : 'bg-slate-100 text-slate-600'
                             }`}>
                               {d.filing_status === 'filed' ? 'Filed' : d.filing_status === 'not_required' ? 'N/A' : overdue ? 'Overdue' : 'Pending'}
@@ -778,6 +805,14 @@ export default function DashboardPage() {
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Banking Summary + Spending Threshold Cards */}
+              {selectedTrust && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8" data-testid="banking-cards-row">
+                  <BankingSummaryCard />
+                  <SpendingThresholdCard />
                 </div>
               )}
 

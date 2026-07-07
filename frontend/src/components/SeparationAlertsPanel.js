@@ -38,7 +38,7 @@ const RESOLUTION_TYPES = [
   { value: 'reviewed_no_issue', label: 'Reviewed — No Issue' },
 ];
 
-export function SeparationAlertsPanel({ entityId = null, compact = false }) {
+export function SeparationAlertsPanel({ entityId = null, compact = false, onLinkMinutes = null }) {
   const { selectedTrust } = useAuth();
   const [alerts, setAlerts] = useState([]);
   const [counts, setCounts] = useState(null);
@@ -196,11 +196,11 @@ export function SeparationAlertsPanel({ entityId = null, compact = false }) {
         <div className="space-y-3">
           {/* Red alerts first */}
           {redAlerts.map(alert => (
-            <AlertCard key={alert.alert_id} alert={alert} onResolve={() => setResolveAlert(alert)} />
+            <AlertCard key={alert.alert_id} alert={alert} onResolve={() => setResolveAlert(alert)} onLinkMinutes={onLinkMinutes} />
           ))}
           {/* Then yellow */}
           {yellowAlerts.map(alert => (
-            <AlertCard key={alert.alert_id} alert={alert} onResolve={() => setResolveAlert(alert)} />
+            <AlertCard key={alert.alert_id} alert={alert} onResolve={() => setResolveAlert(alert)} onLinkMinutes={onLinkMinutes} />
           ))}
         </div>
       )}
@@ -295,9 +295,10 @@ export function SeparationAlertsPanel({ entityId = null, compact = false }) {
   );
 }
 
-function AlertCard({ alert, onResolve }) {
+function AlertCard({ alert, onResolve, onLinkMinutes = null }) {
   const cfg = severityConfig[alert.severity] || severityConfig.yellow;
   const Icon = cfg.icon;
+  const isThreshold = alert.alert_type === 'spending_threshold_exceeded';
 
   return (
     <div className={`p-3 rounded border ${cfg.border} ${cfg.bg} transition-colors`} data-testid={`alert-card-${alert.alert_id}`}>
@@ -309,14 +310,26 @@ function AlertCard({ alert, onResolve }) {
             {alert.entity_name && (
               <span className="text-[10px] text-muted-foreground">{alert.entity_name}</span>
             )}
+            {isThreshold && (
+              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-warning/10 text-warning">
+                Threshold
+              </span>
+            )}
           </div>
           <p className="text-sm font-medium text-foreground">{alert.title}</p>
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{alert.description}</p>
         </div>
-        <Button size="sm" variant="outline" onClick={onResolve}
-          className="flex-shrink-0 text-xs" data-testid={`resolve-btn-${alert.alert_id}`}>
-          Resolve
-        </Button>
+        <div className="flex flex-col gap-1 flex-shrink-0">
+          {isThreshold && onLinkMinutes && alert.transaction_id && (
+            <Button size="sm" variant="outline" onClick={() => onLinkMinutes(alert)} className="text-xs" data-testid={`link-minutes-alert-${alert.alert_id}`}>
+              Link Minutes
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={onResolve}
+            className="text-xs" data-testid={`resolve-btn-${alert.alert_id}`}>
+            Resolve
+          </Button>
+        </div>
       </div>
     </div>
   );

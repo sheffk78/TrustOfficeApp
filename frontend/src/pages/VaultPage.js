@@ -19,6 +19,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import PageHelpButton from '@/components/PageHelpButton';
 import AnalysisStatusBadge from '@/components/AnalysisStatusBadge';
+import BankStatementBadge from '@/components/BankStatementBadge';
 
 const CATEGORY_ICONS = {
   trust_instrument: Shield,
@@ -283,7 +284,7 @@ export default function VaultPage() {
 
   const deleteDocument = async (id) => {
     try {
-      const res = await fetchWithAuth(`/vault/documents/${id}`, { method: 'DELETE' });
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/vault/documents/${id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Document removed');
         loadData();
@@ -300,7 +301,7 @@ export default function VaultPage() {
     try {
       const token = localStorage.getItem('auth_token');
       const API_BASE = (process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app') + '/api';
-      const res = await fetch(`${API_BASE}/vault/documents/${docId}/download`, {
+      const res = await fetch(`${API_BASE}/trusts/${selectedTrust.trust_id}/vault/documents/${docId}/download`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Download failed');
@@ -622,6 +623,12 @@ export default function VaultPage() {
                               category={doc.category}
                             />
                           </div>
+                          {/* Bank statement extraction badge + link-to-account actions */}
+                          {doc.category === 'bank_statement' && (
+                            <div className="mb-2">
+                              <BankStatementBadge trustId={selectedTrust?.trust_id} vaultDocId={doc.doc_id} />
+                            </div>
+                          )}
                           <div className="flex items-center justify-between">
                             {doc.storage_provider === 'trustoffice' ? (
                               <button

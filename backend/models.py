@@ -279,6 +279,7 @@ class TrustUpdate(BaseModel):
     trust_type: Optional[TrustType] = None
     jurisdiction: Optional[str] = None
     benevolence_enabled: Optional[bool] = None
+    governance_settings: Optional[dict] = None
     tax_status: Optional[str] = None
     start_date: Optional[str] = None
     trustees: Optional[str] = None
@@ -317,6 +318,7 @@ class TrustResponse(BaseModel):
     trust_type: Optional[str] = "irrevocable"
     jurisdiction: Optional[str] = ""
     benevolence_enabled: Optional[bool] = False
+    governance_settings: Optional[dict] = None
     tax_status: Optional[str] = "private"
     created_at: str
     governance_score: int = 0
@@ -1209,6 +1211,7 @@ class TransactionCreate(BaseModel):
     other_note: str = ""  # Required when classification is "Other"
     linked_distribution_id: Optional[str] = None
     linked_compensation_payment_id: Optional[str] = None
+    linked_minutes_id: Optional[str] = None
     document_name: Optional[str] = None
 
 class TransactionUpdate(BaseModel):
@@ -1222,6 +1225,7 @@ class TransactionUpdate(BaseModel):
     other_note: Optional[str] = None
     linked_distribution_id: Optional[str] = None
     linked_compensation_payment_id: Optional[str] = None
+    linked_minutes_id: Optional[str] = None
     document_name: Optional[str] = None
 
 class TransactionResponse(BaseModel):
@@ -1239,6 +1243,7 @@ class TransactionResponse(BaseModel):
     other_note: str
     linked_distribution_id: Optional[str] = None
     linked_compensation_payment_id: Optional[str] = None
+    linked_minutes_id: Optional[str] = None
     document_name: Optional[str] = None
     import_batch_id: Optional[str] = None
     created_at: str
@@ -1489,3 +1494,77 @@ class ConversationListItem(BaseModel):
     last_message_preview: str
     updated_at: str
     trust_id: Optional[str] = None
+
+
+# ==================== BANKING MODELS ====================
+
+class BankAccountType(str, Enum):
+    checking = "checking"
+    savings = "savings"
+    investment = "investment"
+    brokerage = "brokerage"
+    cd = "cd"
+    other = "other"
+
+class BankAccountCreate(BaseModel):
+    trust_id: str
+    entity_id: str
+    nickname: str
+    institution_name: str
+    account_type: BankAccountType = BankAccountType.checking
+    last_four: str = Field(..., min_length=4, max_length=4)
+
+class BankAccountUpdate(BaseModel):
+    nickname: Optional[str] = None
+    institution_name: Optional[str] = None
+    account_type: Optional[BankAccountType] = None
+    last_four: Optional[str] = Field(None, min_length=4, max_length=4)
+    is_archived: Optional[bool] = None
+
+class BankAccountResponse(BaseModel):
+    account_id: str
+    trust_id: str
+    entity_id: str
+    user_id: str
+    nickname: str
+    institution_name: str
+    account_type: str
+    last_four: str
+    is_archived: bool = False
+    created_at: str
+    updated_at: Optional[str] = None
+
+class BankStatementResponse(BaseModel):
+    statement_id: str
+    trust_id: str
+    account_id: str
+    user_id: str
+    vault_document_id: str
+    bank_name: Optional[str] = None
+    account_last_four: Optional[str] = None
+    statement_period_start: Optional[str] = None
+    statement_period_end: Optional[str] = None
+    beginning_balance: Optional[float] = None
+    ending_balance: Optional[float] = None
+    total_deposits: Optional[float] = None
+    total_withdrawals: Optional[float] = None
+    extraction_status: str = "pending"
+    extraction_confidence: float = 0.0
+    extraction_error: Optional[str] = None
+    needs_review: bool = False
+    created_at: str
+    updated_at: Optional[str] = None
+
+
+# ==================== GOVERNANCE SETTINGS ====================
+
+class SpendingThresholdConfig(BaseModel):
+    amount: float = Field(..., gt=0, description="Dollar threshold (e.g., 10000.00)")
+    requires_minutes: bool = True
+    scope_classifications: List[str] = Field(
+        default=["Operational Expense", "Other"],
+        description="Governance classifications that trigger the threshold check"
+    )
+
+class GovernanceSettings(BaseModel):
+    spending_threshold: Optional[SpendingThresholdConfig] = None

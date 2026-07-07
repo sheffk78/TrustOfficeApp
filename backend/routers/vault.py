@@ -294,6 +294,46 @@ async def upload_document(
         except Exception as e:
             logger.warning(f"Failed to trigger trust doc analysis: {e}")
 
+    # Trigger bank statement analysis if this is a bank statement
+    if category == "bank_statement" and file_content:
+        try:
+            from trust_doc_analyzer import analyze_bank_statement
+            import asyncio
+
+            # Create a bank_statements record linked to this vault document
+            statement_id = f"bstmt_{uuid.uuid4().hex[:12]}"
+            now_iso = datetime.now(timezone.utc).isoformat()
+            await db.bank_statements.insert_one({
+                "statement_id": statement_id,
+                "trust_id": trust_id,
+                "account_id": None,  # Trustee links it to an account after extraction
+                "user_id": user["user_id"],
+                "vault_document_id": doc_id,
+                "bank_name": None,
+                "account_last_four": None,
+                "statement_period_start": None,
+                "statement_period_end": None,
+                "beginning_balance": None,
+                "ending_balance": None,
+                "total_deposits": None,
+                "total_withdrawals": None,
+                "extraction_status": "pending",
+                "extraction_confidence": 0.0,
+                "extraction_error": None,
+                "needs_review": False,
+                "created_at": now_iso,
+                "updated_at": now_iso,
+            })
+
+            asyncio.create_task(
+                analyze_bank_statement(
+                    trust_id, user["user_id"], statement_id, file_content
+                )
+            )
+            logger.info(f"Triggered bank statement analysis for trust {trust_id}, doc {doc_id}, statement {statement_id}")
+        except Exception as e:
+            logger.warning(f"Failed to trigger bank statement analysis: {e}")
+
     # Return without file_content or _id in the response
     # _id is added by MongoDB insert_one and is an ObjectId, which is not JSON serializable
     # FastAPI would throw 500 AFTER the file is already saved, causing the "error then success on refresh" bug

@@ -20,7 +20,8 @@ import PageHelpButton from '@/components/PageHelpButton';
 import {
   Plus, Search, Calendar as CalendarIcon, ArrowUpRight, ArrowDownLeft,
   FileSpreadsheet, Tag, Trash2, Filter, X, Upload, ChevronDown,
-  ArrowUpDown, CheckSquare, Loader2
+  ArrowUpDown, CheckSquare, Loader2,
+  AlertTriangle, Link2, FileText
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -86,16 +87,30 @@ export default function TransactionLedgerPage() {
   const [bulkMemo, setBulkMemo] = useState('');
   const [bulkOtherNote, setBulkOtherNote] = useState('');
 
+  // Threshold alerts + Link Minutes
+  const [thresholdAlerts, setThresholdAlerts] = useState([]);
+  const [minutesList, setMinutesList] = useState([]);
+  const [linkMinutesTxn, setLinkMinutesTxn] = useState(null); // transaction being linked
+  const [selectedMinutesId, setSelectedMinutesId] = useState('');
+  const [linking, setLinking] = useState(false);
+
   const loadData = useCallback(async () => {
     if (!selectedTrust) return;
     setLoading(true);
     try {
-      const [txnRes, entRes] = await Promise.all([
+      const [txnRes, entRes, alertsRes, minutesRes] = await Promise.all([
         fetchWithAuth(`/transactions?trust_id=${selectedTrust.trust_id}`),
-        fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}`)
+        fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}`),
+        fetchWithAuth(`/alerts?trust_id=${selectedTrust.trust_id}`),
+        fetchWithAuth(`/minutes?trust_id=${selectedTrust.trust_id}`),
       ]);
       if (txnRes.ok) setTransactions(await txnRes.json());
       if (entRes.ok) setEntities(await entRes.json());
+      if (alertsRes.ok) {
+        const allAlerts = await alertsRes.json();
+        setThresholdAlerts(allAlerts.filter(a => a.alert_type === 'spending_threshold_exceeded' && a.status === 'active'));
+      }
+      if (minutesRes.ok) setMinutesList(await minutesRes.json());
     } catch (e) {
       showError(toast, e, { operation: 'load', page: 'TransactionLedger' });
     } finally {
@@ -298,6 +313,41 @@ export default function TransactionLedgerPage() {
     else setSelectedIds(new Set(filtered.map(t => t.transaction_id)));
   };
 
+  // Map transaction_id → active threshold alert
+  const thresholdAlertByTxn = new Map(thresholdAlerts.map(a => [a.transaction_id, a]));
+
+  // ==================== LINK MINUTES ====================
+  const openLinkMinutes = (txn) => {
+    setLinkMinutesTxn(txn);
+    setSelectedMinutesId(txn.linked_minutes_id || '');
+  };
+
+  const handleLinkMinutes = async () => {
+    if (!linkMinutesTxn || !selectedMinutesId) {
+      toast.error('Please select a minutes document');
+      return;
+    }
+    setLinking(true);
+    try {
+      const res = await fetchWithAuth(`/transactions/${linkMinutesTxn.transaction_id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ linked_minutes_id: selectedMinutesId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Failed to link minutes');
+      }
+      toast.success('Minutes linked — threshold alert will auto-resolve');
+      setLinkMinutesTxn(null);
+      setSelectedMinutesId('');
+      loadData(); // refresh transactions + alerts
+    } catch (e) {
+      showError(toast, e, { operation: 'link_minutes', page: 'TransactionLedger' });
+    } finally {
+      setLinking(false);
+    }
+  };
+
   if (!selectedTrust) {
     return (
       <div className="flex min-h-screen bg-background">
@@ -362,7 +412,10 @@ export default function TransactionLedgerPage() {
 
         {/* Separation Alerts Panel */}
         <div className="mb-6 rounded border border-border bg-card p-4">
-          <SeparationAlertsPanel />
+          <SeparationAlertsPanel onLinkMinutes={(alert) => {
+            const txn = transactions.find(t => t.transaction_id === alert.transaction_id);
+            if (txn) openLinkMinutes(txn);
+          }} />
         </div>
 
         {/* Filters & Search */}
@@ -442,6 +495,7 @@ export default function TransactionLedgerPage() {
                     <th className="p-3 text-left font-medium text-muted-foreground">From / To</th>
                     <th className="p-3 text-left font-medium text-muted-foreground">Classification</th>
                     <th className="p-3 text-left font-medium text-muted-foreground">Memo</th>
+                    <th className="p-3 text-center font-medium text-muted-foreground w-32">Threshold</th>
                     <th className="p-3 text-center font-medium text-muted-foreground w-16"></th>
                   </tr>
                 </thead>
@@ -474,6 +528,33 @@ export default function TransactionLedgerPage() {
                         </span>
                       </td>
                       <td className="p-3 text-muted-foreground text-xs max-w-[200px] truncate">{t.purpose_memo}</td>
+                      <td className="p-3 text-center">
+                        {(() => {
+                          const alert = thresholdAlertByTxn.get(t.transaction_id);
+                          if (t.linked_minutes_id) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/10 text-success" title="Linked to minutes">
+                                <FileText className="w-3 h-3" /> Linked
+                              </span>
+                            );
+                          }
+                          if (alert) {
+                            return (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-warning/10 text-warning" title={alert.description}>
+                                  <AlertTriangle className="w-3 h-3" /> Exceeded
+                                </span>
+                                <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-navy hover:text-navy/70"
+                                  onClick={() => openLinkMinutes(t)}
+                                  data-testid={`link-minutes-${t.transaction_id}`}>
+                                  <Link2 className="w-3 h-3 mr-1" /> Link Minutes
+                                </Button>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </td>
                       <td className="p-3 text-center">
                         <Button variant="ghost" size="sm" onClick={() => handleDelete(t.transaction_id)}
                           data-testid={`delete-txn-${t.transaction_id}`}>
@@ -709,6 +790,52 @@ export default function TransactionLedgerPage() {
               Apply Classification
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ==================== LINK MINUTES DIALOG ==================== */}
+      <Dialog open={!!linkMinutesTxn} onOpenChange={v => { if (!v) { setLinkMinutesTxn(null); setSelectedMinutesId(''); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link Minutes to Transaction</DialogTitle>
+          </DialogHeader>
+          {linkMinutesTxn && (
+            <div className="space-y-4 mt-2">
+              <div className="p-3 rounded bg-warning/10 border border-warning/20">
+                <p className="text-sm font-medium text-foreground">
+                  {linkMinutesTxn.direction === 'inflow' ? '+' : '-'}${linkMinutesTxn.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{linkMinutesTxn.purpose_memo || 'No memo'}</p>
+                <p className="text-xs text-warning mt-1">This transaction exceeded the spending threshold. Linking minutes documents the trustee approval.</p>
+              </div>
+
+              <div>
+                <Label>Select Minutes Document *</Label>
+                {minutesList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    No minutes found. Create minutes first from the Minutes page.
+                  </p>
+                ) : (
+                  <Select value={selectedMinutesId} onValueChange={setSelectedMinutesId}>
+                    <SelectTrigger data-testid="link-minutes-select">
+                      <SelectValue placeholder="Choose a minutes document" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {minutesList.map(m => (
+                        <SelectItem key={m.minutes_id} value={m.minutes_id}>
+                          {m.meeting_date ? format(parseISO(m.meeting_date), 'MMM d, yyyy') : 'No date'} — {m.minutes_type || 'Minutes'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <Button className="w-full" onClick={handleLinkMinutes} disabled={linking || !selectedMinutesId} data-testid="link-minutes-submit-btn">
+                {linking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Linking...</> : <><Link2 className="w-4 h-4 mr-2" /> Link Minutes</>}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

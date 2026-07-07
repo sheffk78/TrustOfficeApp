@@ -677,6 +677,34 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
             "Include WHEREAS/RESOLVED language for benevolence with purpose and amount."
         ),
     },
+
+    # ─── Financial: Spending Authorization ──────────────────
+    "spending_authorization": {
+        "display_name": "Spending Authorization",
+        "description": "Document trustee approval of an expenditure that exceeds the spending threshold",
+        "icon": "shield-check",
+        "category": "financial",
+        "fields": [
+            {"name": "expenditure_amount", "label": "Expenditure Amount", "type": "currency", "required": True},
+            {"name": "expenditure_date", "label": "Expenditure Date", "type": "date", "required": True},
+            {"name": "expenditure_purpose", "label": "Purpose of Expenditure", "type": "textarea", "required": True},
+            {"name": "expenditure_vendor", "label": "Vendor/Payee", "type": "text", "required": False},
+            {"name": "expenditure_source_account", "label": "Source Account", "type": "text", "required": False},
+        ],
+        "ai_prompt_template": (
+            "Generate minutes documenting trustee approval of an expenditure for {trust_name}. "
+            "Meeting date: {meeting_date}. Trustees present: {participants}. "
+            "Expenditure amount: {expenditure_amount}. Date: {expenditure_date}. "
+            "Purpose: {expenditure_purpose}. Vendor/Payee: {expenditure_vendor}. "
+            "Source account: {expenditure_source_account}. "
+            "Additional context: {additional_context}. "
+            "Include WHEREAS/RESOLVED language. The WHEREAS clause should reference that "
+            "this expenditure exceeds the trust's spending threshold and requires documented "
+            "trustee approval per the trust's governance policy. The RESOLVED clause should "
+            "authorize the expenditure and confirm it is in the best interest of the trust "
+            "and its beneficiaries."
+        ),
+    },
 }
 
 

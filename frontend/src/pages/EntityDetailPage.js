@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
+import BankAccountsSection from '@/components/BankAccountsSection';
 import PageHelpButton from '@/components/PageHelpButton';
 import { 
   ArrowLeft, 
@@ -357,6 +358,11 @@ export default function EntityDetailPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Bank Accounts Section */}
+          <div className="mt-8">
+            <BankAccountsSection entityId={entityId} />
           </div>
 
           {/* Separation Intelligence Section */}
