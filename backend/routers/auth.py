@@ -226,13 +226,25 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
                 {"$set": {"is_admin": True}}
             )
         # Always ensure forever_free active subscription
+        # Use $setOnInsert for fields that should only be set on creation (like subscription_id)
         await db.subscriptions.update_one(
             {"user_id": user_doc["user_id"]},
-            {"$set": {
-                "plan_type": "forever_free", 
-                "status": "active",
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }},
+            {
+                "$set": {
+                    "plan_type": "forever_free", 
+                    "status": "active",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                },
+                "$setOnInsert": {
+                    "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+                    "trial_start_date": None,
+                    "trial_end_date": None,
+                    "stripe_customer_id": None,
+                    "stripe_subscription_id": None,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "notes": "Forever free admin account"
+                }
+            },
             upsert=True
         )
         logger.info(f"Ensured admin status and subscription for {email}")
