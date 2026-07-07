@@ -124,6 +124,7 @@ const CATEGORY_MAP = {
   governance: 'governance',
   financial: 'financial',
   assets: 'assets',
+  property_assets: 'assets',
   beneficiaries: 'beneficiaries',
   reviews: 'reviews',
   administrative: 'administrative',
