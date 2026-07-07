@@ -1763,6 +1763,7 @@ def generate_bill_of_sale_content(data: dict) -> str:
     state_code = data.get("state_code", "[State]")
 
     value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
+    ein_text = f" (EIN: {ein})" if ein and ein != "[EIN]" else ""
 
     content = f"""BILL OF SALE
 
@@ -1772,7 +1773,7 @@ WHEREAS, {grantor} ("Grantor") is the lawful owner of the following described pe
     Identifier: {identifier}
     Location: {location}
 
-NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Grantor does hereby BARGAIN, SELL, GRANT, ASSIGN, TRANSFER, and CONVEY unto {trust_name} ("Trust"), the following described personal property:
+NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Grantor does hereby BARGAIN, SELL, GRANT, ASSIGN, TRANSFER, and CONVEY unto {trust_name}{ein_text} ("Trust"), the following described personal property:
 
     {description}
     Identifier: {identifier}
@@ -1829,6 +1830,7 @@ def generate_assignment_of_personal_property_content(data: dict) -> str:
 
     value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
     appraiser_text = f"\n    Appraised by: {appraiser_name}" if appraiser_name else ""
+    ein_text = f" (EIN: {ein})" if ein and ein != "[EIN]" else ""
 
     content = f"""ASSIGNMENT AND CONVEYANCE OF PERSONAL PROPERTY
 
@@ -1839,7 +1841,7 @@ WHEREAS, {grantor} ("Assignor") is the lawful owner of the following described p
     Location: {location}
     Appraised value: {value_text}{appraiser_text}
 
-NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Assignor does hereby ASSIGN, TRANSFER, CONVEY, and DELIVER unto {trust_name} ("Trust"), all of Assignor's right, title, and interest in and to the following described personal property:
+NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Assignor does hereby ASSIGN, TRANSFER, CONVEY, and DELIVER unto {trust_name}{ein_text} ("Trust"), all of Assignor's right, title, and interest in and to the following described personal property:
 
     {description}
     Identifier: {identifier}
@@ -1891,6 +1893,7 @@ def generate_general_assignment_content(data: dict) -> str:
     state_code = data.get("state_code", "[State]")
 
     value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
+    ein_text = f" (EIN: {ein})" if ein and ein != "[EIN]" else ""
 
     content = f"""GENERAL ASSIGNMENT OF ASSETS
 
@@ -1899,7 +1902,7 @@ WHEREAS, {grantor} ("Assignor") is the lawful owner of the following described a
     Description: {description}
     Identifier: {identifier}
 
-NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Assignor does hereby ASSIGN, TRANSFER, and CONVEY unto {trust_name} ("Trust"), all of Assignor's right, title, and interest in and to the following described assets:
+NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Assignor does hereby ASSIGN, TRANSFER, and CONVEY unto {trust_name}{ein_text} ("Trust"), all of Assignor's right, title, and interest in and to the following described assets:
 
     {description}
     Identifier: {identifier}

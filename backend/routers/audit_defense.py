@@ -3,7 +3,6 @@ import io
 import uuid
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import StreamingResponse
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -13,79 +12,12 @@ from reportlab.lib import colors
 
 from database import db
 from dependencies import get_current_user
+from pdf_utils import (
+    NAVY, GOLD, GRAY, LIGHT_GRAY, RED, AMBER, GREEN,
+    build_styles, separator_line, info_table, data_table, pdf_response,
+)
 
 router = APIRouter(tags=["audit-defense"])
-
-NAVY = colors.HexColor('#010079')
-GOLD = colors.HexColor('#d5ad36')
-GRAY = colors.HexColor('#666666')
-LIGHT_GRAY = colors.HexColor('#f0f0f0')
-RED = colors.HexColor('#dc2626')
-AMBER = colors.HexColor('#d97706')
-GREEN = colors.HexColor('#16a34a')
-
-
-def build_styles():
-    base = getSampleStyleSheet()
-    return {
-        'title': ParagraphStyle('AuditTitle', parent=base['Heading1'], fontSize=20, spaceAfter=4,
-                                textColor=NAVY, alignment=1, fontName='Helvetica-Bold'),
-        'subtitle': ParagraphStyle('AuditSubtitle', parent=base['Normal'], fontSize=10, spaceAfter=12,
-                                   textColor=GRAY, alignment=1, fontName='Helvetica'),
-        'section': ParagraphStyle('SectionTitle', parent=base['Heading2'], fontSize=13, spaceBefore=20,
-                                  spaceAfter=8, textColor=NAVY, fontName='Helvetica-Bold'),
-        'subsection': ParagraphStyle('SubSection', parent=base['Heading3'], fontSize=11, spaceBefore=12,
-                                     spaceAfter=4, textColor=NAVY, fontName='Helvetica-Bold'),
-        'body': ParagraphStyle('BodyText', parent=base['Normal'], fontSize=9, spaceAfter=4,
-                               fontName='Helvetica', leading=12),
-        'small': ParagraphStyle('SmallText', parent=base['Normal'], fontSize=8, textColor=GRAY,
-                                fontName='Helvetica', leading=10),
-        'label': ParagraphStyle('Label', parent=base['Normal'], fontSize=9, fontName='Helvetica-Bold',
-                                textColor=NAVY),
-    }
-
-
-def separator_line():
-    t = Table([[""]], colWidths=[6.5 * inch], rowHeights=[1])
-    t.setStyle(TableStyle([('LINEBELOW', (0, 0), (-1, -1), 1, NAVY)]))
-    return t
-
-
-def info_table(rows, label_width=1.8 * inch, value_width=4.7 * inch):
-    t = Table(rows, colWidths=[label_width, value_width])
-    t.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('TEXTCOLOR', (0, 0), (0, -1), NAVY),
-        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-    ]))
-    return t
-
-
-def data_table(header, rows, col_widths=None):
-    data = [header] + rows
-    if not col_widths:
-        col_widths = [6.5 * inch / len(header)] * len(header)
-    t = Table(data, colWidths=col_widths, repeatRows=1)
-    style = [
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('BACKGROUND', (0, 0), (-1, 0), NAVY),
-        ('ALIGN', (0, 0), (-1, 0), 'LEFT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, LIGHT_GRAY]),
-    ]
-    t.setStyle(TableStyle(style))
-    return t
 
 
 @router.get("/exports/audit-defense/{trust_id}")
@@ -389,14 +321,9 @@ async def export_audit_defense_pdf(trust_id: str, days: int = 365, user: dict = 
                             topMargin=0.75 * inch, bottomMargin=0.75 * inch,
                             leftMargin=0.75 * inch, rightMargin=0.75 * inch)
     doc.build(story)
-    buffer.seek(0)
 
     filename = f"audit_defense_{trust_id}_{now.strftime('%Y%m%d')}.pdf"
-    return StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
+    return pdf_response(buffer, filename)
 
 
 @router.get("/audit-logs")
