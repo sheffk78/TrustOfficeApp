@@ -3,12 +3,11 @@ from fastapi import APIRouter, HTTPException, Depends, Response
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
-import io
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 from database import db
@@ -16,6 +15,7 @@ from dependencies import get_current_user, require_write_access, should_show_wat
 from models import (
     BenevolenceRecordCreate, BenevolenceRecordUpdate, BenevolenceRecordResponse
 )
+from pdf_utils import NAVY, GRAY, separator_line, create_doc_template
 
 router = APIRouter(tags=["benevolence"])
 
@@ -333,15 +333,7 @@ async def export_benevolence_pdf(
     unique_beneficiaries = len(set(r.get("beneficiary_name", "") for r in records))
     
     # Generate PDF
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, 
-        pagesize=letter, 
-        topMargin=0.75*inch, 
-        bottomMargin=0.75*inch,
-        leftMargin=0.75*inch,
-        rightMargin=0.75*inch
-    )
+    doc, buffer = create_doc_template()
     
     styles = getSampleStyleSheet()
     
@@ -351,7 +343,7 @@ async def export_benevolence_pdf(
         parent=styles['Heading1'],
         fontSize=18,
         spaceAfter=6,
-        textColor=colors.HexColor('#010079'),
+        textColor=NAVY,
         alignment=1,
         fontName='Helvetica-Bold'
     )
@@ -361,7 +353,7 @@ async def export_benevolence_pdf(
         parent=styles['Normal'],
         fontSize=10,
         spaceAfter=12,
-        textColor=colors.HexColor('#666666'),
+        textColor=GRAY,
         alignment=1,
         fontName='Helvetica'
     )
@@ -372,7 +364,7 @@ async def export_benevolence_pdf(
         fontSize=12,
         spaceBefore=18,
         spaceAfter=6,
-        textColor=colors.HexColor('#010079'),
+        textColor=NAVY,
         fontName='Helvetica-Bold'
     )
     
@@ -402,7 +394,7 @@ async def export_benevolence_pdf(
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#010079')),
+        ('TEXTCOLOR', (0, 0), (0, -1), NAVY),
         ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
         ('ALIGN', (1, 0), (1, -1), 'LEFT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -412,10 +404,7 @@ async def export_benevolence_pdf(
     story.append(Spacer(1, 12))
     
     # Separator line
-    story.append(Table([[""]], colWidths=[6.5*inch], rowHeights=[1]))
-    story[-1].setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#010079')),
-    ]))
+    story.append(separator_line())
     story.append(Spacer(1, 16))
     
     # Summary Statistics
@@ -433,7 +422,7 @@ async def export_benevolence_pdf(
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica'),
         ('FONTNAME', (1, 0), (1, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#010079')),
+        ('TEXTCOLOR', (1, 0), (1, -1), NAVY),
         ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
         ('ALIGN', (1, 0), (1, -1), 'LEFT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
@@ -497,7 +486,7 @@ async def export_benevolence_pdf(
         grant_table = Table(table_data, colWidths=col_widths)
         grant_table.setStyle(TableStyle([
             # Header row
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#010079')),
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
@@ -518,7 +507,7 @@ async def export_benevolence_pdf(
     story.append(Spacer(1, 24))
     story.append(Table([[""]], colWidths=[6.5*inch], rowHeights=[1]))
     story[-1].setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#010079')),
+        ('LINEBELOW', (0, 0), (-1, -1), 1, NAVY),
     ]))
     story.append(Spacer(1, 8))
     

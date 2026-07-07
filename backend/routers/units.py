@@ -15,13 +15,13 @@ from models import (
 )
 
 # PDF generation imports
-from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
-import io
 import base64
+
+from pdf_utils import NAVY, create_doc_template
 
 router = APIRouter(prefix="/trust-units", tags=["trust-units"])
 
@@ -83,23 +83,26 @@ def validate_units(units: float, allow_fractional: bool) -> float:
 
 def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_watermark: bool = False) -> bytes:
     """Generate a professional PDF certificate for trust units"""
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=1*inch, bottomMargin=0.75*inch)
+    doc, buffer = create_doc_template(margins={
+        'topMargin': 1 * inch,
+        'bottomMargin': 0.75 * inch,
+        'leftMargin': 0.75 * inch,
+        'rightMargin': 0.75 * inch,
+    })
     
     styles = getSampleStyleSheet()
-    navy = colors.HexColor('#010079')
     
     title_style = ParagraphStyle(
         'CertTitle', parent=styles['Heading1'], fontName='Times-Bold',
-        fontSize=24, spaceAfter=6, textColor=navy, alignment=1
+        fontSize=24, spaceAfter=6, textColor=NAVY, alignment=1
     )
     subtitle_style = ParagraphStyle(
         'CertSubtitle', parent=styles['Heading2'], fontName='Times-Roman',
-        fontSize=14, spaceBefore=4, spaceAfter=20, textColor=navy, alignment=1
+        fontSize=14, spaceBefore=4, spaceAfter=20, textColor=NAVY, alignment=1
     )
     heading_style = ParagraphStyle(
         'CertHeading', parent=styles['Heading2'], fontName='Times-Bold',
-        fontSize=12, spaceBefore=16, spaceAfter=8, textColor=navy
+        fontSize=12, spaceBefore=16, spaceAfter=8, textColor=NAVY
     )
     body_style = ParagraphStyle(
         'CertBody', parent=styles['Normal'], fontName='Times-Roman',
@@ -126,7 +129,7 @@ def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_water
     cert_number_table = Table(cert_number_data, colWidths=[2.5*inch])
     cert_number_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('BOX', (0, 0), (-1, -1), 1, navy),
+        ('BOX', (0, 0), (-1, -1), 1, NAVY),
         ('TOPPADDING', (0, 0), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
     ]))

@@ -4,15 +4,13 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
-import io
 import base64
 import re
 import logging
 
-from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 from database import db
@@ -25,6 +23,7 @@ from models import (
 from email_service import email_service
 from ai_service import draft_minutes_from_structured_input, MinutesDraftRequest as AiMinutesDraftRequest
 from routers.template_registry import get_template_registry, get_template_definition, build_ai_prompt
+from pdf_utils import NAVY, GRAY, create_doc_template
 
 router = APIRouter(tags=["minutes"])
 logger = logging.getLogger(__name__)
@@ -541,15 +540,12 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
     """Generate a professional legal-style PDF for minutes record with proper formatting"""
     import re
     
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, 
-        pagesize=letter, 
-        topMargin=0.75*inch, 
-        bottomMargin=0.75*inch,
-        leftMargin=1*inch,
-        rightMargin=1*inch
-    )
+    doc, buffer = create_doc_template(margins={
+        'topMargin': 0.75 * inch,
+        'bottomMargin': 0.75 * inch,
+        'leftMargin': 1 * inch,
+        'rightMargin': 1 * inch,
+    })
     
     # Custom styles for legal document appearance
     styles = getSampleStyleSheet()
@@ -562,7 +558,7 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
         fontSize=16,
         alignment=1,  # Center
         spaceAfter=4,
-        textColor=colors.HexColor('#010079')
+        textColor=NAVY
     )
     
     # Document subtitle
@@ -584,10 +580,10 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
         fontSize=11,
         spaceBefore=16,
         spaceAfter=8,
-        textColor=colors.HexColor('#010079'),
+        textColor=NAVY,
         borderWidth=0,
         borderPadding=0,
-        borderColor=colors.HexColor('#010079'),
+        borderColor=NAVY,
     )
     
     # WHEREAS clause style - indented, formal
@@ -646,7 +642,7 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
         parent=styles['Normal'],
         fontName='Times-Italic',
         fontSize=10,
-        textColor=colors.HexColor('#666666')
+        textColor=GRAY
     )
     
     # Divider line style
@@ -762,7 +758,7 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
         ))
     story.append(Paragraph(
         f"{trust_name} – Private Trust Minutes – Confidential",
-        ParagraphStyle('FooterNote', parent=styles['Normal'], fontName='Times-Italic', fontSize=8, alignment=1, textColor=colors.HexColor('#666666'))
+        ParagraphStyle('FooterNote', parent=styles['Normal'], fontName='Times-Italic', fontSize=8, alignment=1, textColor=GRAY)
     ))
     
     doc.build(story)
@@ -4011,8 +4007,12 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
         raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     
     # Generate PDF from the document text
-    buffer = io.BytesIO()
-    pdf_doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch, bottomMargin=0.75*inch)
+    pdf_doc, buffer = create_doc_template(margins={
+        'topMargin': 0.75 * inch,
+        'bottomMargin': 0.75 * inch,
+        'leftMargin': 1 * inch,
+        'rightMargin': 1 * inch,
+    })
     
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
@@ -4020,7 +4020,7 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
         parent=styles['Heading1'],
         fontSize=16,
         spaceAfter=6,
-        textColor=colors.HexColor('#010079'),
+        textColor=NAVY,
         alignment=1  # Center
     )
     body_style = ParagraphStyle(

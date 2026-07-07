@@ -4,18 +4,18 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
-import io
 import base64
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 from database import db
 from dependencies import get_current_user, require_write_access, should_show_watermark
 from models import ScheduleAItemCreate, ScheduleAItemUpdate, ScheduleAItemResponse
+from pdf_utils import NAVY, GRAY, LIGHT_GRAY, separator_line, create_doc_template
 
 router = APIRouter(tags=["schedule-a"])
 
@@ -257,15 +257,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     total_value = sum(item.get("approximate_value", 0) or 0 for item in items)
     
     # Generate PDF
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, 
-        pagesize=letter, 
-        topMargin=0.75*inch, 
-        bottomMargin=0.75*inch,
-        leftMargin=0.75*inch,
-        rightMargin=0.75*inch
-    )
+    doc, buffer = create_doc_template()
     
     styles = getSampleStyleSheet()
     
@@ -275,7 +267,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
         parent=styles['Heading1'],
         fontSize=18,
         spaceAfter=6,
-        textColor=colors.HexColor('#010079'),
+        textColor=NAVY,
         alignment=1,  # Center
         fontName='Helvetica-Bold'
     )
@@ -285,7 +277,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
         parent=styles['Normal'],
         fontSize=10,
         spaceAfter=12,
-        textColor=colors.HexColor('#666666'),
+        textColor=GRAY,
         alignment=1,
         fontName='Helvetica'
     )
@@ -296,7 +288,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
         fontSize=12,
         spaceBefore=18,
         spaceAfter=6,
-        textColor=colors.HexColor('#010079'),
+        textColor=NAVY,
         fontName='Helvetica-Bold'
     )
     
@@ -341,7 +333,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#010079')),
+        ('TEXTCOLOR', (0, 0), (0, -1), NAVY),
         ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
         ('ALIGN', (1, 0), (1, -1), 'LEFT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -351,10 +343,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     story.append(Spacer(1, 12))
     
     # Separator line
-    story.append(Table([[""]], colWidths=[6.5*inch], rowHeights=[1]))
-    story[-1].setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#010079')),
-    ]))
+    story.append(separator_line())
     story.append(Spacer(1, 12))
     
     # Categories
@@ -404,7 +393,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
         asset_table = Table(table_data, colWidths=col_widths)
         asset_table.setStyle(TableStyle([
             # Header row
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#010079')),
+            ('BACKGROUND', (0, 0), (-1, 0), NAVY),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 8),
@@ -419,12 +408,12 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
             # Subtotal row
             ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, -1), (-1, -1), 8),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
+            ('BACKGROUND', (0, -1), (-1, -1), LIGHT_GRAY),
             ('ALIGN', (2, -1), (2, -1), 'RIGHT'),
             
             # Grid
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#010079')),
+            ('BOX', (0, 0), (-1, -1), 1, NAVY),
             
             # Padding
             ('TOPPADDING', (0, 0), (-1, -1), 4),
@@ -437,10 +426,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     
     # Grand Total
     story.append(Spacer(1, 12))
-    story.append(Table([[""]], colWidths=[6.5*inch], rowHeights=[1]))
-    story[-1].setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 2, colors.HexColor('#010079')),
-    ]))
+    story.append(separator_line(thickness=2))
     story.append(Spacer(1, 8))
     
     total_data = [
@@ -450,7 +436,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     total_table.setStyle(TableStyle([
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 11),
-        ('TEXTCOLOR', (0, 0), (0, 0), colors.HexColor('#010079')),
+        ('TEXTCOLOR', (0, 0), (0, 0), NAVY),
         ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
     ]))
     story.append(total_table)
