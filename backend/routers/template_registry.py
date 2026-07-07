@@ -266,6 +266,80 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
     },
 
+    # ─── Conveyance Documents ────────────────────────────────
+    "bill_of_sale": {
+        "display_name": "Bill of Sale (Vehicle/Equipment)",
+        "description": "Generate a bill of sale transferring tangible personal property to the trust",
+        "icon": "file-text",
+        "category": "property_assets",
+        "fields": [
+            {"name": "grantor_name", "label": "Grantor/Seller Name", "type": "text", "required": True},
+            {"name": "property_description", "label": "Property Description", "type": "textarea", "required": True},
+            {"name": "property_identifier", "label": "Identifier (VIN, Serial #, etc.)", "type": "text", "required": False},
+            {"name": "property_location", "label": "Property Location", "type": "text", "required": False},
+            {"name": "property_value", "label": "Sale Price / Approximate Value", "type": "currency", "required": False},
+            {"name": "conveyance_date", "label": "Date of Sale/Transfer", "type": "date", "required": True},
+            {"name": "add_to_schedule_a", "label": "Auto-add to Schedule A", "type": "boolean", "required": False},
+            {"name": "schedule_a_category", "label": "Schedule A Category", "type": "select", "required": False,
+             "options": ["personal_property", "real_property", "other_property"]},
+        ],
+        "ai_prompt_template": (
+            "Generate a bill of sale for transfer of tangible personal property to {trust_name}. "
+            "Grantor: {grantor_name}. Property: {property_description}. Identifier: {property_identifier}. "
+            "Value: {property_value}. Date: {conveyance_date}. Trustee: {trustee_name}. EIN: {ein}. "
+            "Include conveyance language, consideration statement, 'as-is' clause, and notary acknowledgment block "
+            "for {state_code}. Output formal bill of sale document text."
+        ),
+    },
+    "assignment_of_personal_property": {
+        "display_name": "Assignment of Personal Property (Art/Jewelry/Collectibles)",
+        "description": "Assign artwork, antiques, jewelry, or collectibles to the trust",
+        "icon": "gem",
+        "category": "property_assets",
+        "fields": [
+            {"name": "grantor_name", "label": "Grantor/Assignor Name", "type": "text", "required": True},
+            {"name": "property_description", "label": "Property Description", "type": "textarea", "required": True},
+            {"name": "property_identifier", "label": "Identifier (Serial #, Provenance Ref, etc.)", "type": "text", "required": False},
+            {"name": "property_location", "label": "Property Location", "type": "text", "required": False},
+            {"name": "property_value", "label": "Appraised Value", "type": "currency", "required": False},
+            {"name": "appraiser_name", "label": "Appraiser Name (if appraised)", "type": "text", "required": False},
+            {"name": "conveyance_date", "label": "Date of Assignment", "type": "date", "required": True},
+            {"name": "add_to_schedule_a", "label": "Auto-add to Schedule A", "type": "boolean", "required": False},
+            {"name": "schedule_a_category", "label": "Schedule A Category", "type": "select", "required": False,
+             "options": ["personal_property", "real_property", "other_property"]},
+        ],
+        "ai_prompt_template": (
+            "Generate an assignment of personal property for transfer of artwork, jewelry, or collectibles to {trust_name}. "
+            "Grantor: {grantor_name}. Property: {property_description}. Appraised value: {property_value}. "
+            "Appraiser: {appraiser_name}. Date: {conveyance_date}. Trustee: {trustee_name}. EIN: {ein}. "
+            "Include assignment and conveyance language, consideration statement, warranty of title, "
+            "and notary acknowledgment block for {state_code}. Output formal assignment document text."
+        ),
+    },
+    "general_assignment": {
+        "display_name": "General Assignment (Intangible Assets)",
+        "description": "Assign intangible assets (notes, IP, business interests, digital assets) to the trust",
+        "icon": "briefcase",
+        "category": "property_assets",
+        "fields": [
+            {"name": "grantor_name", "label": "Grantor/Assignor Name", "type": "text", "required": True},
+            {"name": "property_description", "label": "Asset Description", "type": "textarea", "required": True},
+            {"name": "property_identifier", "label": "Identifier (Account #, Patent #, etc.)", "type": "text", "required": False},
+            {"name": "property_value", "label": "Approximate Value", "type": "currency", "required": False},
+            {"name": "conveyance_date", "label": "Date of Assignment", "type": "date", "required": True},
+            {"name": "add_to_schedule_a", "label": "Auto-add to Schedule A", "type": "boolean", "required": False},
+            {"name": "schedule_a_category", "label": "Schedule A Category", "type": "select", "required": False,
+             "options": ["personal_property", "real_property", "other_property"]},
+        ],
+        "ai_prompt_template": (
+            "Generate a general assignment of intangible assets to {trust_name}. "
+            "Grantor: {grantor_name}. Asset: {property_description}. Identifier: {property_identifier}. "
+            "Value: {property_value}. Date: {conveyance_date}. Trustee: {trustee_name}. EIN: {ein}. "
+            "Include general assignment language, consideration statement, warranty of title, "
+            "and notary acknowledgment block for {state_code}. Output formal general assignment document text."
+        ),
+    },
+
     # ─── Financial ────────────────────────────────────────────
     "bank_account_authorization": {
         "display_name": "Open Bank Account",

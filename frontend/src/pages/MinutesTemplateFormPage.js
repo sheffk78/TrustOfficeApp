@@ -72,7 +72,10 @@ const TEMPLATE_TITLES = {
   'fiscal_year_election': 'Fiscal Year Election',
   'tax_filing_authorization': 'Tax Filing Authorization',
   'emergency_ratification': 'Emergency Action Ratification',
-  'conflict_of_interest': 'Conflict of Interest Disclosure'
+  'conflict_of_interest': 'Conflict of Interest Disclosure',
+  'bill_of_sale': 'Bill of Sale',
+  'assignment_of_personal_property': 'Assignment of Personal Property',
+  'general_assignment': 'General Assignment'
 };
 
 const ASSET_CATEGORIES = [
@@ -714,6 +717,9 @@ export default function MinutesTemplateFormPage() {
         };
       
       case 'acceptance_of_property':
+      case 'bill_of_sale':
+      case 'assignment_of_personal_property':
+      case 'general_assignment':
         return {
           ...baseData,
           grantor_name: propertyData.grantor_name,
@@ -722,6 +728,7 @@ export default function MinutesTemplateFormPage() {
           property_identifier: propertyData.property_identifier,
           property_location: propertyData.property_location,
           conveyance_date: propertyData.conveyance_date,
+          appraiser_name: propertyData.appraiser_name || null,
           add_to_schedule_a: propertyData.add_to_schedule_a,
           schedule_a_category: propertyData.schedule_a_category
         };
@@ -1446,7 +1453,7 @@ export default function MinutesTemplateFormPage() {
                 </div>
               )}
 
-              {templateType === 'acceptance_of_property' && (
+              {(templateType === 'acceptance_of_property' || templateType === 'bill_of_sale' || templateType === 'assignment_of_personal_property' || templateType === 'general_assignment') && (
                 <div className="card-trust corner-mark p-6">
                   <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Property Details</h2>
                   <div className="grid md:grid-cols-2 gap-4">
@@ -1507,6 +1514,17 @@ export default function MinutesTemplateFormPage() {
                         placeholder="e.g., February 23, 2024"
                       />
                     </div>
+                    {templateType === 'assignment_of_personal_property' && (
+                      <div className="md:col-span-2">
+                        <Label className="label-trust">Appraiser Name (if appraised)</Label>
+                        <Input
+                          value={propertyData.appraiser_name || ''}
+                          onChange={(e) => setPropertyData({ ...propertyData, appraiser_name: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="e.g., Sotheby's Appraisal Services"
+                        />
+                      </div>
+                    )}
                     <div className="md:col-span-2 flex items-center gap-3 mt-2">
                       <Checkbox
                         checked={propertyData.add_to_schedule_a}

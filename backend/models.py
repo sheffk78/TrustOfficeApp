@@ -131,6 +131,10 @@ class MinutesTemplateType(str, Enum):
     tax_filing_authorization = "tax_filing_authorization"
     emergency_ratification = "emergency_ratification"
     conflict_of_interest = "conflict_of_interest"
+    # Conveyance documents
+    bill_of_sale = "bill_of_sale"
+    assignment_of_personal_property = "assignment_of_personal_property"
+    general_assignment = "general_assignment"
 
 class AssetStatus(str, Enum):
     active = "active"

@@ -992,6 +992,14 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
 
 """
     
+    # Enrich template_data with trust context for conveyance templates
+    # (bill_of_sale, assignment, general_assignment need trust_name, trustee_name, ein, state_code)
+    if template_type in ("bill_of_sale", "assignment_of_personal_property", "general_assignment"):
+        template_data.setdefault("trust_name", trust_name)
+        template_data.setdefault("trustee_name", ", ".join(trustee_names))
+        template_data.setdefault("ein", trust.get("ein", ""))
+        template_data.setdefault("state_code", trust.get("jurisdiction", "") or trust.get("state_code", ""))
+    
     # Generate template-specific content
     if template_type == "general_meeting":
         doc += generate_general_meeting_content(template_data)
@@ -1057,6 +1065,12 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
         doc += generate_emergency_ratification_content(template_data)
     elif template_type == "conflict_of_interest":
         doc += generate_conflict_of_interest_content(template_data)
+    elif template_type == "bill_of_sale":
+        doc += generate_bill_of_sale_content(template_data)
+    elif template_type == "assignment_of_personal_property":
+        doc += generate_assignment_of_personal_property_content(template_data)
+    elif template_type == "general_assignment":
+        doc += generate_general_assignment_content(template_data)
     
     # Add adjournment and certification
     doc += f"""
@@ -1733,6 +1747,195 @@ Effective Date: Immediately upon adoption
 
 """
     
+    return content
+
+def generate_bill_of_sale_content(data: dict) -> str:
+    """Generate bill of sale content for tangible personal property transfer."""
+    grantor = data.get("grantor_name", "[Grantor]")
+    trust_name = data.get("trust_name", "[Trust Name]")
+    trustee = data.get("trustee_name", "[Trustee]")
+    description = data.get("property_description", "[Description]")
+    identifier = data.get("property_identifier", "N/A")
+    location = data.get("property_location", "N/A")
+    value = data.get("property_value")
+    conveyance_date = data.get("conveyance_date", "[Date]")
+    ein = data.get("ein", "[EIN]")
+    state_code = data.get("state_code", "[State]")
+
+    value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
+
+    content = f"""BILL OF SALE
+
+WHEREAS, {grantor} ("Grantor") is the lawful owner of the following described personal property:
+
+    Description: {description}
+    Identifier: {identifier}
+    Location: {location}
+
+NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Grantor does hereby BARGAIN, SELL, GRANT, ASSIGN, TRANSFER, and CONVEY unto {trust_name} ("Trust"), the following described personal property:
+
+    {description}
+    Identifier: {identifier}
+
+TO HAVE AND TO HOLD said property unto the Trust, its successors and assigns, forever.
+
+Grantor warrants that Grantor is the lawful owner of said property, that the same is free from all encumbrances and liens, and that Grantor has full right and authority to convey the same.
+
+This Bill of Sale is executed in conjunction with the trust's acceptance resolution dated {conveyance_date}.
+
+AS-IS: Said property is conveyed "as-is" and "where-is" without any warranty, express or implied, except as expressly stated herein.
+
+GRANTOR:
+
+___________________________________________
+{grantor}, Grantor
+
+Date: {conveyance_date}
+
+TRUSTEE ACKNOWLEDGMENT OF RECEIPT:
+
+___________________________________________
+{trustee}, Trustee of {trust_name}
+
+Date: {conveyance_date}
+
+NOTARY ACKNOWLEDGMENT:
+
+State of {state_code}
+County of _________________
+
+On this _____ day of ____________, 20___, before me personally appeared {grantor}, known to me to be the person whose name is subscribed to the foregoing instrument, and acknowledged that he/she executed the same for the purposes therein contained.
+
+___________________________________________
+Notary Public
+My Commission Expires: _________________
+
+"""
+    return content
+
+def generate_assignment_of_personal_property_content(data: dict) -> str:
+    """Generate assignment of personal property content for artwork, jewelry, collectibles."""
+    grantor = data.get("grantor_name", "[Grantor]")
+    trust_name = data.get("trust_name", "[Trust Name]")
+    trustee = data.get("trustee_name", "[Trustee]")
+    description = data.get("property_description", "[Description]")
+    identifier = data.get("property_identifier", "N/A")
+    location = data.get("property_location", "N/A")
+    value = data.get("property_value")
+    appraiser_name = data.get("appraiser_name", "")
+    conveyance_date = data.get("conveyance_date", "[Date]")
+    ein = data.get("ein", "[EIN]")
+    state_code = data.get("state_code", "[State]")
+
+    value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
+    appraiser_text = f"\n    Appraised by: {appraiser_name}" if appraiser_name else ""
+
+    content = f"""ASSIGNMENT AND CONVEYANCE OF PERSONAL PROPERTY
+
+WHEREAS, {grantor} ("Assignor") is the lawful owner of the following described personal property:
+
+    Description: {description}
+    Identifier: {identifier}
+    Location: {location}
+    Appraised value: {value_text}{appraiser_text}
+
+NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Assignor does hereby ASSIGN, TRANSFER, CONVEY, and DELIVER unto {trust_name} ("Trust"), all of Assignor's right, title, and interest in and to the following described personal property:
+
+    {description}
+    Identifier: {identifier}
+
+TO HAVE AND TO HOLD said property unto the Trust, its successors and assigns, forever.
+
+Assignor warrants that Assignor is the lawful owner of said property, that the same is free from all encumbrances and liens, and that Assignor has full right and authority to assign and convey the same.
+
+This Assignment is executed in conjunction with the trust's acceptance resolution dated {conveyance_date}.
+
+ASSIGNOR:
+
+___________________________________________
+{grantor}, Assignor
+
+Date: {conveyance_date}
+
+TRUSTEE ACKNOWLEDGMENT OF RECEIPT:
+
+___________________________________________
+{trustee}, Trustee of {trust_name}
+
+Date: {conveyance_date}
+
+NOTARY ACKNOWLEDGMENT:
+
+State of {state_code}
+County of _________________
+
+On this _____ day of ____________, 20___, before me personally appeared {grantor}, known to me to be the person whose name is subscribed to the foregoing instrument, and acknowledged that he/she executed the same for the purposes therein contained.
+
+___________________________________________
+Notary Public
+My Commission Expires: _________________
+
+"""
+    return content
+
+def generate_general_assignment_content(data: dict) -> str:
+    """Generate general assignment content for intangible assets."""
+    grantor = data.get("grantor_name", "[Grantor]")
+    trust_name = data.get("trust_name", "[Trust Name]")
+    trustee = data.get("trustee_name", "[Trustee]")
+    description = data.get("property_description", "[Description]")
+    identifier = data.get("property_identifier", "N/A")
+    value = data.get("property_value")
+    conveyance_date = data.get("conveyance_date", "[Date]")
+    ein = data.get("ein", "[EIN]")
+    state_code = data.get("state_code", "[State]")
+
+    value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
+
+    content = f"""GENERAL ASSIGNMENT OF ASSETS
+
+WHEREAS, {grantor} ("Assignor") is the lawful owner of the following described assets:
+
+    Description: {description}
+    Identifier: {identifier}
+
+NOW, THEREFORE, for and in consideration of {value_text}, the receipt and sufficiency of which is hereby acknowledged, Assignor does hereby ASSIGN, TRANSFER, and CONVEY unto {trust_name} ("Trust"), all of Assignor's right, title, and interest in and to the following described assets:
+
+    {description}
+    Identifier: {identifier}
+
+TO HAVE AND TO HOLD said assets unto the Trust, its successors and assigns, forever.
+
+Assignor warrants that Assignor is the lawful owner of said assets, that the same is free from all encumbrances and liens, and that Assignor has full right and authority to assign and convey the same.
+
+This General Assignment is executed in conjunction with the trust's acceptance resolution dated {conveyance_date}.
+
+ASSIGNOR:
+
+___________________________________________
+{grantor}, Assignor
+
+Date: {conveyance_date}
+
+TRUSTEE ACKNOWLEDGMENT OF RECEIPT:
+
+___________________________________________
+{trustee}, Trustee of {trust_name}
+
+Date: {conveyance_date}
+
+NOTARY ACKNOWLEDGMENT:
+
+State of {state_code}
+County of _________________
+
+On this _____ day of ____________, 20___, before me personally appeared {grantor}, known to me to be the person whose name is subscribed to the foregoing instrument, and acknowledged that he/she executed the same for the purposes therein contained.
+
+___________________________________________
+Notary Public
+My Commission Expires: _________________
+
+"""
     return content
 
 def generate_disposition_content(data: dict) -> str:
@@ -3660,8 +3863,9 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
     except Exception:
         pass
     
-    # If accepting property and add_to_schedule_a is true, add to Schedule A
-    if template.template_type.value == "acceptance_of_property" and template.template_data.get("add_to_schedule_a"):
+    # If accepting property or conveying property and add_to_schedule_a is true, add to Schedule A
+    CONVEYANCE_TEMPLATES = {"acceptance_of_property", "bill_of_sale", "assignment_of_personal_property", "general_assignment"}
+    if template.template_type.value in CONVEYANCE_TEMPLATES and template.template_data.get("add_to_schedule_a"):
         category = template.template_data.get("schedule_a_category", "other_property")
         asset_doc = {
             "item_id": f"asset_{uuid.uuid4().hex[:12]}",
