@@ -120,7 +120,24 @@ export default function SettingsPage() {
     tax_year_end_month: selectedTrust?.tax_year_end_month?.toString() || '',
     tax_year_end_day: selectedTrust?.tax_year_end_day?.toString() || '',
     is_fiscal_year: selectedTrust?.is_fiscal_year || false,
-    trustees: selectedTrust?.trustees || ''
+    trustees: selectedTrust?.trustees || '',
+    successor_trustee_name: selectedTrust?.successor_trustee_name || '',
+    successor_trustee_email: selectedTrust?.successor_trustee_email || '',
+    successor_trustee_phone: selectedTrust?.successor_trustee_phone || '',
+    successor_trustee_relationship: selectedTrust?.successor_trustee_relationship || '',
+    successor_trustee_notes: selectedTrust?.successor_trustee_notes || '',
+    grantor_name: selectedTrust?.grantor_name || '',
+    attorney_name: selectedTrust?.attorney_name || '',
+    attorney_phone: selectedTrust?.attorney_phone || '',
+    attorney_email: selectedTrust?.attorney_email || '',
+    cpa_name: selectedTrust?.cpa_name || '',
+    cpa_phone: selectedTrust?.cpa_phone || '',
+    cpa_email: selectedTrust?.cpa_email || '',
+    financial_advisor_name: selectedTrust?.financial_advisor_name || '',
+    financial_advisor_phone: selectedTrust?.financial_advisor_phone || '',
+    financial_advisor_email: selectedTrust?.financial_advisor_email || '',
+    successor_instructions: selectedTrust?.successor_instructions || '',
+    document_location: selectedTrust?.document_location || '',
   });
 
   // Governance: Spending Threshold state (synced from selectedTrust.governance_settings)
@@ -188,7 +205,24 @@ export default function SettingsPage() {
         tax_year_end_month: selectedTrust.tax_year_end_month?.toString() || '',
         tax_year_end_day: selectedTrust.tax_year_end_day?.toString() || '',
         is_fiscal_year: selectedTrust.is_fiscal_year || false,
-        trustees: trustees
+        trustees: trustees,
+        successor_trustee_name: selectedTrust.successor_trustee_name || '',
+        successor_trustee_email: selectedTrust.successor_trustee_email || '',
+        successor_trustee_phone: selectedTrust.successor_trustee_phone || '',
+        successor_trustee_relationship: selectedTrust.successor_trustee_relationship || '',
+        successor_trustee_notes: selectedTrust.successor_trustee_notes || '',
+        grantor_name: selectedTrust.grantor_name || '',
+        attorney_name: selectedTrust.attorney_name || '',
+        attorney_phone: selectedTrust.attorney_phone || '',
+        attorney_email: selectedTrust.attorney_email || '',
+        cpa_name: selectedTrust.cpa_name || '',
+        cpa_phone: selectedTrust.cpa_phone || '',
+        cpa_email: selectedTrust.cpa_email || '',
+        financial_advisor_name: selectedTrust.financial_advisor_name || '',
+        financial_advisor_phone: selectedTrust.financial_advisor_phone || '',
+        financial_advisor_email: selectedTrust.financial_advisor_email || '',
+        successor_instructions: selectedTrust.successor_instructions || '',
+        document_location: selectedTrust.document_location || '',
       });
       // Sync spending threshold from trust governance_settings
       const st = selectedTrust.governance_settings?.spending_threshold;
@@ -1293,6 +1327,176 @@ export default function SettingsPage() {
                       Fiscal year — tax deadlines are calculated from this date.
                     </p>
                   )}
+                </div>
+
+                {/* Successor Trustee */}
+                <div className="p-4 border border-navy/10 bg-navy/5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <Shield className="w-5 h-5 text-navy mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-navy">Successor Trustee</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Designate who steps in if the trustee can no longer serve.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div data-section="successor-trustee" className="space-y-3">
+                    <div>
+                      <Label className="label-trust">Successor Trustee Name</Label>
+                      <Input
+                        type="text"
+                        value={trustData.successor_trustee_name}
+                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_name: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Who steps in if you can't serve?"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">The person named to take over if the trustee dies or becomes incapacitated</p>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Successor Trustee Email</Label>
+                      <Input
+                        type="email"
+                        value={trustData.successor_trustee_email}
+                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_email: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Successor Trustee Phone</Label>
+                      <Input
+                        type="tel"
+                        value={trustData.successor_trustee_phone}
+                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_phone: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="(555) 123-4567"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Relationship to Grantor</Label>
+                      <Input
+                        type="text"
+                        value={trustData.successor_trustee_relationship}
+                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_relationship: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Spouse, adult child, sibling, etc."
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Notes</Label>
+                      <Input
+                        type="text"
+                        value={trustData.successor_trustee_notes}
+                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_notes: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Any special instructions about the successor trustee"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Grantor */}
+                <div className="p-4 border border-navy/10 bg-navy/5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <Users className="w-5 h-5 text-navy mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-navy">Grantor</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        The person who created the trust.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div data-section="grantor" className="space-y-3">
+                    <div>
+                      <Label className="label-trust">Grantor Name</Label>
+                      <Input
+                        type="text"
+                        value={trustData.grantor_name}
+                        onChange={(e) => setTrustData({ ...trustData, grantor_name: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Who created the trust?"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">The person who established the trust</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key Contacts */}
+                <div className="p-4 border border-navy/10 bg-navy/5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <Mail className="w-5 h-5 text-navy mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-navy">Key Contacts</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Trusted professionals associated with this trust.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div data-section="key-contacts" className="space-y-4">
+                    <div>
+                      <Label className="label-trust">Trust Attorney</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-1">
+                        <Input type="text" value={trustData.attorney_name} onChange={(e) => setTrustData({ ...trustData, attorney_name: e.target.value })} className="input-trust" placeholder="Name" />
+                        <Input type="tel" value={trustData.attorney_phone} onChange={(e) => setTrustData({ ...trustData, attorney_phone: e.target.value })} className="input-trust" placeholder="Phone" />
+                        <Input type="email" value={trustData.attorney_email} onChange={(e) => setTrustData({ ...trustData, attorney_email: e.target.value })} className="input-trust" placeholder="Email" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="label-trust">CPA / Tax Preparer</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-1">
+                        <Input type="text" value={trustData.cpa_name} onChange={(e) => setTrustData({ ...trustData, cpa_name: e.target.value })} className="input-trust" placeholder="Name" />
+                        <Input type="tel" value={trustData.cpa_phone} onChange={(e) => setTrustData({ ...trustData, cpa_phone: e.target.value })} className="input-trust" placeholder="Phone" />
+                        <Input type="email" value={trustData.cpa_email} onChange={(e) => setTrustData({ ...trustData, cpa_email: e.target.value })} className="input-trust" placeholder="Email" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Financial Advisor</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-1">
+                        <Input type="text" value={trustData.financial_advisor_name} onChange={(e) => setTrustData({ ...trustData, financial_advisor_name: e.target.value })} className="input-trust" placeholder="Name" />
+                        <Input type="tel" value={trustData.financial_advisor_phone} onChange={(e) => setTrustData({ ...trustData, financial_advisor_phone: e.target.value })} className="input-trust" placeholder="Phone" />
+                        <Input type="email" value={trustData.financial_advisor_email} onChange={(e) => setTrustData({ ...trustData, financial_advisor_email: e.target.value })} className="input-trust" placeholder="Email" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Successor Instructions */}
+                <div className="p-4 border border-navy/10 bg-navy/5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <FileText className="w-5 h-5 text-navy mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-navy">Successor Instructions</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        A letter of guidance and document location for your successor trustee.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div data-section="successor-instructions" className="space-y-3">
+                    <div>
+                      <Label className="label-trust">Letter of Guidance for Successor Trustee</Label>
+                      <textarea
+                        value={trustData.successor_instructions}
+                        onChange={(e) => setTrustData({ ...trustData, successor_instructions: e.target.value })}
+                        className="mt-1 w-full rounded border border-input bg-background px-3 py-2 text-sm min-h-[120px]"
+                        placeholder="Personal wishes, priorities, values, and guidance for your successor trustee. This is your voice to them."
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">This will be included in the Successor Trustee Packet</p>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Physical Document Location</Label>
+                      <Input
+                        type="text"
+                        value={trustData.document_location}
+                        onChange={(e) => setTrustData({ ...trustData, document_location: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Where are the original paper documents stored? (safe deposit box, filing cabinet, etc.)"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Governance Settings — Spending Threshold */}

@@ -94,6 +94,16 @@ export default function AuthorityPage() {
           authorityClause: null,
         });
       }
+      // Add successor trustee
+      if (trustData.successor_trustee_name) {
+        people.push({
+          name: trustData.successor_trustee_name,
+          role: 'Successor Trustee',
+          source: 'Trust',
+          authority: 'contingent',
+          authorityClause: trustData.successor_trustee_notes || ''
+        });
+      }
     }
 
     // From entity-level data

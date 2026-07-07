@@ -38,7 +38,8 @@ import {
   BarChart3,
   Bot,
   GraduationCap,
-  Briefcase
+  Briefcase,
+  UserCheck
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ const NAV_GROUPS = [
     { path: '/authority', icon: Gavel, label: 'Authority' },
     { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
     { path: '/binder', icon: NotebookTabs, label: 'Binder Tools' },
+    { path: '/successor-packet', icon: UserCheck, label: 'Successor Packet' },
   ]},
   { key: 'score', icon: HeartPulse, label: 'Trust Health', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },

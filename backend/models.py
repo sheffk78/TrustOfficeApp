@@ -243,6 +243,23 @@ class TrustCreate(BaseModel):
     start_date: Optional[str] = None
     trustees: Optional[str] = None
     authority_clause: Optional[str] = None
+    successor_trustee_name: Optional[str] = None
+    successor_trustee_email: Optional[str] = None
+    successor_trustee_phone: Optional[str] = None
+    successor_trustee_relationship: Optional[str] = None
+    successor_trustee_notes: Optional[str] = None
+    grantor_name: Optional[str] = None
+    attorney_name: Optional[str] = None
+    attorney_phone: Optional[str] = None
+    attorney_email: Optional[str] = None
+    cpa_name: Optional[str] = None
+    cpa_phone: Optional[str] = None
+    cpa_email: Optional[str] = None
+    financial_advisor_name: Optional[str] = None
+    financial_advisor_phone: Optional[str] = None
+    financial_advisor_email: Optional[str] = None
+    successor_instructions: Optional[str] = None
+    document_location: Optional[str] = None
     ein: Optional[str] = None
     state_code: Optional[str] = None
     tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
@@ -284,6 +301,23 @@ class TrustUpdate(BaseModel):
     start_date: Optional[str] = None
     trustees: Optional[str] = None
     authority_clause: Optional[str] = None
+    successor_trustee_name: Optional[str] = None
+    successor_trustee_email: Optional[str] = None
+    successor_trustee_phone: Optional[str] = None
+    successor_trustee_relationship: Optional[str] = None
+    successor_trustee_notes: Optional[str] = None
+    grantor_name: Optional[str] = None
+    attorney_name: Optional[str] = None
+    attorney_phone: Optional[str] = None
+    attorney_email: Optional[str] = None
+    cpa_name: Optional[str] = None
+    cpa_phone: Optional[str] = None
+    cpa_email: Optional[str] = None
+    financial_advisor_name: Optional[str] = None
+    financial_advisor_phone: Optional[str] = None
+    financial_advisor_email: Optional[str] = None
+    successor_instructions: Optional[str] = None
+    document_location: Optional[str] = None
     ein: Optional[str] = None
     state_code: Optional[str] = None
     tax_year_end_month: Optional[int] = Field(None, ge=1, le=12)
@@ -325,6 +359,23 @@ class TrustResponse(BaseModel):
     trustees: Optional[str] = None
     start_date: Optional[str] = None
     authority_clause: Optional[str] = None
+    successor_trustee_name: Optional[str] = None
+    successor_trustee_email: Optional[str] = None
+    successor_trustee_phone: Optional[str] = None
+    successor_trustee_relationship: Optional[str] = None
+    successor_trustee_notes: Optional[str] = None
+    grantor_name: Optional[str] = None
+    attorney_name: Optional[str] = None
+    attorney_phone: Optional[str] = None
+    attorney_email: Optional[str] = None
+    cpa_name: Optional[str] = None
+    cpa_phone: Optional[str] = None
+    cpa_email: Optional[str] = None
+    financial_advisor_name: Optional[str] = None
+    financial_advisor_phone: Optional[str] = None
+    financial_advisor_email: Optional[str] = None
+    successor_instructions: Optional[str] = None
+    document_location: Optional[str] = None
     role: Optional[str] = "Trustee"
     # Additional fields for tax and state compliance
     ein: Optional[str] = None
@@ -998,6 +1049,7 @@ class OnboardingState(BaseModel):
     minutes_generated: bool = False
     calendar_set: bool = False
     checklist_dismissed: bool = False
+    successor_trustee_added: bool = False
 
 
 # ==================== BENEFICIARY DASHBOARD MODELS ====================

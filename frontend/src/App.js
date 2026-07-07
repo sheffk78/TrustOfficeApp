@@ -39,6 +39,7 @@ import CommunicationsPage from "@/pages/CommunicationsPage";
 import VaultPage from "@/pages/VaultPage";
 import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import PrintableBinderPage from "@/pages/PrintableBinderPage";
+import SuccessorPacketPage from "@/pages/SuccessorPacketPage";
 import TrustAssistantPage from "@/pages/TrustAssistantPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -323,6 +324,11 @@ const AppRouter = () => {
       <Route path="/binder" element={
         <SubscriptionProtectedRoute>
           <PrintableBinderPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/successor-packet" element={
+        <SubscriptionProtectedRoute>
+          <SuccessorPacketPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/admin-kits" element={

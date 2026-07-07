@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
-import { 
-  FileText, 
+import {
+  FileText,
   DollarSign,
   Receipt,
   Calendar,
@@ -38,6 +38,7 @@ import {
   ClipboardList,
   GraduationCap,
   Shield,
+  UserCheck,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import PageHelpButton from '@/components/PageHelpButton';
@@ -293,13 +294,21 @@ export default function DashboardPage() {
         icon: FileUp,
         action: '/vault'
       },
-      { 
-        id: 'ein_doc', 
+      {
+        id: 'ein_doc',
         label: 'Add EIN Letter to Vault',
         description: 'The IRS confirmation letter (CP575) for your EIN. Skip if you don\'t have it yet.',
         done: onboarding.ein_doc_uploaded,
         icon: Upload,
         action: '/vault'
+      },
+      {
+        id: 'successor_trustee',
+        label: 'Designate a Successor Trustee',
+        description: 'Ensure someone can step in if the trustee can no longer serve.',
+        done: onboarding.successor_trustee_added,
+        icon: UserCheck,
+        action: '/settings#successor-trustee'
       }
     ];
     

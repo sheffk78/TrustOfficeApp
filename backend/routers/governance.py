@@ -738,7 +738,8 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
             "assets_added": False,
             "minutes_generated": False,
             "calendar_set": False,
-            "checklist_dismissed": False
+            "checklist_dismissed": False,
+            "successor_trustee_added": False
         }
         await db.user_onboarding.insert_one(existing)
     
@@ -756,6 +757,9 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
                 updates["formation_date_added"] = has_formation
             if has_ein != existing.get("ein_entered"):
                 updates["ein_entered"] = has_ein
+            has_successor = bool(trust.get("successor_trustee_name"))
+            if has_successor != existing.get("successor_trustee_added"):
+                updates["successor_trustee_added"] = has_successor
         
         # Check document uploads in vault
         trust_doc_count = await db.vault_documents.count_documents({
@@ -935,7 +939,7 @@ async def get_onboarding(user: dict = Depends(get_current_user)):
 @router.patch("/onboarding")
 async def update_onboarding(updates: dict, user: dict = Depends(get_current_user)):
     """Update onboarding state"""
-    allowed_fields = ["formation_date_added", "ein_entered", "trust_doc_uploaded", "ein_doc_uploaded", "beneficiaries_added", "assets_added", "minutes_generated", "calendar_set", "checklist_dismissed"]
+    allowed_fields = ["formation_date_added", "ein_entered", "trust_doc_uploaded", "ein_doc_uploaded", "beneficiaries_added", "assets_added", "minutes_generated", "calendar_set", "checklist_dismissed", "successor_trustee_added"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
