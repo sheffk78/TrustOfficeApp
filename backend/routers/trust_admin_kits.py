@@ -151,7 +151,7 @@ async def _gather_trust_data(trust_id: str, user_id: str) -> Dict[str, Any]:
     # 3. Vault documents — exclude file_content (large BSON binary)
     vault_docs: List[Dict[str, Any]] = []
     async for doc in db.vault_documents.find(
-        {"user_id": user_id},
+        {"user_id": user_id, "trust_id": trust_id},
         {"_id": 0, "file_content": 0},
     ):
         vault_docs.append({
@@ -377,30 +377,27 @@ async def generate_kit(
     if not trust_id:
         raise HTTPException(status_code=400, detail="trust_id is required")
 
-    # Validate required user inputs
+    # Rate limit — check early before any expensive DB/AI work
+    _check_rate_limit(user["user_id"])
+
+    # Gather trust data once (used for validation defaults + AI generation)
+    gathered = await _gather_trust_data(trust_id, user["user_id"])
+
+    # Validate required user inputs — auto-fill from gathered data where possible
     kit_def = KIT_TYPES[kit_type]
     missing = []
     for field in kit_def["user_fields"]:
         if field.get("required") and not user_inputs.get(field["key"]):
-            # Field may have a default_from that we can auto-fill
             default_from = field.get("default_from")
-            if default_from:
-                gathered_preview = await _gather_trust_data(trust_id, user["user_id"])
-                if gathered_preview.get(default_from):
-                    user_inputs.setdefault(field["key"], gathered_preview[default_from])
-                    continue
+            if default_from and gathered.get(default_from):
+                user_inputs.setdefault(field["key"], gathered[default_from])
+                continue
             missing.append(field["label"])
     if missing:
         raise HTTPException(
             status_code=422,
             detail=f"Missing required inputs: {', '.join(missing)}",
         )
-
-    # Rate limit
-    _check_rate_limit(user["user_id"])
-
-    # Gather fresh trust data
-    gathered = await _gather_trust_data(trust_id, user["user_id"])
 
     state_code = gathered.get("state_code")
     if not state_code:
@@ -417,7 +414,7 @@ async def generate_kit(
         raw_response = await ai_sonnet(
             system_prompt,
             user_content,
-            max_tokens=4000,
+            max_tokens=8000,
             temperature=0.3,
         )
     except AIClientError as e:
@@ -434,6 +431,18 @@ async def generate_kit(
         ) from e
 
     generated_content = _parse_ai_kit_response(raw_response)
+
+    # Validate AI output has the minimum required structure
+    required_keys = {"kit_title", "summary", "instructions", "forms"}
+    if not required_keys.issubset(generated_content.keys()):
+        logger.error(
+            "AI returned incomplete kit structure for user=%s kit=%s. Keys: %s",
+            user["user_id"], kit_type, list(generated_content.keys()),
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="The AI response was incomplete. Please try generating the kit again.",
+        )
 
     # Compose kit document
     now = datetime.now(timezone.utc).isoformat()

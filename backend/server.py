@@ -590,6 +590,11 @@ async def startup_event():
         # Webhook event idempotency index (prevents duplicate event processing)
         await db.webhook_events.create_index("event_id", unique=True)
         
+        # Trust Admin Kits indexes
+        await db.trust_admin_kits.create_index("kit_id", unique=True)
+        await db.trust_admin_kits.create_index([("user_id", 1), ("trust_id", 1)])
+        await db.trust_admin_kits.create_index([("user_id", 1), ("created_at", -1)])
+        
         logger.info("Database indexes created/verified successfully")
         
         # Ensure primary admin account exists

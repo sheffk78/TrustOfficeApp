@@ -21,8 +21,6 @@ const KIT_ICONS = {
   Car, Building, Home, FileText, Shield, Briefcase
 };
 
-const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
-
 export default function TrustAdminKitsPage() {
   const { user, trusts, selectedTrust } = useAuth();
   const trustId = selectedTrust?.trust_id;
@@ -41,7 +39,7 @@ export default function TrustAdminKitsPage() {
 
   // Load kit types on mount
   useEffect(() => {
-    fetchWithAuth(`${API_BASE}/api/trust-admin-kits/types`)
+    fetchWithAuth(`/trust-admin-kits/types`)
       .then(res => res.json())
       .then(data => { setKitTypes(data.kit_types || []); })
       .catch(err => { console.error('Failed to load kit types', err); });
@@ -51,7 +49,7 @@ export default function TrustAdminKitsPage() {
   const loadKits = useCallback(() => {
     if (!trustId) return;
     setKitsLoading(true);
-    fetchWithAuth(`${API_BASE}/api/trust-admin-kits?trust_id=${trustId}`)
+    fetchWithAuth(`/trust-admin-kits?trust_id=${trustId}`)
       .then(res => res.json())
       .then(data => { setExistingKits(data.kits || []); })
       .catch(err => { console.error('Failed to load kits', err); })
@@ -73,7 +71,7 @@ export default function TrustAdminKitsPage() {
     setFormInputs({});
     try {
       const res = await fetchWithAuth(
-        `${API_BASE}/api/trust-admin-kits/preview/${kitType}?trust_id=${trustId}`
+        `/trust-admin-kits/preview/${kitType}?trust_id=${trustId}`
       );
       if (!res.ok) {
         const err = await res.json();
@@ -88,7 +86,7 @@ export default function TrustAdminKitsPage() {
       });
       setFormInputs(initialInputs);
     } catch (err) {
-      toast.error(err.message || 'Failed to load kit preview');
+      showError(toast, err, { operation: 'load_kit_preview', page: 'TrustAdminKits' });
       setView('select');
     } finally {
       setPreviewLoading(false);
@@ -114,7 +112,7 @@ export default function TrustAdminKitsPage() {
     if (!selectedKitType || !trustId) return;
     setGenerating(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE}/api/trust-admin-kits/generate`, {
+      const res = await fetchWithAuth(`/trust-admin-kits/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -133,7 +131,7 @@ export default function TrustAdminKitsPage() {
       toast.success('Kit generated successfully');
       loadKits();
     } catch (err) {
-      toast.error(err.message || 'Failed to generate kit');
+      showError(toast, err, { operation: 'generate_kit', page: 'TrustAdminKits' });
     } finally {
       setGenerating(false);
     }
@@ -142,13 +140,13 @@ export default function TrustAdminKitsPage() {
   // View an existing kit
   const viewKit = async (kitId) => {
     try {
-      const res = await fetchWithAuth(`${API_BASE}/api/trust-admin-kits/${kitId}`);
+      const res = await fetchWithAuth(`/trust-admin-kits/${kitId}`);
       if (!res.ok) throw new Error('Failed to load kit');
       const kit = await res.json();
       setCurrentKit(kit);
       setView('detail');
     } catch (err) {
-      toast.error(err.message);
+      showError(toast, err, { operation: 'view_kit', page: 'TrustAdminKits' });
     }
   };
 
@@ -156,14 +154,17 @@ export default function TrustAdminKitsPage() {
   const deleteKit = async (kitId) => {
     if (!window.confirm('Delete this kit?')) return;
     try {
-      const res = await fetchWithAuth(`${API_BASE}/api/trust-admin-kits/${kitId}`, {
+      const res = await fetchWithAuth(`/trust-admin-kits/${kitId}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to delete');
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.detail || 'Failed to delete');
+      }
       toast.success('Kit deleted');
       loadKits();
     } catch (err) {
-      toast.error(err.message);
+      showError(toast, err, { operation: 'delete_kit', page: 'TrustAdminKits' });
     }
   };
 
@@ -392,9 +393,8 @@ export default function TrustAdminKitsPage() {
                         </label>
                         <input
                           type="text"
-                          value={isAutoFilled ? field.default : (formInputs[key] || '')}
+                          value={formInputs[key] || ''}
                           onChange={(e) => updateInput(key, e.target.value)}
-                          readOnly={isAutoFilled}
                           placeholder={field.placeholder || ''}
                           className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors ${
                             isAutoFilled
@@ -404,7 +404,7 @@ export default function TrustAdminKitsPage() {
                         />
                         {isAutoFilled && (
                           <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> From your trust profile
+                            <CheckCircle2 className="w-3 h-3" /> From your trust profile (editable)
                           </p>
                         )}
                       </div>
