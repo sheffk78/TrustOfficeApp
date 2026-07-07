@@ -149,7 +149,7 @@ async def get_beneficiary_dashboard(
     # Aggregate by holder (use composite key to avoid merging different entities with same name)
     holder_map = {}
     for cert in certificates:
-        holder_key = (cert["holder_name"], cert.get("holder_identifier") or "")
+        holder_key = (cert["holder_name"], cert.get("holder_identifier") or "", cert.get("holder_type") or "individual")
         holder = cert["holder_name"]
         if holder_key not in holder_map:
             holder_map[holder_key] = {

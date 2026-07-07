@@ -212,6 +212,7 @@ export default function BeneficiariesPage() {
       setCertificateForm({
         holder_name: editing.holder_name,
         holder_identifier: editing.holder_identifier || '',
+        holder_type: editing.holder_type || 'individual',
         email: editing.email || '',
         phone: editing.phone || '',
         units: editing.units.toString(),
@@ -248,7 +249,7 @@ export default function BeneficiariesPage() {
   const handleSaveSettings = async () => {
     try {
       const response = await fetchWithAuth('/trust-units/settings', {
-        method: 'PUT',
+        method: 'PATCH',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
           ...settingsForm
@@ -642,9 +643,9 @@ export default function BeneficiariesPage() {
                       ) : (
                         <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
                           {overviewData.beneficiaries.map((ben, index) => (
-                            <div key={`${ben.holder_name}-${ben.holder_identifier || ''}`} data-testid={`beneficiary-row-${index}`}>
+                            <div key={`${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}`} data-testid={`beneficiary-row-${index}`}>
                               <button
-                                onClick={() => setExpandedHolder(expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}` ? null : `${ben.holder_name}-${ben.holder_identifier || ''}`)}
+                                onClick={() => setExpandedHolder(expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}` ? null : `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}`)}
                                 className="w-full p-4 flex items-center justify-between hover:bg-muted/20 transition-colors"
                               >
                                 <div className="flex items-center gap-4">
@@ -680,11 +681,11 @@ export default function BeneficiariesPage() {
                                     <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
                                     <p className="text-xs text-muted-foreground">ownership</p>
                                   </div>
-                                  {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}` ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                  {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}` ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                                 </div>
                               </button>
                               
-                              {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}` && (
+                              {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}` && (
                                 <div className="bg-muted/30 p-4 border-t border-border">
                                   <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
                                     {ben.certificate_count} Certificate{ben.certificate_count !== 1 ? 's' : ''}
