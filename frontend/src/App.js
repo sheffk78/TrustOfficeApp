@@ -48,6 +48,7 @@ import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { installGlobalErrorHandlers } from "@/utils/errors";
 import CoursePage from "@/pages/CoursePage";
+import TrustAdminKitsPage from "@/pages/TrustAdminKitsPage";
 
 // Install global uncaught error handlers once at app load
 // Reports to /api/report-error -> Discord alert (see utils/errors.js)
@@ -322,6 +323,11 @@ const AppRouter = () => {
       <Route path="/binder" element={
         <SubscriptionProtectedRoute>
           <PrintableBinderPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/admin-kits" element={
+        <SubscriptionProtectedRoute>
+          <TrustAdminKitsPage />
         </SubscriptionProtectedRoute>
       } />
       {/* Settings and Billing are accessible without active subscription */}

@@ -92,6 +92,7 @@ from routers.notifications import router as notifications_router
 from routers.assessments import router as assessments_router
 from routers.chat import router as chat_router  # Trust Assistant
 from routers.trust_doc_analysis import router as trust_doc_analysis_router
+from routers.trust_admin_kits import router as trust_admin_kits_router
 
 # Error alerting: global exception handler + frontend error reporting endpoint
 from error_alerting import ErrorReporter
@@ -387,6 +388,8 @@ app.include_router(assessments_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 # Trust Document Intelligence — AI extraction from trust documents
 app.include_router(trust_doc_analysis_router, prefix="/api")
+# Trust Administration Kits — auto-gathered paperwork packets (vehicle retitle, bank, real estate, etc.)
+app.include_router(trust_admin_kits_router, prefix="/api")
 # Frontend error reporting endpoint (POST /api/report-error)
 app.include_router(error_reports_router, prefix="/api")
 
