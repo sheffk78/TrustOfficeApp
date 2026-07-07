@@ -1536,7 +1536,7 @@ export default function SettingsPage() {
                     <div>
                       <Label className="text-xs text-muted-foreground mb-2 block">In-Scope Transaction Classifications</Label>
                       <div className="flex flex-wrap gap-2">
-                        {CLASSIFICATIONS.map(cls => {
+                        {GOVERNANCE_CLASSIFICATIONS.map(cls => {
                           const selected = (spendingThreshold.scope_classifications || []).includes(cls);
                           return (
                             <button
