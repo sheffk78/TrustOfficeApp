@@ -36,6 +36,7 @@ export default function TrustAdminKitsPage() {
   const [currentKit, setCurrentKit] = useState(null);
   const [existingKits, setExistingKits] = useState([]);
   const [kitsLoading, setKitsLoading] = useState(true);
+  const [viewKitLoading, setViewKitLoading] = useState(false);
 
   // Load kit types on mount
   useEffect(() => {
@@ -139,6 +140,7 @@ export default function TrustAdminKitsPage() {
 
   // View an existing kit
   const viewKit = async (kitId) => {
+    setViewKitLoading(true);
     try {
       const res = await fetchWithAuth(`/trust-admin-kits/${kitId}`);
       if (!res.ok) throw new Error('Failed to load kit');
@@ -147,6 +149,8 @@ export default function TrustAdminKitsPage() {
       setView('detail');
     } catch (err) {
       showError(toast, err, { operation: 'view_kit', page: 'TrustAdminKits' });
+    } finally {
+      setViewKitLoading(false);
     }
   };
 
@@ -233,6 +237,11 @@ export default function TrustAdminKitsPage() {
       ) : existingKits.length > 0 ? (
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-4">Your Generated Kits</h2>
+          {viewKitLoading && (
+            <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading kit…
+            </div>
+          )}
           {existingKits.map(kit => {
             const Icon = KIT_ICONS[kitTypes.find(k => k.kit_type === kit.kit_type)?.icon] || FileText;
             return (
@@ -451,6 +460,22 @@ export default function TrustAdminKitsPage() {
 
     return (
       <>
+        <style>{`
+          @media print {
+            /* Hide sidebar, mobile nav, and action buttons */
+            nav, [class*="MobileBottomNav"], [class*="sidebar"],
+            .page-header button, [class*="bottom-nav"] {
+              display: none !important;
+            }
+            /* Reset layout for print */
+            .flex.min-h-screen { display: block !important; }
+            .flex-1 { width: 100% !important; max-width: 100% !important; }
+            .page-content { padding: 0 !important; }
+            .max-w-3xl { max-width: 100% !important; }
+            /* Remove card shadows/borders for clean print */
+            [class*="Card"] { box-shadow: none !important; border: 1px solid #ccc !important; }
+          }
+        `}</style>
         <div className="page-header flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={backToSelect}>

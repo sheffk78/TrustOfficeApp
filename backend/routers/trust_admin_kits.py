@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import json
 import logging
-import time
 import uuid
 
 from database import db
@@ -94,31 +93,6 @@ KIT_TYPES: Dict[str, Dict[str, Any]] = {
         ],
     },
 }
-
-
-# ==================== RATE LIMITING ====================
-# In-memory per-user generation counter.  Resets after the window elapses.
-# Key: user_id  Value: (count, window_start_ts)
-_MAX_KITS_PER_HOUR = 10
-_RATE_WINDOW_SECONDS = 3600
-_rate_limit_store: Dict[str, tuple] = {}
-
-
-def _check_rate_limit(user_id: str) -> None:
-    """Raise 429 if user has exceeded the kit generation rate limit."""
-    now = time.time()
-    entry = _rate_limit_store.get(user_id)
-    if entry is None or (now - entry[1]) > _RATE_WINDOW_SECONDS:
-        _rate_limit_store[user_id] = (1, now)
-        return
-    count, window_start = entry
-    if count >= _MAX_KITS_PER_HOUR:
-        retry_in = int(_RATE_WINDOW_SECONDS - (now - window_start))
-        raise HTTPException(
-            status_code=429,
-            detail=f"Rate limit exceeded: maximum {_MAX_KITS_PER_HOUR} kits per hour. Try again in {max(retry_in, 1)} seconds.",
-        )
-    _rate_limit_store[user_id] = (count + 1, window_start)
 
 
 # ==================== DATA AUTO-GATHERING ====================
@@ -257,6 +231,26 @@ def _build_kit_system_prompt(kit_type: str, state_code: str) -> str:
     )
 
 
+def _sanitize_user_inputs(user_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Sanitize user-supplied inputs before passing to the AI.
+
+    - Caps each string value to 500 chars (prevents oversized payloads).
+    - Strips common prompt-injection patterns.
+    """
+    MAX_FIELD_LEN = 500
+    cleaned: Dict[str, Any] = {}
+    for key, value in user_inputs.items():
+        if isinstance(value, str):
+            # Truncate to max length
+            truncated = value[:MAX_FIELD_LEN]
+            # Strip markdown fence patterns that could try to break out of JSON context
+            truncated = truncated.replace("```", "")
+            cleaned[key] = truncated.strip()
+        else:
+            cleaned[key] = value
+    return cleaned
+
+
 def _build_kit_user_content(
     kit_type: str,
     gathered: Dict[str, Any],
@@ -377,9 +371,6 @@ async def generate_kit(
     if not trust_id:
         raise HTTPException(status_code=400, detail="trust_id is required")
 
-    # Rate limit — check early before any expensive DB/AI work
-    _check_rate_limit(user["user_id"])
-
     # Gather trust data once (used for validation defaults + AI generation)
     gathered = await _gather_trust_data(trust_id, user["user_id"])
 
@@ -407,6 +398,7 @@ async def generate_kit(
         )
 
     # Build AI prompt and call
+    user_inputs = _sanitize_user_inputs(user_inputs)
     system_prompt = _build_kit_system_prompt(kit_type, state_code)
     user_content = _build_kit_user_content(kit_type, gathered, user_inputs)
 

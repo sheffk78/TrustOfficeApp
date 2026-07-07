@@ -48,6 +48,9 @@ class RateLimitConfig:
         "/api/minutes-templates": (20, 60),    # 20 requests per minute
         "/api/trust-units/certificates": (20, 60),
         "/api/exports": (10, 60),
+
+        # Trust Admin Kit generation — AI-powered, expensive
+        "/api/trust-admin-kits/generate": (10, 3600),  # 10 kits per hour
         
         # Standard CRUD operations
         "default": (100, 60),                  # 100 requests per minute
