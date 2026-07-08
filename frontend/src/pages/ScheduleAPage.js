@@ -250,8 +250,8 @@ export default function ScheduleAPage() {
           loadAssets();
           loadSummary();
         } else {
-          const error = await response.json();
-          showError(toast, new Error(error.detail || 'Failed to dispose asset'), { operation: 'dispose', page: 'ScheduleA' });
+          const errBody = await response.json().catch(() => ({}));
+          showError(toast, new Error(errBody.detail || 'Failed to dispose asset'), { operation: 'dispose', page: 'ScheduleA' });
         }
       } catch (error) {
         showError(toast, error, { operation: 'dispose', page: 'ScheduleA' });
