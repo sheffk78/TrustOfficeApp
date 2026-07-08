@@ -7,6 +7,7 @@ import re
 
 from database import db
 from dependencies import get_current_user, require_write_access, auto_update_onboarding
+from trustee_utils import parse_trustees
 from models import (
     DistributionCreate, DistributionUpdate, DistributionResponse,
     DistributionApprove, DistributionStatusUpdate,
@@ -68,7 +69,7 @@ async def create_distribution(
     # Auto-populate trustee_name from trust if not provided
     trustee_name = dist.trustee_name
     if not trustee_name:
-        trustee_name = trust.get("trustees", "").split(",")[0].strip() if trust.get("trustees") else ""
+        trustee_name = parse_trustees(trust.get("trustees", ""))[0] if trust.get("trustees") else ""
     
     dist_doc = {
         "distribution_id": dist_id,
@@ -250,7 +251,7 @@ async def approve_distribution(
     # Resolve trustee name from the trust record for human-readable audit trail
     trust = await db.trusts.find_one({"trust_id": dist["trust_id"]}, {"_id": 0})
     trustees_str = (trust or {}).get("trustees", "") or ""
-    parsed_trustees = [t.strip() for t in trustees_str.split(",") if t.strip()]
+    parsed_trustees = parse_trustees(trustees_str)
     
     # Prefer the trustee_name already stored on the distribution; otherwise try
     # to match the approving user's identity against the trust's trustees, and

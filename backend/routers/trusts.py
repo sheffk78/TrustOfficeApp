@@ -12,6 +12,7 @@ from dependencies import (
     create_initial_governance_tasks, check_feature_access, Feature,
     PREMIUM_FEATURE_ERROR_MESSAGE, PREMIUM_FEATURE_ERROR_CODE
 )
+from trustee_utils import parse_trustees
 from models import TrustCreate, TrustUpdate, TrustResponse
 from utils.tax_calendar_math import _generate_entries
 from utils.audit import log_audit_event
@@ -72,8 +73,8 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
         if trustees is None or (isinstance(trustees, str) and not trustees.strip()) or (isinstance(trustees, list) and len(trustees) == 0):
             trustees = [user.get("name", "")] if user.get("name") else []
         elif isinstance(trustees, str):
-            # Legacy string format — split on commas (backward compat)
-            trustees = [t.strip() for t in trustees.split(",") if t.strip()]
+            # Legacy string format — use suffix-aware parser
+            trustees = parse_trustees(trustees)
         # trustees is now a List[str]
         
         trust_doc = {

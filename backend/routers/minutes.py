@@ -15,6 +15,7 @@ from reportlab.lib import colors
 
 from database import db
 from dependencies import get_current_user, require_write_access, should_show_watermark, auto_update_onboarding
+from trustee_utils import parse_trustees
 from models import (
     MinutesCreate, MinutesResponse, MinutesTemplateCreate, MinutesTemplateResponse,
     MinutesDraftRequest, MinutesDraftResponse, MinutesAutosaveRequest,
@@ -222,7 +223,7 @@ async def create_minutes_draft(
             ai_request = AiMinutesDraftRequest(
                 minutes_type=minutes_type,
                 meeting_date=request.meeting_date,
-                participants=request.participants or [t.strip() for t in (trust.get("trustees") or "").split(",") if t.strip()] or [trust.get("role", "Trustee")],
+                participants=request.participants or parse_trustees(trust.get("trustees") or "") or [trust.get("role", "Trustee")],
                 decisions_outline=[ai_prompt_text],
                 trust_name=trust_name,
                 jurisdiction=jurisdiction,
@@ -283,7 +284,7 @@ async def create_minutes_draft(
             ai_request = AiMinutesDraftRequest(
                 minutes_type=ai_minutes_type,
                 meeting_date=request.meeting_date,
-                participants=request.participants or [t.strip() for t in (trust.get("trustees") or "").split(",") if t.strip()] or [trust.get("role", "Trustee")],
+                participants=request.participants or parse_trustees(trust.get("trustees") or "") or [trust.get("role", "Trustee")],
                 decisions_outline=decisions_outline if decisions_outline else ["No specific decisions recorded"],
                 trust_name=trust_name,
                 jurisdiction=jurisdiction,
@@ -453,22 +454,17 @@ async def get_minutes_context(
     # Get trustees from trust document or from entities
     # trustees is stored as comma-separated string in MongoDB, must parse it
     trustees_raw = trust.get("trustees", "")
-    if isinstance(trustees_raw, str):
-        trustees = [t.strip() for t in trustees_raw.split(",") if t.strip()] if trustees_raw else []
-    elif isinstance(trustees_raw, list):
-        trustees = trustees_raw
-    else:
-        trustees = []
-    
+    trustees = parse_trustees(trustees_raw) if isinstance(trustees_raw, str) else (trustees_raw if isinstance(trustees_raw, list) else [])
+
     # Always query entity for beneficiary standard (not just when trustees is empty)
     entity = await db.entities.find_one(
         {"trust_id": trust["trust_id"], "entity_type": "Trust", "user_id": user_id},
         {"_id": 0}
     )
-    
+
     # If no trustees from trust doc, try entity trustee_names
     if not trustees and entity and entity.get("trustee_names"):
-        trustees = [t.strip() for t in entity.get("trustee_names", "").split(",") if t.strip()]
+        trustees = parse_trustees(entity.get("trustee_names", ""))
     
     # Get beneficiary standard from entity if available
     beneficiary_standard = entity.get("beneficiary_standard") if entity else None
@@ -996,14 +992,9 @@ def generate_template_document(trust: dict, template_type: str, template_data: d
     """Generate the full text minutes document from template"""
     trust_name = trust.get("name", "[Trust Name]")
     trustees_raw = trust.get("trustees") or trust.get("trustee_names") or ""
-    if isinstance(trustees_raw, str):
-        trustees = [t.strip() for t in trustees_raw.split(",") if t.strip()] if trustees_raw else []
-    elif isinstance(trustees_raw, list):
-        trustees = trustees_raw
-    else:
-        trustees = []
+    trustees = parse_trustees(trustees_raw) if isinstance(trustees_raw, str) else (trustees_raw if isinstance(trustees_raw, list) else [])
     trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
-    
+
     # Get data from template_data with defaults
     minute_number = template_data.get("minute_number", f"{datetime.now().year}-001")
     meeting_date = template_data.get("meeting_date", datetime.now().strftime("%B %d, %Y"))
@@ -1213,12 +1204,7 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     """
     trust_name = trust.get("name", "[Trust Name]")
     trustees_raw = trust.get("trustees") or trust.get("trustee_names") or ""
-    if isinstance(trustees_raw, str):
-        trustees = [t.strip() for t in trustees_raw.split(",") if t.strip()] if trustees_raw else []
-    elif isinstance(trustees_raw, list):
-        trustees = trustees_raw
-    else:
-        trustees = []
+    trustees = parse_trustees(trustees_raw) if isinstance(trustees_raw, str) else (trustees_raw if isinstance(trustees_raw, list) else [])
     trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
     jurisdiction = trust.get("jurisdiction") or trust.get("state_code") or "[State]"
     # Use the trust_formation_date from the form data (which comes from the entity's

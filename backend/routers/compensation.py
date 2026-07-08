@@ -6,6 +6,7 @@ import uuid
 
 from database import db
 from dependencies import get_current_user, require_write_access, get_year_start
+from trustee_utils import parse_trustees
 from models import (
     CompensationPlanCreate, CompensationPlanResponse,
     CompensationPaymentCreate, CompensationPaymentResponse
@@ -206,7 +207,7 @@ async def create_comp_plan(plan: CompensationPlanCreate, user: dict = Depends(re
     plan_trustee_name = plan.trustee_name or ""
     if not plan_trustee_name:
         trustees_str = (trust or {}).get("trustees", "") or ""
-        parsed_trustees = [t.strip() for t in trustees_str.split(",") if t.strip()]
+        parsed_trustees = parse_trustees(trustees_str)
         if len(parsed_trustees) == 1:
             plan_trustee_name = parsed_trustees[0]
     

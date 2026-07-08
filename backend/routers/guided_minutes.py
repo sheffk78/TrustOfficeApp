@@ -9,6 +9,7 @@ import logging
 
 from database import db
 from dependencies import get_current_user, require_write_access, auto_update_onboarding
+from trustee_utils import parse_trustees
 from models import (
     GuidedMinutesContext,
     GuidedMinutesDraftRequest,
@@ -59,12 +60,7 @@ async def get_guided_minutes_context(
     # Get trustees from trust document or from entities
     # trustees is stored as comma-separated string in MongoDB, must parse it
     trustees_raw = trust.get("trustees", "")
-    if isinstance(trustees_raw, str):
-        trustees = [t.strip() for t in trustees_raw.split(",") if t.strip()] if trustees_raw else []
-    elif isinstance(trustees_raw, list):
-        trustees = trustees_raw
-    else:
-        trustees = []
+    trustees = parse_trustees(trustees_raw) if isinstance(trustees_raw, str) else (trustees_raw if isinstance(trustees_raw, list) else [])
     
     # Look for the main trust entity (needed for trustee names fallback + beneficiary standard)
     entity = await db.entities.find_one(
@@ -74,7 +70,7 @@ async def get_guided_minutes_context(
     
     # If no trustees from trust doc, try entity trustee_names
     if not trustees and entity and entity.get("trustee_names"):
-        trustees = [t.strip() for t in entity.get("trustee_names", "").split(",") if t.strip()]
+        trustees = parse_trustees(entity.get("trustee_names", ""))
     
     # Get beneficiary standard from entity if available
     beneficiary_standard = entity.get("beneficiary_standard") if entity else None

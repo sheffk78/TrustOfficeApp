@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from database import db
 from dependencies import get_current_user
+from trustee_utils import parse_trustees
 from pydantic import BaseModel
 
 router = APIRouter(tags=["binder"])
@@ -88,11 +89,10 @@ def format_jurisdiction(jurisdiction: Optional[str], state_code: Optional[str]) 
     return ""
 
 
-def parse_trustees(raw: Optional[str]) -> List[str]:
-    """Parse comma-separated trustee names into a list."""
-    if not raw:
-        return []
-    return [name.strip() for name in raw.split(",") if name.strip()]
+def parse_trustees_legacy(raw: Optional[str]) -> List[str]:
+    """DEPRECATED: Use trustee_utils.parse_trustees instead.
+    Kept for backward compat — delegates to the shared utility."""
+    return parse_trustees(raw)
 
 
 @router.get("/binder/cover-sheet-data", response_model=BinderCoverSheetResponse)
