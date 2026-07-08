@@ -903,7 +903,7 @@ async def auto_draft_quarterly_minutes(
     for t in transactions:
         amt = t.get("amount", 0)
         desc = t.get("description", "transaction")
-        decisions.append(f"Logged {t.get('transaction_type', 'transaction')}: {desc} (${amt:,.2f}).")
+        decisions.append(f"Logged {t.get('governance_classification', 'transaction')}: {t.get('purpose_memo', t.get('other_note', 'transaction'))} (${amt:,.2f}).")
 
     # Compensation payments in this quarter
     payments = await _db.compensation_payments.find({

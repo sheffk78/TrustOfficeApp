@@ -741,7 +741,7 @@ async def generate_additional_governance_insights(trust_id: str, user_id: str) -
     overdue_tax_count = await db.tax_calendar.count_documents({
         "trust_id": trust_id,
         "due_date": {"$lt": today_iso},
-        "filing_status": {"$nin": ["filed", "not_required"]}
+        "filing_status": {"$nin": ["filed", "not_required", "extended"]}
     })
     if overdue_tax_count > 0:
         points = min(overdue_tax_count * 10, 20)
