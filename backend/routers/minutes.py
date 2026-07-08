@@ -528,6 +528,16 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
             "user_id": user["user_id"],
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
+        # When unfinalizing, ONLY allow status change — no content edits in the same request
+        update_data = {"status": "draft"}
+        update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+        result = await db.minutes_records.update_one(
+            {"minutes_id": minutes_id, "user_id": user["user_id"]},
+            {"$set": update_data}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
+        return {"message": "Minutes unfinalized", "updated_fields": list(update_data.keys())}
     
     # Only allow updating specific fields
     allowed_fields = [

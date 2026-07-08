@@ -37,16 +37,16 @@ async def create_distribution(
     # HEMS enforcement: if the trust uses HEMS standard, warn but don't block
     # (HEMS = Health, Education, Maintenance, Support)
     # Since PurposeClassification only has distribution/compensation/expense/other,
-    # we can't hard-block non-HEMS categories. Instead, add a soft flag for review.
-    if distribution_standard and distribution_standard.strip():
-        dist_doc_note = f"Distribution standard: {distribution_standard}. Trustee should verify this distribution complies with the trust's beneficiary standard."
+    # we can't hard-block non-HEMS categories. The distribution_standard is stored
+    # on the distribution record for audit/review purposes.
 
     # Fix 9: Validate beneficiary against known beneficiaries (soft warning)
     beneficiary_not_verified = False
     if dist.beneficiary_name and dist.beneficiary_name.strip():
+        escaped_name = re.escape(dist.beneficiary_name.strip())
         beneficiary = await db.beneficiaries.find_one({
             "trust_id": dist.trust_id,
-            "name": {"$regex": f"^{dist.beneficiary_name.strip()}$", "$options": "i"}
+            "name": {"$regex": f"^{escaped_name}$", "$options": "i"}
         })
         if not beneficiary:
             beneficiary_not_verified = True
@@ -124,9 +124,11 @@ async def validate_distribution_beneficiary(
     user: dict = Depends(get_current_user)
 ):
     """Check if a beneficiary name matches a known beneficiary of the trust"""
+    escaped_name = re.escape(name.strip())
     beneficiary = await db.beneficiaries.find_one({
         "trust_id": trust_id,
-        "name": {"$regex": f"^{name.strip()}$", "$options": "i"}
+        "user_id": user["user_id"],
+        "name": {"$regex": f"^{escaped_name}$", "$options": "i"}
     })
     return {"valid": bool(beneficiary), "beneficiary": beneficiary}
 
