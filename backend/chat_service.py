@@ -701,7 +701,7 @@ Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Trustees: {trust_info.get('trustees', 'Not specified')}
-Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get('health_score', {}).get('color', 'red')})
+Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('health_score', {}).get('max_score', 115)} ({ctx.get('health_score', {}).get('color', 'red')})
 
 {vault_section}
 
@@ -863,7 +863,7 @@ Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Trustees: {trust_info.get('trustees', 'Not specified')}
-Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/120 ({ctx.get('health_score', {}).get('color', 'red')})
+Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('health_score', {}).get('max_score', 115)} ({ctx.get('health_score', {}).get('color', 'red')})
 
 {vault_section}
 
@@ -967,7 +967,7 @@ def build_citation_notes(trust_context: dict, intent: str) -> tuple:
 
     health = ctx.get("health_score", {})
     if health.get("total", 0) > 0:
-        citations.append(f"Defensibility score: {health['total']}/120")
+        citations.append(f"Defensibility score: {health['total']}/{health.get('max_score', 115)}")
 
     deadlines = ctx.get("upcoming_deadlines", [])
     if deadlines:

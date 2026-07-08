@@ -245,7 +245,7 @@ async def generate_governance_suggestions(req: GovernanceSuggestionsRequest) -> 
     user_content = f"""Please provide governance improvement suggestions for this trust:
 
 TRUST: {req.trust_name}
-CURRENT HEALTH SCORE: {req.health_score:.0f}/120
+CURRENT HEALTH SCORE: {req.health_score:.0f}/115
 
 {criteria_summary}
 {activity_summary}

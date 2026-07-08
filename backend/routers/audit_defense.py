@@ -294,7 +294,7 @@ async def export_audit_defense_pdf(trust_id: str, days: int = 365, user: dict = 
             color_label = h.get("color", "red").upper()
             rows.append([
                 (h.get("calculated_at", "") or "")[:10],
-                f"{score}/100",
+                f"{score}/{h.get('max_score', 115)}",
                 color_label,
             ])
         story.append(data_table(header, rows, [2.5 * inch, 2 * inch, 2 * inch]))

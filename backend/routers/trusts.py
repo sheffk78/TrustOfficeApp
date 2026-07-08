@@ -305,6 +305,20 @@ async def delete_trust(trust_id: str, user: dict = Depends(require_write_access)
     await db.separation_alerts.delete_many({"trust_id": trust_id})
     await db.beneficiaries.delete_many({"trust_id": trust_id})
     await db.schedule_a.delete_many({"trust_id": trust_id})
+    # Phase 2: cascade additional trust-scoped collections
+    await db.chat_conversations.delete_many({"trust_id": trust_id})
+    await db.trust_document_analysis.delete_many({"trust_id": trust_id})
+    await db.trust_unit_certificates.delete_many({"trust_id": trust_id})
+    await db.trust_unit_transfers.delete_many({"trust_id": trust_id})
+    await db.trust_unit_settings.delete_many({"trust_id": trust_id})
+    await db.schedule_a_items.delete_many({"trust_id": trust_id})
+    await db.dismissed_insights.delete_many({"trust_id": trust_id})
+    await db.class_beneficiaries.delete_many({"trust_id": trust_id})
+    await db.expenses.delete_many({"trust_id": trust_id})
+    await db.bank_accounts.delete_many({"trust_id": trust_id})
+    await db.bank_statements.delete_many({"trust_id": trust_id})
+    await db.trust_admin_kits.delete_many({"trust_id": trust_id})
+    await db.ai_suggestion_cache.delete_many({"trust_id": trust_id})
     
     return {"message": "Trust deleted"}
 

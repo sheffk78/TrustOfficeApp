@@ -720,6 +720,37 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
     story.append(details_table)
     story.append(Spacer(1, 16))
     
+    # ==== RETROACTIVE HEADER (only when is_retroactive is true) ====
+    if minutes.get('is_retroactive'):
+        retroactive_data = [
+            ['RETROACTIVE MINUTES', ''],
+            ['Date of Original Event:', minutes.get('meeting_date', 'N/A')],
+            ['Reason for Retroactive Documentation:', minutes.get('retroactive_reason', 'Not specified')],
+            ['Retroactive Type:', minutes.get('retroactive_type', 'Not specified')],
+            ['Trustees Aware at Time:', 'Yes' if minutes.get('retroactive_trustees_aware') else 'No'],
+        ]
+        retroactive_table = Table(retroactive_data, colWidths=[2.5 * inch, 3.5 * inch])
+        retroactive_table.setStyle(TableStyle([
+            ('SPAN', (0, 0), (1, 0)),  # Merge top row for label
+            ('FONTNAME', (0, 0), (1, 0), 'Times-Bold'),
+            ('FONTSIZE', (0, 0), (1, 0), 13),
+            ('TEXTCOLOR', (0, 0), (1, 0), colors.HexColor('#990000')),
+            ('ALIGN', (0, 0), (1, 0), 'CENTER'),
+            ('FONTNAME', (0, 1), (0, -1), 'Times-Bold'),
+            ('FONTNAME', (1, 1), (1, -1), 'Times-Bold'),
+            ('FONTSIZE', (0, 1), (-1, -1), 11),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#333333')),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fff3e0')),
+            ('BOX', (0, 0), (-1, -1), 1.5, colors.HexColor('#990000')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cc9966')),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        story.append(retroactive_table)
+        story.append(Spacer(1, 16))
+    
     # ==== TRUSTEES PRESENT ====
     if minutes.get('participants_text'):
         story.append(Paragraph("TRUSTEES PRESENT", section_header_style))
