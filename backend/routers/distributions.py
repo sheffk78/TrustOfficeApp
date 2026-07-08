@@ -28,6 +28,29 @@ async def create_distribution(
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
+    # Fix 8: Check distribution standard from the trust's associated entity
+    entity = await db.entities.find_one({"trust_id": dist.trust_id}, {"_id": 0})
+    distribution_standard = ""
+    if entity:
+        distribution_standard = entity.get("beneficiary_standard", "")
+
+    # HEMS enforcement: if the trust uses HEMS standard, warn but don't block
+    # (HEMS = Health, Education, Maintenance, Support)
+    # Since PurposeClassification only has distribution/compensation/expense/other,
+    # we can't hard-block non-HEMS categories. Instead, add a soft flag for review.
+    if distribution_standard and distribution_standard.strip():
+        dist_doc_note = f"Distribution standard: {distribution_standard}. Trustee should verify this distribution complies with the trust's beneficiary standard."
+
+    # Fix 9: Validate beneficiary against known beneficiaries (soft warning)
+    beneficiary_not_verified = False
+    if dist.beneficiary_name and dist.beneficiary_name.strip():
+        beneficiary = await db.beneficiaries.find_one({
+            "trust_id": dist.trust_id,
+            "name": {"$regex": f"^{dist.beneficiary_name.strip()}$", "$options": "i"}
+        })
+        if not beneficiary:
+            beneficiary_not_verified = True
+
     # Validate benevolence fields if is_benevolence is true
     if dist.is_benevolence:
         if not dist.benevolence_recipient_name or not dist.benevolence_recipient_name.strip():
@@ -68,7 +91,11 @@ async def create_distribution(
         "is_benevolence": dist.is_benevolence,
         "benevolence_recipient_name": dist.benevolence_recipient_name if dist.is_benevolence else None,
         "benevolence_need_description": dist.benevolence_need_description if dist.is_benevolence else None,
-        "benevolence_notes": dist.benevolence_notes if dist.is_benevolence else None
+        "benevolence_notes": dist.benevolence_notes if dist.is_benevolence else None,
+        # Fix 8: distribution standard from entity
+        "distribution_standard": distribution_standard if distribution_standard else None,
+        # Fix 9: beneficiary validation flag
+        "beneficiary_not_verified": beneficiary_not_verified
     }
     
     await db.distribution_records.insert_one(dist_doc)
@@ -88,6 +115,20 @@ async def create_distribution(
     )
     
     return DistributionResponse(**dist_doc)
+
+
+@router.get("/distributions/validate-beneficiary")
+async def validate_distribution_beneficiary(
+    trust_id: str,
+    name: str,
+    user: dict = Depends(get_current_user)
+):
+    """Check if a beneficiary name matches a known beneficiary of the trust"""
+    beneficiary = await db.beneficiaries.find_one({
+        "trust_id": trust_id,
+        "name": {"$regex": f"^{name.strip()}$", "$options": "i"}
+    })
+    return {"valid": bool(beneficiary), "beneficiary": beneficiary}
 
 
 @router.get("/distributions", response_model=List[DistributionResponse])

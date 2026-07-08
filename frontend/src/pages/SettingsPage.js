@@ -1085,7 +1085,7 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    {(trustData.trustees || '').split(',').map(t => t.trim()).filter(t => t || true).map((trustee, index) => (
+                    {(trustData.trustees || '').split(',').map(t => t.trim()).filter(Boolean).map((trustee, index) => (
                       <div key={index} className="flex gap-2">
                         <Input
                           value={trustee}

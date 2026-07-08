@@ -237,6 +237,12 @@ export default function MinutesDetailPage() {
                     Draft
                   </span>
                 )}
+                {/* Finalized Badge */}
+                {!isDraft && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-mono rounded-full border border-green-300 dark:border-green-700 font-semibold uppercase tracking-wider">
+                    Finalized
+                  </span>
+                )}
               </div>
               <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mt-1">
                 {selectedTrust?.name} • {isRetroactive ? `Meeting: ${formatDate(minutes.meeting_date)}` : formatDate(minutes.meeting_date)}
@@ -245,10 +251,12 @@ export default function MinutesDetailPage() {
             <div className="flex gap-2">
               {!isEditing ? (
                 <>
-                  <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="edit-minutes-btn">
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
+                  {isDraft && (
+                    <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="edit-minutes-btn">
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
+                  )}
                   <Button variant="outline" onClick={handleViewPDF} data-testid="view-pdf-btn">
                     <Eye className="w-4 h-4 mr-2" />
                     View PDF

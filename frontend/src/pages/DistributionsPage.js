@@ -93,12 +93,36 @@ export default function DistributionsPage() {
     benevolence_need_description: '',
     benevolence_notes: ''
   });
+  const [beneficiaryVerified, setBeneficiaryVerified] = useState(null); // null = not checked, true = verified, false = not found
+  const debouncedBeneficiary = useDebounce(formData.beneficiary, 500);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
   useEffect(() => {
     loadCategories();
   }, []);
+
+  // Beneficiary verification check
+  useEffect(() => {
+    if (!selectedTrust || !debouncedBeneficiary || !debouncedBeneficiary.trim()) {
+      setBeneficiaryVerified(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetchWithAuth(`/distributions/validate-beneficiary?trust_id=${selectedTrust.trust_id}&name=${encodeURIComponent(debouncedBeneficiary.trim())}`);
+        if (cancelled) return;
+        if (response.ok) {
+          const data = await response.json();
+          setBeneficiaryVerified(data.valid);
+        }
+      } catch {
+        // Silently fail - don't block distribution creation
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [debouncedBeneficiary, selectedTrust]);
 
   useEffect(() => {
     if (selectedTrust) {
@@ -444,6 +468,16 @@ export default function DistributionsPage() {
                       placeholder="Beneficiary name"
                       data-testid="dist-beneficiary-input"
                     />
+                    {beneficiaryVerified === false && formData.beneficiary.trim() && (
+                      <p className="text-xs text-warning mt-1 flex items-center gap-1" data-testid="beneficiary-warning">
+                        <span>⚠</span> This beneficiary is not in your trust's beneficiary list. Verify this is the correct recipient before proceeding.
+                      </p>
+                    )}
+                    {beneficiaryVerified === true && formData.beneficiary.trim() && (
+                      <p className="text-xs text-success mt-1 flex items-center gap-1">
+                        <span>✓</span> Verified beneficiary
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -713,7 +747,12 @@ export default function DistributionsPage() {
                     return (
                     <tr key={dist.distribution_id} data-testid={`dist-row-${dist.distribution_id}`}>
                       <td>{formatDate(dist.date)}</td>
-                      <td>{dist.beneficiary_name || dist.beneficiary || '-'}</td>
+                      <td>
+                        {dist.beneficiary_name || dist.beneficiary || '-'}
+                        {dist.beneficiary_not_verified && (
+                          <span className="ml-1 text-xs text-warning" title="Beneficiary not found in trust beneficiary list">⚠</span>
+                        )}
+                      </td>
                       <td>{dist.purpose_classification || dist.category || '-'}</td>
                       <td className="text-right font-mono">{formatCurrency(dist.amount)}</td>
                       <td className="text-center">

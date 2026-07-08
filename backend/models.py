@@ -830,6 +830,8 @@ class DistributionResponse(BaseModel):
     benevolence_recipient_name: Optional[str] = None
     benevolence_need_description: Optional[str] = None
     benevolence_notes: Optional[str] = None
+    distribution_standard: Optional[str] = None
+    beneficiary_not_verified: bool = False
 
 class DistributionUpdate(BaseModel):
     beneficiary_name: Optional[str] = None

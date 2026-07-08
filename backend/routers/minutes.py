@@ -504,6 +504,31 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
     """Update minutes content, participants, or other attendees"""
     data = await request.json()
     
+    # Check if minutes are finalized
+    existing = await db.minutes_records.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
+    
+    if existing.get("status") == "finalized":
+        # Only allow unfinalizing (status -> draft) with a documented reason
+        if "status" not in data or data["status"] != "draft":
+            raise HTTPException(
+                status_code=403,
+                detail="Finalized minutes cannot be edited. To make changes, unfinalize with a documented reason."
+            )
+        # Record the unfinalize event in version history
+        await db.minutes_version_history.insert_one({
+            "minutes_id": minutes_id,
+            "trust_id": existing.get("trust_id"),
+            "action": "unfinalized",
+            "previous_content": existing.get("generated_content", ""),
+            "reason": data.get("unfinalize_reason", "No reason provided"),
+            "user_id": user["user_id"],
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    
     # Only allow updating specific fields
     allowed_fields = [
         'decisions_text', 'participants_text', 'other_attendees_text',
@@ -535,6 +560,15 @@ async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_acc
     minutes = await db.minutes_records.find_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
     )
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
+    
+    if minutes.get("status") == "finalized":
+        raise HTTPException(
+            status_code=403,
+            detail="Finalized minutes cannot be deleted. This protects the legal record chain."
+        )
+    
     result = await db.minutes_records.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
