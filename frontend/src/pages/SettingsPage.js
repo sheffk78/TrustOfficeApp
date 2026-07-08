@@ -219,9 +219,20 @@ export default function SettingsPage() {
   useEffect(() => {
     if (selectedTrust) {
       // Auto-populate trustees from the account creator's name if not set
-      let trustees = selectedTrust.trustees || '';
-      if (!trustees && user?.name) {
-        trustees = user.name;
+      let trusteesStr = selectedTrust.trustees || '';
+      if (!trusteesStr && user?.name) {
+        trusteesStr = user.name;
+      }
+      // Initialize trustees array state (Fix 12: array-based, not comma-split)
+      const rawTrustees = selectedTrust.trustees;
+      if (Array.isArray(rawTrustees)) {
+        setTrustees(rawTrustees.length > 0 ? rawTrustees : (user?.name ? [user.name] : ['']));
+      } else if (typeof rawTrustees === 'string' && rawTrustees.trim()) {
+        setTrustees(rawTrustees.split(',').map(t => t.trim()).filter(Boolean));
+      } else if (user?.name) {
+        setTrustees([user.name]);
+      } else {
+        setTrustees(['']);
       }
       setTrustData({
         name: selectedTrust.name || '',
@@ -236,7 +247,7 @@ export default function SettingsPage() {
         tax_year_end_month: selectedTrust.tax_year_end_month?.toString() || '',
         tax_year_end_day: selectedTrust.tax_year_end_day?.toString() || '',
         is_fiscal_year: selectedTrust.is_fiscal_year || false,
-        trustees: trustees,
+        trustees: trusteesStr,
         successor_trustee_name: selectedTrust.successor_trustee_name || '',
         successor_trustee_email: selectedTrust.successor_trustee_email || '',
         successor_trustee_phone: selectedTrust.successor_trustee_phone || '',
@@ -561,7 +572,7 @@ export default function SettingsPage() {
           scope_classifications: spendingThreshold.scope_classifications || [],
         },
       };
-      const payload = { ...trustData, is_fiscal_year: computedFiscalYear, governance_settings };
+      const payload = { ...trustData, trustees: trustees.filter(Boolean), is_fiscal_year: computedFiscalYear, governance_settings };
       const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}`, {
         method: 'PUT',
         body: JSON.stringify(payload)
@@ -685,6 +696,17 @@ export default function SettingsPage() {
             />
           </div>
 
+          {/* Settings Tabs (Fix 15: split scroll wall into 4 tabs) */}
+          <Tabs value={settingsTab} onValueChange={setSettingsTab} className="mb-8">
+            <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
+              <TabsTrigger value="profile">Trust Profile</TabsTrigger>
+              <TabsTrigger value="people">People</TabsTrigger>
+              <TabsTrigger value="compliance">Tax & Compliance</TabsTrigger>
+              <TabsTrigger value="account">Account & Billing</TabsTrigger>
+            </TabsList>
+
+          {/* ============ ACCOUNT TAB (part 1) ============ */}
+          <TabsContent value="account">
           {/* Profile Section */}
           <div className="card-trust corner-mark mb-8">
             <div className="flex items-center gap-2 mb-6">
@@ -1068,13 +1090,17 @@ export default function SettingsPage() {
               </DialogContent>
             </Dialog>
           </div>
+          </TabsContent>
+          {/* ============ END ACCOUNT TAB (part 1) ============ */}
 
+          {/* ============ PROFILE TAB ============ */}
+          <TabsContent value="profile">
           {/* Trust Settings */}
           {selectedTrust && (
             <div className="card-trust mb-8">
               <div className="flex items-center gap-2 mb-6">
                 <Building2 className="w-5 h-5 text-navy" />
-                <h2 className="font-serif text-xl text-navy">Trust Settings</h2>
+                <h2 className="font-serif text-xl text-navy">Trust Profile</h2>
               </div>
 
               <div className="space-y-6">
@@ -1104,41 +1130,28 @@ export default function SettingsPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        const current = trustData.trustees || '';
-                        const names = current.split(',').map(t => t.trim()).filter(t => t);
-                        names.push('');
-                        setTrustData({ ...trustData, trustees: names.join(', ') });
-                      }}
+                      onClick={addTrustee}
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add Trustee
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    {(trustData.trustees || '').split(',').map(t => t.trim()).filter(Boolean).map((trustee, index) => (
+                    {trustees.map((trustee, index) => (
                       <div key={index} className="flex gap-2">
                         <Input
                           value={trustee}
-                          onChange={(e) => {
-                            const names = (trustData.trustees || '').split(',').map(t => t.trim());
-                            names[index] = e.target.value;
-                            setTrustData({ ...trustData, trustees: names.join(', ') });
-                          }}
+                          onChange={(e) => updateTrustee(index, e.target.value)}
                           className="input-trust"
                           placeholder={index === 0 ? "Your name (as trustee)" : "Co-trustee name"}
                         />
-                        {(trustData.trustees || '').split(',').map(t => t.trim()).filter(t => t).length > 1 && (
+                        {trustees.length > 1 && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
-                            onClick={() => {
-                              const names = (trustData.trustees || '').split(',').map(t => t.trim());
-                              const filtered = names.filter((_, i) => i !== index);
-                              setTrustData({ ...trustData, trustees: filtered.join(', ') });
-                            }}
+                            onClick={() => removeTrustee(index)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -1360,7 +1373,13 @@ export default function SettingsPage() {
                     </p>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+          </TabsContent>
 
+          {/* ============ PEOPLE TAB ============ */}
+          <TabsContent value="people">
                 {/* Successor Trustee */}
                 <div className="p-4 border border-navy/10 bg-navy/5">
                   <div className="flex items-start gap-3 mb-4">
@@ -1530,9 +1549,15 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
+          </TabsContent>
 
-                {/* Governance Settings — Spending Threshold */}
-                <div className="pt-4 border-t border-navy/10" data-section="governance">
+          {/* ============ COMPLIANCE TAB ============ */}
+          <TabsContent value="compliance">
+          {/* Compliance tab — only shown when a trust is selected */}
+          {selectedTrust && (
+            <>
+              {/* Governance Settings — Spending Threshold */}
+              <div className="pt-4 border-t border-navy/10" data-section="governance">
                   <div className="flex items-center gap-2 mb-4">
                     <Shield className="w-4 h-4 text-navy" />
                     <Label className="label-trust">Governance Settings</Label>
@@ -1641,10 +1666,12 @@ export default function SettingsPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-              </div>
-            </div>
+            </>
           )}
+          </TabsContent>
 
+          {/* ============ ACCOUNT TAB (part 2) ============ */}
+          <TabsContent value="account">
           {/* Trust Document Intelligence — extracted provisions from uploaded trust document */}
           {selectedTrust && (
             <div className="mb-8">
@@ -2326,6 +2353,8 @@ export default function SettingsPage() {
               </p>
             </div>
           )}
+          </TabsContent>
+          </Tabs>
         </div>
       </main>
       <MobileBottomNav />
