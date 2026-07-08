@@ -975,7 +975,7 @@ def generate_template_document(trust: dict, template_type: str, template_data: d
     
     # Build the document
     doc = f"""TRUST MINUTES
-Private Irrevocable Ecclesiastical Trust
+Private Irrevocable Trust
 
 Trust Name: {trust_name}
 Minute Number: {minute_number}
@@ -999,9 +999,9 @@ Quorum: YES
 
 OPENING STATEMENT
 
-The Trustees, acting in their fiduciary capacity and not in any personal capacity, convened this meeting to conduct the business of the Trust in accordance with the Declaration and Indenture of Private Irrevocable Trust dated {trust_formation_date}, and the principles of Natural Law, Common Law, Equity, and Ecclesiastical Jurisdiction declared therein.
+The Trustees, acting in their fiduciary capacity, convened this meeting to conduct the business of the Trust in accordance with the Declaration of Trust dated {trust_formation_date}, and applicable state law.
 
-All Trustees present affirm they are acting as living men and women in private capacity, and not as surety, representative, or accommodation party for any artificial PERSON or all-capital-letter NAME.
+All Trustees present affirm they are acting in their fiduciary capacity as trustees of the Trust.
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1103,9 +1103,9 @@ CERTIFICATION AND AUTHENTICATION
 
 The undersigned Trustees hereby certify that the foregoing Minutes constitute a true, accurate, and complete record of the meeting and resolutions adopted, and that all decisions recorded herein were made in good faith, in accordance with the Trust Indenture, and for the benefit of the Trust and its Beneficiaries.
 
-These Trust Minutes are executed in the private capacity of the Trustees as living men and women, and not as surety, representative, or accommodation party for any artificial PERSON or all-capital-letter NAME.
+These Trust Minutes are executed by the Trustees in their official capacity as fiduciaries of the Trust.
 
-All Trust Minutes and records are private and confidential, held under Common Law Copyright, and are not to be disclosed to any third party except as unanimously authorized by the Board of Trustees.
+All Trust Minutes and records are confidential and maintained as fiduciary records of the Trust. They are not to be disclosed to any third party except as authorized by the Board of Trustees.
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1125,7 +1125,7 @@ Date: _________________
 ═══════════════════════════════════════════════════════════════════════════════
 
 END OF TRUST MINUTES
-{trust_name} – Private Trust Minutes – Common Law Copyright – Not for Public Disclosure
+{trust_name} – Private Trust Minutes – Confidential
 """
     
     return doc
@@ -2110,17 +2110,17 @@ Effective Date: Immediately upon adoption
 
 EXHIBIT A – TRUSTEE ACCEPTANCE AND OATH
 
-I, {new_trustee}, a living {gender} acting in private capacity, hereby accept the appointment as {'Successor' if appointment_type == 'successor' else 'Additional'} Trustee of this Trust.
+I, {new_trustee}, acting in my fiduciary capacity, hereby accept the appointment as {'Successor' if appointment_type == 'successor' else 'Additional'} Trustee of this Trust.
 
 I affirm and declare:
 
 1. I have read the Declaration and Indenture of Private Irrevocable Trust and understand my duties, obligations, and responsibilities as Trustee.
 
-2. I agree to faithfully and diligently perform all duties as Trustee in accordance with the Trust Indenture and applicable principles of Natural Law, Common Law, and Equity.
+2. I agree to faithfully and diligently perform all duties as Trustee in accordance with the Trust Indenture and applicable law.
 
 3. I will act at all times in the best interest of the Trust and its Beneficiaries, with loyalty, prudence, and good faith.
 
-4. I understand that I am accepting this appointment in my private capacity as a living {gender}, and not as surety, representative, or accommodation party for any artificial PERSON or all-capital-letter NAME.
+4. I understand that I am accepting this appointment in my fiduciary capacity as Trustee of the Trust.
 
 5. I agree to maintain the confidentiality of all Trust matters and records.
 

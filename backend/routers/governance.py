@@ -520,9 +520,9 @@ def _compute_health_score(data: dict) -> dict:
 
     base_score = sum(c["points"] for c in [cr.model_dump() for cr in criteria])
 
-    # --- Final Score with Hard Floor ---
+    # --- Final Score with Critical Cap ---
     if has_critical:
-        final_score = max(50, base_score + total_penalty)
+        final_score = min(50, max(0, base_score + total_penalty))
     else:
         final_score = max(0, base_score + total_penalty)
 

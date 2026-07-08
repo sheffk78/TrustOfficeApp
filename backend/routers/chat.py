@@ -765,7 +765,7 @@ async def _execute_approved_action(
                 "status": "finalized",
                 "is_retroactive": False,
                 "retroactive_reason": None,
-                "retroactive_trusttees_aware": None,
+                "retroactive_trustees_aware": None,
                 "retroactive_type": None,
                 "manually_edited": False,
             }

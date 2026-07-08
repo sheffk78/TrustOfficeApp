@@ -23,7 +23,7 @@ Some trusts are exceptions. For example, a grantor trust where all income is tax
 - **Calendar-year trusts:** Due April 15th
 - **Fiscal-year trusts:** Due the 15th day of the 4th month after the tax year ends
 
-Trusts can file for a **5-month extension** using Form 7004, which pushes the deadline to September 15th for calendar-year trusts. Note that an extension to file is not an extension to pay — any taxes owed are still due by the original deadline.
+Trusts can file for a **5.5-month extension** using Form 7004, which pushes the deadline to September 30th for calendar-year trusts. Note that an extension to file is not an extension to pay, any taxes owed are still due by the original deadline.
 
 ## Key Concepts
 
@@ -44,7 +44,7 @@ When a trust distributes income to beneficiaries, it must provide each beneficia
 - What type of income it is (interest, dividends, capital gains, etc.)
 - Any deductions they can claim related to the distribution
 
-K-1s must be sent to beneficiaries before they file their own tax returns. Delaying K-1s can cause problems for beneficiaries and create friction in the trustee-beneficiary relationship.
+K-1s must be sent to beneficiaries before they file their own tax returns. The K-1 deadline is the same as the Form 1041 deadline (April 15 for calendar-year trusts), since the K-1 is filed as part of the 1041 return. Delaying K-1s can cause problems for beneficiaries and create friction in the trustee-beneficiary relationship.
 
 ## Common Filing Considerations
 

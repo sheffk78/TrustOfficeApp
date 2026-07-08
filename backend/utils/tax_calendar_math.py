@@ -4,8 +4,8 @@ import calendar
 
 CALENDAR_RULES = [
     {"deadline_type": "federal_1041",          "month": 4,  "day": 15, "desc": "Form 1041 — Estate and Trust Income Tax Return"},
-    {"deadline_type": "federal_1041_extension","month": 9,  "day": 15, "desc": "Form 1041 — Extended filing deadline"},
-    {"deadline_type": "k1_beneficiaries",      "month": 3,  "day": 15, "desc": "Schedule K-1 — Beneficiary income allocations"},
+    {"deadline_type": "federal_1041_extension","month": 9,  "day": 30, "desc": "Form 1041 — Extended filing deadline (5.5-month extension via Form 7004)"},
+    {"deadline_type": "k1_beneficiaries",      "month": 4,  "day": 15, "desc": "Schedule K-1 — Filed with Form 1041"},
     {"deadline_type": "estimated_q1",          "month": 4,  "day": 15, "desc": "Q1 Estimated tax payment"},
     {"deadline_type": "estimated_q2",          "month": 6,  "day": 15, "desc": "Q2 Estimated tax payment"},
     {"deadline_type": "estimated_q3",          "month": 9,  "day": 15, "desc": "Q3 Estimated tax payment"},
@@ -14,8 +14,8 @@ CALENDAR_RULES = [
 
 FISCAL_RULES = [
     {"deadline_type": "federal_1041",          "months_after": 4,  "day": 15, "desc": "Form 1041 — Estate and Trust Income Tax Return"},
-    {"deadline_type": "federal_1041_extension","months_after": 10, "day": 15, "desc": "Form 1041 — Extended filing deadline"},
-    {"deadline_type": "k1_beneficiaries",      "months_after": 4,  "day": 15, "desc": "Schedule K-1 — Beneficiary income allocations"},
+    {"deadline_type": "federal_1041_extension","months_after": 9, "day": 30, "desc": "Form 1041 — Extended filing deadline (5.5-month extension via Form 7004)"},
+    {"deadline_type": "k1_beneficiaries",      "months_after": 4, "day": 15, "desc": "Schedule K-1 — Filed with Form 1041"},
     {"deadline_type": "estimated_q1",          "fy_month_offset": 3,  "day": 15, "desc": "Q1 Estimated tax payment"},
     {"deadline_type": "estimated_q2",          "fy_month_offset": 5,  "day": 15, "desc": "Q2 Estimated tax payment"},
     {"deadline_type": "estimated_q3",          "fy_month_offset": 8,  "day": 15, "desc": "Q3 Estimated tax payment"},

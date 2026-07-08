@@ -937,7 +937,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "due_date": (now - timedelta(days=60)).date().isoformat(),
             "filing_status": "filed",
             "filed_date": (now - timedelta(days=60)).date().isoformat(),
-            "notes": "Extension granted to September 15",
+            "notes": "Extension granted to September 30",
             "accountant_engaged": True,
             "created_at": (now - timedelta(days=60)).isoformat(),
             "updated_at": (now - timedelta(days=60)).isoformat(),

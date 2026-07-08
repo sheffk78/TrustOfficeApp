@@ -782,7 +782,7 @@ export default function SettingsPage() {
                         <SelectItem value="charitable">Charitable Trust</SelectItem>
                         <SelectItem value="charitable_remainder">Charitable Remainder Trust</SelectItem>
                         <SelectItem value="business">Business Trust</SelectItem>
-                        <SelectItem value="ecclesiastical">Ecclesiastical Trust</SelectItem>
+                        <SelectItem value="ecclesiastical">Religious/Charitable Trust</SelectItem>
                         <SelectItem value="special_needs">Special Needs Trust</SelectItem>
                         <SelectItem value="spendthrift">Spendthrift Trust</SelectItem>
                         <SelectItem value="testamentary">Testamentary Trust</SelectItem>

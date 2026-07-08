@@ -15,7 +15,7 @@ TRUST_TYPE_LABELS = {
     "family": "Family Trust",
     "charitable": "Charitable Trust",
     "business": "Business Trust",
-    "ecclesiastical": "Ecclesiastical Trust",
+    "ecclesiastical": "Religious/Charitable Trust",
     "institutional": "Institutional Trust",
 }
 

@@ -445,7 +445,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     story.append(Spacer(1, 24))
     if not hide_watermark:
         story.append(Paragraph(
-            f"{trust_name} – Schedule A – Private Trust Document – Common Law Copyright",
+            f"{trust_name} – Schedule A – Private Trust Document – Confidential",
             footer_style
         ))
         story.append(Paragraph(

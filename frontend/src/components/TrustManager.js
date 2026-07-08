@@ -37,7 +37,7 @@ const TRUST_TYPES = [
   { value: 'family', label: 'Family', icon: HeartHandshake },
   { value: 'charitable', label: 'Charitable', icon: HeartHandshake },
   { value: 'business', label: 'Business', icon: Briefcase },
-  { value: 'ecclesiastical', label: 'Ecclesiastical', icon: Church },
+  { value: 'ecclesiastical', label: 'Religious/Charitable', icon: Church },
   { value: 'institutional', label: 'Institutional', icon: Building2 },
 ];
 
