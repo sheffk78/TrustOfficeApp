@@ -83,6 +83,7 @@ export default function MinutesDetailPage() {
   }, [loadMinutes]);
 
   const handleSave = async () => {
+    if (!isDraft) return; // Defense-in-depth: backend also blocks this
     setSaving(true);
     try {
       const response = await fetchWithAuth(`/minutes/${minutesId}`, {

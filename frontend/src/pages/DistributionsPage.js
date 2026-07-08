@@ -116,9 +116,11 @@ export default function DistributionsPage() {
         if (response.ok) {
           const data = await response.json();
           setBeneficiaryVerified(data.valid);
+        } else {
+          setBeneficiaryVerified(null);
         }
       } catch {
-        // Silently fail - don't block distribution creation
+        setBeneficiaryVerified(null);
       }
     })();
     return () => { cancelled = true; };
