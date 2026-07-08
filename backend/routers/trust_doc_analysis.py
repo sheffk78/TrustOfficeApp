@@ -94,6 +94,62 @@ async def get_analysis_status(
     }
 
 
+@router.get("/trusts/{trust_id}/vault/analysis-status")
+async def get_vault_analysis_status(trust_id: str, user: dict = Depends(get_current_user)):
+    """Combined vault + analysis status for onboarding polling.
+    Returns vault document existence and analysis status/fields in one call."""
+    # Verify trust ownership
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    # Check for trust instrument in vault
+    doc = await db.vault_documents.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"], "category": {"$in": ["trust_instrument", "amendment"]}},
+        sort=[("created_at", -1)]
+    )
+
+    if not doc:
+        return {"vault_status": "empty", "analysis_status": "none", "extracted_fields": None, "doc_id": None}
+
+    # Get completed analysis
+    analysis = await db.trust_document_analysis.find_one(
+        {"trust_id": trust_id, "vault_document_id": doc["doc_id"], "status": "complete"},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+
+    if analysis:
+        return {
+            "vault_status": "uploaded",
+            "analysis_status": "complete",
+            "extracted_fields": analysis.get("extracted_fields", {}),
+            "doc_id": doc["doc_id"]
+        }
+
+    # Check for pending/analyzing
+    pending = await db.trust_document_analysis.find_one(
+        {"trust_id": trust_id, "vault_document_id": doc["doc_id"], "status": {"$in": ["pending", "analyzing"]}},
+        {"_id": 0, "status": 1},
+        sort=[("created_at", -1)]
+    )
+
+    if pending:
+        return {"vault_status": "uploaded", "analysis_status": pending["status"], "extracted_fields": None, "doc_id": doc["doc_id"]}
+
+    # Check for failed
+    failed = await db.trust_document_analysis.find_one(
+        {"trust_id": trust_id, "vault_document_id": doc["doc_id"], "status": "failed"},
+        {"_id": 0, "status": 1, "error_message": 1},
+        sort=[("created_at", -1)]
+    )
+
+    if failed:
+        return {"vault_status": "uploaded", "analysis_status": "failed", "error_message": failed.get("error_message"), "extracted_fields": None, "doc_id": doc["doc_id"]}
+
+    return {"vault_status": "uploaded", "analysis_status": "none", "extracted_fields": None, "doc_id": doc["doc_id"]}
+
+
 @router.post("/trusts/{trust_id}/document-analysis/reanalyze")
 async def reanalyze(trust_id: str, user: dict = Depends(get_current_user)):
     """
