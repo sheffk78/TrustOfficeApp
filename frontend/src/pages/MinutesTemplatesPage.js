@@ -162,7 +162,7 @@ export default function MinutesTemplatesPage() {
             <p className="text-sm text-muted-foreground">
               Templates provide pre-filled language following private trust governance standards. 
               All generated documents are editable and maintain an audit trail of any changes. 
-              The ecclesiastical language and WHEREAS/RESOLVED format follows established trust administration practices.
+              The formal WHEREAS/RESOLVED format follows established trust administration practices.
             </p>
           </div>
         </div>

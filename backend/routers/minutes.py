@@ -2063,7 +2063,7 @@ WHEREAS, the Trust Indenture provides for the appointment of {'successor' if app
 
 WHEREAS, {whereas_reason};
 
-WHEREAS, {new_trustee}, a living {gender} acting in private capacity, has been identified as a suitable and qualified person to serve as Trustee of this Trust, and has expressed willingness to accept such appointment;
+WHEREAS, {new_trustee}, acting in a fiduciary capacity, has been identified as a suitable and qualified person to serve as Trustee of this Trust, and has expressed willingness to accept such appointment;
 
 NOW, THEREFORE, BE IT RESOLVED that:
 
@@ -2289,7 +2289,7 @@ NOW, THEREFORE, BE IT RESOLVED that:
 
 • The situs of this Trust is hereby changed from {current_situs} to {new_situs}, effective {effective_date}.
 
-• Henceforth, the Trust shall be administered under the laws of {new_situs}, to the extent such laws do not conflict with the express terms of the Trust Indenture or the ecclesiastical nature of this Trust.
+• Henceforth, the Trust shall be administered under the laws of {new_situs}, to the extent such laws do not conflict with the express terms of the Trust Indenture.
 
 • The principal place of administration of the Trust shall be located in {new_situs}.
 
@@ -2305,7 +2305,7 @@ BE IT FURTHER RESOLVED that this change of situs shall not affect:
     • The validity or continuity of this Trust
     • The interests of any Beneficiary
     • Any existing rights, duties, or obligations under the Trust Indenture
-    • The Trust's status as a private, ecclesiastical trust operating under Common Law principles
+    • The Trust's status as a private trust operating in accordance with applicable law
 
 Vote: Unanimous approval
 Requires unanimous consent per Indenture: YES
@@ -2345,7 +2345,7 @@ def generate_benevolence_approval_content(data: dict) -> str:
     
     content = f"""Resolution 1: Approval of Benevolence Assistance
 
-WHEREAS, this Trust operates as a private ecclesiastical trust with charitable purposes, consistent with the principles set forth in the Trust Indenture;
+WHEREAS, this Trust operates with charitable purposes, consistent with the principles set forth in the Trust Indenture;
 
 WHEREAS, the Board of Trustees has received and reviewed a request for benevolence assistance from {beneficiary_name}, {type_text}, for the purpose of {purpose_text};
 

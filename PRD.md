@@ -33,7 +33,7 @@ Trustees lose track of 1041 deadlines, K-1 distribution requirements, and state 
 ### MVP Scope:
 - Add `ein`, `tax_year_end_month`, `tax_year_end_day`, `is_fiscal_year`, `state_of_administration` columns to `trusts` table (PostgreSQL)
 - New `tax_calendar` table: per-trust per-tax-year deadline tracking
-- New `tax_deadline_templates` seed table: federal deadlines (1041 Apr 15, extension Sept 15, K-1 Mar 15, estimated Q1-Q4 dates)
+- New `tax_deadline_templates` seed table: federal deadlines (1041 Apr 15, extension Sept 30, K-1 Apr 15, estimated Q1-Q4 dates)
 - API: GET/POST `/api/trusts/{id}/tax-calendar`, GET `/api/tax-calendar/upcoming`
 - Frontend: New "Tax Calendar" page (`/tax-calendar`) with:
   - Upcoming deadlines list with countdown badges
