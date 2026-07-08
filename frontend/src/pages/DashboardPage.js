@@ -663,7 +663,7 @@ export default function DashboardPage() {
                               to={item.action_link}
                               className="text-xs text-navy/60 hover:text-navy font-mono uppercase tracking-widest flex items-center gap-1"
                             >
-                              View <ArrowRight className="w-3 h-3" />
+                              Fix now <ArrowRight className="w-3 h-3" />
                             </Link>
                           </div>
                         </div>
