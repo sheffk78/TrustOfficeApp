@@ -1318,6 +1318,12 @@ async def _execute_approved_action(
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             await db.class_beneficiaries.insert_one(cb_doc)
+            # Update onboarding checklist
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
             return {"success": True, "record_id": cb_id, "endpoint": "class-beneficiaries", "action": "created"}
 
         elif endpoint_type == "class_beneficiary_removal":
