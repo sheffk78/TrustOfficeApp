@@ -82,6 +82,7 @@ async def create_distribution(
         "authority_clause_ref": dist.authority_clause_ref,
         "notes": dist.notes,
         "trustee_name": trustee_name,
+        "status": "review",  # Phase 5 Fix 4: distributions start in review
         "solvency_confirmed": False,
         "recusal_acknowledged": False,
         "approved_by": None,

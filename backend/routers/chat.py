@@ -776,6 +776,14 @@ async def _execute_approved_action(
                 background_tasks=BackgroundTasks(),
                 user=user_doc,
             )
+            # Onboarding update: minutes router only calls auto_update_onboarding
+            # for finalized minutes, but chat creates drafts. Update here so
+            # the onboarding checklist reflects that minutes were generated.
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
             return {
                 "success": True,
                 "record_id": result.minutes_id,
