@@ -20,6 +20,18 @@ from database import db
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_trustees(trustees):
+    """Normalize trustees field to a comma-joined string.
+
+    Handles both legacy comma-separated strings and new list format.
+    """
+    if not trustees:
+        return ""
+    if isinstance(trustees, list):
+        return ", ".join(t for t in trustees if t)
+    return str(trustees)
+
 # Path to prompt files
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
@@ -298,7 +310,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
             "beneficiary_standard": trust.get("beneficiary_standard", ""),
             "start_date": trust.get("start_date", ""),
             "status": trust.get("status", "active"),
-            "trustees": trust.get("trustees", ""),
+            "trustees": _normalize_trustees(trust.get("trustees", "")),
         }
     else:
         context["trust"] = {"name": "Unknown Trust"}

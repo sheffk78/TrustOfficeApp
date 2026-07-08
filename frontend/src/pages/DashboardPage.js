@@ -430,10 +430,69 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              {/* Onboarding Checklist */}
+              {/* Fix 14: "Do This Next" hero card */}
+              {nextAction ? (
+                <div
+                  className={`mb-8 card-trust overflow-hidden ${
+                    nextAction.variant === 'urgent'
+                      ? 'bg-gradient-to-r from-error/10 to-error/5 border-l-4 border-l-error'
+                      : nextAction.variant === 'onboarding'
+                        ? 'bg-gradient-to-r from-gold/10 to-navy/5 border-l-4 border-l-gold'
+                        : 'bg-gradient-to-r from-navy/10 to-navy/5 border-l-4 border-l-navy'
+                  }`}
+                  data-testid="do-this-next-hero"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                          Do This Next
+                        </span>
+                        {nextAction.variant === 'urgent' && (
+                          <span className="font-mono text-[10px] uppercase tracking-widest px-1.5 py-0.5 bg-error/20 text-error">
+                            Urgent
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="font-serif text-2xl text-navy dark:text-foreground mb-1">
+                        {nextAction.title}
+                      </h2>
+                      <p className="text-sm text-muted-foreground">{nextAction.context}</p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <Link
+                        to={nextAction.action}
+                        className="btn-primary inline-flex items-center gap-2 h-12 px-6 text-base"
+                        data-testid="do-this-next-cta"
+                      >
+                        {nextAction.cta}
+                        <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-8 card-trust bg-gradient-to-r from-success/10 to-success/5 border-l-4 border-l-success" data-testid="all-caught-up-hero">
+                  <div className="flex items-center gap-4 p-6">
+                    <div className="w-12 h-12 bg-success/20 flex items-center justify-center">
+                      <CheckCircle2 className="w-6 h-6 text-success" />
+                    </div>
+                    <div>
+                      <h2 className="font-serif text-2xl text-navy dark:text-foreground mb-1">You're all caught up!</h2>
+                      <p className="text-sm text-muted-foreground">No pending actions. Your trust governance is in great shape.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fix 13/14: Collapsed onboarding checklist accordion */}
               {onboarding && !onboarding.checklist_dismissed && onboardingProgress.completed < onboardingProgress.total && (
-                <div className="mb-8 card-trust border-l-4 border-l-gold bg-gold/5" data-testid="onboarding-checklist">
-                  <div className="flex items-start justify-between mb-4">
+                <div className="mb-8 card-trust" data-testid="onboarding-checklist">
+                  <button
+                    onClick={() => setOnboardingExpanded(!onboardingExpanded)}
+                    className="w-full flex items-center justify-between text-left"
+                    data-testid="onboarding-accordion-toggle"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gold/20 flex items-center justify-center text-gold">
                         <Zap className="w-5 h-5" />
@@ -441,127 +500,90 @@ export default function DashboardPage() {
                       <div>
                         <h3 className="font-serif text-lg text-navy">Getting Started</h3>
                         <p className="text-sm text-muted-foreground">
-                          {onboardingProgress.completed}/{onboardingProgress.total} steps completed
+                          {onboardingProgress.completed} of {onboardingProgress.total} setup steps complete
                         </p>
                       </div>
                     </div>
-                    <button 
-                      onClick={dismissOnboarding}
-                      className="text-muted-foreground hover:text-navy"
-                      data-testid="dismiss-onboarding"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  {/* Start Here - Trustee 101 */}
-                  <div className="mb-4">
-                    <h4 className="font-mono text-xs uppercase tracking-widest text-gold mb-2">Start Here</h4>
-                    <button
-                      onClick={() => navigate('/course')}
-                      className="w-full p-4 border-2 border-gold/30 bg-gold/5 hover:border-gold hover:bg-gold/10 transition-all text-left flex items-center gap-4 group"
-                      data-testid="onboarding-step-trustee-101"
-                    >
-                      <div className="w-10 h-10 bg-gold/20 flex items-center justify-center group-hover:bg-gold/30 transition-colors flex-shrink-0">
-                        <GraduationCap className="w-5 h-5 text-gold" />
+                    <div className="flex items-center gap-4">
+                      {/* Progress bar */}
+                      <div className="hidden sm:block w-40 h-2 bg-navy/10">
+                        <div
+                          className="h-full bg-gold transition-all"
+                          style={{ width: `${(onboardingProgress.completed / onboardingProgress.total) * 100}%` }}
+                        />
                       </div>
-                      <div className="flex-1">
-                        <p className="font-mono text-xs font-medium text-navy">Watch Trustee 101 First</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">9 short video lessons (6-12 min each) that explain what a trust is, your duties, and how to avoid common traps. Start here before anything else.</p>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-gold opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
-                  </div>
-                  
-                  {/* Profile Completion Section */}
-                  <div className="mb-4">
-                    <h4 className="font-mono text-xs uppercase tracking-widest text-navy/60 mb-2">Complete Your Trust Profile</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {onboardingProgress.profileSteps.map(step => {
-                        const Icon = step.icon;
-                        return (
-                          <button
-                            key={step.id}
-                            onClick={() => {
-                              if (step.done) return;
-                              navigate(step.action);
-                            }}
-                            className={`p-4 border text-left transition-colors ${
-                              step.done 
-                                ? 'border-success/30 bg-success/5 cursor-default' 
-                                : 'border-navy/20 hover:border-navy/40 cursor-pointer'
-                            }`}
-                            data-testid={`onboarding-step-${step.id}`}
-                          >
-                            <div className="flex items-center gap-2 mb-1.5">
-                              {step.done ? (
-                                <CheckCircle2 className="w-4 h-4 text-success" />
-                              ) : (
-                                <Circle className="w-4 h-4 text-muted-foreground" />
-                              )}
-                              <Icon className={`w-4 h-4 ${step.done ? 'text-success' : 'text-navy'}`} />
-                              <span className={`font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy'}`}>
-                                {step.label}
-                              </span>
-                              {step.done && (
-                                <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-success/60">
-                                  Done
-                                </span>
-                              )}
-                            </div>
-                            <p className={`text-xs leading-relaxed ${step.done ? 'text-success/60' : 'text-muted-foreground'}`}>
-                              {step.description}
-                            </p>
-                          </button>
-                        );
-                      })}
+                      <ChevronRight className={`w-5 h-5 text-muted-foreground transition-transform ${onboardingExpanded ? 'rotate-90' : ''}`} />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); dismissOnboarding(); }}
+                        className="text-muted-foreground hover:text-navy"
+                        data-testid="dismiss-onboarding"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
-                  </div>
+                  </button>
 
-                  {/* Trust Setup Section */}
-                  <div>
-                    <h4 className="font-mono text-xs uppercase tracking-widest text-navy/60 mb-2">Get Your Trust Running</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {onboardingProgress.setupSteps.map(step => {
-                        const Icon = step.icon;
-                        return (
-                          <button
-                            key={step.id}
-                            onClick={() => {
-                              if (step.done) return;
-                              navigate(step.action);
-                            }}
-                            className={`p-4 border text-left transition-colors ${
-                              step.done 
-                                ? 'border-success/30 bg-success/5 cursor-default' 
-                                : 'border-navy/20 hover:border-navy/40 cursor-pointer'
-                            }`}
-                            data-testid={`onboarding-step-${step.id}`}
-                          >
-                            <div className="flex items-center gap-2 mb-1.5">
-                              {step.done ? (
-                                <CheckCircle2 className="w-4 h-4 text-success" />
-                              ) : (
-                                <Circle className="w-4 h-4 text-muted-foreground" />
-                              )}
-                              <Icon className={`w-4 h-4 ${step.done ? 'text-success' : 'text-navy'}`} />
-                              <span className={`font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy'}`}>
-                                {step.label}
-                              </span>
-                              {step.done && (
-                                <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-success/60">
-                                  Done
+                  {onboardingExpanded && (
+                    <div className="mt-6 pt-6 border-t border-navy/10">
+                      {/* Start Here - Trustee 101 */}
+                      <div className="mb-4">
+                        <h4 className="font-mono text-xs uppercase tracking-widest text-gold mb-2">Start Here</h4>
+                        <button
+                          onClick={() => navigate('/course')}
+                          className="w-full p-4 border-2 border-gold/30 bg-gold/5 hover:border-gold hover:bg-gold/10 transition-all text-left flex items-center gap-4 group"
+                          data-testid="onboarding-step-trustee-101"
+                        >
+                          <div className="w-10 h-10 bg-gold/20 flex items-center justify-center group-hover:bg-gold/30 transition-colors flex-shrink-0">
+                            <GraduationCap className="w-5 h-5 text-gold" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-mono text-xs font-medium text-navy">Watch Trustee 101 First</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">9 short video lessons (6-12 min each) that explain what a trust is, your duties, and how to avoid common traps. Start here before anything else.</p>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-gold opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      </div>
+
+                      {/* Unified step list */}
+                      <div>
+                        <h4 className="font-mono text-xs uppercase tracking-widest text-navy/60 mb-2">Setup Steps</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {onboardingProgress.allSteps.map((step, index) => (
+                            <button
+                              key={step.id}
+                              onClick={() => {
+                                if (step.done) return;
+                                navigate(step.action);
+                              }}
+                              className={`p-4 border text-left transition-colors ${
+                                step.done
+                                  ? 'border-success/30 bg-success/5 cursor-default'
+                                  : 'border-navy/20 hover:border-navy/40 cursor-pointer'
+                              }`}
+                              data-testid={`onboarding-step-${step.id}`}
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                {step.done ? (
+                                  <CheckCircle2 className="w-4 h-4 text-success" />
+                                ) : (
+                                  <Circle className="w-4 h-4 text-muted-foreground" />
+                                )}
+                                <span className="font-mono text-[10px] text-muted-foreground">#{step.priority}</span>
+                                <span className={`font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy'}`}>
+                                  {step.label}
                                 </span>
-                              )}
-                            </div>
-                            <p className={`text-xs leading-relaxed ${step.done ? 'text-success/60' : 'text-muted-foreground'}`}>
-                              {step.description}
-                            </p>
-                          </button>
-                        );
-                      })}
+                                {step.done && (
+                                  <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-success/60">
+                                    Done
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 

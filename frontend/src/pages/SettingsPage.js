@@ -46,6 +46,7 @@ import {
   Unlock
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -140,6 +141,30 @@ export default function SettingsPage() {
     document_location: selectedTrust?.document_location || '',
   });
 
+  // Settings tab state (Fix 15: split single scroll wall into 4 tabs)
+  const [settingsTab, setSettingsTab] = useState('profile');
+
+  // Hash anchor → tab mapping for deep links from dashboard
+  const hashToTab = {
+    'formation-date': 'profile', 'ein': 'profile', 'grantor': 'profile',
+    'successor-trustee': 'people', 'key-contacts': 'people', 'successor-instructions': 'people',
+    'governance': 'compliance',
+    'notifications': 'account', 'billing': 'account',
+  };
+
+  // Trustees array state (Fix 12: replace comma-separated string with array)
+  // Handles both string (legacy) and array (new) formats from the API
+  const [trustees, setTrustees] = useState(() => {
+    const raw = selectedTrust?.trustees;
+    if (Array.isArray(raw)) return raw.length > 0 ? raw : [''];
+    if (typeof raw === 'string' && raw.trim()) return raw.split(',').map(t => t.trim()).filter(Boolean);
+    return [''];
+  });
+
+  const addTrustee = () => setTrustees(prev => [...prev, '']);
+  const updateTrustee = (index, value) => setTrustees(prev => prev.map((t, i) => i === index ? value : t));
+  const removeTrustee = (index) => setTrustees(prev => prev.filter((_, i) => i !== index));
+
   // Governance: Spending Threshold state (synced from selectedTrust.governance_settings)
   const GOVERNANCE_CLASSIFICATIONS = [
     'Distribution', 'Compensation', 'Inter-Entity Transfer',
@@ -169,18 +194,24 @@ export default function SettingsPage() {
   };
 
   // Scroll to section from dashboard hash (e.g., /settings#ein, /settings#formation-date)
+  // Also switches to the correct tab (Fix 15)
   useEffect(() => {
     if (location.hash) {
       const targetId = location.hash.slice(1); // remove '#'
+      // Switch to the right tab if the hash maps to one
+      if (hashToTab[targetId]) {
+        setSettingsTab(hashToTab[targetId]);
+      }
       // Map hash to the data-section attribute on the wrapper div
-      const el = document.querySelector(`[data-section="${targetId}"]`);
-      if (el) {
-        setTimeout(() => {
+      // (slight delay so the tab content has time to render)
+      setTimeout(() => {
+        const el = document.querySelector(`[data-section="${targetId}"]`);
+        if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           el.classList.add('ring-2', 'ring-navy/30', 'rounded');
           setTimeout(() => el.classList.remove('ring-2', 'ring-navy/30', 'rounded'), 3000);
-        }, 300);
-      }
+        }
+      }, 350);
     }
   }, [location.hash]);
 

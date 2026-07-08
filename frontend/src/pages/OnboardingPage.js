@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,9 +14,6 @@ import {
   CheckCircle2,
   FileText,
   Users,
-  Package,
-  Calendar,
-  ClipboardList,
   Upload,
   Sparkles,
   Lock,
@@ -27,8 +24,6 @@ import {
   ChevronDown,
   Plus,
   X,
-  Landmark,
-  ShieldCheck,
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -86,16 +81,7 @@ const xhrRequest = (method, url, data = null, token = null) => {
   });
 };
 
-// Quick start tasks shown after trust creation + document upload
-const QUICK_START_TASKS = [
-  { label: 'Set up beneficiaries', path: '/beneficiaries', icon: Users, description: 'Add the people who benefit from your trust' },
-  { label: 'Set up your trust structure', path: '/structures', icon: Package, description: 'Add your trust entity and any related LLCs or structures' },
-  { label: 'Hold your first trustee meeting', path: '/minutes/create?type=initial_trustee_meeting&from=onboarding', icon: ClipboardList, description: 'Document your acceptance of trusteeship and initial decisions' },
-  { label: 'Check your tax calendar', path: '/calendar', icon: Calendar, description: 'See your filing deadlines based on your trust setup' },
-  { label: 'Add a bank account', path: '/structures', icon: Landmark, description: 'Link a bank account to your trust entity for tracking' },
-  { label: 'Upload a bank statement', path: '/vault', icon: Upload, description: 'Upload a bank statement to start tracking balances and transactions' },
-  { label: 'Set a spending threshold', path: '/settings#governance', icon: ShieldCheck, description: 'Configure a spending threshold to flag large transactions for trustee approval' },
-];
+// Quick start tasks have been moved to the dashboard's unified "Do This Next" engine (Fix 13/14).
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
@@ -922,29 +908,15 @@ export default function OnboardingPage() {
                 {createdTrustName ? `${createdTrustName} is Ready!` : "You're All Set!"}
               </h1>
               <p className="text-muted-foreground mb-8">
-                Here are your recommended next steps, in order:
+                Your trust is created. Head to your dashboard to see your next steps.
               </p>
 
               <div className="text-left mb-8">
-                <div className="space-y-3">
-                  {QUICK_START_TASKS.map((task, index) => (
-                    <button
-                      key={index}
-                      onClick={() => navigate(task.path)}
-                      className="w-full p-4 border border-navy/10 hover:border-navy/30 hover:bg-navy/5 transition-all flex items-center gap-4 text-left group"
-                      data-testid={`quick-start-${task.id || index}`}
-                    >
-                      <div className="w-10 h-10 bg-navy/10 flex items-center justify-center group-hover:bg-navy/20 transition-colors flex-shrink-0">
-                        <task.icon className="w-5 h-5 text-navy" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-navy">{task.label}</p>
-                        <p className="text-xs text-muted-foreground">{task.description}</p>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-navy opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
-                  ))}
-                </div>
+                <h3 className="text-xl font-serif text-navy dark:text-foreground mb-2">You're all set!</h3>
+                <p className="text-muted-foreground mb-4">Your dashboard will guide you through the next steps to get your trust fully configured.</p>
+                <Link to="/dashboard" className="btn-primary inline-flex items-center gap-2 h-12 px-6 text-base">
+                  Go to Dashboard <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
 
               <div className="bg-navy/5 border border-navy/10 p-4 mb-6">
@@ -952,15 +924,6 @@ export default function OnboardingPage() {
                   <strong>Tip:</strong> You can also explore the app with demo data to see all features in action. Demo data is separate from your real trust and can be deleted anytime in Settings.
                 </p>
               </div>
-
-              <Button
-                onClick={() => navigate('/dashboard')}
-                className="w-full btn-primary h-12"
-                data-testid="go-to-dashboard-btn"
-              >
-                Go to Dashboard
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
             </div>
           </div>
         )}

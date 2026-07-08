@@ -68,8 +68,13 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
         # Auto-populate trustees with the account creator's name if not provided
         # (assumption: the person creating the trust is the trustee)
         trustees = trust.trustees
-        if not trustees or not trustees.strip():
-            trustees = user.get("name", "")
+        # Normalize trustees to a list for consistent storage
+        if trustees is None or (isinstance(trustees, str) and not trustees.strip()) or (isinstance(trustees, list) and len(trustees) == 0):
+            trustees = [user.get("name", "")] if user.get("name") else []
+        elif isinstance(trustees, str):
+            # Legacy string format — split on commas (backward compat)
+            trustees = [t.strip() for t in trustees.split(",") if t.strip()]
+        # trustees is now a List[str]
         
         trust_doc = {
             "trust_id": trust_id,
@@ -161,7 +166,7 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
             "formation_date": trust.start_date,
             "governing_law": jurisdiction or "",
             "ein": trust.ein,
-            "trustee_names": trustees or "",
+            "trustee_names": ", ".join(trustees) if isinstance(trustees, list) else (trustees or ""),
             "beneficiary_standard": "",
             "article_ref_distribution": "",
             "article_ref_compensation": "",
@@ -262,9 +267,15 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
     
     # Sync trustees to the entity's trustee_names field
     if "trustees" in update_data:
+        tr = update_data["trustees"]
+        # Normalize trustees to a comma-joined string for the entity's trustee_names field
+        if isinstance(tr, list):
+            tr_str = ", ".join(tr)
+        else:
+            tr_str = tr or ""
         await db.entities.update_one(
             {"trust_id": trust_id, "entity_type": "Trust"},
-            {"$set": {"trustee_names": update_data["trustees"] or ""}}
+            {"$set": {"trustee_names": tr_str}}
         )
     
     # If governance_settings changed (spending threshold), backfill alerts
