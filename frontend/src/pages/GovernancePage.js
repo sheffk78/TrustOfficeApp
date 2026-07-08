@@ -600,7 +600,7 @@ export default function GovernancePage() {
                       <h4 className="font-medium text-sm">Asset Valuation Freshness</h4>
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Keep Schedule A asset valuations current (within 12 months)
+                      Keep Trust Assets valuations current (within 12 months)
                     </p>
                     <span className="badge-trust">15 points</span>
                   </div>

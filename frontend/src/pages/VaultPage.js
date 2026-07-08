@@ -43,7 +43,7 @@ const CATEGORY_ICONS = {
 const DOC_CATEGORIES = {
   trust_instrument: "Trust Instrument / Governing Document",
   amendment: "Trust Amendment / Restatement",
-  schedule_a: "Schedule A (Assets)",
+  schedule_a: "Trust Assets",
   minutes: "Minutes of Meetings",
   tax_return: "Tax Return (Form 1041)",
   k1: "Schedule K-1",

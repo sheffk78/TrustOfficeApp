@@ -308,8 +308,8 @@ export default function BeneficiariesPage() {
         loadCertificatesData();
         loadOverviewData();
       } else {
-        const error = await response.json();
-        showError(toast, new Error(error.detail || 'Failed to save certificate'), { operation: 'save', page: 'Beneficiaries' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to save certificate (${response.status})`), { operation: 'save', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'Beneficiaries' });
@@ -346,8 +346,8 @@ export default function BeneficiariesPage() {
         loadCertificatesData();
         loadOverviewData();
       } else {
-        const error = await response.json();
-        showError(toast, new Error(error.detail || 'Transfer failed'), { operation: 'transfer_certificate', page: 'Beneficiaries' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Transfer failed (${response.status})`), { operation: 'transfer_certificate', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'transfer_certificate', page: 'Beneficiaries' });
@@ -413,8 +413,8 @@ export default function BeneficiariesPage() {
         setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' });
         loadOverviewData();
       } else {
-        const error = await response.json();
-        showError(toast, new Error(error.detail || 'Failed to add Class Beneficiary'), { operation: 'add', page: 'Beneficiaries' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to add Class Beneficiary (${response.status})`), { operation: 'add', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'add', page: 'Beneficiaries' });

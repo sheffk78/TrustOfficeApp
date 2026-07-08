@@ -56,7 +56,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'Add Asset to Trust',
-    description: 'Accept property and update Schedule A',
+    description: 'Accept property and update Trust Assets',
     icon: PlusCircle,
     path: '/minutes/template/acceptance_of_property',
     color: 'bg-blue-500/10 text-blue-600'

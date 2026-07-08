@@ -157,7 +157,7 @@ const PrintableBinderPage = () => {
         <main className="main-content no-print">
           <div className="page-container max-w-5xl mx-auto">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Printable Binder Tools
+              Printable Record Book
             </h1>
           <div className="flex items-center gap-2 mb-2">
             <PageHelpButton

@@ -116,7 +116,7 @@ export default function ScheduleAPage() {
 
   const handleDialogOpenChange = (open) => {
     if (open && isReadOnly) {
-      showUpgradeModal('add assets to Schedule A', 'button_click', 'schedule_a_page');
+      showUpgradeModal('add assets to Trust Assets', 'button_click', 'schedule_a_page');
       return;
     }
     setDialogOpen(open);
@@ -149,14 +149,14 @@ export default function ScheduleAPage() {
       }
 
       if (response.ok) {
-        toast.success(editingAsset ? 'Asset updated' : 'Asset added to Schedule A');
+        toast.success(editingAsset ? 'Asset updated' : 'Asset added to Trust Assets');
         setDialogOpen(false);
         resetForm();
         loadAssets();
         loadSummary();
       } else {
-        const error = await response.json();
-        showError(toast, new Error(error.detail || 'Failed to save asset'), { operation: 'save', page: 'ScheduleA' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to save asset (${response.status})`), { operation: 'save', page: 'ScheduleA' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'ScheduleA' });
@@ -164,7 +164,7 @@ export default function ScheduleAPage() {
   };
 
   const handleDelete = async (itemId) => {
-    if (!confirm('Are you sure you want to remove this asset from Schedule A?')) return;
+    if (!confirm('Are you sure you want to remove this asset from Trust Assets?')) return;
     
     try {
       const response = await fetchWithAuth(`/schedule-a/${itemId}`, { method: 'DELETE' });
@@ -312,7 +312,7 @@ export default function ScheduleAPage() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success('Schedule A PDF downloaded');
+        toast.success('Trust Assets PDF downloaded');
       } else {
         toast.error('Failed to generate PDF. Please try again. If the problem continues, contact support@trustoffice.app.');
       }
@@ -343,7 +343,7 @@ export default function ScheduleAPage() {
         <main className="lg:pl-64 pt-16 lg:pt-0">
           <div className="p-8">
             <div className="card-trust p-8 text-center">
-              <p className="text-muted-foreground">Select a trust to view Schedule A</p>
+              <p className="text-muted-foreground">Select a trust to view Trust Assets</p>
             </div>
           </div>
         </main>
@@ -370,7 +370,7 @@ export default function ScheduleAPage() {
                   { text: 'Add, update, or dispose of trust assets with proper documentation' },
                   { text: 'Track asset values, dates, and disposition history' },
                 ]}
-                taPrompt="Walk me through the Schedule A page and how to add an asset"
+                taPrompt="Walk me through the Trust Assets page and how to add an asset"
               />
               <Button
                 variant="outline" 
@@ -391,7 +391,7 @@ export default function ScheduleAPage() {
                 <DialogContent className="max-w-lg">
                   <DialogHeader>
                     <DialogTitle className="font-serif text-xl text-navy">
-                      {editingAsset ? 'Edit Asset' : 'Add Asset to Schedule A'}
+                      {editingAsset ? 'Edit Asset' : 'Add Asset to Trust Assets'}
                     </DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4 mt-4">
@@ -543,7 +543,7 @@ export default function ScheduleAPage() {
               <Package className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="font-serif text-xl text-navy mb-2">No Assets Yet</h3>
               <p className="text-muted-foreground mb-6">
-                Add assets to Schedule A to track the trust corpus
+                Add assets to Trust Assets to track the trust corpus
               </p>
               <Button className="btn-primary" onClick={() => handleDialogOpenChange(true)}>
                 <Plus className="w-4 h-4 mr-2" />

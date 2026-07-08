@@ -385,8 +385,8 @@ export default function SettingsPage() {
         setUserPrefs({ ...userPrefs, hide_watermark: checked });
         toast.success(checked ? 'Watermark hidden' : 'Watermark enabled');
       } else {
-        const error = await response.json();
-        showError(toast, error, { operation: 'update', page: 'Settings' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Update failed (${response.status})`), { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'update', page: 'Settings' });
@@ -409,8 +409,8 @@ export default function SettingsPage() {
         setUserPrefs({ ...userPrefs, admin_access_locked: newValue });
         toast.success(newValue ? 'Admin access locked' : 'Admin access unlocked');
       } else {
-        const error = await response.json();
-        showError(toast, error, { operation: 'update', page: 'Settings' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Update failed (${response.status})`), { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'update', page: 'Settings' });

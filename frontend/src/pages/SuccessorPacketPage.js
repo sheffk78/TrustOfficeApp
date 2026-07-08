@@ -210,7 +210,7 @@ const SuccessorPacketPage = () => {
                     { icon: FileText, title: 'Trust Overview', desc: 'Name, EIN, type, jurisdiction, formation date' },
                     { icon: Users, title: 'Trustee Transition', desc: 'Current trustee, successor trustee, contact info' },
                     { icon: Users, title: 'Beneficiaries', desc: 'Names, contacts, allocations, unit certificates' },
-                    { icon: Building2, title: 'Asset Inventory', desc: 'Schedule A assets, entity structure, ownership' },
+                    { icon: Building2, title: 'Asset Inventory', desc: 'Trust Assets, entity structure, ownership' },
                     { icon: Landmark, title: 'Bank Accounts', desc: 'Institutions, account types, last four digits' },
                     { icon: Phone, title: 'Professional Contacts', desc: 'Attorney, CPA, financial advisor' },
                     { icon: ClipboardList, title: 'Document Inventory', desc: 'Vault documents by category' },
@@ -353,7 +353,7 @@ const SuccessorPacketPage = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 italic">No entities or assets found. Add entities in the Structures page.</p>
+              <p className="text-sm text-gray-400 italic">No entities or assets found. Add entities in the Trust & Entities page.</p>
             )}
           </div>
         </div>

@@ -172,7 +172,7 @@ export default function AuthorityPage() {
           {/* Header */}
           <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="page-title">Authority Management</h1>
+              <h1 className="page-title">Legal Powers</h1>
               <p className="page-subtitle">View trustee authorities, signing powers, and delegation structure as defined in your trust agreement</p>
             </div>
             <div className="flex items-center gap-2">
