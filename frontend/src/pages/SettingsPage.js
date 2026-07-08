@@ -92,7 +92,7 @@ export default function SettingsPage() {
     jurisdiction: '',
     role: 'Trustee',
     start_date: '',
-    trustees: '',
+    trustees: [''],
     authority_clause: '',
     ein: '',
     state_code: '',
@@ -164,6 +164,10 @@ export default function SettingsPage() {
   const addTrustee = () => setTrustees(prev => [...prev, '']);
   const updateTrustee = (index, value) => setTrustees(prev => prev.map((t, i) => i === index ? value : t));
   const removeTrustee = (index) => setTrustees(prev => prev.filter((_, i) => i !== index));
+
+  const addNewTrustee = () => setNewTrustData(prev => ({ ...prev, trustees: [...prev.trustees, ''] }));
+  const updateNewTrustee = (index, value) => setNewTrustData(prev => ({ ...prev, trustees: prev.trustees.map((t, i) => i === index ? value : t) }));
+  const removeNewTrustee = (index) => setNewTrustData(prev => ({ ...prev, trustees: prev.trustees.filter((_, i) => i !== index) }));
 
   // Governance: Spending Threshold state (synced from selectedTrust.governance_settings)
   const GOVERNANCE_CLASSIFICATIONS = [
@@ -639,7 +643,7 @@ export default function SettingsPage() {
           jurisdiction: newTrustData.jurisdiction.trim(),
           role: newTrustData.role,
           start_date: newTrustData.start_date || null,
-          trustees: newTrustData.trustees.trim() || null,
+          trustees: newTrustData.trustees.filter(Boolean).length > 0 ? newTrustData.trustees.filter(Boolean) : null,
           authority_clause: newTrustData.authority_clause.trim() || null,
           ein: newTrustData.ein.trim() || null,
           state_code: newTrustData.state_code.trim().toUpperCase() || null,
@@ -924,14 +928,27 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <Label className="label-trust">Trustees</Label>
-                    <Input
-                      value={newTrustData.trustees}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, trustees: e.target.value })}
-                      className="mt-1 input-trust"
-                      placeholder="e.g., John Smith, Jane Smith"
-                      data-testid="new-trust-trustees"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Comma-separated list of trustees</p>
+                    <div className="space-y-2 mt-1">
+                      {newTrustData.trustees.map((trustee, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            value={trustee}
+                            onChange={(e) => updateNewTrustee(index, e.target.value)}
+                            className="input-trust"
+                            placeholder={`Trustee ${index + 1} name`}
+                            data-testid={`new-trust-trustee-${index}`}
+                          />
+                          {newTrustData.trustees.length > 1 && (
+                            <Button type="button" variant="outline" size="sm" onClick={() => removeNewTrustee(index)} className="shrink-0">
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" size="sm" onClick={addNewTrustee} className="mt-2">
+                        + Add Trustee
+                      </Button>
+                    </div>
                   </div>
                   <div>
                     <Label className="label-trust">Authority Clause (from DOT)</Label>
@@ -1090,8 +1107,6 @@ export default function SettingsPage() {
               </DialogContent>
             </Dialog>
           </div>
-          </TabsContent>
-          {/* ============ END ACCOUNT TAB (part 1) ============ */}
 
           {/* ============ PROFILE TAB ============ */}
           <TabsContent value="profile">
@@ -1671,7 +1686,6 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* ============ ACCOUNT TAB (part 2) ============ */}
-          <TabsContent value="account">
           {/* Trust Document Intelligence — extracted provisions from uploaded trust document */}
           {selectedTrust && (
             <div className="mb-8">
