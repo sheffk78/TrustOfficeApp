@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -33,7 +33,8 @@ import {
   Link2,
   FileText,
   Send,
-  Mail
+  Mail,
+  Bot
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -769,35 +770,46 @@ export default function DistributionsPage() {
                         </button>
                       </td>
                       <td className="text-center">
-                        {status === 'review' && (
-                          <div className="flex justify-center gap-2">
+                        <div className="flex justify-center items-center gap-1.5">
+                          {status === 'review' && (
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(dist.distribution_id, 'approved')}
+                                className="p-1 hover:bg-success/10 text-success"
+                                title="Approve"
+                                data-testid={`approve-${dist.distribution_id}`}
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleUpdateStatus(dist.distribution_id, 'declined')}
+                                className="p-1 hover:bg-error/10 text-error"
+                                title="Decline"
+                                data-testid={`decline-${dist.distribution_id}`}
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          {status !== 'review' && (
                             <button
-                              onClick={() => handleUpdateStatus(dist.distribution_id, 'approved')}
-                              className="p-1 hover:bg-success/10 text-success"
-                              title="Approve"
-                              data-testid={`approve-${dist.distribution_id}`}
+                              onClick={() => handleUpdateStatus(dist.distribution_id, 'review')}
+                              className="p-1 hover:bg-warning/10 text-warning"
+                              title="Set to Review"
                             >
-                              <Check className="w-4 h-4" />
+                              <Clock className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleUpdateStatus(dist.distribution_id, 'declined')}
-                              className="p-1 hover:bg-error/10 text-error"
-                              title="Decline"
-                              data-testid={`decline-${dist.distribution_id}`}
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
-                        {status !== 'review' && (
-                          <button
-                            onClick={() => handleUpdateStatus(dist.distribution_id, 'review')}
-                            className="p-1 hover:bg-warning/10 text-warning"
-                            title="Set to Review"
+                          )}
+                          <Link
+                            to={`/trust-assistant?prompt=${encodeURIComponent(`Draft meeting minutes documenting the $${dist.amount} distribution to ${dist.beneficiary_name || dist.beneficiary || 'the beneficiary'} on ${formatDate(dist.date)}.`)}`}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gold hover:bg-gold/10 transition-colors"
+                            title="Ask Trust Assistant to draft minutes"
+                            data-testid={`ta-draft-minutes-${dist.distribution_id}`}
                           >
-                            <Clock className="w-4 h-4" />
-                          </button>
-                        )}
+                            <Bot className="w-3.5 h-3.5" />
+                            <span className="hidden lg:inline">Draft Minutes</span>
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   )})}

@@ -1038,6 +1038,7 @@ class DashboardResponse(BaseModel):
     stats: DashboardStats
     governance_insights: List[GovernanceInsight]
     subscription: Optional["DashboardSubscriptionState"] = None
+    pending_quarterly_draft: Optional[dict] = None
 
 class OnboardingState(BaseModel):
     user_id: str

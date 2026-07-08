@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -37,7 +38,8 @@ import {
   History,
   Info,
   UsersRound,
-  Trash2
+  Trash2,
+  Bot
 } from 'lucide-react';
 
 // ========== PIE CHART COMPONENT ==========
@@ -688,9 +690,20 @@ export default function BeneficiariesPage() {
                               
                               {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}` && (
                                 <div className="bg-muted/30 p-4 border-t border-border">
-                                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
-                                    {ben.certificate_count} Certificate{ben.certificate_count !== 1 ? 's' : ''}
-                                  </p>
+                                  <div className="flex items-center justify-between mb-3">
+                                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                                      {ben.certificate_count} Certificate{ben.certificate_count !== 1 ? 's' : ''}
+                                    </p>
+                                    <Link
+                                      to={`/trust-assistant?prompt=${encodeURIComponent(`Draft meeting minutes to add ${ben.holder_name} as a beneficiary.`)}`}
+                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gold hover:bg-gold/10 transition-colors"
+                                      title="Ask Trust Assistant to draft minutes"
+                                      data-testid={`ta-add-beneficiary-${index}`}
+                                    >
+                                      <Bot className="w-3.5 h-3.5" />
+                                      Draft Minutes
+                                    </Link>
+                                  </div>
                                   <div className="space-y-2">
                                     {ben.certificates.map((cert) => (
                                       <div key={cert.certificate_id} className="flex items-center justify-between p-3 bg-background border border-border">

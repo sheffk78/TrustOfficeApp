@@ -670,3 +670,311 @@ async def ai_health_check(user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"AI health check failed: {type(e).__name__}: {e}")
         return {"ok": False, "error": "AI backend status unavailable"}
+
+
+# ==================== WEEKLY BRIEFING (Fix 5) ====================
+
+@router.get("/weekly-briefing")
+async def get_weekly_briefing(
+    trust_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Generate a deterministic 3-item weekly briefing from insights, deadlines,
+    and activity. No LLM call required — purely rule-based for speed and reliability.
+    """
+    user_id = user["user_id"]
+
+    if not trust_id:
+        trust = await db.trusts.find_one(
+            {"user_id": user_id}, {"_id": 0}, sort=[("created_at", -1)]
+        )
+        if not trust:
+            raise HTTPException(status_code=404, detail="No trust found")
+        trust_id = trust["trust_id"]
+    else:
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id}, {"_id": 0}
+        )
+        if not trust:
+            raise HTTPException(status_code=404, detail="Trust not found")
+
+    now = datetime.now(timezone.utc)
+    items = []
+
+    # 1. Overdue tax filings / governance tasks
+    overdue_tasks = await db.governance_tasks.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "due_date": {"$lt": now.strftime("%Y-%m-%d")},
+        "completed_at": None,
+    }).to_list(10)
+    if overdue_tasks:
+        items.append({
+            "id": "overdue_tasks",
+            "title": f"{len(overdue_tasks)} overdue task{'s' if len(overdue_tasks) > 1 else ''}",
+            "severity": "high",
+            "action_link": "/calendar",
+            "cta_prompt": f"What do I need to do for my {len(overdue_tasks)} overdue governance task{'s' if len(overdue_tasks) > 1 else ''}?",
+        })
+
+    # 2. Undocumented distributions (no minutes, older than 7 days)
+    cutoff = (now - timedelta(days=7)).isoformat()
+    undocumented = await db.distribution_records.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "minutes_record_id": {"$in": [None, ""]},
+        "created_at": {"$lt": cutoff},
+    }).to_list(10)
+    if undocumented:
+        items.append({
+            "id": "undocumented_distributions",
+            "title": f"{len(undocumented)} distribution{'s' if len(undocumented) > 1 else ''} without meeting minutes",
+            "severity": "medium",
+            "action_link": "/minutes",
+            "cta_prompt": f"Draft meeting minutes for {len(undocumented)} undocumented distribution{'s' if len(undocumented) > 1 else ''}.",
+        })
+
+    # 3. Stale asset valuations (not updated in 12+ months)
+    twelve_months_ago = (now - timedelta(days=365)).strftime("%Y-%m-%d")
+    stale_assets = await db.schedule_a_items.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "$or": [
+            {"updated_at": {"$lt": twelve_months_ago}},
+            {"date_conveyed": {"$lt": twelve_months_ago}, "updated_at": None},
+        ],
+    }).to_list(10)
+    if stale_assets:
+        items.append({
+            "id": "stale_assets",
+            "title": f"{len(stale_assets)} asset{'s' if len(stale_assets) > 1 else ''} not revalued in over 12 months",
+            "severity": "low",
+            "action_link": "/schedule-a",
+            "cta_prompt": f"Help me update the valuation for {len(stale_assets)} stale asset{'s' if len(stale_assets) > 1 else ''}.",
+        })
+
+    # 4. Upcoming deadlines in next 14 days
+    fourteen_days = (now + timedelta(days=14)).strftime("%Y-%m-%d")
+    today_str = now.strftime("%Y-%m-%d")
+    upcoming = await db.governance_tasks.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "due_date": {"$gte": today_str, "$lte": fourteen_days},
+        "completed_at": None,
+    }).to_list(10)
+    if upcoming:
+        items.append({
+            "id": "upcoming_deadlines",
+            "title": f"{len(upcoming)} deadline{'s' if len(upcoming) > 1 else ''} in the next 14 days",
+            "severity": "medium",
+            "action_link": "/calendar",
+            "cta_prompt": f"What are my upcoming deadlines in the next 14 days and what do I need to prepare?",
+        })
+
+    # 5. Pending distribution approvals
+    pending_dist = await db.distribution_records.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "approved_at": None,
+        "solvency_confirmed": {"$ne": True},
+    }).to_list(10)
+    if pending_dist:
+        items.append({
+            "id": "pending_distributions",
+            "title": f"{len(pending_dist)} distribution{'s' if len(pending_dist) > 1 else ''} awaiting solvency confirmation",
+            "severity": "medium",
+            "action_link": "/distributions",
+            "cta_prompt": f"Help me review {len(pending_dist)} pending distribution{'s' if len(pending_dist) > 1 else ''} for solvency confirmation.",
+        })
+
+    # Sort by severity and take top 3
+    severity_order = {"high": 0, "medium": 1, "low": 2}
+    items.sort(key=lambda x: severity_order.get(x["severity"], 3))
+    top_3 = items[:3]
+
+    return {"briefing": top_3, "generated_at": now.isoformat()}
+
+
+# ==================== AUTO-DRAFTED QUARTERLY MINUTES (Fix 3) ====================
+
+@router.post("/quarterly-draft")
+async def auto_draft_quarterly_minutes(
+    trust_id: Optional[str] = None,
+    quarter: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Auto-generate a draft minutes record from the quarter's activity.
+    Deterministic (no LLM call) — builds structured decisions from DB records
+    and saves a status='draft' minutes record.
+    """
+    import uuid as _uuid
+    from database import db as _db
+
+    user_id = user["user_id"]
+
+    if not trust_id:
+        trust = await _db.trusts.find_one(
+            {"user_id": user_id}, {"_id": 0}, sort=[("created_at", -1)]
+        )
+        if not trust:
+            raise HTTPException(status_code=404, detail="No trust found")
+        trust_id = trust["trust_id"]
+        trust_doc = trust
+    else:
+        trust_doc = await _db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id}, {"_id": 0}
+        )
+        if not trust_doc:
+            raise HTTPException(status_code=404, detail="Trust not found")
+
+    now = datetime.now(timezone.utc)
+
+    # Determine quarter if not provided (e.g., "2026-Q2")
+    if not quarter:
+        q_num = (now.month - 1) // 3 + 1
+        # Use previous quarter (the one that just ended)
+        if q_num == 1:
+            quarter = f"{now.year - 1}-Q4"
+        else:
+            quarter = f"{now.year}-Q{q_num - 1}"
+
+    # Parse quarter to date range
+    try:
+        year_str, q_str = quarter.split("-Q")
+        year = int(year_str)
+        q = int(q_str)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail=f"Invalid quarter format: {quarter}. Use YYYY-QN.")
+
+    q_start_month = (q - 1) * 3 + 1
+    q_end_month = q_start_month + 2
+    q_start = f"{year}-{q_start_month:02d}-01"
+    q_end = f"{year}-{q_end_month:02d}-31"
+
+    # Check if a draft already exists for this quarter
+    existing = await _db.minutes_records.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "minutes_type": "quarterly_review",
+        "template_data.quarter": quarter,
+        "status": "draft",
+    })
+    if existing:
+        return {
+            "minutes_id": existing["minutes_id"],
+            "quarter": quarter,
+            "already_existed": True,
+            "review_link": f"/minutes/{existing['minutes_id']}/edit",
+        }
+
+    # Gather quarterly activity
+    decisions = []
+
+    # Distributions in this quarter
+    distributions = await _db.distribution_records.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "date": {"$gte": q_start, "$lte": q_end},
+    }).to_list(100)
+    for d in distributions:
+        amt = d.get("amount", 0)
+        bene = d.get("beneficiary_name", "beneficiary")
+        decisions.append(f"Approved ${amt:,.2f} distribution to {bene} on {d.get('date', 'N/A')}.")
+
+    # Assets recorded in this quarter
+    assets = await _db.schedule_a_items.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "date_conveyed": {"$gte": q_start, "$lte": q_end},
+    }).to_list(100)
+    for a in assets:
+        desc = a.get("description", "asset")
+        val = a.get("approximate_value", 0)
+        decisions.append(f"Recorded asset: {desc} (approximate value ${val:,.2f}).")
+
+    # Transactions in this quarter
+    transactions = await _db.transactions.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "date": {"$gte": q_start, "$lte": q_end},
+    }).to_list(100)
+    for t in transactions:
+        amt = t.get("amount", 0)
+        desc = t.get("description", "transaction")
+        decisions.append(f"Logged {t.get('transaction_type', 'transaction')}: {desc} (${amt:,.2f}).")
+
+    # Compensation payments in this quarter
+    payments = await _db.compensation_payments.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "date": {"$gte": q_start, "$lte": q_end},
+    }).to_list(100)
+    for p in payments:
+        amt = p.get("amount", 0)
+        decisions.append(f"Recorded trustee compensation payment of ${amt:,.2f} on {p.get('date', 'N/A')}.")
+
+    # Other minutes in this quarter
+    other_minutes = await _db.minutes_records.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "meeting_date": {"$gte": q_start, "$lte": q_end},
+        "minutes_type": {"$ne": "quarterly_review"},
+    }).to_list(100)
+    for m in other_minutes:
+        mtype = m.get("minutes_type", "meeting").replace("_", " ").title()
+        decisions.append(f"Held {mtype} on {m.get('meeting_date', 'N/A')}.")
+
+    if not decisions:
+        return {
+            "minutes_id": None,
+            "quarter": quarter,
+            "no_activity": True,
+            "message": f"No trust activity found for {quarter}.",
+        }
+
+    # Build the minutes record
+    trustee_name = trust_doc.get("trustee_name", "") or trust_doc.get("name", "Trustee")
+    minutes_id = f"minutes_{_uuid.uuid4().hex[:12]}"
+    decisions_text = " ".join(decisions)
+
+    minutes_doc = {
+        "minutes_id": minutes_id,
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "minutes_type": "quarterly_review",
+        "meeting_date": now.strftime("%Y-%m-%d"),
+        "participants_text": trustee_name,
+        "decisions_text": decisions_text,
+        "created_at": now.isoformat(),
+        "template_type": None,
+        "sections": [],
+        "template_data": {
+            "quarter": quarter,
+            "auto_drafted": True,
+            "activity_count": len(decisions),
+        },
+        "status": "draft",
+        "is_retroactive": False,
+        "retroactive_reason": None,
+        "retroactive_trustees_aware": None,
+        "retroactive_type": None,
+        "manually_edited": False,
+    }
+
+    await _db.minutes_records.insert_one(minutes_doc)
+
+    # Update onboarding checklist
+    try:
+        from dependencies import auto_update_onboarding
+        await auto_update_onboarding(user_id, trust_id)
+    except Exception:
+        pass
+
+    return {
+        "minutes_id": minutes_id,
+        "quarter": quarter,
+        "activity_count": len(decisions),
+        "review_link": f"/minutes/{minutes_id}/edit",
+    }

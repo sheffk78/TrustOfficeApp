@@ -107,6 +107,7 @@ export default function DashboardPage() {
   const { user, selectedTrust, trusts, trustsLoading, loadTrusts, seedDemoData } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [weeklyBriefing, setWeeklyBriefing] = useState(null);
   
   // Tax Calendar dashboard state
   const [taxDeadlines, setTaxDeadlines] = useState([]);
@@ -130,6 +131,7 @@ export default function DashboardPage() {
     if (selectedTrust) {
       loadDashboardData();
       loadTaxDeadlines();
+      loadWeeklyBriefing();
     } else {
       // No trust selected — stop loading to prevent blank screen
       setLoading(false);
@@ -173,6 +175,20 @@ export default function DashboardPage() {
       console.error('Failed to load tax deadlines:', error);
     } finally {
       setTaxDeadlinesLoading(false);
+    }
+  };
+
+  const loadWeeklyBriefing = async () => {
+    if (!selectedTrust) return;
+    try {
+      const response = await fetchWithAuth(`/ai/weekly-briefing?trust_id=${selectedTrust.trust_id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setWeeklyBriefing(data.briefing || []);
+      }
+    } catch (error) {
+      // Silent fail — briefing is non-critical
+      console.error('Failed to load weekly briefing:', error);
     }
   };
 
@@ -613,6 +629,75 @@ export default function DashboardPage() {
                     <Zap className="w-3.5 h-3.5" />
                     Show Getting Started ({onboardingProgress.completed}/{onboardingProgress.total} complete)
                   </button>
+                </div>
+              )}
+
+              {/* Pending Quarterly Draft Hero (Fix 3) */}
+              {dashboard?.pending_quarterly_draft && (
+                <div className="mb-6 card-trust border-l-4 border-l-blue-400 bg-blue-50/30" data-testid="quarterly-draft-hero">
+                  <div className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400/20 to-navy/10 flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-lg text-navy">
+                          Your {dashboard.pending_quarterly_draft.quarter} minutes are drafted
+                        </h3>
+                        <p className="text-sm text-muted-foreground">Review and finalize when ready</p>
+                      </div>
+                    </div>
+                    <Link
+                      to={dashboard.pending_quarterly_draft.review_link}
+                      className="btn btn-primary btn-sm"
+                    >
+                      Review now <ArrowRight className="w-4 h-4 inline ml-1" />
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {/* Weekly Briefing Hero — "3 things need your attention" */}
+              {weeklyBriefing && weeklyBriefing.length > 0 && (
+                <div className="mb-8 card-trust border-l-4 border-l-gold" data-testid="weekly-briefing-hero">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-gold/20 to-navy/10 flex items-center justify-center">
+                      <CalendarCheck className="w-5 h-5 text-gold" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-lg text-navy">{weeklyBriefing.length} {weeklyBriefing.length === 1 ? 'thing' : 'things'} need{weeklyBriefing.length === 1 ? 's' : ''} your attention</h3>
+                      <p className="text-sm text-muted-foreground">Weekly briefing</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {weeklyBriefing.map((item) => {
+                      const severityColors = {
+                        high: 'border-error/30 bg-error/5 text-error',
+                        medium: 'border-warning/30 bg-warning/5 text-warning',
+                        low: 'border-navy/20 bg-navy/5 text-navy/70',
+                      };
+                      const severityClass = severityColors[item.severity] || severityColors.low;
+                      return (
+                        <div key={item.id} className={`flex items-center justify-between p-3 border ${severityClass}`}>
+                          <span className="text-sm font-medium">{item.title}</span>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              to={`/trust-assistant?prompt=${encodeURIComponent(item.cta_prompt)}`}
+                              className="text-xs text-navy hover:text-navy/70 font-mono uppercase tracking-widest flex items-center gap-1"
+                            >
+                              Ask AI <ArrowRight className="w-3 h-3" />
+                            </Link>
+                            <Link
+                              to={item.action_link}
+                              className="text-xs text-navy/60 hover:text-navy font-mono uppercase tracking-widest flex items-center gap-1"
+                            >
+                              View <ArrowRight className="w-3 h-3" />
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 

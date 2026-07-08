@@ -235,6 +235,21 @@ export default function MinutesPage() {
               </button>
               {draftsOpen && (
                 <div className="mt-4 space-y-3">
+                  {/* Trust Assistant quick-draft banner */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gold/5 border border-gold/20 rounded">
+                    <Bot className="w-4 h-4 text-gold flex-shrink-0" />
+                    <p className="font-mono text-xs text-navy/70 flex-1">
+                      Draft quarterly review minutes from recent trust activity.
+                    </p>
+                    <Link
+                      to={`/trust-assistant?prompt=${encodeURIComponent('Draft quarterly review minutes from recent trust activity.')}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gold hover:bg-gold/10 transition-colors font-medium"
+                      data-testid="ta-draft-quarterly-review"
+                    >
+                      <Bot className="w-3.5 h-3.5" />
+                      Draft with AI
+                    </Link>
+                  </div>
                   {drafts.map((draft) => {
                     const summary = draft.summary || `${(draft.minutes_type || 'Meeting').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Minutes`;
                     const entryDate = draft.date || draft.meeting_date;

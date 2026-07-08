@@ -687,6 +687,80 @@ def generate_governance_insights(criteria: List[dict]) -> List[GovernanceInsight
     return insights
 
 
+async def generate_additional_governance_insights(trust_id: str, user_id: str) -> List[GovernanceInsight]:
+    """
+    Generate supplementary governance insights that require direct DB queries
+    (beyond the standard health-score criteria). These are appended to the
+    insights list produced by generate_governance_insights() for the dashboard's
+    Today's Focus section.
+
+    Criteria:
+      1. Undocumented Distributions — distributions older than 7 days with no
+         linked minutes_record_id.
+      2. Overdue Tax Filings — tax_calendar entries past their due_date that are
+         not filed/not_required.
+
+    Note: "Stale Asset Valuations" is already covered by the existing
+    "Asset Valuation Freshness" health-score criterion and is intentionally not
+    duplicated here.
+    """
+    insights: List[GovernanceInsight] = []
+    now = datetime.now(timezone.utc)
+
+    # --- 1. Undocumented Distributions ---
+    # Distributions created >7 days ago that still have no linked meeting minutes.
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+    undocumented_count = await db.distribution_records.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "created_at": {"$lt": seven_days_ago},
+        "$or": [
+            {"minutes_record_id": None},
+            {"minutes_record_id": ""}
+        ]
+    })
+    if undocumented_count > 0:
+        points = min(undocumented_count * 5, 15)
+        insights.append(GovernanceInsight(
+            type="warning",
+            criterion_name="Undocumented Distributions",
+            title="Undocumented Distributions",
+            description=(
+                f"{undocumented_count} distribution(s) lack meeting minutes. "
+                f"Document them to strengthen your records. "
+                f"Draft minutes for each undocumented distribution."
+            ),
+            action_path="/distributions",
+            action_label="Review Distributions",
+            points=points
+        ))
+
+    # --- 2. Overdue Tax Filings ---
+    # tax_calendar entries whose due_date has passed and are still pending.
+    today_iso = now.date().isoformat()
+    overdue_tax_count = await db.tax_calendar.count_documents({
+        "trust_id": trust_id,
+        "due_date": {"$lt": today_iso},
+        "filing_status": {"$nin": ["filed", "not_required"]}
+    })
+    if overdue_tax_count > 0:
+        points = min(overdue_tax_count * 10, 20)
+        insights.append(GovernanceInsight(
+            type="warning",
+            criterion_name="Overdue Tax Filings",
+            title="Overdue Tax Filings",
+            description=(
+                f"{overdue_tax_count} tax filing(s) are overdue. "
+                f"Review and complete overdue filings or mark them as filed."
+            ),
+            action_path="/tax-calendar",
+            action_label="View Tax Calendar",
+            points=points
+        ))
+
+    return insights
+
+
 async def get_dashboard_stats(trust_id: str, user_id: str) -> DashboardStats:
     """Calculate dashboard statistics for a trust."""
     now = datetime.now(timezone.utc)
@@ -1061,6 +1135,9 @@ async def get_dashboard(
     dismissed_names = {d["criterion_name"] for d in dismissed}
     
     governance_insights = generate_governance_insights(health_data["criteria"])
+    # Append supplementary insights that require direct DB queries
+    # (Undocumented Distributions, Overdue Tax Filings)
+    governance_insights.extend(await generate_additional_governance_insights(trust_id, user_id))
     governance_insights = [i for i in governance_insights if i.criterion_name not in dismissed_names]
     
     sub_state = await get_subscription_state(user_id)
@@ -1072,7 +1149,24 @@ async def get_dashboard(
         is_read_only=sub_state.is_read_only,
         trial_days_remaining=sub_state.trial_days_remaining
     )
-    
+
+    # Check for pending quarterly draft (Fix 3)
+    pending_quarterly_draft = None
+    pending_draft = await db.minutes_records.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "minutes_type": "quarterly_review",
+        "status": "draft",
+        "template_data.auto_drafted": True,
+    })
+    if pending_draft:
+        quarter = pending_draft.get("template_data", {}).get("quarter", "")
+        pending_quarterly_draft = {
+            "minutes_id": pending_draft["minutes_id"],
+            "quarter": quarter,
+            "review_link": f"/minutes/{pending_draft['minutes_id']}/edit",
+        }
+
     return DashboardResponse(
         trust_id=trust_id,
         trust_name=trust_name,
@@ -1081,7 +1175,8 @@ async def get_dashboard(
         recent_activity=recent_activity,
         stats=stats,
         governance_insights=governance_insights,
-        subscription=subscription
+        subscription=subscription,
+        pending_quarterly_draft=pending_quarterly_draft,
     )
 
 

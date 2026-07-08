@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
 import {
-  Calendar, Plus, AlertTriangle, Clock, X,
+  Calendar, Plus, AlertTriangle, Clock, X, Bot,
 } from 'lucide-react';
 import { format, parseISO, addDays } from 'date-fns';
 import { toast } from 'sonner';
@@ -439,6 +439,15 @@ export default function TrustCalendarPage() {
                         Complete
                       </Button>
                     )}
+                    <Link
+                      to={`/trust-assistant?prompt=${encodeURIComponent(`Explain what I need to do for the ${nextUp.event_type === 'tax_deadline' ? (nextUp.title || nextUp.deadline_type) : (nextUp.title || nextUp.task_type?.replace(/_/g, ' '))} deadline on ${formatDate(nextUp.date)} and help me prepare.`)}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-gold hover:bg-gold/10 transition-colors border border-gold/20"
+                      title="Ask Trust Assistant for help"
+                      data-testid="ta-next-up-help"
+                    >
+                      <Bot className="w-3.5 h-3.5" />
+                      Ask AI
+                    </Link>
                   </div>
                 </div>
               </div>

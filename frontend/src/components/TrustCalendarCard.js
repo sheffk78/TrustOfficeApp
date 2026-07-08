@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   CheckCircle2, Clock, AlertTriangle, DollarSign,
-  ChevronDown, ChevronUp, X, Check, Shield,
+  ChevronDown, ChevronUp, X, Check, Shield, Bot,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -146,6 +147,15 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
                 </Button>
               </>
             )}
+            <Link
+              to={`/trust-assistant?prompt=${encodeURIComponent(`Explain what I need to do for the ${label} deadline on ${due ? format(due, 'MMM d, yyyy') : 'the due date'} and help me prepare.`)}`}
+              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-gold hover:bg-gold/10 transition-colors"
+              title="Ask Trust Assistant for help"
+              data-testid={`ta-help-${event.entry_id}`}
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Ask AI</span>
+            </Link>
           </div>
         </div>
 
@@ -306,6 +316,15 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
               Undo
             </Button>
           )}
+          <Link
+            to={`/trust-assistant?prompt=${encodeURIComponent(`Explain what I need to do for the ${humanizeTaskType(event.task_type || event.title || '')} deadline on ${formatDate(event.date)} and help me prepare.`)}`}
+            className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-gold hover:bg-gold/10 transition-colors"
+            title="Ask Trust Assistant for help"
+            data-testid={`ta-help-task-${event.id}`}
+          >
+            <Bot className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Ask AI</span>
+          </Link>
           <Button
             onClick={() => onDelete(event.id)}
             size="sm"

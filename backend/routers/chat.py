@@ -617,8 +617,11 @@ async def _execute_approved_action(
 
     try:
         if endpoint_type == "distribution":
-            # Create distribution record
-            from models import PurposeClassification
+            # Route through the real distribution router to ensure validation,
+            # activity logging, onboarding updates, and email notifications.
+            from routers.distributions import create_distribution as _create_dist
+            from models import DistributionCreate, PurposeClassification
+            from fastapi import BackgroundTasks
 
             purpose = mapped_data.pop("purpose_classification", "other")
             try:
@@ -626,33 +629,39 @@ async def _execute_approved_action(
             except ValueError:
                 purpose_enum = PurposeClassification.other
 
-            dist_id = f"dist_{uuid.uuid4().hex[:12]}"
-            dist_doc = {
-                "distribution_id": dist_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "beneficiary_name": mapped_data.get("beneficiary_name", "Unknown"),
-                "amount": float(mapped_data.get("amount", 0)),
-                "date": mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                "purpose_classification": purpose_enum.value,
-                "authority_clause_ref": "",
-                "notes": mapped_data.get("notes", ""),
-                "solvency_confirmed": False,
-                "recusal_acknowledged": False,
-                "approved_by": None,
-                "approved_at": None,
-                "minutes_record_id": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "is_benevolence": False,
-                "benevolence_recipient_name": None,
-                "benevolence_need_description": None,
-                "benevolence_notes": None,
+            dist_create = DistributionCreate(
+                trust_id=trust_id,
+                beneficiary_name=mapped_data.get("beneficiary_name", "Unknown"),
+                amount=float(mapped_data.get("amount", 0)),
+                date=mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                purpose_classification=purpose_enum,
+                notes=mapped_data.get("notes", ""),
+                is_benevolence=False,
+            )
+            # Fetch user dict for the router call
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            result = await _create_dist(
+                dist=dist_create,
+                background_tasks=BackgroundTasks(),
+                user=user_doc,
+            )
+            # Distribution is created in "review" status with solvency_confirmed=False.
+            # The chat must tell the user to confirm solvency on the Distributions page.
+            return {
+                "success": True,
+                "record_id": result.distribution_id,
+                "endpoint": "distributions",
+                "requires_solvency_confirmation": True,
+                "solvency_link": f"/distributions?approve={result.distribution_id}",
             }
-            await db.distribution_records.insert_one(dist_doc)
-            return {"success": True, "record_id": dist_id, "endpoint": "distributions"}
 
         elif endpoint_type == "asset":
-            from models import AssetCategory
+            # Route through the real schedule_a router to ensure validation.
+            from routers.schedule_a import create_schedule_a_item as _create_asset
+            from models import ScheduleAItemCreate, AssetCategory
+            from fastapi import BackgroundTasks
 
             category = mapped_data.pop("category", "other_property")
             try:
@@ -660,28 +669,25 @@ async def _execute_approved_action(
             except ValueError:
                 category_enum = AssetCategory.other_property
 
-            item_id = f"asset_{uuid.uuid4().hex[:12]}"
-            asset_doc = {
-                "item_id": item_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "category": category_enum.value,
-                "description": mapped_data.get("description", ""),
-                "identifier": "",
-                "location": "",
-                "approximate_value": mapped_data.get("approximate_value"),
-                "date_conveyed": mapped_data.get("date_conveyed", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                "notes": mapped_data.get("notes", ""),
-                "status": "active",
-                "minutes_ref": None,
-                "disposition_minutes_ref": None,
-                "disposition_date": None,
-                "disposition_notes": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": None,
-            }
-            await db.schedule_a_items.insert_one(asset_doc)
-            return {"success": True, "record_id": item_id, "endpoint": "schedule-a"}
+            asset_create = ScheduleAItemCreate(
+                trust_id=trust_id,
+                category=category_enum,
+                description=mapped_data.get("description", ""),
+                approximate_value=mapped_data.get("approximate_value"),
+                date_conveyed=mapped_data.get("date_conveyed", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                notes=mapped_data.get("notes", ""),
+            )
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            result = await _create_asset(item=asset_create, user=user_doc)
+            # Update onboarding (schedule_a router doesn't call auto_update_onboarding)
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
+            return {"success": True, "record_id": result.item_id, "endpoint": "schedule-a"}
 
         elif endpoint_type == "asset_update":
             # Look up the existing asset by description (fuzzy match)
@@ -733,7 +739,12 @@ async def _execute_approved_action(
             return {"success": True, "record_id": existing["item_id"], "endpoint": "schedule-a"}
 
         elif endpoint_type == "minutes":
-            from models import MinutesType
+            # Route through the real minutes router to ensure validation,
+            # onboarding updates, and email notifications.
+            # Fix 4b: chat minutes must be status="draft", not "finalized".
+            from routers.minutes import create_minutes as _create_minutes
+            from models import MinutesCreate, MinutesType
+            from fastapi import BackgroundTasks
 
             minutes_type_val = mapped_data.pop("minutes_type", "general")
             try:
@@ -749,42 +760,41 @@ async def _execute_approved_action(
             if isinstance(decisions_text, list):
                 decisions_text = "; ".join(decisions_text)
 
-            minutes_id = f"minutes_{uuid.uuid4().hex[:12]}"
-            minutes_doc = {
-                "minutes_id": minutes_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "minutes_type": minutes_type_enum.value,
-                "meeting_date": mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                "participants_text": participants_text,
-                "decisions_text": decisions_text,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "template_type": None,
-                "sections": [],
-                "template_data": {},
-                "status": "finalized",
-                "is_retroactive": False,
-                "retroactive_reason": None,
-                "retroactive_trustees_aware": None,
-                "retroactive_type": None,
-                "manually_edited": False,
+            minutes_create = MinutesCreate(
+                trust_id=trust_id,
+                minutes_type=minutes_type_enum,
+                meeting_date=mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                participants_text=participants_text,
+                decisions_text=decisions_text,
+                status="draft",  # Fix 4b: draft, not finalized
+            )
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            result = await _create_minutes(
+                minutes=minutes_create,
+                background_tasks=BackgroundTasks(),
+                user=user_doc,
+            )
+            return {
+                "success": True,
+                "record_id": result.minutes_id,
+                "endpoint": "minutes",
+                "status": "draft",
+                "review_link": f"/minutes/{result.minutes_id}/edit",
             }
-            await db.minutes_records.insert_one(minutes_doc)
-            return {"success": True, "record_id": minutes_id, "endpoint": "minutes"}
 
         elif endpoint_type == "beneficiary":
-            # Beneficiaries are managed via trust unit certificates
-            cert_id = f"cert_{uuid.uuid4().hex[:12]}"
-            cert_number = f"TC-{uuid.uuid4().hex[:6].upper()}"
+            # Route through the real trust_units router to ensure validation
+            # (units overflow check, fractional validation, certificate numbering).
+            from routers.trust_units import create_unit_certificate as _create_cert
+            from models import TrustUnitCertificateCreate
 
-            # Get unit settings for the trust
-            settings = await db.trust_unit_settings.find_one(
-                {"trust_id": trust_id}
-            )
+            # Get unit settings for the trust to convert percentage to units
+            settings = await db.trust_units_settings.find_one({"trust_id": trust_id})
             total_authorized = settings.get("total_authorized_units", 0) if settings else 0
 
             allocation_pct = mapped_data.get("units", 0)
-            # Convert percentage to units if settings exist
             if total_authorized > 0 and isinstance(allocation_pct, (int, float)) and allocation_pct < 100:
                 units = max(1, round(total_authorized * allocation_pct / 100))
             elif isinstance(allocation_pct, (int, float)):
@@ -792,24 +802,25 @@ async def _execute_approved_action(
             else:
                 units = 1
 
-            cert_doc = {
-                "certificate_id": cert_id,
-                "certificate_number": cert_number,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "holder_name": mapped_data.get("holder_name", "Unknown"),
-                "holder_identifier": "",
-                "holder_type": mapped_data.get("holder_type", "individual"),
-                "email": mapped_data.get("email", ""),
-                "phone": mapped_data.get("phone", ""),
-                "units": units,
-                "issue_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "status": "active",
-                "notes": "",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.trust_unit_certificates.insert_one(cert_doc)
-            return {"success": True, "record_id": cert_id, "endpoint": "trust-units/certificates"}
+            cert_create = TrustUnitCertificateCreate(
+                trust_id=trust_id,
+                holder_name=mapped_data.get("holder_name", "Unknown"),
+                holder_type=mapped_data.get("holder_type", "individual"),
+                units=float(units),
+                issue_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                email=mapped_data.get("email"),
+                phone=mapped_data.get("phone"),
+            )
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                result = await _create_cert(certificate=cert_create, user=user_doc)
+                return {"success": True, "record_id": result.certificate_id, "endpoint": "trust-units/certificates"}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create beneficiary: {str(e)}"}
 
         elif endpoint_type == "beneficiary_update":
             # Find the existing beneficiary certificate by holder_name
@@ -1011,6 +1022,12 @@ async def _execute_approved_action(
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             await db.compensation_plans.insert_one(plan_doc)
+            # Update onboarding checklist
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
             return {"success": True, "record_id": plan_id, "endpoint": "compensation-plans", "action": "created"}
 
         elif endpoint_type == "compensation_payment":
@@ -1133,6 +1150,12 @@ async def _execute_approved_action(
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             await db.investments.insert_one(investment_doc)
+            # Update onboarding checklist
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
             return {"success": True, "record_id": investment_id, "endpoint": "investments", "action": "created"}
 
         elif endpoint_type == "task":
@@ -1149,6 +1172,12 @@ async def _execute_approved_action(
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             await db.governance_tasks.insert_one(task_doc)
+            # Update onboarding checklist
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
             return {"success": True, "record_id": task_id, "endpoint": "tasks", "action": "created"}
 
         elif endpoint_type == "transaction":
@@ -1165,6 +1194,12 @@ async def _execute_approved_action(
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             await db.transactions.insert_one(txn_doc)
+            # Update onboarding checklist
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
             return {"success": True, "record_id": txn_id, "endpoint": "transactions", "action": "created"}
 
         elif endpoint_type == "entity":
@@ -1204,6 +1239,12 @@ async def _execute_approved_action(
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
             await db.entities.insert_one(entity_doc)
+            # Update onboarding checklist
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
             return {"success": True, "record_id": entity_id, "endpoint": "entities", "action": "created"}
 
         elif endpoint_type == "settings_update":
