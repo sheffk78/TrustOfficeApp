@@ -108,7 +108,10 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [weeklyBriefing, setWeeklyBriefing] = useState(null);
-  
+
+  // Onboarding accordion expansion state (starts collapsed)
+  const [onboardingExpanded, setOnboardingExpanded] = useState(false);
+
   // Tax Calendar dashboard state
   const [taxDeadlines, setTaxDeadlines] = useState([]);
   const [taxDeadlinesLoading, setTaxDeadlinesLoading] = useState(false);
@@ -280,116 +283,27 @@ export default function DashboardPage() {
     }
   };
 
-  // Calculate onboarding progress from dashboard data
+  // Calculate onboarding progress from dashboard data — single unified ordered list
   const getOnboardingProgress = () => {
     const onboarding = dashboard?.onboarding_state;
-    if (!onboarding) return { completed: 0, total: 8, profileSteps: [], setupSteps: [] };
-    
-    const profileSteps = [
-      { 
-        id: 'formation_date', 
-        label: 'Add Formation Date',
-        description: 'The IRS uses this to calculate your filing deadlines.',
-        done: onboarding.formation_date_added,
-        icon: CalendarCheck,
-        action: '/settings#formation-date'
-      },
-      { 
-        id: 'ein', 
-        label: 'Enter Your EIN',
-        description: 'Every trust needs an EIN for tax filing. Don\'t have one yet? Skip this for now.',
-        done: onboarding.ein_entered,
-        icon: FileCheck,
-        action: '/settings#ein'
-      },
-      { 
-        id: 'trust_doc', 
-        label: 'Add Trust Document to Vault',
-        description: 'Your signed, notarized Declaration of Trust. Link it from Google Drive, Dropbox, or wherever you store it.',
-        done: onboarding.trust_doc_uploaded,
-        icon: FileUp,
-        action: '/vault'
-      },
-      {
-        id: 'ein_doc',
-        label: 'Add EIN Letter to Vault',
-        description: 'The IRS confirmation letter (CP575) for your EIN. Skip if you don\'t have it yet.',
-        done: onboarding.ein_doc_uploaded,
-        icon: Upload,
-        action: '/vault'
-      },
-      {
-        id: 'successor_trustee',
-        label: 'Designate a Successor Trustee',
-        description: 'Ensure someone can step in if the trustee can no longer serve.',
-        done: onboarding.successor_trustee_added,
-        icon: UserCheck,
-        action: '/settings#successor-trustee'
-      }
+    if (!onboarding) return { nextStep: null, completed: 0, total: 9, allSteps: [] };
+
+    // Field names must match backend OnboardingState model (backend/models.py L1045)
+    const steps = [
+      { id: 'trust_doc', label: 'Add your trust document', done: onboarding.trust_doc_uploaded, action: '/vault', priority: 1 },
+      { id: 'beneficiaries', label: 'Add beneficiaries', done: onboarding.beneficiaries_added, action: '/beneficiaries', priority: 2 },
+      { id: 'successor_trustee', label: 'Name a successor trustee', done: onboarding.successor_trustee_added, action: '/settings#successor-trustee', priority: 3 },
+      { id: 'assets', label: 'Add your trust assets', done: onboarding.assets_added, action: '/schedule-a', priority: 4 },
+      { id: 'minutes', label: 'Hold your first trustee meeting', done: onboarding.minutes_generated, action: '/minutes/create?type=initial_trustee_meeting', priority: 5 },
+      { id: 'ein_doc', label: 'Add EIN letter to vault', done: onboarding.ein_doc_uploaded, action: '/vault', priority: 6 },
+      { id: 'formation_date', label: 'Add formation date', done: onboarding.formation_date_added, action: '/settings#formation-date', priority: 7 },
+      { id: 'ein', label: 'Enter your EIN', done: onboarding.ein_entered, action: '/settings#ein', priority: 8 },
+      { id: 'calendar', label: 'Review your tax calendar', done: onboarding.calendar_set, action: '/calendar', priority: 9 },
     ];
-    
-    const setupSteps = [
-      { 
-        id: 'beneficiaries', 
-        label: 'Set Up Beneficiaries', 
-        description: 'Every distribution requires a named beneficiary. This is step one before you can record anything else.',
-        done: onboarding.beneficiaries_added,
-        icon: Users,
-        action: '/beneficiaries'
-      },
-      { 
-        id: 'assets', 
-        label: 'Set Up Your Trust Structure', 
-        description: 'Add your trust entity to the Trust & Entities section. This is where you manage your trust and any related LLCs.',
-        done: onboarding.assets_added,
-        icon: Package,
-        action: '/structures'
-      },
-      { 
-        id: 'minutes', 
-        label: 'Hold Your First Trustee Meeting', 
-        description: 'Trustees are legally required to document decisions. Your first meeting covers accepting trusteeship, opening bank accounts, and setting up the trust.',
-        done: onboarding.minutes_generated,
-        icon: ClipboardList,
-        action: '/minutes/create?type=initial_trustee_meeting&from=onboarding'
-      },
-      { 
-        id: 'calendar', 
-        label: 'Check Your Tax Calendar', 
-        description: 'Your trust has hard filing deadlines. We\'ve calculated yours based on your setup. Miss one and the IRS notices.',
-        done: onboarding.calendar_set,
-        icon: Calendar,
-        action: '/calendar'
-      },
-      { 
-        id: 'bank_account', 
-        label: 'Add a Bank Account', 
-        description: 'Link a bank account to your trust entity. This unlocks balance tracking, statement uploads, and transaction reconciliation.',
-        done: onboarding.bank_account_added,
-        icon: Landmark,
-        action: '/structures'
-      },
-      { 
-        id: 'bank_statement', 
-        label: 'Upload a Bank Statement', 
-        description: 'Upload a bank statement to the Vault. We\'ll extract balances and transactions automatically so you can reconcile your ledger.',
-        done: onboarding.bank_statement_uploaded,
-        icon: Upload,
-        action: '/vault'
-      },
-      { 
-        id: 'spending_threshold', 
-        label: 'Set a Spending Threshold', 
-        description: 'Configure a per-transaction spending threshold in Settings. Transactions over the limit are flagged for trustee minutes.',
-        done: onboarding.spending_threshold_set,
-        icon: Shield,
-        action: '/settings#governance'
-      }
-    ];
-    
-    const allSteps = [...profileSteps, ...setupSteps];
-    const completed = allSteps.filter(s => s.done).length;
-    return { completed, total: allSteps.length, profileSteps, setupSteps, steps: allSteps };
+
+    const completed = steps.filter(s => s.done).length;
+    const nextStep = steps.find(s => !s.done);
+    return { nextStep, completed, total: steps.length, allSteps: steps };
   };
 
   // Get insights from dashboard API (single source of truth)
@@ -399,6 +313,42 @@ export default function DashboardPage() {
   const stats = dashboard?.stats;
   const activities = dashboard?.recent_activity || [];
   const onboarding = dashboard?.onboarding_state;
+
+  // Fix 14: Compute the single highest-priority "do this next" action
+  const computeNextAction = () => {
+    // Priority 1: Overdue tax deadline
+    const overdueDeadline = taxDeadlines?.find(d => d.days_until < 0 || (d.is_overdue && d.filing_status === 'pending'));
+    if (overdueDeadline) return {
+      title: `${overdueDeadline.description || 'Tax deadline'} is overdue`,
+      action: '/calendar',
+      cta: 'Review deadline',
+      context: `${Math.abs(overdueDeadline.days_remaining ?? overdueDeadline.days_until ?? 0)} days overdue`,
+      variant: 'urgent'
+    };
+
+    // Priority 2: First incomplete onboarding step
+    if (onboardingProgress.nextStep) return {
+      title: onboardingProgress.nextStep.label,
+      action: onboardingProgress.nextStep.action,
+      cta: 'Start now',
+      context: `${onboardingProgress.completed}/${onboardingProgress.total} setup steps done`,
+      variant: 'onboarding'
+    };
+
+    // Priority 3: Highest-point governance insight
+    const topInsight = [...insights].sort((a, b) => (b.points || 0) - (a.points || 0))[0];
+    if (topInsight) return {
+      title: topInsight.title || topInsight.description,
+      action: topInsight.action_path || '/governance',
+      cta: 'Fix this',
+      context: `+${topInsight.points || 0} health points`,
+      variant: 'insight'
+    };
+
+    return null; // All caught up
+  };
+
+  const nextAction = computeNextAction();
 
   // Determine if this is a new trust (less than 14 days old)
   const trustCreatedAt = selectedTrust?.created_at;

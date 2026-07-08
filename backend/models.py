@@ -1,6 +1,6 @@
 # Shared Pydantic models and enums for TrustOffice API
 from pydantic import BaseModel, Field, EmailStr, model_validator
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Union
 from enum import Enum
 import calendar
 import re
@@ -241,7 +241,7 @@ class TrustCreate(BaseModel):
     jurisdiction: str = ""
     role: Optional[str] = "Trustee"
     start_date: Optional[str] = None
-    trustees: Optional[str] = None
+    trustees: Optional[Union[str, List[str]]] = None
     authority_clause: Optional[str] = None
     successor_trustee_name: Optional[str] = None
     successor_trustee_email: Optional[str] = None
@@ -299,7 +299,7 @@ class TrustUpdate(BaseModel):
     governance_settings: Optional[dict] = None
     tax_status: Optional[str] = None
     start_date: Optional[str] = None
-    trustees: Optional[str] = None
+    trustees: Optional[Union[str, List[str]]] = None
     authority_clause: Optional[str] = None
     successor_trustee_name: Optional[str] = None
     successor_trustee_email: Optional[str] = None
@@ -356,7 +356,7 @@ class TrustResponse(BaseModel):
     tax_status: Optional[str] = "private"
     created_at: str
     governance_score: int = 0
-    trustees: Optional[str] = None
+    trustees: Optional[Union[str, List[str]]] = None
     start_date: Optional[str] = None
     authority_clause: Optional[str] = None
     successor_trustee_name: Optional[str] = None

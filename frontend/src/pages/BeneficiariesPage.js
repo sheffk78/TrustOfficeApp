@@ -96,7 +96,7 @@ const OwnershipPieChart = ({ beneficiaries, totalAuthorized }) => {
 export default function BeneficiariesPage() {
   const { selectedTrust, isReadOnly } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('beneficiaries');
   
   // Overview data
   const [overviewData, setOverviewData] = useState(null);
@@ -149,6 +149,14 @@ export default function BeneficiariesPage() {
     notes: ''
   });
   const [deleteConfirmClass, setDeleteConfirmClass] = useState(null);
+
+  // Person-centric "People" tab state
+  const [showPersonModal, setShowPersonModal] = useState(false);
+  const [personForm, setPersonForm] = useState({
+    name: '',
+    relationship: '',
+    sharePercentage: '',
+  });
 
   // ========== DATA LOADING ==========
   const loadOverviewData = useCallback(async () => {
@@ -449,6 +457,91 @@ export default function BeneficiariesPage() {
     { value: 'custom', label: 'Custom Class' },
   ];
 
+  // ========== PERSON-CENTRIC ADD BENEFICIARY (People tab) ==========
+  const RELATIONSHIP_OPTIONS = [
+    { value: 'Spouse', label: 'Spouse' },
+    { value: 'Child', label: 'Child' },
+    { value: 'Daughter', label: 'Daughter' },
+    { value: 'Son', label: 'Son' },
+    { value: 'Parent', label: 'Parent' },
+    { value: 'Sibling', label: 'Sibling' },
+    { value: 'Grandchild', label: 'Grandchild' },
+    { value: 'Other relative', label: 'Other relative' },
+    { value: 'Friend', label: 'Friend' },
+    { value: 'Charity', label: 'Charity / Organization' },
+    { value: 'Other', label: 'Other' },
+  ];
+
+  const handleAddPerson = async () => {
+    if (!personForm.name || !personForm.sharePercentage) {
+      toast.error('Name and share percentage are required');
+      return;
+    }
+    const pct = parseFloat(personForm.sharePercentage);
+    if (!pct || pct <= 0 || pct > 100) {
+      toast.error('Share percentage must be between 0 and 100');
+      return;
+    }
+    if (isReadOnly) {
+      showUpgradeModal('add beneficiaries', 'button_click', 'beneficiaries_page');
+      return;
+    }
+
+    // Compute units from share percentage using total authorized units
+    const totalAuthorized = summary?.settings?.total_authorized_units || 100;
+    const units = (pct / 100) * totalAuthorized;
+
+    // Check availability
+    if (summary && units > summary.remaining_units) {
+      toast.error(`Cannot allocate ${pct}%. Only ${summary.remaining_units} units available (${((summary.remaining_units / totalAuthorized) * 100).toFixed(1)}%).`);
+      return;
+    }
+
+    try {
+      const relationship = personForm.relationship || '';
+      const notesText = relationship ? `Relationship to grantor: ${relationship}` : '';
+      const response = await fetchWithAuth('/trust-units/certificates', {
+        method: 'POST',
+        body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          holder_name: personForm.name,
+          holder_identifier: null,
+          holder_type: 'individual',
+          email: null,
+          phone: null,
+          units: units,
+          issue_date: format(new Date(), 'yyyy-MM-dd'),
+          notes: notesText || null,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`${personForm.name} added as a beneficiary (${pct}%)`);
+        setShowPersonModal(false);
+        setPersonForm({ name: '', relationship: '', sharePercentage: '' });
+        loadCertificatesData();
+        loadOverviewData();
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to add beneficiary (${response.status})`), { operation: 'add', page: 'Beneficiaries' });
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'add', page: 'Beneficiaries' });
+    }
+  };
+
+  const resetPersonForm = () => {
+    setPersonForm({ name: '', relationship: '', sharePercentage: '' });
+  };
+
+  const handleOpenPersonModal = () => {
+    if (isReadOnly) {
+      showUpgradeModal('add beneficiaries', 'button_click', 'beneficiaries_page');
+      return;
+    }
+    setShowPersonModal(true);
+  };
+
   const resetCertificateForm = () => {
     setCertificateForm({
       holder_name: '',
@@ -530,13 +623,17 @@ export default function BeneficiariesPage() {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mb-6 bg-muted/50 flex flex-wrap gap-1">
+              <TabsTrigger value="beneficiaries" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-beneficiaries">
+                <Users className="w-4 h-4 mr-2" />
+                People
+              </TabsTrigger>
               <TabsTrigger value="overview" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-overview">
                 <PieChart className="w-4 h-4 mr-2" />
                 Overview
               </TabsTrigger>
               <TabsTrigger value="certificates" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-certificates">
                 <Award className="w-4 h-4 mr-2" />
-                Certificates
+                Ownership Shares
               </TabsTrigger>
               <TabsTrigger value="transfers" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-transfers">
                 <ArrowRightLeft className="w-4 h-4 mr-2" />
@@ -547,6 +644,85 @@ export default function BeneficiariesPage() {
                 Class Beneficiaries
               </TabsTrigger>
             </TabsList>
+
+            {/* ========== PEOPLE TAB (person-centric, first) ========== */}
+            <TabsContent value="beneficiaries">
+              {/* Primary CTA */}
+              <div className="card-trust p-4 mb-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                      Add the people you want to benefit from this trust
+                    </p>
+                  </div>
+                  <Button className="btn-primary" onClick={handleOpenPersonModal} data-testid="add-beneficiary-btn">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Beneficiary
+                  </Button>
+                </div>
+              </div>
+
+              {/* People List */}
+              <div className="card-trust overflow-hidden">
+                <div className="p-4 border-b border-border flex items-center gap-2">
+                  <Users className="w-4 h-4 text-navy dark:text-gold" />
+                  <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Beneficiaries</h2>
+                  <span className="ml-auto text-xs text-muted-foreground">{overviewData?.beneficiaries?.length || 0} people</span>
+                </div>
+
+                {loading ? (
+                  <div className="p-8 text-center">
+                    <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin mx-auto mb-4"></div>
+                    <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading...</p>
+                  </div>
+                ) : !overviewData?.beneficiaries?.length ? (
+                  <div className="p-8 text-center">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
+                    <p className="text-muted-foreground mb-2">No beneficiaries yet</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Add a person — like a spouse, child, or charity — and choose what share of the trust they receive.
+                    </p>
+                    <Button className="btn-primary" onClick={handleOpenPersonModal} data-testid="empty-add-beneficiary-btn">
+                      <Plus className="w-4 h-4 mr-2" /> Add Your First Beneficiary
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {overviewData.beneficiaries.map((ben, index) => {
+                      // Try to surface the relationship stored in certificate notes
+                      const relationshipNote = ben.certificates?.find(c => c.notes?.startsWith('Relationship to grantor:'))?.notes;
+                      const relationship = relationshipNote ? relationshipNote.replace('Relationship to grantor: ', '') : null;
+                      return (
+                        <div key={`${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}`} className="p-4 flex items-center justify-between hover:bg-muted/20 transition-colors" data-testid={`person-row-${index}`}>
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-navy/10 dark:bg-gold/10 flex items-center justify-center">
+                              <Users className="w-6 h-6 text-navy dark:text-gold" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-navy dark:text-foreground">{ben.holder_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {relationship ? (
+                                  <span>{relationship} to grantor</span>
+                                ) : (
+                                  <span>{ben.holder_type || 'Individual'}</span>
+                                )}
+                              </p>
+                              {ben.email && (
+                                <p className="text-xs text-muted-foreground">{ben.email}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
+                            <p className="text-xs text-muted-foreground">share</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
 
             {/* ========== OVERVIEW TAB ========== */}
             <TabsContent value="overview">
@@ -569,7 +745,7 @@ export default function BeneficiariesPage() {
                           <Award className="w-5 h-5 text-navy dark:text-gold" />
                         </div>
                         <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Total Authorized</p>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Total Available</p>
                           <p className="font-serif text-2xl text-navy dark:text-foreground">{overviewData.total_authorized_units}</p>
                         </div>
                       </div>
@@ -626,7 +802,7 @@ export default function BeneficiariesPage() {
                           <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
                           <p>No certificates issued yet</p>
                           <Button className="btn-primary mt-4" onClick={() => { setActiveTab('certificates'); handleOpenCertificateModal(); }}>
-                            <Plus className="w-4 h-4 mr-2" /> Issue First Certificate
+                            <Plus className="w-4 h-4 mr-2" /> Add First Ownership Share
                           </Button>
                         </div>
                       )}
@@ -635,7 +811,7 @@ export default function BeneficiariesPage() {
                     <div className="lg:col-span-2 card-trust overflow-hidden">
                       <div className="p-4 border-b border-border flex items-center gap-2">
                         <Users className="w-4 h-4 text-navy dark:text-gold" />
-                        <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Certificate Holders</h2>
+                        <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Share Holders</h2>
                       </div>
                       
                       {overviewData.beneficiaries.length === 0 ? (
@@ -761,7 +937,7 @@ export default function BeneficiariesPage() {
                     </Button>
                     <Button className="btn-primary" onClick={() => { resetCertificateForm(); handleOpenCertificateModal(); }} data-testid="issue-units-btn">
                       <Plus className="w-4 h-4 mr-2" />
-                      Issue Units
+                      Add Shares
                     </Button>
                   </div>
                 </div>
@@ -771,7 +947,7 @@ export default function BeneficiariesPage() {
               <div className="card-trust overflow-hidden">
                 <div className="p-4 border-b border-border flex items-center gap-2">
                   <Award className="w-4 h-4 text-navy dark:text-gold" />
-                  <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Certificates</h2>
+                  <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Ownership Shares</h2>
                   <span className="ml-auto text-xs text-muted-foreground">{filteredCertificates.length} records</span>
                 </div>
                 
@@ -785,7 +961,7 @@ export default function BeneficiariesPage() {
                     <Award className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
                     <p className="text-muted-foreground mb-4">No certificates found</p>
                     <Button className="btn-primary" onClick={() => { resetCertificateForm(); handleOpenCertificateModal(); }}>
-                      <Plus className="w-4 h-4 mr-2" /> Issue First Certificate
+                      <Plus className="w-4 h-4 mr-2" /> Add First Ownership Share
                     </Button>
                   </div>
                 ) : (
@@ -1389,6 +1565,75 @@ export default function BeneficiariesPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowClassBeneficiaryModal(false); setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' }); }}>Cancel</Button>
             <Button className="btn-primary" onClick={handleAddClassBeneficiary} data-testid="save-class-beneficiary-btn">Add Class</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Beneficiary Modal (People tab — simplified person-centric form) */}
+      <Dialog open={showPersonModal} onOpenChange={(open) => { if (!open) resetPersonForm(); setShowPersonModal(open); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Beneficiary</DialogTitle>
+            <DialogDescription>
+              Add a person to benefit from this trust and choose their share.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="label-trust">Name *</Label>
+              <Input
+                value={personForm.name}
+                onChange={(e) => setPersonForm({ ...personForm, name: e.target.value })}
+                placeholder="e.g., Jane Smith"
+                className="mt-1"
+                data-testid="person-name-input"
+              />
+            </div>
+            <div>
+              <Label className="label-trust">Relationship to Grantor</Label>
+              <Select
+                value={personForm.relationship}
+                onValueChange={(v) => setPersonForm({ ...personForm, relationship: v })}
+              >
+                <SelectTrigger className="mt-1" data-testid="person-relationship-select">
+                  <SelectValue placeholder="Select relationship (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {RELATIONSHIP_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="label-trust">Share Percentage *</Label>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                max="100"
+                value={personForm.sharePercentage}
+                onChange={(e) => setPersonForm({ ...personForm, sharePercentage: e.target.value })}
+                placeholder="e.g., 50"
+                className="mt-1"
+                data-testid="person-share-input"
+              />
+              <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+                <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                The percentage of the trust this person will receive. This automatically creates an ownership share record.
+                {summary && (
+                  <span className="ml-1 font-mono">
+                    {((summary.remaining_units / (summary.settings?.total_authorized_units || 100)) * 100).toFixed(1)}% available.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowPersonModal(false); resetPersonForm(); }}>Cancel</Button>
+            <Button className="btn-primary" onClick={handleAddPerson} data-testid="save-beneficiary-btn">
+              Add Beneficiary
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
