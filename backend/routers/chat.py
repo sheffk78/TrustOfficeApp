@@ -816,6 +816,12 @@ async def _execute_approved_action(
                 user_doc = {"user_id": user_id, "email": "", "name": ""}
             try:
                 result = await _create_cert(certificate=cert_create, user=user_doc)
+                # Update onboarding checklist
+                try:
+                    from dependencies import auto_update_onboarding
+                    await auto_update_onboarding(user_id, trust_id)
+                except Exception:
+                    pass
                 return {"success": True, "record_id": result.certificate_id, "endpoint": "trust-units/certificates"}
             except HTTPException as e:
                 return {"success": False, "error": e.detail}
@@ -960,180 +966,113 @@ async def _execute_approved_action(
             return {"success": True, "record_id": existing["distribution_id"], "endpoint": "distributions", "action": "cancelled"}
 
         elif endpoint_type == "document_upload":
-            doc_id = f"doc_{uuid.uuid4().hex[:12]}"
-            doc_doc = {
-                "document_id": doc_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "title": mapped_data.get("title", "Untitled Document"),
-                "category": mapped_data.get("category", "other"),
-                "notes": mapped_data.get("notes", ""),
-                "file_url": "",
-                "uploaded_at": datetime.now(timezone.utc).isoformat(),
-                "status": "pending_upload",
-            }
-            await db.vault_documents.insert_one(doc_doc)
-            return {"success": True, "record_id": doc_id, "endpoint": "vault/documents", "action": "created", "note": "Document record created. Upload the file in the Vault page to complete."}
+            # Route through the real vault router to ensure validation
+            # and onboarding updates.
+            from routers.vault import add_document as _add_doc, DocumentCreate
+
+            # Validate category against vault's DOC_CATEGORIES
+            category = mapped_data.get("category", "other")
+            try:
+                doc_create = DocumentCreate(
+                    title=mapped_data.get("title", "Untitled Document"),
+                    category=category,
+                    description=mapped_data.get("notes", ""),
+                    storage_provider="local_server",
+                )
+            except Exception as ve:
+                return {"success": False, "error": f"Invalid document data: {str(ve)}"}
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                result = await _add_doc(trust_id=trust_id, doc=doc_create, user=user_doc)
+                return {
+                    "success": True,
+                    "record_id": result["doc_id"],
+                    "endpoint": "vault/documents",
+                    "action": "created",
+                    "note": "Document record created. Upload the file in the Vault page to complete.",
+                }
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create document: {str(e)}"}
 
         elif endpoint_type == "compensation_plan":
-            plan_id = f"plan_{uuid.uuid4().hex[:12]}"
-            # Derive year from effective_date
-            effective_date = mapped_data.get("effective_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-            try:
-                year = int(effective_date[:4])
-            except (ValueError, TypeError, IndexError):
-                year = datetime.now(timezone.utc).year
-            
+            # Route through the real compensation router to ensure validation,
+            # primary-plan logic, and onboarding updates.
+            from routers.compensation import create_comp_plan as _create_plan
+            from models import CompensationPlanCreate
+
             annual_amount = float(mapped_data.get("annual_amount", 0))
-            trustee_name = mapped_data.get("trustee_name", "")
-            role = mapped_data.get("role", "")
-            
-            # Auto-determine is_primary: True if no trustee_name/role and no existing primary for this year
-            existing_primary = await db.compensation_plans.find_one(
-                {"trust_id": trust_id, "user_id": user_id, "year": year, "is_primary": True},
-                {"_id": 0}
+            effective_date = mapped_data.get("effective_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+            plan_create = CompensationPlanCreate(
+                trust_id=trust_id,
+                trustee_name=mapped_data.get("trustee_name", ""),
+                role=mapped_data.get("role", ""),
+                annual_amount=annual_amount,
+                annual_approved_amount=annual_amount,
+                fee_type=mapped_data.get("fee_type", "fixed"),
+                effective_date=effective_date,
+                notes=mapped_data.get("notes", ""),
             )
-            if not trustee_name and not role:
-                is_primary = not existing_primary
-            else:
-                is_primary = False
-            
-            # If setting as primary, demote any existing primary
-            if is_primary:
-                await db.compensation_plans.update_many(
-                    {"trust_id": trust_id, "user_id": user_id, "year": year, "is_primary": True},
-                    {"$set": {"is_primary": False}}
-                )
-            
-            plan_doc = {
-                "plan_id": plan_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "trustee_name": trustee_name,
-                "role": role,
-                "annual_fee": annual_amount,
-                "annual_amount": annual_amount,
-                "annual_approved_amount": annual_amount,
-                "fee_type": mapped_data.get("fee_type", "fixed"),
-                "effective_date": effective_date,
-                "year": year,
-                "is_primary": is_primary,
-                "notes": "",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.compensation_plans.insert_one(plan_doc)
-            # Update onboarding checklist
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
             try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-            return {"success": True, "record_id": plan_id, "endpoint": "compensation-plans", "action": "created"}
+                result = await _create_plan(plan=plan_create, user=user_doc)
+                return {
+                    "success": True,
+                    "record_id": result.plan_id,
+                    "endpoint": "compensation-plans",
+                    "action": "created",
+                }
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create compensation plan: {str(e)}"}
 
         elif endpoint_type == "compensation_payment":
-            payment_id = f"payment_{uuid.uuid4().hex[:12]}"
+            # Route through the real compensation router to ensure validation,
+            # exceeds-plan detection, and onboarding updates.
+            from routers.compensation import create_comp_payment as _create_payment
+            from models import CompensationPaymentCreate
+
             payment_date = mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
             payment_amount = float(mapped_data.get("amount", 0))
-            trustee_name = mapped_data.get("trustee_name", "")
-            
-            # Derive year from payment date
-            try:
-                payment_year = int(payment_date[:4])
-            except (ValueError, TypeError, IndexError):
-                payment_year = datetime.now(timezone.utc).year
-            
-            # Get primary plan for this year (port from compensation.py L26-65)
-            primary_plan = await db.compensation_plans.find_one(
-                {"trust_id": trust_id, "user_id": user_id, "year": payment_year, "is_primary": True},
-                {"_id": 0}
+
+            payment_create = CompensationPaymentCreate(
+                trust_id=trust_id,
+                amount=payment_amount,
+                date=payment_date,
+                classification_text=mapped_data.get("classification_text", ""),
+                trustee_name=mapped_data.get("trustee_name") or None,
             )
-            if not primary_plan:
-                # Fallback: any plan for this year
-                primary_plan = await db.compensation_plans.find_one(
-                    {"trust_id": trust_id, "user_id": user_id,
-                     "$or": [{"year": payment_year}, {"effective_date": {"$regex": f"^{payment_year}"}}]},
-                    {"_id": 0},
-                    sort=[("is_primary", -1), ("effective_date", -1)]
-                )
-            
-            # Compute YTD total and check if payment exceeds plan
-            exceeds_plan = False
-            if primary_plan:
-                year_start = f"{payment_year}-01-01"
-                year_end = f"{payment_year}-12-31"
-                existing_payments = await db.compensation_payments.find(
-                    {"trust_id": trust_id, "user_id": user_id, "date": {"$gte": year_start, "$lte": year_end}},
-                    {"_id": 0}
-                ).to_list(1000)
-                ytd_total = sum(p.get("amount", 0) for p in existing_payments) + payment_amount
-                approved_amount = primary_plan.get("annual_approved_amount") or primary_plan.get("annual_fee") or primary_plan.get("annual_amount", 0)
-                exceeds_plan = ytd_total > approved_amount
-            
-            payment_doc = {
-                "payment_id": payment_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "amount": payment_amount,
-                "date": payment_date,
-                "classification_text": mapped_data.get("classification_text", ""),
-                "trustee_name": trustee_name,
-                "exceeds_plan_flag": exceeds_plan,
-                "plan_id": primary_plan.get("plan_id") if primary_plan else None,
-                "minutes_record_id": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.compensation_payments.insert_one(payment_doc)
-            
-            # Auto-update onboarding (port from compensation.py L67-131)
-            onboarding_updates = {}
-            trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
-            if trust:
-                if trust.get("start_date"):
-                    onboarding_updates["formation_date_added"] = True
-                if trust.get("ein"):
-                    onboarding_updates["ein_entered"] = True
-            doc_count = await db.vault_documents.count_documents({
-                "trust_id": trust_id, "user_id": user_id,
-                "category": {"$in": ["trust_instrument", "trust_document", "declaration_of_trust"]}
-            })
-            if doc_count > 0:
-                onboarding_updates["trust_doc_uploaded"] = True
-            ein_doc_count = await db.vault_documents.count_documents({
-                "trust_id": trust_id, "user_id": user_id,
-                "category": {"$in": ["ein_letter", "irs_notice"]}
-            })
-            if ein_doc_count > 0:
-                onboarding_updates["ein_doc_uploaded"] = True
-            beneficiary_count = await db.beneficiaries.count_documents({"trust_id": trust_id, "user_id": user_id})
-            if beneficiary_count > 0:
-                onboarding_updates["beneficiaries_added"] = True
-            entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
-            if entity_count > 0:
-                onboarding_updates["assets_added"] = True
-            task_count = await db.governance_tasks.count_documents({
-                "trust_id": trust_id, "user_id": user_id, "task_type": {"$ne": "custom"}
-            })
-            if task_count > 0:
-                onboarding_updates["calendar_set"] = True
-            minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
-            if minutes_count > 0:
-                onboarding_updates["minutes_generated"] = True
-            if onboarding_updates:
-                onboarding_updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-                await db.user_onboarding.update_one(
-                    {"user_id": user_id}, {"$set": onboarding_updates}, upsert=True
-                )
-            
-            return {"success": True, "record_id": payment_id, "endpoint": "compensation-payments", "action": "created"}
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                result = await _create_payment(payment=payment_create, user=user_doc)
+                return {
+                    "success": True,
+                    "record_id": result.payment_id,
+                    "endpoint": "compensation-payments",
+                    "action": "created",
+                }
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create compensation payment: {str(e)}"}
 
         elif endpoint_type == "investment":
-            investment_id = f"inv_{uuid.uuid4().hex[:12]}"
+            # Route through the real investments router to ensure validation.
+            from routers.investments import create_investment as _create_inv
+
             cost_basis = float(mapped_data.get("cost_basis", 0))
             current_value = float(mapped_data.get("current_value", 0)) if mapped_data.get("current_value") else cost_basis
-            investment_doc = {
-                "investment_id": investment_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
+            investment_dict = {
                 "asset_name": mapped_data.get("asset_name", ""),
                 "asset_type": mapped_data.get("asset_type", "other"),
                 "purchase_date": mapped_data.get("purchase_date"),
@@ -1143,109 +1082,176 @@ async def _execute_approved_action(
                 "unit": mapped_data.get("unit", "shares"),
                 "custodian": mapped_data.get("custodian"),
                 "notes": mapped_data.get("notes"),
-                "documents": [],
-                "performance_snapshot": None,
-                "is_active": True,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
-            await db.investments.insert_one(investment_doc)
-            # Update onboarding checklist
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
             try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-            return {"success": True, "record_id": investment_id, "endpoint": "investments", "action": "created"}
+                result = await _create_inv(trust_id=trust_id, investment=investment_dict, user=user_doc)
+                # Update onboarding checklist (investments router doesn't call auto_update_onboarding)
+                try:
+                    from dependencies import auto_update_onboarding
+                    await auto_update_onboarding(user_id, trust_id)
+                except Exception:
+                    pass
+                return {
+                    "success": True,
+                    "record_id": result["investment_id"],
+                    "endpoint": "investments",
+                    "action": "created",
+                }
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create investment: {str(e)}"}
 
         elif endpoint_type == "task":
-            task_id = f"task_{uuid.uuid4().hex[:12]}"
-            task_doc = {
-                "task_id": task_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "task_type": mapped_data.get("task_type", "custom"),
-                "description": mapped_data.get("description", ""),
-                "due_date": mapped_data.get("due_date", ""),
-                "priority": mapped_data.get("priority", "normal"),
-                "completed_at": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.governance_tasks.insert_one(task_doc)
-            # Update onboarding checklist
+            # Route through the real tasks router to ensure validation,
+            # checklist template population, and onboarding updates.
+            from routers.tasks import create_task as _create_task
+            from models import GovernanceTaskCreate, TaskType
+
+            task_type_val = mapped_data.get("task_type", "custom")
             try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-            return {"success": True, "record_id": task_id, "endpoint": "tasks", "action": "created"}
+                task_type_enum = TaskType(task_type_val)
+            except ValueError:
+                task_type_enum = TaskType.custom
+
+            task_create = GovernanceTaskCreate(
+                trust_id=trust_id,
+                task_type=task_type_enum,
+                due_date=mapped_data.get("due_date", ""),
+                description=mapped_data.get("description", ""),
+            )
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                result = await _create_task(task=task_create, user=user_doc)
+                return {
+                    "success": True,
+                    "record_id": result.task_id,
+                    "endpoint": "tasks",
+                    "action": "created",
+                }
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create task: {str(e)}"}
 
         elif endpoint_type == "transaction":
-            txn_id = f"txn_{uuid.uuid4().hex[:12]}"
-            txn_doc = {
-                "transaction_id": txn_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "transaction_type": mapped_data.get("transaction_type", "expense"),
-                "amount": float(mapped_data.get("amount", 0)),
-                "category": mapped_data.get("category", "other_expense"),
-                "date": mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                "description": mapped_data.get("description", ""),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.transactions.insert_one(txn_doc)
-            # Update onboarding checklist
+            # Route through the real transactions router to ensure validation,
+            # audit logging, and alert detection.
+            from routers.transactions import create_transaction as _create_txn
+            from models import TransactionCreate, TransactionDirection, GovernanceClassification
+
+            # The transactions router requires an entity_id — look up the
+            # first entity for this trust (typically the Trust entity itself).
+            entity = await db.entities.find_one(
+                {"trust_id": trust_id, "user_id": user_id},
+                {"_id": 0},
+                sort=[("created_at", 1)],
+            )
+            if not entity:
+                return {
+                    "success": False,
+                    "error": "No entity found for this trust. Please create an entity (Trust, Holding LLC, or Operating LLC) before recording transactions.",
+                }
+            entity_id = entity["entity_id"]
+
+            # Map chat's "transaction_type" to direction + governance_classification.
+            # Chat sends transaction_type as "expense"/"income"/etc.
+            raw_type = mapped_data.get("transaction_type", "expense")
+            if raw_type in ("income", "deposit", "inflow"):
+                direction_enum = TransactionDirection.inflow
+                classification_enum = GovernanceClassification.capital_contribution
+            else:
+                direction_enum = TransactionDirection.outflow
+                classification_enum = GovernanceClassification.operational_expense
+
+            # Map chat's "category" if it matches a known GovernanceClassification
+            raw_category = mapped_data.get("category", "")
+            if raw_category:
+                try:
+                    classification_enum = GovernanceClassification(raw_category)
+                except ValueError:
+                    pass  # keep the default
+
+            txn_create = TransactionCreate(
+                trust_id=trust_id,
+                entity_id=entity_id,
+                date=mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                amount=float(mapped_data.get("amount", 0)),
+                direction=direction_enum,
+                governance_classification=classification_enum,
+                purpose_memo=mapped_data.get("description", ""),
+            )
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
             try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-            return {"success": True, "record_id": txn_id, "endpoint": "transactions", "action": "created"}
+                result = await _create_txn(txn=txn_create, user=user_doc)
+                # Update onboarding checklist (transactions router doesn't call auto_update_onboarding)
+                try:
+                    from dependencies import auto_update_onboarding
+                    await auto_update_onboarding(user_id, trust_id)
+                except Exception:
+                    pass
+                return {
+                    "success": True,
+                    "record_id": result.transaction_id,
+                    "endpoint": "transactions",
+                    "action": "created",
+                }
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create transaction: {str(e)}"}
 
         elif endpoint_type == "entity":
+            # Route through the real entities router to ensure validation
+            # and onboarding updates.
+            from routers.entities import create_entity as _create_entity
+            from models import EntityCreate, EntityType
+
             # Validate entity_type — must be one of the allowed values
             raw_type = mapped_data.get("entity_type", "Trust")
-            valid_types = {"Trust", "Holding LLC", "Operating LLC"}
-            # Try to match case-insensitively
-            matched_type = None
-            for vt in valid_types:
-                if raw_type and raw_type.lower() == vt.lower():
-                    matched_type = vt
+            entity_type_enum = None
+            for et in EntityType:
+                if raw_type and raw_type.lower() == et.value.lower():
+                    entity_type_enum = et
                     break
-            if not matched_type:
-                matched_type = "Trust"  # default to Trust if unrecognized
+            if not entity_type_enum:
+                entity_type_enum = EntityType.trust  # default to Trust if unrecognized
 
-            entity_id = f"entity_{uuid.uuid4().hex[:12]}"
-            entity_doc = {
-                "entity_id": entity_id,
-                "user_id": user_id,
-                "trust_id": trust_id,
-                "name": mapped_data.get("name", ""),
-                "entity_type": matched_type,
-                "legal_name": mapped_data.get("legal_name", mapped_data.get("name", "")),
-                "formation_date": mapped_data.get("formation_date"),
-                "governing_law": mapped_data.get("governing_law", ""),
-                "ein": mapped_data.get("ein"),
-                "trustee_names": mapped_data.get("trustee_names", ""),
-                "beneficiary_standard": "",
-                "article_ref_distribution": "",
-                "article_ref_compensation": "",
-                "article_ref_amendment": "",
-                "oversight_required": False,
-                "member_names": mapped_data.get("member_names", ""),
-                "manager_names": mapped_data.get("manager_names", ""),
-                "article_ref_authority": "",
-                "article_ref_profit_distribution": "",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            await db.entities.insert_one(entity_doc)
-            # Update onboarding checklist
+            name = mapped_data.get("name", "")
+            entity_create = EntityCreate(
+                trust_id=trust_id,
+                name=name,
+                entity_type=entity_type_enum,
+                legal_name=mapped_data.get("legal_name", name),
+                formation_date=mapped_data.get("formation_date"),
+                governing_law=mapped_data.get("governing_law", ""),
+                ein=mapped_data.get("ein"),
+                trustee_names=mapped_data.get("trustee_names", ""),
+                member_names=mapped_data.get("member_names", ""),
+                manager_names=mapped_data.get("manager_names", ""),
+            )
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
             try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-            return {"success": True, "record_id": entity_id, "endpoint": "entities", "action": "created"}
+                result = await _create_entity(entity=entity_create, user=user_doc)
+                return {
+                    "success": True,
+                    "record_id": result.entity_id,
+                    "endpoint": "entities",
+                    "action": "created",
+                }
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create entity: {str(e)}"}
 
         elif endpoint_type == "settings_update":
             field = mapped_data.get("field", "")

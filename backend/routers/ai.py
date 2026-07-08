@@ -674,15 +674,55 @@ async def ai_health_check(user: dict = Depends(get_current_user)):
 
 # ==================== WEEKLY BRIEFING (Fix 5) ====================
 
+def _briefing_action_link(criterion_name: str) -> str:
+    """Map a governance criterion name to the deep-link users should follow to fix it."""
+    links = {
+        "Asset Valuation Freshness": "/schedule-a",
+        "Undocumented Distributions": "/distributions",
+        "Overdue Tax Filings": "/calendar",
+        "Documentation Hygiene": "/minutes",
+        "Minutes Generation": "/minutes",
+        "Beneficiaries": "/beneficiaries",
+        "Asset Documentation": "/schedule-a",
+        "Distribution Documentation": "/distributions",
+        "Transaction Classification": "/banking",
+        "Separation Alert Health": "/banking",
+        "Quarterly Minutes": "/minutes",
+        "Task Compliance": "/calendar",
+        "Compensation Alignment": "/banking",
+        "Annual Review": "/minutes",
+    }
+    return links.get(criterion_name, "/dashboard")
+
+
+def _briefing_cta_prompt(insight) -> str:
+    """Build the 'Ask AI' prompt for a briefing item from a GovernanceInsight."""
+    name = getattr(insight, "criterion_name", "")
+    description = getattr(insight, "description", "")
+    if description:
+        return f"Help me with: {name}. {description}"
+    return f"Help me with: {name}"
+
+
 @router.get("/weekly-briefing")
 async def get_weekly_briefing(
     trust_id: Optional[str] = None,
     user: dict = Depends(get_current_user)
 ):
     """
-    Generate a deterministic 3-item weekly briefing from insights, deadlines,
-    and activity. No LLM call required — purely rule-based for speed and reliability.
+    Generate a deterministic 3-item weekly briefing by reusing
+    generate_governance_insights + generate_additional_governance_insights
+    so that any new criteria added to governance.py (e.g. Fix 6 criteria)
+    automatically appear in the briefing without changes here.
+
+    No LLM call — purely rule-based for speed and reliability.
     """
+    from routers.governance import (
+        calculate_health_score,
+        generate_governance_insights,
+        generate_additional_governance_insights,
+    )
+
     user_id = user["user_id"]
 
     if not trust_id:
@@ -700,100 +740,54 @@ async def get_weekly_briefing(
             raise HTTPException(status_code=404, detail="Trust not found")
 
     now = datetime.now(timezone.utc)
-    items = []
 
-    # 1. Overdue tax filings / governance tasks
-    overdue_tasks = await db.governance_tasks.find({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "due_date": {"$lt": now.strftime("%Y-%m-%d")},
-        "completed_at": None,
-    }).to_list(10)
-    if overdue_tasks:
-        items.append({
-            "id": "overdue_tasks",
-            "title": f"{len(overdue_tasks)} overdue task{'s' if len(overdue_tasks) > 1 else ''}",
-            "severity": "high",
-            "action_link": "/calendar",
-            "cta_prompt": f"What do I need to do for my {len(overdue_tasks)} overdue governance task{'s' if len(overdue_tasks) > 1 else ''}?",
+    # 1. Reuse governance insights (same path as /dashboard)
+    health_data = await calculate_health_score(trust_id, user_id, save_snapshot=False)
+    insights = generate_governance_insights(health_data["criteria"])
+    # Append supplementary insights (undocumented distributions, overdue tax filings)
+    insights.extend(await generate_additional_governance_insights(trust_id, user_id))
+
+    # 2. Sort by points descending, take top 3
+    insights.sort(key=lambda x: getattr(x, "points", 0), reverse=True)
+    top_3 = insights[:3]
+
+    # 3. Build briefing items
+    briefing = []
+    for insight in top_3:
+        points = getattr(insight, "points", 0)
+        severity = "high" if points >= 15 else "medium" if points >= 8 else "low"
+        briefing.append({
+            "id": getattr(insight, "criterion_name", "item"),
+            "title": getattr(insight, "description", "") or getattr(insight, "title", ""),
+            "severity": severity,
+            "action_link": _briefing_action_link(getattr(insight, "criterion_name", "")),
+            "cta_prompt": _briefing_cta_prompt(insight),
         })
 
-    # 2. Undocumented distributions (no minutes, older than 7 days)
-    cutoff = (now - timedelta(days=7)).isoformat()
-    undocumented = await db.distribution_records.find({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "minutes_record_id": {"$in": [None, ""]},
-        "created_at": {"$lt": cutoff},
-    }).to_list(10)
-    if undocumented:
-        items.append({
-            "id": "undocumented_distributions",
-            "title": f"{len(undocumented)} distribution{'s' if len(undocumented) > 1 else ''} without meeting minutes",
-            "severity": "medium",
-            "action_link": "/minutes",
-            "cta_prompt": f"Draft meeting minutes for {len(undocumented)} undocumented distribution{'s' if len(undocumented) > 1 else ''}.",
-        })
+    # 4. Backfill with upcoming deadlines (next 14 days) if we have room
+    if len(briefing) < 3:
+        today_str = now.strftime("%Y-%m-%d")
+        fourteen_days = (now + timedelta(days=14)).strftime("%Y-%m-%d")
+        upcoming = await db.governance_tasks.find({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "due_date": {"$gte": today_str, "$lte": fourteen_days},
+            "completed_at": None,
+        }).to_list(10)
+        for task in upcoming:
+            if len(briefing) >= 3:
+                break
+            due = task.get("due_date", "")
+            desc = task.get("description", task.get("task_type", "Task").replace("_", " ").title())
+            briefing.append({
+                "id": f"deadline_{task.get('task_id', desc)}",
+                "title": f"Upcoming: {desc} due {due}",
+                "severity": "medium",
+                "action_link": "/calendar",
+                "cta_prompt": f"Help me prepare for the {desc} deadline on {due}.",
+            })
 
-    # 3. Stale asset valuations (not updated in 12+ months)
-    twelve_months_ago = (now - timedelta(days=365)).strftime("%Y-%m-%d")
-    stale_assets = await db.schedule_a_items.find({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "$or": [
-            {"updated_at": {"$lt": twelve_months_ago}},
-            {"date_conveyed": {"$lt": twelve_months_ago}, "updated_at": None},
-        ],
-    }).to_list(10)
-    if stale_assets:
-        items.append({
-            "id": "stale_assets",
-            "title": f"{len(stale_assets)} asset{'s' if len(stale_assets) > 1 else ''} not revalued in over 12 months",
-            "severity": "low",
-            "action_link": "/schedule-a",
-            "cta_prompt": f"Help me update the valuation for {len(stale_assets)} stale asset{'s' if len(stale_assets) > 1 else ''}.",
-        })
-
-    # 4. Upcoming deadlines in next 14 days
-    fourteen_days = (now + timedelta(days=14)).strftime("%Y-%m-%d")
-    today_str = now.strftime("%Y-%m-%d")
-    upcoming = await db.governance_tasks.find({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "due_date": {"$gte": today_str, "$lte": fourteen_days},
-        "completed_at": None,
-    }).to_list(10)
-    if upcoming:
-        items.append({
-            "id": "upcoming_deadlines",
-            "title": f"{len(upcoming)} deadline{'s' if len(upcoming) > 1 else ''} in the next 14 days",
-            "severity": "medium",
-            "action_link": "/calendar",
-            "cta_prompt": f"What are my upcoming deadlines in the next 14 days and what do I need to prepare?",
-        })
-
-    # 5. Pending distribution approvals
-    pending_dist = await db.distribution_records.find({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "approved_at": None,
-        "solvency_confirmed": {"$ne": True},
-    }).to_list(10)
-    if pending_dist:
-        items.append({
-            "id": "pending_distributions",
-            "title": f"{len(pending_dist)} distribution{'s' if len(pending_dist) > 1 else ''} awaiting solvency confirmation",
-            "severity": "medium",
-            "action_link": "/distributions",
-            "cta_prompt": f"Help me review {len(pending_dist)} pending distribution{'s' if len(pending_dist) > 1 else ''} for solvency confirmation.",
-        })
-
-    # Sort by severity and take top 3
-    severity_order = {"high": 0, "medium": 1, "low": 2}
-    items.sort(key=lambda x: severity_order.get(x["severity"], 3))
-    top_3 = items[:3]
-
-    return {"briefing": top_3, "generated_at": now.isoformat()}
+    return {"briefing": briefing[:3], "generated_at": now.isoformat()}
 
 
 # ==================== AUTO-DRAFTED QUARTERLY MINUTES (Fix 3) ====================
