@@ -15,7 +15,7 @@ const COLLAPSED_KEY = 'trust_assistant_snapshot_collapsed';
 const TrustAssistantPage = () => {
   const { selectedTrust } = useAuth();
   const [searchParams] = useSearchParams();
-  const promptSent = useRef(false);
+  const sentPrompts = useRef(new Set());
 
   // Snapshot column collapse state — collapsed by default on revisit
   const [snapshotCollapsed, setSnapshotCollapsed] = useState(() => {
@@ -69,16 +69,17 @@ const TrustAssistantPage = () => {
     fetchConversations();
   }, [fetchConversations]);
 
-  // Auto-send ?prompt= query parameter on first mount
+  // Auto-send ?prompt= query parameter — fires even if arriving on an open conversation,
+  // as long as this exact prompt hasn't been sent yet in this page session.
   useEffect(() => {
     const prompt = searchParams.get('prompt');
-    if (prompt && !promptSent.current && messages.length === 0 && !loading) {
-      promptSent.current = true;
+    if (prompt && !sentPrompts.current.has(prompt) && !loading) {
+      sentPrompts.current.add(prompt);
       sendMessage(prompt, conversationId, messages, () => {
         fetchConversations();
       });
     }
-  }, [searchParams, messages.length, loading, sendMessage, conversationId, messages, fetchConversations]);
+  }, [searchParams, messages, loading, sendMessage, conversationId, fetchConversations]);
 
   // Handle sending a message through the chat
   const handleSendMessage = useCallback(async (text) => {

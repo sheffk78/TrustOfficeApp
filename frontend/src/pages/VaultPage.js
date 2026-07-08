@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -14,7 +15,7 @@ import {
   FolderOpen, Plus, FileText, Calendar, Link as LinkIcon,
   Search, AlertTriangle, CheckCircle2, ExternalLink,
   Trash2, Tag, Shield, FileCheck, Upload, Download,
-  File, X, CloudUpload, Link2, Copy, Check
+  File, X, CloudUpload, Link2, Copy, Check, Bot
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import PageHelpButton from '@/components/PageHelpButton';
@@ -673,6 +674,17 @@ export default function VaultPage() {
                             <span className="text-[10px] text-neutral-400">
                               {doc.date ? format(parseISO(doc.date), 'MMM d, yyyy') : ''}
                             </span>
+                          </div>
+                          {/* AI CTA — Summarize this document */}
+                          <div className="mt-2">
+                            <Link
+                              to={`/trust-assistant?prompt=${encodeURIComponent(`Summarize the document "${doc.title}" in the trust vault and explain its key provisions and relevance to the trust.`)}`}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gold hover:bg-gold/10 transition-colors"
+                              data-testid={`ta-summarize-${doc.doc_id}`}
+                            >
+                              <Bot className="w-3.5 h-3.5" />
+                              Summarize this document
+                            </Link>
                           </div>
                           {doc.needs_renewal && doc.expiration_date && (
                             <div className="mt-2 text-[10px] text-warning bg-warning/5 border border-warning/10 rounded px-2 py-1">

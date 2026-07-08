@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -55,6 +55,7 @@ function useDebounce(value, delay) {
 
 export default function DistributionsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { selectedTrust, isReadOnly } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
   const [distributions, setDistributions] = useState([]);
@@ -131,6 +132,24 @@ export default function DistributionsPage() {
       loadDistributions(debouncedSearch);
     }
   }, [selectedTrust, debouncedSearch]);
+
+  // Auto-open approval modal when arriving via ?approve=<id> deep-link
+  const [autoApproveHandled, setAutoApproveHandled] = useState(false);
+  useEffect(() => {
+    const approveId = searchParams.get('approve');
+    if (approveId && !autoApproveHandled && distributions.length > 0) {
+      const dist = distributions.find(d => d.distribution_id === approveId);
+      if (dist) {
+        setApprovalModal(dist);
+        setSolvencyConfirmed(false);
+        setRecusalAcknowledged(false);
+      }
+      setAutoApproveHandled(true);
+      // Clean URL
+      searchParams.delete('approve');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, distributions, autoApproveHandled]);
 
   const loadCategories = async () => {
     try {

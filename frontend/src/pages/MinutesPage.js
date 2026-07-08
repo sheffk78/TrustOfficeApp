@@ -209,6 +209,14 @@ export default function MinutesPage() {
                 <Plus className="w-4 h-4 mr-2" />
                 Create Minutes
               </Button>
+              <Link
+                to={`/trust-assistant?prompt=${encodeURIComponent('Draft Q1 minutes from recent activity — review recent distributions, deadlines, and trust actions and draft meeting minutes summarizing this quarter.')}`}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gold border border-gold/30 hover:bg-gold/10 transition-colors rounded font-medium"
+                data-testid="ta-draft-q1-hero"
+              >
+                <Bot className="w-4 h-4" />
+                Draft Q1 Minutes with AI
+              </Link>
             </div>
           </div>
 
