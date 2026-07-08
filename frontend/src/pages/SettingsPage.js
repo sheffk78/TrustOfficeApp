@@ -434,7 +434,8 @@ export default function SettingsPage() {
       if (!response.ok) {
         // Revert on error — use functional updater to avoid stale closure
         setNotificationPrefs(prev => ({ ...prev, [key]: !value }));
-        showError(toast, error, { operation: 'update', page: 'Settings' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Update failed (${response.status})`), { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
       setNotificationPrefs(prev => ({ ...prev, [key]: !value }));

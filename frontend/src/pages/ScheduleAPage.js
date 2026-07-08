@@ -360,7 +360,7 @@ export default function ScheduleAPage() {
           {/* Header */}
           <div className="page-header flex items-center justify-between">
             <div>
-              <h1 className="page-title">Schedule A</h1>
+              <h1 className="page-title">Trust Assets</h1>
               <p className="page-subtitle">Manage trust assets and corpus — add, update, or dispose of trust property with proper documentation</p>
             </div>
             <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">

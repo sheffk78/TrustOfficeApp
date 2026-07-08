@@ -380,7 +380,8 @@ export default function BeneficiariesPage() {
         const data = await response.json();
         setPdfPreview({ show: true, loading: false, data: data.pdf_base64, filename: data.filename });
       } else {
-        showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to load PDF (${response.status})`), { operation: 'load', page: 'Beneficiaries' });
         setPdfPreview({ show: false, loading: false, data: null, filename: '' });
       }
     } catch (error) {

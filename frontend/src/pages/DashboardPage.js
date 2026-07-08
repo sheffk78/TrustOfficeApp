@@ -76,7 +76,7 @@ const QUICK_ACTIONS = [
     color: 'bg-orange-500/10 text-orange-600'
   },
   {
-    title: 'View Schedule A',
+    title: 'View Trust Assets',
     description: 'Manage trust assets and corpus',
     icon: Package,
     path: '/schedule-a',
@@ -324,7 +324,7 @@ export default function DashboardPage() {
       { 
         id: 'assets', 
         label: 'Set Up Your Trust Structure', 
-        description: 'Add your trust entity to the Structures section. This is where you manage your trust and any related LLCs.',
+        description: 'Add your trust entity to the Trust & Entities section. This is where you manage your trust and any related LLCs.',
         done: onboarding.assets_added,
         icon: Package,
         action: '/structures'

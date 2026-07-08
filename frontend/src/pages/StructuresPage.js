@@ -337,7 +337,7 @@ export default function StructuresPage() {
           {/* Page Header */}
           <div className="page-header flex items-center justify-between mb-6">
             <div>
-              <h1 className="page-title">Structures</h1>
+              <h1 className="page-title">Trust & Entities</h1>
               <p className="page-subtitle">
                 Manage trust structures, entities, and relationships — define the organizational framework of your trust
               </p>
