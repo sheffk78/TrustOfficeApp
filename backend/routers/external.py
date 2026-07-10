@@ -782,18 +782,18 @@ async def provision_trustoffice(
     )
 
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
-    # Include coupon, action, and plan params in set-password URL so WingPoint users
-    # are directed to the right pricing tier after password reset.
+    # Include coupon and plan params in set-password URL so WingPoint users
+    # are directed to the right pricing tier after setting their password.
     coupon_param = f"&coupon={quote(request.coupon_code, safe='')}" if request.coupon_code else ""
-    # For set-password users, always include action=subscribe and plan based on package
+    # Plan is derived from the source package via PACKAGE_TO_PLAN, not hardcoded.
     _prelim_plan = PACKAGE_TO_PLAN.get(request.source_package or "", "trustee")
     _prelim_limit = PLAN_TRUST_LIMITS.get(_prelim_plan, 1)
     if _prelim_limit != float('inf'):
         _current_trust_count = await db.trusts.count_documents({"user_id": user_id})
         if _current_trust_count > _prelim_limit:
             _prelim_plan = "estate" if _current_trust_count <= 5 else "advisor"
-    action_plan_param = f"&action=subscribe&plan={_prelim_plan}"
-    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}{coupon_param}{action_plan_param}"
+    action_plan_param = f"&plan={_prelim_plan}"
+    set_password_url = f"{frontend_url}/wingpoint?action=set_password&token={set_password_token}{coupon_param}{action_plan_param}"
 
     # ---- INSERT PROVISION RECORD EARLY (pending status) ----
     # Inserted before email send so retries find an existing anchor even if
@@ -1036,8 +1036,8 @@ async def _resend_activation(provision: dict, partner: dict) -> dict:
     coupon_param = f"&coupon={quote(coupon_code, safe='')}" if coupon_code else ""
     _source_pkg = provision.get("request_payload", {}).get("source_package") if provision else None
     _resend_plan = PACKAGE_TO_PLAN.get(_source_pkg or "", "trustee")
-    action_plan_param = f"&action=subscribe&plan={_resend_plan}"
-    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}{coupon_param}{action_plan_param}"
+    action_plan_param = f"&plan={_resend_plan}"
+    set_password_url = f"{frontend_url}/wingpoint?action=set_password&token={set_password_token}{coupon_param}{action_plan_param}"
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
 
     # Resolve first name for the WingPoint-aware email.
