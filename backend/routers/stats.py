@@ -22,8 +22,31 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID')
 STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
+STRIPE_TRUSTEE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_TRUSTEE_MONTHLY_PRICE_ID')
+STRIPE_TRUSTEE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_TRUSTEE_ANNUAL_PRICE_ID')
+STRIPE_ESTATE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ESTATE_MONTHLY_PRICE_ID')
+STRIPE_ESTATE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ESTATE_ANNUAL_PRICE_ID')
+STRIPE_ADVISOR_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ADVISOR_MONTHLY_PRICE_ID')
+STRIPE_ADVISOR_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ADVISOR_ANNUAL_PRICE_ID')
 
-TRUSTOFFICE_PRICE_IDS = {STRIPE_MONTHLY_PRICE_ID, STRIPE_ANNUAL_PRICE_ID}
+TRUSTOFFICE_PRICE_IDS = {
+    STRIPE_MONTHLY_PRICE_ID, STRIPE_ANNUAL_PRICE_ID,
+    STRIPE_TRUSTEE_MONTHLY_PRICE_ID, STRIPE_TRUSTEE_ANNUAL_PRICE_ID,
+    STRIPE_ESTATE_MONTHLY_PRICE_ID, STRIPE_ESTATE_ANNUAL_PRICE_ID,
+    STRIPE_ADVISOR_MONTHLY_PRICE_ID, STRIPE_ADVISOR_ANNUAL_PRICE_ID,
+}
+
+# Map price ID -> plan label for revenue breakdowns
+PRICE_ID_TO_PLAN_LABEL = {
+    STRIPE_MONTHLY_PRICE_ID: "trustee_monthly",
+    STRIPE_ANNUAL_PRICE_ID: "trustee_annual",
+    STRIPE_TRUSTEE_MONTHLY_PRICE_ID: "trustee_monthly",
+    STRIPE_TRUSTEE_ANNUAL_PRICE_ID: "trustee_annual",
+    STRIPE_ESTATE_MONTHLY_PRICE_ID: "estate_monthly",
+    STRIPE_ESTATE_ANNUAL_PRICE_ID: "estate_annual",
+    STRIPE_ADVISOR_MONTHLY_PRICE_ID: "advisor_monthly",
+    STRIPE_ADVISOR_ANNUAL_PRICE_ID: "advisor_annual",
+}
 
 
 def _get_price_id(line):
@@ -54,7 +77,8 @@ def _get_price_id(line):
 
 def _is_trustoffice_invoice(inv) -> bool:
     """Check if an invoice has a line item matching a TrustOffice Price ID."""
-    if not STRIPE_MONTHLY_PRICE_ID and not STRIPE_ANNUAL_PRICE_ID:
+    if not any(TRUSTOFFICE_PRICE_IDS):
+        logger.warning("No TrustOffice price IDs configured — including all invoices in revenue")
         return True
     try:
         for line in inv.lines.data:
@@ -181,19 +205,16 @@ def _fetch_stripe_revenue(start_date: datetime, end_date: datetime):
                 month_key = inv_date.strftime("%Y-%m")
                 revenue_by_month[month_key] += amount
 
-                # Plan detection from line items
-                plan_type = "monthly"
+                # Plan detection from line items — use full 3-tier lookup
+                plan_type = "unknown"
                 try:
                     for line in inv.lines.data:
                         price_id = _get_price_id(line)
-                        if price_id == STRIPE_ANNUAL_PRICE_ID:
-                            plan_type = "annual"
-                            break
-                        elif price_id == STRIPE_MONTHLY_PRICE_ID:
-                            plan_type = "monthly"
+                        if price_id and price_id in PRICE_ID_TO_PLAN_LABEL:
+                            plan_type = PRICE_ID_TO_PLAN_LABEL[price_id]
                             break
                 except Exception:
-                    plan_type = "monthly"
+                    plan_type = "unknown"
 
                 subscriptions_by_plan[plan_type] = subscriptions_by_plan.get(plan_type, 0) + 1
 
