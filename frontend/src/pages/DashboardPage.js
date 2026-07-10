@@ -104,7 +104,7 @@ const INSIGHT_ICONS = {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, selectedTrust, trusts, trustsLoading, loadTrusts, seedDemoData } = useAuth();
+  const { user, selectedTrust, trusts, trustsLoading, loadTrusts, seedDemoData, subscription } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [weeklyBriefing, setWeeklyBriefing] = useState(null);
@@ -116,6 +116,13 @@ export default function DashboardPage() {
   const [taxDeadlines, setTaxDeadlines] = useState([]);
   const [taxDeadlinesLoading, setTaxDeadlinesLoading] = useState(false);
   
+  // Dismissible upgrade banner state
+  const [upgradeBannerDismissed, setUpgradeBannerDismissed] = useState(false);
+
+  // WingPoint welcome modal state
+  const [showWpWelcome, setShowWpWelcome] = useState(false);
+  const [wpBannerVisible, setWpBannerVisible] = useState(false);
+
   // Show welcome toast after successful purchase
   useEffect(() => {
     if (searchParams.get('welcome') === 'true') {
@@ -128,6 +135,20 @@ export default function DashboardPage() {
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  // WingPoint welcome modal — show on first visit when ?wp=1 or not yet dismissed
+  useEffect(() => {
+    const wpParam = searchParams.get('wp');
+    const dismissed = localStorage.getItem('wp_welcome_dismissed');
+    const hasTrusts = trusts && trusts.length > 0;
+
+    if (wpParam === '1' || (!dismissed && hasTrusts)) {
+      setShowWpWelcome(true);
+      setWpBannerVisible(false);
+    } else if (dismissed && hasTrusts) {
+      setWpBannerVisible(true);
+    }
+  }, [searchParams, trusts]);
 
   useEffect(() => {
     if (trustsLoading) return;
@@ -205,6 +226,18 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Failed to dismiss onboarding:', error);
     }
+  };
+
+  const dismissWpWelcome = () => {
+    localStorage.setItem('wp_welcome_dismissed', 'true');
+    setShowWpWelcome(false);
+    setWpBannerVisible(true);
+  };
+
+  const goToTrustDocsFromWp = () => {
+    localStorage.setItem('wp_welcome_dismissed', 'true');
+    setShowWpWelcome(false);
+    navigate('/vault');
   };
 
   const dismissInsight = async (criterionName) => {
@@ -392,8 +425,114 @@ export default function DashboardPage() {
       <Sidebar />
       <main className="main-content dot-grid">
         {/* Subscription Banners */}
-        
+        {subscription?.needs_upgrade && !upgradeBannerDismissed && (
+          <div
+            className="mx-auto max-w-4xl mt-4 mb-2 border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 dark:border-amber-700"
+            data-testid="upgrade-banner"
+          >
+            <div className="flex items-center gap-4 p-4">
+              <div className="w-10 h-10 bg-amber-400/20 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  Your current plan supports{' '}
+                  <span className="font-semibold">{subscription.trust_limit}</span> trusts but you have{' '}
+                  <span className="font-semibold">{subscription.trust_count}</span>. Upgrade to manage all your trusts.
+                </p>
+              </div>
+              <Link
+                to="/billing?wp=1&action=upgrade"
+                className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors flex-shrink-0"
+                data-testid="upgrade-banner-cta"
+              >
+                Upgrade <ArrowRight className="w-4 h-4" />
+              </Link>
+              <button
+                onClick={() => setUpgradeBannerDismissed(true)}
+                className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 flex-shrink-0"
+                aria-label="Dismiss upgrade banner"
+                data-testid="upgrade-banner-dismiss"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* WingPoint persistent banner — shows after welcome modal dismissal */}
+        {wpBannerVisible && (
+          <div
+            className="mx-auto max-w-4xl mt-4 mb-2 border border-gold/30 bg-gold/10"
+            data-testid="wp-persistent-banner"
+          >
+            <div className="flex items-center gap-4 p-4">
+              <div className="w-10 h-10 bg-gold/20 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-gold" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-navy">
+                  Your WingPoint trust is ready.{' '}
+                  <Link to="/vault" className="font-semibold underline hover:text-navy/70">
+                    Review your trust documents.
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="page-container">
+          {/* WingPoint Welcome Modal */}
+          {showWpWelcome && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40" data-testid="wp-welcome-modal">
+              <div className="bg-white border border-gold/30 max-w-lg w-full mx-4 p-8">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="w-12 h-12 bg-gold/10 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-6 h-6 text-gold" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="font-serif text-xl text-navy mb-3">Welcome to TrustOffice, your WingPoint trust is here.</h2>
+                  </div>
+                </div>
+                <div className="text-sm text-navy/80 space-y-3 mb-6">
+                  <p>You are all set. Your trust documents are ready to review, and your management plan is active. Here is what you can do right now:</p>
+                  <ul className="space-y-2 ml-4">
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
+                      <span>Review your trust in the Trust Documents tab.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
+                      <span>Add beneficiaries to make sure your trust reflects your wishes.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
+                      <span>Schedule a consultation with a trust advisor.</span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    onClick={goToTrustDocsFromWp}
+                    className="btn-primary flex-1"
+                    data-testid="wp-welcome-go-to-trust"
+                  >
+                    Go to My Trust Documents
+                  </Button>
+                  <Button
+                    onClick={dismissWpWelcome}
+                    variant="outline"
+                    className="flex-1"
+                    data-testid="wp-welcome-dismiss"
+                  >
+                    Maybe Later
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Page Header */}
           <div className="page-header flex items-start justify-between">
             <div>

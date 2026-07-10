@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -114,6 +114,14 @@ export default function BillingPage() {
   const [pickerBillingPeriod, setPickerBillingPeriod] = useState('monthly');
   const [changePlanBillingPeriod, setChangePlanBillingPeriod] = useState('monthly');
 
+  // WingPoint flow: ?plan=XX triggers auto-scroll + highlight on the matching
+  // tier card; ?action=upgrade shows a contextual banner at the top.
+  const targetPlan = searchParams.get('plan');
+  const actionParam = searchParams.get('action');
+  const wpParam = searchParams.get('wp');
+  const isWp = wpParam === '1';
+  const planCardRefs = useRef({});
+
   useEffect(() => {
     loadSubscription();
     
@@ -123,6 +131,15 @@ export default function BillingPage() {
       verifyPayment(sessionId);
     }
   }, [searchParams]);
+
+  // Auto-scroll to the target plan card once data has loaded and the card
+  // is present in the DOM.  Runs whenever loading flips to false or the
+  // target plan param changes.
+  useEffect(() => {
+    if (!loading && targetPlan && planCardRefs.current[targetPlan]) {
+      planCardRefs.current[targetPlan].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [loading, targetPlan]);
 
   const loadSubscription = async () => {
     setLoading(true);
@@ -428,6 +445,149 @@ export default function BillingPage() {
       <Sidebar />
       <main className="main-content dot-grid">
         <div className="page-container max-w-4xl">
+          {/* WingPoint upgrade banner */}
+          {actionParam === 'upgrade' && !isWp && (
+            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-upgrade-banner">
+              <ArrowUpCircle className="w-5 h-5 text-navy flex-shrink-0" />
+              <p className="text-sm text-navy font-medium">
+                Upgrade your plan to manage all your trusts.
+              </p>
+            </div>
+          )}
+
+          {/* WingPoint upgrade banner (enhanced for ?wp=1) */}
+          {actionParam === 'upgrade' && isWp && (
+            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg" data-testid="wp-upgrade-banner">
+              <div className="flex items-start gap-3">
+                <ArrowUpCircle className="w-5 h-5 text-navy flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-navy mb-1">
+                    You have more trusts than your current plan supports.
+                  </p>
+                  <p className="text-sm text-navy/80 mb-2">
+                    Your WingPoint purchase included additional trust credits, but your current plan covers fewer trusts than you now have. To access all your trusts, upgrade to a higher plan.
+                  </p>
+                  <p className="text-sm text-success font-medium mb-3">
+                    Your $50 WingPoint coupon still applies if you upgrade now.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      const tierSection = document.querySelector('[data-testid="tier-change-section"]');
+                      if (tierSection) tierSection.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="btn-primary"
+                    data-testid="wp-upgrade-cta"
+                  >
+                    <ArrowUpCircle className="w-4 h-4 mr-2" />
+                    Upgrade My Plan
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* WingPoint resubscribe banner */}
+          {actionParam === 'resubscribe' && !isWp && (
+            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-resubscribe-banner">
+              <RefreshCw className="w-5 h-5 text-navy flex-shrink-0" />
+              <p className="text-sm text-navy font-medium flex-1">
+                Your new trust has been added. Reactivate your subscription to manage all your trusts.
+              </p>
+              <Button
+                onClick={() => {
+                  const reactivateBtn = document.querySelector('[data-testid="reactivate-btn"]');
+                  if (reactivateBtn) {
+                    reactivateBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  } else {
+                    const statusCard = document.querySelector('[data-testid="subscription-status-card"]');
+                    if (statusCard) statusCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="border-gold/40 text-navy hover:bg-gold/10"
+                data-testid="wp-resubscribe-cta"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reactivate
+              </Button>
+            </div>
+          )}
+
+          {/* WingPoint resubscribe banner (enhanced for ?wp=1) */}
+          {actionParam === 'resubscribe' && isWp && (
+            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-resubscribe-banner">
+              <RefreshCw className="w-5 h-5 text-navy flex-shrink-0" />
+              <p className="text-sm text-navy font-medium flex-1">
+                Your new WingPoint trust has been added. Reactivate your subscription to manage all your trusts.
+              </p>
+              <Button
+                onClick={() => {
+                  const reactivateBtn = document.querySelector('[data-testid="reactivate-btn"]');
+                  if (reactivateBtn) {
+                    reactivateBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  } else {
+                    const statusCard = document.querySelector('[data-testid="subscription-status-card"]');
+                    if (statusCard) statusCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="border-gold/40 text-navy hover:bg-gold/10"
+                data-testid="wp-resubscribe-cta"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reactivate
+              </Button>
+            </div>
+          )}
+
+          {/* WingPoint update payment banner */}
+          {actionParam === 'update_payment' && !isWp && (
+            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-update-payment-banner">
+              <CreditCard className="w-5 h-5 text-navy flex-shrink-0" />
+              <p className="text-sm text-navy font-medium flex-1">
+                Your trust has been added. Update your payment method to keep your subscription active.
+              </p>
+              <Button
+                onClick={() => {
+                  const manageBtn = document.querySelector('[data-testid="manage-billing-btn"]');
+                  if (manageBtn) manageBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+                variant="outline"
+                size="sm"
+                className="border-gold/40 text-navy hover:bg-gold/10"
+                data-testid="wp-update-payment-cta"
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                Update Payment
+              </Button>
+            </div>
+          )}
+
+          {/* WingPoint update payment banner (enhanced for ?wp=1) */}
+          {actionParam === 'update_payment' && isWp && (
+            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-update-payment-banner">
+              <CreditCard className="w-5 h-5 text-navy flex-shrink-0" />
+              <p className="text-sm text-navy font-medium flex-1">
+                Your WingPoint trust has been added. Update your payment method to keep your subscription active.
+              </p>
+              <Button
+                onClick={() => {
+                  const manageBtn = document.querySelector('[data-testid="manage-billing-btn"]');
+                  if (manageBtn) manageBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+                variant="outline"
+                size="sm"
+                className="border-gold/40 text-navy hover:bg-gold/10"
+                data-testid="wp-update-payment-cta"
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                Update Payment
+              </Button>
+            </div>
+          )}
+
           {/* Back Button */}
           <Button 
             onClick={() => navigate('/settings')}
@@ -511,7 +671,8 @@ export default function BillingPage() {
               {TIERS.map(tier => (
                 <div
                   key={tier.id}
-                  className={`card-trust relative ${tier.popular ? 'border-gold/30 bg-gold/5' : ''}`}
+                  ref={(el) => { planCardRefs.current[tier.id] = el; }}
+                  className={`card-trust relative ${tier.popular ? 'border-gold/30 bg-gold/5' : ''} ${targetPlan === tier.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
                   data-testid={`plan-card-${tier.id}`}
                 >
                   {tier.popular && (
@@ -766,7 +927,8 @@ export default function BillingPage() {
                         return (
                           <div
                             key={tier.id}
-                            className={`card-trust relative p-6 ${tier.popular ? 'border-gold/40' : ''} ${isCurrentTier ? 'ring-2 ring-navy' : ''}`}
+                            ref={(el) => { planCardRefs.current[tier.id] = el; }}
+                            className={`card-trust relative p-6 ${tier.popular ? 'border-gold/40' : ''} ${isCurrentTier ? 'ring-2 ring-navy' : ''} ${targetPlan === tier.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
                             data-testid={`tier-change-card-${tier.id}`}
                           >
                             {tier.popular && !isCurrentTier && (

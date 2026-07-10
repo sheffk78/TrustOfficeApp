@@ -28,10 +28,12 @@ import hmac
 import json
 import asyncio
 import logging
+from urllib.parse import quote
 import re
 
 from database import db
 from email_service import email_service
+from dependencies import get_subscription_state, get_trust_limit, PLAN_TRUST_LIMITS
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +138,280 @@ async def log_audit(partner_id: str, action: str, wingpoint_ref: str, details: d
     })
 
 
+# ==================== SMART ROUTING HELPERS ====================
+
+# Map WingPoint packages to recommended TrustOffice tiers
+PACKAGE_TO_PLAN = {
+    "single_trust": "trustee",      # 1 trust → Trustee ($79/mo, 1 trust)
+    "estate_bundle": "estate",      # 2 trusts → Estate ($149/mo, 5 trusts)
+    "builder_bundle": "estate",     # 4 trusts → Estate ($149/mo, 5 trusts covers it)
+}
+
+# Human-readable plan names for API response
+PLAN_DISPLAY_NAMES = {
+    "free": "Free",
+    "forever_free": "Forever Free",
+    "trustee": "Trustee",
+    "estate": "Estate",
+    "advisor": "Advisor",
+    "monthly": "Legacy Monthly",
+    "annual": "Legacy Annual",
+    "trial": "Trial",
+}
+
+
+async def _determine_recommended_action(
+    user_id: str,
+    is_new_user: bool,
+    source_package: Optional[str],
+    coupon_code: Optional[str],
+    frontend_url: str,
+) -> dict:
+    """
+    Determine the recommended action for a provisioned user based on their
+    current subscription state, trust count, and whether they already have a password.
+
+    Returns a structured object with:
+    - action: set_password | login | login_and_subscribe | login_and_upgrade
+    - redirect_url: where WingPoint should send the user
+    - message: human-readable explanation
+    - suggested_plan: recommended TrustOffice tier
+    - needs_upgrade: bool
+    - requires_payment: bool
+    """
+    # Count trusts for this user
+    trust_count = await db.trusts.count_documents({"user_id": user_id})
+
+    # Get subscription state
+    sub_state = await get_subscription_state(user_id)
+    plan_type = sub_state.plan_type
+    is_active = sub_state.is_active
+    cancel_pending = sub_state.cancel_at_period_end
+
+    # Check if user has a password (existing users who set one already)
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 1})
+    has_password = bool(user is not None and user.get("password_hash") is not None)
+
+    # Determine recommended plan based on package or trust count
+    suggested_plan = PACKAGE_TO_PLAN.get(source_package, None)
+    if not suggested_plan:
+        # Fallback: recommend based on trust count
+        if trust_count <= 1:
+            suggested_plan = "trustee"
+        elif trust_count <= 5:
+            suggested_plan = "estate"
+        else:
+            suggested_plan = "advisor"
+    else:
+        # Validate package-based plan against actual trust count
+        # (e.g., user bought multiple Single Trust packages → Trustee won't cover them)
+        plan_limit = PLAN_TRUST_LIMITS.get(suggested_plan, 1)
+        if plan_limit != float('inf') and trust_count > plan_limit:
+            if trust_count <= 5:
+                suggested_plan = "estate"
+            else:
+                suggested_plan = "advisor"
+
+    # Prevent recommending a downgrade for legacy plan users (legacy limit = 10)
+    current_limit = get_trust_limit(plan_type, sub_state.legacy_trust_limit)
+    suggested_limit = PLAN_TRUST_LIMITS.get(suggested_plan, 1)
+    if current_limit != float('inf') and suggested_limit != float('inf') and suggested_limit < current_limit:
+        # Don't recommend a plan with fewer trusts than they already have
+        if current_limit >= 10:
+            suggested_plan = "advisor"  # Only Advisor exceeds legacy 10
+        elif trust_count <= 5:
+            suggested_plan = "estate"
+        else:
+            suggested_plan = "advisor"
+
+    needs_upgrade = trust_count > current_limit if current_limit != float('inf') else False
+
+    # Check for past_due status BEFORE is_free_or_trial (past_due has is_active=False but
+    # the user needs to update payment, not re-subscribe from scratch)
+    sub_status = getattr(sub_state, 'status', None)
+    is_past_due = sub_status == 'past_due'
+
+    # Determine if user needs to pay (free/trial/canceled → yes; active paid → no unless upgrade needed)
+    is_free_or_trial = plan_type in ("free", "forever_free", "trial") or not is_active
+    requires_payment = (is_free_or_trial and not is_past_due) or needs_upgrade or is_past_due
+
+    # Build redirect URL and action
+    if is_new_user or not has_password:
+        # New user or existing user without password → set password first
+        action = "set_password"
+        # Set-password URL is built by the caller; we just flag the action
+        redirect_url = None  # Caller provides set_password_url
+    elif is_past_due:
+        # Payment failed but access still active (grace period) → update payment method
+        action = "login_and_update_payment"
+        redirect_url = f"{frontend_url}/login?wp=1&action=update_payment"
+    elif is_free_or_trial:
+        # Existing user with password, on free/trial → login then subscribe
+        action = "login_and_subscribe"
+        params = "?wp=1&action=subscribe"
+        if coupon_code:
+            params += f"&coupon={quote(coupon_code, safe='')}"
+        if suggested_plan:
+            params += f"&plan={suggested_plan}"
+        redirect_url = f"{frontend_url}/login{params}"
+    elif needs_upgrade:
+        # Existing paid user whose plan can't handle the trust count → upgrade
+        action = "login_and_upgrade"
+        redirect_url = f"{frontend_url}/login?wp=1&action=upgrade&plan={suggested_plan}"
+    elif cancel_pending:
+        # Active subscription but cancellation pending → resubscribe
+        action = "login_and_resubscribe"
+        redirect_url = f"{frontend_url}/login?wp=1&action=resubscribe"
+    else:
+        # Existing paid user, plan covers trusts → just log in
+        action = "login"
+        redirect_url = f"{frontend_url}/login?wp=1&action=welcome"
+
+    # Build human-readable message
+    if action == "set_password":
+        message = "Check your email to set your password and activate your account."
+    elif action == "login_and_subscribe":
+        message = f"Your trust has been added. Log in to choose your TrustOffice plan ({PLAN_DISPLAY_NAMES.get(suggested_plan, suggested_plan)})."
+    elif action == "login_and_upgrade":
+        message = f"Your trust has been added. Log in to upgrade to the {PLAN_DISPLAY_NAMES.get(suggested_plan, suggested_plan)} plan to manage all your trusts."
+    elif action == "login_and_resubscribe":
+        message = "Your trust has been added. Log in to reactivate your subscription."
+    elif action == "login_and_update_payment":
+        message = "Your trust has been added. Log in to update your payment method."
+    else:
+        message = "Your trust has been added to your account. Log in to get started."
+
+    # Return only what WingPoint needs for routing — no internal user state
+    return {
+        "action": action,
+        "redirect_url": redirect_url,
+        "message": message,
+        "suggested_plan": suggested_plan,
+        "suggested_plan_name": PLAN_DISPLAY_NAMES.get(suggested_plan, suggested_plan),
+        "needs_upgrade": needs_upgrade,
+        "requires_payment": requires_payment,
+    }
+
+
+# ==================== WINGPOINT-AWARE SET-PASSWORD EMAIL ====================
+
+_WINGPOINT_SET_PASSWORD_SUBJECT = "Your WingPoint trust is ready. Let's set up your access"
+
+_WINGPOINT_SET_PASSWORD_TEXT = """Hi {first_name},
+
+You recently purchased a trust package through WingPoint.
+
+TrustOffice is the platform that manages your trust.
+WingPoint built your trust.
+TrustOffice keeps it running, updated, secure, and accessible whenever you need it.
+
+Here is what happens next:
+
+1. Set your password (30 seconds).
+2. Choose your management plan (covers amendments, beneficiary updates, document storage). WingPoint has covered $50 of your first month.
+3. Access your trust on your dashboard.
+
+If you have questions, just reply to this email.
+
+Activate your account: {set_password_url}
+
+Welcome aboard,
+The TrustOffice Team
+In partnership with WingPoint
+"""
+
+_WINGPOINT_SET_PASSWORD_HTML_BODY = """
+<h2>Hi {first_name},</h2>
+<p>You recently purchased a trust package through WingPoint.</p>
+
+<p>TrustOffice is the platform that manages your trust.<br>
+WingPoint built your trust.<br>
+TrustOffice keeps it running, updated, secure, and accessible whenever you need it.</p>
+
+<h3>Here is what happens next:</h3>
+<ol>
+  <li><strong>Set your password</strong> (30 seconds).</li>
+  <li><strong>Choose your management plan</strong> (covers amendments, beneficiary updates, document storage). WingPoint has covered $50 of your first month.</li>
+  <li><strong>Access your trust</strong> on your dashboard.</li>
+</ol>
+
+<p>If you have questions, just reply to this email.</p>
+
+<p style="text-align: center; margin: 30px 0;">
+  <a href="{set_password_url}" class="button">Activate My Trust Account</a>
+</p>
+
+<p style="font-size: 12px; color: #666;">
+  If the button doesn't work, copy and paste this link into your browser:<br>
+  <span style="word-break: break-all;">{set_password_url}</span>
+</p>
+
+<p>Welcome aboard,<br>
+The TrustOffice Team<br>
+In partnership with WingPoint</p>
+"""
+
+
+def _wingpoint_set_password_html(first_name: str, set_password_url: str) -> str:
+    """Build the WingPoint-aware set-password HTML using the base template wrapper."""
+    from email_templates import _base_template
+    inner = _WINGPOINT_SET_PASSWORD_HTML_BODY.format(
+        first_name=first_name,
+        set_password_url=set_password_url,
+    )
+    return _base_template(inner)
+
+
+def _wingpoint_set_password_text(first_name: str, set_password_url: str) -> str:
+    """Build the WingPoint-aware set-password plain-text body."""
+    return _WINGPOINT_SET_PASSWORD_TEXT.format(
+        first_name=first_name,
+        set_password_url=set_password_url,
+    )
+
+
+def _resolve_first_name(
+    grantor_first_name: Optional[str] = None,
+    grantor_full_name: Optional[str] = None,
+    fallback: str = "there",
+) -> str:
+    """Extract a first name from the provision record or grantor fields."""
+    if grantor_first_name and grantor_first_name.strip():
+        return grantor_first_name.strip()
+    if grantor_full_name and grantor_full_name.strip():
+        # Full name is present; take the first token as first name
+        return grantor_full_name.strip().split()[0]
+    return fallback
+
+
+async def _send_wingpoint_set_password_email(
+    to_email: str,
+    first_name: str,
+    set_password_url: str,
+) -> dict:
+    """
+    Send the WingPoint-aware warm set-password email.
+
+    All provisions through this external router originate from WingPoint
+    (every request carries a wingpoint_ref), so we always send the warm
+    WingPoint-branded copy.  The generic send_welcome_set_password_email
+    is still used by the admin-created-account path (routers/admin.py)
+    which is NOT a WingPoint provision.
+    """
+    subject = _WINGPOINT_SET_PASSWORD_SUBJECT
+    html_body = _wingpoint_set_password_html(first_name, set_password_url)
+    text_body = _wingpoint_set_password_text(first_name, set_password_url)
+    return await email_service.send_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+        to_name=first_name if first_name != "there" else "",
+        tag="wingpoint_set_password",
+        metadata={"email_type": "wingpoint_set_password"},
+    )
+
+
 # ==================== MODELS ====================
 
 class WingPointProvisionRequest(BaseModel):
@@ -187,7 +463,7 @@ class WingPointProvisionRequest(BaseModel):
     # Metadata
     wingpoint_ref: str = Field(..., description="Unique WingPoint reference (used as idempotency key)")
     source_package: Optional[Literal["single_trust", "estate_bundle", "builder_bundle"]] = None
-    coupon_code: Optional[str] = None
+    coupon_code: Optional[str] = Field(None, pattern=r'^[A-Za-z0-9_-]+$', max_length=50)
 
     # Control flags
     dry_run: bool = False
@@ -245,6 +521,7 @@ async def provision_trustoffice(
     Use resend=true with an existing wingpoint_ref to re-send the welcome email.
     """
     partner_id = partner["partner_id"]
+    logger.info(f"Provision: START wingpoint_ref={request.wingpoint_ref} email={request.email} trust_name='{request.trust_name}' partner={partner_id}")
 
     # Rate limiting
     await check_rate_limit(partner_id)
@@ -273,16 +550,34 @@ async def provision_trustoffice(
                 status_code=409,
                 detail={
                     "error": "Idempotency conflict: this wingpoint_ref was already used with different data.",
-                    "existing_user_id": existing_provision.get("user_id"),
-                    "existing_trust_id": existing_provision.get("trust_id"),
-                    "existing_set_password_url": existing_provision.get("set_password_url"),
-                    "existing_set_password_expires": existing_provision.get("set_password_expires"),
                     "message": "Use the existing provision or provide a different wingpoint_ref."
                 }
             )
 
         # Same payload, same ref → return existing result (idempotent success)
+        # Enrich with recommended_action so WingPoint gets consistent routing on replays
+        _replay_frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
+        try:
+            replay_recommended = await _determine_recommended_action(
+                user_id=existing_provision.get("user_id", ""),
+                is_new_user=False,
+                source_package=existing_provision.get("request_payload", {}).get("source_package"),
+                coupon_code=existing_provision.get("request_payload", {}).get("coupon_code"),
+                frontend_url=_replay_frontend_url,
+            )
+        except Exception as e:
+            logger.warning(f"Idempotent replay: _determine_recommended_action failed: {e}")
+            replay_recommended = {
+                "action": "login",
+                "redirect_url": f"{_replay_frontend_url}/login",
+                "message": "Your trust has been added to your account. Log in to get started.",
+                "suggested_plan": None,
+                "suggested_plan_name": None,
+                "needs_upgrade": False,
+                "requires_payment": False,
+            }
         existing_provision["status"] = "already_exists"
+        existing_provision["recommended_action"] = replay_recommended
         return existing_provision
 
     # ---- DRY RUN ----
@@ -428,6 +723,7 @@ async def provision_trustoffice(
     trust_doc = {
         "trust_id": trust_id,
         "user_id": user_id,
+        "wingpoint_ref": request.wingpoint_ref,
         "name": request.trust_name,
         "trust_type": to_trust_type,
         "entity_type": request.entity_type,
@@ -461,8 +757,14 @@ async def provision_trustoffice(
         "updated_at": now.isoformat()
     }
 
-    await db.trusts.insert_one(trust_doc)
-    logger.info(f"Provision: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
+    # Check for duplicate trust from same wingpoint_ref (race condition guard)
+    _existing_trust = await db.trusts.find_one({"wingpoint_ref": request.wingpoint_ref}, {"trust_id": 1, "_id": 0})
+    if _existing_trust:
+        logger.info(f"Provision: Duplicate trust for wingpoint_ref={request.wingpoint_ref}, using existing trust {_existing_trust['trust_id']}")
+        trust_id = _existing_trust["trust_id"]
+    else:
+        await db.trusts.insert_one(trust_doc)
+        logger.info(f"Provision: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
 
     # ---- GENERATE SET-PASSWORD TOKEN (7-day expiry) ----
     set_password_token = secrets.token_urlsafe(32)
@@ -480,9 +782,18 @@ async def provision_trustoffice(
     )
 
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
-    # Include coupon code in set-password URL so WingPoint users are directed to pricing after password reset
-    coupon_param = f"&coupon={request.coupon_code}" if request.coupon_code else ""
-    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}{coupon_param}"
+    # Include coupon, action, and plan params in set-password URL so WingPoint users
+    # are directed to the right pricing tier after password reset.
+    coupon_param = f"&coupon={quote(request.coupon_code, safe='')}" if request.coupon_code else ""
+    # For set-password users, always include action=subscribe and plan based on package
+    _prelim_plan = PACKAGE_TO_PLAN.get(request.source_package or "", "trustee")
+    _prelim_limit = PLAN_TRUST_LIMITS.get(_prelim_plan, 1)
+    if _prelim_limit != float('inf'):
+        _current_trust_count = await db.trusts.count_documents({"user_id": user_id})
+        if _current_trust_count > _prelim_limit:
+            _prelim_plan = "estate" if _current_trust_count <= 5 else "advisor"
+    action_plan_param = f"&action=subscribe&plan={_prelim_plan}"
+    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}{coupon_param}{action_plan_param}"
 
     # ---- INSERT PROVISION RECORD EARLY (pending status) ----
     # Inserted before email send so retries find an existing anchor even if
@@ -518,13 +829,34 @@ async def provision_trustoffice(
             # Concurrent request with same idem_key already provisioned — return existing
             existing = await db.external_provisions.find_one({"idem_key": idem_key}, {"_id": 0})
             if existing:
-                logger.info(f"Idempotent replay for idem_key={idem_key} (race resolved)")
+                logger.info(f"Provision: Duplicate key on provision insert for wingpoint_ref={request.wingpoint_ref} idem_key={idem_key} (race resolved, existing status={existing.get('status')})")
                 # Return the existing provision whether pending or complete.
                 # Do NOT fall through — that would create a duplicate trust and send a duplicate email.
                 if existing.get("status") == "complete":
+                    # Enrich race-condition replay with recommended_action too
+                    _race_frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
+                    try:
+                        race_recommended = await _determine_recommended_action(
+                            user_id=existing.get("user_id", ""),
+                            is_new_user=False,
+                            source_package=existing.get("request_payload", {}).get("source_package"),
+                            coupon_code=existing.get("request_payload", {}).get("coupon_code"),
+                            frontend_url=_race_frontend_url,
+                        )
+                    except Exception:
+                        race_recommended = {
+                            "action": "login",
+                            "redirect_url": f"{_race_frontend_url}/login",
+                            "message": "Your trust has been added to your account. Log in to get started.",
+                            "suggested_plan": None,
+                            "suggested_plan_name": None,
+                            "needs_upgrade": False,
+                            "requires_payment": False,
+                        }
                     return {
                         "status": "already_exists",
                         "provision": existing,
+                        "recommended_action": race_recommended,
                         "message": "Trust already provisioned"
                     }
                 else:
@@ -539,24 +871,64 @@ async def provision_trustoffice(
         else:
             raise
 
-    # ---- SEND WELCOME EMAIL (wrapped so it can't block the provision record) ----
-    user_name = display_name or email.split("@")[0]
+    # ---- DETERMINE RECOMMENDED ACTION (smart routing) ----
+    # Wrap in try/except — trust is already inserted, so we must not fail here.
+    # On error, fall back to a safe "login" action.
     try:
-        email_result = await email_service.send_welcome_set_password_email(
-            to_email=email,
-            user_name=user_name,
-            set_password_url=set_password_url
+        recommended = await _determine_recommended_action(
+            user_id=user_id,
+            is_new_user=is_new_user,
+            source_package=request.source_package,
+            coupon_code=request.coupon_code,
+            frontend_url=frontend_url,
         )
-        email_status = email_result.get("status", "unknown")
     except Exception as e:
-        email_result = {"status": "failed", "error": str(e)}
-        email_status = "failed"
-        logger.error(f"Provision: Welcome email raised exception for {email}: {e}")
+        logger.error(f"Provision: _determine_recommended_action failed for {email}: {e}", exc_info=True)
+        recommended = {
+            "action": "login",
+            "redirect_url": f"{frontend_url}/login?wp=1&action=welcome",
+            "message": "Your trust has been added to your account. Log in to get started.",
+            "suggested_plan": None,
+            "suggested_plan_name": None,
+            "needs_upgrade": False,
+            "requires_payment": False,
+        }
+
+    # ---- SEND EMAIL (conditional: new users get set-password, existing users get trust-added notification) ----
+    user_name = display_name or email.split("@")[0]
+
+    if recommended["action"] == "set_password":
+        # New user or existing user without password -> send set-password email.
+        # All provisions through this router are WingPoint provisions
+        # (identified by wingpoint_ref / source), so we use the warm
+        # WingPoint-aware email copy.
+        first_name = _resolve_first_name(
+            grantor_first_name=request.grantor_first_name,
+            grantor_full_name=request.grantor_full_name,
+        )
+        try:
+            email_result = await _send_wingpoint_set_password_email(
+                to_email=email,
+                first_name=first_name,
+                set_password_url=set_password_url,
+            )
+            email_status = email_result.get("status", "unknown")
+        except Exception as e:
+            email_result = {"status": "failed", "error": str(e)}
+            email_status = "failed"
+            logger.error(f"Provision: Welcome email raised exception for {email}: {e}")
+    else:
+        # Existing user with password → send trust-added notification (reuse welcome email for now)
+        # TODO: Create a dedicated "trust_added" email template. For now, skip email
+        # since the user already has an account and will be redirected to login.
+        email_result = {"status": "skipped", "reason": "existing_user_with_password"}
+        email_status = "skipped"
+        logger.info(f"Provision: Skipping set-password email for existing user {email} (already has password). Action: {recommended['action']}")
 
     if email_status == "failed":
         logger.error(f"Provision: Welcome email failed for {email}: {email_result.get('error')}")
     elif email_status == "skipped":
-        logger.warning(f"Provision: Email service not configured — welcome email skipped for {email}")
+        logger.warning(f"Provision: Email skipped for {email}: {email_result.get('reason', 'service not configured')}")
 
     # ---- UPDATE PROVISION RECORD TO COMPLETE ----
     await db.external_provisions.update_one(
@@ -567,6 +939,7 @@ async def provision_trustoffice(
             "completed_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+    logger.info(f"Provision: COMPLETE wingpoint_ref={request.wingpoint_ref} user_id={user_id} trust_id={trust_id} is_new_user={is_new_user} email_status={email_status} action={recommended['action']}")
 
     # ---- AUDIT LOG ----
     await log_audit(
@@ -589,16 +962,20 @@ async def provision_trustoffice(
         "status": "created" if is_new_user else "trust_added",
         "user_id": user_id,
         "trust_id": trust_id,
-        "set_password_url": set_password_url,
-        "set_password_expires": expires_at.isoformat(),
+        "set_password_url": set_password_url if recommended["action"] == "set_password" else None,
+        "set_password_expires": expires_at.isoformat() if recommended["action"] == "set_password" else None,
         "is_new_user": is_new_user,
         "email": email,
         "trust_name": request.trust_name,
         "email_status": email_status,
+        # Smart routing — WingPoint uses this to direct the user
+        "recommended_action": recommended,
     }
 
     if email_status == "failed":
         response["message"] = f"Account created, but welcome email failed: {email_result.get('error', 'unknown error')}"
+    elif recommended["action"] != "set_password":
+        response["message"] = recommended["message"]
     elif email_status == "skipped":
         response["message"] = "Account created, but email service is not configured. Set-password link generated but not emailed."
     else:
@@ -654,17 +1031,28 @@ async def _resend_activation(provision: dict, partner: dict) -> dict:
     )
 
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
-    # Preserve coupon code from original provisioning in resend URL
+    # Preserve coupon code and plan from original provisioning in resend URL
     coupon_code = provision.get("coupon_code") if provision else None
-    coupon_param = f"&coupon={coupon_code}" if coupon_code else ""
-    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}{coupon_param}"
+    coupon_param = f"&coupon={quote(coupon_code, safe='')}" if coupon_code else ""
+    _source_pkg = provision.get("request_payload", {}).get("source_package") if provision else None
+    _resend_plan = PACKAGE_TO_PLAN.get(_source_pkg or "", "trustee")
+    action_plan_param = f"&action=subscribe&plan={_resend_plan}"
+    set_password_url = f"{frontend_url}/reset-password?token={set_password_token}{coupon_param}{action_plan_param}"
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    user_name = user.get("name", email.split("@")[0]) if user else email.split("@")[0]
 
-    email_result = await email_service.send_welcome_set_password_email(
+    # Resolve first name for the WingPoint-aware email.
+    # Pull grantor name fields from the original provisioning request payload
+    # (stored on the provision record), falling back to "there".
+    _payload = provision.get("request_payload", {}) if provision else {}
+    first_name = _resolve_first_name(
+        grantor_first_name=_payload.get("grantor_first_name"),
+        grantor_full_name=_payload.get("grantor_full_name"),
+    )
+
+    email_result = await _send_wingpoint_set_password_email(
         to_email=email,
-        user_name=user_name,
-        set_password_url=set_password_url
+        first_name=first_name,
+        set_password_url=set_password_url,
     )
 
     email_status = email_result.get("status", "unknown")

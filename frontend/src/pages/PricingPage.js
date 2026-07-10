@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -126,6 +126,13 @@ const COMPARISON_ROWS = [
   { label: 'Priority email support', trustee: false, estate: false, advisor: true },
 ];
 
+// WingPoint plan descriptions shown on the pre-selected plan card.
+const WP_PLAN_DESCRIPTIONS = {
+  trustee: 'Perfect for your single WingPoint trust. Manage one trust with full access to documents and amendments.',
+  estate: 'Ideal if you have WingPoints Estate Bundle. Manage up to 5 trusts for family, properties, or business entities.',
+  advisor: 'For WingPoint Builder Bundle customers managing multiple trusts. Unlimited trusts, priority support.'
+};
+
 export default function PricingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -137,13 +144,33 @@ export default function PricingPage() {
   
   // Get coupon from URL if present
   const couponCode = searchParams.get('coupon') || searchParams.get('promo');
-  
+
+  // WingPoint flow: ?plan=XX triggers auto-scroll + highlight on the matching
+  // tier card, exactly like BillingPage.js does.
+  const targetPlan = searchParams.get('plan');
+  const planCardRefs = useRef({});
+  // Ref to the pricing tiers section so the pre-selected plan card's
+  // "See other plans" link can scroll to it.
+  const pricingTiersRef = useRef(null);
+
+  // WingPoint flow flag - computed at component level so JSX can use it.
+  const isWingPointFlow = searchParams.get('wp') === '1';
+  // The pre-selected plan from the WingPoint flow (?plan=XX).
+  const wingPointPlan = isWingPointFlow && targetPlan ? targetPlan : null;
+
   useEffect(() => {
     if (couponCode) {
       setCouponApplied(true);
       toast.success(`Coupon "${couponCode}" will be applied at checkout`);
     }
   }, [couponCode]);
+
+  // Auto-scroll to the target plan card after the page has rendered.
+  useEffect(() => {
+    if (targetPlan && planCardRefs.current[targetPlan]) {
+      planCardRefs.current[targetPlan].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [targetPlan]);
 
   // Phase 3: handleCheckout now takes a tier (trustee/estate/advisor) AND a billing period
   const handleCheckout = async (planType, period = billingPeriod) => {
@@ -162,7 +189,9 @@ export default function PricingPage() {
 
     // Already-subscribed guard (Phase 3): authenticated users with an active
     // subscription should manage their plan in billing settings, not re-checkout.
-    if (user?.subscription?.is_active) {
+    // WingPoint users arriving with ?wp=1 bypass this guard — they may need to
+    // upgrade or change plans even with an active subscription.
+    if (user?.subscription?.is_active && !isWingPointFlow) {
       toast.info("You're already subscribed. Manage your plan in Settings.");
       navigate('/settings/billing');
       return;
@@ -260,11 +289,84 @@ export default function PricingPage() {
           The workspace for trustees who take their duties seriously.
         </p>
         {couponApplied && (
-          <div className="inline-block bg-gold/20 text-gold-dark px-4 py-2 rounded-full text-sm font-medium">
+          <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium">
             Coupon "{couponCode}" will be applied at checkout
           </div>
         )}
       </section>
+
+      {/* WingPoint Welcome Banner (only when ?wp=1) */}
+      {isWingPointFlow && (
+        <section className="pb-6 px-8" data-testid="wp-welcome-banner">
+          <div className="max-w-3xl mx-auto bg-navy text-white rounded-lg p-8 text-center">
+            <h2 className="font-serif text-3xl mb-4" data-testid="wp-banner-headline">
+              Your trust is ready. Choose your management plan to access it.
+            </h2>
+            <p className="text-base text-white/80 max-w-2xl mx-auto mb-6 leading-relaxed">
+              You purchased your trust through WingPoint. TrustOffice is where that trust lives, managed, updated, and accessible whenever you need it. Your monthly plan covers ongoing trust management: amendments, beneficiary updates, secure document storage, and access to your trust documents.
+            </p>
+            <div className="inline-block bg-gold/20 text-white px-5 py-3 rounded-full text-sm font-medium mb-3">
+              $50 off your first month, courtesy of WingPoint, already applied at checkout.
+            </div>
+            <p className="text-sm text-white/60 mt-2">
+              We have highlighted our recommendation based on your WingPoint purchase.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* WingPoint Pre-Selected Plan Card (only when ?wp=1 AND ?plan=XX) */}
+      {wingPointPlan && TIERS.find((t) => t.id === wingPointPlan) && (() => {
+        const wpTier = TIERS.find((t) => t.id === wingPointPlan);
+        const wpPrice = formatPrice(wpTier);
+        return (
+          <section className="pb-8 px-8" data-testid="wp-preselected-card">
+            <div className="max-w-3xl mx-auto">
+              <div className="card-trust corner-mark p-8 border-2 border-gold relative">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
+                  Recommended for You
+                </div>
+                <div className="text-center mt-4">
+                  <h2 className="font-serif text-3xl text-navy mb-2">{wpTier.name} Plan</h2>
+                  <p className="text-base text-muted-foreground mb-4 max-w-xl mx-auto">
+                    {WP_PLAN_DESCRIPTIONS[wpTier.id]}
+                  </p>
+                  <div className="flex items-baseline justify-center gap-1 mb-4">
+                    <span className="font-serif text-5xl text-navy">${wpPrice.amount}</span>
+                    <span className="text-muted-foreground">{wpPrice.unit}</span>
+                  </div>
+                  <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium mb-6">
+                    $50 off your first month, courtesy of WingPoint, already applied at checkout.
+                  </div>
+                </div>
+                <Button
+                  onClick={() => handleCheckout(wpTier.id)}
+                  disabled={loading !== null}
+                  className="w-full btn-primary text-lg py-6"
+                  data-testid="wp-confirm-plan-btn"
+                >
+                  {loading === wpTier.id ? 'Loading...' : 'Confirm and Continue'}
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+                <div className="text-center mt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (pricingTiersRef.current) {
+                        pricingTiersRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }}
+                    className="text-sm text-navy hover:underline font-medium"
+                    data-testid="wp-see-other-plans-link"
+                  >
+                    See other plans
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Billing Period Toggle (Monthly / Annual) */}
       <section className="pb-6 px-8">
@@ -292,7 +394,7 @@ export default function PricingPage() {
       </section>
 
       {/* Pricing Cards — 3 tiers side by side */}
-      <section className="pb-12 px-8">
+      <section ref={pricingTiersRef} className="pb-12 px-8 scroll-mt-4">
         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
           {TIERS.map((tier) => {
             const { amount, unit } = formatPrice(tier);
@@ -300,7 +402,8 @@ export default function PricingPage() {
             return (
               <div
                 key={tier.id}
-                className={`card-trust corner-mark p-8 relative ${isPopular ? 'border-2 border-gold mt-4' : ''}`}
+                ref={(el) => { planCardRefs.current[tier.id] = el; }}
+                className={`card-trust corner-mark p-8 relative ${isPopular ? 'border-2 border-gold mt-4' : ''} ${targetPlan === tier.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
                 data-testid={`tier-card-${tier.id}`}
               >
                 {isPopular && (

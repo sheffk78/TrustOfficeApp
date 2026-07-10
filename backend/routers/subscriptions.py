@@ -15,6 +15,7 @@ from dependencies import (
     get_current_user, 
     get_subscription_state, 
     get_user_features,
+    get_trust_limit,
     TRIAL_DAYS
 )
 from models import SubscriptionResponse, CheckoutRequest, PortalRequest, ChangePlanRequest
@@ -225,7 +226,16 @@ async def get_subscription_state_endpoint(user: dict = Depends(get_current_user)
         )
     
     state = await get_subscription_state(user["user_id"])
-    return state.model_dump()
+    state_dict = state.model_dump()
+    
+    # Enrich with trust count and upgrade status for frontend use
+    trust_count = await db.trusts.count_documents({"user_id": user["user_id"]})
+    current_limit = get_trust_limit(state.plan_type, state.legacy_trust_limit)
+    state_dict["trust_count"] = trust_count
+    state_dict["trust_limit"] = current_limit if current_limit != float('inf') else "unlimited"
+    state_dict["needs_upgrade"] = trust_count > current_limit if current_limit != float('inf') else False
+    
+    return state_dict
 
 
 @router.get("/subscription/features")

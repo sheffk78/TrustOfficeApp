@@ -45,7 +45,10 @@ export const AuthProvider = ({ children }) => {
         is_read_only: false,
         status: 'active',
         plan_type: 'forever_free',
-        is_trial: false
+        is_trial: false,
+        trust_count: 0,
+        trust_limit: 999,
+        needs_upgrade: false
       };
       setSubscription(adminState);
       setSubscriptionExpired(false);
@@ -69,14 +72,14 @@ export const AuthProvider = ({ children }) => {
       } else {
         console.error('[AuthContext] Subscription API returned:', response.status);
         // Set default state on error so the app doesn't hang
-        setSubscription({ is_active: false, is_read_only: true });
+        setSubscription({ is_active: false, is_read_only: true, trust_count: 0, trust_limit: 0, needs_upgrade: false });
         setSubscriptionExpired(true);
         setIsReadOnly(true);
       }
     } catch (error) {
       console.error('[AuthContext] Failed to load subscription state:', error);
       // Set default state on error so the app doesn't hang
-      setSubscription({ is_active: false, is_read_only: true });
+      setSubscription({ is_active: false, is_read_only: true, trust_count: 0, trust_limit: 0, needs_upgrade: false });
       setSubscriptionExpired(true);
       setIsReadOnly(true);
     }

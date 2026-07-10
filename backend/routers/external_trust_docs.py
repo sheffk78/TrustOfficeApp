@@ -3,6 +3,10 @@
 # document delivery and health check only.
 
 import os
+import re
+import hmac
+import ipaddress
+import socket
 import uuid
 import httpx
 import logging
@@ -37,7 +41,7 @@ async def verify_document_api_key(request: Request) -> None:
     
     # Accept either the dedicated doc key or the general external key
     valid_keys = [k for k in [TRUSTOFFICE_EXTERNAL_API_KEY, os.environ.get("EXTERNAL_API_KEY", "")] if k]
-    if not valid_keys or key not in valid_keys:
+    if not valid_keys or not any(hmac.compare_digest(key, k) for k in valid_keys):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
@@ -52,9 +56,14 @@ class TrustDocumentInput(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
-        valid = {"ein_confirmation", "declaration", "certification", "binder_kit"}
-        if v not in valid:
-            raise ValueError(f"Invalid document type: {v}. Must be one of {valid}")
+        # Only EIN confirmation letters (CP575) transfer automatically.
+        # Other documents (Declaration, Certificate, Binder Kit) require
+        # notarization/signing and must be uploaded manually by the user.
+        if v != "ein_confirmation":
+            raise ValueError(
+                f"Automatic document transfer is only available for EIN confirmation letters (CP575). "
+                f"Received: '{v}'. Other documents must be uploaded manually by the user."
+            )
         return v
 
 
@@ -120,7 +129,7 @@ async def receive_trust_documents(request: Request, payload: DeliverDocumentsReq
         email_lower = payload.customer_email.lower()
         user = await db.users.find_one({"email": email_lower}, {"_id": 0})
         if not user:
-            raise HTTPException(status_code=404, detail=f"No TrustOffice user found for email: {payload.customer_email}")
+            raise HTTPException(status_code=404, detail="Document delivery failed. User or trust not found.")
 
         user_id = user["user_id"]
 
@@ -132,7 +141,7 @@ async def receive_trust_documents(request: Request, payload: DeliverDocumentsReq
 
         if not trust:
             trust = await db.trusts.find_one(
-                {"user_id": user_id, "name": {"$regex": f"^{payload.trust_name}$", "$options": "i"}}
+                {"user_id": user_id, "name": {"$regex": f"^{re.escape(payload.trust_name)}$", "$options": "i"}}
             )
 
         if not trust:
@@ -189,9 +198,52 @@ async def receive_trust_documents(request: Request, payload: DeliverDocumentsReq
                     ))
                     continue
 
-                # Download the PDF from WingPoint
+                # Validate HTTPS + block private/internal IPs (SSRF prevention)
+                from urllib.parse import urlparse
+                parsed_url = urlparse(str(doc.url))
+                if parsed_url.scheme != "https":
+                    logger.warning(f"Rejected non-HTTPS download URL for {doc.filename}: {parsed_url.scheme}://")
+                    stored_docs.append(DocumentStored(
+                        doc_id="",
+                        type=doc.type,
+                        category=doc.category,
+                        title=doc.title,
+                        stored=False
+                    ))
+                    continue
+
+                # Resolve hostname and reject private/loopback/link-local IPs
+                hostname = parsed_url.hostname
+                is_safe_url = True
+                if hostname:
+                    try:
+                        # Get all A/AAAA records
+                        addr_infos = socket.getaddrinfo(hostname, None)
+                        for addr_info in addr_infos:
+                            ip = ipaddress.ip_address(addr_info[4][0])
+                            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                                logger.warning(f"Rejected SSRF attempt: {hostname} resolves to private IP {ip}")
+                                is_safe_url = False
+                                break
+                    except (socket.gaierror, ValueError):
+                        # If we can't resolve it, let httpx handle the error
+                        pass
+                else:
+                    is_safe_url = False
+
+                if not is_safe_url:
+                    stored_docs.append(DocumentStored(
+                        doc_id="",
+                        type=doc.type,
+                        category=doc.category,
+                        title=doc.title,
+                        stored=False
+                    ))
+                    continue
+
+                # Download the PDF from WingPoint (no redirect following to prevent SSRF bypass)
                 try:
-                    response = await http_client.get(str(doc.url))
+                    response = await http_client.get(str(doc.url), follow_redirects=False)
                     response.raise_for_status()
                     file_content = response.content
                 except httpx.HTTPError as e:
@@ -293,7 +345,7 @@ async def receive_trust_documents(request: Request, payload: DeliverDocumentsReq
         raise
     except Exception as e:
         logger.error(f"Document delivery failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Document delivery failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Document delivery failed. Check server logs.")
 
 
 # ─── Health Check ─────────────────────────────────────────────────────────

@@ -13,6 +13,9 @@ export default function ResetPasswordPage() {
   const navigate = useNavigate();
   const token = searchParams.get('token');
   const coupon = searchParams.get('coupon');
+  const action = searchParams.get('action');
+  const plan = searchParams.get('plan');
+  const isWp = searchParams.get('wp') === '1';
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -136,17 +139,28 @@ export default function ResetPasswordPage() {
             </div>
             <h2 className="font-serif text-xl text-navy mb-2">Password Reset Complete</h2>
             <p className="text-muted-foreground mb-6">
-              {coupon 
+              {coupon
                 ? "Your password is set. Now choose your TrustOffice plan to activate your trust. Your $50 WingPoint discount will be applied at checkout."
                 : "Your password has been successfully reset. You can now log in with your new password."
               }
             </p>
-            <Button 
-              onClick={() => navigate(coupon ? `/pricing?coupon=${coupon}` : '/')}
+            <Button
+              onClick={() => {
+                if (action === 'subscribe') {
+                  const params = new URLSearchParams({ wp: '1', action: 'subscribe' });
+                  if (coupon) params.set('coupon', coupon);
+                  if (plan) params.set('plan', plan);
+                  navigate(`/pricing?${params.toString()}`);
+                } else if (coupon) {
+                  navigate(`/pricing?coupon=${coupon}`);
+                } else {
+                  navigate('/');
+                }
+              }}
               className="btn-primary w-full"
               data-testid="go-to-login-btn"
             >
-              {coupon ? 'Choose Your Plan' : 'Go to Login'}
+              {action === 'subscribe' ? 'Choose Your Plan' : coupon ? 'Choose Your Plan' : 'Go to Login'}
             </Button>
           </div>
         </div>
@@ -167,9 +181,14 @@ export default function ResetPasswordPage() {
 
         <div className="card-trust corner-mark" data-testid="reset-password-card">
           <div className="text-center mb-6">
-            <h2 className="font-serif text-xl text-navy mb-2">Create New Password</h2>
+            <h2 className="font-serif text-xl text-navy mb-2">
+              {isWp ? 'Welcome, your WingPoint trust is ready' : 'Create New Password'}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Enter your new password below. Make sure it's at least 8 characters.
+              {isWp
+                ? 'You are one step away from accessing your trust account. Let us set your password and get you in.'
+                : "Enter your new password below. Make sure it's at least 8 characters."
+              }
             </p>
           </div>
 
@@ -237,10 +256,16 @@ export default function ResetPasswordPage() {
                   Resetting...
                 </>
               ) : (
-                'Reset Password'
+                isWp ? 'Continue to My Trust' : 'Reset Password'
               )}
             </Button>
           </form>
+
+          {isWp && (
+            <p className="mt-4 text-xs text-navy/60 text-center px-4">
+              TrustOffice is the management platform for your WingPoint trust. WingPoint created it. We keep it current, secure, and accessible for as long as you need it.
+            </p>
+          )}
 
           <div className="mt-6 text-center">
             <Link 

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,7 @@ const xhrPost = (url, data) => {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, setUser, loadTrusts, loadSubscriptionState } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,11 +51,34 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Redirect if already logged in
-  if (user) {
-    navigate('/dashboard', { replace: true });
-    return null;
-  }
+  // Redirect if already logged in — use wp-aware routing so params are preserved
+  useEffect(() => {
+    if (!user) return;
+    const wp = searchParams.get('wp');
+    const action = searchParams.get('action');
+    if (wp === '1' && action) {
+      const coupon = searchParams.get('coupon');
+      const plan = searchParams.get('plan');
+      if (action === 'subscribe') {
+        const params = new URLSearchParams({ wp: '1', action: 'subscribe' });
+        if (coupon) params.set('coupon', coupon);
+        if (plan) params.set('plan', plan);
+        navigate(`/pricing?${params.toString()}`, { replace: true });
+      } else if (action === 'upgrade') {
+        const params = new URLSearchParams({ wp: '1', action: 'upgrade' });
+        if (plan) params.set('plan', plan);
+        navigate(`/billing?${params.toString()}`, { replace: true });
+      } else if (action === 'resubscribe') {
+        navigate('/billing?wp=1&action=resubscribe', { replace: true });
+      } else if (action === 'update_payment') {
+        navigate('/billing?wp=1&action=update_payment', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, searchParams, navigate]);
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
@@ -98,7 +122,34 @@ export default function LoginPage() {
       ]);
       
       toast.success('Welcome back');
-      navigate('/dashboard', { replace: true });
+
+      // WingPoint-aware routing: check URL params for wp=1 and action
+      const wp = searchParams.get('wp');
+      const action = searchParams.get('action');
+      if (wp === '1' && action) {
+        const coupon = searchParams.get('coupon');
+        const plan = searchParams.get('plan');
+        if (action === 'subscribe') {
+          const params = new URLSearchParams({ wp: '1', action: 'subscribe' });
+          if (coupon) params.set('coupon', coupon);
+          if (plan) params.set('plan', plan);
+          navigate(`/pricing?${params.toString()}`, { replace: true });
+        } else if (action === 'upgrade') {
+          const params = new URLSearchParams({ wp: '1', action: 'upgrade' });
+          if (plan) params.set('plan', plan);
+          navigate(`/billing?${params.toString()}`, { replace: true });
+        } else if (action === 'resubscribe') {
+          navigate('/billing?wp=1&action=resubscribe', { replace: true });
+        } else if (action === 'update_payment') {
+          navigate('/billing?wp=1&action=update_payment', { replace: true });
+        } else if (action === 'welcome') {
+          navigate('/dashboard', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     } catch (error) {
       const rawMsg = error.message || 'Login failed';
       // Provide more user-friendly messages for common error cases
@@ -163,6 +214,15 @@ export default function LoginPage() {
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-8">
               Sign in to your account
             </p>
+
+            {/* WingPoint welcome-back banner — only when ?wp=1 present */}
+            {searchParams.get('wp') === '1' && (
+              <div className="mb-6 bg-gold/10 border border-gold/30 rounded-lg p-4 text-navy" data-testid="wp-welcome-banner">
+                <p className="text-sm">
+                  Welcome back. Your WingPoint trust is waiting in your TrustOffice account. Log in to continue setting up your management plan.
+                </p>
+              </div>
+            )}
 
             {/* Google login button */}
             <Button
