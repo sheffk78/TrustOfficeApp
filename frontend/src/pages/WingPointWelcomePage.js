@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertTriangle, CreditCard, LayoutDashboard, Mail, LogIn, ChevronDown, ChevronUp } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertTriangle, CreditCard, LayoutDashboard, BookOpen, Coins, Network, Scale, HeartPulse, Mail, LogIn, ChevronDown, ChevronUp } from 'lucide-react';
 
 const API = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -195,8 +195,8 @@ export default function WingPointWelcomePage() {
  {/* Top bar with TrustOffice logo */}
  <header className="bg-navy text-white py-4 px-4 sm:px-6">
  <div className="max-w-5xl mx-auto flex items-center justify-between">
- <Link to="/" className="text-xl font-bold tracking-tight">
- TrustOffice
+ <Link to="/" className="flex items-center gap-2">
+ <img src="/assets/trustoffice-logo.svg" alt="TrustOffice" className="h-7" />
  </Link>
  {user && (
  <Link to="/dashboard" className="text-sm text-white/70 hover:text-white transition-colors">
@@ -266,7 +266,72 @@ export default function WingPointWelcomePage() {
  </div>
  </section>
 
- {/* 2. Package Recognition Section */}
+ {/* 2. What TrustOffice Does (with screenshot) */}
+ <section className="mb-12">
+ <h2 className="text-xl sm:text-2xl font-serif font-bold text-navy text-center mb-2">
+ What TrustOffice does for you
+ </h2>
+ <p className="text-sm text-muted-foreground text-center mb-8">
+ Your TrustOffice dashboard is where you manage everything about your trust. Here is what you will see when you log in.
+ </p>
+
+ {/* Dashboard screenshot */}
+ <div className="max-w-4xl mx-auto mb-8 border border-border shadow-lg">
+ <img
+ src="/assets/dashboard-hero.png"
+ alt="TrustOffice dashboard showing trust management features including Governance, Money, Structure, Compliance, and Trust Health"
+ className="w-full"
+ />
+ </div>
+
+ {/* Feature grid */}
+ <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+ <div className="bg-white border border-border p-5">
+ <div className="flex items-center gap-2 mb-2">
+ <LayoutDashboard className="w-5 h-5 text-gold" />
+ <h4 className="text-sm font-bold text-navy">Dashboard</h4>
+ </div>
+ <p className="text-xs text-muted-foreground">See your trust status at a glance. Getting Started checklist guides you through setup step by step.</p>
+ </div>
+ <div className="bg-white border border-border p-5">
+ <div className="flex items-center gap-2 mb-2">
+ <BookOpen className="w-5 h-5 text-gold" />
+ <h4 className="text-sm font-bold text-navy">Governance</h4>
+ </div>
+ <p className="text-xs text-muted-foreground">Record trustee meetings, pass resolutions, and maintain the paper trail that keeps your trust legally defensible.</p>
+ </div>
+ <div className="bg-white border border-border p-5">
+ <div className="flex items-center gap-2 mb-2">
+ <Coins className="w-5 h-5 text-gold" />
+ <h4 className="text-sm font-bold text-navy">Money</h4>
+ </div>
+ <p className="text-xs text-muted-foreground">Track trust accounts, record contributions and distributions, and keep finances organized in one place.</p>
+ </div>
+ <div className="bg-white border border-border p-5">
+ <div className="flex items-center gap-2 mb-2">
+ <Network className="w-5 h-5 text-gold" />
+ <h4 className="text-sm font-bold text-navy">Structure</h4>
+ </div>
+ <p className="text-xs text-muted-foreground">Manage beneficiaries, trustees, and trust structure. Update roles and relationships as circumstances change.</p>
+ </div>
+ <div className="bg-white border border-border p-5">
+ <div className="flex items-center gap-2 mb-2">
+ <Scale className="w-5 h-5 text-gold" />
+ <h4 className="text-sm font-bold text-navy">Compliance</h4>
+ </div>
+ <p className="text-xs text-muted-foreground">Risk dashboard and state compliance tracking. Know what is required and stay ahead of deadlines.</p>
+ </div>
+ <div className="bg-white border border-border p-5">
+ <div className="flex items-center gap-2 mb-2">
+ <HeartPulse className="w-5 h-5 text-gold" />
+ <h4 className="text-sm font-bold text-navy">Trust Health</h4>
+ </div>
+ <p className="text-xs text-muted-foreground">A score that tells you how well your records would hold up if anyone ever asked. Know your weak spots before they become problems.</p>
+ </div>
+ </div>
+ </section>
+
+ {/* 3. Package Recognition Section */}
  <section className="mb-12">
  <h2 className="text-xl sm:text-2xl font-serif font-bold text-navy text-center mb-2">
  Which package did you purchase?
