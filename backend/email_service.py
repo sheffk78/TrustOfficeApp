@@ -449,7 +449,8 @@ class EmailService:
         to_email: str,
         user_name: str,
         old_plan: str,
-        new_plan: str
+        new_plan: str,
+        annual_savings: str = None
     ) -> Dict[str, Any]:
         """Send notification when subscription is upgraded"""
         return await self.send_templated_email(
@@ -458,7 +459,8 @@ class EmailService:
             template_data={
                 "user_name": user_name,
                 "old_plan": old_plan,
-                "new_plan": new_plan
+                "new_plan": new_plan,
+                "annual_savings": annual_savings or "See your billing page for details"
             },
             to_name=user_name,
             tag="subscription",

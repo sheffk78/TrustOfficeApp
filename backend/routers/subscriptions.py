@@ -66,6 +66,11 @@ PLAN_AMOUNTS = {
 # Reverse lookup for webhook: price_id -> (plan_type, billing_period)
 PRICE_ID_TO_PLAN = {v: (k[0], k[1]) for k, v in PRICE_IDS.items() if v}
 
+# Startup validation: warn if any tier price IDs are missing
+_missing_prices = [k for k, v in PRICE_IDS.items() if not v]
+if _missing_prices:
+    logger.warning(f"Missing Stripe price env vars for tiers: {_missing_prices}. Checkout for these tiers will fail.")
+
 # Legacy price ID mapping (backward compat during migration)
 LEGACY_PRICE_MAP = {
     STRIPE_MONTHLY_PRICE_ID: ("trustee", "monthly", 10),   # (plan_type, billing_period, legacy_trust_limit)
@@ -271,7 +276,8 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         price_id = STRIPE_MONTHLY_PRICE_ID if checkout.plan_type == "monthly" else STRIPE_ANNUAL_PRICE_ID
     
     # Get amount for logging
-    amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), 79.00 if checkout.plan_type in ["monthly", "trustee"] else 790.00)
+    _amount_fallbacks = {"trustee": 79.00, "estate": 149.00, "advisor": 399.00, "monthly": 79.00, "annual": 790.00}
+    amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 79.00))
     
     # Get or create subscription to get/create stripe customer
     sub = await get_or_create_subscription(user["user_id"])
@@ -546,7 +552,7 @@ async def upgrade_subscription(user: dict = Depends(get_current_user)):
     
     # Determine current plan to find what "annual" means for them
     current_plan = sub.get("plan_type", "monthly")
-    current_billing = sub.get("billing_period", "monthly" if current_plan in ("monthly", "trustee") else "monthly")
+    current_billing = sub.get("billing_period", "monthly" if current_plan in ("monthly", "trustee") else "annual")
     
     # Map to new tier system: legacy monthly/annual -> trustee
     if current_plan in ("monthly", "annual"):
@@ -647,16 +653,18 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
             proration_behavior="create_prorations"
         )
         
+        # Clear grandfathering only when changing to a different tier (not billing period switch within same tier)
+        update_set = {
+            "plan_type": request.plan_type,
+            "billing_period": request.billing_period,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        if current_plan != request.plan_type:
+            update_set["legacy_trust_limit"] = None
+        
         await db.subscriptions.update_one(
             {"user_id": user["user_id"]},
-            {
-                "$set": {
-                    "plan_type": request.plan_type,
-                    "billing_period": request.billing_period,
-                    "legacy_trust_limit": None,  # clear grandfathering on explicit plan change
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }
-            }
+            {"$set": update_set}
         )
         
         # Send upgrade/downgrade email
@@ -878,8 +886,10 @@ async def stripe_webhook(request: Request):
                         "billing_period": new_billing_period,
                         "updated_at": datetime.now(timezone.utc).isoformat()
                     }
-                    # If migrating from a legacy plan, grandfather the 10-trust limit
-                    if old_plan in ("monthly", "annual") and new_plan in ("monthly", "annual"):
+                    # If migrating from a legacy plan, preserve the 10-trust grandfathering
+                    old_price_in_legacy = old_price in LEGACY_PRICE_MAP
+                    new_price_in_legacy = new_price in LEGACY_PRICE_MAP
+                    if old_price_in_legacy and new_price_in_legacy:
                         update_set["legacy_trust_limit"] = 10
 
                     # Update database

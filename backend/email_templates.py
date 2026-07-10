@@ -895,7 +895,7 @@ The TrustOffice Team
                 </tr>
                 <tr>
                   <td style="padding: 5px 0;"><span class="label">Annual Savings</span></td>
-                  <td style="padding: 5px 0;"><span class="value" style="color: #28a745;">$158/year</span></td>
+                  <td style="padding: 5px 0;"><span class="value" style="color: #28a745;">{data.get('annual_savings', 'See your billing page for details')}</span></td>
                 </tr>
               </table>
             </div>
@@ -918,7 +918,7 @@ Your TrustOffice plan has been successfully upgraded to {data.get('new_plan', 'A
 Upgrade Details:
 - Previous Plan: {data.get('old_plan', 'Monthly').title()}
 - New Plan: {data.get('new_plan', 'Annual').title()}
-- Annual Savings: $158/year
+- Annual Savings: {data.get('annual_savings', 'See your billing page for details')}
 
 Thank you for your continued commitment to good governance!
 
