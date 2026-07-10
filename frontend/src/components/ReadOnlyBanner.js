@@ -53,7 +53,7 @@ export const ReadOnlyBanner = () => {
             </p>
           </div>
         </div>
-        <Link to="/pricing">
+        <Link to="/settings/billing">
           <Button 
             size="sm" 
             className="bg-warning hover:bg-warning text-white"

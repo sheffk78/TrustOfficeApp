@@ -17,7 +17,7 @@ from dependencies import (
     get_user_features,
     TRIAL_DAYS
 )
-from models import SubscriptionResponse, CheckoutRequest, PortalRequest
+from models import SubscriptionResponse, CheckoutRequest, PortalRequest, ChangePlanRequest
 
 # Import email service
 from email_service import email_service
@@ -31,6 +31,46 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET')
 STRIPE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_MONTHLY_PRICE_ID')
 STRIPE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ANNUAL_PRICE_ID')
+
+# New 3-tier price IDs (6 total: 3 tiers x 2 billing periods)
+STRIPE_TRUSTEE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_TRUSTEE_MONTHLY_PRICE_ID')
+STRIPE_TRUSTEE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_TRUSTEE_ANNUAL_PRICE_ID')
+STRIPE_ESTATE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ESTATE_MONTHLY_PRICE_ID')
+STRIPE_ESTATE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ESTATE_ANNUAL_PRICE_ID')
+STRIPE_ADVISOR_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ADVISOR_MONTHLY_PRICE_ID')
+STRIPE_ADVISOR_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ADVISOR_ANNUAL_PRICE_ID')
+
+# Price ID lookup: (plan_type, billing_period) -> stripe_price_id
+PRICE_IDS = {
+    ("trustee", "monthly"): STRIPE_TRUSTEE_MONTHLY_PRICE_ID,
+    ("trustee", "annual"): STRIPE_TRUSTEE_ANNUAL_PRICE_ID,
+    ("estate", "monthly"): STRIPE_ESTATE_MONTHLY_PRICE_ID,
+    ("estate", "annual"): STRIPE_ESTATE_ANNUAL_PRICE_ID,
+    ("advisor", "monthly"): STRIPE_ADVISOR_MONTHLY_PRICE_ID,
+    ("advisor", "annual"): STRIPE_ADVISOR_ANNUAL_PRICE_ID,
+}
+
+# Amount lookup (for payment_transactions logging)
+PLAN_AMOUNTS = {
+    ("trustee", "monthly"): 79.00,
+    ("trustee", "annual"): 790.00,
+    ("estate", "monthly"): 149.00,
+    ("estate", "annual"): 1490.00,
+    ("advisor", "monthly"): 399.00,
+    ("advisor", "annual"): 3990.00,
+    # Legacy
+    ("monthly", "monthly"): 79.00,
+    ("annual", "annual"): 790.00,
+}
+
+# Reverse lookup for webhook: price_id -> (plan_type, billing_period)
+PRICE_ID_TO_PLAN = {v: (k[0], k[1]) for k, v in PRICE_IDS.items() if v}
+
+# Legacy price ID mapping (backward compat during migration)
+LEGACY_PRICE_MAP = {
+    STRIPE_MONTHLY_PRICE_ID: ("trustee", "monthly", 10),   # (plan_type, billing_period, legacy_trust_limit)
+    STRIPE_ANNUAL_PRICE_ID: ("trustee", "annual", 10),
+}
 
 # Mailercloud Config
 from mailercloud_service import add_to_paid_list
@@ -90,10 +130,18 @@ def calculate_subscription_status(sub: dict) -> dict:
             # Update plan type from Stripe if needed
             if stripe_sub.items.data:
                 price_id = stripe_sub.items.data[0].price.id
-                if price_id == STRIPE_ANNUAL_PRICE_ID:
-                    result["plan_type"] = "annual"
-                elif price_id == STRIPE_MONTHLY_PRICE_ID:
-                    result["plan_type"] = "monthly"
+                # Check new tier price IDs first
+                plan_info = PRICE_ID_TO_PLAN.get(price_id)
+                if plan_info:
+                    result["plan_type"] = plan_info[0]
+                    result["billing_period"] = plan_info[1]
+                elif price_id in LEGACY_PRICE_MAP:
+                    # Legacy price IDs (backward compat)
+                    legacy_info = LEGACY_PRICE_MAP[price_id]
+                    result["plan_type"] = legacy_info[0]
+                    result["billing_period"] = legacy_info[1]
+                    result["legacy_trust_limit"] = legacy_info[2]
+                # If price_id doesn't match anything, leave plan_type as-is from DB
             
             return result
         except stripe.StripeError as e:
@@ -198,10 +246,32 @@ async def get_subscription_features(user: dict = Depends(get_current_user)):
 @router.post("/subscription/create-checkout")
 async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depends(get_current_user)):
     """Create a Stripe checkout session for subscription"""
-    if checkout.plan_type not in ["monthly", "annual"]:
-        raise HTTPException(status_code=400, detail="Invalid plan type. Please choose either 'monthly' or 'annual'.")
+    # Support both new 3-tier system and legacy 2-plan system
+    valid_new_plans = ["trustee", "estate", "advisor"]
+    valid_legacy_plans = ["monthly", "annual"]
+    valid_periods = ["monthly", "annual"]
     
-    price_id = STRIPE_MONTHLY_PRICE_ID if checkout.plan_type == "monthly" else STRIPE_ANNUAL_PRICE_ID
+    # Determine billing_period for legacy plan_type values
+    if checkout.plan_type in valid_legacy_plans:
+        billing_period = checkout.plan_type  # "monthly" or "annual" IS the billing period for legacy
+    elif checkout.plan_type in valid_new_plans:
+        billing_period = checkout.billing_period or "monthly"
+        if billing_period not in valid_periods:
+            raise HTTPException(status_code=400, detail="Invalid billing period. Choose 'monthly' or 'annual'.")
+    else:
+        raise HTTPException(status_code=400, detail="Invalid plan type. Choose 'trustee', 'estate', or 'advisor'.")
+    
+    # Get price_id from lookup
+    if checkout.plan_type in valid_new_plans:
+        price_id = PRICE_IDS.get((checkout.plan_type, billing_period))
+        if not price_id:
+            raise HTTPException(status_code=500, detail=f"Price ID not configured for {checkout.plan_type}/{billing_period}")
+    else:
+        # Legacy
+        price_id = STRIPE_MONTHLY_PRICE_ID if checkout.plan_type == "monthly" else STRIPE_ANNUAL_PRICE_ID
+    
+    # Get amount for logging
+    amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), 79.00 if checkout.plan_type in ["monthly", "trustee"] else 790.00)
     
     # Get or create subscription to get/create stripe customer
     sub = await get_or_create_subscription(user["user_id"])
@@ -240,7 +310,7 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
             "line_items": [{"price": price_id, "quantity": 1}],
             "success_url": checkout.success_url,
             "cancel_url": checkout.cancel_url,
-            "metadata": {"user_id": user["user_id"], "plan_type": checkout.plan_type},
+            "metadata": {"user_id": user["user_id"], "plan_type": checkout.plan_type, "billing_period": billing_period},
             "allow_promotion_codes": True  # Always allow entering promo codes
         }
         
@@ -298,9 +368,10 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
             "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
             "user_id": user["user_id"],
             "session_id": session.id,
-            "amount": 79.00 if checkout.plan_type == "monthly" else 790.00,
+            "amount": amount,
             "currency": "usd",
             "plan_type": checkout.plan_type,
+            "billing_period": billing_period,
             "payment_status": "initiated",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
@@ -328,6 +399,10 @@ async def verify_payment(session_id: str, user: dict = Depends(get_current_user)
 
         if session.payment_status == "paid":
             plan_type = session.metadata.get("plan_type", "monthly")
+            billing_period = session.metadata.get("billing_period")
+            # For legacy plans, infer billing_period from plan_type
+            if not billing_period and plan_type in ("monthly", "annual"):
+                billing_period = plan_type
             
             # Update subscription
             await db.subscriptions.update_one(
@@ -335,6 +410,7 @@ async def verify_payment(session_id: str, user: dict = Depends(get_current_user)
                 {
                     "$set": {
                         "plan_type": plan_type,
+                        "billing_period": billing_period,
                         "status": "active",
                         "stripe_subscription_id": session.subscription,
                         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -459,25 +535,37 @@ async def reactivate_subscription(user: dict = Depends(get_current_user)):
 
 @router.post("/subscription/upgrade")
 async def upgrade_subscription(user: dict = Depends(get_current_user)):
-    """Upgrade from monthly to annual plan"""
+    """Upgrade from monthly to annual plan (legacy endpoint — kept for backward compat).
+    
+    New clients should use /subscription/change-plan for 3-tier changes.
+    """
     sub = await get_or_create_subscription(user["user_id"])
     
     if not sub.get("stripe_subscription_id"):
         raise HTTPException(status_code=400, detail="No active subscription found. Please subscribe to a plan first at trustoffice.app/settings/billing.")
-
-    if sub.get("plan_type") == "annual":
-        raise HTTPException(status_code=400, detail="You are already on the annual plan. No upgrade needed.")
+    
+    # Determine current plan to find what "annual" means for them
+    current_plan = sub.get("plan_type", "monthly")
+    current_billing = sub.get("billing_period", "monthly" if current_plan in ("monthly", "trustee") else "monthly")
+    
+    # Map to new tier system: legacy monthly/annual -> trustee
+    if current_plan in ("monthly", "annual"):
+        target_tier = "trustee"
+    else:
+        target_tier = current_plan  # keep same tier, just switch billing period
+    
+    target_price = PRICE_IDS.get((target_tier, "annual"))
+    if not target_price:
+        raise HTTPException(status_code=500, detail="Annual price not configured")
     
     try:
-        # Get current subscription
         stripe_sub = stripe.Subscription.retrieve(sub["stripe_subscription_id"])
         
-        # Update to annual price
         stripe.Subscription.modify(
             sub["stripe_subscription_id"],
             items=[{
                 "id": stripe_sub["items"]["data"][0]["id"],
-                "price": STRIPE_ANNUAL_PRICE_ID
+                "price": target_price
             }],
             proration_behavior="create_prorations"
         )
@@ -485,7 +573,8 @@ async def upgrade_subscription(user: dict = Depends(get_current_user)):
         await db.subscriptions.update_one(
             {"user_id": user["user_id"]},
             {"$set": {
-                "plan_type": "annual",
+                "plan_type": target_tier,
+                "billing_period": "annual",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
@@ -496,20 +585,101 @@ async def upgrade_subscription(user: dict = Depends(get_current_user)):
                 await email_service.send_subscription_upgraded(
                     to_email=user["email"],
                     user_name=user.get("name", ""),
-                    old_plan="monthly",
-                    new_plan="annual"
+                    old_plan=f"{current_plan} ({current_billing})",
+                    new_plan=f"{target_tier} (annual)"
                 )
             except Exception as e:
                 logger.error(f"Failed to send upgrade email: {e}")
         
         return {
             "status": "upgraded",
-            "message": "Successfully upgraded to annual plan. You'll be charged the prorated difference.",
-            "new_plan": "annual"
+            "message": "Successfully upgraded to annual billing. You'll be charged the prorated difference.",
+            "new_plan": target_tier,
+            "billing_period": "annual"
         }
     except stripe.StripeError as e:
         logger.error(f"Stripe upgrade error: {e}")
         raise HTTPException(status_code=500, detail="Could not upgrade subscription. Please try again. If this continues, contact support@trustoffice.app.")
+
+
+@router.post("/subscription/change-plan")
+async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_current_user)):
+    """Change plan tier or billing period (3-tier system).
+    
+    Supports upgrades and downgrades between trustee/estate/advisor,
+    and switching between monthly/annual billing.
+    Uses Stripe proration for mid-cycle changes.
+    """
+    valid_plans = ["trustee", "estate", "advisor"]
+    valid_periods = ["monthly", "annual"]
+    
+    if request.plan_type not in valid_plans:
+        raise HTTPException(status_code=400, detail="Invalid plan type. Choose 'trustee', 'estate', or 'advisor'.")
+    if request.billing_period not in valid_periods:
+        raise HTTPException(status_code=400, detail="Invalid billing period. Choose 'monthly' or 'annual'.")
+    
+    sub = await get_or_create_subscription(user["user_id"])
+    
+    if not sub.get("stripe_subscription_id"):
+        raise HTTPException(status_code=400, detail="No active subscription found. Please subscribe at trustoffice.app/settings/billing.")
+    
+    new_price_id = PRICE_IDS.get((request.plan_type, request.billing_period))
+    if not new_price_id:
+        raise HTTPException(status_code=500, detail=f"Price ID not configured for {request.plan_type}/{request.billing_period}")
+    
+    # Check if already on this plan
+    current_plan = sub.get("plan_type", "")
+    current_billing = sub.get("billing_period", "")
+    if current_plan == request.plan_type and current_billing == request.billing_period:
+        raise HTTPException(status_code=400, detail=f"You are already on the {request.plan_type} {request.billing_period} plan.")
+    
+    try:
+        stripe_sub = stripe.Subscription.retrieve(sub["stripe_subscription_id"])
+        old_plan_label = f"{current_plan} ({current_billing})" if current_billing else current_plan
+        new_plan_label = f"{request.plan_type} ({request.billing_period})"
+        
+        stripe.Subscription.modify(
+            sub["stripe_subscription_id"],
+            items=[{
+                "id": stripe_sub["items"]["data"][0]["id"],
+                "price": new_price_id
+            }],
+            proration_behavior="create_prorations"
+        )
+        
+        await db.subscriptions.update_one(
+            {"user_id": user["user_id"]},
+            {
+                "$set": {
+                    "plan_type": request.plan_type,
+                    "billing_period": request.billing_period,
+                    "legacy_trust_limit": None,  # clear grandfathering on explicit plan change
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        
+        # Send upgrade/downgrade email
+        if email_service.is_configured:
+            try:
+                await email_service.send_subscription_upgraded(
+                    to_email=user["email"],
+                    user_name=user.get("name", ""),
+                    old_plan=old_plan_label,
+                    new_plan=new_plan_label
+                )
+            except Exception as e:
+                logger.error(f"Failed to send plan change email: {e}")
+        
+        return {
+            "status": "changed",
+            "message": f"Successfully changed to {request.plan_type} ({request.billing_period}). Proration will be applied to your next billing cycle.",
+            "new_plan": request.plan_type,
+            "billing_period": request.billing_period
+        }
+    except stripe.StripeError as e:
+        logger.error(f"Stripe plan change error: {e}")
+        raise HTTPException(status_code=500, detail="Could not change plan. Please try again or contact support@trustoffice.app.")
 
 
 # ==================== STRIPE WEBHOOK ====================
@@ -569,18 +739,30 @@ async def stripe_webhook(request: Request):
             session = event["data"]["object"]
             user_id = session.get("metadata", {}).get("user_id")
             plan_type = session.get("metadata", {}).get("plan_type", "monthly")
+            billing_period = session.get("metadata", {}).get("billing_period")
+            
+            # For legacy plans, billing_period wasn't in metadata — infer from plan_type
+            if not billing_period and plan_type in ("monthly", "annual"):
+                billing_period = plan_type
 
             if user_id:
+                # Determine if this is a legacy plan that needs grandfathering
+                update_set = {
+                    "plan_type": plan_type,
+                    "billing_period": billing_period,
+                    "status": "active",
+                    "stripe_subscription_id": session.get("subscription"),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+                # Grandfather legacy monthly/annual subscribers with 10-trust limit
+                if plan_type in ("monthly", "annual"):
+                    update_set["legacy_trust_limit"] = 10
+
                 # Update subscription status
                 await db.subscriptions.update_one(
                     {"user_id": user_id},
                     {
-                        "$set": {
-                            "plan_type": plan_type,
-                            "status": "active",
-                            "stripe_subscription_id": session.get("subscription"),
-                            "updated_at": datetime.now(timezone.utc).isoformat()
-                        },
+                        "$set": update_set,
                         "$unset": {
                             "gifted": "",
                             "gift_type": "",
@@ -609,7 +791,7 @@ async def stripe_webhook(request: Request):
 
                 # Send activation email
                 user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-                amount = "790" if plan_type == "annual" else "79"
+                amount = str(int(PLAN_AMOUNTS.get((plan_type, billing_period), 79.00)))
                 if user and email_service.is_configured:
                     try:
                         # Get subscription details from Stripe
@@ -621,7 +803,8 @@ async def stripe_webhook(request: Request):
                             user_name=user.get("name", ""),
                             plan_type=plan_type,
                             amount=amount,
-                            next_billing_date=next_billing
+                            next_billing_date=next_billing,
+                            legacy_trust_limit=10 if plan_type in ("monthly", "annual") else None
                         )
 
                         # Send admin notification about new purchase
@@ -675,17 +858,34 @@ async def stripe_webhook(request: Request):
                 new_price = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
 
                 if old_price and new_price and old_price != new_price:
-                    # Determine plan types
-                    old_plan = "annual" if old_price == STRIPE_ANNUAL_PRICE_ID else "monthly"
-                    new_plan = "annual" if new_price == STRIPE_ANNUAL_PRICE_ID else "monthly"
+                    # Determine plan types using new + legacy lookup
+                    old_plan_info = PRICE_ID_TO_PLAN.get(old_price)
+                    if not old_plan_info:
+                        legacy = LEGACY_PRICE_MAP.get(old_price)
+                        old_plan_info = (legacy[0], legacy[1]) if legacy else ("monthly", None)
+                    new_plan_info = PRICE_ID_TO_PLAN.get(new_price)
+                    if not new_plan_info:
+                        legacy = LEGACY_PRICE_MAP.get(new_price)
+                        new_plan_info = (legacy[0], legacy[1]) if legacy else ("monthly", None)
+                    
+                    old_plan = old_plan_info[0]
+                    new_plan = new_plan_info[0]
+                    new_billing_period = new_plan_info[1]
+
+                    # Build update set
+                    update_set = {
+                        "plan_type": new_plan,
+                        "billing_period": new_billing_period,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    # If migrating from a legacy plan, grandfather the 10-trust limit
+                    if old_plan in ("monthly", "annual") and new_plan in ("monthly", "annual"):
+                        update_set["legacy_trust_limit"] = 10
 
                     # Update database
                     await db.subscriptions.update_one(
                         {"user_id": user["user_id"]},
-                        {"$set": {
-                            "plan_type": new_plan,
-                            "updated_at": datetime.now(timezone.utc).isoformat()
-                        }}
+                        {"$set": update_set}
                     )
 
                     # Send upgrade email

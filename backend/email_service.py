@@ -360,18 +360,22 @@ class EmailService:
         user_name: str,
         plan_type: str,
         amount: str,
-        next_billing_date: str
+        next_billing_date: str,
+        legacy_trust_limit: int | None = None
     ) -> Dict[str, Any]:
         """Send notification when subscription is activated"""
+        template_data = {
+            "user_name": user_name,
+            "plan_type": plan_type,
+            "amount": amount,
+            "next_billing_date": next_billing_date
+        }
+        if legacy_trust_limit is not None:
+            template_data["legacy_trust_limit"] = legacy_trust_limit
         return await self.send_templated_email(
             to_email=to_email,
             template_name="subscription_activated",
-            template_data={
-                "user_name": user_name,
-                "plan_type": plan_type,
-                "amount": amount,
-                "next_billing_date": next_billing_date
-            },
+            template_data=template_data,
             to_name=user_name,
             tag="subscription",
             metadata={"email_type": "subscription_activated", "plan": plan_type}

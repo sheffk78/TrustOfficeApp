@@ -51,13 +51,44 @@ def _base_template(content: str, year: int = None) -> str:
       {content}
     </div>
     <div class="footer">
-      <p>© {year} TrustOffice. All rights reserved.</p>
+      <p>&copy; {year} TrustOffice. All rights reserved.</p>
       <p>This is an automated message from your trust governance system.</p>
     </div>
   </div>
 </body>
 </html>
 """
+
+
+def get_trust_limit_text(plan_type: str, legacy_trust_limit: int | None = None) -> str:
+    """
+    Return the tier-aware trust limit text for subscription emails.
+
+    Tiers:
+      - trustee:  '1 trust or entity'
+      - estate:  'Up to 5 trusts & entities'
+      - advisor: 'Unlimited trusts & entities'
+      - Legacy grandfathered (monthly/annual with legacy_trust_limit=10):
+          'Up to 10 trusts & entities (grandfathered)'
+    """
+    pt = (plan_type or "").lower().strip()
+
+    # Grandfathered users (any tier with legacy_trust_limit > 1) get special text
+    if legacy_trust_limit and legacy_trust_limit > 1:
+        return f"Up to {legacy_trust_limit} trusts & entities (grandfathered)"
+
+    if pt == "trustee":
+        return "1 trust or entity"
+    elif pt == "estate":
+        return "Up to 5 trusts & entities"
+    elif pt == "advisor":
+        return "Unlimited trusts & entities"
+    elif pt in ("monthly", "annual"):
+        # Legacy plans without explicit limit
+        return "Up to 10 trusts & entities (grandfathered)"
+    else:
+        # Unknown plan — use conservative default
+        return "Up to 10 trusts & entities"
 
 # ================== TEMPLATE DEFINITIONS ==================
 
@@ -620,7 +651,7 @@ TrustOffice
             
             <h3>You now have full access to:</h3>
             <ul>
-              <li>Up to 10 trusts & entities</li>
+              <li>{get_trust_limit_text(data.get('plan_type', ''), data.get('legacy_trust_limit'))}</li>
               <li>Governance health tracking</li>
               <li>Minutes & distribution management</li>
               <li>PDF generation & CSV export</li>
@@ -646,7 +677,7 @@ Subscription Details:
 - Amount: ${data.get('amount', '79')}/{'year' if data.get('plan_type') == 'annual' else 'month'}
 
 You now have full access to:
-- Up to 10 trusts & entities
+- {get_trust_limit_text(data.get('plan_type', ''), data.get('legacy_trust_limit'))}
 - Governance health tracking
 - Minutes & distribution management
 - PDF generation & CSV export

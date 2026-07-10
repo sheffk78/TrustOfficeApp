@@ -139,15 +139,19 @@ export const FullSubscriptionGate = ({ children }) => {
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Up to 10 trusts & entities
+                Trustee ($79/mo): 1 trust, all governance tools
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Defensibility tracking
+                Estate ($149/mo): up to 5 trusts, multi-trust dashboard
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Minutes & distribution management
+                Advisor ($399/mo): unlimited trusts, client view, white-label
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                Defensibility tracking, minutes & distribution management
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
@@ -159,7 +163,7 @@ export const FullSubscriptionGate = ({ children }) => {
           {/* CTA Buttons */}
           <div className="flex flex-col gap-3">
             <Button
-              onClick={() => navigate('/pricing')}
+              onClick={() => navigate('/settings/billing')}
               className="btn-primary w-full"
               data-testid="subscribe-cta-btn"
             >
@@ -168,7 +172,7 @@ export const FullSubscriptionGate = ({ children }) => {
             </Button>
             
             <p className="text-xs text-muted-foreground">
-              Starting at $79/month or save with annual billing
+              Starting at $79/month for Trustee, $149/month for Estate, or $399/month for Advisor — or save with annual billing
             </p>
           </div>
 

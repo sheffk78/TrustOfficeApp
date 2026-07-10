@@ -10,7 +10,8 @@ from database import db
 from dependencies import (
     get_current_user, require_write_access, calculate_health_score, 
     create_initial_governance_tasks, check_feature_access, Feature,
-    PREMIUM_FEATURE_ERROR_MESSAGE, PREMIUM_FEATURE_ERROR_CODE
+    PREMIUM_FEATURE_ERROR_MESSAGE, PREMIUM_FEATURE_ERROR_CODE,
+    get_trust_limit, PLAN_TRUST_LIMITS
 )
 from trustee_utils import parse_trustees
 from models import TrustCreate, TrustUpdate, TrustResponse
@@ -33,27 +34,37 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
     is enforced below via check_feature_access().
     
     Feature Gate: MULTIPLE_TRUSTS
-    - Trial users can only have 1 trust
-    - Paid users (monthly/annual) can create up to 10 trusts
+    - Trustee: 1 trust
+    - Estate: 5 trusts
+    - Advisor: unlimited
+    - Legacy monthly/annual: 10 trusts (grandfathered)
     """
-    TRUST_LIMIT = 10
+    # Get the user's subscription state to determine trust limit
+    from dependencies import get_subscription_state
+    sub_state = await get_subscription_state(user["user_id"])
+    trust_limit = get_trust_limit(sub_state.plan_type, sub_state.legacy_trust_limit)
     
     # Check if user already has a trust - need MULTIPLE_TRUSTS feature for more
+    # Grandfathered users with legacy_trust_limit > 1 bypass the feature gate
     existing_count = await db.trusts.count_documents({"user_id": user["user_id"]})
     if existing_count >= 1:
         has_multiple_trusts = await check_feature_access(user["user_id"], Feature.MULTIPLE_TRUSTS)
-        if not has_multiple_trusts:
+        is_grandfathered = sub_state.legacy_trust_limit is not None and sub_state.legacy_trust_limit > 1
+        if not has_multiple_trusts and not is_grandfathered:
             raise HTTPException(
                 status_code=PREMIUM_FEATURE_ERROR_CODE,
-                detail="Multiple trusts require a paid subscription. Trial accounts are limited to 1 trust."
+                detail="Multiple trusts require an Estate or Advisor plan. Trustee accounts are limited to 1 trust."
             )
     
-    # Hard cap for paid users
-    if existing_count >= TRUST_LIMIT:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Your account can manage up to {TRUST_LIMIT} trusts. Contact contact@trustoffice.app with subject 'Need more trusts' if you need more."
-        )
+    # Hard cap based on plan tier
+    if existing_count >= trust_limit:
+        if trust_limit == float('inf'):
+            pass  # unlimited, should never hit
+        else:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Your plan supports up to {int(trust_limit)} trusts. Upgrade to create more, or contact contact@trustoffice.app with subject 'Need more trusts' if you need additional capacity."
+            )
     
     try:
         trust_id = f"trust_{uuid.uuid4().hex[:12]}"

@@ -23,14 +23,18 @@ import { toast } from 'sonner';
 import { showError } from '@/utils/errors';
 import PageHelpButton from '@/components/PageHelpButton';
 
-const PLANS = [
+// Phase 3: 3-tier pricing structure (Trustee, Estate, Advisor)
+// Each tier supports both monthly and annual billing periods.
+// Annual price = monthly × 10 (2 months free).
+const TIERS = [
   {
-    id: 'monthly',
-    name: 'Monthly',
-    price: 79,
-    period: 'month',
+    id: 'trustee',
+    name: 'Trustee Plan',
+    monthly: 79,
+    annual: 790,
+    trustLimit: '1 trust',
     features: [
-      'Up to 10 trusts & entities',
+      '1 trust record',
       'Governance health tracking',
       'Minutes & distribution management',
       'PDF generation',
@@ -39,19 +43,64 @@ const PLANS = [
     ]
   },
   {
-    id: 'annual',
-    name: 'Annual',
-    price: 790,
-    period: 'year',
-    savings: '2 months free',
+    id: 'estate',
+    name: 'Estate Plan',
+    monthly: 149,
+    annual: 1490,
+    trustLimit: 'Up to 5 trusts',
+    popular: true,
     features: [
-      'Everything in Monthly',
-      '2 months free ($158 savings)',
-      'Priority onboarding',
+      'Everything in Trustee',
+      'Up to 5 trusts & entities',
+      'Multi-trust dashboard',
+      'Recurring task automation',
+      'Minutes & distribution management',
+      'PDF generation & CSV export'
+    ]
+  },
+  {
+    id: 'advisor',
+    name: 'Advisor Plan',
+    monthly: 399,
+    annual: 3990,
+    trustLimit: 'Unlimited trusts',
+    features: [
+      'Everything in Estate',
+      'Unlimited trusts & entities',
+      'Client view',
+      'White-label binder export',
+      'Multi-signature approvals',
       'Dedicated account manager'
     ]
   }
 ];
+
+// Map subscription plan_type to a display name.
+// Handles the new tiers (trustee/estate/advisor) AND legacy values
+// (monthly/annual) which are now grandfathered Trustee plans.
+const planDisplayName = (planType) => {
+  switch (planType) {
+    case 'trustee': return 'Trustee Plan';
+    case 'estate': return 'Estate Plan';
+    case 'advisor': return 'Advisor Plan';
+    case 'monthly': return 'Trustee Plan (Legacy)';
+    case 'annual': return 'Trustee Plan (Legacy)';
+    case 'forever_free':
+    case 'free':
+      return 'Free Plan';
+    case 'trial':
+      return 'Free Plan';
+    default:
+      return planType || 'Unknown';
+  }
+};
+
+// Return the tier price for a given billing period.
+const tierPriceFor = (tierId, period) => {
+  const tier = TIERS.find((t) => t.id === tierId);
+  if (!tier) return null;
+  return period === 'annual' ? tier.annual : tier.monthly;
+};
 
 export default function BillingPage() {
   const navigate = useNavigate();
@@ -61,6 +110,9 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  // Phase 3: billing period toggle for the no-subscription plan picker
+  const [pickerBillingPeriod, setPickerBillingPeriod] = useState('monthly');
+  const [changePlanBillingPeriod, setChangePlanBillingPeriod] = useState('monthly');
 
   useEffect(() => {
     loadSubscription();
@@ -77,7 +129,11 @@ export default function BillingPage() {
     try {
       const response = await fetchWithAuth('/subscription');
       if (response.ok) {
-        setSubscription(await response.json());
+        const data = await response.json();
+        setSubscription(data);
+        if (data?.billing_period) {
+          setChangePlanBillingPeriod(data.billing_period);
+        }
       }
     } catch (error) {
       console.error('Failed to load subscription:', error);
@@ -105,12 +161,13 @@ export default function BillingPage() {
     }
   };
 
-  const handleSubscribe = async (planId) => {
+  const handleSubscribe = async (planId, period = 'monthly') => {
     setProcessing(true);
     try {
       const currentUrl = window.location.origin;
       const checkoutData = {
         plan_type: planId,
+        billing_period: period,
         success_url: `${currentUrl}/dashboard?welcome=true`,
         cancel_url: `${currentUrl}/settings/billing`
       };
@@ -135,6 +192,34 @@ export default function BillingPage() {
     } catch (error) {
       showError(toast, error, { operation: 'create_checkout', page: 'Billing' });
       setProcessing(false);
+    }
+  };
+
+  // Phase 3: change-plan endpoint for tier upgrades/downgrades.
+  // Body: { plan_type, billing_period }. Used by the existing-subscription
+  // "Change Plan" buttons rendered for each tier card below.
+  const handleChangePlan = async (planId, period = 'monthly') => {
+    if (!window.confirm(`Change your plan to ${planDisplayName(planId)} (${period})? Your billing will be prorated for the remainder of your current cycle.`)) {
+      return;
+    }
+    setActionLoading('change-plan');
+    try {
+      const response = await fetchWithAuth('/subscription/change-plan', {
+        method: 'POST',
+        body: JSON.stringify({ plan_type: planId, billing_period: period })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message || `Plan changed to ${planDisplayName(planId)}.`);
+        loadSubscription();
+      } else {
+        const error = await response.json();
+        showError(toast, new Error(error.detail || 'Could not change plan. Please try again or contact support@trustoffice.app.'), { operation: 'change_plan', page: 'Billing' });
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'change_plan', page: 'Billing' });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -175,29 +260,6 @@ export default function BillingPage() {
       }
     } catch (error) {
       showError(toast, error, { operation: 'reactivate_subscription', page: 'Billing' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleUpgrade = async () => {
-    if (!window.confirm('Upgrade to annual plan? You will be charged the prorated difference for the remainder of your billing cycle.')) {
-      return;
-    }
-    
-    setActionLoading('upgrade');
-    try {
-      const response = await fetchWithAuth('/subscription/upgrade', { method: 'POST' });
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(data.message);
-        loadSubscription();
-      } else {
-        const error = await response.json();
-        showError(toast, new Error(error.detail || 'Could not upgrade subscription. Please try again or contact support@trustoffice.app.'), { operation: 'upgrade_subscription', page: 'Billing' });
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'upgrade_subscription', page: 'Billing' });
     } finally {
       setActionLoading(null);
     }
@@ -329,7 +391,37 @@ export default function BillingPage() {
   const isFreePlan = subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial' || subscription?.plan_type === 'none' || subscription?.plan_type === 'free';
   const isActivePaidSubscription = subscription?.status === 'active' && !isFreePlan;
   const isCanceling = subscription?.cancel_at_period_end;
-  const canUpgrade = isActivePaidSubscription && subscription?.plan_type === 'monthly' && !isCanceling;
+
+  // Phase 3: tier-aware upgrade logic.
+  // The backend now returns plan_type as trustee/estate/advisor, with
+  // billing_period as monthly/annual. Legacy monthly/annual subscribers are
+  // grandfathered as Trustee. canUpgrade is true whenever there's a higher
+  // tier available (or an Estate/Advisor user can switch to annual billing).
+  const currentPlanType = subscription?.plan_type;
+  // Normalize legacy plan types to the Trustee tier for tier comparison.
+  const normalizedPlanType =
+    currentPlanType === 'monthly' || currentPlanType === 'annual' ? 'trustee' : currentPlanType;
+  const currentTierIndex = TIERS.findIndex((t) => t.id === normalizedPlanType);
+  const currentBillingPeriod = subscription?.billing_period || 'monthly';
+  const isLegacyPlan = currentPlanType === 'monthly' || currentPlanType === 'annual';
+  const legacyTrustLimit = subscription?.legacy_trust_limit;
+  const isGrandfathered = isLegacyPlan && legacyTrustLimit != null;
+
+  // There are higher tiers available OR same tier with a different billing
+  // period (e.g. switch from monthly to annual).
+  const canUpgrade =
+    isActivePaidSubscription &&
+    !isCanceling &&
+    (currentTierIndex < TIERS.length - 1 || currentBillingPeriod === 'monthly');
+
+  // Trust limit display for the current subscription.
+  const trustLimitLabel = () => {
+    if (isGrandfathered) {
+      return `Grandfathered: ${legacyTrustLimit} trusts`;
+    }
+    const tier = TIERS.find((t) => t.id === normalizedPlanType);
+    return tier ? tier.trustLimit : '—';
+  };
 
   return (
     <div className="main-layout" data-testid="billing-page">
@@ -383,7 +475,7 @@ export default function BillingPage() {
                 </p>
                 <Button
                   onClick={() => {
-                    const plansSection = document.querySelector('[data-testid="plan-card-monthly"]');
+                    const plansSection = document.querySelector('[data-testid="plan-card-trustee"]');
                     if (plansSection) plansSection.scrollIntoView({ behavior: 'smooth' });
                   }}
                   className="btn-primary"
@@ -396,25 +488,52 @@ export default function BillingPage() {
             </div>
             {/* Pricing Plans for no-subscription state */}
             <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {PLANS.map(plan => (
-                <div
-                  key={plan.id}
-                  className={`card-trust relative ${plan.id === 'annual' ? 'border-gold/30 bg-gold/5' : ''}`}
-                  data-testid={`plan-card-${plan.id}`}
+            {/* Phase 3: billing period toggle for the no-subscription plan picker */}
+            <div className="flex justify-center mb-6">
+              <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
+                <button
+                  type="button"
+                  onClick={() => setPickerBillingPeriod('monthly')}
+                  className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${pickerBillingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
                 >
-                  {plan.savings && (
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPickerBillingPeriod('annual')}
+                  className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${pickerBillingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+                >
+                  Annual <span className="ml-1 text-xs text-success">2 months free</span>
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {TIERS.map(tier => (
+                <div
+                  key={tier.id}
+                  className={`card-trust relative ${tier.popular ? 'border-gold/30 bg-gold/5' : ''}`}
+                  data-testid={`plan-card-${tier.id}`}
+                >
+                  {tier.popular && (
                     <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
-                      {plan.savings}
+                      Most Popular
                     </div>
                   )}
-                  <h3 className="font-serif text-xl text-navy mb-2">{plan.name}</h3>
+                  <h3 className="font-serif text-xl text-navy mb-2">{tier.name}</h3>
+                  <p className="text-xs text-muted-foreground mb-3">{tier.trustLimit}</p>
                   <div className="flex items-baseline gap-1 mb-4">
-                    <span className="font-mono text-4xl text-navy">${plan.price}</span>
-                    <span className="text-muted-foreground">/{plan.period}</span>
+                    <span className="font-mono text-4xl text-navy">
+                      ${pickerBillingPeriod === 'annual' ? tier.annual : tier.monthly}
+                    </span>
+                    <span className="text-muted-foreground">/{pickerBillingPeriod === 'annual' ? 'year' : 'month'}</span>
                   </div>
+                  {pickerBillingPeriod === 'annual' && (
+                    <p className="text-xs text-success mb-3 font-medium">
+                      Save ${tier.monthly * 2} (2 months free)
+                    </p>
+                  )}
                   <ul className="space-y-3 mb-6">
-                    {plan.features.map((feature, i) => (
+                    {tier.features.map((feature, i) => (
                       <li key={i} className="flex items-center gap-2 text-sm">
                         <Check className="w-4 h-4 text-success flex-shrink-0" />
                         <span>{feature}</span>
@@ -422,10 +541,10 @@ export default function BillingPage() {
                     ))}
                   </ul>
                   <Button
-                    onClick={() => handleSubscribe(plan.id)}
-                    className={`w-full ${plan.id === 'annual' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => handleSubscribe(tier.id, pickerBillingPeriod)}
+                    className={`w-full ${tier.popular ? 'btn-primary' : 'btn-secondary'}`}
                     disabled={processing}
-                    data-testid={`subscribe-${plan.id}-btn`}
+                    data-testid={`subscribe-${tier.id}-btn`}
                   >
                     {processing ? (
                       <>
@@ -435,7 +554,7 @@ export default function BillingPage() {
                     ) : (
                       <>
                         <CreditCard className="w-4 h-4 mr-2" />
-                        Subscribe to {plan.name}
+                        Subscribe to {tier.name}
                       </>
                     )}
                   </Button>
@@ -450,14 +569,21 @@ export default function BillingPage() {
                 <div className="flex items-start justify-between mb-6">
                   <div>
                     <p className="label-trust mb-2">Current Plan</p>
-                    <h2 className="font-serif text-2xl text-navy capitalize">
-                      {subscription?.plan_type === 'trial' ? 'Free Plan' : 
-                       subscription?.plan_type === 'monthly' ? 'Monthly Plan' :
-                       subscription?.plan_type === 'annual' ? 'Annual Plan' : 
-                       subscription?.plan_type === 'forever_free' ? 'Free Plan' :
-                       subscription?.plan_type === 'free' ? 'Free Plan' :
-                       subscription?.plan_type || 'Unknown'}
+                    <h2 className="font-serif text-2xl text-navy">
+                      {planDisplayName(subscription?.plan_type)}
                     </h2>
+                    {isActivePaidSubscription && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {subscription?.billing_period === 'annual' ? 'Annual billing' : 'Monthly billing'}
+                        {' · '}
+                        {trustLimitLabel()}
+                      </p>
+                    )}
+                    {isGrandfathered && (
+                      <p className="text-xs text-success mt-1 font-medium">
+                        Grandfathered: {legacyTrustLimit} trusts at your current price
+                      </p>
+                    )}
                   </div>
                   {getStatusBadge()}
                 </div>
@@ -492,9 +618,18 @@ export default function BillingPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="label-trust text-xs mb-1">Monthly Cost</p>
+                      <p className="label-trust text-xs mb-1">
+                        {subscription?.billing_period === 'annual' ? 'Annual Cost' : 'Monthly Cost'}
+                      </p>
                       <p className="font-mono text-sm text-navy">
-                        {subscription.plan_type === 'annual' ? '$65.83/month (billed annually)' : '$79/month'}
+                        {(() => {
+                          // Resolve the price for the current tier + billing period.
+                          // Legacy monthly/annual map to the Trustee tier price.
+                          const price = tierPriceFor(normalizedPlanType, subscription?.billing_period || 'monthly');
+                          if (price == null) return 'N/A';
+                          const periodLabel = subscription?.billing_period === 'annual' ? '/year' : '/month';
+                          return `$${price}${periodLabel}`;
+                        })()}
                       </p>
                     </div>
                   </div>
@@ -553,17 +688,15 @@ export default function BillingPage() {
                   <div className="flex flex-wrap gap-3">
                     {canUpgrade && (
                       <Button
-                        onClick={handleUpgrade}
+                        onClick={() => {
+                          const tierSection = document.querySelector('[data-testid="tier-change-section"]');
+                          if (tierSection) tierSection.scrollIntoView({ behavior: 'smooth' });
+                        }}
                         className="btn-primary"
-                        disabled={actionLoading === 'upgrade'}
-                        data-testid="upgrade-btn"
+                        data-testid="change-plan-btn"
                       >
-                        {actionLoading === 'upgrade' ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <ArrowUpCircle className="w-4 h-4 mr-2" />
-                        )}
-                        Upgrade to Annual (Save $158)
+                        <ArrowUpCircle className="w-4 h-4 mr-2" />
+                        Change Plan
                       </Button>
                     )}
                     
@@ -597,33 +730,140 @@ export default function BillingPage() {
                     </Button>
                   </div>
                 )}
+
+                {/* Phase 3: Tier change section for active paid subscriptions.
+                    Lets an existing subscriber switch to Trustee/Estate/Advisor
+                    (or switch billing period) via the change-plan endpoint. */}
+                {isActivePaidSubscription && !isCanceling && (
+                  <div className="mt-8" data-testid="tier-change-section">
+                    <h3 className="font-serif text-xl text-navy mb-1">Change Your Plan</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Upgrade or downgrade at any time. Changes are prorated for the remainder of your billing cycle.
+                    </p>
+                    <div className="flex justify-center mb-6">
+                      <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
+                        <button
+                          type="button"
+                          onClick={() => setChangePlanBillingPeriod('monthly')}
+                          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${changePlanBillingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+                        >
+                          Monthly
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setChangePlanBillingPeriod('annual')}
+                          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${changePlanBillingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+                        >
+                          Annual
+                          <span className="ml-1 text-xs opacity-70">2 months free</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {TIERS.map((tier) => {
+                        const isCurrentTier = tier.id === normalizedPlanType;
+                        const isUpgrade = TIERS.findIndex((t) => t.id === tier.id) > currentTierIndex;
+                        return (
+                          <div
+                            key={tier.id}
+                            className={`card-trust relative p-6 ${tier.popular ? 'border-gold/40' : ''} ${isCurrentTier ? 'ring-2 ring-navy' : ''}`}
+                            data-testid={`tier-change-card-${tier.id}`}
+                          >
+                            {tier.popular && !isCurrentTier && (
+                              <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
+                                Most Popular
+                              </div>
+                            )}
+                            {isCurrentTier && (
+                              <div className="absolute top-0 right-0 bg-navy text-white px-3 py-1 font-mono text-xs uppercase">
+                                Current
+                              </div>
+                            )}
+                            <h4 className="font-serif text-lg text-navy mb-1">{tier.name}</h4>
+                            <p className="text-xs text-muted-foreground mb-3">{tier.trustLimit}</p>
+                            <div className="flex items-baseline gap-1 mb-2">
+                              <span className="font-mono text-2xl text-navy">
+                                ${changePlanBillingPeriod === 'annual' ? tier.annual : tier.monthly}
+                              </span>
+                              <span className="text-muted-foreground text-sm">
+                                /{changePlanBillingPeriod === 'annual' ? 'year' : 'month'}
+                              </span>
+                            </div>
+                            <Button
+                              onClick={() => handleChangePlan(tier.id, changePlanBillingPeriod)}
+                              disabled={(isCurrentTier && changePlanBillingPeriod === currentBillingPeriod) || actionLoading === 'change-plan'}
+                              variant={isUpgrade ? 'default' : 'outline'}
+                              className={`w-full mt-3 ${isUpgrade ? 'btn-primary' : ''}`}
+                              data-testid={`change-to-${tier.id}-btn`}
+                            >
+                              {actionLoading === 'change-plan' ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : null}
+                              {isCurrentTier && changePlanBillingPeriod === currentBillingPeriod
+                                ? 'Current Plan'
+                                : isCurrentTier && changePlanBillingPeriod !== currentBillingPeriod
+                                ? `Switch to ${changePlanBillingPeriod === 'annual' ? 'Annual' : 'Monthly'}`
+                                : isUpgrade ? 'Upgrade' : 'Switch'}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Pricing Plans — Show for free plan, expired, or non-active subscriptions */}
               {(isFreePlan || !isActivePaidSubscription) && (
                 <>
                   <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    {PLANS.map(plan => (
-                      <div 
-                        key={plan.id}
-                        className={`card-trust relative ${plan.id === 'annual' ? 'border-gold/30 bg-gold/5' : ''}`}
-                        data-testid={`plan-card-${plan.id}`}
+                  {/* Phase 3: billing period toggle for the no-subscription plan picker */}
+                  <div className="flex justify-center mb-6">
+                    <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
+                      <button
+                        type="button"
+                        onClick={() => setPickerBillingPeriod('monthly')}
+                        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${pickerBillingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
                       >
-                        {plan.savings && (
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPickerBillingPeriod('annual')}
+                        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${pickerBillingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+                      >
+                        Annual <span className="ml-1 text-xs text-success">2 months free</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    {TIERS.map(tier => (
+                      <div 
+                        key={tier.id}
+                        className={`card-trust relative ${tier.popular ? 'border-gold/30 bg-gold/5' : ''}`}
+                        data-testid={`plan-card-${tier.id}`}
+                      >
+                        {tier.popular && (
                           <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
-                            {plan.savings}
+                            Most Popular
                           </div>
                         )}
-                        
-                        <h3 className="font-serif text-xl text-navy mb-2">{plan.name}</h3>
+                        <h3 className="font-serif text-xl text-navy mb-2">{tier.name}</h3>
+                        <p className="text-xs text-muted-foreground mb-3">{tier.trustLimit}</p>
                         <div className="flex items-baseline gap-1 mb-4">
-                          <span className="font-mono text-4xl text-navy">${plan.price}</span>
-                          <span className="text-muted-foreground">/{plan.period}</span>
+                          <span className="font-mono text-4xl text-navy">
+                            ${pickerBillingPeriod === 'annual' ? tier.annual : tier.monthly}
+                          </span>
+                          <span className="text-muted-foreground">/{pickerBillingPeriod === 'annual' ? 'year' : 'month'}</span>
                         </div>
+                        {pickerBillingPeriod === 'annual' && (
+                          <p className="text-xs text-success mb-3 font-medium">
+                            Save ${tier.monthly * 2} (2 months free)
+                          </p>
+                        )}
                         
                         <ul className="space-y-3 mb-6">
-                          {plan.features.map((feature, i) => (
+                          {tier.features.map((feature, i) => (
                             <li key={i} className="flex items-center gap-2 text-sm">
                               <Check className="w-4 h-4 text-success flex-shrink-0" />
                               <span>{feature}</span>
@@ -632,10 +872,10 @@ export default function BillingPage() {
                         </ul>
                         
                         <Button 
-                          onClick={() => handleSubscribe(plan.id)}
-                          className={`w-full ${plan.id === 'annual' ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => handleSubscribe(tier.id, pickerBillingPeriod)}
+                          className={`w-full ${tier.popular ? 'btn-primary' : 'btn-secondary'}`}
                           disabled={processing}
-                          data-testid={`subscribe-${plan.id}-btn`}
+                          data-testid={`subscribe-${tier.id}-btn`}
                         >
                           {processing ? (
                             <>
@@ -645,7 +885,7 @@ export default function BillingPage() {
                           ) : (
                             <>
                               <CreditCard className="w-4 h-4 mr-2" />
-                              Subscribe to {plan.name}
+                              Subscribe to {tier.name}
                             </>
                           )}
                         </Button>
@@ -668,7 +908,7 @@ export default function BillingPage() {
                   <div>
                     <p className="font-medium text-navy">Can I switch between plans?</p>
                     <p className="text-muted-foreground mt-1">
-                      Yes! You can upgrade from monthly to annual at any time. The difference will be prorated for your current billing cycle.
+                      Yes! You can upgrade, downgrade, or switch between monthly and annual billing at any time. Changes are prorated for your current billing cycle.
                     </p>
                   </div>
                   <div>
@@ -684,7 +924,7 @@ export default function BillingPage() {
               <div className="mt-8 text-center text-sm text-muted-foreground">
                 <p>
                   Questions about billing?{' '}
-                  <a href="mailto:support@trustoffice.com" className="text-navy hover:text-navy/70">
+                  <a href="mailto:support@trustoffice.app" className="text-navy hover:text-navy/70">
                     Contact support
                   </a>
                 </p>

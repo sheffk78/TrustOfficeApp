@@ -16,10 +16,10 @@ export const UpgradeModalProvider = ({ children }) => {
   const { isReadOnly, subscription } = useAuth();
   
   const showUpgradeModal = useCallback((feature = 'this feature', triggerSource = 'blocked_action', location = 'unknown') => {
-    // Only show if user is in read-only mode
-    if (!isReadOnly) return false;
-    
     // Track the blocked action
+    // Note: callers already check isReadOnly before invoking showUpgradeModal,
+    // so we do NOT guard on isReadOnly here — double-guarding blocked the modal
+    // for free-tier and paid users hitting trust limits.
     trackFeatureBlocked({
       feature_name: feature,
       location,
@@ -30,7 +30,7 @@ export const UpgradeModalProvider = ({ children }) => {
     setTrigger(triggerSource);
     setIsOpen(true);
     return true;
-  }, [isReadOnly, subscription]);
+  }, [subscription]);
   
   const hideUpgradeModal = useCallback(() => {
     setIsOpen(false);

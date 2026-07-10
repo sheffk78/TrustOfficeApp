@@ -96,6 +96,7 @@ class CustomerListItem(BaseModel):
     created_at: str
     subscription_status: str
     subscription_plan: str
+    billing_period: Optional[str] = None
     trust_count: int = 0
     last_login: Optional[str] = None
 
@@ -121,7 +122,7 @@ class AdminActionRequest(BaseModel):
 
 
 class GrantAccessRequest(BaseModel):
-    plan_type: str = "gifted_14day"  # gifted_14day, gifted_monthly, gifted_annual, monthly, annual, forever_free
+    plan_type: str = "gifted_14day"  # gifted_14day, gifted_monthly, gifted_annual, gifted_trustee, gifted_estate, gifted_advisor, monthly, annual, forever_free
     days: Optional[int] = None  # For gift period extension
 
 
@@ -141,7 +142,7 @@ class CreateAdminUserRequest(BaseModel):
 class CreateUserRequest(BaseModel):
     email: EmailStr
     name: str
-    gifted_tier: str = "14day"  # REQUIRED: "14day", "monthly", "annual", "forever_free"
+    gifted_tier: str = "14day"  # REQUIRED: "14day", "monthly", "annual", "trustee", "estate", "advisor", "forever_free"
 
 
 class SystemStats(BaseModel):
@@ -257,6 +258,7 @@ async def list_customers(
         # Determine subscription status
         sub_status = sub.get("status", "none") if sub else "none"
         sub_plan = sub.get("plan_type", "none") if sub else "none"
+        sub_billing_period = sub.get("billing_period") if sub else None
         
         # Filter by status if specified (do this filtering here)
         if status and status != "all" and sub_status != status:
@@ -271,6 +273,7 @@ async def list_customers(
             created_at=user.get("created_at", ""),
             subscription_status=sub_status,
             subscription_plan=sub_plan,
+            billing_period=sub_billing_period,
             trust_count=trust_count,
             last_login=user.get("last_login")
         ).model_dump())
@@ -333,6 +336,11 @@ async def get_customer_detail(
         "distributions": dist_count
     }
     
+    # Enrich subscription with tier_display_name for admin display
+    if sub:
+        from routers.admin_api import _enrich_subscription_display
+        sub = _enrich_subscription_display(sub)
+
     return CustomerDetail(
         user_id=user["user_id"],
         email=user["email"],
@@ -539,6 +547,31 @@ async def grant_access(
                 "status": "active",
                 "gifted": True,
                 "gift_type": plan,
+                "gift_start_date": now.isoformat(),
+                "gift_end_date": gift_end,
+                "gifted_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": f"Gifted {plan} access granted by admin {admin['email']}"
+            }},
+            upsert=True
+        )
+        
+        return {"message": f"Gifted {plan} access to {user['email']}"}
+    
+    elif request.plan_type in ("gifted_trustee", "gifted_estate", "gifted_advisor"):
+        # Gift new tier access (trustee, estate, advisor)
+        tier_map = {"gifted_trustee": "trustee", "gifted_estate": "estate", "gifted_advisor": "advisor"}
+        plan = tier_map.get(request.plan_type, "trustee")
+        duration = 30
+        gift_end = (now + timedelta(days=duration)).isoformat()
+        
+        await db.subscriptions.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "plan_type": plan,
+                "status": "active",
+                "gifted": True,
+                "gift_type": request.plan_type,
                 "gift_start_date": now.isoformat(),
                 "gift_end_date": gift_end,
                 "gifted_at": now.isoformat(),
@@ -1076,7 +1109,10 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
     # Revenue estimate (rough calculation from DB)
     monthly_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
     annual_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "annual"})
-    revenue_estimate = (monthly_subs * 79) + (annual_subs * 790 / 12)
+    trustee_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "trustee"})
+    estate_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "estate"})
+    advisor_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "advisor"})
+    revenue_estimate = (monthly_subs * 79) + (annual_subs * 790 / 12) + (trustee_subs * 79) + (estate_subs * 149) + (advisor_subs * 399)
     
     # Real Stripe revenue data
     stripe_total_revenue_cents = 0
@@ -1110,7 +1146,8 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
         
         # Calculate MRR from active subscriptions
         # Monthly: $79/mo, Annual: $790/yr ≈ $65.83/mo
-        stripe_mrr_cents = (monthly_subs * 7900) + (annual_subs * 6583)
+        # Trustee: $79/mo, Estate: $149/mo, Advisor: $399/mo
+        stripe_mrr_cents = (monthly_subs * 7900) + (annual_subs * 6583) + (trustee_subs * 7900) + (estate_subs * 14900) + (advisor_subs * 39900)
         stripe_arr_cents = stripe_mrr_cents * 12
         
     except stripe.StripeError as e:
@@ -1594,7 +1631,7 @@ async def create_user(
     name = request.name.strip()
     
     # Validate gifted_tier
-    valid_tiers = {"14day", "monthly", "annual", "forever_free"}
+    valid_tiers = {"14day", "monthly", "annual", "trustee", "estate", "advisor", "forever_free"}
     if request.gifted_tier not in valid_tiers:
         raise HTTPException(
             status_code=400,
@@ -1639,9 +1676,9 @@ async def create_user(
         })
     else:
         # Gifted tier — create time-limited gift
-        gift_duration_days = {"14day": 14, "monthly": 30, "annual": 365}
+        gift_duration_days = {"14day": 14, "monthly": 30, "annual": 365, "trustee": 30, "estate": 30, "advisor": 30}
         duration = gift_duration_days[request.gifted_tier]
-        plan_type_map = {"14day": "free", "monthly": "monthly", "annual": "annual"}
+        plan_type_map = {"14day": "free", "monthly": "monthly", "annual": "annual", "trustee": "trustee", "estate": "estate", "advisor": "advisor"}
         
         gift_end = (now + timedelta(days=duration)).isoformat()
         await db.subscriptions.insert_one({

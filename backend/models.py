@@ -73,6 +73,13 @@ class HealthColor(str, Enum):
     green = "green"
 
 class PlanType(str, Enum):
+    # New 3-tier system
+    trustee = "trustee"
+    estate = "estate"
+    advisor = "advisor"
+    free = "free"
+    forever_free = "forever_free"
+    # Legacy (for migration compatibility)
     trial = "trial"
     monthly = "monthly"
     annual = "annual"
@@ -1107,8 +1114,10 @@ class SubscriptionState(BaseModel):
     """Normalized subscription state object for consistent access across modules"""
     user_id: str
     subscription_id: Optional[str] = None
-    plan_type: str  # "trial", "monthly", "annual"
+    plan_type: str  # "trustee", "estate", "advisor", "free", "forever_free", legacy: "monthly", "annual"
     status: str  # "trialing", "active", "past_due", "canceled", "expired"
+    billing_period: Optional[str] = None  # "monthly" | "annual" (new tiers)
+    legacy_trust_limit: Optional[int] = None  # grandfathered users keep their old limit
     trial_start_date: Optional[str] = None
     trial_end_date: Optional[str] = None
     trial_days_remaining: Optional[int] = None
@@ -1134,6 +1143,8 @@ class SubscriptionResponse(BaseModel):
     user_id: str
     plan_type: str
     status: str
+    billing_period: Optional[str] = None  # "monthly" | "annual" (new tiers)
+    legacy_trust_limit: Optional[int] = None  # grandfathered users
     trial_start_date: Optional[str] = None
     trial_end_date: Optional[str] = None
     stripe_customer_id: Optional[str] = None
@@ -1144,12 +1155,19 @@ class SubscriptionResponse(BaseModel):
     cancel_at_period_end: Optional[bool] = None
 
 class CheckoutRequest(BaseModel):
-    plan_type: str
+    plan_type: str  # "trustee", "estate", "advisor" (legacy: "monthly", "annual")
+    billing_period: Optional[str] = None  # "monthly" or "annual" (new tiers). Legacy plans infer from plan_type.
     success_url: str
     cancel_url: str
     promotion_code: Optional[str] = None
     coupon: Optional[str] = None  # Direct Stripe coupon ID (e.g., TRUST49)
     referral_id: Optional[str] = None  # Rewardful affiliate referral ID
+
+
+class ChangePlanRequest(BaseModel):
+    """Request to change plan tier (upgrade/downgrade between trustee/estate/advisor)"""
+    plan_type: str  # "trustee", "estate", "advisor"
+    billing_period: str  # "monthly" or "annual"
 
 class PortalRequest(BaseModel):
     return_url: str

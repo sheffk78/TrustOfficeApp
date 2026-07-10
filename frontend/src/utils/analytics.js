@@ -76,6 +76,32 @@ export const setUserId = (userId) => {
 // ============================================================
 
 /**
+ * 3-tier pricing lookup (Phase 3).
+ * Trustee: $79/mo, $790/yr
+ * Estate:  $149/mo, $1,490/yr
+ * Advisor: $399/mo, $3,990/yr
+ * Legacy 'monthly'/'annual' plan types map to Trustee for backward compat.
+ */
+const TIER_PRICES = {
+  trustee: { monthly: 79, annual: 790 },
+  estate: { monthly: 149, annual: 1490 },
+  advisor: { monthly: 399, annual: 3990 },
+  // Legacy compat — old single-tier plans treated as Trustee
+  monthly: { monthly: 79, annual: 790 },
+  annual: { monthly: 79, annual: 790 },
+};
+
+/**
+ * Resolve the revenue value for a subscription event.
+ * @param {string} planType - 'trustee' | 'estate' | 'advisor' | legacy 'monthly' | 'annual'
+ * @param {string} [billingPeriod] - 'monthly' | 'annual'
+ * @returns {number} Price in USD
+ */
+const getTierPrice = (planType, billingPeriod) => {
+  return TIER_PRICES[planType]?.[billingPeriod || 'monthly'] || 79;
+};
+
+/**
  * Track when a user starts their trial
  * @param {Object} params - Event parameters
  * @param {string} params.plan_type - 'trial'
@@ -95,7 +121,8 @@ export const trackTrialStarted = (params = {}) => {
 /**
  * Track when a trial user converts to a paid subscription
  * @param {Object} params - Event parameters
- * @param {string} params.plan_type - 'monthly' | 'annual'
+ * @param {string} params.plan_type - 'trustee' | 'estate' | 'advisor'
+ * @param {string} params.billing_period - 'monthly' | 'annual'
  * @param {string} params.origin - Where the conversion originated
  * @param {number} params.trial_length_days - Original trial length
  * @param {number} params.days_until_trial_end - Days remaining when converted
@@ -103,11 +130,12 @@ export const trackTrialStarted = (params = {}) => {
 export const trackTrialConverted = (params = {}) => {
   trackEvent('subscription_trial_converted', {
     event_category: 'subscription',
-    plan_type: params.plan_type || 'monthly',
+    plan_type: params.plan_type || 'trustee',
+    billing_period: params.billing_period || 'monthly',
     origin: params.origin || 'billing_page',
     trial_length_days: params.trial_length_days || 14,
     days_until_trial_end: params.days_until_trial_end,
-    value: params.plan_type === 'annual' ? 790 : 79,
+    value: getTierPrice(params.plan_type, params.billing_period),
     currency: 'USD',
     ...params
   });
@@ -116,13 +144,17 @@ export const trackTrialConverted = (params = {}) => {
 /**
  * Track when a subscription is canceled
  * @param {Object} params - Event parameters
- * @param {string} params.plan_type - 'monthly' | 'annual'
+ * @param {string} params.plan_type - 'trustee' | 'estate' | 'advisor'
+ * @param {string} params.billing_period - 'monthly' | 'annual'
  * @param {string} params.cancellation_reason - Optional reason
  */
 export const trackSubscriptionCanceled = (params = {}) => {
   trackEvent('subscription_canceled', {
     event_category: 'subscription',
-    plan_type: params.plan_type || 'monthly',
+    plan_type: params.plan_type || 'trustee',
+    billing_period: params.billing_period || 'monthly',
+    value: getTierPrice(params.plan_type, params.billing_period),
+    currency: 'USD',
     cancellation_reason: params.cancellation_reason || 'user_initiated',
     ...params
   });
@@ -131,12 +163,16 @@ export const trackSubscriptionCanceled = (params = {}) => {
 /**
  * Track when a subscription goes past due (payment failed)
  * @param {Object} params - Event parameters
- * @param {string} params.plan_type - 'monthly' | 'annual'
+ * @param {string} params.plan_type - 'trustee' | 'estate' | 'advisor'
+ * @param {string} params.billing_period - 'monthly' | 'annual'
  */
 export const trackSubscriptionPastDue = (params = {}) => {
   trackEvent('subscription_past_due', {
     event_category: 'subscription',
-    plan_type: params.plan_type || 'monthly',
+    plan_type: params.plan_type || 'trustee',
+    billing_period: params.billing_period || 'monthly',
+    value: getTierPrice(params.plan_type, params.billing_period),
+    currency: 'USD',
     ...params
   });
 };
@@ -144,13 +180,17 @@ export const trackSubscriptionPastDue = (params = {}) => {
 /**
  * Track checkout initiated
  * @param {Object} params - Event parameters
+ * @param {string} params.plan_type - 'trustee' | 'estate' | 'advisor'
+ * @param {string} params.billing_period - 'monthly' | 'annual'
+ * @param {string} params.origin - Where checkout was initiated
  */
 export const trackCheckoutInitiated = (params = {}) => {
   trackEvent('checkout_initiated', {
     event_category: 'subscription',
-    plan_type: params.plan_type || 'monthly',
+    plan_type: params.plan_type || 'trustee',
+    billing_period: params.billing_period || 'monthly',
     origin: params.origin || 'billing_page',
-    value: params.plan_type === 'annual' ? 790 : 79,
+    value: getTierPrice(params.plan_type, params.billing_period),
     currency: 'USD',
     ...params
   });

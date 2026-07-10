@@ -65,8 +65,10 @@ class SubscriptionState(BaseModel):
     """Normalized subscription state object for consistent access across modules"""
     user_id: str
     subscription_id: Optional[str] = None
-    plan_type: str  # "free", "trial", "forever_free", "monthly", "annual"
+    plan_type: str  # "trustee", "estate", "advisor", "free", "forever_free", legacy: "monthly", "annual"
     status: str  # "trialing", "active", "past_due", "canceled", "expired"
+    billing_period: Optional[str] = None  # "monthly" | "annual" (new tiers)
+    legacy_trust_limit: Optional[int] = None  # for grandfathered users
     trial_start_date: Optional[str] = None
     trial_end_date: Optional[str] = None
     trial_days_remaining: Optional[int] = None
@@ -202,6 +204,8 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
         subscription_id=sub.get("subscription_id"),
         plan_type=sub.get("plan_type", "trial"),
         status=sub.get("status", "trialing"),
+        billing_period=sub.get("billing_period"),
+        legacy_trust_limit=sub.get("legacy_trust_limit"),
         trial_start_date=sub.get("trial_start_date"),
         trial_end_date=sub.get("trial_end_date"),
         stripe_customer_id=sub.get("stripe_customer_id"),
@@ -273,7 +277,7 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
                     end = end.replace(tzinfo=timezone.utc)
                 state.gift_days_remaining = max(0, (end - now).days)
                 # If gift has expired and no active paid subscription, mark as expired
-                if end < now and not sub.get("stripe_subscription_id") and sub.get("plan_type") not in ("monthly", "annual"):
+                if end < now and not sub.get("stripe_subscription_id") and sub.get("plan_type") not in ("monthly", "annual", "trustee", "estate", "advisor"):
                     state.status = "expired"
                     state.is_active = False
                     state.is_read_only = True
@@ -296,7 +300,7 @@ class Feature:
     GOVERNANCE_BASIC = "governance_basic"
     SINGLE_TRUST = "single_trust"
     
-    # Premium features - paid only (monthly/annual)
+    # Premium features - paid only
     PDF_NO_WATERMARK = "pdf_no_watermark"
     CSV_EXPORT = "csv_export"
     MULTIPLE_TRUSTS = "multiple_trusts"
@@ -305,6 +309,11 @@ class Feature:
     TRUST_UNITS = "trust_units"
     GOVERNANCE_HISTORY = "governance_history"
     ADVANCED_TEMPLATES = "advanced_templates"
+    
+    # Advisor-tier features (Phase 2 sprint, not yet built)
+    CLIENT_VIEW = "client_view"           # Advisor can view client trusts
+    WHITE_LABEL_BINDER = "white_label"    # White-label PDF binder export
+    MULTI_SIGNATURE = "multi_signature"   # Multi-signature approvals
 
 
 # Features available to each plan type
@@ -326,13 +335,12 @@ PLAN_FEATURES = {
     "none": {
         # No features until they subscribe
     },
+    # Legacy plans (migrated to trustee but kept for compatibility)
     "monthly": {
-        # All core features
         Feature.MINUTES_BASIC,
         Feature.DISTRIBUTIONS_BASIC,
         Feature.GOVERNANCE_BASIC,
         Feature.SINGLE_TRUST,
-        # Plus all premium features
         Feature.PDF_NO_WATERMARK,
         Feature.CSV_EXPORT,
         Feature.MULTIPLE_TRUSTS,
@@ -343,7 +351,7 @@ PLAN_FEATURES = {
         Feature.ADVANCED_TEMPLATES,
     },
     "annual": {
-        # Same as monthly
+        # Same as monthly (legacy)
         Feature.MINUTES_BASIC,
         Feature.DISTRIBUTIONS_BASIC,
         Feature.GOVERNANCE_BASIC,
@@ -357,15 +365,81 @@ PLAN_FEATURES = {
         Feature.GOVERNANCE_HISTORY,
         Feature.ADVANCED_TEMPLATES,
     },
+    # New 3-tier system
+    "trustee": {
+        # All current features, single trust
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.PDF_NO_WATERMARK,
+        Feature.CSV_EXPORT,
+        Feature.BENEVOLENCE_MODE,
+        Feature.BENEFICIARY_DASHBOARD,
+        Feature.TRUST_UNITS,
+        Feature.GOVERNANCE_HISTORY,
+        Feature.ADVANCED_TEMPLATES,
+        Feature.SINGLE_TRUST,
+    },
+    "estate": {
+        # Everything in trustee + multi-trust
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.PDF_NO_WATERMARK,
+        Feature.CSV_EXPORT,
+        Feature.BENEVOLENCE_MODE,
+        Feature.BENEFICIARY_DASHBOARD,
+        Feature.TRUST_UNITS,
+        Feature.GOVERNANCE_HISTORY,
+        Feature.ADVANCED_TEMPLATES,
+        Feature.MULTIPLE_TRUSTS,
+    },
+    "advisor": {
+        # Everything in estate + advisor-exclusive features
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.PDF_NO_WATERMARK,
+        Feature.CSV_EXPORT,
+        Feature.BENEVOLENCE_MODE,
+        Feature.BENEFICIARY_DASHBOARD,
+        Feature.TRUST_UNITS,
+        Feature.GOVERNANCE_HISTORY,
+        Feature.ADVANCED_TEMPLATES,
+        Feature.MULTIPLE_TRUSTS,
+        Feature.CLIENT_VIEW,
+        Feature.WHITE_LABEL_BINDER,
+        Feature.MULTI_SIGNATURE,
+    },
     "forever_free": {
         # Free tier — limited features. Core trust management only.
-        # Paid features require monthly or annual subscription.
         Feature.MINUTES_BASIC,
         Feature.DISTRIBUTIONS_BASIC,
         Feature.GOVERNANCE_BASIC,
         Feature.SINGLE_TRUST,
     }
 }
+
+# ==================== TRUST LIMITS ====================
+
+PLAN_TRUST_LIMITS = {
+    "none": 0,
+    "free": 1,
+    "forever_free": 1,
+    "trustee": 1,
+    "estate": 5,
+    "advisor": float('inf'),  # unlimited
+    # Legacy (grandfathered)
+    "monthly": 10,
+    "annual": 10,
+    "trial": 1,
+}
+
+def get_trust_limit(plan_type: str, legacy_limit: Optional[int] = None) -> float:
+    """Get the trust limit for a plan, respecting grandfathered limits."""
+    if legacy_limit is not None:
+        return legacy_limit  # grandfathered users keep their limit
+    return PLAN_TRUST_LIMITS.get(plan_type, 1)
 
 
 async def check_feature_access(user_id: str, feature: str) -> bool:

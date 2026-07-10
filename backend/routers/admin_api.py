@@ -118,7 +118,7 @@ class ExtendTrialRequest(BaseModel):
 
 
 class GiftSubscriptionRequest(BaseModel):
-    plan_type: str  # "monthly", "annual", or "forever_free"
+    plan_type: str  # "monthly", "annual", "trustee", "estate", "advisor", or "forever_free"
     reason: Optional[str] = None  # Optional reason for gifting
 
 
@@ -284,6 +284,9 @@ async def get_summary_stats(
     # Plan breakdown for active subscriptions
     monthly_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
     annual_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "annual"})
+    trustee_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "trustee"})
+    estate_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "estate"})
+    advisor_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "advisor"})
     
     # Users who registered in the last 7 days
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
@@ -321,7 +324,14 @@ async def get_summary_stats(
     ]
     sub_result = await db.subscriptions.aggregate(sub_pipeline).to_list(length=None)
     # Monthly: $79/mo = 7900 cents; Annual: $790/yr ≈ 6583 cents/mo
-    monthly_mrr = sum(s["count"] * 7900 for s in sub_result if s["_id"] == "monthly") + sum(s["count"] * 6583 for s in sub_result if s["_id"] == "annual")
+    # Trustee: $79/mo = 7900 cents; Estate: $149/mo = 14900 cents; Advisor: $399/mo = 39900 cents
+    monthly_mrr = (
+        sum(s["count"] * 7900 for s in sub_result if s["_id"] == "monthly")
+        + sum(s["count"] * 6583 for s in sub_result if s["_id"] == "annual")
+        + sum(s["count"] * 7900 for s in sub_result if s["_id"] == "trustee")
+        + sum(s["count"] * 14900 for s in sub_result if s["_id"] == "estate")
+        + sum(s["count"] * 39900 for s in sub_result if s["_id"] == "advisor")
+    )
     
     await log_api_action(
         action="get_summary_stats",
@@ -344,7 +354,10 @@ async def get_summary_stats(
         },
         "plans": {
             "monthly_active": monthly_active,
-            "annual_active": annual_active
+            "annual_active": annual_active,
+            "trustee_active": trustee_active,
+            "estate_active": estate_active,
+            "advisor_active": advisor_active
         },
         "revenue": {
             "total_cents": total_revenue,
@@ -424,6 +437,8 @@ async def list_users(
             "subscription": {
                 "status": sub.get("status") if sub else "none",
                 "plan": sub.get("plan") if sub else None,
+                "plan_type": sub.get("plan_type") if sub else None,
+                "billing_period": sub.get("billing_period") if sub else None,
                 "trial_end": sub.get("trial_end") if sub else None
             } if sub else None,
             "trust_count": trust_count
@@ -486,13 +501,43 @@ async def get_user(
             "created_at": user.get("created_at"),
             "is_admin": user.get("is_admin", False)
         },
-        "subscription": subscription,
+        "subscription": _enrich_subscription_display(subscription),
         "stats": {
             "trust_count": trust_count,
             "minutes_count": recent_minutes,
             "distributions_count": recent_distributions
         }
     }
+
+
+def _enrich_subscription_display(subscription):
+    """Add tier_display_name to a raw subscription dict for admin display."""
+    if not subscription:
+        return subscription
+    # Make a shallow copy so we don't mutate the DB document
+    sub = dict(subscription)
+    tier_name_map = {
+        "trustee": "Trustee",
+        "estate": "Estate",
+        "advisor": "Advisor",
+        "monthly": "Trustee (Legacy)",
+        "annual": "Trustee (Legacy)",
+        "forever_free": "Forever Free",
+        "free": "Free",
+    }
+    plan_type = sub.get("plan_type") or ""
+    legacy_trust_limit = sub.get("legacy_trust_limit")
+    display_name = tier_name_map.get(plan_type, plan_type or "Free")
+    # Append (Legacy) for grandfathered users on any tier with legacy_trust_limit set
+    if legacy_trust_limit and legacy_trust_limit > 1 and plan_type in ("trustee", "monthly", "annual"):
+        if "(Legacy)" not in display_name:
+            display_name = f"{display_name} (Legacy)"
+    billing_period = sub.get("billing_period")
+    if billing_period:
+        period_label = billing_period.capitalize()
+        display_name = f"{display_name} ({period_label})"
+    sub["tier_display_name"] = display_name
+    return sub
 
 
 # ==================== ACTION ENDPOINTS ====================
@@ -598,10 +643,10 @@ async def gift_subscription(
     """
     Gift a subscription to a user.
     
-    - plan_type: "monthly", "annual", or "forever_free"
+    - plan_type: "monthly", "annual", "trustee", "estate", "advisor", or "forever_free"
     - reason: Optional reason for gifting (logged for audit)
     """
-    valid_plans = ["monthly", "annual", "forever_free"]
+    valid_plans = ["monthly", "annual", "trustee", "estate", "advisor", "forever_free"]
     if body.plan_type not in valid_plans:
         raise HTTPException(status_code=400, detail=f"Invalid plan_type. Must be one of: {', '.join(valid_plans)}")
     
@@ -629,6 +674,10 @@ async def gift_subscription(
             "current_period_end": None,
             "updated_at": now.isoformat()
         }
+    elif body.plan_type in ("trustee", "estate", "advisor"):
+        status = "active"
+        current_period_end = (now + timedelta(days=30)).isoformat()
+        plan = body.plan_type
     elif body.plan_type == "monthly":
         status = "active"
         current_period_end = (now + timedelta(days=30)).isoformat()
@@ -650,6 +699,7 @@ async def gift_subscription(
             "activated_at": now.isoformat(),
             "current_period_end": current_period_end,
             "gifted": True,
+            "gift_type": plan,
             "gift_reason": body.reason,
             "gifted_at": now.isoformat(),
             "updated_at": now.isoformat()
@@ -878,7 +928,7 @@ async def fix_subscription(
     
     # Validate plan_type if provided
     if body.plan_type is not None:
-        valid_plans = ["monthly", "annual", "forever_free"]
+        valid_plans = ["monthly", "annual", "forever_free", "trustee", "estate", "advisor"]
         if body.plan_type not in valid_plans:
             raise HTTPException(status_code=400, detail=f"Invalid plan_type. Must be one of: {', '.join(valid_plans)}")
     

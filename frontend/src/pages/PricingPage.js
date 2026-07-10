@@ -41,15 +41,89 @@ const xhrPost = (url, data, token = null) => {
   });
 };
 
-const features = [
-  'Unlimited trust records',
-  'Guided minutes templates',
-  'Schedule A asset tracking',
-  'Distribution management',
-  'PDF export with watermark control',
-  'Defensibility scoring',
-  'Email notifications',
-  'Benevolence mode for charitable trusts'
+// 3-tier pricing structure (Phase 3)
+// Annual = monthly × 10 (2 months free)
+const TIERS = [
+  {
+    id: 'trustee',
+    name: 'Trustee',
+    tagline: '1 trust, all governance tools',
+    monthly: 79,
+    annual: 790,
+    trustLimit: '1 trust',
+    popular: false,
+    features: [
+      '1 trust record',
+      'Guided minutes templates',
+      'Schedule A asset tracking',
+      'Distribution management',
+      'PDF export with watermark control',
+      'Defensibility scoring',
+      'Email notifications',
+      'Benevolence mode for charitable trusts'
+    ]
+  },
+  {
+    id: 'estate',
+    name: 'Estate',
+    tagline: 'Up to 5 trusts, multi-trust dashboard',
+    monthly: 149,
+    annual: 1490,
+    trustLimit: 'Up to 5 trusts',
+    popular: true, // "Most Popular" badge
+    features: [
+      'Up to 5 trusts & entities',
+      'Everything in Trustee',
+      'Multi-trust dashboard',
+      'Recurring task automation',
+      'Guided minutes templates',
+      'Schedule A asset tracking',
+      'Distribution management',
+      'PDF export with watermark control',
+      'Defensibility scoring',
+      'Email notifications'
+    ]
+  },
+  {
+    id: 'advisor',
+    name: 'Advisor',
+    tagline: 'Unlimited trusts, client view, white-label',
+    monthly: 399,
+    annual: 3990,
+    trustLimit: 'Unlimited trusts',
+    popular: false,
+    features: [
+      'Unlimited trusts & entities',
+      'Everything in Estate',
+      'Client view',
+      'White-label binder export',
+      'Multi-signature approvals',
+      'Multi-trust dashboard',
+      'Recurring task automation',
+      'PDF export with watermark control',
+      'Defensibility scoring',
+      'Priority email support'
+    ]
+  }
+];
+
+// Feature comparison rows for the table below the cards
+// Each row: { label, trustee, estate, advisor } where values are true (check) / false (dash) / string
+const COMPARISON_ROWS = [
+  { label: 'Trust records', trustee: '1', estate: '5', advisor: 'Unlimited' },
+  { label: 'Guided minutes templates', trustee: true, estate: true, advisor: true },
+  { label: 'Schedule A asset tracking', trustee: true, estate: true, advisor: true },
+  { label: 'Distribution management', trustee: true, estate: true, advisor: true },
+  { label: 'PDF export with watermark control', trustee: true, estate: true, advisor: true },
+  { label: 'Defensibility scoring', trustee: true, estate: true, advisor: true },
+  { label: 'Email notifications', trustee: true, estate: true, advisor: true },
+  { label: 'Benevolence mode for charitable trusts', trustee: true, estate: true, advisor: true },
+  { label: 'Multi-trust dashboard', trustee: false, estate: true, advisor: true },
+  { label: 'Recurring task automation', trustee: false, estate: true, advisor: true },
+  { label: 'Client view', trustee: false, estate: false, advisor: true },
+  { label: 'White-label binder export', trustee: false, estate: false, advisor: true },
+  { label: 'Multi-signature approvals', trustee: false, estate: false, advisor: true },
+  { label: 'Priority email support', trustee: false, estate: false, advisor: true },
 ];
 
 export default function PricingPage() {
@@ -58,6 +132,8 @@ export default function PricingPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(null);
   const [couponApplied, setCouponApplied] = useState(false);
+  // Monthly / annual billing toggle (Phase 3)
+  const [billingPeriod, setBillingPeriod] = useState('monthly');
   
   // Get coupon from URL if present
   const couponCode = searchParams.get('coupon') || searchParams.get('promo');
@@ -69,16 +145,26 @@ export default function PricingPage() {
     }
   }, [couponCode]);
 
-  const handleCheckout = async (planType) => {
+  // Phase 3: handleCheckout now takes a tier (trustee/estate/advisor) AND a billing period
+  const handleCheckout = async (planType, period = billingPeriod) => {
     // If not logged in, redirect to signup first
     if (!user) {
       // Store intent in sessionStorage so we can continue after signup
       sessionStorage.setItem('checkout_intent', JSON.stringify({
         plan: planType,
+        billing_period: period,
         coupon: couponCode
       }));
       toast.info('Please create an account first to start your subscription');
       navigate('/signup');
+      return;
+    }
+
+    // Already-subscribed guard (Phase 3): authenticated users with an active
+    // subscription should manage their plan in billing settings, not re-checkout.
+    if (user?.subscription?.is_active) {
+      toast.info("You're already subscribed. Manage your plan in Settings.");
+      navigate('/settings/billing');
       return;
     }
 
@@ -90,6 +176,7 @@ export default function PricingPage() {
       
       const checkoutData = {
         plan_type: planType,
+        billing_period: period,
         success_url: `${baseUrl}/dashboard?welcome=true`,
         cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`
       };
@@ -123,6 +210,23 @@ export default function PricingPage() {
     }
   };
 
+  const formatPrice = (tier) => {
+    if (billingPeriod === 'annual') {
+      return { amount: tier.annual, unit: '/year' };
+    }
+    return { amount: tier.monthly, unit: '/month' };
+  };
+
+  const renderComparisonCell = (value) => {
+    if (value === true) {
+      return <Check className="w-4 h-4 text-success mx-auto" />;
+    }
+    if (value === false) {
+      return <span className="text-muted-foreground">—</span>;
+    }
+    return <span className="text-sm font-mono text-navy">{value}</span>;
+  };
+
   return (
     <div className="min-h-screen bg-subtle-bg">
       {/* Header */}
@@ -136,11 +240,11 @@ export default function PricingPage() {
             />
           </Link>
           {user ? (
-            <Link to="/dashboard" className="text-sm hover:text-navy/70 transition-colors">
+            <Link to="/dashboard" className="text-sm hover:text-white/70 transition-colors">
               Go to Dashboard
             </Link>
           ) : (
-            <Link to="/login" className="text-sm hover:text-navy/70 transition-colors">
+            <Link to="/login" className="text-sm hover:text-white/70 transition-colors">
               Sign In
             </Link>
           )}
@@ -162,83 +266,125 @@ export default function PricingPage() {
         )}
       </section>
 
-      {/* Pricing Cards */}
-      <section className="pb-20 px-8">
-        <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
-          {/* Monthly Plan */}
-          <div className="card-trust corner-mark p-8">
-            <div className="text-center mb-8">
-              <h2 className="font-serif text-2xl text-navy mb-2">Monthly</h2>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="font-serif text-5xl text-navy">$79</span>
-                <span className="text-muted-foreground">/month</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Billed monthly, cancel anytime
-              </p>
-            </div>
-            
-            <ul className="space-y-3 mb-8">
-              {features.map((feature, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">{feature}</span>
-                </li>
-              ))}
-            </ul>
-            
-            <Button 
-              onClick={() => handleCheckout('monthly')}
-              disabled={loading !== null}
-              className="w-full btn-secondary"
-              data-testid="monthly-checkout-btn"
+      {/* Billing Period Toggle (Monthly / Annual) */}
+      <section className="pb-6 px-8">
+        <div className="max-w-4xl mx-auto flex flex-col items-center">
+          <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1" data-testid="billing-period-toggle">
+            <button
+              type="button"
+              onClick={() => setBillingPeriod('monthly')}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${billingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+              data-testid="billing-period-monthly"
             >
-              {loading === 'monthly' ? 'Loading...' : 'Get Started'}
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-
-          {/* Annual Plan */}
-          <div className="card-trust corner-mark p-8 border-2 border-gold relative overflow-visible mt-4">
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
-              Best Value
-            </div>
-            
-            <div className="text-center mb-8">
-              <h2 className="font-serif text-2xl text-navy mb-2">Annual</h2>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="font-serif text-5xl text-navy">$790</span>
-                <span className="text-muted-foreground">/year</span>
-              </div>
-              <p className="text-sm text-success font-medium mt-2">
-                Save $158 (2 months free)
-              </p>
-            </div>
-            
-            <ul className="space-y-3 mb-8">
-              {features.map((feature, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">{feature}</span>
-                </li>
-              ))}
-            </ul>
-            
-            <Button 
-              onClick={() => handleCheckout('annual')}
-              disabled={loading !== null}
-              className="w-full btn-primary"
-              data-testid="annual-checkout-btn"
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillingPeriod('annual')}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${billingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+              data-testid="billing-period-annual"
             >
-              {loading === 'annual' ? 'Loading...' : 'Get Started'}
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+              Annual
+              <span className="ml-2 text-xs text-success">2 months free</span>
+            </button>
           </div>
         </div>
+      </section>
 
-        {/* Trial Note */}
-        <p className="text-center text-sm text-muted-foreground mt-8 max-w-xl mx-auto">
-          Subscribe to start — $79/month or $790/year. The trust pays for governance tools the same way it pays for legal counsel.
+      {/* Pricing Cards — 3 tiers side by side */}
+      <section className="pb-12 px-8">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+          {TIERS.map((tier) => {
+            const { amount, unit } = formatPrice(tier);
+            const isPopular = tier.popular;
+            return (
+              <div
+                key={tier.id}
+                className={`card-trust corner-mark p-8 relative ${isPopular ? 'border-2 border-gold mt-4' : ''}`}
+                data-testid={`tier-card-${tier.id}`}
+              >
+                {isPopular && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
+                    Most Popular
+                  </div>
+                )}
+                <div className="text-center mb-8">
+                  <h2 className="font-serif text-2xl text-navy mb-2">{tier.name}</h2>
+                  <p className="text-sm text-muted-foreground mb-3">{tier.tagline}</p>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="font-serif text-5xl text-navy">${amount}</span>
+                    <span className="text-muted-foreground">{unit}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {billingPeriod === 'annual'
+                      ? `Billed annually (${tier.trustLimit.toLowerCase()})`
+                      : `Billed monthly, cancel anytime (${tier.trustLimit.toLowerCase()})`}
+                  </p>
+                  {billingPeriod === 'annual' && (
+                    <p className="text-sm text-success font-medium mt-1">
+                      Save ${tier.monthly * 2} (2 months free)
+                    </p>
+                  )}
+                </div>
+                
+                <ul className="space-y-3 mb-8">
+                  {tier.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                
+                <Button 
+                  onClick={() => handleCheckout(tier.id)}
+                  disabled={loading !== null}
+                  className={`w-full ${isPopular ? 'btn-primary' : 'btn-secondary'}`}
+                  data-testid={`${tier.id}-checkout-btn`}
+                >
+                  {loading === tier.id ? 'Loading...' : 'Get Started'}
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Feature Comparison Table */}
+      <section className="pb-20 px-8">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="font-serif text-2xl text-navy text-center mb-8">Compare Plans</h2>
+          <div className="card-trust overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left p-4 font-mono text-xs uppercase text-muted-foreground">Features</th>
+                  <th className="text-center p-4 font-serif text-navy">Trustee</th>
+                  <th className="text-center p-4 font-serif text-navy bg-gold/5">Estate</th>
+                  <th className="text-center p-4 font-serif text-navy">Advisor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON_ROWS.map((row, i) => (
+                  <tr key={i} className={`border-b border-border/50 ${i % 2 === 1 ? 'bg-subtle-bg/50' : ''}`}>
+                    <td className="text-left p-4 text-navy">{row.label}</td>
+                    <td className="text-center p-4">{renderComparisonCell(row.trustee)}</td>
+                    <td className="text-center p-4 bg-gold/5">{renderComparisonCell(row.estate)}</td>
+                    <td className="text-center p-4">{renderComparisonCell(row.advisor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Trial Note */}
+      <section className="pb-12 px-8">
+        <p className="text-center text-sm text-muted-foreground max-w-2xl mx-auto">
+          Subscribe to start — $79/month for Trustee, $149/month for Estate, or $399/month for Advisor. 
+          Save 2 months with annual billing. The trust pays for governance tools the same way it pays for legal counsel.
         </p>
       </section>
 

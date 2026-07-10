@@ -49,7 +49,7 @@ export const useReadOnlyAwareSubmit = () => {
           description: 'Your subscription is inactive. Please subscribe to make changes.',
           action: {
             label: 'Subscribe',
-            onClick: () => window.location.href = '/settings?tab=subscription'
+            onClick: () => window.location.href = '/settings/billing'
           }
         });
       }
@@ -82,7 +82,7 @@ export const useReadOnlyAwareSubmit = () => {
               description: errorData.detail || 'Please subscribe to make changes.',
               action: {
                 label: 'Subscribe',
-                onClick: () => window.location.href = '/settings?tab=subscription'
+                onClick: () => window.location.href = '/settings/billing'
               }
             });
           }
@@ -139,7 +139,7 @@ export const useReadOnlyCheck = () => {
         description: 'Your subscription is inactive. Please subscribe to make changes.',
         action: {
           label: 'Subscribe',
-          onClick: () => window.location.href = '/settings?tab=subscription'
+          onClick: () => window.location.href = '/settings/billing'
         }
       });
       return true;
