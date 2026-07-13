@@ -85,3 +85,92 @@
 - Mobile bottom nav has Minutes entry, works correctly
 - NoSQL query user_id is always enforced in queries
 - No rounding violations (rounded-lg/md/xl) in any Minutes page
+
+---
+
+## Feature #2: Vault + Trust Assistant
+**Date:** 2026-07-13
+**Agents:** 4 (Functional, UX/Visual, API/Data, Cross-Feature)
+**Pages tested:** VaultPage, TrustAssistantPage, FileUploadCard, ChatPanel, TrustDocumentSummary, useAnalysisPolling
+**Backend:** vault.py (511 lines), chat.py (1659 lines), chat_service.py (1021 lines), trust_doc_analysis.py (204 lines), external_trust_docs.py (354 lines)
+
+---
+
+### Fixes Applied (22 items)
+
+#### Critical (2)
+1. **[FIXED] Vault delete button 404 on every call** - VaultPage.js:288. Called `/trusts/{id}/vault/documents/{id}` but backend route is `/vault/documents/{id}`. Fixed path.
+2. **[FIXED] Vault download button 404 on every call** - VaultPage.js:305. Same wrong path prefix. Fixed path.
+
+#### Security (8)
+3. **[FIXED] vault_summary aggregation missing user_id** - vault.py:478. count_documents and $match had no user_id filter (IDOR defense-in-depth). Added user_id.
+4. **[FIXED] chat_service vault_docs query missing user_id** - chat_service.py:516. Vault metadata query only filtered by trust_id. Added user_id.
+5. **[FIXED] chat_service health_score query missing user_id** - chat_service.py:319. Added user_id filter.
+6. **[FIXED] chat_service tax_calendar query missing user_id** - chat_service.py:470. Added user_id filter.
+7. **[FIXED] chat_service trust_doc_analysis query missing user_id** - chat_service.py:487. Added user_id filter.
+8. **[FIXED] trust_doc_analysis.py 3 queries missing user_id** - Lines 28, 43, 56. All analysis queries (complete, pending, failed) had no user_id. Added to all 3.
+9. **[FIXED] Beneficiary regex queries not escaped** - chat.py:843, 867. holder_name used in $regex without re.escape(). Could match unintended docs with regex special chars. Added re.escape().
+10. **[FIXED] SSE error event leaks exception details** - chat.py:1621. Sent `str(e)` to client, could leak internal paths. Replaced with generic message.
+
+#### Frontend Brand/UX (12)
+11. **[FIXED] Critical Documents alert: 6 raw red color violations** - VaultPage.js:373-389. border-red-200, bg-red-50, text-red-600/700/800/400 -> warning tokens.
+12. **[FIXED] Upload form: 6 raw gray color violations** - VaultPage.js:460-486. text-gray-400/500/700/900, border-gray-200/300 -> foreground/muted-foreground/navy tokens.
+13. **[FIXED] Document cards: 3 raw color violations** - VaultPage.js:598, 605, 616. text-neutral-400 hover:text-red-500, text-emerald-700 bg-emerald-50, font-mono bg-slate-100 text-slate-600 -> brand tokens.
+14. **[FIXED] 5 form inputs missing input-trust class** - VaultPage.js:413, 498, 509, 525, FileUploadCard.js:247, 259, 277. Added input-trust.
+15. **[FIXED] 2 font-mono on body text** - FileUploadCard.js:288, 317. Error message and uploading status. Removed font-mono.
+16. **[FIXED] Cancel button missing btn-secondary** - VaultPage.js:565. Added btn-secondary.
+17. **[FIXED] FileUploadCard size limit mismatch** - FileUploadCard.js:41. Was 16MB, VaultPage allows 50MB. Aligned to 50MB.
+18. **[FIXED] useAnalysisPolling TDZ circular dependency** - useAnalysisPolling.js:172. stopPolling used in pollOnce deps array before definition. Moved stopPolling before pollOnce.
+19. **[FIXED] TrustAssistantPage action errors silently swallowed** - Lines 143, 178, 205. approve/edit/discard catches only console.error. Added toast.error notifications.
+20. **[FIXED] handleVideoClick empty no-op** - TrustAssistantPage.js:210. Was `() => {}`. Added toast.info("Video playback coming soon").
+21. **[FIXED] ChatPanel paperclip enabled without trust** - ChatPanel.js:318. Clicking paperclip with no trust did nothing. Added disabled when !trustId.
+22. **[FIXED] AuditTrailPage missing Vault filter** - AuditTrailPage.js:302. No vault filter despite vault events being fetched. Added { value: 'vault', label: 'Vault' }.
+23. **[FIXED] MobileBottomNav missing Vault entry** - MobileBottomNav.js:13. No vault in mobile nav. Added { path: '/vault', icon: FolderOpen, label: 'Vault' }.
+24. **[FIXED] TrustDocumentSummary polling fallback** - TrustDocumentSummary.js:49. Only 5s and 15s timeouts. Added 30s fallback for slow analysis.
+25. **[FIXED] VaultPage link mode URL validation** - VaultPage.js:140. No client-side https:// check. Added validation before fetch.
+
+---
+
+### Fix-Later Backlog (14 items)
+
+#### Architecture (P1)
+1. **VaultPage layout inconsistency**: Uses custom wrapper instead of `main-layout > main-content dot-grid > page-container`. Causes spacing differences vs DashboardPage.
+2. **Non-streaming /ai/chat endpoint is dead code**: Frontend only uses streaming. ~130 lines of dead code maintained in parallel.
+3. **Chat conversation auto-threading creates orphaned conversations**: 2-hour timeout creates new conversation with no link to old one.
+
+#### UX (P2)
+4. **TrustAssistantPage missing no-trust empty state**: No frontend guard for !selectedTrust. Backend returns 404, user sees broken chat UI.
+5. **VaultPage search sends partial text on category change**: search state updates on every keystroke but only committed on Enter. Category change triggers loadData with stale partial search.
+6. **No file type validation on drag-and-drop in FileUploadCard**: input `accept` only filters file picker, not drag-and-drop.
+7. **VaultPage empty state doesn't show missing critical docs**: When vault is empty AND summary.missing_critical has entries, should show guided "Upload Trust Instrument first" state.
+8. **No onboarding nudge for vault**: Dashboard onboarding links to /vault but vault page itself doesn't guide new users.
+
+#### Cross-Feature (P2)
+9. **Dashboard recent activity excludes vault uploads**: governance.py only queries minutes and distributions. Vault uploads not in dashboard activity.
+10. **Chat actions not logged to audit trail**: Chat-initiated governance actions (distributions, minutes, beneficiaries) bypass audit trail entirely.
+11. **Dashboard has no vault summary widget**: Vault has /vault/summary endpoint but dashboard doesn't surface it.
+12. **SnapshotColumn doesn't show vault documents**: Chat context includes vault docs but snapshot column doesn't display them.
+13. **Vault documents cannot be attached to minutes/distributions**: No vault document picker in minutes or distribution creation.
+14. **Vault analysis not shared with risk dashboard**: Analysis results stored but not surfaced in risk dashboard.
+
+#### Security (P2)
+15. **No magic byte validation on file uploads**: File type relies on client Content-Type header. Malicious file could be uploaded with spoofed type.
+16. **File download serves with stored (untrusted) Content-Type**: Could enable XSS if HTML/SVG file uploaded with spoofed type.
+17. **Prompt injection risk in chat**: User message directly interpolated into AI prompt without delimiters or sanitization.
+18. **Trust context data injected into system prompt without full sanitization**: Trust name at chat_service.py:710 is raw f-string, not JSON-encoded.
+19. **No rate limiting on vault upload endpoint**: security.py rate limit bypassed for uploads.
+
+---
+
+### What Was Verified Safe
+- All vault and chat endpoints require authentication (get_current_user)
+- Direct doc_id/conversation_id lookups include user_id (no IDOR on direct access)
+- Vault file upload has 16MB size limit with PDF compression
+- No path traversal risk (files stored as BSON binary, not filesystem)
+- Search parameter uses re.escape() before MongoDB $regex (no injection)
+- Asset lookup queries in chat use re.escape() (no injection)
+- Vault uploads/downloads/deletes all log to audit trail
+- Trust Assistant has strong context: trust info, vault docs, beneficiaries, entities, deadlines, health score
+- Vault "Summarize this document" links to Trust Assistant with prompt
+- Mobile nav includes Trust Assistant
+- All /vault and /trust-assistant links resolve to registered routes
