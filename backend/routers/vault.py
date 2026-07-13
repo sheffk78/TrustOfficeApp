@@ -475,11 +475,11 @@ async def vault_summary(trust_id: str, user: dict = Depends(get_current_user)):
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
-    total = await db.vault_documents.count_documents({"trust_id": trust_id})
+    total = await db.vault_documents.count_documents({"trust_id": trust_id, "user_id": user["user_id"]})
 
     by_category = []
     pipeline = [
-        {"$match": {"trust_id": trust_id}},
+        {"$match": {"trust_id": trust_id, "user_id": user["user_id"]}},
         {"$group": {"_id": "$category", "count": {"$sum": 1}}}
     ]
     async for doc in db.vault_documents.aggregate(pipeline):

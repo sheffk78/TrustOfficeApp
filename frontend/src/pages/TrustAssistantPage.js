@@ -9,6 +9,7 @@ import ActionEditModal from '@/components/ActionEditModal';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
 import PageHelpButton from '@/components/PageHelpButton';
+import { toast } from 'sonner';
 
 const COLLAPSED_KEY = 'trust_assistant_snapshot_collapsed';
 
@@ -141,6 +142,7 @@ const TrustAssistantPage = () => {
       }));
     } catch (err) {
       console.error('[TrustAssistant] Action approve error:', err);
+      toast.error('Failed to approve action: ' + (err.message || 'Please try again'));
     }
   }, [confirmAction, conversationId, setMessages]);
 
@@ -176,6 +178,7 @@ const TrustAssistantPage = () => {
       }));
     } catch (err) {
       console.error('[TrustAssistant] Action edit error:', err);
+      toast.error('Failed to edit action: ' + (err.message || 'Please try again'));
     } finally {
       setEditingCard(null);
     }
@@ -203,11 +206,13 @@ const TrustAssistantPage = () => {
       }));
     } catch (err) {
       console.error('[TrustAssistant] Action discard error:', err);
+      toast.error('Failed to discard action: ' + (err.message || 'Please try again'));
     }
   }, [confirmAction, conversationId, setMessages]);
 
   // Video card click handler placeholder
   const handleVideoClick = useCallback((card) => {
+    toast.info('Video playback coming soon');
   }, []);
 
   // Start a new chat — resets conversation state

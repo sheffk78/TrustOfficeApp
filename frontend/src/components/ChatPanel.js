@@ -314,8 +314,8 @@ const ChatPanel = ({
           <button
             onClick={() => setShowUploadCard(!showUploadCard)}
             className={`p-2 transition-colors flex-shrink-0 mb-1 ${showUploadCard ? 'text-gold bg-gold/10' : 'text-muted-foreground hover:text-navy hover:bg-navy/5'}`}
-            title="Upload a document to the vault"
-            disabled={loading}
+            title={trustId ? "Upload a document to the vault" : "Select a trust first"}
+            disabled={loading || !trustId}
           >
             <Paperclip className="w-5 h-5" />
           </button>

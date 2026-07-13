@@ -299,6 +299,7 @@ export default function AuditTrailPage() {
     { value: 'relationship', label: 'Relationships' },
     { value: 'alert', label: 'Alerts' },
     { value: 'transaction', label: 'Transactions' },
+    { value: 'vault', label: 'Vault' },
   ];
 
   const getEventColor = (type) => EVENT_COLORS[type] || DEFAULT_COLOR;

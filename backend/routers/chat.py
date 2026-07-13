@@ -840,7 +840,7 @@ async def _execute_approved_action(
             # Find the existing beneficiary certificate by holder_name
             existing = await db.trust_unit_certificates.find_one({
                 "trust_id": trust_id,
-                "holder_name": {"$regex": f"^{mapped_data.get('holder_name', '')}$", "$options": "i"},
+                "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
                 "status": "active",
             })
             if not existing:
@@ -864,7 +864,7 @@ async def _execute_approved_action(
         elif endpoint_type == "beneficiary_removal":
             existing = await db.trust_unit_certificates.find_one({
                 "trust_id": trust_id,
-                "holder_name": {"$regex": f"^{mapped_data.get('holder_name', '')}$", "$options": "i"},
+                "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
                 "status": "active",
             })
             if not existing:
@@ -1618,7 +1618,7 @@ async def _chat_stream_generator(
 
     except Exception as e:
         logger.error(f"Chat stream error: {type(e).__name__}: {e}", exc_info=True)
-        yield await _sse_event("error", {"message": f"An error occurred while generating the response: {str(e)}"})
+        yield await _sse_event("error", {"message": "An error occurred while generating the response. Please try again."})
 
 
 @router.post("/chat/stream")

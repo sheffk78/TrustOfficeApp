@@ -138,6 +138,10 @@ export default function VaultPage() {
   };
 
   const addDocument = async () => {
+    if (addMode === 'link' && form.storage_url && !form.storage_url.startsWith('https://')) {
+      toast.error('Storage URL must start with https://');
+      return;
+    }
     try {
       const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/vault/documents`, {
         method: 'POST',
@@ -285,7 +289,7 @@ export default function VaultPage() {
 
   const deleteDocument = async (id) => {
     try {
-      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/vault/documents/${id}`, { method: 'DELETE' });
+      const res = await fetchWithAuth(`/vault/documents/${id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Document removed');
         loadData();
@@ -302,7 +306,7 @@ export default function VaultPage() {
     try {
       const token = localStorage.getItem('auth_token');
       const API_BASE = (process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app') + '/api';
-      const res = await fetch(`${API_BASE}/trusts/${selectedTrust.trust_id}/vault/documents/${docId}/download`, {
+      const res = await fetch(`${API_BASE}/vault/documents/${docId}/download`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Download failed');
@@ -328,9 +332,9 @@ export default function VaultPage() {
         <div className="md:pl-64 pb-20 md:pb-0">
           <div className="pt-16 md:pt-8 ml-4 mr-4">
             <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
-              <FolderOpen className="w-12 h-12 text-slate-400 mb-3"/>
+              <FolderOpen className="w-12 h-12 text-muted-foreground/40 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
-              <p className="text-sm text-neutral-600">Choose a trust to view document vault.</p>
+              <p className="text-sm text-muted-foreground">Choose a trust to view document vault.</p>
             </div>
           </div>
         </div>
@@ -370,23 +374,23 @@ export default function VaultPage() {
 
           {/* Missing Critical Alert */}
           {summary?.missing_critical && summary.missing_critical.length > 0 && !criticalDismissed && (
-            <Card className="mb-6 border-red-200 bg-red-50">
+            <Card className="mb-6 border-warning/20 bg-warning/5">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-5 h-5 text-red-600"/>
-                  <h3 className="font-semibold text-red-800">Critical Documents Missing</h3>
+                  <AlertTriangle className="w-5 h-5 text-warning"/>
+                  <h3 className="font-semibold text-warning">Critical Documents Missing</h3>
                   <button
                     onClick={() => setCriticalDismissed(true)}
-                    className="ml-auto p-1 text-red-400 hover:text-red-700 transition-colors"
+                    className="ml-auto p-1 text-warning/40 hover:text-warning transition-colors"
                     title="Dismiss"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                <ul className="text-sm text-red-700 space-y-1">
+                <ul className="text-sm text-warning space-y-1">
                   {summary.missing_critical.map((m, i) => (
                     <li key={i} className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-red-600 rounded-full"/>
+                      <span className="w-1.5 h-1.5 bg-warning rounded-full"/>
                       {m.label} · {m.message}
                     </li>
                   ))}
@@ -410,7 +414,7 @@ export default function VaultPage() {
             <select
               value={activeCategory}
               onChange={e => { setActiveCategory(e.target.value); }}
-              className="border border-neutral-300 rounded px-3 py-2 text-sm bg-white"
+              className="input-trust text-sm"
             >
               <option value="">All Categories</option>
               {Object.entries(categories).map(([k, v]) => (
@@ -457,11 +461,11 @@ export default function VaultPage() {
                     {!uploadFile ? (
                       <label
                         htmlFor="vault-file-upload"
-                        className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded p-8 cursor-pointer hover:border-navy hover:bg-subtle-bg transition-colors"
+                        className="flex flex-col items-center justify-center border-2 border-dashed border-navy/20 rounded p-8 cursor-pointer hover:border-navy hover:bg-subtle-bg transition-colors"
                       >
-                        <CloudUpload className="w-10 h-10 text-gray-400 mb-2"/>
-                        <p className="text-sm font-medium text-gray-700">Click to upload or drag and drop</p>
-                        <p className="text-xs text-gray-500 mt-1">PDF, images, Word, Excel — up to 50MB (PDFs auto-compressed)</p>
+                        <CloudUpload className="w-10 h-10 text-muted-foreground/40 mb-2"/>
+                        <p className="text-sm font-medium text-foreground">Click to upload or drag and drop</p>
+                        <p className="text-xs text-muted-foreground mt-1">PDF, images, Word, Excel — up to 50MB (PDFs auto-compressed)</p>
                         <input
                           id="vault-file-upload"
                           ref={fileInputRef}
@@ -472,18 +476,18 @@ export default function VaultPage() {
                         />
                       </label>
                     ) : (
-                      <div className="flex items-center gap-3 bg-subtle-bg border border-gray-200 rounded p-3">
+                      <div className="flex items-center gap-3 bg-subtle-bg border border-navy/10 rounded p-3">
                         <File className="w-8 h-8 text-navy"/>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{uploadFile.name}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-sm font-medium text-foreground truncate">{uploadFile.name}</p>
+                          <p className="text-xs text-muted-foreground">
                             {(uploadFile.size / 1024).toFixed(1)} KB
                             {uploadFile.size > 1024 * 1024 && ` (${(uploadFile.size / (1024*1024)).toFixed(1)} MB)`}
                           </p>
                         </div>
                         <button
                           onClick={() => { setUploadFile(null); setForm(f => ({...f, file_name: ''})); }}
-                          className="text-gray-400 hover:text-red-500"
+                          className="text-muted-foreground hover:text-rust"
                         >
                           <X className="w-5 h-5"/>
                         </button>
@@ -495,7 +499,7 @@ export default function VaultPage() {
                 {/* Common Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                   <Input placeholder="Document title *" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-                  <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="border border-neutral-300 rounded px-3 py-2 text-sm">
+                  <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="input-trust text-sm">
                     {Object.entries(categories).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <Input type="date" placeholder="Document date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
@@ -506,7 +510,7 @@ export default function VaultPage() {
                 {addMode === 'link' && (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                      <select value={form.storage_provider} onChange={e => setForm({ ...form, storage_provider: e.target.value })} className="border border-neutral-300 rounded px-3 py-2 text-sm">
+                      <select value={form.storage_provider} onChange={e => setForm({ ...form, storage_provider: e.target.value })} className="input-trust text-sm">
                         <option value="google_drive">Google Drive</option>
                         <option value="dropbox">Dropbox</option>
                         <option value="onedrive">OneDrive</option>
@@ -522,7 +526,7 @@ export default function VaultPage() {
                   </>
                 )}
 
-                <textarea placeholder="Description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border border-neutral-300 rounded px-3 py-2 text-sm mb-3" rows={2} />
+                <textarea placeholder="Description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="input-trust w-full text-sm mb-3" rows={2} />
                 {/* Expiration / Renewal - only relevant for documents that expire */}
                 <div className="mb-3">
                   <label className="text-sm font-medium text-neutral-700 block mb-1.5">Expiration / Renewal Date (optional)</label>
@@ -537,7 +541,7 @@ export default function VaultPage() {
                   </div>
                 </div>
                 {form.needs_renewal && form.expiration_date && (
-                  <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1.5 mb-3">
+                  <p className="text-xs text-success bg-success/10 rounded px-2 py-1.5 mb-3">
                     You will receive a reminder email 30 days before this document expires.
                   </p>
                 )}
@@ -562,7 +566,7 @@ export default function VaultPage() {
                       'Save to Vault'
                     )}
                   </Button>
-                  <Button variant="outline" onClick={resetForm}>Cancel</Button>
+                  <Button variant="outline" onClick={resetForm} className="btn-secondary">Cancel</Button>
                 </div>
               </CardContent>
             </Card>
@@ -575,7 +579,7 @@ export default function VaultPage() {
             </div>
           ) : Object.keys(byCategory).length === 0 ? (
             <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
-              <FolderOpen className="w-12 h-12 text-slate-300 mb-3"/>
+              <FolderOpen className="w-12 h-12 text-muted-foreground/30 mb-3"/>
               <h2 className="text-lg font-semibold text-navy mb-1">Vault is empty</h2>
               <p className="text-sm text-neutral-600 mb-4">Upload your trust documents or link to files stored externally.</p>
               <Button onClick={() => { setShowAdd(true); setAddMode('upload'); }}>Upload First Document</Button>
@@ -595,14 +599,14 @@ export default function VaultPage() {
                         <div key={doc.doc_id} className="bg-white border border-neutral-200 rounded p-4 hover:shadow-sm transition-shadow">
                           <div className="flex items-start justify-between mb-2">
                             <p className="font-semibold text-navy text-sm line-clamp-2">{doc.title}</p>
-                            <button onClick={() => deleteDocument(doc.doc_id)} className="text-neutral-400 hover:text-red-500 ml-2 flex-shrink-0">
+                            <button onClick={() => deleteDocument(doc.doc_id)} className="text-muted-foreground hover:text-rust ml-2 flex-shrink-0">
                               <Trash2 className="w-3.5 h-3.5"/>
                             </button>
                           </div>
 
                           {/* File indicator */}
                           {doc.storage_provider === 'trustoffice' ? (
-                            <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1 mb-2 w-fit">
+                            <div className="flex items-center gap-1.5 text-xs text-success bg-success/10 rounded px-2 py-1 mb-2 w-fit">
                               <File className="w-3 h-3"/>
                               {doc.file_name} {doc.file_size && `(${doc.file_size})`}
                             </div>
@@ -613,7 +617,7 @@ export default function VaultPage() {
                           {doc.description && <p className="text-xs text-neutral-600 mb-2 line-clamp-2">{doc.description}</p>}
                           <div className="flex flex-wrap gap-1 mb-3">
                             {doc.tags?.map((tag, i) => (
-                              <span key={i} className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{tag}</span>
+                              <span key={i} className="text-[10px] bg-navy/5 text-navy/60 px-1.5 py-0.5 rounded">{tag}</span>
                             ))}
                           </div>
                           {/* Analysis status badge for trust instruments and amendments */}

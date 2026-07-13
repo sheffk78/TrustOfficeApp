@@ -317,7 +317,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
 
     # 2. Defensibility Score
     health = await db.health_score_snapshots.find_one(
-        {"trust_id": trust_id},
+        {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0, "score_value": 1, "color": 1, "base_score": 1, "risk_penalty": 1},
         sort=[("calculated_at", -1)]
     )
@@ -470,6 +470,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
     upcoming_tax = await db.tax_calendar_entries.find(
         {
             "trust_id": trust_id,
+            "user_id": user_id,
             "status": {"$in": ["pending", "upcoming"]},
             "due_date": {"$gte": now.isoformat()[:10]},
         },
@@ -485,7 +486,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
 
     # 8. Trust Document Analysis (if available)
     analysis = await db.trust_document_analysis.find_one(
-        {"trust_id": trust_id, "status": "complete"},
+        {"trust_id": trust_id, "user_id": user_id, "status": "complete"},
         {"_id": 0, "extracted_fields": 1},
         sort=[("created_at", -1)]
     )
@@ -514,7 +515,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
     # (see _should_include_vault_context). Keeping it in the context dict is cheap because
     # we exclude file_content — just metadata.
     vault_docs = await db.vault_documents.find(
-        {"trust_id": trust_id},
+        {"trust_id": trust_id, "user_id": user_id},
         {
             "_id": 0,
             "file_content": 0,

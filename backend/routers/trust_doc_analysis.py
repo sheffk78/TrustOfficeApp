@@ -26,7 +26,7 @@ async def get_analysis(trust_id: str, user: dict = Depends(get_current_user)):
 
     # Try to find a complete analysis
     analysis = await db.trust_document_analysis.find_one(
-        {"trust_id": trust_id, "status": "complete"},
+        {"trust_id": trust_id, "user_id": user["user_id"], "status": "complete"},
         {"_id": 0},
         sort=[("created_at", -1)]
     )
@@ -41,7 +41,7 @@ async def get_analysis(trust_id: str, user: dict = Depends(get_current_user)):
 
     # Check if there's a pending/analyzing one
     pending = await db.trust_document_analysis.find_one(
-        {"trust_id": trust_id, "status": {"$in": ["pending", "analyzing"]}},
+        {"trust_id": trust_id, "user_id": user["user_id"], "status": {"$in": ["pending", "analyzing"]}},
         {"_id": 0, "status": 1, "created_at": 1},
         sort=[("created_at", -1)]
     )
@@ -54,7 +54,7 @@ async def get_analysis(trust_id: str, user: dict = Depends(get_current_user)):
 
     # Check if there's a failed one (so frontend can show retry)
     failed = await db.trust_document_analysis.find_one(
-        {"trust_id": trust_id, "status": "failed"},
+        {"trust_id": trust_id, "user_id": user["user_id"], "status": "failed"},
         {"_id": 0, "status": 1, "error_message": 1, "created_at": 1},
         sort=[("created_at", -1)]
     )

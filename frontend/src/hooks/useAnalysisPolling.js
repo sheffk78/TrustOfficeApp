@@ -57,6 +57,18 @@ export function useAnalysisPolling(trustId, options = {}) {
   }, [onError]);
 
   /**
+   * Stops the polling interval and resets polling flags.
+   */
+  const stopPolling = useCallback(() => {
+    shouldStopRef.current = true;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setIsPolling(false);
+  }, []);
+
+  /**
    * Performs a single poll request to the analysis-status endpoint.
    * Uses XMLHttpRequest for maximum mobile compatibility (matches OnboardingPage.js).
    */
@@ -170,18 +182,6 @@ export function useAnalysisPolling(trustId, options = {}) {
     xhr.timeout = 15000;
     xhr.send();
   }, [stopPolling]);
-
-  /**
-   * Stops the polling interval and resets polling flags.
-   */
-  const stopPolling = useCallback(() => {
-    shouldStopRef.current = true;
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setIsPolling(false);
-  }, []);
 
   /**
    * Starts polling. Does nothing if already polling, disabled, or no trustId.

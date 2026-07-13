@@ -47,6 +47,7 @@ export default function TrustDocumentSummary({ trustId }) {
         // Poll for completion
         setTimeout(() => loadAnalysis(), 5000);
         setTimeout(() => loadAnalysis(), 15000);
+        setTimeout(() => loadAnalysis(), 30000);
       } else {
         const data = await res.json();
         toast.error(data.detail || 'Failed to start re-analysis');

@@ -38,8 +38,8 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
 
   const handleFileSelect = useCallback((file) => {
     if (!file) return;
-    if (file.size > 16 * 1024 * 1024) {
-      setUploadResult({ success: false, error: 'File too large. Maximum size is 16MB.' });
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadResult({ success: false, error: 'File too large. Maximum size is 50MB.' });
       return;
     }
     setSelectedFile(file);
@@ -244,7 +244,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Document title"
-                    className="w-full px-3 py-2 text-sm border border-navy/10 bg-background text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-gold/40"
+                    className="input-trust w-full text-sm"
                   />
                 </div>
 
@@ -256,7 +256,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-navy/10 bg-background text-foreground focus:outline-none focus:border-gold/40"
+                    className="input-trust w-full text-sm"
                   >
                     {VAULT_CATEGORIES.map(cat => (
                       <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -274,7 +274,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Brief description of the document"
-                    className="w-full px-3 py-2 text-sm border border-navy/10 bg-background text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-gold/40"
+                    className="input-trust w-full text-sm"
                   />
                 </div>
               </div>
@@ -285,7 +285,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
           {uploadResult && !uploadResult.success && (
             <div className="mt-3 p-2 border border-rust/20 bg-rust/5 flex items-start gap-2">
               <X className="w-3.5 h-3.5 text-rust flex-shrink-0 mt-0.5" />
-              <p className="font-mono text-xs text-rust">{uploadResult.error}</p>
+              <p className="text-xs text-rust">{uploadResult.error}</p>
             </div>
           )}
 
@@ -314,7 +314,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
           {uploading && (
             <div className="flex items-center gap-2 pt-3 mt-3 border-t border-navy/10">
               <Loader2 className="w-4 h-4 animate-spin text-gold" />
-              <span className="font-mono text-xs text-muted-foreground">Uploading to vault...</span>
+              <span className="text-xs text-muted-foreground">Uploading to vault...</span>
             </div>
           )}
         </>
