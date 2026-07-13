@@ -193,6 +193,15 @@ export const trackCheckoutInitiated = (params = {}) => {
     currency: 'USD',
     ...params
   });
+
+  // Meta Pixel — InitiateCheckout standard event
+  if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+    window.fbq('track', 'InitiateCheckout', {
+      content_name: `trustoffice_${params.plan_type || 'trustee'}`,
+      value: getTierPrice(params.plan_type, params.billing_period),
+      currency: 'USD',
+    });
+  }
 };
 
 /**
@@ -358,14 +367,20 @@ export const trackGoogleAdsConversion = (params = {}) => {
 };
 
 /**
- * Track signup completion — fires Google Ads signup conversion.
- * Uses AW-955235972 (primary Google Ads account).
+ * Track signup completion — fires GA4 sign_up, Google Ads conversion,
+ * and Meta Pixel CompleteRegistration.
  */
 export const trackSignupConversion = () => {
   if (isGtagAvailable()) {
     // GA4 sign_up event
     window.gtag('event', 'sign_up', {
       method: 'email',
+    });
+  }
+  // Meta Pixel — CompleteRegistration standard event
+  if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+    window.fbq('track', 'CompleteRegistration', {
+      content_name: 'trustoffice_signup',
     });
   }
 };
@@ -389,6 +404,15 @@ export const trackPurchaseConversion = (params = {}) => {
     transaction_id: params.transaction_id || `checkout_${Date.now()}`,
     plan_type: params.plan_type,
   });
+
+  // Meta Pixel — Subscribe standard event
+  if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+    window.fbq('track', 'Subscribe', {
+      content_name: `trustoffice_${params.plan_type || 'trustee'}`,
+      value,
+      currency: 'USD',
+    });
+  }
 };
 
 export default {
