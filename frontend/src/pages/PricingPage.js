@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Check, ArrowRight } from 'lucide-react';
+import { trackCheckoutInitiated } from '@/utils/analytics';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -225,7 +226,14 @@ export default function PricingPage() {
         checkoutData,
         token
       );
-      
+
+      // Track checkout initiated for ad conversion tracking
+      trackCheckoutInitiated({
+        plan_type: planType,
+        billing_period: period,
+        origin: 'pricing_page',
+      });
+
       if (result.checkout_url) {
         window.location.href = result.checkout_url;
       } else {

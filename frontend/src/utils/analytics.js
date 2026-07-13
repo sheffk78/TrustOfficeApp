@@ -314,6 +314,84 @@ export const trackSubscriptionEvent = (eventType, params = {}) => {
   });
 };
 
+// ============================================================
+// GOOGLE ADS CONVERSION TRACKING
+// ============================================================
+
+/**
+ * Track a Google Ads conversion event.
+ * Fires both the GA4 purchase event and the Google Ads conversion.
+ *
+ * @param {Object} params
+ * @param {string} params.conversion_id - Google Ads conversion ID (e.g. 'AW-955235972')
+ * @param {string} params.conversion_label - Google Ads conversion label
+ * @param {number} params.value - Revenue value in USD
+ * @param {string} params.currency - Currency code (default 'USD')
+ * @param {string} params.transaction_id - Unique transaction ID for dedup
+ */
+export const trackGoogleAdsConversion = (params = {}) => {
+  if (isGtagAvailable()) {
+    // Google Ads conversion
+    if (params.conversion_id && params.conversion_label) {
+      window.gtag('event', 'conversion', {
+        send_to: `${params.conversion_id}/${params.conversion_label}`,
+        value: params.value,
+        currency: params.currency || 'USD',
+        transaction_id: params.transaction_id,
+      });
+    }
+    // GA4 purchase event
+    window.gtag('event', 'purchase', {
+      transaction_id: params.transaction_id,
+      value: params.value,
+      currency: params.currency || 'USD',
+      items: [{
+        item_id: params.plan_type || 'trustee',
+        item_name: `TrustOffice ${params.plan_type || 'Trustee'}`,
+        item_category: 'subscription',
+        price: params.value,
+        quantity: 1,
+      }],
+    });
+  } else {
+    console.warn('[Analytics] gtag not available for conversion tracking');
+  }
+};
+
+/**
+ * Track signup completion — fires Google Ads signup conversion.
+ * Uses AW-955235972 (primary Google Ads account).
+ */
+export const trackSignupConversion = () => {
+  if (isGtagAvailable()) {
+    // GA4 sign_up event
+    window.gtag('event', 'sign_up', {
+      method: 'email',
+    });
+  }
+};
+
+/**
+ * Track checkout completion (purchase) — fires both GA4 purchase
+ * and Google Ads conversion.
+ *
+ * @param {Object} params
+ * @param {string} params.plan_type - 'trustee' | 'estate' | 'advisor'
+ * @param {string} params.billing_period - 'monthly' | 'annual'
+ * @param {string} [params.transaction_id] - Stripe checkout session ID
+ */
+export const trackPurchaseConversion = (params = {}) => {
+  const value = getTierPrice(params.plan_type, params.billing_period);
+  trackGoogleAdsConversion({
+    conversion_id: 'AW-955235972',
+    conversion_label: params.conversion_label || 'purchase',
+    value,
+    currency: 'USD',
+    transaction_id: params.transaction_id || `checkout_${Date.now()}`,
+    plan_type: params.plan_type,
+  });
+};
+
 export default {
   trackEvent,
   trackPageView,
@@ -332,5 +410,8 @@ export default {
   trackTrialBannerClicked,
   trackUpgradeModalShown,
   trackUpgradeModalClicked,
+  trackGoogleAdsConversion,
+  trackSignupConversion,
+  trackPurchaseConversion,
   isGtagAvailable
 };

@@ -45,6 +45,7 @@ import PageHelpButton from '@/components/PageHelpButton';
 import { TrustManager } from '@/components/TrustManager';
 import BankingSummaryCard from '@/components/BankingSummaryCard';
 import SpendingThresholdCard from '@/components/SpendingThresholdCard';
+import { trackPurchaseConversion } from '@/utils/analytics';
 
 const QUICK_ACTIONS = [
   {
@@ -130,6 +131,14 @@ export default function DashboardPage() {
         description: 'Your subscription is now active. Let\'s get your trust organized.',
         duration: 6000
       });
+
+      // Track purchase conversion for Google Ads + GA4
+      trackPurchaseConversion({
+        plan_type: user?.subscription?.plan_type || 'trustee',
+        billing_period: user?.subscription?.billing_period || 'monthly',
+        transaction_id: searchParams.get('session_id') || `checkout_${Date.now()}`,
+      });
+
       // Remove the query param to prevent showing again on refresh
       searchParams.delete('welcome');
       setSearchParams(searchParams, { replace: true });

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -116,6 +116,52 @@
     .rounded-3xl {
         border-radius: 0 !important;
     }
+}
+
+/* Marketing site design system classes (trustoffice.app) */
+@layer components {
+    .label-mono {
+        @apply text-xs md:text-sm font-mono font-medium uppercase tracking-[0.2em] text-gold;
+    }
+
+    .section-container {
+        @apply max-w-7xl mx-auto px-6 md:px-12;
+    }
+
+    .section-spacing {
+        @apply py-20 md:py-28;
+    }
+
+    .grid-pattern {
+        background-image: linear-gradient(rgba(1, 0, 121, 0.03) 1px, transparent 1px),
+                          linear-gradient(90deg, rgba(1, 0, 121, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+    }
+
+    .btn-primary-marketing {
+        @apply bg-navy text-white hover:bg-navy/90 px-8 py-4 font-mono uppercase tracking-widest text-xs shadow-lg transition-all duration-200 active:scale-95;
+    }
+
+    .btn-secondary-marketing {
+        @apply bg-transparent border border-navy text-navy hover:bg-navy hover:text-white px-8 py-4 font-mono uppercase tracking-widest text-xs transition-all duration-200;
+    }
+
+    .btn-gold-marketing {
+        @apply bg-gold text-navy hover:bg-gold/80 px-8 py-4 font-mono uppercase tracking-widest text-xs shadow-lg transition-all duration-200 active:scale-95;
+    }
+
+    .card-marketing {
+        @apply bg-white border border-slate-100 p-8 shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden;
+    }
+}
+
+/* Marketing site animation delays */
+@layer utilities {
+    .animation-delay-100 { animation-delay: 100ms; }
+    .animation-delay-200 { animation-delay: 200ms; }
+    .animation-delay-300 { animation-delay: 300ms; }
+    .animation-delay-400 { animation-delay: 400ms; }
+    .animation-delay-500 { animation-delay: 500ms; }
 }
 
 /* Corner marks decoration */

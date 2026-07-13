@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { reportErrorToBackend } from '@/utils/errors';
 import { Mail, Lock, Eye, EyeOff, User, Gift, AlertCircle } from 'lucide-react';
+import { trackSignupConversion, trackTrialStarted } from '@/utils/analytics';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -223,6 +224,11 @@ export default function SignUpPage() {
       }
       
       toast.success('Account created successfully');
+
+      // Track signup conversion for Google Ads + GA4
+      trackSignupConversion();
+      trackTrialStarted({ origin: 'signup_page' });
+
       navigate('/onboarding');
     } catch (error) {
       console.error('Signup error:', error);
