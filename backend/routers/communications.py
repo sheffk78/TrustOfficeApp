@@ -1,12 +1,13 @@
 # Communication log router — trustee/beneficiary relationship records
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime, timezone
 from typing import Optional
 import re
 import uuid
+from pydantic import BaseModel, field_validator
 
 from database import db
-from dependencies import get_current_user
+from dependencies import get_current_user, require_write_access
 
 router = APIRouter(tags=["communications"])
 
@@ -20,8 +21,37 @@ COMM_TYPES = {
     "other": "Other",
 }
 
+
+class CommunicationCreate(BaseModel):
+    comm_type: str = "other"
+    subject: str = ""
+    content: str = ""
+    parties: list = []
+    direction: str = "outbound"
+    document_ids: list = []
+    action_required: bool = False
+    action_completed: bool = False
+    action_due: Optional[str] = None
+    tags: list = []
+    date: Optional[str] = None
+
+    @field_validator("comm_type")
+    @classmethod
+    def validate_comm_type(cls, v):
+        if v not in COMM_TYPES:
+            raise ValueError(f"comm_type must be one of: {', '.join(COMM_TYPES.keys())}")
+        return v
+
+    @field_validator("direction")
+    @classmethod
+    def validate_direction(cls, v):
+        if v not in ("outbound", "inbound", "internal"):
+            raise ValueError("direction must be one of: outbound, inbound, internal")
+        return v
+
+
 @router.post("/trusts/{trust_id}/communications")
-async def log_communication(trust_id: str, comm: dict, user: dict = Depends(get_current_user)):
+async def log_communication(trust_id: str, comm: CommunicationCreate, user: dict = Depends(require_write_access)):
     """Log a trustee-beneficiary communication event."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
@@ -31,18 +61,19 @@ async def log_communication(trust_id: str, comm: dict, user: dict = Depends(get_
     doc = {
         "comm_id": f"comm_{uuid.uuid4().hex[:12]}",
         "trust_id": trust_id,
-        "comm_type": comm.get("comm_type", "other"),
-        "comm_type_label": COMM_TYPES.get(comm.get("comm_type", "other"), "Other"),
-        "subject": comm.get("subject", ""),
-        "content": comm.get("content", ""),
-        "parties": comm.get("parties", []),  # [{"role": "trustee", "name": "..."}, {"role": "beneficiary", "name": "..."}]
-        "direction": comm.get("direction", "outbound"),  # outbound, inbound, internal
-        "document_ids": comm.get("document_ids", []),
-        "action_required": comm.get("action_required", False),
-        "action_completed": comm.get("action_completed", False),
-        "action_due": comm.get("action_due"),
-        "tags": comm.get("tags", []),
-        "created_at": comm.get("date", now),
+        "user_id": user["user_id"],
+        "comm_type": comm.comm_type,
+        "comm_type_label": COMM_TYPES.get(comm.comm_type, "Other"),
+        "subject": comm.subject,
+        "content": comm.content,
+        "parties": comm.parties,  # [{"role": "trustee", "name": "..."}, {"role": "beneficiary", "name": "..."}]
+        "direction": comm.direction,  # outbound, inbound, internal
+        "document_ids": comm.document_ids,
+        "action_required": comm.action_required,
+        "action_completed": comm.action_completed,
+        "action_due": comm.action_due,
+        "tags": comm.tags,
+        "created_at": comm.date or now,
         "updated_at": now,
     }
     await db.communications.insert_one(doc)
@@ -56,7 +87,7 @@ async def list_communications(
     direction: Optional[str] = None,
     action_required: Optional[bool] = None,
     search: Optional[str] = None,
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=500),
     user: dict = Depends(get_current_user)
 ):
     """List communications with filtering."""
@@ -96,7 +127,7 @@ async def list_communications(
 
 
 @router.patch("/communications/{comm_id}")
-async def update_communication(comm_id: str, update: dict, user: dict = Depends(get_current_user)):
+async def update_communication(comm_id: str, update: dict, user: dict = Depends(require_write_access)):
     """Update a communication — mark action completed, add notes."""
     comm = await db.communications.find_one({"comm_id": comm_id}, {"_id": 0})
     if not comm:
@@ -106,7 +137,8 @@ async def update_communication(comm_id: str, update: dict, user: dict = Depends(
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
-    update_data = {k: v for k, v in update.items() if v is not None}
+    allowed_fields = {"subject", "content", "action_required", "action_completed", "action_due", "tags"}
+    update_data = {k: v for k, v in update.items() if k in allowed_fields and v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     await db.communications.update_one({"comm_id": comm_id}, {"$set": update_data})
@@ -114,7 +146,7 @@ async def update_communication(comm_id: str, update: dict, user: dict = Depends(
 
 
 @router.delete("/communications/{comm_id}")
-async def delete_communication(comm_id: str, user: dict = Depends(get_current_user)):
+async def delete_communication(comm_id: str, user: dict = Depends(require_write_access)):
     """Delete a communication record."""
     comm = await db.communications.find_one({"comm_id": comm_id}, {"_id": 0})
     if not comm:

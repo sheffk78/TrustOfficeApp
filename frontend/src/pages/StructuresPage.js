@@ -329,6 +329,26 @@ export default function StructuresPage() {
 
   const rootEntities = buildTree();
 
+  if (!selectedTrust) {
+    return (
+      <div className="main-layout" data-testid="structures-page">
+        <Sidebar />
+        <main className="main-content dot-grid">
+          <div className="page-container">
+            <div className="card-trust text-center py-16">
+              <Building2 className="w-12 h-12 text-navy/30 mx-auto mb-4" />
+              <h3 className="font-serif text-xl text-navy mb-2">Select a trust to manage entities</h3>
+              <p className="text-muted-foreground">
+                Choose a trust from the sidebar to view and manage its structures
+              </p>
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
   return (
     <div className="main-layout" data-testid="structures-page">
       <Sidebar />
@@ -367,7 +387,7 @@ export default function StructuresPage() {
                 <TabsTrigger value="separation" data-testid="tab-separation" className="relative">
                   <ShieldAlert className="w-4 h-4 mr-2" /> Separation
                   {separationData?.alert_summary?.total_active > 0 && (
-                    <span className="ml-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="ml-1.5 w-5 h-5 rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center">
                       {separationData.alert_summary.total_active}
                     </span>
                   )}
@@ -632,13 +652,13 @@ export default function StructuresPage() {
                     </div>
                     <div className="rounded border border-border bg-card p-4">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Active Alerts</p>
-                      <p className={`text-2xl font-semibold ${separationData.alert_summary.total_active > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                      <p className={`text-2xl font-semibold ${separationData.alert_summary.total_active > 0 ? 'text-error' : 'text-success'}`}>
                         {separationData.alert_summary.total_active}
                       </p>
                     </div>
                     <div className="rounded border border-border bg-card p-4">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net Flow (90d)</p>
-                      <p className={`text-2xl font-semibold ${(separationData.transaction_summary.total_inflows - separationData.transaction_summary.total_outflows) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      <p className={`text-2xl font-semibold ${(separationData.transaction_summary.total_inflows - separationData.transaction_summary.total_outflows) >= 0 ? 'text-success' : 'text-error'}`}>
                         ${(separationData.transaction_summary.total_inflows - separationData.transaction_summary.total_outflows).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       </p>
                     </div>
@@ -667,7 +687,7 @@ export default function StructuresPage() {
                             </div>
                             <div className="flex items-center gap-1.5">
                               {ent.red_alerts > 0 && (
-                                <span className="w-6 h-6 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center" title={`${ent.red_alerts} red alert(s)`}>
+                                <span className="w-6 h-6 rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center" title={`${ent.red_alerts} red alert(s)`}>
                                   {ent.red_alerts}
                                 </span>
                               )}
@@ -677,7 +697,7 @@ export default function StructuresPage() {
                                 </span>
                               )}
                               {ent.total_alerts === 0 && (
-                                <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center" title="No alerts">
+                                <span className="w-6 h-6 rounded-full bg-success text-white text-[10px] font-bold flex items-center justify-center" title="No alerts">
                                   ✓
                                 </span>
                               )}
@@ -689,13 +709,13 @@ export default function StructuresPage() {
                           <div className="grid grid-cols-3 gap-3 text-center">
                             <div>
                               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Inflows</p>
-                              <p className="text-sm font-semibold text-emerald-600">
+                              <p className="text-sm font-semibold text-success">
                                 ${ent.total_inflows.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                               </p>
                             </div>
                             <div>
                               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Outflows</p>
-                              <p className="text-sm font-semibold text-red-500">
+                              <p className="text-sm font-semibold text-error">
                                 ${ent.total_outflows.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                               </p>
                             </div>

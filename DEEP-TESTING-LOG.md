@@ -272,3 +272,120 @@
 - Subscription gating is server-side via check_feature_access
 - Alerts router properly uses require_write_access for mutations
 - Onboarding allowlist prevents arbitrary field updates
+
+---
+
+## Feature #4: Money Section (Distributions, Compensation, Investments, Benevolence)
+**Date:** 2026-07-13  
+**Agents:** 4 (Functional, UX/Visual, API/Data, Cross-Feature)  
+**Pages tested:** DistributionsPage, CompensationPage, InvestmentsPage, BenevolencePage, BenevolenceLogPage, TransactionLedgerPage  
+**Backend:** distributions.py (638 lines), compensation.py (525 lines), investments.py (108 lines), transactions.py (478 lines), models.py  
+
+---
+
+### Fixes Applied (42 items across 16 files)
+
+#### Critical: Unrouted Pages (2)
+1. **[FIXED] TransactionLedgerPage not routed in App.js** - 843-line page completely inaccessible. Added import, route `/transactions`, sidebar entry, and mobile nav entry.
+2. **[FIXED] BenevolenceLogPage not routed in App.js** - 452-line page completely inaccessible. Added import, route `/benevolence-log`, sidebar entry with requiresBenevolence gating.
+
+#### Frontend - TransactionLedgerPage.js (14 fixes)
+3. **[FIXED] catch block references undefined `e`** - Line 197. `} catch {` would throw ReferenceError. Fixed to `} catch (e) {`.
+4. **[FIXED] classificationColors object uses raw Tailwind colors** - Lines 38-46. Replaced bg-blue/purple/emerald/red/orange/gray with brand tokens (gold, navy, success, error, warning, muted).
+5. **[FIXED] DIRECTION_OPTIONS raw colors** - Lines 34-35. text-emerald-600 → text-success, text-red-500 → text-error.
+6. **[FIXED] Summary card raw colors** - Lines 395, 401, 407. Replaced text-emerald-600 and text-red-500 with brand tokens.
+7. **[FIXED] Transaction amount raw colors** - Line 515. Same replacements.
+8. **[FIXED] Trash2 icon raw color** - Line 561. text-red-500 → text-error.
+9. **[FIXED] 12 standalone `rounded` class violations** - Lines 393, 399, 405, 414, 460, 472, 526, 536, 544, 699, 730, 804. Removed rounded (brand uses sharp corners).
+10. **[FIXED] Fallback badge color** - Line 526. bg-gray-100 text-gray-700 → bg-muted text-muted-foreground.
+11. **[FIXED] 6 buttons missing btn-primary/btn-secondary** - Lines 382, 385, 674, 751, 789, 834.
+12. **[FIXED] 15 Label components missing label-trust** - All dialog labels.
+13. **[FIXED] 7 Input/Textarea components missing input-trust** - All dialog inputs.
+14. **[FIXED] Page layout structure** - Changed from `flex min-h-screen bg-background` to `main-layout` → `main-content dot-grid` → `page-container`.
+
+#### Frontend - InvestmentsPage.js (14 fixes)
+15. **[FIXED] Page layout structure** - Changed from `min-h-screen bg-subtle-bg` + `md:pl-64` to `main-layout` → `main-content dot-grid` → `page-container`.
+16. **[FIXED] Empty state containers** - Replaced `bg-white border border-neutral-200 rounded` with `card-trust`.
+17. **[FIXED] Investment card containers** - Same replacement with `card-trust p-4`.
+18. **[FIXED] 4 Card components using border-neutral-200** - Replaced with `card-trust` class.
+19. **[FIXED] All raw color violations** - text-emerald-600 → text-success, text-red-600 → text-error, text-slate-400 → text-navy/30, text-neutral-600 → text-muted-foreground, border-neutral-200 → border-border, bg-neutral-100 → bg-navy/10.
+20. **[FIXED] Raw select/textarea elements** - Replaced with `input-trust` class.
+21. **[FIXED] 4 buttons missing btn-primary/btn-secondary** - Add Investment, Record Investment, Record First Investment, Cancel.
+22. **[FIXED] Missing corner-mark** - Added to Asset Allocation summary card.
+23. **[FIXED] Progress bar rounded** - Removed rounded, fixed bg-neutral-100 → bg-navy/10.
+24. **[FIXED] Skeleton loading containers** - Replaced with `card-trust animate-pulse`.
+25. **[FIXED] Delete button commented out** - Uncommented, fixed Trash2 icon color.
+26. **[FIXED] Missing null guard in loadData** - Added `if (!selectedTrust) return;`.
+
+#### Frontend - DistributionsPage.js (5 fixes)
+27. **[FIXED] Missing dot-grid on main-content** - Line 412.
+28. **[FIXED] No "Select a Trust" state** - Added no-trust guard with DollarSign icon and message.
+29. **[FIXED] loadCategories uses raw fetch instead of fetchWithAuth** - Categories dropdown was always empty. Fixed to use fetchWithAuth.
+30. **[FIXED] Declined status filter never shows results** - Status computation only checked approved_at. Added check for `d.status === 'declined'`.
+31. **[FIXED] loadDistributions silently swallows errors** - Added showError toast in catch block.
+
+#### Frontend - CompensationPage.js (2 fixes)
+32. **[FIXED] No "Select a Trust" state** - Added no-trust guard with Wallet icon.
+33. **[FIXED] Missing isReadOnly/upgradeModal checks** - Added to openNewPrimaryPlan and openNewAdditionalPlan.
+
+#### Frontend - BenevolencePage.js (3 fixes)
+34. **[FIXED] Loading state never resolves when benevolence disabled** - Added setLoading(false) in else branch.
+35. **[FIXED] window.location.href instead of router navigate** - Line 357. Changed to navigate('/settings').
+36. **[FIXED] Raw blue colors on "This Year" card** - Replaced bg-blue-100/text-blue-700 with bg-gold/10/text-gold.
+
+#### Frontend - BenevolenceLogPage.js (3 fixes)
+37. **[FIXED] Page layout structure** - Changed to main-layout → main-content dot-grid → page-container.
+38. **[FIXED] Missing MobileBottomNav in no-trust state** - Added.
+39. **[FIXED] Raw blue colors on "This Year" card** - Same fix as BenevolencePage.
+
+#### Frontend - Cross-Feature (3 fixes)
+40. **[FIXED] SpendingThresholdCard Review button navigates to wrong page** - Was going to /distributions, changed to /transactions.
+41. **[FIXED] AuditTrailPage fetches wrong compensation endpoint** - Was fetching /compensation (404). Changed to fetch /compensation-plans and /compensation-payments in parallel.
+42. **[FIXED] AuditTrailPage missing investment events** - Added fetch from /trusts/{id}/investments and 'Investments' filter option.
+
+#### Backend Security (10 fixes)
+43. **[FIXED] investments.py: Missing user_id in query filter** - Added user_id to list query, aggregation $match, and document creation.
+44. **[FIXED] investments.py: update_investment allows overwriting trust_id** - Added field allowlist (asset_name, asset_type, current_value, quantity, unit, custodian, notes, performance_snapshot, is_active only).
+45. **[FIXED] models.py: No amount validation** - Added ge=0 to DistributionCreate, DistributionUpdate, CompensationPlanCreate, CompensationPaymentCreate, TransactionCreate, TransactionUpdate.
+46. **[FIXED] models.py: No max_length on bulk operations** - Added max_length=500 to BulkClassifyRequest.transaction_ids, max_length=1000 to CsvImportRequest.rows.
+47. **[FIXED] transactions.py: Unbounded limit parameter** - Added Field(200, ge=1, le=10000) and skip Field(0, ge=0).
+48. **[FIXED] transactions.py: Unbounded days parameter** - Added Field(90, ge=1, le=3650) to both summary and separation-dashboard endpoints.
+49. **[FIXED] transactions.py: Bare except blocks swallow errors** - Replaced with logging.exception calls.
+50. **[FIXED] distributions.py: validate-beneficiary exposes full beneficiary document** - Changed to return only {"valid": bool(beneficiary)}.
+51. **[FIXED] distributions.py: Deprecated PUT endpoint still active** - Marked with deprecated=True, include_in_schema=False.
+52. **[FIXED] compensation.py: Regex-based year filter** - Replaced with simple field query query["year"] = year.
+
+---
+
+### Backlog (FIX LATER)
+
+| # | Issue | Priority | Effort |
+|---|---|---|---|
+| A | TransactionLedgerPage: no inline edit for individual transactions | Medium | Medium |
+| B | BenevolencePage: no delete or edit for benevolence records | Medium | Medium |
+| C | DistributionsPage: no delete functionality | Medium | Low |
+| D | CompensationPage: payment history shows all years but header says current year | Low | Low |
+| E | InvestmentsPage: no edit/update flow (backend PATCH exists) | Medium | Medium |
+| F | BenevolencePage: duplicate data merging is fragile (amount+date+name match) | Low | Medium |
+| G | TransactionLedgerPage: no empty state CTA for "no entities" | Low | Low |
+| H | InvestmentsPage: deleteInvestment has no confirm dialog | Low | Low |
+| I | DistributionsPage: filterStatus not sent to backend (client-side only) | Low | Low |
+| J | Distributions/Compensation: no pagination on list endpoints (to_list(1000)) | Medium | Medium |
+| K | AuditTrailPage: BenevolenceLogPage ?highlight= deep link is dead | Low | Low |
+| L | Dashboard: no deep-links to Money section pages | Low | Low |
+| M | Calendar: doesn't auto-populate Money events | Low | High |
+| N | Trust Assistant: no direct Money section API access | Low | High |
+| O | Vault/PrintableBinder: no Money section data | Low | Medium |
+
+---
+
+### Deploy Status
+Commit `157f814` pushed. Build succeeded (483.68 kB gzip). Railway auto-deploying. App + API confirmed live (200/200).
+
+---
+
+### Running Totals (4 features complete)
+- Features tested: 4 of 8
+- Total issues found: 125
+- Total fixed: 115
+- Total backlogged: 72

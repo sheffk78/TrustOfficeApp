@@ -338,25 +338,25 @@ export default function ScheduleAPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="main-layout">
         <Sidebar />
-        <main className="lg:pl-64 pt-16 lg:pt-0">
-          <div className="p-8">
+        <div className="main-content dot-grid">
+          <div className="page-container">
             <div className="card-trust p-8 text-center">
               <p className="text-muted-foreground">Select a trust to view Trust Assets</p>
             </div>
           </div>
-        </main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background" data-testid="schedule-a-page">
+    <div className="main-layout" data-testid="schedule-a-page">
       <Sidebar />
-      <main className="lg:pl-64 pt-16 lg:pt-0 mobile-layout-offset">
+      <div className="main-content dot-grid mobile-layout-offset">
         
-        <div className="p-4 lg:p-8">
+        <div className="page-container">
           {/* Header */}
           <div className="page-header flex items-center justify-between">
             <div>
@@ -511,7 +511,7 @@ export default function ScheduleAPage() {
               </div>
               <div className="card-trust p-4">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Disposed</p>
-                <p className="font-serif text-2xl text-orange-600">{disposedAssets.length}</p>
+                <p className="font-serif text-2xl text-warning">{disposedAssets.length}</p>
               </div>
             </div>
           )}
@@ -600,7 +600,7 @@ export default function ScheduleAPage() {
                                 {asset.minutes_ref && (
                                   <Link 
                                     to={`/minutes/${asset.minutes_ref}`}
-                                    className="text-xs text-blue-600 hover:underline mt-1 flex items-center gap-1"
+                                    className="text-xs text-gold hover:underline mt-1 flex items-center gap-1"
                                   >
                                     Added via Minutes <ExternalLink className="w-3 h-3" />
                                   </Link>
@@ -608,7 +608,7 @@ export default function ScheduleAPage() {
                                 {asset.disposition_minutes_ref && (
                                   <Link 
                                     to={`/minutes/${asset.disposition_minutes_ref}`}
-                                    className="text-xs text-orange-600 hover:underline mt-1 flex items-center gap-1"
+                                    className="text-xs text-warning hover:underline mt-1 flex items-center gap-1"
                                     data-testid={`disposition-minutes-link-${asset.item_id}`}
                                   >
                                     Disposition Minutes <ExternalLink className="w-3 h-3" />
@@ -621,14 +621,14 @@ export default function ScheduleAPage() {
                               <td className="p-3 text-center text-sm hidden md:table-cell">
                                 {formatDate(asset.date_conveyed)}
                                 {asset.disposition_date && (
-                                  <div className="text-xs text-orange-600">
+                                  <div className="text-xs text-warning">
                                     Disposed: {formatDate(asset.disposition_date)}
                                   </div>
                                 )}
                               </td>
                               <td className="p-3 text-center">
                                 {asset.status === 'disposed' ? (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" data-testid={`status-badge-${asset.item_id}`}>
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning" data-testid={`status-badge-${asset.item_id}`}>
                                     Disposed
                                   </span>
                                 ) : (
@@ -652,7 +652,7 @@ export default function ScheduleAPage() {
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                      className="text-warning hover:text-warning hover:bg-warning/10"
                                       onClick={() => handleDisposeClick(asset)}
                                       title="Dispose/Sell asset"
                                       data-testid={`dispose-asset-${asset.item_id}`}
@@ -662,7 +662,7 @@ export default function ScheduleAPage() {
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="text-red-600 hover:text-red-700"
+                                      className="text-error hover:text-error"
                                       onClick={() => handleDelete(asset.item_id)}
                                       title="Delete asset"
                                       data-testid={`delete-asset-${asset.item_id}`}
@@ -685,7 +685,7 @@ export default function ScheduleAPage() {
             </div>
           )}
         </div>
-      </main>
+      </div>
       <MobileBottomNav />
 
       {/* Dispose Asset Dialog */}
@@ -805,7 +805,7 @@ export default function ScheduleAPage() {
             </Button>
             <Button 
               onClick={handleDisposeSubmit}
-              className={disposeFormData.create_minutes ? "btn-primary" : "bg-orange-600 hover:bg-orange-700 text-white"}
+              className={disposeFormData.create_minutes ? "btn-primary" : "btn-gold"}
               data-testid="confirm-dispose-btn"
             >
               {disposeFormData.create_minutes ? (

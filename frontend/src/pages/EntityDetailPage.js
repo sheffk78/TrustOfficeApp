@@ -41,7 +41,7 @@ export default function EntityDetailPage() {
       loadEntity();
       loadEntityTransactions();
     }
-  }, [entityId]);
+  }, [entityId, selectedTrust]);
 
   const loadEntityTransactions = async () => {
     if (!selectedTrust || !entityId) return;
@@ -62,11 +62,11 @@ export default function EntityDetailPage() {
         setFormData(data);
       } else {
         toast.error('Entity not found');
-        navigate('/entities');
+        navigate('/structures?tab=entities');
       }
     } catch (error) {
       console.error('Failed to load entity:', error);
-      navigate('/entities');
+      navigate('/structures?tab=entities');
     } finally {
       setLoading(false);
     }
@@ -84,7 +84,8 @@ export default function EntityDetailPage() {
         const data = await response.json();
         setEntity(data);
       } else {
-        showError(toast, error, { operation: 'save', page: 'EntityDetail' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || 'Failed to save entity'), { operation: 'save', page: 'EntityDetail' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'EntityDetail' });
@@ -103,9 +104,10 @@ export default function EntityDetailPage() {
       });
       if (response.ok) {
         toast.success('Entity deleted');
-        navigate('/entities');
+        navigate('/structures?tab=entities');
       } else {
-        showError(toast, error, { operation: 'delete', page: 'EntityDetail' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || 'Failed to delete entity'), { operation: 'delete', page: 'EntityDetail' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'delete', page: 'EntityDetail' });
@@ -152,7 +154,7 @@ export default function EntityDetailPage() {
         <div className="page-container">
           {/* Back Button */}
           <Button 
-            onClick={() => navigate('/entities')}
+            onClick={() => navigate('/structures?tab=entities')}
             variant="ghost"
             className="mb-4 text-navy hover:text-navy/70"
           >
@@ -408,7 +410,7 @@ export default function EntityDetailPage() {
                             {(() => { try { return format(parseISO(t.date), 'MMM d, yyyy'); } catch { return t.date; } })()}
                           </td>
                           <td className="py-2 text-right font-medium whitespace-nowrap">
-                            <span className={t.direction === 'inflow' ? 'text-emerald-600' : 'text-red-500'}>
+                            <span className={t.direction === 'inflow' ? 'text-success' : 'text-error'}>
                               {t.direction === 'inflow' ? '+' : '-'}${t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </span>
                           </td>

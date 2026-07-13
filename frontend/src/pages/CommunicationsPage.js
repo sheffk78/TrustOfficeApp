@@ -62,6 +62,7 @@ export default function CommunicationsPage() {
   }, [selectedTrust, filterType]);
 
   const loadData = async () => {
+    if (!selectedTrust) return;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -104,11 +105,12 @@ export default function CommunicationsPage() {
 
   const completeAction = async (id) => {
     try {
-      await fetchWithAuth(`/communications/${id}`, {
+      const res = await fetchWithAuth(`/communications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action_completed: true }),
       });
+      if (!res.ok) throw new Error('Failed to mark action complete');
       toast.success('Action marked complete');
       loadData();
     } catch (e) {
@@ -118,14 +120,14 @@ export default function CommunicationsPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="min-h-screen bg-subtle-bg">
+      <div className="main-layout">
         <Sidebar />
-        <div className="md:pl-64 pb-20 md:pb-0">
-          <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
-              <MessageSquare className="w-12 h-12 text-slate-400 mb-3"/>
+        <div className="main-content dot-grid">
+          <div className="page-container">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <MessageSquare className="w-12 h-12 text-muted-foreground/40 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
-              <p className="text-sm text-neutral-600">Choose a trust to view communications log.</p>
+              <p className="text-sm text-muted-foreground">Choose a trust to view communications log.</p>
             </div>
           </div>
         </div>
@@ -135,10 +137,10 @@ export default function CommunicationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-subtle-bg">
+    <div className="main-layout">
       <Sidebar />
-      <div className="md:pl-64 pb-20 md:pb-0 mobile-layout-offset">
-        <div className="pt-16 md:pt-8 ml-4 mr-4">
+      <div className="main-content dot-grid mobile-layout-offset">
+        <div className="page-container">
 
           <div className="page-header flex items-center justify-between">
             <div>
@@ -154,7 +156,7 @@ export default function CommunicationsPage() {
                 ]}
                 taPrompt="Walk me through the Communication Log and how to log a beneficiary contact"
               />
-              <Button onClick={() => setShowAdd(!showAdd)}>
+              <Button className="btn-primary" onClick={() => setShowAdd(!showAdd)}>
                 <Plus className="w-4 h-4 mr-2"/>
                 Log Communication
               </Button>
@@ -165,15 +167,15 @@ export default function CommunicationsPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <Card><CardContent className="p-4">
               <div className="text-2xl font-bold text-navy">{summary?.total_communications || 0}</div>
-              <div className="text-xs text-neutral-600">Total Recorded</div>
+              <div className="text-xs text-muted-foreground">Total Recorded</div>
             </CardContent></Card>
             <Card><CardContent className="p-4">
               <div className="text-2xl font-bold text-warning">{summary?.pending_actions || 0}</div>
-              <div className="text-xs text-neutral-600">Pending Actions</div>
+              <div className="text-xs text-muted-foreground">Pending Actions</div>
             </CardContent></Card>
-            <Card className="col-span-2 border border-neutral-200">
+            <Card className="col-span-2 card-trust">
               <CardContent className="p-3 flex gap-2 items-center">
-                <Search className="w-4 h-4 text-neutral-400"/>
+                <Search className="w-4 h-4 text-muted-foreground"/>
                 <Input
                   placeholder="Search communications..."
                   value={search}
@@ -184,7 +186,7 @@ export default function CommunicationsPage() {
                 <select
                   value={filterType}
                   onChange={e => { setFilterType(e.target.value); loadData(); }}
-                  className="border border-neutral-300 rounded px-2 py-1.5 text-sm"
+                  className="input-trust px-2 py-1.5 text-sm"
                 >
                   <option value="">All Types</option>
                   {Object.entries(COMM_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -195,14 +197,14 @@ export default function CommunicationsPage() {
 
           {/* Add Form */}
           {showAdd && (
-            <Card className="mb-6 border border-neutral-200">
+            <Card className="mb-6 card-trust">
               <CardContent className="p-4">
                 <h3 className="font-semibold text-navy mb-3">Log Communication</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                  <select value={form.comm_type} onChange={e => setForm({ ...form, comm_type: e.target.value })} className="border border-neutral-300 rounded px-3 py-2 text-sm">
+                  <select value={form.comm_type} onChange={e => setForm({ ...form, comm_type: e.target.value })} className="input-trust px-3 py-2 text-sm">
                     {Object.entries(COMM_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
-                  <select value={form.direction} onChange={e => setForm({ ...form, direction: e.target.value })} className="border border-neutral-300 rounded px-3 py-2 text-sm">
+                  <select value={form.direction} onChange={e => setForm({ ...form, direction: e.target.value })} className="input-trust px-3 py-2 text-sm">
                     <option value="outbound">Outbound (Trustee → Beneficiary)</option>
                     <option value="inbound">Inbound (Beneficiary → Trustee)</option>
                     <option value="internal">Internal (Trustee to Trustee)</option>
@@ -210,7 +212,7 @@ export default function CommunicationsPage() {
                   <Input type="date" placeholder="Action due date" value={form.action_due} onChange={e => setForm({ ...form, action_due: e.target.value })} />
                 </div>
                 <Input placeholder="Subject / Topic" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} className="mb-3" />
-                <textarea placeholder="Content / Summary of communication..." value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} className="w-full border border-neutral-300 rounded px-3 py-2 text-sm mb-3" rows={4} />
+                <textarea placeholder="Content / Summary of communication..." value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} className="input-trust w-full px-3 py-2 text-sm mb-3" rows={4} />
                 <div className="flex items-center gap-2 mb-3">
                   <input
                     type="checkbox"
@@ -218,10 +220,10 @@ export default function CommunicationsPage() {
                     onChange={e => setForm({ ...form, action_required: e.target.checked })}
                     id="action_req"
                   />
-                  <label htmlFor="action_req" className="text-sm text-neutral-600">This communication requires follow-up action</label>
+                  <label htmlFor="action_req" className="text-sm text-muted-foreground">This communication requires follow-up action</label>
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={createCommunication}>Log Communication</Button>
+                  <Button className="btn-primary" onClick={createCommunication}>Log Communication</Button>
                   <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
                 </div>
               </CardContent>
@@ -231,14 +233,14 @@ export default function CommunicationsPage() {
           {/* List */}
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-20 bg-white border border-neutral-200 rounded animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="card-trust h-20 animate-pulse"/>)}
             </div>
           ) : communications.length === 0 ? (
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
-              <MessageSquare className="w-12 h-12 text-slate-300 mb-3"/>
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <MessageSquare className="w-12 h-12 text-muted-foreground/30 mb-3"/>
               <h2 className="text-lg font-semibold text-navy mb-1">No communications logged</h2>
-              <p className="text-sm text-neutral-600 mb-4">Every trustee-beneficiary interaction should be documented. Start logging emails, calls, and notices.</p>
-              <Button onClick={() => setShowAdd(true)}>Log First Communication</Button>
+              <p className="text-sm text-muted-foreground mb-4">Every trustee-beneficiary interaction should be documented. Start logging emails, calls, and notices.</p>
+              <Button className="btn-primary" onClick={() => setShowAdd(true)}>Log First Communication</Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -246,21 +248,21 @@ export default function CommunicationsPage() {
                 const Icon = COMM_TYPE_ICONS[comm.comm_type] || MessageSquare;
                 const needsAction = comm.action_required && !comm.action_completed;
                 return (
-                  <div key={comm.comm_id} className={`bg-white border ${needsAction ? 'border-warning/30' : 'border-neutral-200'} rounded p-4`}>
+                  <div key={comm.comm_id} className={`card-trust ${needsAction ? 'border-warning/30' : ''} p-4`}>
                     <div className="flex items-start gap-3">
                       <div className={`w-9 h-9 flex items-center justify-center flex-shrink-0 rounded ${needsAction ? 'bg-warning/10 text-warning' : 'bg-navy/5 text-navy'}`}>
                         <Icon className="w-4 h-4"/>
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-mono text-neutral-500 uppercase">{COMM_TYPE_LABELS[comm.comm_type] || comm.comm_type}</span>
+                          <span className="text-xs font-mono text-muted-foreground uppercase">{COMM_TYPE_LABELS[comm.comm_type] || comm.comm_type}</span>
                           {needsAction && (
                             <Badge className="bg-warning/10 text-warning">Action Required</Badge>
                           )}
-                          <span className="text-xs text-neutral-400 ml-auto">{format(parseISO(comm.created_at), 'MMM d, yyyy')}</span>
+                          <span className="text-xs text-muted-foreground ml-auto">{format(parseISO(comm.created_at), 'MMM d, yyyy')}</span>
                         </div>
                         <h3 className="font-semibold text-navy text-sm">{comm.subject}</h3>
-                        <p className="text-sm text-neutral-600 mt-1 line-clamp-2">{comm.content}</p>
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{comm.content}</p>
                         {needsAction && comm.action_due && (
                           <p className="text-xs text-warning mt-2 flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5"/>

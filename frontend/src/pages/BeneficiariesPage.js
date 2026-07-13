@@ -82,7 +82,7 @@ const OwnershipPieChart = ({ beneficiaries, totalAuthorized }) => {
         )}
         {totalIssued < 100 && (
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 flex-shrink-0 bg-gray-200" />
+            <div className="w-3 h-3 flex-shrink-0 bg-muted" />
             <span>Unissued</span>
             <span className="font-mono text-xs text-muted-foreground">{(100 - totalIssued).toFixed(1)}%</span>
           </div>
@@ -557,6 +557,10 @@ export default function BeneficiariesPage() {
   };
 
   const openEditModal = (certificate) => {
+    if (isReadOnly) {
+      showUpgradeModal('edit certificates', 'button_click', 'beneficiaries_page');
+      return;
+    }
     setEditingCertificate(certificate);
     setCertificateForm({
       holder_name: certificate.holder_name,
@@ -579,10 +583,10 @@ export default function BeneficiariesPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="main-layout">
         <Sidebar />
-        <main className="lg:pl-64 pt-16 lg:pt-0">
-          <div className="p-8">
+        <main className="main-content dot-grid">
+          <div className="page-container">
             <div className="card-trust p-8 text-center">
               <p className="text-muted-foreground">Select a trust to manage beneficiaries</p>
             </div>
@@ -594,10 +598,10 @@ export default function BeneficiariesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="main-layout">
       <Sidebar />
-      <main className="lg:pl-64 pt-16 lg:pt-0 mobile-layout-offset">
-        <div className="p-4 lg:p-8">
+      <main className="main-content dot-grid mobile-layout-offset">
+        <div className="page-container">
           {/* Header */}
           <div className="page-header flex items-center justify-between">
             <div>
@@ -613,7 +617,7 @@ export default function BeneficiariesPage() {
                 ]}
                 taPrompt="Help me understand the Beneficiaries page and how to add a beneficiary"
               />
-              <Button variant="outline" onClick={() => setShowSettingsModal(true)} data-testid="settings-btn">
+              <Button variant="outline" onClick={handleOpenSettingsModal} data-testid="settings-btn">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </Button>
@@ -765,8 +769,8 @@ export default function BeneficiariesPage() {
                     
                     <div className="card-trust p-4" data-testid="remaining-units-card">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                          <PieChart className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                        <div className="w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
+                          <PieChart className="w-5 h-5 text-gold" />
                         </div>
                         <div>
                           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Remaining</p>
@@ -982,8 +986,8 @@ export default function BeneficiariesPage() {
                               )}
                               <span className={`px-2 py-0.5 text-xs font-mono ${
                                 cert.status === 'active' ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success' :
-                                cert.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                                cert.status === 'cancelled' ? 'bg-error/10 text-error dark:bg-error/20 dark:text-error' :
+                                'bg-muted text-muted-foreground'
                               }`}>
                                 {cert.status}
                               </span>
@@ -1024,7 +1028,7 @@ export default function BeneficiariesPage() {
                                   Transfer Units
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setShowRevokeModal(cert)} className="text-red-600">
+                                <DropdownMenuItem onClick={() => setShowRevokeModal(cert)} className="text-error">
                                   <XCircle className="w-4 h-4 mr-2" />
                                   Revoke
                                 </DropdownMenuItem>
@@ -1058,8 +1062,8 @@ export default function BeneficiariesPage() {
                     {overviewData.recent_transfers.map((transfer) => (
                       <div key={transfer.transfer_id} className="p-4 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                            <TrendingUp className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                          <div className="w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
+                            <TrendingUp className="w-5 h-5 text-gold" />
                           </div>
                           <div>
                             <p className="font-medium text-navy dark:text-foreground">
@@ -1145,7 +1149,7 @@ export default function BeneficiariesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          className="text-error hover:text-error hover:bg-error/10 dark:hover:bg-error/20"
                           onClick={() => setDeleteConfirmClass(cb)}
                           data-testid={`delete-class-${cb.class_beneficiary_id}`}
                         >
@@ -1254,7 +1258,7 @@ export default function BeneficiariesPage() {
                     </p>
                   )}
                   {certificateForm.units && parseFloat(certificateForm.units) > summary.remaining_units && !editingCertificate && (
-                    <p className="text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1">
+                    <p className="text-xs text-error dark:text-error font-medium flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
                       Exceeds available units ({summary.remaining_units} remaining)
                     </p>
@@ -1412,7 +1416,7 @@ export default function BeneficiariesPage() {
       <Dialog open={!!showRevokeModal} onOpenChange={() => setShowRevokeModal(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-red-600">Revoke Certificate</DialogTitle>
+            <DialogTitle className="text-error">Revoke Certificate</DialogTitle>
             <DialogDescription>
               Are you sure you want to revoke certificate {showRevokeModal?.certificate_number}? 
               This will return {showRevokeModal?.units} units to the available pool.
@@ -1487,7 +1491,7 @@ export default function BeneficiariesPage() {
       <Dialog open={!!deleteConfirmClass} onOpenChange={() => setDeleteConfirmClass(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-red-600">Remove Class Beneficiary</DialogTitle>
+            <DialogTitle className="text-error">Remove Class Beneficiary</DialogTitle>
             <DialogDescription>
               Are you sure you want to remove "{deleteConfirmClass?.class_type_label}"? 
               This will remove the class designation from this trust.

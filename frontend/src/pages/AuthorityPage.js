@@ -51,7 +51,7 @@ export default function AuthorityPage() {
     try {
       const [entitiesRes, relsRes, trustRes] = await Promise.all([
         fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}`),
-        fetchWithAuth(`/relationships?trust_id=${selectedTrust.trust_id}`),
+        fetchWithAuth(`/entity-relationships?trust_id=${selectedTrust.trust_id}`),
         fetchWithAuth(`/trusts/${selectedTrust.trust_id}`),
       ]);
       if (entitiesRes.ok) setEntities((await entitiesRes.json()).entities || []);

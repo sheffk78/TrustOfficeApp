@@ -441,7 +441,7 @@ class EntityRelationshipCreate(BaseModel):
     parent_entity_id: str
     child_entity_id: str
     relationship_type: RelationshipType
-    ownership_percentage: Optional[float] = None
+    ownership_percentage: Optional[float] = Field(None, ge=0, le=100)
     notes: str = ""
 
 class EntityRelationshipResponse(BaseModel):
@@ -765,7 +765,7 @@ class ScheduleAItemCreate(BaseModel):
     description: str
     identifier: str = ""
     location: str = ""
-    approximate_value: Optional[float] = None
+    approximate_value: Optional[float] = Field(None, ge=0)
     date_conveyed: str
     notes: str = ""
     minutes_ref: Optional[str] = None
@@ -774,7 +774,7 @@ class ScheduleAItemUpdate(BaseModel):
     description: Optional[str] = None
     identifier: Optional[str] = None
     location: Optional[str] = None
-    approximate_value: Optional[float] = None
+    approximate_value: Optional[float] = Field(None, ge=0)
     date_conveyed: Optional[str] = None
     notes: Optional[str] = None
 

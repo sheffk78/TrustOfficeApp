@@ -93,10 +93,13 @@ async def delete_entity(entity_id: str, user: dict = Depends(require_write_acces
         raise HTTPException(status_code=404, detail="Entity not found. It may have been already deleted. Please refresh the page and try again.")
     
     # Delete related relationships
-    await db.entity_relationships.delete_many({"$or": [
-        {"parent_entity_id": entity_id},
-        {"child_entity_id": entity_id}
-    ]})
+    await db.entity_relationships.delete_many({
+        "user_id": user["user_id"],
+        "$or": [
+            {"parent_entity_id": entity_id},
+            {"child_entity_id": entity_id}
+        ]
+    })
     
     return {"message": "Entity deleted"}
 
@@ -106,6 +109,21 @@ async def delete_entity(entity_id: str, user: dict = Depends(require_write_acces
 @router.post("/entity-relationships", response_model=EntityRelationshipResponse)
 async def create_relationship(rel: EntityRelationshipCreate, user: dict = Depends(require_write_access)):
     """Create an entity relationship"""
+    # Verify trust ownership
+    trust = await db.trusts.find_one({"trust_id": rel.trust_id, "user_id": user["user_id"]})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
+
+    # Verify parent entity exists and belongs to user
+    parent = await db.entities.find_one({"entity_id": rel.parent_entity_id, "user_id": user["user_id"]})
+    if not parent:
+        raise HTTPException(status_code=404, detail="Parent entity not found. It may have been deleted. Please refresh the page and try again.")
+
+    # Verify child entity exists and belongs to user
+    child = await db.entities.find_one({"entity_id": rel.child_entity_id, "user_id": user["user_id"]})
+    if not child:
+        raise HTTPException(status_code=404, detail="Child entity not found. It may have been deleted. Please refresh the page and try again.")
+
     rel_id = f"rel_{uuid.uuid4().hex[:12]}"
     rel_doc = {
         "relationship_id": rel_id,
@@ -114,9 +132,9 @@ async def create_relationship(rel: EntityRelationshipCreate, user: dict = Depend
         "relationship_type": rel.relationship_type.value,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    
+
     await db.entity_relationships.insert_one(rel_doc)
-    
+
     return EntityRelationshipResponse(**rel_doc)
 
 

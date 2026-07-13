@@ -1,6 +1,6 @@
 # Schedule A router - handles trust asset ledger (Schedule A)
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
@@ -114,7 +114,7 @@ async def update_schedule_a_item(item_id: str, update: ScheduleAItemUpdate, user
     if not item:
         raise HTTPException(status_code=404, detail="Asset not found")
     
-    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     await db.schedule_a_items.update_one(
@@ -138,7 +138,7 @@ class DisposeAssetRequest(BaseModel):
     """Request model for disposing an asset without minutes"""
     disposition_date: str
     disposition_reason: str = "sale"  # sale, transfer, donation, destruction
-    disposition_value: Optional[float] = None
+    disposition_value: Optional[float] = Field(None, ge=0)
     disposition_recipient: Optional[str] = None
     disposition_notes: Optional[str] = None
 

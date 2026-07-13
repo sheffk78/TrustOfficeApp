@@ -206,7 +206,7 @@ export default function TrustAdminKitsPage() {
             >
               <CardContent className="p-5">
                 <div className="flex items-start gap-3">
-                  <div className="p-2.5 rounded-lg bg-gold/10 text-gold">
+                  <div className="p-2.5 bg-gold/10 text-gold">
                     <Icon className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -231,8 +231,8 @@ export default function TrustAdminKitsPage() {
       {kitsLoading ? (
         <div className="mt-8 animate-pulse space-y-3">
           <div className="h-5 w-48 bg-muted rounded" />
-          <div className="h-16 bg-muted rounded-lg" />
-          <div className="h-16 bg-muted rounded-lg" />
+          <div className="h-16 bg-muted " />
+          <div className="h-16 bg-muted " />
         </div>
       ) : existingKits.length > 0 ? (
         <div className="mt-8">
@@ -252,7 +252,7 @@ export default function TrustAdminKitsPage() {
               >
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-muted">
+                    <div className="p-2 bg-muted">
                       <Icon className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div>
@@ -324,7 +324,7 @@ export default function TrustAdminKitsPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <CheckCircle2 className="w-5 h-5 text-success" />
                   What We Already Know
                 </CardTitle>
               </CardHeader>
@@ -350,7 +350,7 @@ export default function TrustAdminKitsPage() {
                     </p>
                     {previewData.auto_gathered.vault_docs.map(doc => (
                       <div key={doc.doc_id} className="flex items-center gap-2 text-xs py-1">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
                         <span className="truncate">{doc.title || doc.file_name}</span>
                         <Badge variant="outline" className="text-[10px] py-0 px-1.5">{doc.category}</Badge>
                       </div>
@@ -385,7 +385,7 @@ export default function TrustAdminKitsPage() {
                           <select
                             value={formInputs[key] || ''}
                             onChange={(e) => updateInput(key, e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-gold/40 focus:border-gold/40 outline-none"
+                            className="w-full px-3 py-2 border border-border bg-background text-sm focus:ring-2 focus:ring-gold/40 focus:border-gold/40 outline-none"
                           >
                             <option value="">Select...</option>
                             {field.options?.map(opt => (
@@ -405,14 +405,14 @@ export default function TrustAdminKitsPage() {
                           value={formInputs[key] || ''}
                           onChange={(e) => updateInput(key, e.target.value)}
                           placeholder={field.placeholder || ''}
-                          className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors ${
+                          className={`w-full px-3 py-2 border text-sm outline-none transition-colors ${
                             isAutoFilled
-                              ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900'
+                              ? 'bg-success/10 dark:bg-success/20 border-success/30 dark:border-success/40'
                               : 'bg-background border-border focus:ring-2 focus:ring-gold/40 focus:border-gold/40'
                           }`}
                         />
                         {isAutoFilled && (
-                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                          <p className="text-xs text-success mt-1 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> From your trust profile (editable)
                           </p>
                         )}
@@ -429,7 +429,7 @@ export default function TrustAdminKitsPage() {
               <Button
                 onClick={generateKit}
                 disabled={!requiredFieldsFilled() || generating}
-                className="bg-gold hover:bg-gold/90 text-white"
+                className="btn-gold"
               >
                 {generating ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
@@ -492,7 +492,7 @@ export default function TrustAdminKitsPage() {
           <Card>
             <CardContent className="p-5">
               <div className="flex items-start gap-3 mb-3">
-                <div className="p-2.5 rounded-lg bg-gold/10 text-gold">
+                <div className="p-2.5 bg-gold/10 text-gold">
                   <Icon className="w-6 h-6" />
                 </div>
                 <div className="flex-1">
@@ -557,7 +557,7 @@ export default function TrustAdminKitsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {content.forms.map((form, i) => (
-                  <div key={i} className="border border-border rounded-lg p-4">
+                  <div key={i} className="border border-border p-4">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div>
                         <p className="font-medium text-sm">{form.form_name}</p>
@@ -577,7 +577,7 @@ export default function TrustAdminKitsPage() {
                       )}
                     </div>
                     {form.pre_fill_data && Object.keys(form.pre_fill_data).length > 0 && (
-                      <div className="mt-2 rounded-md bg-muted/50 p-3">
+                      <div className="mt-2 bg-muted/50 p-3">
                         <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Pre-fill Data</p>
                         <div className="space-y-1">
                           {Object.entries(form.pre_fill_data).map(([k, v]) => (
@@ -611,7 +611,7 @@ export default function TrustAdminKitsPage() {
               <CardContent className="space-y-2">
                 {content.documents_to_bring.map((doc, i) => (
                   <div key={i} className="flex items-center gap-3 py-1.5 border-b border-border/40 last:border-0">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium">{doc.document}</span>
                       {doc.source && (
@@ -654,16 +654,16 @@ export default function TrustAdminKitsPage() {
 
           {/* Special notes */}
           {content.special_notes && content.special_notes.length > 0 && (
-            <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+            <Card className="border-warning/30 bg-warning/5 dark:bg-warning/10">
               <CardContent className="p-4">
                 <div className="flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium text-sm mb-1.5">Important Notes</p>
                     <ul className="space-y-1.5">
                       {content.special_notes.map((note, i) => (
                         <li key={i} className="text-sm text-muted-foreground flex gap-2">
-                          <span className="text-amber-500">•</span> {note}
+                          <span className="text-warning">•</span> {note}
                         </li>
                       ))}
                     </ul>
@@ -689,13 +689,13 @@ export default function TrustAdminKitsPage() {
 
   // ==================== MAIN RENDER ====================
   return (
-    <div className="flex min-h-screen">
+    <div className="main-layout">
       <Sidebar />
-      <div className="flex-1 page-container">
-        <div className="page-content">
+      <div className="main-content dot-grid">
+        <div className="page-container">
           {!trustId && view !== 'select' ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <AlertCircle className="w-8 h-8 text-amber-500" />
+              <AlertCircle className="w-8 h-8 text-warning" />
               <p className="text-sm text-muted-foreground">Please select a trust to use Administration Kits.</p>
             </div>
           ) : (

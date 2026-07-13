@@ -327,11 +327,11 @@ export default function VaultPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="min-h-screen bg-subtle-bg">
+      <div className="main-layout">
         <Sidebar />
-        <div className="md:pl-64 pb-20 md:pb-0">
-          <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
+        <div className="main-content dot-grid">
+          <div className="page-container">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
               <FolderOpen className="w-12 h-12 text-muted-foreground/40 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
               <p className="text-sm text-muted-foreground">Choose a trust to view document vault.</p>
@@ -346,10 +346,10 @@ export default function VaultPage() {
   const categories = summary?.categories || DOC_CATEGORIES;
 
   return (
-    <div className="min-h-screen bg-subtle-bg">
+    <div className="main-layout">
       <Sidebar />
-      <div className="md:pl-64 pb-20 md:pb-0 mobile-layout-offset">
-        <div className="pt-16 md:pt-8 ml-4 mr-4">
+      <div className="main-content dot-grid">
+        <div className="page-container">
 
           <div className="page-header flex items-center justify-between">
             <div>
@@ -365,7 +365,7 @@ export default function VaultPage() {
                 ]}
                 taPrompt="Help me understand the Document Vault and how to upload files"
               />
-              <Button onClick={() => { setShowAdd(!showAdd); setAddMode('upload'); }}>
+              <Button className="btn-primary" onClick={() => { setShowAdd(!showAdd); setAddMode('upload'); }}>
                 <Plus className="w-4 h-4 mr-2"/>
                 Add Document
               </Button>
@@ -402,7 +402,7 @@ export default function VaultPage() {
           {/* Search + Category Filter */}
           <div className="flex gap-2 mb-6">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-neutral-400"/>
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground"/>
               <Input
                 placeholder="Search documents..."
                 value={search}
@@ -425,16 +425,16 @@ export default function VaultPage() {
 
           {/* Add Form */}
           {showAdd && (
-            <Card className="mb-6 border border-neutral-200">
+            <Card className="mb-6 border-border">
               <CardContent className="p-4">
                 {/* Mode Toggle - styled as tabs, not action buttons */}
-                <div className="flex border-b border-neutral-200 mb-4">
+                <div className="flex border-b border-border mb-4">
                   <button
                     onClick={() => setAddMode('upload')}
                     className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                       addMode === 'upload'
                         ? 'border-navy text-navy'
-                        : 'border-transparent text-neutral-500 hover:text-neutral-800'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     <Upload className="w-4 h-4"/> Upload File
@@ -444,7 +444,7 @@ export default function VaultPage() {
                     className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                       addMode === 'link'
                         ? 'border-navy text-navy'
-                        : 'border-transparent text-neutral-500 hover:text-neutral-800'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     <Link2 className="w-4 h-4"/> Link External
@@ -529,15 +529,15 @@ export default function VaultPage() {
                 <textarea placeholder="Description..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="input-trust w-full text-sm mb-3" rows={2} />
                 {/* Expiration / Renewal - only relevant for documents that expire */}
                 <div className="mb-3">
-                  <label className="text-sm font-medium text-neutral-700 block mb-1.5">Expiration / Renewal Date (optional)</label>
-                  <p className="text-xs text-neutral-500 mb-2">
+                  <label className="text-sm font-medium text-foreground block mb-1.5">Expiration / Renewal Date (optional)</label>
+                  <p className="text-xs text-muted-foreground mb-2">
                     For documents that have an expiration or renewal date, such as insurance policies, certifications, or licenses. Trust instruments and most legal documents do not expire, so you can skip this.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <Input type="date" placeholder="Expires on" value={form.expiration_date} onChange={e => setForm({ ...form, expiration_date: e.target.value })} />
                     <div className="flex items-center gap-2">
                       <input type="checkbox" checked={form.needs_renewal} onChange={e => setForm({ ...form, needs_renewal: e.target.checked })} id="renew" />
-                    <label htmlFor="renew" className="text-sm text-neutral-600">Remind me to renew before this date</label>
+                    <label htmlFor="renew" className="text-sm text-muted-foreground">Remind me to renew before this date</label>
                   </div>
                 </div>
                 {form.needs_renewal && form.expiration_date && (
@@ -554,6 +554,7 @@ export default function VaultPage() {
 
                 <div className="flex gap-2">
                   <Button
+                    className="btn-primary"
                     onClick={addMode === 'upload' ? handleUpload : addDocument}
                     disabled={addMode === 'upload' ? uploading || !uploadFile : !form.title}
                   >
@@ -575,14 +576,14 @@ export default function VaultPage() {
           {/* Document Grid by Category */}
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-20 bg-white border border-neutral-200 rounded animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-20 card-trust animate-pulse"/>)}
             </div>
           ) : Object.keys(byCategory).length === 0 ? (
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
               <FolderOpen className="w-12 h-12 text-muted-foreground/30 mb-3"/>
               <h2 className="text-lg font-semibold text-navy mb-1">Vault is empty</h2>
-              <p className="text-sm text-neutral-600 mb-4">Upload your trust documents or link to files stored externally.</p>
-              <Button onClick={() => { setShowAdd(true); setAddMode('upload'); }}>Upload First Document</Button>
+              <p className="text-sm text-muted-foreground mb-4">Upload your trust documents or link to files stored externally.</p>
+              <Button className="btn-primary" onClick={() => { setShowAdd(true); setAddMode('upload'); }}>Upload First Document</Button>
             </div>
           ) : (
             <div className="space-y-8">
@@ -590,13 +591,13 @@ export default function VaultPage() {
                 const Icon = CATEGORY_ICONS[cat] || FileText;
                 return (
                   <div key={cat}>
-                    <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
                       <Icon className="w-4 h-4"/>
                       {data.label} ({data.documents.length})
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {data.documents.map((doc) => (
-                        <div key={doc.doc_id} className="bg-white border border-neutral-200 rounded p-4 hover:shadow-sm transition-shadow">
+                        <div key={doc.doc_id} className="card-trust p-4 hover:shadow-sm transition-shadow">
                           <div className="flex items-start justify-between mb-2">
                             <p className="font-semibold text-navy text-sm line-clamp-2">{doc.title}</p>
                             <button onClick={() => deleteDocument(doc.doc_id)} className="text-muted-foreground hover:text-rust ml-2 flex-shrink-0">
@@ -611,10 +612,10 @@ export default function VaultPage() {
                               {doc.file_name} {doc.file_size && `(${doc.file_size})`}
                             </div>
                           ) : doc.file_name ? (
-                            <p className="text-xs text-neutral-500 mb-2">{doc.file_name}</p>
+                            <p className="text-xs text-muted-foreground mb-2">{doc.file_name}</p>
                           ) : null}
 
-                          {doc.description && <p className="text-xs text-neutral-600 mb-2 line-clamp-2">{doc.description}</p>}
+                          {doc.description && <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{doc.description}</p>}
                           <div className="flex flex-wrap gap-1 mb-3">
                             {doc.tags?.map((tag, i) => (
                               <span key={i} className="text-[10px] bg-navy/5 text-navy/60 px-1.5 py-0.5 rounded">{tag}</span>
@@ -673,9 +674,9 @@ export default function VaultPage() {
                                 </button>
                               </div>
                             ) : (
-                              <span className="text-xs text-neutral-400">No link</span>
+                              <span className="text-xs text-muted-foreground">No link</span>
                             )}
-                            <span className="text-[10px] text-neutral-400">
+                            <span className="text-[10px] text-muted-foreground">
                               {doc.date ? format(parseISO(doc.date), 'MMM d, yyyy') : ''}
                             </span>
                           </div>

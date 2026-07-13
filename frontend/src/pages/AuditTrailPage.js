@@ -31,6 +31,9 @@ const EVENT_ICONS = {
   entity_created: Building2,
   entity_updated: Building2,
   relationship_created: ArrowUpDown,
+  beneficiary_created: Users,
+  schedule_a_created: DollarSign,
+  communication_logged: FileText,
   alert_created: AlertTriangle,
   alert_resolved: Shield,
   transaction_created: DollarSign,
@@ -48,6 +51,9 @@ const EVENT_COLORS = {
   entity_created: 'bg-purple-50 text-purple-700 border-purple-200',
   entity_updated: 'bg-purple-50 text-purple-600 border-purple-200',
   relationship_created: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  beneficiary_created: 'bg-success/5 text-success border-success/20',
+  schedule_a_created: 'bg-amber-50 text-amber-700 border-amber-200',
+  communication_logged: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   alert_created: 'bg-warning/5 text-warning border-warning/20',
   alert_resolved: 'bg-success/5 text-success border-success/20',
   transaction_created: 'bg-teal-50 text-teal-700 border-teal-200',
@@ -121,7 +127,7 @@ export default function AuditTrailPage() {
 
       // Fetch relationships
       try {
-        const relsRes = await fetchWithAuth(`/relationships?trust_id=${trustId}`);
+        const relsRes = await fetchWithAuth(`/entity-relationships?trust_id=${trustId}`);
         if (relsRes.ok) {
           const data = await relsRes.json();
           const rels = data.relationships || [];
@@ -133,6 +139,63 @@ export default function AuditTrailPage() {
               description: `${r.relationship_type || 'relationship'} between entities`,
               date: r.created_at,
               source: 'relationships',
+            });
+          });
+        }
+      } catch (e) { /* skip */ }
+
+      // Fetch beneficiaries
+      try {
+        const benRes = await fetchWithAuth(`/beneficiaries?trust_id=${trustId}`);
+        if (benRes.ok) {
+          const data = await benRes.json();
+          const beneficiaries = data.beneficiaries || data || [];
+          (Array.isArray(beneficiaries) ? beneficiaries : []).forEach(b => {
+            allEvents.push({
+              id: `ben-${b.beneficiary_id || b.id}`,
+              type: 'beneficiary_created',
+              title: `Beneficiary Added: ${b.name || 'Unknown'}`,
+              description: b.relationship || 'Beneficiary added to trust',
+              date: b.created_at || b.date_added,
+              source: 'beneficiaries',
+            });
+          });
+        }
+      } catch (e) { /* skip */ }
+
+      // Fetch Schedule A items
+      try {
+        const schedRes = await fetchWithAuth(`/schedule-a?trust_id=${trustId}&status=all`);
+        if (schedRes.ok) {
+          const data = await schedRes.json();
+          const scheduleItems = data.items || data || [];
+          (Array.isArray(scheduleItems) ? scheduleItems : []).forEach(s => {
+            allEvents.push({
+              id: `sched-${s.item_id || s.id}`,
+              type: 'schedule_a_created',
+              title: `Asset Added: ${s.description || 'Unknown'}`,
+              description: `${s.category || 'Asset'}${s.approximate_value ? ` — $${s.approximate_value.toLocaleString()}` : ''}`,
+              date: s.created_at || s.date_conveyed,
+              source: 'schedule_a',
+            });
+          });
+        }
+      } catch (e) { /* skip */ }
+
+      // Fetch communications
+      try {
+        const commRes = await fetchWithAuth(`/trusts/${trustId}/communications?limit=100`);
+        if (commRes.ok) {
+          const data = await commRes.json();
+          const comms = data.communications || [];
+          comms.forEach(c => {
+            allEvents.push({
+              id: `comm-${c.comm_id}`,
+              type: 'communication_logged',
+              title: `Communication: ${c.subject || c.comm_type_label || 'Logged'}`,
+              description: c.content ? c.content.substring(0, 100) : '',
+              date: c.created_at,
+              source: 'communications',
             });
           });
         }
@@ -335,6 +398,9 @@ export default function AuditTrailPage() {
     { value: 'compensation', label: 'Compensation' },
     { value: 'entity', label: 'Entities' },
     { value: 'relationship', label: 'Relationships' },
+    { value: 'beneficiary', label: 'Beneficiaries' },
+    { value: 'schedule_a', label: 'Schedule A' },
+    { value: 'communication', label: 'Communications' },
     { value: 'alert', label: 'Alerts' },
     { value: 'transaction', label: 'Transactions' },
     { value: 'investment', label: 'Investments' },
