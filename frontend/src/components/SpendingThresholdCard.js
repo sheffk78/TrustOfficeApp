@@ -108,7 +108,7 @@ export default function SpendingThresholdCard() {
                 {alertCount} transaction{alertCount !== 1 ? 's' : ''} exceeded the threshold.
               </p>
               <button
-                onClick={() => navigate('/distributions')}
+                onClick={() => navigate('/transactions')}
                 className="ml-auto text-xs text-error font-medium hover:underline"
               >
                 Review

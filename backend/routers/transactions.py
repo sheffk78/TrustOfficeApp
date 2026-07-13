@@ -1,5 +1,6 @@
 # Transactions router - Trust Transaction Ledger for structural separation tracking
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import Field
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
@@ -79,8 +80,9 @@ async def create_transaction(txn: TransactionCreate, user: dict = Depends(requir
     # Run alert detection on new transaction
     try:
         await check_transaction_alerts(txn_doc)
-    except Exception:
-        pass  # Don't fail the create if alerting errors
+    except Exception as e:
+        import logging
+        logging.exception(f"Alert detection failed for transaction {txn_id}: {e}")
 
     return TransactionResponse(**txn_doc)
 
@@ -94,8 +96,8 @@ async def get_transactions(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     unclassified_only: bool = False,
-    limit: int = 200,
-    skip: int = 0,
+    limit: int = Field(200, ge=1, le=10000),
+    skip: int = Field(0, ge=0),
     user: dict = Depends(get_current_user)
 ):
     """Get transactions for a trust, optionally filtered by entity"""
@@ -177,8 +179,9 @@ async def update_transaction(transaction_id: str, updates: TransactionUpdate, us
     try:
         await auto_resolve_alert_if_fixed(updated)
         await check_transaction_alerts(updated)
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.exception(f"Alert detection failed for transaction {transaction_id}: {e}")
 
     return TransactionResponse(**updated)
 
@@ -310,7 +313,7 @@ async def bulk_classify_transactions(req: BulkClassifyRequest, user: dict = Depe
 # ==================== SUMMARY / ANALYTICS ====================
 
 @router.get("/transactions/summary")
-async def get_transaction_summary(trust_id: str, days: int = 90, user: dict = Depends(get_current_user)):
+async def get_transaction_summary(trust_id: str, days: int = Field(90, ge=1, le=3650), user: dict = Depends(get_current_user)):
     """Get transaction summary per entity for a trust"""
     from datetime import timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -361,7 +364,7 @@ async def get_transaction_summary(trust_id: str, days: int = 90, user: dict = De
 
 
 @router.get("/transactions/separation-dashboard")
-async def get_separation_dashboard(trust_id: str, days: int = 90, user: dict = Depends(get_current_user)):
+async def get_separation_dashboard(trust_id: str, days: int = Field(90, ge=1, le=3650), user: dict = Depends(get_current_user)):
     """Get full separation dashboard data: entities + transactions + alerts + inter-entity flows"""
     from datetime import timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")

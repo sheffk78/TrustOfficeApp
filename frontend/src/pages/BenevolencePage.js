@@ -105,6 +105,8 @@ export default function BenevolencePage() {
   useEffect(() => {
     if (selectedTrust?.benevolence_enabled) {
       loadAllData();
+    } else {
+      setLoading(false);
     }
   }, [selectedTrust]);
 
@@ -354,7 +356,7 @@ export default function BenevolencePage() {
               <p className="text-muted-foreground mb-4">
                 Enable benevolence tracking in Trust Settings to record charitable assistance.
               </p>
-              <Button onClick={() => window.location.href = '/settings'} className="btn-secondary">
+              <Button onClick={() => navigate('/settings')} className="btn-secondary">
                 Go to Settings
               </Button>
             </div>
@@ -508,8 +510,8 @@ export default function BenevolencePage() {
             </div>
             <div className="card-trust p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                <div className="w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-gold" />
                 </div>
                 <div>
                   <p className="label-trust">This Year</p>

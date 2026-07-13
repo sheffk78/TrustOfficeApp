@@ -149,24 +149,27 @@ export default function BenevolenceLogPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="main-layout">
         <Sidebar />
-        <main className="lg:pl-64 pt-16 lg:pt-0">
-          <div className="p-8">
-            <div className="card-trust p-8 text-center">
-              <p className="text-muted-foreground">Select a trust to view benevolence log</p>
+        <main className="main-content dot-grid">
+          <div className="page-container">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <HeartHandshake className="w-12 h-12 text-navy/30 mb-3" />
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a Trust</h2>
+              <p className="text-sm text-muted-foreground">Choose a trust to view benevolence log.</p>
             </div>
           </div>
         </main>
+        <MobileBottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="main-layout">
       <Sidebar />
-      <main className="lg:pl-64 pt-16 lg:pt-0">
-        <div className="p-4 lg:p-8">
+      <main className="main-content dot-grid">
+        <div className="page-container">
           {/* Header */}
           <div className="page-header flex items-center justify-between">
             <div>
@@ -220,8 +223,8 @@ export default function BenevolenceLogPage() {
                 
                 <div className="card-trust p-4" data-testid="this-year-card">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                    <div className="w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-gold" />
                     </div>
                     <div>
                       <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">This Year</p>

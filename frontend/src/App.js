@@ -51,6 +51,8 @@ import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { installGlobalErrorHandlers } from "@/utils/errors";
 import CoursePage from "@/pages/CoursePage";
 import TrustAdminKitsPage from "@/pages/TrustAdminKitsPage";
+import TransactionLedgerPage from "@/pages/TransactionLedgerPage";
+import BenevolenceLogPage from "@/pages/BenevolenceLogPage";
 
 // Install global uncaught error handlers once at app load
 // Reports to /api/report-error -> Discord alert (see utils/errors.js)
@@ -241,9 +243,19 @@ const AppRouter = () => {
           <BenevolencePage />
         </SubscriptionProtectedRoute>
       } />
+      <Route path="/benevolence-log" element={
+        <SubscriptionProtectedRoute>
+          <BenevolenceLogPage />
+        </SubscriptionProtectedRoute>
+      } />
       <Route path="/distributions" element={
         <SubscriptionProtectedRoute>
           <DistributionsPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/transactions" element={
+        <SubscriptionProtectedRoute>
+          <TransactionLedgerPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/compensation" element={

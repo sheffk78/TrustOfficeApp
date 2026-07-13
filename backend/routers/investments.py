@@ -20,6 +20,7 @@ async def create_investment(trust_id: str, investment: dict, user: dict = Depend
     doc = {
         "investment_id": f"inv_{uuid.uuid4().hex[:12]}",
         "trust_id": trust_id,
+        "user_id": user["user_id"],
         "asset_name": investment["asset_name"],
         "asset_type": investment.get("asset_type", "other"),  # stock, bond, reit, crypto, real_estate, other
         "purchase_date": investment.get("purchase_date"),
@@ -48,7 +49,7 @@ async def list_investments(trust_id: str, user: dict = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="Trust not found")
 
     docs = await db.investments.find(
-        {"trust_id": trust_id, "is_active": True},
+        {"trust_id": trust_id, "user_id": user["user_id"], "is_active": True},
         {"_id": 0}
     ).sort("created_at", -1).to_list(200)
 
@@ -79,7 +80,8 @@ async def update_investment(investment_id: str, update: dict, user: dict = Depen
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
-    update_data = {k: v for k, v in update.items() if v is not None}
+    allowed_fields = {"asset_name", "asset_type", "current_value", "quantity", "unit", "custodian", "notes", "performance_snapshot", "is_active"}
+    update_data = {k: v for k, v in update.items() if v is not None and k in allowed_fields}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     await db.investments.update_one({"investment_id": investment_id}, {"$set": update_data})
@@ -95,7 +97,7 @@ async def investment_summary(trust_id: str, user: dict = Depends(get_current_use
 
     by_type = []
     pipeline = [
-        {"$match": {"trust_id": trust_id, "is_active": True}},
+        {"$match": {"trust_id": trust_id, "user_id": user["user_id"], "is_active": True}},
         {"$group": {"_id": "$asset_type", "count": {"$sum": 1}, "value": {"$sum": "$current_value"}}}
     ]
     async for doc in db.investments.aggregate(pipeline):

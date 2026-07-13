@@ -132,7 +132,7 @@ async def validate_distribution_beneficiary(
         "user_id": user["user_id"],
         "name": {"$regex": f"^{escaped_name}$", "$options": "i"}
     })
-    return {"valid": bool(beneficiary), "beneficiary": beneficiary}
+    return {"valid": bool(beneficiary)}
 
 
 @router.get("/distributions", response_model=List[DistributionResponse])
@@ -336,7 +336,7 @@ async def patch_distribution_status(
     return DistributionResponse(**updated)
 
 
-@router.put("/distributions/{distribution_id}")
+@router.put("/distributions/{distribution_id}", deprecated=True, include_in_schema=False)
 async def update_distribution_status(
     distribution_id: str, 
     status: str,

@@ -31,18 +31,18 @@ const CLASSIFICATIONS = [
 ];
 
 const DIRECTION_OPTIONS = [
-  { value: 'inflow', label: 'Inflow', icon: ArrowDownLeft, color: 'text-emerald-600' },
-  { value: 'outflow', label: 'Outflow', icon: ArrowUpRight, color: 'text-red-500' },
+  { value: 'inflow', label: 'Inflow', icon: ArrowDownLeft, color: 'text-success' },
+  { value: 'outflow', label: 'Outflow', icon: ArrowUpRight, color: 'text-error' },
 ];
 
 const classificationColors = {
-  'Distribution': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  'Compensation': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  'Distribution': 'bg-gold/10 text-gold dark:bg-gold/20 dark:text-gold',
+  'Compensation': 'bg-navy/10 text-navy dark:bg-navy/20 dark:text-navy',
   'Inter-Entity Transfer': 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning',
-  'Operational Expense': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-  'Capital Contribution': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-  'Tax Payment': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  'Other': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  'Operational Expense': 'bg-muted text-muted-foreground dark:bg-muted/30 dark:text-muted-foreground',
+  'Capital Contribution': 'bg-success/10 text-success dark:bg-success/20 dark:text-success',
+  'Tax Payment': 'bg-error/10 text-error dark:bg-error/20 dark:text-error',
+  'Other': 'bg-navy/5 text-navy/70 dark:bg-navy/20 dark:text-navy/70',
 };
 
 export default function TransactionLedgerPage() {
@@ -194,7 +194,7 @@ export default function TransactionLedgerPage() {
       if (!res.ok) throw new Error('Failed');
       toast.success('Transaction deleted');
       loadData();
-    } catch {
+    } catch (e) {
       showError(toast, e, { operation: 'delete', page: 'TransactionLedger' });
     }
   };
@@ -350,10 +350,12 @@ export default function TransactionLedgerPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="flex min-h-screen bg-background">
+      <div className="main-layout">
         <Sidebar />
-        <main className="flex-1 p-4 md:p-8">
-          <p className="text-muted-foreground">Select a trust to view its transaction ledger.</p>
+        <main className="main-content dot-grid">
+          <div className="page-container">
+            <p className="text-muted-foreground">Select a trust to view its transaction ledger.</p>
+          </div>
         </main>
         <MobileBottomNav />
       </div>
@@ -361,9 +363,10 @@ export default function TransactionLedgerPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="main-layout">
       <Sidebar />
-      <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-x-hidden" data-testid="transaction-ledger-page">
+      <main className="main-content dot-grid" data-testid="transaction-ledger-page">
+        <div className="page-container">
         {/* Header */}
         <div className="page-header flex items-center justify-between">
           <div>
@@ -379,10 +382,10 @@ export default function TransactionLedgerPage() {
               ]}
               taPrompt="Help me understand the Transaction Ledger and how to add a transaction"
             />
-            <Button variant="outline" size="sm" onClick={() => { setShowImport(true); setImportStep(1); }} data-testid="import-csv-btn">
+            <Button variant="outline" size="sm" className="btn-secondary" onClick={() => { setShowImport(true); setImportStep(1); }} data-testid="import-csv-btn">
               <Upload className="w-4 h-4 mr-2" /> Import CSV
             </Button>
-            <Button size="sm" onClick={() => setShowCreate(true)} data-testid="add-transaction-btn">
+            <Button size="sm" className="btn-primary" onClick={() => setShowCreate(true)} data-testid="add-transaction-btn">
               <Plus className="w-4 h-4 mr-2" /> Add Transaction
             </Button>
           </div>
@@ -390,28 +393,28 @@ export default function TransactionLedgerPage() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="rounded border border-border bg-card p-4">
+          <div className="border border-border bg-card p-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total Inflows</p>
-            <p className="text-xl font-semibold text-emerald-600" data-testid="total-inflows">
+            <p className="text-xl font-semibold text-success" data-testid="total-inflows">
               ${totalInflows.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="rounded border border-border bg-card p-4">
+          <div className="border border-border bg-card p-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total Outflows</p>
-            <p className="text-xl font-semibold text-red-500" data-testid="total-outflows">
+            <p className="text-xl font-semibold text-error" data-testid="total-outflows">
               ${totalOutflows.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="rounded border border-border bg-card p-4">
+          <div className="border border-border bg-card p-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net Flow</p>
-            <p className={`text-xl font-semibold ${totalInflows - totalOutflows >= 0 ? 'text-emerald-600' : 'text-red-500'}`} data-testid="net-flow">
+            <p className={`text-xl font-semibold ${totalInflows - totalOutflows >= 0 ? 'text-success' : 'text-error'}`} data-testid="net-flow">
               ${(totalInflows - totalOutflows).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
           </div>
         </div>
 
         {/* Separation Alerts Panel */}
-        <div className="mb-6 rounded border border-border bg-card p-4">
+        <div className="mb-6 border border-border bg-card p-4">
           <SeparationAlertsPanel onLinkMinutes={(alert) => {
             const txn = transactions.find(t => t.transaction_id === alert.transaction_id);
             if (txn) openLinkMinutes(txn);
@@ -457,7 +460,7 @@ export default function TransactionLedgerPage() {
 
         {/* Bulk action bar */}
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-3 mb-4 p-3 rounded bg-navy/5 dark:bg-navy/20 border border-navy/20" data-testid="bulk-action-bar">
+          <div className="flex items-center gap-3 mb-4 p-3 bg-navy/5 dark:bg-navy/20 border border-navy/20" data-testid="bulk-action-bar">
             <span className="text-sm font-medium">{selectedIds.size} selected</span>
             <Button size="sm" variant="outline" onClick={() => setShowBulkClassify(true)} data-testid="bulk-classify-btn">
               <Tag className="w-4 h-4 mr-2" /> Classify Selected
@@ -469,7 +472,7 @@ export default function TransactionLedgerPage() {
         )}
 
         {/* Transaction Table */}
-        <div className="rounded border border-border overflow-hidden bg-card">
+        <div className="border border-border overflow-hidden bg-card">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -512,7 +515,7 @@ export default function TransactionLedgerPage() {
                       </td>
                       <td className="p-3 text-foreground whitespace-nowrap">{t.entity_name}</td>
                       <td className="p-3 text-right whitespace-nowrap font-medium">
-                        <span className={t.direction === 'inflow' ? 'text-emerald-600' : 'text-red-500'}>
+                        <span className={t.direction === 'inflow' ? 'text-success' : 'text-error'}>
                           {t.direction === 'inflow' ? '+' : '-'}${t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
@@ -523,7 +526,7 @@ export default function TransactionLedgerPage() {
                         }
                       </td>
                       <td className="p-3">
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${classificationColors[t.governance_classification] || 'bg-gray-100 text-gray-700'}`}>
+                        <span className={`inline-block px-2 py-0.5 text-xs font-medium ${classificationColors[t.governance_classification] || 'bg-muted text-muted-foreground'}`}>
                           {t.governance_classification}
                         </span>
                       </td>
@@ -533,7 +536,7 @@ export default function TransactionLedgerPage() {
                           const alert = thresholdAlertByTxn.get(t.transaction_id);
                           if (t.linked_minutes_id) {
                             return (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/10 text-success" title="Linked to minutes">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-success/10 text-success" title="Linked to minutes">
                                 <FileText className="w-3 h-3" /> Linked
                               </span>
                             );
@@ -541,7 +544,7 @@ export default function TransactionLedgerPage() {
                           if (alert) {
                             return (
                               <div className="flex flex-col items-center gap-1">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-warning/10 text-warning" title={alert.description}>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-warning/10 text-warning" title={alert.description}>
                                   <AlertTriangle className="w-3 h-3" /> Exceeded
                                 </span>
                                 <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-navy hover:text-navy/70"
@@ -558,7 +561,7 @@ export default function TransactionLedgerPage() {
                       <td className="p-3 text-center">
                         <Button variant="ghost" size="sm" onClick={() => handleDelete(t.transaction_id)}
                           data-testid={`delete-txn-${t.transaction_id}`}>
-                          <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-500" />
+                          <Trash2 className="w-4 h-4 text-muted-foreground hover:text-error" />
                         </Button>
                       </td>
                     </tr>
@@ -572,6 +575,7 @@ export default function TransactionLedgerPage() {
         <p className="text-xs text-muted-foreground mt-3">
           Showing {filtered.length} of {transactions.length} transactions
         </p>
+        </div>
       </main>
       <MobileBottomNav />
 
@@ -583,7 +587,7 @@ export default function TransactionLedgerPage() {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <Label>Entity *</Label>
+              <Label className="label-trust">Entity *</Label>
               <Select value={form.entity_id} onValueChange={v => setForm(f => ({ ...f, entity_id: v }))}>
                 <SelectTrigger data-testid="create-entity-select"><SelectValue placeholder="Select entity" /></SelectTrigger>
                 <SelectContent>
@@ -594,7 +598,7 @@ export default function TransactionLedgerPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Date *</Label>
+                <Label className="label-trust">Date *</Label>
                 <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start font-normal" data-testid="create-date-btn">
@@ -609,15 +613,15 @@ export default function TransactionLedgerPage() {
                 </Popover>
               </div>
               <div>
-                <Label>Amount *</Label>
-                <Input type="number" step="0.01" min="0" placeholder="0.00"
+                <Label className="label-trust">Amount *</Label>
+                <Input type="number" step="0.01" min="0" placeholder="0.00" className="input-trust"
                   value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
                   data-testid="create-amount-input" />
               </div>
             </div>
 
             <div>
-              <Label>Direction *</Label>
+              <Label className="label-trust">Direction *</Label>
               <Select value={form.direction} onValueChange={v => setForm(f => ({ ...f, direction: v }))}>
                 <SelectTrigger data-testid="create-direction-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -632,21 +636,21 @@ export default function TransactionLedgerPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Source Account</Label>
-                <Input placeholder="e.g. Trust Checking" value={form.source_account}
+                <Label className="label-trust">Source Account</Label>
+                <Input placeholder="e.g. Trust Checking" className="input-trust" value={form.source_account}
                   onChange={e => setForm(f => ({ ...f, source_account: e.target.value }))}
                   data-testid="create-source-input" />
               </div>
               <div>
-                <Label>Destination Account</Label>
-                <Input placeholder="e.g. Personal Account" value={form.destination_account}
+                <Label className="label-trust">Destination Account</Label>
+                <Input placeholder="e.g. Personal Account" className="input-trust" value={form.destination_account}
                   onChange={e => setForm(f => ({ ...f, destination_account: e.target.value }))}
                   data-testid="create-dest-input" />
               </div>
             </div>
 
             <div>
-              <Label>Governance Classification *</Label>
+              <Label className="label-trust">Governance Classification *</Label>
               <Select value={form.governance_classification}
                 onValueChange={v => setForm(f => ({ ...f, governance_classification: v }))}>
                 <SelectTrigger data-testid="create-classification-select"><SelectValue placeholder="Select classification" /></SelectTrigger>
@@ -658,20 +662,20 @@ export default function TransactionLedgerPage() {
 
             {form.governance_classification === 'Other' && (
               <div>
-                <Label>Note (required for "Other") *</Label>
-                <Input value={form.other_note} onChange={e => setForm(f => ({ ...f, other_note: e.target.value }))}
+                <Label className="label-trust">Note (required for "Other") *</Label>
+                <Input className="input-trust" value={form.other_note} onChange={e => setForm(f => ({ ...f, other_note: e.target.value }))}
                   placeholder="Explain the nature of this transaction" data-testid="create-other-note" />
               </div>
             )}
 
             <div>
-              <Label>Purpose / Memo</Label>
-              <Textarea placeholder="Describe the purpose of this transaction"
+              <Label className="label-trust">Purpose / Memo</Label>
+              <Textarea className="input-trust" placeholder="Describe the purpose of this transaction"
                 value={form.purpose_memo} onChange={e => setForm(f => ({ ...f, purpose_memo: e.target.value }))}
                 rows={2} data-testid="create-memo-input" />
             </div>
 
-            <Button className="w-full" onClick={handleCreate} disabled={creating} data-testid="create-submit-btn">
+            <Button className="w-full btn-primary" onClick={handleCreate} disabled={creating} data-testid="create-submit-btn">
               {creating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : 'Record Transaction'}
             </Button>
           </div>
@@ -688,7 +692,7 @@ export default function TransactionLedgerPage() {
           {importStep === 1 && (
             <div className="space-y-4 mt-2">
               <div>
-                <Label>Entity *</Label>
+                <Label className="label-trust">Entity *</Label>
                 <Select value={importEntity} onValueChange={setImportEntity}>
                   <SelectTrigger data-testid="import-entity-select"><SelectValue placeholder="Select entity" /></SelectTrigger>
                   <SelectContent>
@@ -696,7 +700,7 @@ export default function TransactionLedgerPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="border-2 border-dashed border-border rounded p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+              <div className="border-2 border-dashed border-border p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
                 onClick={() => fileInputRef.current?.click()}>
                 <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Click to upload a CSV file</p>
@@ -714,7 +718,7 @@ export default function TransactionLedgerPage() {
               <div className="grid grid-cols-1 gap-3">
                 {['date', 'amount', 'description'].map(field => (
                   <div key={field}>
-                    <Label className="capitalize">{field} Column *</Label>
+                    <Label className="capitalize label-trust">{field} Column *</Label>
                     <Select value={csvMapping[field]} onValueChange={v => setCsvMapping(m => ({ ...m, [field]: v }))}>
                       <SelectTrigger data-testid={`map-${field}-select`}><SelectValue placeholder={`Select ${field} column`} /></SelectTrigger>
                       <SelectContent>
@@ -727,7 +731,7 @@ export default function TransactionLedgerPage() {
 
               {/* Preview */}
               {csvData.length > 0 && csvMapping.date && csvMapping.amount && (
-                <div className="rounded border border-border overflow-hidden">
+                <div className="border border-border overflow-hidden">
                   <p className="text-xs font-medium p-2 bg-muted/50">Preview (first 5 rows)</p>
                   <table className="w-full text-xs">
                     <thead><tr className="border-b border-border bg-muted/30">
@@ -748,7 +752,7 @@ export default function TransactionLedgerPage() {
 
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => { setImportStep(1); setCsvData([]); }}>Back</Button>
-                <Button className="flex-1" onClick={handleImport} disabled={importing} data-testid="import-submit-btn">
+                <Button className="flex-1 btn-primary" onClick={handleImport} disabled={importing} data-testid="import-submit-btn">
                   {importing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing...</> : `Import ${csvData.length} Transactions`}
                 </Button>
               </div>
@@ -768,7 +772,7 @@ export default function TransactionLedgerPage() {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <Label>Governance Classification *</Label>
+              <Label className="label-trust">Governance Classification *</Label>
               <Select value={bulkClassification} onValueChange={setBulkClassification}>
                 <SelectTrigger data-testid="bulk-classification-select"><SelectValue placeholder="Select classification" /></SelectTrigger>
                 <SelectContent>
@@ -778,15 +782,15 @@ export default function TransactionLedgerPage() {
             </div>
             {bulkClassification === 'Other' && (
               <div>
-                <Label>Note (required) *</Label>
-                <Input value={bulkOtherNote} onChange={e => setBulkOtherNote(e.target.value)} placeholder="Explain classification" />
+                <Label className="label-trust">Note (required) *</Label>
+                <Input className="input-trust" value={bulkOtherNote} onChange={e => setBulkOtherNote(e.target.value)} placeholder="Explain classification" />
               </div>
             )}
             <div>
-              <Label>Purpose / Memo (optional)</Label>
-              <Textarea value={bulkMemo} onChange={e => setBulkMemo(e.target.value)} rows={2} placeholder="Shared memo for selected transactions" />
+              <Label className="label-trust">Purpose / Memo (optional)</Label>
+              <Textarea className="input-trust" value={bulkMemo} onChange={e => setBulkMemo(e.target.value)} rows={2} placeholder="Shared memo for selected transactions" />
             </div>
-            <Button className="w-full" onClick={handleBulkClassify} data-testid="bulk-classify-submit-btn">
+            <Button className="w-full btn-primary" onClick={handleBulkClassify} data-testid="bulk-classify-submit-btn">
               Apply Classification
             </Button>
           </div>
@@ -801,7 +805,7 @@ export default function TransactionLedgerPage() {
           </DialogHeader>
           {linkMinutesTxn && (
             <div className="space-y-4 mt-2">
-              <div className="p-3 rounded bg-warning/10 border border-warning/20">
+              <div className="p-3 bg-warning/10 border border-warning/20">
                 <p className="text-sm font-medium text-foreground">
                   {linkMinutesTxn.direction === 'inflow' ? '+' : '-'}${linkMinutesTxn.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
@@ -810,7 +814,7 @@ export default function TransactionLedgerPage() {
               </div>
 
               <div>
-                <Label>Select Minutes Document *</Label>
+                <Label className="label-trust">Select Minutes Document *</Label>
                 {minutesList.length === 0 ? (
                   <p className="text-sm text-muted-foreground mt-2">
                     No minutes found. Create minutes first from the Minutes page.
@@ -831,7 +835,7 @@ export default function TransactionLedgerPage() {
                 )}
               </div>
 
-              <Button className="w-full" onClick={handleLinkMinutes} disabled={linking || !selectedMinutesId} data-testid="link-minutes-submit-btn">
+              <Button className="w-full btn-primary" onClick={handleLinkMinutes} disabled={linking || !selectedMinutesId} data-testid="link-minutes-submit-btn">
                 {linking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Linking...</> : <><Link2 className="w-4 h-4 mr-2" /> Link Minutes</>}
               </Button>
             </div>

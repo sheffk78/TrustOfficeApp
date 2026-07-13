@@ -307,10 +307,7 @@ async def get_comp_plans(trust_id: str, year: Optional[int] = None, user: dict =
     query = {"trust_id": trust_id, "user_id": user["user_id"]}
     
     if year:
-        query["$or"] = [
-            {"year": year},
-            {"effective_date": {"$regex": f"^{year}"}}
-        ]
+        query["year"] = year
     
     plans = await db.compensation_plans.find(
         query,

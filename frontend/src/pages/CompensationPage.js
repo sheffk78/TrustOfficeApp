@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
@@ -35,7 +36,8 @@ import { showError } from '../utils/errors';
 
 export default function CompensationPage() {
   const navigate = useNavigate();
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
+  const { showUpgradeModal } = useUpgradeModal();
   const [plans, setPlans] = useState([]);
   const [payments, setPayments] = useState([]);
   const [ytdData, setYtdData] = useState(null);
@@ -228,6 +230,10 @@ export default function CompensationPage() {
   };
 
   const openNewPrimaryPlan = () => {
+    if (isReadOnly) {
+      showUpgradeModal('create a compensation plan', 'button_click', 'compensation_page');
+      return;
+    }
     setEditingPlan(null);
     resetPlanForm();
     setPlanForm(prev => ({ ...prev, is_primary: true }));
@@ -235,6 +241,10 @@ export default function CompensationPage() {
   };
 
   const openNewAdditionalPlan = () => {
+    if (isReadOnly) {
+      showUpgradeModal('create a compensation plan', 'button_click', 'compensation_page');
+      return;
+    }
     setEditingPlan(null);
     resetPlanForm();
     setPlanForm(prev => ({ ...prev, is_primary: false }));
@@ -274,6 +284,24 @@ export default function CompensationPage() {
     ? Math.min(100, (ytdData.ytd_total / ytdData.annual_approved) * 100)
     : 0;
 
+  if (!selectedTrust) {
+    return (
+      <div className="main-layout" data-testid="compensation-page">
+        <Sidebar />
+        <main className="main-content dot-grid">
+          <div className="page-container">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <Wallet className="w-12 h-12 text-navy/30 mb-3" />
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a Trust</h2>
+              <p className="text-sm text-muted-foreground">Choose a trust to manage compensation.</p>
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
   return (
     <div className="main-layout" data-testid="compensation-page">
       <Sidebar />
@@ -296,8 +324,14 @@ export default function CompensationPage() {
                 ]}
                 taPrompt="Help me understand the Compensation page and how to set up trustee pay"
               />
-              <Button 
-                onClick={() => setShowPaymentModal(true)} 
+              <Button
+                onClick={() => {
+                  if (isReadOnly) {
+                    showUpgradeModal('record a payment', 'button_click', 'compensation_page');
+                    return;
+                  }
+                  setShowPaymentModal(true);
+                }}
                 className="btn-primary"
                 data-testid="record-payment-btn"
               >

@@ -157,20 +157,58 @@ export default function AuditTrailPage() {
         }
       } catch (e) { /* skip */ }
 
-      // Fetch compensation
+      // Fetch compensation plans and payments in parallel
       try {
-        const compRes = await fetchWithAuth(`/compensation?trust_id=${trustId}`);
-        if (compRes.ok) {
-          const data = await compRes.json();
-          const comps = data.compensation_records || data || [];
-          (Array.isArray(comps) ? comps : []).forEach(c => {
+        const [plansRes, paymentsRes] = await Promise.all([
+          fetchWithAuth(`/compensation-plans?trust_id=${trustId}`),
+          fetchWithAuth(`/compensation-payments?trust_id=${trustId}`),
+        ]);
+
+        if (plansRes.ok) {
+          const data = await plansRes.json();
+          const plans = data.compensation_plans || data || [];
+          (Array.isArray(plans) ? plans : []).forEach(c => {
             allEvents.push({
-              id: c.compensation_id || c.id,
+              id: `plan-${c.plan_id || c.id}`,
               type: 'compensation_created',
-              title: `Compensation: $${c.amount?.toLocaleString() || 'N/A'}`,
-              description: `Compensation for ${c.recipient_name || c.trustee_name || 'trustee'}`,
+              title: `Compensation Plan: $${c.amount?.toLocaleString() || 'N/A'}`,
+              description: `Compensation plan for ${c.recipient_name || c.trustee_name || 'trustee'}`,
               date: c.created_at || c.effective_date,
               source: 'compensation',
+            });
+          });
+        }
+
+        if (paymentsRes.ok) {
+          const data = await paymentsRes.json();
+          const payments = data.compensation_payments || data || [];
+          (Array.isArray(payments) ? payments : []).forEach(c => {
+            allEvents.push({
+              id: `payment-${c.payment_id || c.id}`,
+              type: 'compensation_created',
+              title: `Compensation Payment: $${c.amount?.toLocaleString() || 'N/A'}`,
+              description: `Compensation payment for ${c.recipient_name || c.trustee_name || 'trustee'}`,
+              date: c.created_at || c.payment_date,
+              source: 'compensation',
+            });
+          });
+        }
+      } catch (e) { /* skip if endpoint fails */ }
+
+      // Fetch investments
+      try {
+        const investRes = await fetchWithAuth(`/trusts/${trustId}/investments`);
+        if (investRes.ok) {
+          const data = await investRes.json();
+          const investments = data.investments || data || [];
+          (Array.isArray(investments) ? investments : []).forEach(inv => {
+            allEvents.push({
+              id: `inv-${inv.investment_id || inv.id}`,
+              type: 'investment_created',
+              title: `Investment: $${inv.amount?.toLocaleString() || 'N/A'}`,
+              description: inv.description || inv.asset_name || 'Investment created',
+              date: inv.created_at || inv.date,
+              source: 'investments',
             });
           });
         }
@@ -299,6 +337,7 @@ export default function AuditTrailPage() {
     { value: 'relationship', label: 'Relationships' },
     { value: 'alert', label: 'Alerts' },
     { value: 'transaction', label: 'Transactions' },
+    { value: 'investment', label: 'Investments' },
     { value: 'vault', label: 'Vault' },
   ];
 

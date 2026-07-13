@@ -153,7 +153,7 @@ export default function DistributionsPage() {
 
   const loadCategories = async () => {
     try {
-      const response = await fetch(`${API}/categories`);
+      const response = await fetchWithAuth('/categories');
       if (response.ok) {
         const data = await response.json();
         // Use purpose_classifications from backend
@@ -182,6 +182,7 @@ export default function DistributionsPage() {
       }
     } catch (error) {
       console.error('Failed to load distributions:', error);
+      showError(toast, error, { operation: 'load', page: 'Distributions' });
     } finally {
       setLoading(false);
     }
@@ -348,7 +349,7 @@ export default function DistributionsPage() {
   };
 
   const filteredDistributions = distributions.filter(d => {
-    const status = d.approved_at ? 'approved' : 'review';
+    const status = d.status === 'declined' ? 'declined' : (d.approved_at ? 'approved' : 'review');
     const matchesStatus = filterStatus === 'all' || status === filterStatus;
     return matchesStatus;
   });
@@ -406,12 +407,30 @@ export default function DistributionsPage() {
     }
   };
 
+  if (!selectedTrust) {
+    return (
+      <div className="main-layout" data-testid="distributions-page">
+        <Sidebar />
+        <main className="main-content dot-grid">
+          <div className="page-container">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <DollarSign className="w-12 h-12 text-navy/30 mb-3" />
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a Trust</h2>
+              <p className="text-sm text-muted-foreground">Choose a trust to manage distributions.</p>
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
   return (
     <div className="main-layout" data-testid="distributions-page">
       <Sidebar />
-      <main className="main-content">
+      <main className="main-content dot-grid">
         {/* Subscription Banners */}
-        
+
         <div className="page-container">
           {/* Page Header */}
           <div className="page-header flex items-start justify-between">
@@ -764,7 +783,7 @@ export default function DistributionsPage() {
                 </thead>
                 <tbody>
                   {filteredDistributions.map((dist) => {
-                    const status = dist.approved_at ? 'approved' : 'review';
+                    const status = dist.status === 'declined' ? 'declined' : (dist.approved_at ? 'approved' : 'review');
                     return (
                     <tr key={dist.distribution_id} data-testid={`dist-row-${dist.distribution_id}`}>
                       <td>{formatDate(dist.date)}</td>

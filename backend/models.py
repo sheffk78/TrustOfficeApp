@@ -802,7 +802,7 @@ class ScheduleAItemResponse(BaseModel):
 class DistributionCreate(BaseModel):
     trust_id: str
     beneficiary_name: str
-    amount: float
+    amount: float = Field(..., ge=0)
     date: str
     purpose_classification: PurposeClassification
     authority_clause_ref: str = ""
@@ -842,7 +842,7 @@ class DistributionResponse(BaseModel):
 
 class DistributionUpdate(BaseModel):
     beneficiary_name: Optional[str] = None
-    amount: Optional[float] = None
+    amount: Optional[float] = Field(None, ge=0)
     date: Optional[str] = None
     purpose_classification: Optional[PurposeClassification] = None
     authority_clause_ref: Optional[str] = None
@@ -928,8 +928,8 @@ class CompensationPlanCreate(BaseModel):
     trust_id: str
     trustee_name: str = ""
     role: str = ""
-    annual_amount: float = 0
-    annual_approved_amount: float = 0
+    annual_amount: float = Field(0, ge=0)
+    annual_approved_amount: float = Field(0, ge=0)
     fee_type: str = "fixed"
     effective_date: str
     notes: str = ""
@@ -953,7 +953,7 @@ class CompensationPlanResponse(BaseModel):
 
 class CompensationPaymentCreate(BaseModel):
     trust_id: str
-    amount: float
+    amount: float = Field(..., ge=0)
     date: str
     classification_text: str = ""
     trustee_name: Optional[str] = None
@@ -1279,7 +1279,7 @@ class TransactionCreate(BaseModel):
     trust_id: str
     entity_id: str
     date: str
-    amount: float
+    amount: float = Field(..., ge=0)
     direction: TransactionDirection
     source_account: str = ""
     destination_account: str = ""
@@ -1293,7 +1293,7 @@ class TransactionCreate(BaseModel):
 
 class TransactionUpdate(BaseModel):
     date: Optional[str] = None
-    amount: Optional[float] = None
+    amount: Optional[float] = Field(None, ge=0)
     direction: Optional[TransactionDirection] = None
     source_account: Optional[str] = None
     destination_account: Optional[str] = None
@@ -1347,10 +1347,10 @@ class CsvImportRow(BaseModel):
 class CsvImportRequest(BaseModel):
     trust_id: str
     entity_id: str
-    rows: List[CsvImportRow]
+    rows: List[CsvImportRow] = Field(..., max_length=1000)
 
 class BulkClassifyRequest(BaseModel):
-    transaction_ids: List[str]
+    transaction_ids: List[str] = Field(..., max_length=500)
     governance_classification: GovernanceClassification
     purpose_memo: str = ""
     other_note: str = ""

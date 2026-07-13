@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FilePen, Settings, HeartPulse, Coins, Wallet, TrendingUp, MessageSquare, Bot, FolderOpen } from 'lucide-react';
+import { LayoutDashboard, FilePen, Settings, HeartPulse, Coins, Wallet, TrendingUp, MessageSquare, Bot, FolderOpen, HeartHandshake, ArrowUpDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 const mainNav = [
@@ -9,6 +9,8 @@ const mainNav = [
     { path: '/distributions', icon: Coins, label: 'Distributions' },
     { path: '/compensation', icon: Wallet, label: 'Compensation' },
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
+    { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence' },
+    { path: '/transactions', icon: ArrowUpDown, label: 'Transactions' },
   ]},
   { path: '/trust-assistant', icon: Bot, label: 'Assistant' },
   { path: '/vault', icon: FolderOpen, label: 'Vault' },

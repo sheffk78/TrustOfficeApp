@@ -39,7 +39,8 @@ import {
   Bot,
   GraduationCap,
   Briefcase,
-  UserCheck
+  UserCheck,
+  ScrollText
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -67,6 +68,8 @@ const NAV_GROUPS = [
     { path: '/compensation', icon: Wallet, label: 'Compensation' },
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
     { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', requiresBenevolence: true },
+    { path: '/benevolence-log', icon: ScrollText, label: 'Benevolence Log', requiresBenevolence: true },
+    { path: '/transactions', icon: ArrowUpDown, label: 'Transaction Ledger' },
   ]},
   { key: 'structure', icon: Network, label: 'Structure', items: [
     { path: '/structures', icon: Layers, label: 'Trust & Entities' },
