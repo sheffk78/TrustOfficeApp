@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
+import { trackSignupConversion, trackTrialStarted } from '@/utils/analytics';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -73,6 +74,10 @@ export default function AuthCallback() {
           
           // Load trusts and subscription state (pass email for admin override)
           await Promise.all([loadTrusts(), loadSubscriptionState(data.user.email)]);
+          
+          // Track signup conversion for Google OAuth signups
+          trackSignupConversion();
+          trackTrialStarted({ origin: 'google_oauth' });
           
           toast.success('Welcome!');
           
