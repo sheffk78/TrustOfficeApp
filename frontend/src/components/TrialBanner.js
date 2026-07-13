@@ -38,7 +38,7 @@ export const TrialBanner = ({ location = 'dashboard' }) => {
   
   return (
     <div 
-      className="bg-gradient-to-r from-navy/5 to-gold/5 border-b border-navy/10 pl-64 px-4 py-3"
+      className="bg-gradient-to-r from-navy/5 to-gold/5 border-b border-navy/10 pl-4 lg:pl-64 px-4 py-3"
       data-testid="trial-banner"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
@@ -58,7 +58,7 @@ export const TrialBanner = ({ location = 'dashboard' }) => {
         <Link to="/settings/billing" onClick={handleUpgradeClick}>
           <Button 
             size="sm" 
-            className="bg-navy hover:bg-navy/90 text-white flex items-center gap-2"
+            className="btn-primary flex items-center gap-2"
             data-testid="trial-upgrade-btn"
           >
             <Sparkles className="h-3.5 w-3.5" />

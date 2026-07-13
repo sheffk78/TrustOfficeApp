@@ -958,6 +958,8 @@ async def get_governance_history(trust_id: str, days: int = 30, user: dict = Dep
     - Trial users cannot access governance history
     - Paid users can view historical scores and trends
     """
+    # Validate days parameter
+    days = max(1, min(days, 365))
     # Check feature access
     has_history_access = await check_feature_access(user["user_id"], Feature.GOVERNANCE_HISTORY)
     if not has_history_access:
@@ -1070,6 +1072,10 @@ async def get_activity(
         if not trust:
             return {"activities": []}
         trust_id = trust["trust_id"]
+    else:
+        trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+        if not trust:
+            raise HTTPException(status_code=404, detail="Trust not found")
     
     return {"activities": await get_recent_activity(user["user_id"], trust_id, limit)}
 

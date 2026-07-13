@@ -15,11 +15,11 @@ import {
 const severityConfig = {
   red: {
     icon: ShieldAlert,
-    bg: 'bg-red-50 dark:bg-red-950/30',
-    border: 'border-red-200 dark:border-red-800',
-    badge: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
+    bg: 'bg-error/10',
+    border: 'border-error/20',
+    badge: 'bg-error/10 text-error',
     label: 'Immediate Risk',
-    dot: 'bg-red-500'
+    dot: 'bg-error'
   },
   yellow: {
     icon: AlertTriangle,
@@ -158,8 +158,8 @@ export function SeparationAlertsPanel({ entityId = null, compact = false, onLink
           {counts && counts.total_active > 0 && (
             <div className="flex gap-1.5">
               {counts.red_count > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300" data-testid="red-alert-badge">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> {counts.red_count}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-error/10 text-error" data-testid="red-alert-badge">
+                  <span className="w-1.5 h-1.5 rounded-full bg-error" /> {counts.red_count}
                 </span>
               )}
               {counts.yellow_count > 0 && (
@@ -174,7 +174,7 @@ export function SeparationAlertsPanel({ entityId = null, compact = false, onLink
           <Button variant="ghost" size="sm" onClick={() => { setShowHistory(true); loadHistory(); }} data-testid="alert-history-btn">
             <History className="w-4 h-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={handleScan} disabled={scanning} data-testid="scan-alerts-btn">
+          <Button variant="outline" size="sm" onClick={handleScan} disabled={scanning} className="btn-secondary" data-testid="scan-alerts-btn">
             {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanSearch className="w-4 h-4" />}
             <span className="ml-1.5 hidden sm:inline">Scan</span>
           </Button>
@@ -187,9 +187,9 @@ export function SeparationAlertsPanel({ entityId = null, compact = false, onLink
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       ) : alerts.length === 0 ? (
-        <div className="text-center py-8 rounded border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" data-testid="no-alerts">
-          <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">No Active Alerts</p>
+        <div className="text-center py-8 rounded border border-success/20 bg-success/5" data-testid="no-alerts">
+          <CheckCircle2 className="w-8 h-8 text-success mx-auto mb-2" />
+          <p className="text-sm font-medium text-success">No Active Alerts</p>
           <p className="text-xs text-muted-foreground mt-1">All clear — no commingling risks detected</p>
         </div>
       ) : (
@@ -234,7 +234,7 @@ export function SeparationAlertsPanel({ entityId = null, compact = false, onLink
                 <Label>Resolution Note *</Label>
                 <Textarea value={resolveNote} onChange={e => setResolveNote(e.target.value)}
                   placeholder="Explain why this is not a commingling risk, or what action was taken..."
-                  rows={3} data-testid="resolve-note-input" />
+                  rows={3} className="input-trust" data-testid="resolve-note-input" />
                 <p className="text-xs text-muted-foreground mt-1">This note becomes a permanent part of the audit trail.</p>
               </div>
 
@@ -271,7 +271,7 @@ export function SeparationAlertsPanel({ entityId = null, compact = false, onLink
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{a.description}</p>
                         {a.entity_name && <p className="text-[10px] text-muted-foreground/70 mt-1">Entity: {a.entity_name}</p>}
                       </div>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${a.status === 'resolved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-orange-100 text-orange-700'}`}>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${a.status === 'resolved' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
                         {a.status}
                       </span>
                     </div>
@@ -303,7 +303,7 @@ function AlertCard({ alert, onResolve, onLinkMinutes = null }) {
   return (
     <div className={`p-3 rounded border ${cfg.border} ${cfg.bg} transition-colors`} data-testid={`alert-card-${alert.alert_id}`}>
       <div className="flex items-start gap-3">
-        <Icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${alert.severity === 'red' ? 'text-red-500' : 'text-warning'}`} />
+        <Icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${alert.severity === 'red' ? 'text-error' : 'text-warning'}`} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${cfg.badge}`}>{cfg.label}</span>
@@ -352,7 +352,7 @@ export function AlertCountBadge({ trustId }) {
   return (
     <span className="inline-flex items-center gap-1" data-testid="alert-count-badge">
       {counts.red_count > 0 && (
-        <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+        <span className="w-5 h-5 rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center">
           {counts.red_count}
         </span>
       )}

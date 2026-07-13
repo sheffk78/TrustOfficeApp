@@ -60,21 +60,21 @@ const QUICK_ACTIONS = [
     description: 'Accept property and update Trust Assets',
     icon: PlusCircle,
     path: '/minutes/template/acceptance_of_property',
-    color: 'bg-blue-500/10 text-blue-600'
+    color: 'bg-navy/10 text-navy'
   },
   {
     title: 'Open Bank Account',
     description: 'Authorize a new trust bank account',
     icon: Landmark,
     path: '/minutes/template/bank_account_authorization',
-    color: 'bg-purple-500/10 text-purple-600'
+    color: 'bg-gold/10 text-gold'
   },
   {
     title: 'Appoint Trustee',
     description: 'Add or replace a trustee',
     icon: UserPlus,
     path: '/minutes/template/appointment_additional_trustee',
-    color: 'bg-orange-500/10 text-orange-600'
+    color: 'bg-warning/10 text-warning'
   },
   {
     title: 'View Trust Assets',
@@ -436,30 +436,30 @@ export default function DashboardPage() {
         {/* Subscription Banners */}
         {subscription?.needs_upgrade && !upgradeBannerDismissed && (
           <div
-            className="mx-auto max-w-4xl mt-4 mb-2 border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 dark:border-amber-700"
+            className="mx-auto max-w-4xl mt-4 mb-2 border border-warning/30 bg-gradient-to-r from-warning/10 to-warning/5"
             data-testid="upgrade-banner"
           >
             <div className="flex items-center gap-4 p-4">
-              <div className="w-10 h-10 bg-amber-400/20 flex items-center justify-center flex-shrink-0">
-                <Zap className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <div className="w-10 h-10 bg-warning/20 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-5 h-5 text-warning" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-amber-900 dark:text-amber-100">
+                <p className="text-sm text-warning">
                   Your current plan supports{' '}
                   <span className="font-semibold">{subscription.trust_limit}</span> trusts but you have{' '}
                   <span className="font-semibold">{subscription.trust_count}</span>. Upgrade to manage all your trusts.
                 </p>
               </div>
               <Link
-                to="/billing?wp=1&action=upgrade"
-                className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors flex-shrink-0"
+                to="/settings/billing?wp=1&action=upgrade"
+                className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium bg-warning text-white hover:bg-warning/90 transition-colors flex-shrink-0"
                 data-testid="upgrade-banner-cta"
               >
                 Upgrade <ArrowRight className="w-4 h-4" />
               </Link>
               <button
                 onClick={() => setUpgradeBannerDismissed(true)}
-                className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 flex-shrink-0"
+                className="text-warning/60 hover:text-warning flex-shrink-0"
                 aria-label="Dismiss upgrade banner"
                 data-testid="upgrade-banner-dismiss"
               >
@@ -532,7 +532,7 @@ export default function DashboardPage() {
                   <Button
                     onClick={dismissWpWelcome}
                     variant="outline"
-                    className="flex-1"
+                    className="flex-1 btn-secondary"
                     data-testid="wp-welcome-dismiss"
                   >
                     Maybe Later
@@ -754,11 +754,11 @@ export default function DashboardPage() {
 
               {/* Pending Quarterly Draft Hero (Fix 3) */}
               {dashboard?.pending_quarterly_draft && (
-                <div className="mb-6 card-trust border-l-4 border-l-blue-400 bg-blue-50/30" data-testid="quarterly-draft-hero">
+                <div className="mb-6 card-trust border-l-4 border-l-gold bg-gold/5" data-testid="quarterly-draft-hero">
                   <div className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400/20 to-navy/10 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-gradient-to-br from-gold/20 to-navy/10 flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-gold" />
                       </div>
                       <div>
                         <h3 className="font-serif text-lg text-navy">
@@ -927,7 +927,7 @@ export default function DashboardPage() {
                     })}
                   </div>
 
-                  {healthScore?.total_score === (healthScore?.max_score || 115) && (
+                  {healthScore?.total_score === healthScore?.max_score && (
                     <div className="mt-4 p-4 bg-success/10 border border-success/20 flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
                       <p className="text-sm text-success font-medium">
@@ -988,16 +988,16 @@ export default function DashboardPage() {
                       {taxDeadlines.slice(0, 5).map((d) => {
                         const overdue = d.is_overdue && d.filing_status === 'pending';
                         return (
-                          <div key={d.entry_id} className={`flex items-center justify-between p-3 border ${overdue ? 'border-red-200 bg-red-50/50' : 'border-navy/10'} rounded`}>
+                          <div key={d.entry_id} className={`flex items-center justify-between p-3 border ${overdue ? 'border-error/20 bg-error/5' : 'border-navy/10'} rounded`}>
                             <div className="flex items-center gap-3">
                               <div className="flex flex-col items-center min-w-[48px]">
                                 <div className="text-[10px] font-medium text-neutral-500 uppercase">{format(parseISO(d.due_date), 'MMM')}</div>
-                                <div className={`text-lg font-bold ${overdue ? 'text-red-600' : 'text-navy'}`}>{format(parseISO(d.due_date), 'd')}</div>
+                                <div className={`text-lg font-bold ${overdue ? 'text-error' : 'text-navy'}`}>{format(parseISO(d.due_date), 'd')}</div>
                               </div>
                               <div>
                                 <p className="font-medium text-sm text-navy">{d.description}</p>
                                 {overdue ? (
-                                  <p className="text-xs text-red-600">Overdue by {Math.abs(d.days_remaining)} days</p>
+                                  <p className="text-xs text-error">Overdue by {Math.abs(d.days_remaining)} days</p>
                                 ) : d.days_remaining <= 30 ? (
                                   <p className="text-xs text-warning">Due in {d.days_remaining} days</p>
                                 ) : (
@@ -1007,10 +1007,10 @@ export default function DashboardPage() {
                             </div>
                             <span className={`font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded ${
                               d.filing_status === 'filed' || d.filing_status === 'not_required'
-                                ? 'bg-emerald-100 text-emerald-700'
+                                ? 'bg-success/10 text-success'
                                 : overdue
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-slate-100 text-slate-600'
+                                  ? 'bg-error/10 text-error'
+                                  : 'bg-navy/5 text-navy/60'
                             }`}>
                               {d.filing_status === 'filed' ? 'Filed' : d.filing_status === 'not_required' ? 'N/A' : overdue ? 'Overdue' : 'Pending'}
                             </span>
@@ -1216,7 +1216,7 @@ export default function DashboardPage() {
                   <div className="space-y-0">
                     {activities.map((activity, index) => (
                       <div 
-                        key={`${activity.type}-${activity.id}`} 
+                        key={`${activity.type}-${activity.id}-${String(index)}`} 
                         className={`timeline-item ${activity.type}`}
                       >
                         <div className="flex items-start gap-4">
@@ -1231,7 +1231,7 @@ export default function DashboardPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-navy truncate">
-                              {activity.source === 'minutes' && activity.id ? (
+                              {activity.type === 'minutes' && activity.id ? (
                                 <button
                                   onClick={() => navigate(`/minutes/${activity.id}`)}
                                   className="text-left hover:text-gold transition-colors"

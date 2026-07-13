@@ -692,7 +692,7 @@ export const TrustManager = ({ embedded = false }) => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none pl-9 pr-8 py-2 border border-navy/20 bg-white text-sm text-navy font-mono cursor-pointer hover:border-navy/40 transition-colors w-full md:w-44"
+              className="input-trust appearance-none pl-9 pr-8 py-2 text-sm cursor-pointer w-full md:w-44"
               data-testid="trust-sort-select"
             >
               {SORT_OPTIONS.map((opt) => (
@@ -710,7 +710,7 @@ export const TrustManager = ({ embedded = false }) => {
             <select
               value={groupBy}
               onChange={(e) => setGroupBy(e.target.value)}
-              className="appearance-none pl-9 pr-8 py-2 border border-navy/20 bg-white text-sm text-navy font-mono cursor-pointer hover:border-navy/40 transition-colors w-full md:w-40"
+              className="input-trust appearance-none pl-9 pr-8 py-2 text-sm cursor-pointer w-full md:w-40"
               data-testid="trust-group-select"
             >
               {GROUP_OPTIONS.map((opt) => (

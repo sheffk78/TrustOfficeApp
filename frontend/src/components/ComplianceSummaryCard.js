@@ -17,14 +17,14 @@ export default function ComplianceSummaryCard({
 }) {
   // Score color logic
   const scoreColor =
-    score >= 90 ? 'text-emerald-700' :
+    score >= 90 ? 'text-success' :
     score >= 70 ? 'text-warning' :
-    'text-red-600';
+    'text-error';
 
   const scoreBg =
-    score >= 90 ? 'bg-emerald-50 border-emerald-200' :
+    score >= 90 ? 'bg-success/10 border-success/20' :
     score >= 70 ? 'bg-warning/10 border-warning/20' :
-    'bg-red-50 border-red-200';
+    'bg-error/10 border-error/20';
 
   // Format deadline
   let deadlineLabel = null;
@@ -50,11 +50,11 @@ export default function ComplianceSummaryCard({
           <div className="flex items-center gap-3">
             <Shield className={`w-8 h-8 ${scoreColor}`} />
             <div>
-              <p className="text-xs font-mono uppercase tracking-wider text-neutral-500">
+              <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                 Compliance Summary
               </p>
               <p className={`text-2xl font-bold ${scoreColor}`}>
-                {score}<span className="text-sm font-normal text-neutral-400">/100</span>
+                {score}<span className="text-sm font-normal text-muted-foreground/40">/100</span>
               </p>
             </div>
           </div>
@@ -69,19 +69,19 @@ export default function ComplianceSummaryCard({
 
         <div className="mt-3 space-y-1.5">
           {alertActive && (
-            <div className="flex items-center gap-2 text-sm text-red-700">
+            <div className="flex items-center gap-2 text-sm text-error">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>Compliance alert active — review required actions</span>
             </div>
           )}
           {deadlineLabel && (
-            <div className="flex items-center gap-2 text-sm text-neutral-700">
-              <CalendarClock className="w-4 h-4 flex-shrink-0 text-neutral-500" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CalendarClock className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
               <span>Next deadline: {deadlineLabel}</span>
             </div>
           )}
           {!alertActive && !deadlineLabel && score >= 90 && (
-            <div className="flex items-center gap-2 text-sm text-emerald-700">
+            <div className="flex items-center gap-2 text-sm text-success">
               <Shield className="w-4 h-4 flex-shrink-0" />
               <span>All compliance requirements current</span>
             </div>
