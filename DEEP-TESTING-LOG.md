@@ -389,3 +389,145 @@ Commit `157f814` pushed. Build succeeded (483.68 kB gzip). Railway auto-deployin
 - Total issues found: 125
 - Total fixed: 115
 - Total backlogged: 72
+
+---
+
+## Feature #5: Structure Section (Entities, Beneficiaries, Schedule A, Communications, Vault, Admin Kits)
+**Date:** 2026-07-13  
+**Agents:** 4 (Functional, UX/Visual, API/Data, Cross-Feature)  
+**Pages tested:** StructuresPage (907 lines), EntityDetailPage (439), BeneficiariesPage (1651), ScheduleAPage (825), CommunicationsPage (288), VaultPage (710), TrustAdminKitsPage (712)  
+**Backend:** entities.py (144 lines), beneficiaries.py (219), schedule_a.py (466), communications.py (162), models.py  
+
+---
+
+### Fixes Applied (67 items across 14 files)
+
+#### Critical Bugs (5)
+1. **[FIXED] EntityDetailPage: undefined `error` in handleSave/handleDelete else branches** - Lines 87, 108. Would throw ReferenceError on API failure. Fixed to parse response body.
+2. **[FIXED] CommunicationsPage: completeAction doesn't check res.ok** - Lines 105-117. Silent failure on PATCH. Added res.ok check with proper error handling.
+3. **[FIXED] AuditTrailPage: wrong API endpoint for relationships** - Line 124. `/relationships` returns 404. Fixed to `/entity-relationships`. Relationship events never appeared in audit trail.
+4. **[FIXED] AuthorityPage: same wrong API endpoint** - Line 54. Same fix.
+5. **[FIXED] EntityDetailPage: missing selectedTrust in useEffect deps** - Line 44. Stale transactions when switching trusts.
+
+#### Security: Read-Only Guard Bypasses (2)
+6. **[FIXED] BeneficiariesPage: openEditModal bypasses read-only guard** - Line 559. Read-only users could open edit modal. Added isReadOnly check.
+7. **[FIXED] BeneficiariesPage: Settings button bypasses handleOpenSettingsModal** - Line 616. Changed to use handleOpenSettingsModal which has the guard.
+
+#### Backend Security (11)
+8. **[FIXED] entities.py: IDOR on create_relationship** - Lines 106-120. No verification that parent/child entities belong to user. Added ownership checks.
+9. **[FIXED] entities.py: delete_entity relationship cleanup missing user_id** - Lines 96-99. Added user_id to filter.
+10. **[FIXED] communications.py: accepts raw dict, no validation** - Line 24. Created CommunicationCreate Pydantic model with field validators.
+11. **[FIXED] communications.py: update allows overwriting trust_id/comm_id** - Lines 98-113. Added field allowlist.
+12. **[FIXED] communications.py: write endpoints use get_current_user instead of require_write_access** - Lines 24, 99, 117. Read-only users could write. Fixed to require_write_access.
+13. **[FIXED] communications.py: unbounded limit parameter** - Line 59. Added Query(100, ge=1, le=500).
+14. **[FIXED] models.py: ScheduleAItemCreate.approximate_value has no ge=0** - Line 768. Negative values accepted. Fixed.
+15. **[FIXED] models.py: ScheduleAItemUpdate.approximate_value has no ge=0** - Line 777. Same fix.
+16. **[FIXED] models.py: EntityRelationshipCreate.ownership_percentage unbounded** - Line 444. Could set 500% or -50%. Added ge=0, le=100.
+17. **[FIXED] schedule_a.py: DisposeAssetRequest.disposition_value has no ge=0** - Line 141. Fixed.
+18. **[FIXED] schedule_a.py: deprecated .dict() instead of .model_dump()** - Line 117. Pydantic v2 deprecation fix.
+
+#### Layout Structure Overhauls (5 pages)
+19. **[FIXED] BeneficiariesPage: wrong layout shell** - Changed from min-h-screen bg-background to main-layout pattern.
+20. **[FIXED] ScheduleAPage: wrong layout shell** - Same fix.
+21. **[FIXED] CommunicationsPage: wrong layout shell** - Changed from min-h-screen bg-subtle-bg to main-layout pattern.
+22. **[FIXED] VaultPage: wrong layout shell** - Same fix.
+23. **[FIXED] TrustAdminKitsPage: wrong layout shell** - Changed from flex min-h-screen to main-layout pattern.
+
+#### Brand Token Violations (67 fixes across 7 pages)
+24-30. **[FIXED] StructuresPage: 7 raw color violations** - bg-red-500, text-emerald-600, bg-emerald-500 replaced with brand tokens.
+31-32. **[FIXED] EntityDetailPage: 2 raw color violations** - text-emerald-600, text-red-500 replaced.
+33-44. **[FIXED] BeneficiariesPage: 12 raw color violations** - bg-blue, bg-red, bg-gray, text-red-600 all replaced with brand tokens.
+45-52. **[FIXED] ScheduleAPage: 8 raw color violations** - text-orange-600, text-blue-600, bg-orange-100 all replaced with warning/gold tokens.
+53-73. **[FIXED] CommunicationsPage: 21 raw color violations** - Entire page converted from bg-white border-neutral-200 to card-trust, all text-neutral-* to text-muted-foreground.
+74-91. **[FIXED] VaultPage: 18 raw color violations** - Same pattern: card-trust, text-muted-foreground, border-border.
+92-109. **[FIXED] TrustAdminKitsPage: 18 violations** - text-green-500, text-amber-500, rounded-lg, rounded-md all replaced with brand tokens.
+
+#### Missing Button Classes (8)
+110. **[FIXED] CommunicationsPage: 3 buttons missing btn-primary** - Lines 157, 224, 241.
+111. **[FIXED] VaultPage: 3 buttons missing btn-primary** - Lines 368, 557, 585.
+112. **[FIXED] TrustAdminKitsPage: 1 button using custom gold instead of btn-gold** - Line 432.
+
+#### Cross-Feature Fixes (4)
+113. **[FIXED] EntityDetailPage: navigate('/entities') uses redirect** - 4 occurrences. Changed to direct navigate('/structures?tab=entities').
+114. **[FIXED] AuditTrailPage: missing beneficiary/schedule-a/communications events** - Added fetch blocks for all three. Incomplete audit trail now covers Structure section.
+115. **[FIXED] CommunicationsPage: no-trust guard missing in loadData** - Added if (!selectedTrust) return guard.
+116. **[FIXED] StructuresPage: no-trust guard missing** - Added card-trust with Building2 icon and message.
+
+---
+
+### Backlog (FIX LATER)
+
+| # | Issue | Priority | Effort |
+|---|---|---|---|
+| A | BeneficiariesPage: transfer dropdown uses holder_name as value, collision risk | Medium | Medium |
+| B | CommunicationsPage: formatDate can crash on invalid dates | Low | Low |
+| C | CommunicationsPage: form has parties field but no UI to edit it | Low | Low |
+| D | ScheduleAPage: handleEdit drops minutes_ref on edit | Medium | Low |
+| E | No pagination on entity/schedule-a/beneficiary/communications list endpoints | Medium | Medium |
+| F | Beneficiaries: dashboard falls back to most recent trust when no trust_id | Low | Low |
+| G | Schedule A: no date format validation on date_conveyed | Low | Low |
+| H | Entities: create_entity doesn't validate formation_date format | Low | Low |
+| I | StructuralMap: nodes not clickable, no navigation to entity detail | Low | Medium |
+| J | Dashboard: no quick link to /structures page | Low | Low |
+| K | PrintableBinder: no Structure data integration | Low | High |
+| L | Risk Dashboard: no Structure API integration | Low | High |
+| M | Calendar: no Structure events | Low | High |
+| N | Trust Assistant: minimal Structure integration | Low | High |
+| O | MobileBottomNav: missing Structure section pages | Low | Medium |
+| P | StructuralMap: Partnership border color typo | Low | Low |
+
+---
+
+---
+
+## Feature #6: Compliance Section (6 pages)
+**Pages:** RiskDashboard, StateCompliance, Authority (Legal Powers), AuditTrail, PrintableBinder (Record Book), SuccessorPacket
+**Commit:** `725bc37` — Build succeeded, pushed to main.
+
+### Issues Found and Fixed
+
+#### Layout Shell Overhauls (4 pages)
+1. **[FIXED] RiskDashboard: wrong layout shell** — `min-h-screen bg-subtle-bg` → `main-layout` + `main-content mobile-layout-offset` + `page-container` (both no-trust guard and main return)
+2. **[FIXED] StateCompliance: wrong layout shell** — Same fix, both no-trust guard and main return
+3. **[FIXED] AuthorityPage: wrong layout shell** — `flex min-h-screen bg-background` → `main-layout` pattern
+4. **[FIXED] AuditTrailPage: wrong layout shell** — Same fix
+
+#### Missing MobileBottomNav (2 pages)
+5. **[FIXED] PrintableBinder: missing MobileBottomNav** — Added import and component
+6. **[FIXED] SuccessorPacket: missing MobileBottomNav** — Added import and component
+
+#### Missing/Incomplete No-Trust Guards (4 pages)
+7. **[FIXED] AuthorityPage: bare text no-trust guard** — Replaced bare centered text with main-layout shell + card-trust + Shield icon
+8. **[FIXED] AuditTrailPage: bare text no-trust guard** — Same fix with FileText icon
+9. **[FIXED] PrintableBinder: no no-trust guard at all** — Added guard with FileText icon, also added selectedTrust check in fetchCoverData and useEffect dependency
+10. **[FIXED] SuccessorPacket: no no-trust guard at all** — Added guard with FileText icon
+
+#### Loading State Fixes (2 pages)
+11. **[FIXED] AuthorityPage: bare spinner loading state** — Wrapped in main-layout shell with Sidebar + MobileBottomNav
+12. **[FIXED] AuditTrailPage: bare spinner loading state** — Same fix
+
+#### Brand Token Violations (93 fixes across 4 pages)
+13-42. **[FIXED] RiskDashboardPage: 30 raw color violations** — getColor()/getBg() functions, loading skeleton, no-trust guard, All Clear div, risk item cards, filter buttons, summary cards all converted to brand tokens
+43-76. **[FIXED] StateCompliancePage: 34 raw color violations** — DeadlineRow, no-trust guard, loading skeleton, all Card borders, compliance score colors, alert text, requirements list, severity icons all converted
+77-90. **[FIXED] AuthorityPage: 14 raw color violations** — ROLE_COLORS (Trustee, Grantor, Successor Trustee, Manager), AUTHORITY_LEVELS.none, authority clause box, entity table, relationship badges all converted
+91-105. **[FIXED] AuditTrailPage: 15 raw color violations** — EVENT_COLORS (all 16 event types), DEFAULT_COLOR, stats colors, filter buttons all converted
+
+#### Missing Import (1)
+106. **[FIXED] AuditTrailPage: missing Users import** — `Users` icon referenced in EVENT_ICONS but not imported from lucide-react. Added to import.
+
+#### Printable Areas (intentionally untouched)
+- PrintableBinder: 80 raw gray colors in printable-area kept intact (physical printing requires raw colors)
+- SuccessorPacket: 87 raw gray colors in printable-area + shared print components (InfoRow, SectionTitle) kept intact
+
+---
+
+### Deploy Status
+Commit `725bc37` pushed. Build succeeded. Railway auto-deploying.
+
+---
+
+### Running Totals (6 features complete)
+- Features tested: 6 of 8
+- Total issues found: 298
+- Total fixed: 288
+- Total backlogged: 88
