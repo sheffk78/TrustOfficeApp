@@ -174,3 +174,101 @@
 - Vault "Summarize this document" links to Trust Assistant with prompt
 - Mobile nav includes Trust Assistant
 - All /vault and /trust-assistant links resolve to registered routes
+
+---
+
+## Feature #3: Dashboard + TrustManager
+**Date:** 2026-07-13
+**Agents:** 4 (Functional, UX/Visual, API/Data, Cross-Feature)
+**Pages tested:** DashboardPage, TrustManager, BankingSummaryCard, SpendingThresholdCard, ComplianceSummaryCard, SeparationAlertsPanel, TrialBanner, SubscriptionGate
+**Backend:** governance.py (1277 lines), dashboard.py (5 lines - dead code)
+
+---
+
+### Fixes Applied (30 items)
+
+#### Critical (2)
+1. **[FIXED] Dashboard upgrade banner CTA 404** - DashboardPage.js:454. Linked to `/billing` but route is `/settings/billing`. Fixed.
+2. **[FIXED] SpendingThresholdCard Review button 404** - SpendingThresholdCard.js:111. Navigated to `/transactions` which has no route. Changed to `/distributions`.
+
+#### Security (3)
+3. **[FIXED] /activity endpoint missing trust ownership verification** - governance.py:1068. When trust_id provided, no ownership check. Added trust lookup + 404.
+4. **[FIXED] /governance/{trust_id}/history days param unbounded** - governance.py:953. Could pass days=999999. Bounded to 1-365.
+5. **[FIXED] Activity feed items never clickable** - DashboardPage.js:1234. Checked `activity.source` but backend returns `activity.type`. Fixed field name.
+
+#### Brand Token Violations (19)
+6. **[FIXED] Quick action: Add Asset raw blue** - DashboardPage.js:63. `bg-blue-500/10 text-blue-600` -> `bg-navy/10 text-navy`.
+7. **[FIXED] Quick action: Open Bank Account raw purple** - DashboardPage.js:70. -> `bg-gold/10 text-gold`.
+8. **[FIXED] Quick action: Appoint Trustee raw orange** - DashboardPage.js:77. -> `bg-warning/10 text-warning`.
+9. **[FIXED] Upgrade banner 6 amber/yellow violations** - DashboardPage.js:439-462. All amber/yellow -> warning tokens.
+10. **[FIXED] Quarterly draft hero 3 blue violations** - DashboardPage.js:757-761. border-l-blue-400, from-blue-400/20, text-blue-600 -> gold tokens.
+11. **[FIXED] Tax deadline overdue row raw red** - DashboardPage.js:991. border-red-200 bg-red-50/50 -> error tokens.
+12. **[FIXED] Tax deadline overdue text raw red** - DashboardPage.js:995, 1000. text-red-600 -> text-error.
+13. **[FIXED] Tax deadline Filed badge raw emerald** - DashboardPage.js:1010. bg-emerald-100 text-emerald-700 -> success tokens.
+14. **[FIXED] Tax deadline Overdue badge raw red** - DashboardPage.js:1012. bg-red-100 text-red-700 -> error tokens.
+15. **[FIXED] Tax deadline Pending badge raw slate** - DashboardPage.js:1013. bg-slate-100 text-slate-600 -> navy tokens.
+16. **[FIXED] ComplianceSummaryCard 4 score color violations** - Lines 21, 22, 25, 27. emerald/red -> success/error tokens.
+17. **[FIXED] ComplianceSummaryCard 4 neutral text violations** - Lines 53, 57, 72, 79. text-neutral-* -> text-muted-foreground.
+18. **[FIXED] ComplianceSummaryCard all-current message raw emerald** - Line 84. -> text-success.
+19. **[FIXED] SeparationAlertsPanel severityConfig 4 red violations** - Lines 18-22. All red -> error tokens.
+20. **[FIXED] SeparationAlertsPanel alert badges 2 red violations** - Lines 161-162. -> error tokens.
+21. **[FIXED] SeparationAlertsPanel no-alerts empty state 3 emerald violations** - Lines 190-192. -> success tokens.
+22. **[FIXED] SeparationAlertsPanel history status badges emerald/orange** - Line 274. -> success/warning tokens.
+23. **[FIXED] SeparationAlertsPanel alert card red icon** - Line 306. text-red-500 -> text-error.
+24. **[FIXED] SeparationAlertsPanel AlertCountBadge bg-red-500** - Line 355. -> bg-error.
+
+#### Missing Classes (5)
+25. **[FIXED] SeparationAlertsPanel Textarea missing input-trust** - Line 235. Added.
+26. **[FIXED] SeparationAlertsPanel Scan button missing btn-secondary** - Line 177. Added.
+27. **[FIXED] TrustManager sort select missing input-trust** - Line 695. Added.
+28. **[FIXED] TrustManager group select missing input-trust** - Line 713. Added.
+29. **[FIXED] DashboardPage Maybe Later button missing btn-secondary** - Line 535. Added.
+
+#### Other UX (2)
+30. **[FIXED] TrialBanner pl-64 breaks mobile** - Line 41. Hardcoded 16rem left padding. Changed to `pl-4 lg:pl-64`.
+31. **[FIXED] TrialBanner upgrade button not using btn-primary** - Line 61. Replaced custom classes with btn-primary.
+32. **[FIXED] Health score hardcoded 115 fallback** - DashboardPage.js:930. Removed `|| 115` fallback, uses max_score from API only.
+33. **[FIXED] Activity key collision risk** - DashboardPage.js:1219. Added index to key to prevent duplicate React keys.
+
+---
+
+### Fix-Later Backlog (15 items)
+
+#### Architecture (P1)
+1. **dashboard.py is dead code**: 5-line file never imported or mounted. Delete or document.
+2. **Dashboard API makes ~28 sequential DB queries**: No asyncio.gather(). Performance bottleneck under load.
+3. **Dashboard rate limit too high**: Uses default 100/min despite being expensive. Should be 20/min.
+4. **Onboarding state scoped to user_id not trust_id**: Multi-trust users share one onboarding checklist.
+
+#### UX (P2)
+5. **DashboardPage no error state on API failure**: Falls through to render with null data, showing zeroed scores. No retry button.
+6. **TrialBanner shows no countdown**: Has `trial_days_remaining` data but doesn't display it. Should show "X days left".
+7. **BankingSummaryCard silently swallows API errors**: Shows "No bank accounts" on 401/500 instead of error state.
+8. **SpendingThresholdCard same silent-swallow**: Shows "0 Active Alerts" in green on API failure.
+9. **SeparationAlertsPanel handleScan no else branch**: Non-OK response gets no user feedback.
+10. **dismissOnboarding crashes if dashboard is null**: Spread on null produces {}, loses state.
+11. **window.location.reload() after undismiss onboarding**: Poor UX, should use local state update.
+12. **Weekly briefing cta_prompt can be undefined**: encodeURIComponent(undefined) passes "undefined" string to assistant.
+
+#### Cross-Feature (P2)
+13. **Activity feed only returns minutes + distributions**: Missing compensation, expenses, vault uploads, entity changes.
+14. **No compliance summary card on dashboard**: ComplianceSummaryCard exists but only used on RiskDashboardPage.
+15. **Mobile bottom nav missing Compliance section**: Risk, State Compliance, Audit Trail unreachable from mobile nav.
+16. **No vault/beneficiaries quick access on dashboard**: Only in onboarding checklist. No card or quick action post-onboarding.
+17. **FullSubscriptionGate is dead code**: Exported but never used. Hard paywall component never wired.
+
+---
+
+### What Was Verified Safe
+- All dashboard/governance endpoints require authentication (confirmed via live API probing)
+- JWT validation includes token revocation checks
+- Dashboard and governance health endpoints verify trust ownership
+- Subscription status computed server-side (cannot be faked client-side)
+- Health score computed server-side (no injection risk)
+- All MongoDB queries filter by user_id (no cross-user data leaks)
+- Error messages don't leak internal details
+- Security headers present (CSP, HSTS, X-Frame-Options)
+- Rate limiting exists (per-user sliding window)
+- Subscription gating is server-side via check_feature_access
+- Alerts router properly uses require_write_access for mutations
+- Onboarding allowlist prevents arbitrary field updates
