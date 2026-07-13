@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import {
   FileText, Shield, HeartPulse, Landmark, Building2, Users,
   ClipboardList, Mail, BookOpen, FilePen, Home, Car,
@@ -124,6 +125,7 @@ const PrintableBinderPage = () => {
 
   useEffect(() => {
     const fetchCoverData = async () => {
+      if (!selectedTrust) { setLoading(false); return; }
       try {
         const response = await fetchWithAuth('/binder/cover-sheet-data');
         if (response.ok) {
@@ -137,7 +139,25 @@ const PrintableBinderPage = () => {
       }
     };
     fetchCoverData();
-  }, []);
+  }, [selectedTrust]);
+
+  if (!selectedTrust) {
+    return (
+      <div className="main-layout">
+        <Sidebar />
+        <main className="main-content no-print mobile-layout-offset">
+          <div className="page-container max-w-5xl mx-auto">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <FileText className="w-12 h-12 text-muted-foreground/60 mb-3"/>
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+              <p className="text-sm text-muted-foreground">Choose a trust to view the Record Book.</p>
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav />
+      </div>
+    );
+  }
 
   const handlePrint = (sectionId) => {
     setActivePrint(sectionId);
@@ -156,7 +176,7 @@ const PrintableBinderPage = () => {
         <Sidebar />
         <main className="main-content no-print">
           <div className="page-container max-w-5xl mx-auto">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-navy mb-2">
               Printable Record Book
             </h1>
           <div className="flex items-center gap-2 mb-2">
@@ -169,32 +189,32 @@ const PrintableBinderPage = () => {
               taPrompt="How do I set up a physical trust compliance binder?"
             />
           </div>
-          <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-2xl">
+          <p className="text-muted-foreground mb-8 max-w-2xl">
             Organize your trust documents with these printable inserts. Print on standard letter-size paper.
             Use a 3-ring binder with tab dividers for best results.
           </p>
 
           {/* COVER SHEET SECTION */}
           <div className="mb-10">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5 text-gold" />
               Binder Cover Sheet
             </h2>
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+            <div className="card-trust border border-border p-6 shadow-sm">
               {loading ? (
                 <div className="animate-pulse space-y-3">
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                  <div className="h-8 bg-subtle-bg rounded w-1/2"></div>
+                  <div className="h-4 bg-subtle-bg rounded w-1/3"></div>
+                  <div className="h-4 bg-subtle-bg rounded w-1/4"></div>
                 </div>
               ) : (
                 <>
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      <h3 className="text-xl font-bold text-navy">
                         {coverData?.trust_name || 'Your Trust Name'}
                       </h3>
-                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 space-y-0.5">
+                      <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
                         {coverData?.trust_type && <div>{coverData.trust_type}</div>}
                         {coverData?.formation_date && <div>Formed: {coverData.formation_date}</div>}
                         {coverData?.ein && <div>EIN: {coverData.ein}</div>}
@@ -218,10 +238,10 @@ const PrintableBinderPage = () => {
 
           {/* SECTION DIVIDERS */}
           <div className="mb-10">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            <h2 className="text-lg font-semibold text-navy mb-4">
               Section Tab Dividers
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Print each divider on cardstock or heavy paper and place behind a tab divider in your binder.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -230,7 +250,7 @@ const PrintableBinderPage = () => {
                 return (
                   <div
                     key={section.id}
-                    className="flex items-start gap-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 shadow-sm hover:shadow-md transition-shadow"
+                    className="flex items-start gap-3 card-trust border border-border p-4 shadow-sm hover:shadow-md transition-shadow"
                   >
                     <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
                       <Icon className="w-5 h-5 text-gold" />
@@ -238,9 +258,9 @@ const PrintableBinderPage = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-gold">Section {section.number}</span>
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{section.title}</h3>
+                        <h3 className="text-sm font-semibold text-navy">{section.title}</h3>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{section.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{section.description}</p>
                       <button
                         onClick={() => handlePrint(`tab-${section.id}`)}
                         className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
@@ -256,12 +276,12 @@ const PrintableBinderPage = () => {
 
           {/* REFERENCE CARD */}
           <div className="mb-10">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-gold" />
               Trustee Quick Reference Card
             </h2>
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            <div className="card-trust border border-border p-6 shadow-sm">
+              <p className="text-sm text-muted-foreground mb-3">
                 A single-page cheat sheet covering your fiduciary duties, decision filter, signing rules, and emergency protocols.
                 Print this and keep it at the front of your binder.
               </p>
@@ -276,12 +296,12 @@ const PrintableBinderPage = () => {
 
           {/* RESOLUTION TEMPLATE */}
           <div className="mb-10">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
               <FilePen className="w-5 h-5 text-gold" />
               Resolution Template
             </h2>
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            <div className="card-trust border border-border p-6 shadow-sm">
+              <p className="text-sm text-muted-foreground mb-3">
                 A blank WHEREAS/BE IT RESOLVED template with signature, witness, and notary blocks.
                 Print a fresh copy each time you need to record a formal trust resolution.
               </p>
@@ -296,20 +316,20 @@ const PrintableBinderPage = () => {
 
           {/* TRANSFER CHECKLISTS */}
           <div className="mb-10">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+            <h2 className="text-lg font-semibold text-navy mb-4">
               Asset Transfer Checklists
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Step-by-step checklists for transferring specific asset types into or out of your trust. Print when you're ready to start a transfer.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-start gap-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+              <div className="flex items-start gap-3 card-trust border border-border p-4 shadow-sm">
                 <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
                   <Home className="w-5 h-5 text-gold" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Real Estate Transfer</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Deed recording, insurance, mortgage, and tax steps.</p>
+                  <h3 className="text-sm font-semibold text-navy">Real Estate Transfer</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Deed recording, insurance, mortgage, and tax steps.</p>
                   <button
                     onClick={() => handlePrint('checklist-real-estate')}
                     className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
@@ -318,13 +338,13 @@ const PrintableBinderPage = () => {
                   </button>
                 </div>
               </div>
-              <div className="flex items-start gap-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+              <div className="flex items-start gap-3 card-trust border border-border p-4 shadow-sm">
                 <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
                   <Car className="w-5 h-5 text-gold" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vehicle Transfer</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Title transfer, DMV, insurance, and registration steps.</p>
+                  <h3 className="text-sm font-semibold text-navy">Vehicle Transfer</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Title transfer, DMV, insurance, and registration steps.</p>
                   <button
                     onClick={() => handlePrint('checklist-vehicle')}
                     className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
@@ -337,6 +357,7 @@ const PrintableBinderPage = () => {
           </div>
         </div>
       </main>
+      <MobileBottomNav />
       </div>
 
       {/* ==================== PRINTABLE AREAS ==================== */}

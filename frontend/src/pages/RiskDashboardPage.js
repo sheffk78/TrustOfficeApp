@@ -51,37 +51,37 @@ export default function RiskDashboardPage() {
 
   const getColor = (a) => {
     switch (a) {
-      case 'critical': return 'text-red-700';
+      case 'critical': return 'text-destructive';
       case 'elevated': return 'text-warning';
-      case 'caution': return 'text-slate-700';
-      case 'healthy': return 'text-emerald-700';
-      default: return 'text-slate-700';
+      case 'caution': return 'text-foreground';
+      case 'healthy': return 'text-success';
+      default: return 'text-foreground';
     }
   };
 
   const getBg = (a) => {
     switch (a) {
-      case 'critical': return 'bg-red-100 border-red-200';
+      case 'critical': return 'bg-destructive/10 border-destructive/20';
       case 'elevated': return 'bg-warning/10 border-warning/20';
-      case 'caution': return 'bg-slate-100 border-slate-200';
-      case 'healthy': return 'bg-emerald-100 border-emerald-200';
-      default: return 'bg-slate-100 border-slate-200';
+      case 'caution': return 'bg-subtle-bg border-border';
+      case 'healthy': return 'bg-success/5 border-success/20';
+      default: return 'bg-subtle-bg border-border';
     }
   };
 
   if (!selectedTrust) {
     return (
-      <div className="min-h-screen bg-subtle-bg">
+      <div className="main-layout">
         <Sidebar />
-        <div className="md:pl-64 pb-20 md:pb-0">
-          <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
-              <Shield className="w-12 h-12 text-slate-400 mb-3"/>
+        <main className="main-content mobile-layout-offset">
+          <div className="page-container">
+            <div className="card-trust border border-border p-12 flex flex-col items-center justify-center rounded">
+              <Shield className="w-12 h-12 text-muted-foreground/60 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
-              <p className="text-sm text-neutral-600">Choose a trust to view the Risk Dashboard.</p>
+              <p className="text-sm text-muted-foreground">Choose a trust to view the Risk Dashboard.</p>
             </div>
           </div>
-        </div>
+        </main>
         <MobileBottomNav />
       </div>
     );
@@ -91,10 +91,10 @@ export default function RiskDashboardPage() {
   const label = data?.assessment_label || 'Low Risk';
 
   return (
-    <div className="min-h-screen bg-subtle-bg">
+    <div className="main-layout">
       <Sidebar />
-      <div className="md:pl-64 pb-20 md:pb-0 mobile-layout-offset">
-        <div className="pt-16 md:pt-8 ml-4 mr-4">
+      <main className="main-content mobile-layout-offset">
+        <div className="page-container">
 
           <div className="page-header flex items-center justify-between">
             <div>
@@ -122,7 +122,7 @@ export default function RiskDashboardPage() {
 
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-16 bg-white border border-neutral-200 rounded animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-16 card-trust border border-border rounded animate-pulse"/>)}
             </div>
           ) : (
             <>
@@ -139,7 +139,7 @@ export default function RiskDashboardPage() {
               <Card className={"mb-6 border " + getBg(assessment)}>
                 <CardContent className="p-5 flex items-center gap-4">
                   {assessment === 'healthy' ? (
-                    <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+                    <CheckCircle2 className="w-10 h-10 text-success" />
                   ) : (
                     <AlertTriangle className="w-10 h-10 text-warning" />
                   )}
@@ -158,24 +158,24 @@ export default function RiskDashboardPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                   <Card><CardContent className="p-3 text-center">
                     <p className="text-2xl font-bold text-navy">{data.risk_count}</p>
-                    <p className="text-[10px] text-neutral-500 uppercase">Total Risks</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">Total Risks</p>
                   </CardContent></Card>
                   <Card><CardContent className="p-3 text-center">
-                    <p className="text-2xl font-bold text-red-600">{data.high_count}</p>
-                    <p className="text-[10px] text-neutral-500 uppercase">High</p>
+                    <p className="text-2xl font-bold text-destructive">{data.high_count}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">High</p>
                   </CardContent></Card>
                   <Card><CardContent className="p-3 text-center">
                     <p className="text-2xl font-bold text-warning">{data.medium_count}</p>
-                    <p className="text-[10px] text-neutral-500 uppercase">Medium</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">Medium</p>
                   </CardContent></Card>
                   <Card><CardContent className="p-3 text-center">
-                    <p className="text-2xl font-bold text-slate-500">{data.low_count}</p>
-                    <p className="text-[10px] text-neutral-500 uppercase">Low</p>
+                    <p className="text-2xl font-bold text-muted-foreground">{data.low_count}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">Low</p>
                   </CardContent></Card>
                   {Object.entries(data.by_module).map(([mod, entries]) => (
                     <Card key={mod}><CardContent className="p-3 text-center cursor-pointer hover:bg-navy/5" onClick={() => setFilterModule(filterModule === mod ? '' : mod)}>
                       <p className="text-lg font-bold text-navy">{entries.length}</p>
-                      <p className="text-[10px] text-neutral-500">{mod}</p>
+                      <p className="text-[10px] text-muted-foreground">{mod}</p>
                     </CardContent></Card>
                   ))}
                 </div>
@@ -187,32 +187,32 @@ export default function RiskDashboardPage() {
                   <button
                     key={sev}
                     onClick={() => setFilterSeverity(filterSeverity === sev ? '' : sev)}
-                    className={"px-3 py-1.5 text-xs font-mono uppercase rounded border transition-colors " + (filterSeverity === sev ? SEVERITY_STYLES[sev].badge : 'border-neutral-200 text-neutral-500 hover:border-neutral-400')}
+                    className={"px-3 py-1.5 text-xs font-mono uppercase rounded border transition-colors " + (filterSeverity === sev ? SEVERITY_STYLES[sev].badge : 'border-border text-muted-foreground hover:border-navy/30')}
                   >
                     {sev}
                   </button>
                 ))}
                 {(filterSeverity || filterModule) && (
-                  <button onClick={() => { setFilterSeverity(''); setFilterModule(''); }} className="px-3 py-1.5 text-xs text-neutral-500 hover:text-navy">Clear</button>
+                  <button onClick={() => { setFilterSeverity(''); setFilterModule(''); }} className="px-3 py-1.5 text-xs text-muted-foreground hover:text-navy">Clear</button>
                 )}
               </div>
 
               {/* Risk List */}
               <div className="space-y-3">
                 {filteredRisks().length === 0 && (data?.risk_count || 0) === 0 ? (
-                  <div className="bg-emerald-50 border border-emerald-200 p-12 text-center rounded">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-3"/>
-                    <p className="text-lg font-semibold text-emerald-800">All Clear</p>
-                    <p className="text-sm text-emerald-700">No risk items detected. Your trust governance is in good shape.</p>
+                  <div className="bg-success/5 border border-success/20 p-12 text-center rounded">
+                    <CheckCircle2 className="w-12 h-12 text-success mx-auto mb-3"/>
+                    <p className="text-lg font-semibold text-success">All Clear</p>
+                    <p className="text-sm text-success">No risk items detected. Your trust governance is in good shape.</p>
                   </div>
                 ) : filteredRisks().length === 0 ? (
-                  <p className="text-center text-sm text-neutral-500 py-8">No items match the selected filters.</p>
+                  <p className="text-center text-sm text-muted-foreground py-8">No items match the selected filters.</p>
                 ) : (
                   filteredRisks().map((r, i) => {
                     const style = SEVERITY_STYLES[r.severity] || SEVERITY_STYLES.low;
                     const Icon = r.severity === 'high' ? AlertOctagon : r.severity === 'medium' ? AlertTriangle : AlertCircle;
                     return (
-                      <div key={i} className={"flex items-start gap-3 bg-white border rounded p-4 " + style.border}>
+                      <div key={i} className={"flex items-start gap-3 card-trust border border-border rounded p-4 " + style.border}>
                         <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + style.bg}>
                           <Icon className={"w-4 h-4 " + style.icon} />
                         </div>
@@ -223,9 +223,9 @@ export default function RiskDashboardPage() {
                               {style.label}
                             </span>
                           </div>
-                          <p className="text-sm text-neutral-600 mb-2">{r.detail}</p>
+                          <p className="text-sm text-muted-foreground mb-2">{r.detail}</p>
                           <div className="flex items-center gap-3">
-                            <p className="text-xs text-neutral-500">Action: {r.action}</p>
+                            <p className="text-xs text-muted-foreground">Action: {r.action}</p>
                             <Link to={r.deeplink} className="text-xs text-navy hover:text-navy/70 flex items-center gap-1">
                               <ArrowUpRight className="w-3 h-3" />
                               Go to {r.module}
@@ -240,7 +240,7 @@ export default function RiskDashboardPage() {
             </>
           )}
         </div>
-      </div>
+      </main>
       <MobileBottomNav />
     </div>
   );

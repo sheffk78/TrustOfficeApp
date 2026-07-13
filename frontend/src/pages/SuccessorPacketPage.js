@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
 import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Printer, FileText, Users, Building2, Landmark, Phone, Mail, ClipboardList, Calendar, Shield, BookOpen } from 'lucide-react';
 
 const PRINT_STYLES = `
@@ -149,6 +150,24 @@ const SuccessorPacketPage = () => {
     return () => { cancelled = true; };
   }, [selectedTrust?.trust_id]);
 
+  if (!selectedTrust) {
+    return (
+      <div className="main-layout">
+        <Sidebar />
+        <main className="main-content no-print mobile-layout-offset">
+          <div className="page-container max-w-5xl mx-auto">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <FileText className="w-12 h-12 text-muted-foreground/60 mb-3"/>
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+              <p className="text-sm text-muted-foreground">Choose a trust to view the Successor Trustee Packet.</p>
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
   const handlePrint = () => {
     setTimeout(() => window.print(), 100);
   };
@@ -188,20 +207,20 @@ const SuccessorPacketPage = () => {
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded">
+              <div className="mb-4 p-3 bg-warning/5 border border-warning/20 text-warning text-sm rounded">
                 {error}
               </div>
             )}
 
             {loading ? (
               <div className="animate-pulse space-y-4">
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-                <div className="h-48 bg-gray-100 dark:bg-gray-800 rounded"></div>
-                <div className="h-48 bg-gray-100 dark:bg-gray-800 rounded"></div>
+                <div className="h-8 bg-subtle-bg rounded w-1/3"></div>
+                <div className="h-48 bg-subtle-bg rounded"></div>
+                <div className="h-48 bg-subtle-bg rounded"></div>
               </div>
             ) : (
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <div className="card-trust border border-border p-6 shadow-sm">
+                <p className="text-sm text-muted-foreground mb-4">
                   Click "Print Full Packet" to generate a printable document with all sections below. The packet includes trust identification, trustee transition info, beneficiaries, assets, bank accounts, professional contacts, governance rules, upcoming deadlines, and your letter of guidance.
                 </p>
 
@@ -220,11 +239,11 @@ const SuccessorPacketPage = () => {
                   ].map((s, i) => {
                     const Icon = s.icon;
                     return (
-                      <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-100 dark:border-gray-700">
+                      <div key={i} className="flex items-start gap-3 p-3 bg-subtle-bg rounded border border-border/50">
                         <Icon className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
                         <div>
-                          <div className="text-sm font-semibold text-gray-900 dark:text-white">{s.title}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{s.desc}</div>
+                          <div className="text-sm font-semibold text-navy">{s.title}</div>
+                          <div className="text-xs text-muted-foreground">{s.desc}</div>
                         </div>
                       </div>
                     );
@@ -234,6 +253,7 @@ const SuccessorPacketPage = () => {
             )}
           </div>
         </main>
+        <MobileBottomNav />
       </div>
 
       {/* ==================== PRINTABLE PACKET ==================== */}

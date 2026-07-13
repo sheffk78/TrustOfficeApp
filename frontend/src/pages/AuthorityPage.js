@@ -19,18 +19,18 @@ import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
 
 const ROLE_COLORS = {
-  Trustee: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-  Grantor: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  Trustee: { bg: 'bg-navy/5', text: 'text-navy', border: 'border-navy/20' },
+  Grantor: { bg: 'bg-navy/5', text: 'text-navy', border: 'border-navy/20' },
   Protector: { bg: 'bg-warning/5', text: 'text-warning', border: 'border-warning/20' },
   Beneficiary: { bg: 'bg-success/5', text: 'text-success', border: 'border-success/20' },
-  Manager: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
-  'Successor Trustee': { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
+  Manager: { bg: 'bg-subtle-bg', text: 'text-foreground', border: 'border-border' },
+  'Successor Trustee': { bg: 'bg-navy/5', text: 'text-navy', border: 'border-navy/20' },
 };
 
 const AUTHORITY_LEVELS = {
   full: { label: 'Full Authority', color: 'text-success', icon: CheckCircle2 },
   limited: { label: 'Limited Authority', color: 'text-warning', icon: AlertTriangle },
-  none: { label: 'No Authority', color: 'text-red-500', icon: XCircle },
+  none: { label: 'No Authority', color: 'text-destructive', icon: XCircle },
 };
 
 export default function AuthorityPage() {
@@ -150,25 +150,41 @@ export default function AuthorityPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+      <div className="main-layout">
+        <Sidebar />
+        <main className="main-content mobile-layout-offset">
+          <div className="page-container flex items-center justify-center py-20">
+            <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        </main>
+        <MobileBottomNav />
       </div>
     );
   }
 
   if (!selectedTrust) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-muted-foreground">
-        Select a trust to view authority management
+      <div className="main-layout">
+        <Sidebar />
+        <main className="main-content mobile-layout-offset">
+          <div className="page-container">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <Shield className="w-12 h-12 text-muted-foreground/60 mb-3"/>
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+              <p className="text-sm text-muted-foreground">Choose a trust to view authority management.</p>
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="main-layout">
       <Sidebar />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-        <div className="max-w-6xl mx-auto space-y-6">
+      <main className="main-content mobile-layout-offset">
+        <div className="page-container max-w-6xl mx-auto space-y-6">
           {/* Header */}
           <div className="page-header flex items-center justify-between">
             <div>
@@ -199,7 +215,7 @@ export default function AuthorityPage() {
               <h2 className="font-serif text-lg text-navy mb-3 flex items-center gap-2">
                 <FileText className="w-5 h-5" /> Governing Authority Clause
               </h2>
-              <div className="bg-slate-50 rounded p-4 text-sm leading-relaxed border border-slate-200">
+              <div className="bg-subtle-bg rounded p-4 text-sm leading-relaxed border border-border">
                 {trustData.authority_clause}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
@@ -258,9 +274,9 @@ export default function AuthorityPage() {
                       </div>
 
                       {person.authorityClause && isSelected && (
-                        <div className="mt-3 pt-3 border-t border-slate-100">
+                        <div className="mt-3 pt-3 border-t border-border/50">
                           <p className="text-muted-foreground mb-1">Authority Reference</p>
-                          <p className="text-navy text-xs leading-relaxed bg-slate-50 rounded p-2">
+                          <p className="text-navy text-xs leading-relaxed bg-subtle-bg rounded p-2">
                             {person.authorityClause}
                           </p>
                         </div>
@@ -268,7 +284,7 @@ export default function AuthorityPage() {
                     </div>
 
                     {isSelected && (
-                      <div className="mt-3 pt-2 border-t border-slate-100">
+                      <div className="mt-3 pt-2 border-t border-border/50">
                         <p className="text-[10px] text-muted-foreground">
                           Tap to collapse • Article references available in entity settings
                         </p>
@@ -289,7 +305,7 @@ export default function AuthorityPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200">
+                    <tr className="border-b border-border">
                       <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs">Entity</th>
                       <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs">Type</th>
                       <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs">Trustees/Managers</th>
@@ -303,7 +319,7 @@ export default function AuthorityPage() {
                       const allPeople = [...trusteeList, ...managerList];
 
                       return (
-                        <tr key={entity.entity_id} className="border-b border-slate-50 hover:bg-slate-50">
+                        <tr key={entity.entity_id} className="border-b border-border/50 hover:bg-subtle-bg">
                           <td className="py-2 px-3 font-medium text-navy">{entity.name}</td>
                           <td className="py-2 px-3">
                             <span className="text-xs font-mono text-muted-foreground">{entity.entity_type}</span>
@@ -312,7 +328,7 @@ export default function AuthorityPage() {
                             {allPeople.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {allPeople.map((name, i) => (
-                                  <span key={i} className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">
+                                  <span key={i} className="text-xs bg-subtle-bg px-1.5 py-0.5 rounded">
                                     {name}
                                   </span>
                                 ))}
@@ -345,10 +361,10 @@ export default function AuthorityPage() {
               </h2>
               <div className="space-y-2">
                 {relationships.map((rel, idx) => (
-                  <div key={idx} className="flex items-center gap-3 py-2 px-3 bg-slate-50 rounded text-sm">
+                  <div key={idx} className="flex items-center gap-3 py-2 px-3 bg-subtle-bg rounded text-sm">
                     <span className="font-medium text-navy">{rel.parent_entity_id}</span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">
+                    <span className="text-xs bg-navy/10 text-navy px-2 py-0.5 rounded font-medium">
                       {rel.relationship_type.replace(/_/g, ' ')}
                       {rel.ownership_percentage && ` (${rel.ownership_percentage}%)`}
                     </span>

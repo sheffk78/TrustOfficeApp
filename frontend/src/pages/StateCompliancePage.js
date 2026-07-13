@@ -46,17 +46,17 @@ function DeadlineRow({ label, lastSent, nextDue, onMarkSent }) {
   const overdue = nextDue && new Date(nextDue) < new Date();
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-neutral-600">{label}</span>
+      <span className="text-muted-foreground">{label}</span>
       <div className="text-right">
         {nextDue ? (
-          <span className={overdue ? 'text-red-600 font-medium' : 'text-navy'}>
+          <span className={overdue ? 'text-destructive font-medium' : 'text-navy'}>
             {overdue ? 'Overdue: ' : 'Due: '}{new Date(nextDue).toLocaleDateString()}
           </span>
         ) : (
-          <span className="text-neutral-400">Not scheduled</span>
+          <span className="text-muted-foreground/70">Not scheduled</span>
         )}
         {lastSent && (
-          <p className="text-xs text-neutral-400">Last: {new Date(lastSent).toLocaleDateString()}</p>
+          <p className="text-xs text-muted-foreground/70">Last: {new Date(lastSent).toLocaleDateString()}</p>
         )}
         <button onClick={onMarkSent} className="text-xs text-gold hover:underline ml-2">Mark as sent</button>
       </div>
@@ -124,17 +124,17 @@ export default function StateCompliancePage() {
 
   if (!selectedTrust) {
     return (
-      <div className="min-h-screen bg-subtle-bg">
+      <div className="main-layout">
         <Sidebar />
-        <div className="md:pl-64 pb-20 md:pb-0">
-          <div className="pt-16 md:pt-8 ml-4 mr-4">
-            <div className="bg-white border border-neutral-200 p-12 flex flex-col items-center justify-center rounded">
-              <MapPin className="w-12 h-12 text-slate-400 mb-3"/>
+        <main className="main-content mobile-layout-offset">
+          <div className="page-container">
+            <div className="card-trust border border-border p-12 flex flex-col items-center justify-center rounded">
+              <MapPin className="w-12 h-12 text-muted-foreground/60 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
-              <p className="text-sm text-neutral-600">Choose a trust to view state compliance requirements.</p>
+              <p className="text-sm text-muted-foreground">Choose a trust to view state compliance requirements.</p>
             </div>
           </div>
-        </div>
+        </main>
         <MobileBottomNav />
       </div>
     );
@@ -144,10 +144,10 @@ export default function StateCompliancePage() {
   const compliance = stateData?.compliance;
 
   return (
-    <div className="min-h-screen bg-subtle-bg">
+    <div className="main-layout">
       <Sidebar />
-      <div className="md:pl-64 pb-20 md:pb-0">
-        <div className="pt-16 md:pt-8 ml-4 mr-4">
+      <main className="main-content mobile-layout-offset">
+        <div className="page-container">
 
           {/* Header */}
           <div className="page-header flex items-center justify-between">
@@ -175,12 +175,12 @@ export default function StateCompliancePage() {
 
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-24 bg-white border border-neutral-200 rounded animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-24 card-trust border border-border rounded animate-pulse"/>)}
             </div>
           ) : stateData?.state_code === null ? (
-            <Card className="border border-neutral-200">
+            <Card className="border border-border">
               <CardContent className="p-12 flex flex-col items-center text-center">
-                <MapPin className="w-12 h-12 text-slate-300 mb-3"/>
+                <MapPin className="w-12 h-12 text-muted-foreground/50 mb-3"/>
                 <h2 className="font-serif text-xl text-navy mb-2">No state set</h2>
                 <p className="text-sm text-muted-foreground mb-4 max-w-md">
                   Set your trust's state jurisdiction to see compliance requirements like UTC adoption, notice rules, and accounting frequency.
@@ -194,27 +194,27 @@ export default function StateCompliancePage() {
             <div className="space-y-6">
               {/* State Summary Card */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="border border-neutral-200">
+                <Card className="border border-border">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <MapPin className="w-5 h-5 text-navy"/>
-                      <p className="text-xs font-mono uppercase tracking-wider text-neutral-500">State</p>
+                      <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">State</p>
                     </div>
                     <p className="text-xl font-bold text-navy">{profile?.state_name || stateData.state_code}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="border border-neutral-200">
+                <Card className="border border-border">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <BookOpen className="w-5 h-5 text-navy"/>
-                      <p className="text-xs font-mono uppercase tracking-wider text-neutral-500">UTC Adoption</p>
+                      <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">UTC Adoption</p>
                     </div>
                     <p className="text-xl font-bold text-navy">
                       {profile?.utc_adopted === 'full' ? 'Full' : profile?.utc_adopted === 'partial' ? 'Partial' : 'Not Adopted'}
                     </p>
                     {profile?.utc_adoption_date && (
-                      <p className="text-xs text-neutral-500 mt-1">As of {profile.utc_adoption_date}</p>
+                      <p className="text-xs text-muted-foreground mt-1">As of {profile.utc_adoption_date}</p>
                     )}
                     <div className="mt-1">
                       <InfoTooltip text="The Uniform Trust Code is a model law that standardizes trust rules. States that adopt it give trustees clearer guidelines and more predictable outcomes." />
@@ -222,11 +222,11 @@ export default function StateCompliancePage() {
                   </CardContent>
                 </Card>
 
-                <Card className="border border-neutral-200">
+                <Card className="border border-border">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <Gavel className="w-5 h-5 text-navy"/>
-                      <p className="text-xs font-mono uppercase tracking-wider text-neutral-500">Trustee Removal</p>
+                      <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Trustee Removal</p>
                     </div>
                     <p className="text-sm font-medium text-navy capitalize">{profile?.trustee_removal_standard}</p>
                     <div className="mt-1">
@@ -240,22 +240,22 @@ export default function StateCompliancePage() {
               {compliance && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Compliance Score Card */}
-                  <Card className="border border-neutral-200">
+                  <Card className="border border-border">
                     <CardContent className="p-5">
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs font-mono uppercase tracking-wider text-neutral-500">Compliance Score</p>
-                        <span className={`text-2xl font-bold ${compliance.compliance_score >= 80 ? 'text-emerald-600' : compliance.compliance_score >= 50 ? 'text-warning' : 'text-red-600'}`}>
+                        <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Compliance Score</p>
+                        <span className={`text-2xl font-bold ${compliance.compliance_score >= 80 ? 'text-success' : compliance.compliance_score >= 50 ? 'text-warning' : 'text-destructive'}`}>
                           {compliance.compliance_score}
                         </span>
                       </div>
                       {compliance.alert_active && (
-                        <div className="flex items-center gap-2 text-sm text-red-600">
+                        <div className="flex items-center gap-2 text-sm text-destructive">
                           <AlertTriangle className="w-4 h-4" />
                           {compliance.alert_reason || 'Compliance alert active'}
                         </div>
                       )}
                       {!compliance.alert_active && (
-                        <p className="text-sm text-neutral-500">
+                        <p className="text-sm text-muted-foreground">
                           {compliance.compliance_score >= 80 ? 'On track' : compliance.compliance_score >= 50 ? 'Needs attention' : 'Critical, take action'}
                         </p>
                       )}
@@ -263,9 +263,9 @@ export default function StateCompliancePage() {
                   </Card>
 
                   {/* Deadline Tracking Card */}
-                  <Card className="border border-neutral-200">
+                  <Card className="border border-border">
                     <CardContent className="p-5 space-y-2">
-                      <p className="text-xs font-mono uppercase tracking-wider text-neutral-500 mb-2">Deadline Tracking</p>
+                      <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Deadline Tracking</p>
                       <DeadlineRow label="Beneficiary Notice" lastSent={compliance.notice_last_sent} nextDue={compliance.notice_next_due} onMarkSent={markNoticeSent} />
                       <DeadlineRow label="Accounting" lastSent={compliance.accounting_last_sent} nextDue={compliance.accounting_next_due} onMarkSent={markAccountingSent} />
                     </CardContent>
@@ -274,7 +274,7 @@ export default function StateCompliancePage() {
               )}
 
               {/* Requirements List */}
-              <Card className="border border-neutral-200">
+              <Card className="border border-border">
                 <CardHeader>
                   <CardTitle className="font-serif text-lg text-navy flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5 text-gold"/>
@@ -283,20 +283,20 @@ export default function StateCompliancePage() {
                 </CardHeader>
                 <CardContent className="p-6 pt-0">
                   {requirements.length === 0 ? (
-                    <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600"/>
-                      <p className="text-sm text-emerald-800">All compliance requirements are satisfied for {profile?.state_name}.</p>
+                    <div className="flex items-center gap-3 p-4 bg-success/5 border border-success/20 rounded">
+                      <CheckCircle2 className="w-5 h-5 text-success"/>
+                      <p className="text-sm text-success">All compliance requirements are satisfied for {profile?.state_name}.</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {requirements.map((req, i) => {
                         const Icon = CATEGORY_ICONS[req.category] || Shield;
                         return (
-                          <div key={i} className="flex gap-4 p-4 bg-white border border-neutral-200 rounded">
+                          <div key={i} className="flex gap-4 p-4 card-trust border border-border rounded">
                             <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 rounded ${
-                              req.severity === 'high' ? 'bg-red-100 text-red-600' :
+                              req.severity === 'high' ? 'bg-destructive/10 text-destructive' :
                               req.severity === 'medium' ? 'bg-warning/10 text-warning' :
-                              'bg-slate-100 text-slate-500'
+                              'bg-subtle-bg text-muted-foreground'
                             }`}>
                               <Icon className="w-5 h-5"/>
                             </div>
@@ -311,10 +311,10 @@ export default function StateCompliancePage() {
                                 </span>
                               </div>
                               {CATEGORY_PLAIN_ENGLISH[req.category] && (
-                                <p className="text-xs text-neutral-400 italic mb-1">{CATEGORY_PLAIN_ENGLISH[req.category]}</p>
+                                <p className="text-xs text-muted-foreground/70 italic mb-1">{CATEGORY_PLAIN_ENGLISH[req.category]}</p>
                               )}
-                              <p className="text-sm text-neutral-600 mb-2">{req.description}</p>
-                              <p className="text-xs text-neutral-500 flex items-center gap-1">
+                              <p className="text-sm text-muted-foreground mb-2">{req.description}</p>
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
                                 <ChevronRight className="w-3 h-3"/>
                                 {req.action}
                               </p>
@@ -329,7 +329,7 @@ export default function StateCompliancePage() {
             </div>
           )}
         </div>
-      </div>
+      </main>
       <MobileBottomNav />
     </div>
   );

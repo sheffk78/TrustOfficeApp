@@ -10,6 +10,7 @@ import {
   ArrowUpDown,
   Clock,
   User,
+  Users,
   Shield,
   DollarSign,
   Building2,
@@ -43,26 +44,26 @@ const EVENT_ICONS = {
 };
 
 const EVENT_COLORS = {
-  minutes_created: 'bg-blue-50 text-blue-700 border-blue-200',
-  minutes_updated: 'bg-blue-50 text-blue-600 border-blue-200',
+  minutes_created: 'bg-navy/5 text-navy border-navy/20',
+  minutes_updated: 'bg-navy/5 text-navy border-navy/20',
   distribution_created: 'bg-success/5 text-success border-success/20',
   distribution_updated: 'bg-success/5 text-success border-success/20',
-  compensation_created: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  entity_created: 'bg-purple-50 text-purple-700 border-purple-200',
-  entity_updated: 'bg-purple-50 text-purple-600 border-purple-200',
-  relationship_created: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  compensation_created: 'bg-success/5 text-success border-success/20',
+  entity_created: 'bg-navy/5 text-navy border-navy/20',
+  entity_updated: 'bg-navy/5 text-navy border-navy/20',
+  relationship_created: 'bg-navy/5 text-navy border-navy/20',
   beneficiary_created: 'bg-success/5 text-success border-success/20',
-  schedule_a_created: 'bg-amber-50 text-amber-700 border-amber-200',
-  communication_logged: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  schedule_a_created: 'bg-warning/5 text-warning border-warning/20',
+  communication_logged: 'bg-navy/5 text-navy border-navy/20',
   alert_created: 'bg-warning/5 text-warning border-warning/20',
   alert_resolved: 'bg-success/5 text-success border-success/20',
-  transaction_created: 'bg-teal-50 text-teal-700 border-teal-200',
-  transaction_updated: 'bg-teal-50 text-teal-600 border-teal-200',
+  transaction_created: 'bg-navy/5 text-navy border-navy/20',
+  transaction_updated: 'bg-navy/5 text-navy border-navy/20',
   trust_updated: 'bg-navy/5 text-navy border-navy/20',
-  user_action: 'bg-slate-50 text-slate-700 border-slate-200',
+  user_action: 'bg-subtle-bg text-foreground border-border',
 };
 
-const DEFAULT_COLOR = 'bg-slate-50 text-slate-700 border-slate-200';
+const DEFAULT_COLOR = 'bg-subtle-bg text-foreground border-border';
 
 export default function AuditTrailPage() {
   const { selectedTrust } = useAuth();
@@ -412,25 +413,41 @@ export default function AuditTrailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+      <div className="main-layout">
+        <Sidebar />
+        <main className="main-content mobile-layout-offset">
+          <div className="page-container flex items-center justify-center py-20">
+            <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        </main>
+        <MobileBottomNav />
       </div>
     );
   }
 
   if (!selectedTrust) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-muted-foreground">
-        Select a trust to view the audit trail
+      <div className="main-layout">
+        <Sidebar />
+        <main className="main-content mobile-layout-offset">
+          <div className="page-container">
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <FileText className="w-12 h-12 text-muted-foreground/60 mb-3"/>
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+              <p className="text-sm text-muted-foreground">Choose a trust to view the audit trail.</p>
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="main-layout">
       <Sidebar />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <main className="main-content mobile-layout-offset">
+        <div className="page-container max-w-4xl mx-auto space-y-6">
           {/* Header */}
           <div className="page-header flex items-center justify-between">
             <div>
@@ -463,10 +480,10 @@ export default function AuditTrailPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: 'Total Events', value: events.length, color: 'text-navy' },
-              { label: 'Minutes', value: events.filter(e => e.type.includes('minutes')).length, color: 'text-blue-600' },
+              { label: 'Minutes', value: events.filter(e => e.type.includes('minutes')).length, color: 'text-navy' },
               { label: 'Financial', value: events.filter(e => e.type.includes('distribution') || e.type.includes('compensation') || e.type.includes('transaction')).length, color: 'text-success' },
               { label: 'Alerts', value: events.filter(e => e.type.includes('alert')).length, color: 'text-warning' },
-              { label: 'Security', value: events.filter(e => ['login', 'login_failed', 'password_reset', 'trust_updated', 'vault_upload', 'vault_download', 'vault_delete'].includes(e.type)).length, color: 'text-purple-600' },
+              { label: 'Security', value: events.filter(e => ['login', 'login_failed', 'password_reset', 'trust_updated', 'vault_upload', 'vault_download', 'vault_delete'].includes(e.type)).length, color: 'text-navy' },
             ].map(stat => (
               <div key={stat.label} className="card-trust text-center">
                 <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
@@ -484,7 +501,7 @@ export default function AuditTrailPage() {
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
                   filter === opt.value
                     ? 'bg-navy text-white border-navy'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    : 'card-trust text-muted-foreground border-border hover:border-navy/30'
                 }`}
               >
                 {opt.label}
