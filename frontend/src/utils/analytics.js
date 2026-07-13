@@ -28,7 +28,6 @@ export const trackEvent = (eventName, eventParams = {}) => {
   if (isGtagAvailable()) {
     window.gtag('event', eventName, eventParams);
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[GA4] Event: ${eventName}`, eventParams);
     }
   } else {
     console.warn('GA4 gtag not available');

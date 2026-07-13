@@ -208,7 +208,6 @@ const TrustAssistantPage = () => {
 
   // Video card click handler placeholder
   const handleVideoClick = useCallback((card) => {
-    console.log('[TrustAssistant] Video clicked:', card);
   }, []);
 
   // Start a new chat — resets conversation state

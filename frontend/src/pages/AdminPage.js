@@ -210,13 +210,10 @@ export default function AdminPage() {
       if (customerSearch) url += `&search=${encodeURIComponent(customerSearch)}`;
       if (statusFilter !== 'all') url += `&status=${statusFilter}`;
       
-      console.log('[AdminPage] Fetching customers:', url);
       const response = await fetchWithAuth(url);
-      console.log('[AdminPage] Response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('[AdminPage] Customers received:', data.total, 'total,', data.customers?.length, 'in this page');
         setCustomers(data.customers || []);
         setCustomerTotal(data.total || 0);
       } else {

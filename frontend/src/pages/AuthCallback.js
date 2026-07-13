@@ -21,7 +21,6 @@ export default function AuthCallback() {
       const redirect = searchParams.get('redirect') || '/dashboard';
       const error = searchParams.get('error');
       
-      console.log('[AuthCallback] Processing:', { hasCode: !!code, redirect, error });
       
       // Handle OAuth errors
       if (error) {
@@ -62,7 +61,6 @@ export default function AuthCallback() {
           }
           
           const data = await response.json();
-          console.log('[AuthCallback] User loaded:', data.user?.email);
           
           // Security: Store token in localStorage for the current session.
           // The HttpOnly session_cookie is also set by the backend — this is the
@@ -78,7 +76,6 @@ export default function AuthCallback() {
           
           toast.success('Welcome!');
           
-          console.log('[AuthCallback] Redirecting to:', redirect);
           navigate(redirect, { replace: true });
           return;
         } catch (err) {

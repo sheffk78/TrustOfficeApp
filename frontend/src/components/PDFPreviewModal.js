@@ -75,7 +75,6 @@ export function PDFPreviewModal({
       // If iframe doesn't report loaded within 3 seconds, show fallback
       loadTimeoutRef.current = setTimeout(() => {
         if (!iframeLoaded) {
-          console.log('PDF iframe load timeout - showing fallback');
           setPreviewError(true);
         }
       }, 3000);
