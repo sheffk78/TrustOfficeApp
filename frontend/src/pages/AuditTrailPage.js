@@ -89,7 +89,7 @@ export default function AuditTrailPage() {
           (Array.isArray(minutes) ? minutes : []).forEach(m => {
             allEvents.push({
               id: m.minutes_id || m.id,
-              type: m.is_retroactive ? 'minutes_created' : 'minutes_created',
+              type: m.is_retroactive ? 'minutes_created' : 'minutes_updated',
               title: m.title || 'Minutes Created',
               description: m.is_retroactive ? 'Retroactive minutes' : `Meeting minutes documented`,
               date: m.created_at || m.meeting_date,

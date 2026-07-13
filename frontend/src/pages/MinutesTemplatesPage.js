@@ -103,7 +103,7 @@ export default function MinutesTemplatesPage() {
           <div className="mb-8">
             <Button 
               variant="ghost" 
-              className="mb-4"
+              className="btn-secondary mb-4"
               onClick={() => navigate('/minutes')}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />

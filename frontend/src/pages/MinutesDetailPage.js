@@ -117,7 +117,7 @@ export default function MinutesDetailPage() {
         const data = await response.json();
         setPdfPreview({ show: true, loading: false, data: data.pdf_base64, filename: data.filename });
       } else {
-        showError(toast, error, { operation: 'generate', page: 'MinutesDetail' });
+        showError(toast, new Error('Failed to generate PDF'), { operation: 'generate', page: 'MinutesDetail' });
         setPdfPreview({ show: false, loading: false, data: null, filename: '' });
       }
     } catch (error) {
@@ -227,20 +227,20 @@ export default function MinutesDetailPage() {
                 )}
                 {/* AI Generated Badge */}
                 {isAiGenerated && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs font-mono rounded-full border border-purple-200 dark:border-purple-700">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gold/10 text-gold text-xs font-mono rounded-full border border-gold/20">
                     <Sparkles className="w-3 h-3" />
                     AI Generated
                   </span>
                 )}
                 {/* Draft Badge */}
                 {isDraft && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-xs font-mono rounded-full border border-red-300 dark:border-red-700 font-semibold uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-warning/10 text-warning text-xs font-mono rounded-full border border-warning/20 font-semibold uppercase tracking-wider">
                     Draft
                   </span>
                 )}
                 {/* Finalized Badge */}
                 {!isDraft && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-mono rounded-full border border-green-300 dark:border-green-700 font-semibold uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-success/10 text-success text-xs font-mono rounded-full border border-success/20 font-semibold uppercase tracking-wider">
                     Finalized
                   </span>
                 )}
@@ -342,7 +342,7 @@ export default function MinutesDetailPage() {
                     value={editedParticipants}
                     onChange={(e) => setEditedParticipants(e.target.value)}
                     placeholder="John Smith, Jane Doe"
-                    className="mt-1"
+                    className="mt-1 input-trust"
                   />
                   <p className="text-xs text-muted-foreground mt-1">Comma-separated list of trustees</p>
                 </div>
@@ -352,7 +352,7 @@ export default function MinutesDetailPage() {
                     value={editedOtherAttendees}
                     onChange={(e) => setEditedOtherAttendees(e.target.value)}
                     placeholder="Bob Wilson (Attorney), Mary Smith (CPA)"
-                    className="mt-1"
+                    className="mt-1 input-trust"
                   />
                   <p className="text-xs text-muted-foreground mt-1">Comma-separated list of other attendees (guests, advisors, etc.)</p>
                 </div>
@@ -429,7 +429,7 @@ export default function MinutesDetailPage() {
                       </button>
                       {!isCollapsed && (
                         <div className="px-4 pb-4 pt-0">
-                          <pre className="whitespace-pre-wrap font-mono text-sm bg-muted/30 p-4 border border-border rounded overflow-auto max-h-[400px]">
+                          <pre className="whitespace-pre-wrap text-sm bg-muted/30 p-4 border border-border rounded overflow-auto max-h-[400px]">
                             {section.content || 'No content for this section.'}
                           </pre>
                         </div>
@@ -454,13 +454,13 @@ export default function MinutesDetailPage() {
               <Textarea
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
-                className="min-h-[500px] font-mono text-sm"
+                className="min-h-[500px] text-sm"
                 placeholder="Meeting minutes content..."
                 data-testid="minutes-content-textarea"
               />
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <pre className="whitespace-pre-wrap font-mono text-sm bg-muted/30 p-6 border border-border overflow-auto max-h-[600px]">
+                <pre className="whitespace-pre-wrap text-sm bg-muted/30 p-6 border border-border overflow-auto max-h-[600px]">
                   {minutes.decisions_text || 'No content recorded.'}
                 </pre>
               </div>
@@ -474,7 +474,7 @@ export default function MinutesDetailPage() {
       <PDFPreviewModal
         open={pdfPreview.show}
         onOpenChange={(open) => {
-          if (!open) setPdfPreview({ show: false, url: null, loading: false });
+          if (!open) setPdfPreview({ show: false, data: null, loading: false, filename: '' });
         }}
         pdfBase64={pdfPreview.data}
         filename={pdfPreview.filename}

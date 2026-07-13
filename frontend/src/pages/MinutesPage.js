@@ -56,7 +56,7 @@ export default function MinutesPage() {
   const [dateFromOpen, setDateFromOpen] = useState(false);
   const [dateToOpen, setDateToOpen] = useState(false);
   const [pdfPreview, setPdfPreview] = useState(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfLoadingId, setPdfLoadingId] = useState(null);
 
   // Drafts state
   const [drafts, setDrafts] = useState([]);
@@ -69,6 +69,8 @@ export default function MinutesPage() {
     if (selectedTrust) {
       loadMinutes(debouncedSearch);
       loadDrafts();
+    } else {
+      setLoading(false);
     }
   }, [selectedTrust, debouncedSearch, dateFrom, dateTo]);
 
@@ -80,7 +82,7 @@ export default function MinutesPage() {
     
     setLoading(true);
     try {
-      let url = `/minutes?trust_id=${selectedTrust.trust_id}`;
+      let url = `/minutes?trust_id=${selectedTrust.trust_id}&status=finalized`;
       if (search) {
         url += `&search=${encodeURIComponent(search)}`;
       }
@@ -118,7 +120,7 @@ export default function MinutesPage() {
   };
 
   const handleViewPdf = async (minutesId) => {
-    setPdfLoading(true);
+    setPdfLoadingId(minutesId);
     try {
       const response = await fetchWithAuth(`/minutes/${minutesId}/pdf`);
       if (response.ok) {
@@ -134,7 +136,7 @@ export default function MinutesPage() {
     } catch (error) {
       showError(toast, error, { operation: 'generate', page: 'Minutes' });
     } finally {
-      setPdfLoading(false);
+      setPdfLoadingId(null);
     }
   };
 
@@ -179,10 +181,30 @@ export default function MinutesPage() {
     navigate('/minutes/create');
   };
 
+  if (!selectedTrust) {
+    return (
+      <div className="main-layout" data-testid="minutes-page">
+        <Sidebar />
+        <main className="main-content dot-grid">
+          <div className="page-container">
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                <FileText className="w-16 h-16 text-navy/20" />
+              </div>
+              <h2 className="font-serif text-2xl text-navy mb-2">Select a Trust</h2>
+              <p className="text-muted-foreground mb-6">Choose a trust from the sidebar to view and create minutes.</p>
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
   return (
     <div className="main-layout" data-testid="minutes-page">
       <Sidebar />
-      <main className="main-content">
+      <main className="main-content dot-grid">
         {/* Subscription Banners */}
         
         <div className="page-container">
@@ -273,7 +295,7 @@ export default function MinutesPage() {
                             <span className="font-serif text-navy">{summary}</span>
                             <span className="badge-trust">{getEntryTypeLabel(entryType)}</span>
                             {draft.template_type && (
-                              <span className="px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-blue-100 text-blue-700 rounded">
+                              <span className="px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-gold/10 text-gold rounded">
                                 {getTemplateTypeLabel(draft.template_type)}
                               </span>
                             )}
@@ -461,11 +483,11 @@ export default function MinutesPage() {
                               e.stopPropagation();
                               handleViewPdf(entry.minutes_id);
                             }}
-                            disabled={pdfLoading}
+                            disabled={pdfLoadingId === entry.minutes_id}
                             className="btn-secondary text-xs"
                             data-testid={`view-pdf-${entry.minutes_id}`}
                           >
-                            {pdfLoading ? (
+                            {pdfLoadingId === entry.minutes_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <>
@@ -489,7 +511,7 @@ export default function MinutesPage() {
                           {getEntryTypeLabel(entryType)}
                         </span>
                         {entry.template_type && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-blue-100 text-blue-700 rounded">
+                          <span className="px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider bg-gold/10 text-gold rounded">
                             {getTemplateTypeLabel(entry.template_type)}
                           </span>
                         )}

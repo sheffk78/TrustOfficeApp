@@ -345,6 +345,9 @@ async def autosave_minutes(
         if not existing:
             raise HTTPException(status_code=404, detail="Draft minutes not found. It may have been deleted. Please start a new draft.")
         
+        if existing.get("status") == "finalized":
+            raise HTTPException(status_code=403, detail="Cannot autosave over finalized minutes. Use the edit function instead.")
+        
         update_doc = {
             "minutes_type": request.minutes_type,
             "template_type": request.template_type,
@@ -368,7 +371,7 @@ async def autosave_minutes(
         
         # Fetch updated doc for response
         updated = await db.minutes_records.find_one(
-            {"minutes_id": request.minutes_id},
+            {"minutes_id": request.minutes_id, "user_id": user_id},
             {"_id": 0}
         )
         logger.info(f"Autosave updated draft: {request.minutes_id}")
@@ -4039,6 +4042,9 @@ async def update_minutes_template(minutes_id: str, update_data: MinutesTemplateU
     if not minutes:
         raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     
+    if minutes.get("status") == "final" and update_data.generated_document is not None:
+        raise HTTPException(status_code=403, detail="Finalized minutes cannot be edited. Create a new minutes record if changes are needed.")
+    
     # Track the update
     update_fields = {
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -4054,7 +4060,7 @@ async def update_minutes_template(minutes_id: str, update_data: MinutesTemplateU
         update_fields["template_data"] = update_data.template_data
     
     await db.minutes_templates.update_one(
-        {"minutes_id": minutes_id},
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
         {"$set": update_fields}
     )
     
@@ -4065,12 +4071,22 @@ async def update_minutes_template(minutes_id: str, update_data: MinutesTemplateU
         except Exception:
             pass
     
-    updated = await db.minutes_templates.find_one({"minutes_id": minutes_id}, {"_id": 0})
+    updated = await db.minutes_templates.find_one({"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0})
     return updated
 
 @router.delete("/minutes-templates/{minutes_id}")
 async def delete_minutes_template(minutes_id: str, user: dict = Depends(require_write_access)):
     """Delete a template-based minutes"""
+    minutes = await db.minutes_templates.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not minutes:
+        raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
+    
+    if minutes.get("status") == "final":
+        raise HTTPException(status_code=403, detail="Finalized minutes cannot be deleted. They are part of the legal record.")
+    
     result = await db.minutes_templates.delete_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]}
     )

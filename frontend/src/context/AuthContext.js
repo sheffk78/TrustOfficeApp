@@ -89,11 +89,6 @@ export const AuthProvider = ({ children }) => {
   }, [loadSubscriptionState]);
 
   const checkAuth = useCallback(async () => {
-      pathname: window.location.pathname,
-      hasToken: hasStoredToken(),
-      authCheckComplete: authCheckComplete.current
-    });
-    
     // CRITICAL: If returning from OAuth callback path, skip the /me check.
     // AuthCallback will handle the token and establish the session.
     if (window.location.hash?.includes('session_id=') || 

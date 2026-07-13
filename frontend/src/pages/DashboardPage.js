@@ -1230,7 +1230,16 @@ export default function DashboardPage() {
                             {getActivityIcon(activity.type)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-navy truncate">{activity.title}</p>
+                            <p className="font-medium text-navy truncate">
+                              {activity.source === 'minutes' && activity.id ? (
+                                <button
+                                  onClick={() => navigate(`/minutes/${activity.id}`)}
+                                  className="text-left hover:text-gold transition-colors"
+                                >
+                                  {activity.title}
+                                </button>
+                              ) : activity.title}
+                            </p>
                             <div className="flex items-center gap-3 mt-1">
                               <span className="font-mono text-xs text-muted-foreground">
                                 {formatDate(activity.date)}

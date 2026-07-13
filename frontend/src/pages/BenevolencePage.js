@@ -690,7 +690,7 @@ export default function BenevolencePage() {
                       </div>
                       <div className="flex items-center gap-3">
                         {/* Minutes Actions */}
-                        {!record.is_documented && record.source_type === 'benevolence' && (
+                        {!record.is_documented && record.source === 'benevolence' && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm" data-testid={`minutes-menu-${record.id}`}>
