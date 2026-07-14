@@ -42,6 +42,7 @@ import PrintableBinderPage from "@/pages/PrintableBinderPage";
 import SuccessorPacketPage from "@/pages/SuccessorPacketPage";
 import TrustAssistantPage from "@/pages/TrustAssistantPage";
 import WingPointWelcomePage from "@/pages/WingPointWelcomePage";
+import WingPointRedirect from "@/pages/WingPointRedirect";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -172,7 +173,7 @@ const AppRouter = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/register" element={<SignUpPage />} />
-      <Route path="/wingpoint" element={<WingPointWelcomePage />} />
+      <Route path="/wingpoint" element={<WingPointRedirect />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/affiliate" element={<AffiliatePage />} />
       <Route path="/help" element={<Navigate to="/dashboard" replace />} />
