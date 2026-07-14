@@ -35,175 +35,109 @@
     font-weight: 700;
 }
 
-@page { size: letter; margin: 0.75in; }
+@page { size: letter; margin: 0; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
     font-family: 'Satoshi', -apple-system, sans-serif;
-    font-size: 10pt;
-    line-height: 1.55;
+    font-size: 9.5pt;
+    line-height: 1.5;
     color: #15151B;
     background: #ffffff;
+    padding: 0.6in 0.7in;
 }
 
+/* --- Title --- */
 .title-block {
-    margin-bottom: 28px;
-    padding-bottom: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
     border-bottom: 2px solid #00B4A6;
 }
-
 .title-block h1 {
     font-family: 'CabinetGrotesk', sans-serif;
     font-weight: 800;
-    font-size: 20pt;
+    font-size: 19pt;
     letter-spacing: -0.02em;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
-
 .title-block .subtitle {
-    font-size: 9pt;
+    font-size: 8.5pt;
     color: #716E68;
 }
 
+/* --- Section headers --- */
 h2 {
     font-family: 'CabinetGrotesk', sans-serif;
     font-weight: 700;
-    font-size: 13pt;
-    color: #15151B;
-    margin-top: 22px;
-    margin-bottom: 10px;
+    font-size: 12pt;
+    margin-top: 20px;
+    margin-bottom: 8px;
 }
-
 h2 .num {
     color: #00B4A6;
     margin-right: 6px;
 }
-
 h3 {
     font-family: 'CabinetGrotesk', sans-serif;
     font-weight: 700;
-    font-size: 10.5pt;
-    margin-top: 14px;
-    margin-bottom: 6px;
+    font-size: 10pt;
+    margin-top: 12px;
+    margin-bottom: 5px;
 }
-
-p { margin-bottom: 8px; }
-
+p { margin-bottom: 6px; }
 strong { font-weight: 700; }
 
-/* Diagram styles */
-.diagram {
-    margin: 14px 0 18px 0;
-    page-break-inside: avoid;
-}
-
-.diagram-row {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-bottom: 0;
-}
-
-.diagram-box {
-    border: 1.5px solid #15151B;
-    border-radius: 4px;
-    padding: 10px 14px;
-    text-align: center;
-    font-family: 'CabinetGrotesk', sans-serif;
-    font-weight: 700;
-    font-size: 9pt;
-    background: #fff;
-}
-
-.diagram-box.accent {
-    border-color: #00B4A6;
-    background: #f0fbfa;
-}
-
-.diagram-box.dark {
-    background: #15151B;
-    color: #fff;
-    border-color: #15151B;
-}
-
-.diagram-box .label {
-    font-family: 'Satoshi', sans-serif;
-    font-weight: 400;
-    font-size: 7.5pt;
-    color: #716E68;
-    margin-top: 3px;
-}
-
-.diagram-box.dark .label { color: #999; }
-
-.diagram-connector {
-    text-align: center;
-    color: #00B4A6;
-    font-size: 8pt;
-    line-height: 1;
-    padding: 4px 0;
-}
-
-.diagram-row.three-col .diagram-box { flex: 1; }
-.diagram-row.two-col .diagram-box { flex: 1; max-width: 48%; }
-.diagram-row .diagram-box.fixed { flex: 0 0 auto; }
-
-/* Table */
+/* --- Tables --- */
 table {
     width: 100%;
     border-collapse: collapse;
     margin: 8px 0 12px 0;
+    font-size: 8.5pt;
     page-break-inside: avoid;
-    font-size: 9pt;
 }
-
 th {
-    background: #f5f4f1;
-    padding: 6px 10px;
+    background: #F7F5EF;
+    padding: 5px 9px;
     text-align: left;
     font-family: 'CabinetGrotesk', sans-serif;
     font-weight: 700;
-    font-size: 8.5pt;
+    font-size: 8pt;
     border-bottom: 1.5px solid #00B4A6;
 }
-
 td {
-    padding: 5px 10px;
+    padding: 5px 9px;
     border-bottom: 1px solid #eee;
     vertical-align: top;
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
-/* Status badges */
+/* --- Badges --- */
 .badge {
     display: inline-block;
-    padding: 2px 8px;
+    padding: 2px 7px;
     border-radius: 3px;
-    font-size: 7.5pt;
+    font-size: 7pt;
     font-weight: 700;
     font-family: 'CabinetGrotesk', sans-serif;
+    white-space: nowrap;
 }
-
 .badge-quick { background: #e6f9f7; color: #00B4A6; }
 .badge-medium { background: #fff4e6; color: #c47900; }
 .badge-live { background: #e6f9f7; color: #00B4A6; }
-.badge-fixed { background: #e6f9f7; color: #00B4A6; }
 
-/* List */
+/* --- List --- */
 ul {
     list-style: none;
     padding: 0;
-    margin: 6px 0 10px 0;
+    margin: 4px 0 8px 0;
 }
-
 li {
-    padding-left: 14px;
+    padding-left: 13px;
     position: relative;
-    margin-bottom: 4px;
-    line-height: 1.5;
+    margin-bottom: 3px;
+    line-height: 1.45;
 }
-
 li::before {
     content: '';
     position: absolute;
@@ -215,16 +149,28 @@ li::before {
     background: #00B4A6;
 }
 
+/* --- SVG diagram containers --- */
+.diagram-container {
+    margin: 14px 0 16px 0;
+    page-break-inside: avoid;
+}
+.diagram-container svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* --- Page break --- */
 .page-break { page-break-after: always; }
 
 @media print {
     body { margin: 0; }
-    .page-break { page-break-after: always; }
-    table, .diagram { page-break-inside: avoid; }
 }
 </style>
 </head>
 <body>
+
+<!-- ============ PAGE 1: INFRASTRUCTURE + SECURITY ============ -->
 
 <div class="title-block">
     <h1>TrustOffice Platform Briefing</h1>
@@ -232,42 +178,77 @@ li::before {
 </div>
 
 <h2><span class="num">01</span>Infrastructure</h2>
-
 <p>Fully owned stack. No shared SaaS backends. Every component is ours, deployed from our own repositories.</p>
 
-<div class="diagram">
-    <div class="diagram-row two-col">
-        <div class="diagram-box">
-            app.trustoffice.app
-            <div class="label">React Frontend (SPA)</div>
-        </div>
-        <div class="diagram-box accent">
-            Railway Auto-Deploy
-            <div class="label">git push to main</div>
-        </div>
-    </div>
-    <div class="diagram-connector">&darr;</div>
-    <div class="diagram-row two-col">
-        <div class="diagram-box">
-            FastAPI Backend
-            <div class="label">REST API, AI orchestration, auth, exports</div>
-        </div>
-        <div class="diagram-box">
-            MongoDB
-            <div class="label">Conversations, users, session state</div>
-        </div>
-    </div>
-    <div class="diagram-connector">&darr;</div>
-    <div class="diagram-row two-col">
-        <div class="diagram-box accent">
-            OpenRouter
-            <div class="label">Claude + Gemini models</div>
-        </div>
-        <div class="diagram-box dark">
-            Hermes Agent (VPS)
-            <div class="label">Profile-isolated autonomous operations</div>
-        </div>
-    </div>
+<div class="diagram-container">
+<svg viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow1" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#15151B" flood-opacity="0.08"/>
+    </filter>
+    <linearGradient id="tealGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00D4C6"/>
+      <stop offset="100%" stop-color="#00B4A6"/>
+    </linearGradient>
+    <linearGradient id="darkGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2A2A35"/>
+      <stop offset="100%" stop-color="#15151B"/>
+    </linearGradient>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#00B4A6"/>
+    </marker>
+  </defs>
+
+  <!-- Layer 1: Frontend + Deploy -->
+  <g filter="url(#shadow1)">
+    <rect x="40" y="10" width="280" height="44" rx="5" fill="#fff" stroke="#15151B" stroke-width="1.2"/>
+    <text x="180" y="28" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#15151B">app.trustoffice.app</text>
+    <text x="180" y="42" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#716E68">React Frontend (SPA)</text>
+  </g>
+
+  <g filter="url(#shadow1)">
+    <rect x="360" y="10" width="280" height="44" rx="5" fill="url(#tealGrad)" stroke="#00B4A6" stroke-width="1.2"/>
+    <text x="500" y="28" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#fff">Railway Auto-Deploy</text>
+    <text x="500" y="42" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#fff" opacity="0.85">git push to main &rarr; live in minutes</text>
+  </g>
+
+  <!-- Arrow down -->
+  <line x1="180" y1="58" x2="180" y2="84" stroke="#00B4A6" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 2: Backend + Database -->
+  <g filter="url(#shadow1)">
+    <rect x="40" y="88" width="280" height="44" rx="5" fill="#fff" stroke="#15151B" stroke-width="1.2"/>
+    <text x="180" y="106" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#15151B">FastAPI Backend</text>
+    <text x="180" y="120" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#716E68">REST API, AI orchestration, auth, exports</text>
+  </g>
+
+  <g filter="url(#shadow1)">
+    <rect x="360" y="88" width="280" height="44" rx="5" fill="#fff" stroke="#15151B" stroke-width="1.2"/>
+    <text x="500" y="106" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#15151B">MongoDB</text>
+    <text x="500" y="120" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#716E68">Conversations, users, session state</text>
+  </g>
+
+  <!-- Arrow down -->
+  <line x1="180" y1="136" x2="180" y2="162" stroke="#00B4A6" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <line x1="500" y1="136" x2="500" y2="162" stroke="#00B4A6" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 3: AI + Agent -->
+  <g filter="url(#shadow1)">
+    <rect x="40" y="166" width="280" height="44" rx="5" fill="url(#tealGrad)" stroke="#00B4A6" stroke-width="1.2"/>
+    <text x="180" y="184" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#fff">OpenRouter</text>
+    <text x="180" y="198" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#fff" opacity="0.85">Claude (complex) + Gemini (fast)</text>
+  </g>
+
+  <g filter="url(#shadow1)">
+    <rect x="360" y="166" width="280" height="44" rx="5" fill="url(#darkGrad)" stroke="#15151B" stroke-width="1.2"/>
+    <text x="500" y="184" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#fff">Hermes Agent (VPS)</text>
+    <text x="500" y="198" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#fff" opacity="0.65">Profile-isolated autonomous operations</text>
+  </g>
+
+  <!-- Bottom labels -->
+  <text x="180" y="228" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7" fill="#716E68">AI Layer</text>
+  <text x="500" y="228" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7" fill="#716E68">Monitoring, maintenance, cron jobs</text>
+</svg>
 </div>
 
 <table>
@@ -280,8 +261,6 @@ li::before {
     <tr><td>AI Layer</td><td>OpenRouter</td><td>Routes to Claude (complex) and Gemini (fast)</td></tr>
     <tr><td>Agent</td><td>Hermes (isolated profile)</td><td>Monitoring, maintenance, content, cron jobs</td></tr>
 </table>
-
-<div class="page-break"></div>
 
 <h2><span class="num">02</span>Security</h2>
 
@@ -297,27 +276,28 @@ li::before {
     <tr><td>Data Scoping</td><td>User data scoped per account. No global read access.</td><td><span class="badge badge-live">Live</span></td></tr>
 </table>
 
-<h2><span class="num">03</span>Performance Fixes (Deployed Tonight)</h2>
+<div class="page-break"></div>
 
+<!-- ============ PAGE 2: FIXES + ROADMAP ============ -->
+
+<h2><span class="num">03</span>Performance Fixes (Deployed Tonight)</h2>
 <p>Both issues Jake reported are <strong>fixed and live</strong>.</p>
 
 <table>
     <tr><th>Issue</th><th>Root Cause</th><th>Fix</th><th>Result</th></tr>
     <tr>
         <td>2-3 min response times</td>
-        <td>Sync AI calls blocked the event loop. Sequential round-trips before first token.</td>
-        <td>asyncio.to_thread, parallelized intent classification, reduced prompt from 15K to 8K tokens, timeout 90s to 30s.</td>
-        <td><span class="badge badge-fixed">15-20s</span></td>
+        <td>Sync AI calls blocked the event loop. Sequential round-trips.</td>
+        <td>asyncio.to_thread, parallelized intent classification, trimmed prompt, timeout 90s to 30s.</td>
+        <td><span class="badge badge-live">15-20s</span></td>
     </tr>
     <tr>
         <td>Mobile drops on backgrounding</td>
-        <td>No visibility handler. OS kills fetch connection when tab is backgrounded.</td>
-        <td>Wake Lock API, visibilitychange handler, auto-reconnection, polling fallback, partial response saving.</td>
-        <td><span class="badge badge-fixed">Fixed</span></td>
+        <td>No visibility handler. OS kills fetch when tab backgrounded.</td>
+        <td>Wake Lock API, visibilitychange handler, auto-reconnect, polling fallback.</td>
+        <td><span class="badge badge-live">Fixed</span></td>
     </tr>
 </table>
-
-<div class="page-break"></div>
 
 <h2><span class="num">04</span>Feature Roadmap</h2>
 
@@ -325,81 +305,111 @@ li::before {
     <tr><th>Feature</th><th>Approach</th><th>Effort</th></tr>
     <tr>
         <td><strong>Image upload in chat</strong></td>
-        <td>Multipart upload endpoint, Cloudflare R2 storage, signed URLs, inline thumbnails in conversation.</td>
+        <td>Multipart upload endpoint, Cloudflare R2 storage, signed URLs, inline thumbnails.</td>
         <td><span class="badge badge-quick">1-2 days</span></td>
     </tr>
     <tr>
         <td><strong>CSV report downloads</strong></td>
-        <td>Backend already has export patterns. Add /reports/export endpoint, query MongoDB, serve as file download.</td>
+        <td>Backend has export patterns. Add /reports/export endpoint, query MongoDB, serve as download.</td>
         <td><span class="badge badge-quick">1-2 days</span></td>
     </tr>
     <tr>
         <td><strong>PDF generation</strong></td>
-        <td>WeasyPrint (HTML/CSS to PDF). Branded templates. /reports/pdf endpoint with same query params as CSV.</td>
+        <td>WeasyPrint (HTML/CSS to PDF). Branded templates. /reports/pdf endpoint.</td>
         <td><span class="badge badge-medium">~1 week</span></td>
     </tr>
     <tr>
         <td><strong>Email notifications</strong></td>
-        <td>Notification triggers in backend, email via Brevo/SendGrid, user preferences for opt-in/out.</td>
+        <td>Triggers in backend, email via Brevo/SendGrid, user preferences.</td>
         <td><span class="badge badge-medium">~1 week</span></td>
     </tr>
     <tr>
         <td><strong>In-app real-time notifications</strong></td>
-        <td>WebSocket per active session. Server pushes events (report ready, task done).</td>
+        <td>WebSocket per active session. Server pushes events.</td>
         <td><span class="badge badge-medium">~2 weeks</span></td>
     </tr>
 </table>
 
-<p><strong>Recommended priority:</strong> CSV export and file upload first (both live within a week). PDF generation and email notifications next. Real-time in-app notifications last.</p>
+<p><strong>Recommended priority:</strong> CSV export and file upload first (live within a week). PDF and email notifications next. Real-time notifications last.</p>
 
 <h2><span class="num">05</span>E-Commerce Vision</h2>
-
 <p>Separate storefront at store.trustoffice.app. Stripe Checkout for payments (PCI-compliant, no card data on our servers). Hermes manages inventory, fulfillment, and customer communications autonomously.</p>
 
-<div class="diagram">
-    <div class="diagram-row">
-        <div class="diagram-box" style="flex:1">
-            store.trustoffice.app
-            <div class="label">Product catalog, cart, checkout, order history</div>
-        </div>
-    </div>
-    <div class="diagram-connector">&darr;</div>
-    <div class="diagram-row two-col">
-        <div class="diagram-box accent">
-            Stripe Checkout
-            <div class="label">Payments, PCI compliance, webhooks</div>
-        </div>
-        <div class="diagram-box">
-            TrustOffice Backend
-            <div class="label">Products, orders, inventory, shared JWT auth</div>
-        </div>
-    </div>
-    <div class="diagram-connector">&darr;</div>
-    <div class="diagram-row two-col">
-        <div class="diagram-box">
-            MongoDB
-            <div class="label">Products, orders, inventory, shared users</div>
-        </div>
-        <div class="diagram-box dark">
-            Hermes Agent
-            <div class="label">Inventory monitoring, fulfillment, communications</div>
-        </div>
-    </div>
+<div class="diagram-container">
+<svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadow2" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#15151B" flood-opacity="0.08"/>
+    </filter>
+    <linearGradient id="tealGrad2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00D4C6"/>
+      <stop offset="100%" stop-color="#00B4A6"/>
+    </linearGradient>
+    <linearGradient id="darkGrad2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2A2A35"/>
+      <stop offset="100%" stop-color="#15151B"/>
+    </linearGradient>
+    <marker id="arrowhead2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#00B4A6"/>
+    </marker>
+  </defs>
+
+  <!-- Storefront (full width) -->
+  <g filter="url(#shadow2)">
+    <rect x="100" y="10" width="480" height="44" rx="5" fill="#fff" stroke="#15151B" stroke-width="1.2"/>
+    <text x="340" y="28" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#15151B">store.trustoffice.app</text>
+    <text x="340" y="42" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#716E68">Product catalog, cart, checkout, order history</text>
+  </g>
+
+  <!-- Arrow down -->
+  <line x1="340" y1="58" x2="340" y2="84" stroke="#00B4A6" stroke-width="1.5" marker-end="url(#arrowhead2)"/>
+
+  <!-- Stripe + Backend -->
+  <g filter="url(#shadow2)">
+    <rect x="40" y="88" width="280" height="44" rx="5" fill="url(#tealGrad2)" stroke="#00B4A6" stroke-width="1.2"/>
+    <text x="180" y="106" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#fff">Stripe Checkout</text>
+    <text x="180" y="120" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#fff" opacity="0.85">Payments, PCI compliance, webhooks</text>
+  </g>
+
+  <g filter="url(#shadow2)">
+    <rect x="360" y="88" width="280" height="44" rx="5" fill="#fff" stroke="#15151B" stroke-width="1.2"/>
+    <text x="500" y="106" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#15151B">TrustOffice Backend</text>
+    <text x="500" y="120" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#716E68">Products, orders, inventory, shared JWT auth</text>
+  </g>
+
+  <!-- Arrow down -->
+  <line x1="180" y1="136" x2="180" y2="162" stroke="#00B4A6" stroke-width="1.5" marker-end="url(#arrowhead2)"/>
+  <line x1="500" y1="136" x2="500" y2="162" stroke="#00B4A6" stroke-width="1.5" marker-end="url(#arrowhead2)"/>
+
+  <!-- MongoDB + Hermes -->
+  <g filter="url(#shadow2)">
+    <rect x="40" y="166" width="280" height="44" rx="5" fill="#fff" stroke="#15151B" stroke-width="1.2"/>
+    <text x="180" y="184" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#15151B">MongoDB</text>
+    <text x="180" y="198" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#716E68">Products, orders, inventory, shared users</text>
+  </g>
+
+  <g filter="url(#shadow2)">
+    <rect x="360" y="166" width="280" height="44" rx="5" fill="url(#darkGrad2)" stroke="#15151B" stroke-width="1.2"/>
+    <text x="500" y="184" text-anchor="middle" font-family="CabinetGrotesk, sans-serif" font-weight="700" font-size="10" fill="#fff">Hermes Agent</text>
+    <text x="500" y="198" text-anchor="middle" font-family="Satoshi, sans-serif" font-size="7.5" fill="#fff" opacity="0.65">Inventory, fulfillment, communications</text>
+  </g>
+</svg>
 </div>
 
 <p>Inherits all existing security: TLS, JWT, CORS, profile isolation. No card data stored. ~3-5 week build for MVP with automated operations.</p>
 
 <div class="page-break"></div>
 
-<h2><span class="num">06</span>Monitoring &amp; Reliability</h2>
+<!-- ============ PAGE 3: MONITORING + SUMMARY ============ -->
 
-<p>Three new systems went live tonight. We now catch issues before users do.</p>
+<h2><span class="num">06</span>Monitoring &amp; Reliability</h2>
+<p>Three new systems went live tonight. We catch issues before users do.</p>
 
 <table>
     <tr><th>System</th><th>What It Does</th><th>Status</th></tr>
     <tr>
         <td><strong>Synthetic Canary</strong></td>
-        <td>Hits AI chat endpoint every 30 min. Measures time-to-first-token. Alerts if &gt;5s (warning) or &gt;10s (critical).</td>
+        <td>Hits AI chat endpoint every 30 min. Measures response time. Alerts if &gt;5s (warning) or &gt;10s (critical).</td>
         <td><span class="badge badge-live">Live</span></td>
     </tr>
     <tr>
@@ -409,17 +419,17 @@ li::before {
     </tr>
     <tr>
         <td><strong>In-App Error Reporting</strong></td>
-        <td>Frontend captures JS crashes and React render errors. Backend logs all unhandled exceptions. Queryable via admin API.</td>
+        <td>Frontend captures JS crashes. Backend logs all unhandled exceptions. Queryable via admin API.</td>
         <td><span class="badge badge-live">Live</span></td>
     </tr>
     <tr>
         <td><strong>Weekly Audit</strong></td>
-        <td>5 new checks: async safety scan, AI response time, mobile resilience, timeout verification, prompt size.</td>
+        <td>5 checks: async safety scan, AI response time, mobile resilience, timeout verification, prompt size.</td>
         <td><span class="badge badge-live">Live</span></td>
     </tr>
 </table>
 
-<h2 style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #eee;"><span class="num"></span>Summary</h2>
+<h2 style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #eee;"><span class="num"></span>Summary</h2>
 
 <table>
     <tr><th>Topic</th><th>Key Takeaway</th></tr>
