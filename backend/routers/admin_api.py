@@ -1088,3 +1088,105 @@ async def admin_delete_vault_document(
 
     logger.info(f"API: Admin deleted vault document {doc_id} for user {user_id}")
     return {"success": True, "message": "Document deleted", "doc_id": doc_id}
+
+
+@router.delete("/users/{user_id}")
+async def admin_delete_user(
+    user_id: str,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """
+    Permanently delete a user and all associated data.
+    Cancels Stripe subscription if present. Cannot delete admin accounts.
+    """
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.get("is_admin") or user.get("email", "").lower() == "contact@trustoffice.app":
+        raise HTTPException(status_code=400, detail="Cannot delete admin accounts")
+
+    email = user.get("email", "unknown")
+
+    # Cancel Stripe subscription if present
+    sub = await db.subscriptions.find_one({"user_id": user_id})
+    if sub and sub.get("stripe_subscription_id"):
+        try:
+            import stripe
+            stripe.Subscription.modify(sub["stripe_subscription_id"], cancel_at_period_end=True)
+            logger.info(f"Cancelled Stripe subscription {sub['stripe_subscription_id']} for deleted user {user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to cancel Stripe subscription for user {user_id}: {e}")
+
+    # Delete all user data across collections
+    collections_to_clean = [
+        "trusts", "entities", "entity_relationships", "minutes_records",
+        "minutes_templates", "distribution_records", "compensation_plans",
+        "compensation_payments", "governance_tasks", "schedule_a_items",
+        "trust_units_settings", "trust_unit_certificates", "trust_unit_transfers",
+        "benevolence_records", "health_score_snapshots", "user_onboarding",
+        "user_preferences", "notification_preferences", "subscriptions",
+        "user_sessions", "password_resets", "referral_codes",
+        "ai_usage_tracking", "ai_suggestion_cache", "vault_documents",
+        "transactions", "banking_accounts", "alerts",
+    ]
+
+    deleted_counts = {}
+    for collection in collections_to_clean:
+        result = await db[collection].delete_many({"user_id": user_id})
+        if result.deleted_count > 0:
+            deleted_counts[collection] = result.deleted_count
+
+    # Clean up referral tracking
+    await db.referral_tracking.delete_many({"referee_user_id": user_id})
+
+    # Delete the user
+    await db.users.delete_one({"user_id": user_id})
+
+    await log_api_action(
+        action="admin_delete_user",
+        details={"target_user_id": user_id, "target_email": email, "deleted_records": deleted_counts},
+        ip_address=get_client_ip(request),
+    )
+
+    logger.info(f"API: Admin deleted user {email} (user_id: {user_id})")
+    return {"success": True, "message": f"User {email} deleted", "deleted_records": deleted_counts}
+
+
+@router.post("/users/bulk-delete")
+async def admin_bulk_delete_users(
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """
+    Bulk delete users by user_id. Skips admin accounts. Returns per-user results.
+    """
+    from pydantic import BaseModel as _BM
+
+    class BulkRequest(_BM):
+        user_ids: List[str]
+
+    try:
+        body = await request.json()
+        bulk = BulkRequest(**body)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Request body must be JSON with 'user_ids' list")
+
+    results = []
+    for uid in bulk.user_ids:
+        try:
+            result = await admin_delete_user(uid, request, api_key)
+            results.append({"user_id": uid, "success": True, "message": result["message"]})
+        except HTTPException as e:
+            results.append({"user_id": uid, "success": False, "error": e.detail})
+        except Exception as e:
+            results.append({"user_id": uid, "success": False, "error": str(e)})
+
+    await log_api_action(
+        action="admin_bulk_delete_users",
+        details={"count": len(bulk.user_ids), "results": results},
+        ip_address=get_client_ip(request),
+    )
+
+    return {"results": results}
