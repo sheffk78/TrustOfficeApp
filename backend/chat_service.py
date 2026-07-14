@@ -539,7 +539,115 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
         for d in vault_docs
     ]
 
+    # 10. Money section summary (distributions, compensation, investments, transactions)
+    context["money_summary"] = await _build_money_summary(trust_id, user_id, now)
+
+    # 11. Structure section summary (entities, beneficiaries, schedule A, communications)
+    context["structure_summary"] = await _build_structure_summary(trust_id, user_id)
+
     return context
+
+
+async def _build_money_summary(trust_id: str, user_id: str, now: datetime) -> dict:
+    """Build a concise summary of Money section data for the AI prompt.
+
+    Returns counts and aggregate amounts — not raw records — to keep the prompt small.
+    All queries filter by user_id.
+    """
+    year_start = datetime(now.year, 1, 1, tzinfo=now.tzinfo).isoformat()
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
+
+    # Distributions: total count + YTD amount
+    dist_total = await db.distribution_records.count_documents(
+        {"trust_id": trust_id, "user_id": user_id}
+    )
+    dist_ytd_docs = await db.distribution_records.find(
+        {"trust_id": trust_id, "user_id": user_id, "date": {"$gte": year_start}},
+        {"_id": 0, "amount": 1},
+    ).to_list(1000)
+    dist_ytd_total = sum(d.get("amount", 0) or 0 for d in dist_ytd_docs)
+
+    # Compensation: active plans + YTD payments
+    active_plans = await db.compensation_plans.count_documents(
+        {"trust_id": trust_id, "user_id": user_id, "is_active": True}
+    )
+    ytd_payments = await db.compensation_payments.find(
+        {"trust_id": trust_id, "user_id": user_id, "date": {"$gte": year_start}},
+        {"_id": 0, "amount": 1},
+    ).to_list(1000)
+    comp_ytd_total = sum(p.get("amount", 0) or 0 for p in ytd_payments)
+
+    # Investments: active count + total current value
+    investments = await db.investments.find(
+        {"trust_id": trust_id, "user_id": user_id, "is_active": True},
+        {"_id": 0, "current_value": 1, "asset_type": 1},
+    ).to_list(1000)
+    inv_count = len(investments)
+    inv_total_value = sum(i.get("current_value", 0) or 0 for i in investments)
+
+    # Recent transactions: count in last 30 days
+    recent_txn_count = await db.transactions.count_documents(
+        {"trust_id": trust_id, "user_id": user_id, "date": {"$gte": thirty_days_ago}}
+    )
+
+    return {
+        "distributions_total": dist_total,
+        "distributions_ytd_amount": round(dist_ytd_total, 2),
+        "compensation_active_plans": active_plans,
+        "compensation_ytd_paid": round(comp_ytd_total, 2),
+        "investments_count": inv_count,
+        "investments_total_value": round(inv_total_value, 2),
+        "recent_transactions_30d": recent_txn_count,
+    }
+
+
+async def _build_structure_summary(trust_id: str, user_id: str) -> dict:
+    """Build a concise summary of Structure section data for the AI prompt.
+
+    Returns counts and aggregate values — not raw records — to keep the prompt small.
+    All queries filter by user_id.
+    """
+    # Entities: count + type breakdown
+    entities = await db.entities.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "entity_type": 1},
+    ).to_list(100)
+    entity_count = len(entities)
+    type_counts: dict[str, int] = {}
+    for e in entities:
+        etype = e.get("entity_type", "Unknown")
+        type_counts[etype] = type_counts.get(etype, 0) + 1
+
+    # Beneficiaries: active count (trust unit certificates)
+    bene_count = await db.trust_unit_certificates.count_documents(
+        {"trust_id": trust_id, "user_id": user_id, "status": "active"}
+    )
+
+    # Schedule A: active asset count + total value
+    schedule_a_items = await db.schedule_a_items.find(
+        {"trust_id": trust_id, "user_id": user_id, "status": "active"},
+        {"_id": 0, "approximate_value": 1},
+    ).to_list(1000)
+    schedule_a_count = len(schedule_a_items)
+    schedule_a_total = sum(a.get("approximate_value", 0) or 0 for a in schedule_a_items)
+
+    # Communications: total count + pending action count
+    comm_total = await db.communications.count_documents(
+        {"trust_id": trust_id, "user_id": user_id}
+    )
+    comm_pending = await db.communications.count_documents(
+        {"trust_id": trust_id, "user_id": user_id, "action_required": True, "action_completed": False}
+    )
+
+    return {
+        "entity_count": entity_count,
+        "entity_type_counts": type_counts,
+        "beneficiary_count": bene_count,
+        "schedule_a_asset_count": schedule_a_count,
+        "schedule_a_total_value": round(schedule_a_total, 2),
+        "communications_total": comm_total,
+        "communications_pending_action": comm_pending,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -689,6 +797,11 @@ async def generate_response(
     ctx = trust_context
     trust_info = ctx.get("trust", {})
 
+    # Precompute summary strings for the prompt
+    _money = ctx.get("money_summary", {})
+    _struct = ctx.get("structure_summary", {})
+    _entity_types = ", ".join(f"{v} {k}" for k, v in _struct.get("entity_type_counts", {}).items()) or "None"
+
     # Build the system prompt with context
     knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
 
@@ -738,6 +851,18 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('hea
 
 ## Tax Deadlines
 {json.dumps(ctx.get('tax_deadlines', []), indent=2)}
+
+## Money Summary
+Distributions: {_money.get('distributions_total', 0)} total, ${_money.get('distributions_ytd_amount', 0):,.2f} this year
+Compensation: {_money.get('compensation_active_plans', 0)} active plans, ${_money.get('compensation_ytd_paid', 0):,.2f} paid YTD
+Investments: {_money.get('investments_count', 0)} assets, ${_money.get('investments_total_value', 0):,.2f} total value
+Recent transactions: {_money.get('recent_transactions_30d', 0)} in last 30 days
+
+## Structure Summary
+Entities: {_struct.get('entity_count', 0)} ({_entity_types})
+Beneficiaries: {_struct.get('beneficiary_count', 0)}
+Schedule A: {_struct.get('schedule_a_asset_count', 0)} assets, ${_struct.get('schedule_a_total_value', 0):,.2f} total
+Communications: {_struct.get('communications_total', 0)} recorded, {_struct.get('communications_pending_action', 0)} pending action
 
 ## Knowledge Base
 {knowledge_context[:9500] if knowledge_context else "No knowledge base available."}
@@ -856,6 +981,11 @@ async def generate_response_stream(
     trust_info = ctx.get("trust", {})
     knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
 
+    # Precompute summary strings for the prompt
+    _money = ctx.get("money_summary", {})
+    _struct = ctx.get("structure_summary", {})
+    _entity_types = ", ".join(f"{v} {k}" for k, v in _struct.get("entity_type_counts", {}).items()) or "None"
+
     # --- Intelligent vault context gate (same logic as non-streaming) ---
     vault_section = ""
     trust_doc = ctx.get("trust_document")
@@ -900,6 +1030,18 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('hea
 
 ## Tax Deadlines
 {json.dumps(ctx.get('tax_deadlines', []), indent=2)}
+
+## Money Summary
+Distributions: {_money.get('distributions_total', 0)} total, ${_money.get('distributions_ytd_amount', 0):,.2f} this year
+Compensation: {_money.get('compensation_active_plans', 0)} active plans, ${_money.get('compensation_ytd_paid', 0):,.2f} paid YTD
+Investments: {_money.get('investments_count', 0)} assets, ${_money.get('investments_total_value', 0):,.2f} total value
+Recent transactions: {_money.get('recent_transactions_30d', 0)} in last 30 days
+
+## Structure Summary
+Entities: {_struct.get('entity_count', 0)} ({_entity_types})
+Beneficiaries: {_struct.get('beneficiary_count', 0)}
+Schedule A: {_struct.get('schedule_a_asset_count', 0)} assets, ${_struct.get('schedule_a_total_value', 0):,.2f} total
+Communications: {_struct.get('communications_total', 0)} recorded, {_struct.get('communications_pending_action', 0)} pending action
 
 ## Knowledge Base
 {knowledge_context[:9500] if knowledge_context else "No knowledge base available."}
@@ -990,6 +1132,28 @@ def build_citation_notes(trust_context: dict, intent: str) -> tuple:
     if beneficiaries:
         citations.append(f"{len(beneficiaries)} active beneficiary record(s)")
 
+    # Money section citations
+    money = ctx.get("money_summary", {})
+    if money:
+        if money.get("distributions_total", 0) > 0:
+            citations.append(f"Distributions: {money['distributions_total']} total, ${money.get('distributions_ytd_amount', 0):,.2f} YTD")
+        if money.get("compensation_active_plans", 0) > 0:
+            citations.append(f"Compensation: {money['compensation_active_plans']} active plan(s), ${money.get('compensation_ytd_paid', 0):,.2f} paid YTD")
+        if money.get("investments_count", 0) > 0:
+            citations.append(f"Investments: {money['investments_count']} holding(s), ${money.get('investments_total_value', 0):,.2f} total")
+        if money.get("recent_transactions_30d", 0) > 0:
+            citations.append(f"Transactions: {money['recent_transactions_30d']} in last 30 days")
+
+    # Structure section citations
+    struct = ctx.get("structure_summary", {})
+    if struct:
+        if struct.get("entity_count", 0) > 0:
+            citations.append(f"Entities: {struct['entity_count']} structure(s)")
+        if struct.get("schedule_a_asset_count", 0) > 0:
+            citations.append(f"Schedule A: {struct['schedule_a_asset_count']} asset(s), ${struct.get('schedule_a_total_value', 0):,.2f} total")
+        if struct.get("communications_total", 0) > 0:
+            citations.append(f"Communications: {struct['communications_total']} recorded, {struct.get('communications_pending_action', 0)} pending action")
+
     # Trust document analysis citations
     trust_doc = ctx.get("trust_document", {})
     if trust_doc:
@@ -1016,6 +1180,24 @@ def build_citation_notes(trust_context: dict, intent: str) -> tuple:
         unknowns.append("No defensibility score has been calculated yet")
     if not trust_doc:
         unknowns.append("No trust instrument has been uploaded and analyzed yet")
+
+    # Money section unknowns
+    if money:
+        if money.get("investments_count", 0) == 0:
+            unknowns.append("No investment holdings tracked — portfolio allocation unknown")
+        if money.get("compensation_active_plans", 0) == 0:
+            unknowns.append("No active trustee compensation plan on file")
+    else:
+        unknowns.append("Money section data unavailable")
+
+    # Structure section unknowns
+    if struct:
+        if struct.get("schedule_a_asset_count", 0) == 0:
+            unknowns.append("No Schedule A assets recorded — trust inventory unknown")
+        if struct.get("communications_pending_action", 0) > 0:
+            unknowns.append(f"{struct['communications_pending_action']} communication(s) with pending actions")
+    else:
+        unknowns.append("Structure section data unavailable")
 
     return (
         "; ".join(citations) if citations else None,

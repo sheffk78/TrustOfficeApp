@@ -492,7 +492,7 @@ export default function MinutesTemplateFormPage() {
       const response = await fetchWithAuth(`/schedule-a?trust_id=${selectedTrust.trust_id}&status=active`);
       if (response.ok) {
         const assets = await response.json();
-        setScheduleAAssets(assets);
+        setScheduleAAssets(assets.items || assets);
       }
     } catch (error) {
       console.error('Failed to load Schedule A assets:', error);
@@ -506,8 +506,9 @@ export default function MinutesTemplateFormPage() {
       const response = await fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}`);
       if (response.ok) {
         const entities = await response.json();
+        const entityList = entities.items || entities;
         // Find the main trust entity (entity_type === 'Trust')
-        const mainTrust = entities.find(e => e.entity_type === 'Trust');
+        const mainTrust = entityList.find(e => e.entity_type === 'Trust');
         if (mainTrust) {
           setTrustEntity(mainTrust);
           

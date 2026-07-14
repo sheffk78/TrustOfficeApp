@@ -1,5 +1,5 @@
 # Compensation router - handles trustee compensation plans and payments
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
@@ -296,10 +296,16 @@ async def delete_comp_plan(plan_id: str, user: dict = Depends(require_write_acce
     return {"message": "Plan deleted"}
 
 
-@router.get("/compensation-plans", response_model=List[CompensationPlanResponse])
-async def get_comp_plans(trust_id: str, year: Optional[int] = None, user: dict = Depends(get_current_user)):
+@router.get("/compensation-plans")
+async def get_comp_plans(
+    trust_id: str,
+    year: Optional[int] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    user: dict = Depends(get_current_user)
+):
     """
-    Get compensation plans for a trust.
+    Get compensation plans for a trust (paginated).
     
     If year is specified, returns plans for that year.
     Otherwise, returns all plans sorted by is_primary desc, effective_date desc.
@@ -309,12 +315,18 @@ async def get_comp_plans(trust_id: str, year: Optional[int] = None, user: dict =
     if year:
         query["year"] = year
     
+    total = await db.compensation_plans.count_documents(query)
     plans = await db.compensation_plans.find(
         query,
         {"_id": 0}
-    ).sort([("is_primary", -1), ("effective_date", -1)]).to_list(100)
+    ).sort([("is_primary", -1), ("effective_date", -1)]).skip(skip).limit(limit).to_list(limit)
     
-    return [CompensationPlanResponse(**p) for p in plans]
+    return {
+        "items": [CompensationPlanResponse(**p) for p in plans],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.get("/compensation-plans/primary")
@@ -399,15 +411,28 @@ async def create_comp_payment(payment: CompensationPaymentCreate, user: dict = D
     return CompensationPaymentResponse(**payment_doc)
 
 
-@router.get("/compensation-payments", response_model=List[CompensationPaymentResponse])
-async def get_comp_payments(trust_id: str, user: dict = Depends(get_current_user)):
-    """Get all compensation payments for a trust"""
-    payments = await db.compensation_payments.find(
-        {"trust_id": trust_id, "user_id": user["user_id"]},
-        {"_id": 0}
-    ).sort("date", -1).to_list(1000)
+@router.get("/compensation-payments")
+async def get_comp_payments(
+    trust_id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    user: dict = Depends(get_current_user)
+):
+    """Get all compensation payments for a trust (paginated)"""
+    query = {"trust_id": trust_id, "user_id": user["user_id"]}
     
-    return [CompensationPaymentResponse(**p) for p in payments]
+    total = await db.compensation_payments.count_documents(query)
+    payments = await db.compensation_payments.find(
+        query,
+        {"_id": 0}
+    ).sort("date", -1).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "items": [CompensationPaymentResponse(**p) for p in payments],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.get("/compensation-ytd")

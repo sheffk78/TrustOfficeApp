@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import {
   CheckCircle2, Clock, AlertTriangle, DollarSign,
   ChevronDown, ChevronUp, X, Check, Shield, Bot,
+  Send, Wallet, TrendingUp, Layers, Package, MessageSquare,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -15,6 +16,16 @@ const DEADLINE_LABELS = {
   estimated_q2: 'Q2 Estimated Tax Payment',
   estimated_q3: 'Q3 Estimated Tax Payment',
   estimated_q4: 'Q4 Estimated Tax Payment',
+};
+
+// Icons + accent colours for Money/Structure event types
+const SECTION_EVENT_META = {
+  distribution:            { icon: Send,           iconBg: 'bg-gold/10',  iconColor: 'text-gold',  accent: 'border-l-gold' },
+  compensation_payment:    { icon: Wallet,         iconBg: 'bg-navy/5',    iconColor: 'text-navy',  accent: 'border-l-navy' },
+  investment:              { icon: TrendingUp,     iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', accent: 'border-l-emerald-600' },
+  entity_formation:        { icon: Layers,         iconBg: 'bg-navy/5',    iconColor: 'text-navy',  accent: 'border-l-navy' },
+  schedule_a_conveyance:   { icon: Package,        iconBg: 'bg-gold/10',  iconColor: 'text-gold',  accent: 'border-l-gold' },
+  communication:           { icon: MessageSquare,  iconBg: 'bg-navy/5',    iconColor: 'text-navy',  accent: 'border-l-navy' },
 };
 
 function FilingStatusBadge({ filingStatus, overdue }) {
@@ -60,6 +71,7 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
 
   const isTax = event.event_type === 'tax_deadline';
   const isGovernance = event.event_type === 'governance_task';
+  const isSectionEvent = !isTax && !isGovernance;
   const status = event.status || 'upcoming';
   const overdue = status === 'overdue';
   const due = event.date ? parseISO(event.date) : null;
@@ -190,6 +202,84 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // ── Money / Structure event card ────────────────────────────
+  if (isSectionEvent) {
+    const meta = SECTION_EVENT_META[event.event_type] || SECTION_EVENT_META.communication;
+    const EventIcon = meta.icon;
+    const label = event.title || event.event_type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+    return (
+      <div
+        className={`card-trust border-l-4 ${meta.accent} transition-shadow hover:shadow-md`}
+        data-testid={`section-card-${event.id}`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="flex items-start gap-4 flex-1">
+            <div className={`flex items-center justify-center w-10 h-10 ${meta.iconBg} shrink-0`}>
+              <EventIcon className={`w-5 h-5 ${meta.iconColor}`} aria-hidden="true" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h3 className="font-medium text-navy text-sm sm:text-base">{label}</h3>
+                {status === 'completed' && (
+                  <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">Completed</span>
+                )}
+                {status === 'upcoming' && (
+                  <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold border border-navy/20 text-navy">Upcoming</span>
+                )}
+              </div>
+
+              {event.description && (
+                <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+              )}
+
+              {due && (
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    Date: {format(due, 'MMM d, yyyy')}
+                  </span>
+                  {typeof event.days_remaining === 'number' && event.days_remaining < 0 && (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {Math.abs(event.days_remaining)} days ago
+                    </span>
+                  )}
+                  {typeof event.days_remaining === 'number' && event.days_remaining >= 0 && (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      in {event.days_remaining} days
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            {event.link && (
+              <Link
+                to={event.link}
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-gold hover:bg-gold/10 transition-colors"
+                title={`View ${event.title || ''} on its page`}
+                data-testid={`section-link-${event.id}`}
+              >
+                View →
+              </Link>
+            )}
+            <Link
+              to={`/trust-assistant?prompt=${encodeURIComponent(`Summarize this calendar event: ${label} on ${due ? format(due, 'MMM d, yyyy') : 'the event date'}.`)}`}
+              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-gold hover:bg-gold/10 transition-colors"
+              title="Ask Trust Assistant for help"
+              data-testid={`ta-help-section-${event.id}`}
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Ask AI</span>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -14,7 +17,7 @@ import PageHelpButton from '@/components/PageHelpButton';
 import {
   TrendingUp, Plus, Wallet, Building2, Landmark,
   ArrowUpRight, Coins, Home, Activity, ChevronRight,
-  Trash2
+  Trash2, Pencil, Loader2
 } from 'lucide-react';
 
 const ASSET_TYPE_ICONS = {
@@ -36,7 +39,8 @@ const ASSET_TYPE_LABELS = {
 };
 
 export default function InvestmentsPage() {
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
+  const { showUpgradeModal } = useUpgradeModal();
   const [investments, setInvestments] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +55,21 @@ export default function InvestmentsPage() {
     custodian: '',
     notes: '',
   });
+
+  // Edit investment state
+  const [showEdit, setShowEdit] = useState(false);
+  const [editingInv, setEditingInv] = useState(null);
+  const [editForm, setEditForm] = useState({
+    asset_name: '',
+    asset_type: 'stock',
+    current_value: '',
+    quantity: '1',
+    unit: 'shares',
+    custodian: '',
+    notes: '',
+    is_active: true,
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     if (selectedTrust) {
@@ -111,6 +130,7 @@ export default function InvestmentsPage() {
   };
 
   const deleteInvestment = async (id) => {
+    if (!window.confirm('Remove this investment from the trust? This can be reversed later if needed.')) return;
     try {
       const res = await fetchWithAuth(`/investments/${id}`, {
         method: 'PATCH',
@@ -123,6 +143,62 @@ export default function InvestmentsPage() {
       }
     } catch (e) {
       showError(toast, e, { operation: 'remove', page: 'Investments' });
+    }
+  };
+
+  // ==================== EDIT INVESTMENT ====================
+  const openEdit = (inv) => {
+    if (isReadOnly) {
+      showUpgradeModal('edit investments', 'button_click', 'investments_page');
+      return;
+    }
+    setEditingInv(inv);
+    setEditForm({
+      asset_name: inv.asset_name || '',
+      asset_type: inv.asset_type || 'stock',
+      current_value: String(inv.current_value ?? ''),
+      quantity: String(inv.quantity ?? '1'),
+      unit: inv.unit || 'shares',
+      custodian: inv.custodian || '',
+      notes: inv.notes || '',
+      is_active: inv.is_active !== false,
+    });
+    setShowEdit(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingInv) return;
+    if (!editForm.asset_name.trim()) {
+      toast.error('Asset name is required');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const res = await fetchWithAuth(`/investments/${editingInv.investment_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_name: editForm.asset_name,
+          asset_type: editForm.asset_type,
+          current_value: parseFloat(editForm.current_value) || 0,
+          quantity: parseFloat(editForm.quantity) || 1,
+          unit: editForm.unit,
+          custodian: editForm.custodian,
+          notes: editForm.notes,
+          is_active: editForm.is_active,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || 'Failed to update investment');
+      toast.success('Investment updated');
+      setShowEdit(false);
+      setEditingInv(null);
+      loadData();
+    } catch (e) {
+      if (e.message?.includes('subscription') || e.message?.includes('402')) showUpgradeModal();
+      showError(toast, e, { operation: 'update_investment', page: 'Investments' });
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -295,9 +371,14 @@ export default function InvestmentsPage() {
                       </p>
                       <p className={`text-xs ${ret >= 0 ? 'text-success' : 'text-error'}`}>{retPct}%</p>
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => deleteInvestment(inv.investment_id)}>
-                      <Trash2 className="w-4 h-4 text-muted-foreground hover:text-error" />
-                    </Button>
+                    <div className="flex flex-col gap-1 flex-shrink-0">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(inv)} data-testid={`edit-investment-${inv.investment_id}`}>
+                        <Pencil className="w-4 h-4 text-muted-foreground hover:text-navy" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => deleteInvestment(inv.investment_id)} data-testid={`delete-investment-${inv.investment_id}`}>
+                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-error" />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
@@ -306,6 +387,74 @@ export default function InvestmentsPage() {
         </div>
       </div>
       <MobileBottomNav />
+
+      {/* ==================== EDIT INVESTMENT DIALOG ==================== */}
+      <Dialog open={showEdit} onOpenChange={v => { setShowEdit(v); if (!v) setEditingInv(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Investment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="block text-sm font-medium text-navy mb-1">Asset Name *</label>
+              <Input placeholder="Asset name" value={editForm.asset_name}
+                onChange={e => setEditForm({ ...editForm, asset_name: e.target.value })}
+                className="input-trust" data-testid="edit-inv-name" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-navy mb-1">Asset Type</label>
+              <select value={editForm.asset_type} onChange={e => setEditForm({ ...editForm, asset_type: e.target.value })} className="input-trust w-full">
+                {Object.entries(ASSET_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-navy mb-1">Current Value ($)</label>
+                <Input type="number" placeholder="0.00" value={editForm.current_value}
+                  onChange={e => setEditForm({ ...editForm, current_value: e.target.value })}
+                  className="input-trust" data-testid="edit-inv-value" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-navy mb-1">Quantity</label>
+                <Input placeholder="Quantity" value={editForm.quantity}
+                  onChange={e => setEditForm({ ...editForm, quantity: e.target.value })}
+                  className="input-trust" data-testid="edit-inv-quantity" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-navy mb-1">Unit</label>
+              <select value={editForm.unit} onChange={e => setEditForm({ ...editForm, unit: e.target.value })} className="input-trust w-full">
+                <option value="shares">Shares</option>
+                <option value="units">Units</option>
+                <option value="coins">Coins</option>
+                <option value="sqft">Sq Ft</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-navy mb-1">Custodian</label>
+              <Input placeholder="e.g. Fidelity, Schwab, Coinbase" value={editForm.custodian}
+                onChange={e => setEditForm({ ...editForm, custodian: e.target.value })}
+                className="input-trust" data-testid="edit-inv-custodian" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-navy mb-1">Notes</label>
+              <textarea placeholder="Notes..." value={editForm.notes}
+                onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
+                className="w-full input-trust" rows={3} data-testid="edit-inv-notes" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={editForm.is_active} onCheckedChange={v => setEditForm({ ...editForm, is_active: v })} data-testid="edit-inv-active" />
+              <label className="text-sm text-muted-foreground cursor-pointer" onClick={() => setEditForm({ ...editForm, is_active: !editForm.is_active })}>Active holding</label>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowEdit(false)} className="btn-secondary flex-1">Cancel</Button>
+              <Button onClick={handleEditSave} disabled={savingEdit} className="btn-primary flex-1" data-testid="edit-inv-submit">
+                {savingEdit ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

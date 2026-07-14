@@ -62,6 +62,9 @@ export default function StructuresPage() {
   const [separationData, setSeparationData] = useState(null);
   const [sepLoading, setSepLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [entitiesTotal, setEntitiesTotal] = useState(0);
+  const [loadingMoreEntities, setLoadingMoreEntities] = useState(false);
+  const PAGE_SIZE = 50;
   
   // Modal states
   const [showEntityModal, setShowEntityModal] = useState(false);
@@ -92,18 +95,43 @@ export default function StructuresPage() {
     setLoading(true);
     try {
       const [entitiesRes, relsRes] = await Promise.all([
-        fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}`),
-        fetchWithAuth(`/entity-relationships?trust_id=${selectedTrust.trust_id}`)
+        fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}&limit=${PAGE_SIZE}`),
+        fetchWithAuth(`/entity-relationships?trust_id=${selectedTrust.trust_id}&limit=${PAGE_SIZE}`)
       ]);
       
-      if (entitiesRes.ok) setEntities(await entitiesRes.json());
-      if (relsRes.ok) setRelationships(await relsRes.json());
+      if (entitiesRes.ok) {
+        const entitiesData = await entitiesRes.json();
+        setEntities(entitiesData.items || []);
+        setEntitiesTotal(entitiesData.total || 0);
+      }
+      if (relsRes.ok) {
+        const relsData = await relsRes.json();
+        setRelationships(relsData.items || []);
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
     }
   }, [selectedTrust]);
+
+  const handleLoadMoreEntities = async () => {
+    if (!selectedTrust) return;
+    setLoadingMoreEntities(true);
+    try {
+      const skip = entities.length;
+      const res = await fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}&skip=${skip}&limit=${PAGE_SIZE}`);
+      if (res.ok) {
+        const data = await res.json();
+        setEntities(prev => [...prev, ...(data.items || [])]);
+        setEntitiesTotal(data.total || 0);
+      }
+    } catch (error) {
+      console.error('Failed to load more entities:', error);
+    } finally {
+      setLoadingMoreEntities(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedTrust) {
@@ -494,6 +522,19 @@ export default function StructuresPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+              {/* Load More button for entities */}
+              {entities.length > 0 && entities.length < entitiesTotal && (
+                <div className="flex justify-center mt-6">
+                  <Button
+                    onClick={handleLoadMoreEntities}
+                    disabled={loadingMoreEntities}
+                    className="btn-secondary"
+                    data-testid="load-more-entities"
+                  >
+                    {loadingMoreEntities ? 'Loading...' : `Load More (${entitiesTotal - entities.length} remaining)`}
+                  </Button>
                 </div>
               )}
             </TabsContent>

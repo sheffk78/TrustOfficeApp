@@ -39,6 +39,17 @@ const COMM_TYPE_LABELS = {
   other: 'Other',
 };
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const parsed = parseISO(dateStr);
+    if (isNaN(parsed.getTime())) return dateStr;
+    return format(parsed, 'MMM d, yyyy');
+  } catch {
+    return dateStr || 'Invalid date';
+  }
+};
+
 export default function CommunicationsPage() {
   const { selectedTrust } = useAuth();
   const [communications, setCommunications] = useState([]);
@@ -47,6 +58,9 @@ export default function CommunicationsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [commTotal, setCommTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 50;
   const [form, setForm] = useState({
     comm_type: 'email',
     subject: '',
@@ -54,6 +68,7 @@ export default function CommunicationsPage() {
     direction: 'outbound',
     action_required: false,
     action_due: '',
+    parties_text: '',
     parties: [{ role: 'trustee', name: '' }],
   });
 
@@ -61,11 +76,15 @@ export default function CommunicationsPage() {
     if (selectedTrust) loadData();
   }, [selectedTrust, filterType]);
 
-  const loadData = async () => {
+  const loadData = async (append = false) => {
     if (!selectedTrust) return;
-    setLoading(true);
+    if (!append) setLoading(true);
+    else setLoadingMore(true);
     try {
       const params = new URLSearchParams();
+      const skip = append ? communications.length : 0;
+      params.append('skip', skip);
+      params.append('limit', PAGE_SIZE);
       if (filterType) params.append('comm_type', filterType);
       if (search) params.append('search', search);
 
@@ -74,7 +93,15 @@ export default function CommunicationsPage() {
         fetchWithAuth(`/trusts/${selectedTrust.trust_id}/communications/summary`),
       ]);
       const cData = await commRes.json();
-      if (commRes.ok) setCommunications(cData.communications || []);
+      if (commRes.ok) {
+        const items = cData.items || [];
+        setCommTotal(cData.total || 0);
+        if (append) {
+          setCommunications(prev => [...prev, ...items]);
+        } else {
+          setCommunications(items);
+        }
+      }
 
       const sData = await sumRes.json();
       if (sumRes.ok) setSummary(sData);
@@ -82,21 +109,32 @@ export default function CommunicationsPage() {
       showError(toast, e, { operation: 'load_communications', page: 'Communications' });
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    loadData(true);
   };
 
   const createCommunication = async () => {
     try {
+      const payload = { ...form };
+      // Convert parties_text to parties array for backend
+      if (form.parties_text && form.parties_text.trim()) {
+        payload.parties = [{ role: 'trustee', name: form.parties_text.trim() }];
+      }
+      delete payload.parties_text;
       const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/communications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed');
       toast.success('Communication logged');
       setShowAdd(false);
-      setForm({ comm_type: 'email', subject: '', content: '', direction: 'outbound', action_required: false, action_due: '', parties: [{ role: 'trustee', name: '' }] });
+      setForm({ comm_type: 'email', subject: '', content: '', direction: 'outbound', action_required: false, action_due: '', parties_text: '', parties: [{ role: 'trustee', name: '' }] });
       loadData();
     } catch (e) {
       showError(toast, e, { operation: 'create_communication', page: 'Communications' });
@@ -212,6 +250,15 @@ export default function CommunicationsPage() {
                   <Input type="date" placeholder="Action due date" value={form.action_due} onChange={e => setForm({ ...form, action_due: e.target.value })} />
                 </div>
                 <Input placeholder="Subject / Topic" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} className="mb-3" />
+                <div className="mb-3">
+                  <label className="label-trust block mb-1 text-sm">Parties (optional)</label>
+                  <Input
+                    placeholder="e.g., Trustee: John Smith; Beneficiary: Jane Smith"
+                    value={form.parties_text || ''}
+                    onChange={e => setForm({ ...form, parties_text: e.target.value })}
+                    className="input-trust"
+                  />
+                </div>
                 <textarea placeholder="Content / Summary of communication..." value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} className="input-trust w-full px-3 py-2 text-sm mb-3" rows={4} />
                 <div className="flex items-center gap-2 mb-3">
                   <input
@@ -259,14 +306,14 @@ export default function CommunicationsPage() {
                           {needsAction && (
                             <Badge className="bg-warning/10 text-warning">Action Required</Badge>
                           )}
-                          <span className="text-xs text-muted-foreground ml-auto">{format(parseISO(comm.created_at), 'MMM d, yyyy')}</span>
+                          <span className="text-xs text-muted-foreground ml-auto">{formatDate(comm.created_at)}</span>
                         </div>
                         <h3 className="font-semibold text-navy text-sm">{comm.subject}</h3>
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{comm.content}</p>
                         {needsAction && comm.action_due && (
                           <p className="text-xs text-warning mt-2 flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5"/>
-                            Action due {format(parseISO(comm.action_due), 'MMM d, yyyy')}
+                            Action due {formatDate(comm.action_due)}
                           </p>
                         )}
                       </div>
@@ -280,6 +327,17 @@ export default function CommunicationsPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+          {communications.length < commTotal && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="btn-secondary"
+              >
+                {loadingMore ? 'Loading...' : 'Load More'}
+              </button>
             </div>
           )}
         </div>

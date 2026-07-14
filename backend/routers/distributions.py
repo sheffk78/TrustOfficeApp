@@ -1,5 +1,5 @@
 # Distributions router - handles distribution records and benevolence log
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
@@ -135,15 +135,17 @@ async def validate_distribution_beneficiary(
     return {"valid": bool(beneficiary)}
 
 
-@router.get("/distributions", response_model=List[DistributionResponse])
+@router.get("/distributions")
 async def get_distributions(
     trust_id: Optional[str] = None,
     search: Optional[str] = None,
     status: Optional[str] = None,
     purpose: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     user: dict = Depends(get_current_user)
 ):
-    """Get distributions with optional search and filters"""
+    """Get distributions with optional search and filters (paginated)"""
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
@@ -151,8 +153,14 @@ async def get_distributions(
     # Filter by approval status
     if status == "approved":
         query["approved_at"] = {"$ne": None}
+        query["status"] = {"$ne": "declined"}
     elif status == "pending":
         query["approved_at"] = None
+    elif status == "review":
+        query["approved_at"] = None
+        query["status"] = {"$ne": "declined"}
+    elif status == "declined":
+        query["status"] = "declined"
     
     # Filter by purpose classification
     if purpose:
@@ -167,8 +175,15 @@ async def get_distributions(
             {"authority_clause_ref": {"$regex": search_term, "$options": "i"}}
         ]
     
-    dists = await db.distribution_records.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
-    return [DistributionResponse(**d) for d in dists]
+    total = await db.distribution_records.count_documents(query)
+    dists = await db.distribution_records.find(query, {"_id": 0}).sort("date", -1).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "items": [DistributionResponse(**d) for d in dists],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.patch("/distributions/{distribution_id}", response_model=DistributionResponse)
@@ -429,12 +444,35 @@ async def attach_minutes_to_distribution(
 @router.delete("/distributions/{distribution_id}")
 async def delete_distribution(distribution_id: str, user: dict = Depends(require_write_access)):
     """Delete a distribution record"""
+    dist = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not dist:
+        raise HTTPException(status_code=404, detail="Distribution not found. It may have been already deleted. Please refresh the page and try again.")
+
     result = await db.distribution_records.delete_one({
         "distribution_id": distribution_id,
         "user_id": user["user_id"]
     })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Distribution not found. It may have been already deleted. Please refresh the page and try again.")
+
+    # Log to audit trail
+    from utils.audit import log_audit_event
+    await log_audit_event(
+        user_id=user["user_id"],
+        action="distribution_deleted",
+        entity_type="distribution",
+        entity_id=distribution_id,
+        details={
+            "trust_id": dist.get("trust_id"),
+            "beneficiary_name": dist.get("beneficiary_name"),
+            "amount": dist.get("amount"),
+            "date": dist.get("date"),
+        }
+    )
+
     return {"message": "Distribution deleted"}
 
 

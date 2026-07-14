@@ -87,10 +87,11 @@ async def list_communications(
     direction: Optional[str] = None,
     action_required: Optional[bool] = None,
     search: Optional[str] = None,
-    limit: int = Query(100, ge=1, le=500),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     user: dict = Depends(get_current_user)
 ):
-    """List communications with filtering."""
+    """List communications with filtering (paginated)."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
@@ -110,7 +111,8 @@ async def list_communications(
             {"content": {"$regex": escaped_search, "$options": "i"}},
         ]
 
-    docs = await db.communications.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    total = await db.communications.count_documents(query)
+    docs = await db.communications.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
 
     # Count action items
     action_items = await db.communications.count_documents({
@@ -118,8 +120,10 @@ async def list_communications(
     })
 
     return {
-        "trust_id": trust_id,
-        "communications": docs,
+        "items": docs,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
         "count": len(docs),
         "action_items_pending": action_items,
         "comm_types": COMM_TYPES,

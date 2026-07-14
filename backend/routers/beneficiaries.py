@@ -2,7 +2,7 @@
 Beneficiaries router - Beneficiary dashboard for trust unit allocations
 Migrated from server.py
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
@@ -64,23 +64,31 @@ async def create_class_beneficiary(
     return class_beneficiary
 
 
-@router.get("/class-beneficiaries", response_model=List[ClassBeneficiaryResponse])
+@router.get("/class-beneficiaries")
 async def list_class_beneficiaries(
     trust_id: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
 ):
-    """List all class beneficiaries for a trust"""
+    """List all class beneficiaries for a trust (paginated)"""
     user_id = user["user_id"]
     
     query = {"user_id": user_id}
     if trust_id:
         query["trust_id"] = trust_id
     
+    total = await db.class_beneficiaries.count_documents(query)
     class_beneficiaries = await db.class_beneficiaries.find(
         query, {"_id": 0}
-    ).sort("created_at", -1).to_list(100)
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
-    return class_beneficiaries
+    return {
+        "items": class_beneficiaries,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.delete("/class-beneficiaries/{class_beneficiary_id}")

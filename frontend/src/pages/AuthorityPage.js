@@ -54,8 +54,8 @@ export default function AuthorityPage() {
         fetchWithAuth(`/entity-relationships?trust_id=${selectedTrust.trust_id}`),
         fetchWithAuth(`/trusts/${selectedTrust.trust_id}`),
       ]);
-      if (entitiesRes.ok) setEntities((await entitiesRes.json()).entities || []);
-      if (relsRes.ok) setRelationships((await relsRes.json()).relationships || []);
+      if (entitiesRes.ok) setEntities((await entitiesRes.json()).items || []);
+      if (relsRes.ok) setRelationships((await relsRes.json()).items || []);
       if (trustRes.ok) setTrustData(await trustRes.json());
     } catch (error) {
       console.error('Failed to load authority data:', error);

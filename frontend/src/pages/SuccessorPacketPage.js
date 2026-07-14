@@ -117,7 +117,7 @@ const SuccessorPacketPage = () => {
         if (trustRes.ok) setTrustData(await trustRes.json());
         if (entitiesRes?.ok) {
           const ed = await entitiesRes.json();
-          setEntities(Array.isArray(ed) ? ed : (ed.entities || []));
+          setEntities(Array.isArray(ed) ? ed : (ed.items || ed.entities || []));
         }
         if (beneRes?.ok) {
           const bd = await beneRes.json();

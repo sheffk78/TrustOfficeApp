@@ -38,6 +38,8 @@ const TYPE_FILTERS = [
   { key: 'all', label: 'All Types' },
   { key: 'governance_task', label: 'Trust Tasks' },
   { key: 'tax_deadline', label: 'Tax Filings' },
+  { key: 'money', label: 'Money Events' },
+  { key: 'structure', label: 'Structure Events' },
 ];
 
 export default function TrustCalendarPage() {
@@ -52,6 +54,8 @@ export default function TrustCalendarPage() {
     const qp = searchParams.get('type');
     if (qp === 'tax') return 'tax_deadline';
     if (qp === 'tasks') return 'governance_task';
+    if (qp === 'money') return 'money';
+    if (qp === 'structure') return 'structure';
     return 'all';
   });
   const [showModal, setShowModal] = useState(false);
@@ -140,7 +144,11 @@ export default function TrustCalendarPage() {
   const tabCounts = useMemo(() => {
     const typeFiltered = typeFilter === 'all'
       ? yearEvents
-      : yearEvents.filter(e => e.event_type === typeFilter);
+      : typeFilter === 'money'
+        ? yearEvents.filter(e => e.category === 'money')
+        : typeFilter === 'structure'
+          ? yearEvents.filter(e => e.category === 'structure')
+          : yearEvents.filter(e => e.event_type === typeFilter);
     return {
       upcoming: typeFiltered.filter(e => e.status === 'upcoming').length,
       overdue: typeFiltered.filter(e => e.status === 'overdue').length,
@@ -168,7 +176,13 @@ export default function TrustCalendarPage() {
     }
     // Type filter
     if (typeFilter !== 'all') {
-      result = result.filter(e => e.event_type === typeFilter);
+      if (typeFilter === 'money') {
+        result = result.filter(e => e.category === 'money');
+      } else if (typeFilter === 'structure') {
+        result = result.filter(e => e.category === 'structure');
+      } else {
+        result = result.filter(e => e.event_type === typeFilter);
+      }
     }
     return result;
   }, [yearEvents, statusFilter, typeFilter]);
@@ -340,8 +354,8 @@ export default function TrustCalendarPage() {
     );
   }
 
-  const showTaxInfoBar = typeFilter === 'all' || typeFilter === 'tax_deadline';
-  const showGenerateBtn = (typeFilter === 'all' || typeFilter === 'tax_deadline') && !hasTaxCalendar;
+  const showTaxInfoBar = (typeFilter === 'all' || typeFilter === 'tax_deadline') && !['money', 'structure'].includes(typeFilter);
+  const showGenerateBtn = (typeFilter === 'all' || typeFilter === 'tax_deadline') && !hasTaxCalendar && !['money', 'structure'].includes(typeFilter);
 
   // Empty state logic
   const isEmpty = yearEvents.length === 0;
@@ -357,17 +371,19 @@ export default function TrustCalendarPage() {
             <div>
               <h1 className="page-title">Calendar</h1>
               <p className="page-subtitle">
-                Trust tasks and tax filing deadlines in one place
+                Trust tasks, tax deadlines, money events, and structure events in one place
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <PageHelpButton
                 items={[
-                  { text: 'Track governance tasks and tax filing deadlines in one unified calendar' },
-                  { text: 'Filter by status (upcoming, overdue, completed) and type (trust tasks, tax filings)' },
+                  { text: 'Track governance tasks, tax filing deadlines, money events, and structure events in one unified calendar' },
+                  { text: 'Filter by status (upcoming, overdue, completed) and type (trust tasks, tax filings, money events, structure events)' },
+                  { text: 'Money events include distributions, compensation payments, and investment purchases' },
+                  { text: 'Structure events include entity formations, asset conveyances, and communications' },
                   { text: 'Mark tax filings as filed or extended, complete governance tasks' },
                 ]}
-                taPrompt="Walk me through the Calendar and how to manage trust tasks and tax deadlines"
+                taPrompt="Walk me through the Calendar and how to manage trust tasks, tax deadlines, money events, and structure events"
               />
               {/* Year selector */}
               <select
@@ -411,7 +427,9 @@ export default function TrustCalendarPage() {
                       <div className="font-medium text-navy">
                         {nextUp.event_type === 'tax_deadline'
                           ? (nextUp.title || nextUp.deadline_type)
-                          : (nextUp.title || nextUp.task_type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}
+                          : nextUp.event_type === 'governance_task'
+                            ? (nextUp.title || nextUp.task_type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
+                            : (nextUp.title || nextUp.event_type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}
                       </div>
                       <div className="font-mono text-xs text-muted-foreground">
                         Due {formatDate(nextUp.date)}
@@ -439,8 +457,17 @@ export default function TrustCalendarPage() {
                         Complete
                       </Button>
                     )}
+                    {nextUp.link && nextUp.event_type !== 'tax_deadline' && nextUp.event_type !== 'governance_task' && (
+                      <Link
+                        to={nextUp.link}
+                        className="inline-flex items-center px-3 py-1.5 text-xs text-gold hover:bg-gold/10 transition-colors border border-gold/20"
+                        title="View on its page"
+                      >
+                        View →
+                      </Link>
+                    )}
                     <Link
-                      to={`/trust-assistant?prompt=${encodeURIComponent(`Explain what I need to do for the ${nextUp.event_type === 'tax_deadline' ? (nextUp.title || nextUp.deadline_type) : (nextUp.title || nextUp.task_type?.replace(/_/g, ' '))} deadline on ${formatDate(nextUp.date)} and help me prepare.`)}`}
+                      to={`/trust-assistant?prompt=${encodeURIComponent(`Explain what I need to do for the ${nextUp.event_type === 'tax_deadline' ? (nextUp.title || nextUp.deadline_type) : nextUp.event_type === 'governance_task' ? (nextUp.title || nextUp.task_type?.replace(/_/g, ' ')) : (nextUp.title || nextUp.event_type?.replace(/_/g, ' '))} on ${formatDate(nextUp.date)} and help me prepare.`)}`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-gold hover:bg-gold/10 transition-colors border border-gold/20"
                       title="Ask Trust Assistant for help"
                       data-testid="ta-next-up-help"
@@ -632,6 +659,8 @@ export default function TrustCalendarPage() {
                 {statusFilter === 'completed' && "No completed items yet."}
                 {statusFilter === 'all' && typeFilter === 'tax_deadline' && `No tax calendar for ${year}. Generate one to see deadlines.`}
                 {statusFilter === 'all' && typeFilter === 'governance_task' && "No trust tasks of this type."}
+                {statusFilter === 'all' && typeFilter === 'money' && "No money events (distributions, compensation, investments) for this year."}
+                {statusFilter === 'all' && typeFilter === 'structure' && "No structure events (entities, assets, communications) for this year."}
                 {statusFilter === 'all' && typeFilter === 'all' && "No items match the current filters."}
               </p>
               {statusFilter === 'all' && typeFilter === 'tax_deadline' && (

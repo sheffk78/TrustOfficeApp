@@ -7,7 +7,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import {
   FileText, Shield, HeartPulse, Landmark, Building2, Users,
   ClipboardList, Mail, BookOpen, FilePen, Home, Car,
-  Printer
+  Printer, DollarSign, Network
 } from 'lucide-react';
 
 // ==================== SECTION DATA ====================
@@ -29,6 +29,10 @@ const SECTION_TABS = [
     description: 'Trustee meeting minutes, formal resolutions, and decision records.' },
   { id: 'correspondence', number: 8, title: 'Correspondence', icon: Mail,
     description: 'Letters to and from beneficiaries, professionals, institutions, and government agencies.' },
+  { id: 'money', number: 9, title: 'Financial Records', icon: DollarSign,
+    description: 'Transaction ledger summary, distribution history, compensation summary, and investment portfolio.' },
+  { id: 'structure', number: 10, title: 'Entity Structure', icon: Network,
+    description: 'Entity list, beneficiary roster, Schedule A assets, and communications log summary.' },
 ];
 
 const QUICK_REFERENCE = {
@@ -122,6 +126,9 @@ const PrintableBinderPage = () => {
   const [coverData, setCoverData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePrint, setActivePrint] = useState(null);
+  const [moneyData, setMoneyData] = useState(null);
+  const [structureData, setStructureData] = useState(null);
+  const [sectionDataLoading, setSectionDataLoading] = useState(false);
 
   useEffect(() => {
     const fetchCoverData = async () => {
@@ -141,6 +148,126 @@ const PrintableBinderPage = () => {
     fetchCoverData();
   }, [selectedTrust]);
 
+  // Fetch Money and Structure section data on demand
+  const fetchSectionData = async (sectionId) => {
+    if (!selectedTrust) return;
+    setSectionDataLoading(true);
+    try {
+      if (sectionId === 'money' && !moneyData) {
+        const params = `?trust_id=${encodeURIComponent(selectedTrust)}`;
+        const [txnsRes, distsRes, compRes, invRes] = await Promise.all([
+          fetchWithAuth(`/transactions${params}&limit=200`),
+          fetchWithAuth(`/distributions${params}&limit=200`),
+          fetchWithAuth(`/compensation-payments${params}&limit=200`),
+          fetchWithAuth(`/trusts/${encodeURIComponent(selectedTrust)}/investments`),
+        ]);
+
+        let transactions = [];
+        if (txnsRes.ok) {
+          const txnsJson = await txnsRes.json();
+          transactions = Array.isArray(txnsJson) ? txnsJson : (txnsJson.items || []);
+        }
+
+        let distributions = [];
+        if (distsRes.ok) {
+          const distsJson = await distsRes.json();
+          distributions = distsJson.items || [];
+        }
+
+        let compensation = [];
+        if (compRes.ok) {
+          const compJson = await compRes.json();
+          compensation = compJson.items || [];
+        }
+
+        let investments = { investments: [], total_cost_basis: 0, total_current_value: 0, total_return: 0, total_return_pct: 0 };
+        if (invRes.ok) {
+          investments = await invRes.json();
+        }
+
+        // Compute transaction summary
+        const totalInflows = transactions
+          .filter(t => t.direction === 'inflow' || t.direction === 'in')
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        const totalOutflows = transactions
+          .filter(t => t.direction === 'outflow' || t.direction === 'out')
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+        // Compute compensation total
+        const compTotal = compensation.reduce((sum, c) => sum + (c.amount || 0), 0);
+
+        // Compute distribution total
+        const distTotal = distributions.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+        setMoneyData({
+          transactions,
+          distributions,
+          compensation,
+          investments: investments.investments || [],
+          investmentSummary: {
+            total_cost_basis: investments.total_cost_basis || 0,
+            total_current_value: investments.total_current_value || 0,
+            total_return: investments.total_return || 0,
+            total_return_pct: investments.total_return_pct || 0,
+          },
+          summary: { totalInflows, totalOutflows, netFlow: totalInflows - totalOutflows, compTotal, distTotal },
+        });
+      } else if (sectionId === 'structure' && !structureData) {
+        const params = `?trust_id=${encodeURIComponent(selectedTrust)}`;
+        const [entitiesRes, beneRes, schedRes, commRes] = await Promise.all([
+          fetchWithAuth(`/entities${params}&limit=200`),
+          fetchWithAuth(`/beneficiaries/dashboard${params}`),
+          fetchWithAuth(`/schedule-a${params}&status=all&limit=200`),
+          fetchWithAuth(`/trusts/${encodeURIComponent(selectedTrust)}/communications?limit=200`),
+        ]);
+
+        let entities = [];
+        if (entitiesRes.ok) {
+          const entitiesJson = await entitiesRes.json();
+          entities = entitiesJson.items || [];
+        }
+
+        let beneficiaries = [];
+        let classBeneficiaries = [];
+        if (beneRes.ok) {
+          const beneJson = await beneRes.json();
+          beneficiaries = beneJson.beneficiaries || [];
+          classBeneficiaries = beneJson.class_beneficiaries || [];
+        }
+
+        let scheduleA = [];
+        if (schedRes.ok) {
+          const schedJson = await schedRes.json();
+          scheduleA = schedJson.items || [];
+        }
+
+        let communications = [];
+        if (commRes.ok) {
+          const commJson = await commRes.json();
+          communications = commJson.items || [];
+        }
+
+        setStructureData({ entities, beneficiaries, classBeneficiaries, scheduleA, communications });
+      }
+    } catch (e) {
+      console.error('Failed to load section data:', e);
+    } finally {
+      setSectionDataLoading(false);
+    }
+  };
+
+  const handlePrint = (sectionId) => {
+    // Pre-fetch data for money/structure sections
+    if (sectionId === 'money' || sectionId === 'structure') {
+      fetchSectionData(sectionId);
+    }
+    setActivePrint(sectionId);
+    setTimeout(() => {
+      window.print();
+      setActivePrint(null);
+    }, 100);
+  };
+
   if (!selectedTrust) {
     return (
       <div className="main-layout">
@@ -158,14 +285,6 @@ const PrintableBinderPage = () => {
       </div>
     );
   }
-
-  const handlePrint = (sectionId) => {
-    setActivePrint(sectionId);
-    setTimeout(() => {
-      window.print();
-      setActivePrint(null);
-    }, 100);
-  };
 
   // ==================== RENDER ====================
 
@@ -353,6 +472,46 @@ const PrintableBinderPage = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* FINANCIAL RECORDS (MONEY) SECTION */}
+          <div className="mb-10">
+            <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-gold" />
+              Financial Records
+            </h2>
+            <div className="card-trust border border-border p-6 shadow-sm">
+              <p className="text-sm text-muted-foreground mb-3">
+                Transaction ledger summary, distribution history, compensation summary, and investment portfolio.
+                Print this section for a comprehensive financial snapshot of your trust.
+              </p>
+              <button
+                onClick={() => handlePrint('money')}
+                className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
+              >
+                <Printer className="w-4 h-4" /> Print Financial Records
+              </button>
+            </div>
+          </div>
+
+          {/* ENTITY STRUCTURE SECTION */}
+          <div className="mb-10">
+            <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
+              <Network className="w-5 h-5 text-gold" />
+              Entity Structure
+            </h2>
+            <div className="card-trust border border-border p-6 shadow-sm">
+              <p className="text-sm text-muted-foreground mb-3">
+                Entity list, beneficiary roster, Schedule A assets, and communications log summary.
+                Print this section for a structural overview of your trust.
+              </p>
+              <button
+                onClick={() => handlePrint('structure')}
+                className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
+              >
+                <Printer className="w-4 h-4" /> Print Entity Structure
+              </button>
             </div>
           </div>
         </div>
@@ -633,6 +792,393 @@ const PrintableBinderPage = () => {
                 <strong>Note:</strong> Some states require the trust name to appear on the title exactly as stated in the trust document. Contact your DMV for specific requirements.
               </div>
               <div className="mt-4 text-center text-xs text-gray-400">TrustOffice — trustoffice.app</div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== FINANCIAL RECORDS (MONEY) PRINTABLE ==================== */}
+        {activePrint === 'money' && (
+          <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
+            <div className="max-w-xl mx-auto">
+              <h1 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontSize: '16pt' }}>
+                Financial Records
+              </h1>
+              <p className="text-gray-500 mb-2" style={{ fontSize: '10pt' }}>
+                {coverData?.trust_name || 'Trust Name: _______________'}
+              </p>
+              <div className="w-16 h-0.5 bg-gold mb-6"></div>
+
+              {/* Transaction Ledger Summary */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+                Transaction Ledger Summary
+              </h2>
+              {moneyData && moneyData.transactions.length > 0 ? (
+                <>
+                  <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #ccc', borderTop: '2px solid #ccc' }}>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Date</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Direction</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Classification</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Memo</th>
+                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {moneyData.transactions.slice(0, 50).map((t, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{t.date || '—'}</td>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{t.direction || '—'}</td>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{t.governance_classification || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.purpose_memo || '—'}</td>
+                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>${(t.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-600">Total Inflows:</span>
+                      <span className="text-gray-900 font-semibold">${moneyData.summary.totalInflows.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-600">Total Outflows:</span>
+                      <span className="text-gray-900 font-semibold">${moneyData.summary.totalOutflows.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5" style={{ borderTop: '1px solid #ddd', marginTop: '2px', paddingTop: '4px' }}>
+                      <span className="text-gray-700 font-semibold">Net Cash Flow:</span>
+                      <span className="text-gray-900 font-bold">${moneyData.summary.netFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    {moneyData.transactions.length > 50 && (
+                      <div className="text-gray-500 mt-1" style={{ fontSize: '9pt' }}>
+                        Showing 50 of {moneyData.transactions.length} transactions.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No transactions recorded.</p>
+              )}
+
+              {/* Distribution History */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+                Distribution History
+              </h2>
+              {moneyData && moneyData.distributions.length > 0 ? (
+                <>
+                  <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Date</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Beneficiary</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Purpose</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Status</th>
+                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {moneyData.distributions.slice(0, 50).map((d, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{d.date || '—'}</td>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{d.beneficiary_name || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{d.purpose_classification || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{d.approved_at ? 'Approved' : 'Pending'}</td>
+                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>${(d.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-600">Total Distributions:</span>
+                      <span className="text-gray-900 font-semibold">${moneyData.summary.distTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    {moneyData.distributions.length > 50 && (
+                      <div className="text-gray-500 mt-1" style={{ fontSize: '9pt' }}>
+                        Showing 50 of {moneyData.distributions.length} distributions.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No distributions recorded.</p>
+              )}
+
+              {/* Compensation Summary */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+                Compensation Summary
+              </h2>
+              {moneyData && moneyData.compensation.length > 0 ? (
+                <>
+                  <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Date</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Trustee</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Classification</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Over Plan?</th>
+                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {moneyData.compensation.slice(0, 50).map((c, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{c.date || '—'}</td>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{c.trustee_name || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.classification_text || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.exceeds_plan_flag ? 'Yes' : 'No'}</td>
+                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>${(c.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-600">Total Compensation Paid:</span>
+                      <span className="text-gray-900 font-semibold">${moneyData.summary.compTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    {moneyData.compensation.length > 50 && (
+                      <div className="text-gray-500 mt-1" style={{ fontSize: '9pt' }}>
+                        Showing 50 of {moneyData.compensation.length} payments.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No compensation payments recorded.</p>
+              )}
+
+              {/* Investment Portfolio Summary */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+                Investment Portfolio Summary
+              </h2>
+              {moneyData && moneyData.investments.length > 0 ? (
+                <>
+                  <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Name</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Type</th>
+                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Cost Basis</th>
+                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Current Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {moneyData.investments.map((inv, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{inv.name || inv.institution || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{inv.investment_type || inv.type || '—'}</td>
+                          <td className="py-1 text-right text-gray-700" style={{ padding: '3px 8px' }}>${(inv.cost_basis || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>${(inv.current_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-600">Total Cost Basis:</span>
+                      <span className="text-gray-900 font-semibold">${(moneyData.investmentSummary.total_cost_basis || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-600">Total Current Value:</span>
+                      <span className="text-gray-900 font-semibold">${(moneyData.investmentSummary.total_current_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-600">Total Return:</span>
+                      <span className="text-gray-900 font-semibold">${(moneyData.investmentSummary.total_return || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5" style={{ borderTop: '1px solid #ddd', marginTop: '2px', paddingTop: '4px' }}>
+                      <span className="text-gray-700 font-semibold">Return %:</span>
+                      <span className="text-gray-900 font-bold">{(moneyData.investmentSummary.total_return_pct || 0).toFixed(2)}%</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No investments recorded.</p>
+              )}
+
+              <div className="mt-6 pt-4 border-t border-gray-200 text-center">
+                <p className="text-xs text-gray-400">TrustOffice — trustoffice.app</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== ENTITY STRUCTURE PRINTABLE ==================== */}
+        {activePrint === 'structure' && (
+          <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
+            <div className="max-w-xl mx-auto">
+              <h1 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontSize: '16pt' }}>
+                Entity Structure
+              </h1>
+              <p className="text-gray-500 mb-2" style={{ fontSize: '10pt' }}>
+                {coverData?.trust_name || 'Trust Name: _______________'}
+              </p>
+              <div className="w-16 h-0.5 bg-gold mb-6"></div>
+
+              {/* Entity List Table */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+                Entity List
+              </h2>
+              {structureData && structureData.entities.length > 0 ? (
+                <table className="w-full mb-6" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Name</th>
+                      <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Type</th>
+                      <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Formation Date</th>
+                      <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>EIN</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {structureData.entities.map((e, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                        <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{e.name || '—'}</td>
+                        <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.entity_type || '—'}</td>
+                        <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.formation_date || '—'}</td>
+                        <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.ein || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No entities recorded.</p>
+              )}
+
+              {/* Beneficiary List Table */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+                Beneficiary List
+              </h2>
+              {structureData && structureData.beneficiaries.length > 0 ? (
+                <>
+                  <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Name</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Type</th>
+                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Units</th>
+                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Share %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {structureData.beneficiaries.map((b, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{b.holder_name || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{b.holder_type || '—'}</td>
+                          <td className="py-1 text-right text-gray-700" style={{ padding: '3px 8px' }}>{b.total_units || 0}</td>
+                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>{(b.percentage || 0).toFixed(2)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {structureData.classBeneficiaries.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1" style={{ fontSize: '11pt' }}>Class Beneficiaries</h3>
+                      <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr>
+                            <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Class Type</th>
+                            <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Description</th>
+                            <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Percentage</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {structureData.classBeneficiaries.map((cb, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                              <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{cb.class_type_label || cb.class_type || '—'}</td>
+                              <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{cb.description || '—'}</td>
+                              <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>{(cb.percentage || 0)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No beneficiaries recorded.</p>
+              )}
+
+              {/* Schedule A Assets Table */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+                Schedule A — Trust Assets
+              </h2>
+              {structureData && structureData.scheduleA.length > 0 ? (
+                <>
+                  <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Description</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Category</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Location</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Status</th>
+                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {structureData.scheduleA.map((s, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{s.description || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{s.category || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{s.location || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{s.status || '—'}</td>
+                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>{s.approximate_value != null ? '$' + s.approximate_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-600">Total Assets Value:</span>
+                      <span className="text-gray-900 font-semibold">${structureData.scheduleA.reduce((sum, s) => sum + (s.approximate_value || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No Schedule A assets recorded.</p>
+              )}
+
+              {/* Communications Log Summary */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+                Communications Log Summary
+              </h2>
+              {structureData && structureData.communications.length > 0 ? (
+                <>
+                  <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Date</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Type</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Direction</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Subject</th>
+                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Action Required</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {structureData.communications.slice(0, 50).map((c, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{c.created_at ? c.created_at.split('T')[0] : '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.comm_type || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.direction || '—'}</td>
+                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.subject || '—'}</td>
+                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.action_required ? 'Yes' : 'No'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {structureData.communications.length > 50 && (
+                    <div className="text-gray-500 mb-6" style={{ fontSize: '9pt' }}>
+                      Showing 50 of {structureData.communications.length} communications.
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No communications logged.</p>
+              )}
+
+              <div className="mt-6 pt-4 border-t border-gray-200 text-center">
+                <p className="text-xs text-gray-400">TrustOffice — trustoffice.app</p>
+              </div>
             </div>
           </div>
         )}

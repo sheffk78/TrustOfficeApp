@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -14,7 +15,7 @@ const ENTITY_COLORS = {
   'Holding LLC': { bg: '#1e3a5f', text: '#FFFFFF', border: '#1e3a5f' },
   'Operating LLC': { bg: '#4a7c59', text: '#FFFFFF', border: '#4a7c59' },
   'Corporation': { bg: '#7c3a1e', text: '#FFFFFF', border: '#7c3a1e' },
-  'Partnership': { bg: '#5f1e5f', text: '#FFFFFF', border: '#5f1e1e' },
+  'Partnership': { bg: '#5f1e5f', text: '#FFFFFF', border: '#5f1e5f' },
 };
 
 const RELATIONSHIP_COLORS = {
@@ -29,6 +30,13 @@ function formatRelType(type) {
 }
 
 export function StructuralMap({ entities = [], relationships = [] }) {
+  const navigate = useNavigate();
+  const handleNodeClick = useCallback((_, node) => {
+    if (node?.id) {
+      navigate(`/entities/${node.id}`);
+    }
+  }, [navigate]);
+
   const { nodes, edges } = useMemo(() => {
     if (entities.length === 0) return { nodes: [], edges: [] };
 
@@ -40,7 +48,7 @@ export function StructuralMap({ entities = [], relationships = [] }) {
         type: 'default',
         data: {
           label: (
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-1 cursor-pointer">
               <span className="font-semibold text-xs">{entity.name}</span>
               <span className="text-[10px] opacity-80">{entity.entity_type}</span>
             </div>
@@ -58,7 +66,9 @@ export function StructuralMap({ entities = [], relationships = [] }) {
           minWidth: '120px',
           maxWidth: '200px',
           textAlign: 'center',
+          cursor: 'pointer',
         },
+        className: 'cursor-pointer hover:opacity-80 transition-opacity',
       };
     });
 
@@ -168,6 +178,7 @@ export function StructuralMap({ entities = [], relationships = [] }) {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodeClick={handleNodeClick}
         fitView
         fitViewOptions={{ padding: 0.3 }}
         minZoom={0.3}

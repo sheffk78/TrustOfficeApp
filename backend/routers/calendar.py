@@ -1,7 +1,8 @@
 # Calendar router — unified calendar events endpoint
-# Aggregates governance tasks and tax calendar entries into a single feed.
-# Phase 1: enriched tax metadata, event_type on all events, days_remaining on all events,
-# dedup of governance tasks that duplicate tax calendar entries.
+# Aggregates governance tasks, tax calendar entries, Money section events
+# (distributions, compensation payments, investments), and Structure section
+# events (entity formations, Schedule A conveyances, communications) into a
+# single feed.
 from fastapi import APIRouter, Depends
 from typing import Optional
 from datetime import datetime, date
@@ -20,6 +21,30 @@ _TAX_OVERLAP_TASK_TYPES = {
     "tax_filing_1041": "federal_1041",
     "tax_filing_k1": "k1_beneficiaries",
 }
+
+
+def _status_from_date(event_date: str) -> str:
+    """Derive a simple upcoming/completed status from a date.
+
+    Past events are treated as 'completed' (they happened).
+    Today and future events are 'upcoming'.
+    """
+    if not event_date:
+        return "upcoming"
+    try:
+        d = event_date[:10]
+        if d < date.today().isoformat():
+            return "completed"
+    except Exception:
+        pass
+    return "upcoming"
+
+
+def _safe_date(raw: Optional[str], fallback: Optional[str] = None) -> Optional[str]:
+    """Return a clean YYYY-MM-DD date or None."""
+    if raw and len(raw) >= 10:
+        return raw[:10]
+    return fallback[:10] if fallback and len(fallback) >= 10 else None
 
 
 @router.get("/calendar/events")
@@ -204,9 +229,175 @@ async def get_calendar_events(
         })
 
     # ------------------------------------------------------------------
-    # 3. Merge + sort
+    # 3. Money section events — distributions, compensation, investments
+    # ------------------------------------------------------------------
+    money_query = {"user_id": user["user_id"]}
+    if trust_id:
+        money_query["trust_id"] = trust_id
+
+    # 3a. Distributions
+    distributions = await db.distribution_records.find(money_query, {"_id": 0}).to_list(1000)
+    for dist in distributions:
+        d_date = _safe_date(dist.get("date"), dist.get("created_at"))
+        if not d_date:
+            continue
+        beneficiary = dist.get("beneficiary_name") or "Beneficiary"
+        amount = dist.get("amount")
+        title = f"Distribution to {beneficiary}"
+        if amount is not None:
+            try:
+                title += f": ${float(amount):,.2f}"
+            except (ValueError, TypeError):
+                pass
+        events.append({
+            "id": dist.get("distribution_id", ""),
+            "event_type": "distribution",
+            "type": "distribution",
+            "title": title,
+            "date": d_date,
+            "description": dist.get("notes") or "",
+            "trust_id": dist.get("trust_id"),
+            "completed": True,
+            "status": _status_from_date(d_date),
+            "days_remaining": _days_remaining(d_date),
+            "link": "/distributions",
+            "category": "money",
+        })
+
+    # 3b. Compensation payments
+    comp_payments = await db.compensation_payments.find(money_query, {"_id": 0}).to_list(1000)
+    for pmt in comp_payments:
+        p_date = _safe_date(pmt.get("date"), pmt.get("created_at"))
+        if not p_date:
+            continue
+        amount = pmt.get("amount")
+        trustee = pmt.get("trustee_name") or ""
+        title = "Compensation Payment"
+        if trustee:
+            title += f": {trustee}"
+        if amount is not None:
+            try:
+                title += f" — ${float(amount):,.2f}"
+            except (ValueError, TypeError):
+                pass
+        events.append({
+            "id": pmt.get("payment_id", ""),
+            "event_type": "compensation_payment",
+            "type": "compensation_payment",
+            "title": title,
+            "date": p_date,
+            "description": pmt.get("classification_text") or "",
+            "trust_id": pmt.get("trust_id"),
+            "completed": True,
+            "status": _status_from_date(p_date),
+            "days_remaining": _days_remaining(p_date),
+            "link": "/compensation",
+            "category": "money",
+        })
+
+    # 3c. Investments
+    investments = await db.investments.find(money_query, {"_id": 0}).to_list(1000)
+    for inv in investments:
+        i_date = _safe_date(inv.get("purchase_date"), inv.get("created_at"))
+        if not i_date:
+            continue
+        asset_name = inv.get("asset_name") or "Investment"
+        title = f"Investment Purchased: {asset_name}"
+        events.append({
+            "id": inv.get("investment_id", ""),
+            "event_type": "investment",
+            "type": "investment",
+            "title": title,
+            "date": i_date,
+            "description": inv.get("asset_type") or "",
+            "trust_id": inv.get("trust_id"),
+            "completed": True,
+            "status": _status_from_date(i_date),
+            "days_remaining": _days_remaining(i_date),
+            "link": "/investments",
+            "category": "money",
+        })
+
+    # ------------------------------------------------------------------
+    # 4. Structure section events — entities, Schedule A, communications
+    # ------------------------------------------------------------------
+    structure_query = {"user_id": user["user_id"]}
+    if trust_id:
+        structure_query["trust_id"] = trust_id
+
+    # 4a. Entity formation dates
+    entities = await db.entities.find(structure_query, {"_id": 0}).to_list(1000)
+    for ent in entities:
+        e_date = _safe_date(ent.get("formation_date"))
+        if not e_date:
+            continue
+        name = ent.get("name") or ent.get("legal_name") or "Entity"
+        title = f"Entity Formed: {name}"
+        events.append({
+            "id": ent.get("entity_id", ""),
+            "event_type": "entity_formation",
+            "type": "entity_formation",
+            "title": title,
+            "date": e_date,
+            "description": ent.get("entity_type") or "",
+            "trust_id": ent.get("trust_id"),
+            "completed": True,
+            "status": _status_from_date(e_date),
+            "days_remaining": _days_remaining(e_date),
+            "link": "/structures",
+            "category": "structure",
+        })
+
+    # 4b. Schedule A conveyance dates
+    schedule_a_items = await db.schedule_a_items.find(structure_query, {"_id": 0}).to_list(1000)
+    for item in schedule_a_items:
+        s_date = _safe_date(item.get("date_conveyed"))
+        if not s_date:
+            continue
+        desc = item.get("description") or "Asset"
+        title = f"Asset Conveyed: {desc}"
+        events.append({
+            "id": item.get("item_id", ""),
+            "event_type": "schedule_a_conveyance",
+            "type": "schedule_a_conveyance",
+            "title": title,
+            "date": s_date,
+            "description": item.get("category") or "",
+            "trust_id": item.get("trust_id"),
+            "completed": True,
+            "status": _status_from_date(s_date),
+            "days_remaining": _days_remaining(s_date),
+            "link": "/schedule-a",
+            "category": "structure",
+        })
+
+    # 4c. Communication dates
+    communications = await db.communications.find(structure_query, {"_id": 0}).to_list(1000)
+    for comm in communications:
+        c_date = _safe_date(comm.get("created_at"))
+        if not c_date:
+            continue
+        subject = comm.get("subject") or comm.get("comm_type_label") or "Communication"
+        title = f"Communication: {subject}"
+        events.append({
+            "id": comm.get("comm_id", ""),
+            "event_type": "communication",
+            "type": "communication",
+            "title": title,
+            "date": c_date,
+            "description": comm.get("comm_type_label") or "",
+            "trust_id": comm.get("trust_id"),
+            "completed": True,
+            "status": _status_from_date(c_date),
+            "days_remaining": _days_remaining(c_date),
+            "link": "/communications",
+            "category": "structure",
+        })
+
+    # ------------------------------------------------------------------
+    # 5. Merge + sort
     # ------------------------------------------------------------------
     events.extend(tax_events)
-    events.sort(key=lambda e: e.get("date", ""))
+    events.sort(key=lambda e: e.get("date") or "")
 
     return {"events": events, "count": len(events)}

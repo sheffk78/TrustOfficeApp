@@ -122,6 +122,7 @@ export default function BeneficiariesPage() {
   });
   const [transferForm, setTransferForm] = useState({
     from_certificate_id: '',
+    to_certificate_id: '',
     to_holder_name: '',
     to_holder_identifier: '',
     units: '',
@@ -240,6 +241,7 @@ export default function BeneficiariesPage() {
     }
     setTransferForm({
       from_certificate_id: fromCert.certificate_id,
+      to_certificate_id: '',
       to_holder_name: '',
       to_holder_identifier: '',
       units: '',
@@ -327,7 +329,7 @@ export default function BeneficiariesPage() {
   };
 
   const handleTransfer = async () => {
-    if (!transferForm.from_certificate_id || !transferForm.to_holder_name || !transferForm.units) {
+    if (!transferForm.from_certificate_id || !transferForm.to_certificate_id || !transferForm.units) {
       toast.error('All fields are required');
       return;
     }
@@ -338,13 +340,20 @@ export default function BeneficiariesPage() {
         toast.error('Invalid source certificate');
         return;
       }
-      
+
+      // Get the "to" holder name from the selected certificate ID
+      const toCert = summary?.certificates?.find(c => c.certificate_id === transferForm.to_certificate_id);
+      if (!toCert) {
+        toast.error('Invalid destination certificate');
+        return;
+      }
+
       const response = await fetchWithAuth('/trust-units/transfers', {
         method: 'POST',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
           from_holder: fromCert.holder_name,
-          to_holder: transferForm.to_holder_name,
+          to_holder: toCert.holder_name,
           units: parseFloat(transferForm.units),
           reason: transferForm.reason || 'Transfer'
         })
@@ -352,7 +361,7 @@ export default function BeneficiariesPage() {
       if (response.ok) {
         toast.success('Transfer completed');
         setShowTransferModal(false);
-        setTransferForm({ from_certificate_id: '', to_holder_name: '', to_holder_identifier: '', units: '', reason: '' });
+        setTransferForm({ from_certificate_id: '', to_certificate_id: '', to_holder_name: '', to_holder_identifier: '', units: '', reason: '' });
         loadCertificatesData();
         loadOverviewData();
       } else {
@@ -587,8 +596,10 @@ export default function BeneficiariesPage() {
         <Sidebar />
         <main className="main-content dot-grid">
           <div className="page-container">
-            <div className="card-trust p-8 text-center">
-              <p className="text-muted-foreground">Select a trust to manage beneficiaries</p>
+            <div className="card-trust p-12 flex flex-col items-center justify-center">
+              <Users className="w-12 h-12 text-muted-foreground/40 mb-3"/>
+              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+              <p className="text-sm text-muted-foreground">Choose a trust to manage beneficiaries.</p>
             </div>
           </div>
         </main>
@@ -1023,7 +1034,7 @@ export default function BeneficiariesPage() {
                                   <Pencil className="w-4 h-4 mr-2" />
                                   Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setTransferForm({ ...transferForm, from_certificate_id: cert.certificate_id }); setShowTransferModal(true); }}>
+                                <DropdownMenuItem onClick={() => { setTransferForm({ ...transferForm, from_certificate_id: cert.certificate_id, to_certificate_id: '', to_holder_name: '', to_holder_identifier: '' }); setShowTransferModal(true); }}>
                                   <ArrowRightLeft className="w-4 h-4 mr-2" />
                                   Transfer Units
                                 </DropdownMenuItem>
@@ -1308,14 +1319,14 @@ export default function BeneficiariesPage() {
               <Select 
                 value={transferForm.from_certificate_id} 
                 onValueChange={(v) => {
-                  // When changing "from", check if current "to" holder is the same as new "from" holder
-                  const newFromCert = summary?.certificates?.find(c => c.certificate_id === v);
-                  const shouldClearTo = transferForm.to_holder_name === newFromCert?.holder_name;
+                  // When changing "from", check if current "to" certificate is the same as new "from"
+                  const shouldClearTo = transferForm.to_certificate_id === v;
                   
                   setTransferForm({ 
                     ...transferForm, 
                     from_certificate_id: v,
                     // Clear "to" selection if it's now the same as "from"
+                    to_certificate_id: shouldClearTo ? '' : transferForm.to_certificate_id,
                     to_holder_name: shouldClearTo ? '' : transferForm.to_holder_name,
                     to_holder_identifier: shouldClearTo ? '' : transferForm.to_holder_identifier
                   });
@@ -1336,13 +1347,14 @@ export default function BeneficiariesPage() {
             <div>
               <Label className="label-trust">To Beneficiary *</Label>
               <Select 
-                value={transferForm.to_holder_name} 
+                value={transferForm.to_certificate_id} 
                 onValueChange={(v) => {
-                  // Find the selected certificate to get the identifier
-                  const selectedCert = summary?.certificates?.find(c => c.holder_name === v);
+                  // Find the selected certificate to get the holder name and identifier
+                  const selectedCert = summary?.certificates?.find(c => c.certificate_id === v);
                   setTransferForm({ 
                     ...transferForm, 
-                    to_holder_name: v,
+                    to_certificate_id: v,
+                    to_holder_name: selectedCert?.holder_name || '',
                     to_holder_identifier: selectedCert?.holder_identifier || ''
                   });
                 }}
@@ -1352,30 +1364,10 @@ export default function BeneficiariesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
-                    // Get the holder name of the selected "from" certificate
-                    const fromCert = summary?.certificates?.find(c => c.certificate_id === transferForm.from_certificate_id);
-                    const fromHolderName = fromCert?.holder_name;
-                    
-                    // Aggregate units per holder, excluding the "from" holder
-                    const holderTotals = {};
-                    summary?.certificates?.filter(c => c.status === 'active').forEach(cert => {
-                      if (cert.holder_name !== fromHolderName) {
-                        if (!holderTotals[cert.holder_name]) {
-                          holderTotals[cert.holder_name] = {
-                            holder_name: cert.holder_name,
-                            holder_identifier: cert.holder_identifier,
-                            total_units: 0,
-                            certificate_count: 0
-                          };
-                        }
-                        holderTotals[cert.holder_name].total_units += cert.units || 0;
-                        holderTotals[cert.holder_name].certificate_count += 1;
-                      }
-                    });
-                    
-                    return Object.values(holderTotals).map((holder) => (
-                      <SelectItem key={holder.holder_name} value={holder.holder_name}>
-                        {holder.holder_name} - {holder.total_units} units
+                    // Exclude the "from" certificate from the destination list
+                    return summary?.certificates?.filter(c => c.status === 'active' && c.certificate_id !== transferForm.from_certificate_id).map((cert) => (
+                      <SelectItem key={cert.certificate_id} value={cert.certificate_id}>
+                        {cert.holder_name} - {cert.units} units ({cert.certificate_number})
                       </SelectItem>
                     ));
                   })()}

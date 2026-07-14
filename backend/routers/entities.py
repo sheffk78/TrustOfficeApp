@@ -1,8 +1,9 @@
 # Entities router - handles entity and relationship management
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime, timezone
 from typing import List
 import uuid
+from pydantic import field_validator
 
 from database import db
 from dependencies import get_current_user, require_write_access, auto_update_onboarding
@@ -20,6 +21,12 @@ async def create_entity(entity: EntityCreate, user: dict = Depends(require_write
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
+    # Validate formation_date format if provided
+    if entity.formation_date:
+        try:
+            datetime.strptime(entity.formation_date[:10], "%Y-%m-%d")
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=422, detail="Invalid formation_date format. Use YYYY-MM-DD.")
     entity_id = f"entity_{uuid.uuid4().hex[:12]}"
     entity_doc = {
         "entity_id": entity_id,
@@ -35,15 +42,28 @@ async def create_entity(entity: EntityCreate, user: dict = Depends(require_write
     return EntityResponse(**entity_doc)
 
 
-@router.get("/entities", response_model=List[EntityResponse])
-async def get_entities(trust_id: str, user: dict = Depends(get_current_user)):
-    """Get all entities for a trust"""
-    entities = await db.entities.find(
-        {"trust_id": trust_id, "user_id": user["user_id"]},
-        {"_id": 0}
-    ).to_list(100)
+@router.get("/entities")
+async def get_entities(
+    trust_id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    user: dict = Depends(get_current_user)
+):
+    """Get all entities for a trust (paginated)"""
+    query = {"trust_id": trust_id, "user_id": user["user_id"]}
     
-    return [EntityResponse(**e) for e in entities]
+    total = await db.entities.count_documents(query)
+    entities = await db.entities.find(
+        query,
+        {"_id": 0}
+    ).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "items": [EntityResponse(**e) for e in entities],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.get("/entities/{entity_id}", response_model=EntityResponse)
@@ -138,15 +158,28 @@ async def create_relationship(rel: EntityRelationshipCreate, user: dict = Depend
     return EntityRelationshipResponse(**rel_doc)
 
 
-@router.get("/entity-relationships", response_model=List[EntityRelationshipResponse])
-async def get_relationships(trust_id: str, user: dict = Depends(get_current_user)):
-    """Get all entity relationships for a trust"""
-    rels = await db.entity_relationships.find(
-        {"trust_id": trust_id, "user_id": user["user_id"]},
-        {"_id": 0}
-    ).to_list(100)
+@router.get("/entity-relationships")
+async def get_relationships(
+    trust_id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    user: dict = Depends(get_current_user)
+):
+    """Get all entity relationships for a trust (paginated)"""
+    query = {"trust_id": trust_id, "user_id": user["user_id"]}
     
-    return [EntityRelationshipResponse(**r) for r in rels]
+    total = await db.entity_relationships.count_documents(query)
+    rels = await db.entity_relationships.find(
+        query,
+        {"_id": 0}
+    ).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "items": [EntityRelationshipResponse(**r) for r in rels],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.delete("/entity-relationships/{relationship_id}")

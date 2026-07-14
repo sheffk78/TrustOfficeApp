@@ -112,7 +112,7 @@ export default function AuditTrailPage() {
         const entitiesRes = await fetchWithAuth(`/entities?trust_id=${trustId}`);
         if (entitiesRes.ok) {
           const data = await entitiesRes.json();
-          const entityList = data.entities || [];
+          const entityList = data.items || data.entities || [];
           entityList.forEach(e => {
             allEvents.push({
               id: `entity-${e.entity_id}`,
@@ -131,7 +131,7 @@ export default function AuditTrailPage() {
         const relsRes = await fetchWithAuth(`/entity-relationships?trust_id=${trustId}`);
         if (relsRes.ok) {
           const data = await relsRes.json();
-          const rels = data.relationships || [];
+          const rels = data.items || data.relationships || [];
           rels.forEach(r => {
             allEvents.push({
               id: `rel-${r.relationship_id || r.id}`,
@@ -207,7 +207,7 @@ export default function AuditTrailPage() {
         const distRes = await fetchWithAuth(`/distributions?trust_id=${trustId}`);
         if (distRes.ok) {
           const data = await distRes.json();
-          const dists = data.distributions || data || [];
+          const dists = data.items || data.distributions || data || [];
           (Array.isArray(dists) ? dists : []).forEach(d => {
             allEvents.push({
               id: d.distribution_id || d.id,
@@ -230,7 +230,7 @@ export default function AuditTrailPage() {
 
         if (plansRes.ok) {
           const data = await plansRes.json();
-          const plans = data.compensation_plans || data || [];
+          const plans = data.items || data.compensation_plans || data || [];
           (Array.isArray(plans) ? plans : []).forEach(c => {
             allEvents.push({
               id: `plan-${c.plan_id || c.id}`,
@@ -245,7 +245,7 @@ export default function AuditTrailPage() {
 
         if (paymentsRes.ok) {
           const data = await paymentsRes.json();
-          const payments = data.compensation_payments || data || [];
+          const payments = data.items || data.compensation_payments || data || [];
           (Array.isArray(payments) ? payments : []).forEach(c => {
             allEvents.push({
               id: `payment-${c.payment_id || c.id}`,

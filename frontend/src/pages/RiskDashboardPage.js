@@ -10,7 +10,8 @@ import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import {
   Shield, AlertTriangle, AlertOctagon, AlertCircle,
-  CheckCircle2, ArrowUpRight, Activity
+  CheckCircle2, ArrowUpRight, Activity,
+  Building2, Users, DollarSign
 } from 'lucide-react';
 
 import { SEVERITY_STYLES } from '@/utils/severityStyles';
@@ -19,6 +20,7 @@ import ComplianceSummaryCard from '@/components/ComplianceSummaryCard';
 export default function RiskDashboardPage() {
   const { selectedTrust } = useAuth();
   const [data, setData] = useState(null);
+  const [structureData, setStructureData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterModule, setFilterModule] = useState('');
@@ -30,10 +32,42 @@ export default function RiskDashboardPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/risk-dashboard`);
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.detail || 'Failed');
+      const [riskRes, entitiesRes, beneRes, schedRes] = await Promise.all([
+        fetchWithAuth(`/trusts/${selectedTrust.trust_id}/risk-dashboard`),
+        fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}&limit=200`).catch(() => null),
+        fetchWithAuth(`/beneficiaries/dashboard?trust_id=${selectedTrust.trust_id}`).catch(() => null),
+        fetchWithAuth(`/schedule-a/summary/${selectedTrust.trust_id}`).catch(() => null),
+      ]);
+
+      const d = await riskRes.json();
+      if (!riskRes.ok) throw new Error(d.detail || 'Failed');
       setData(d);
+
+      // Structure data
+      let entityCount = 0;
+      let entityTypes = [];
+      if (entitiesRes?.ok) {
+        const ed = await entitiesRes.json();
+        const items = ed.items || [];
+        entityCount = ed.total ?? items.length;
+        entityTypes = [...new Set(items.map(e => e.entity_type || e.type).filter(Boolean))];
+      }
+
+      let beneficiaryCount = 0;
+      if (beneRes?.ok) {
+        const bd = await beneRes.json();
+        beneficiaryCount = (bd.beneficiaries || []).length;
+      }
+
+      let scheduleATotal = 0;
+      let scheduleAItems = 0;
+      if (schedRes?.ok) {
+        const sd = await schedRes.json();
+        scheduleATotal = sd.total_value || 0;
+        scheduleAItems = sd.total_items || 0;
+      }
+
+      setStructureData({ entityCount, entityTypes, beneficiaryCount, scheduleATotal, scheduleAItems });
     } catch (e) {
       toast.error(e.message);
     } finally {
@@ -178,6 +212,81 @@ export default function RiskDashboardPage() {
                       <p className="text-[10px] text-muted-foreground">{mod}</p>
                     </CardContent></Card>
                   ))}
+                </div>
+              )}
+
+              {/* Structure Risk Factors */}
+              {structureData && (
+                <div className="space-y-3 mb-6">
+                  <h2 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Structure Risk Factors</h2>
+
+                  {/* Entity Structure */}
+                  <div className={"flex items-start gap-3 card-trust border border-border rounded p-4 " + (structureData.entityCount === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
+                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + (structureData.entityCount === 0 ? "bg-destructive/10" : "bg-navy/5")}>
+                      <Building2 className={"w-4 h-4 " + (structureData.entityCount === 0 ? "text-destructive" : "text-navy")} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-navy text-sm">Entity Structure: {structureData.entityCount} entit{structureData.entityCount === 1 ? 'y' : 'ies'}</h3>
+                        {structureData.entityCount === 0 && (
+                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                            Risk
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {structureData.entityCount === 0
+                          ? 'No entities registered — trust structure is undefined. Add entities in Structures.'
+                          : `${structureData.entityTypes.length} type${structureData.entityTypes.length === 1 ? '' : 's'}: ${structureData.entityTypes.join(', ') || 'unspecified'}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Beneficiaries */}
+                  <div className={"flex items-start gap-3 card-trust border border-border rounded p-4 " + (structureData.beneficiaryCount === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
+                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + (structureData.beneficiaryCount === 0 ? "bg-destructive/10" : "bg-navy/5")}>
+                      <Users className={"w-4 h-4 " + (structureData.beneficiaryCount === 0 ? "text-destructive" : "text-navy")} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-navy text-sm">Beneficiaries: {structureData.beneficiaryCount} named</h3>
+                        {structureData.beneficiaryCount === 0 && (
+                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                            Risk
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {structureData.beneficiaryCount === 0
+                          ? 'No beneficiaries designated — add beneficiaries to define trust distribution.'
+                          : `${structureData.beneficiaryCount} beneficiary holder${structureData.beneficiaryCount === 1 ? '' : 's'} with active certificates.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Schedule A Assets */}
+                  <div className={"flex items-start gap-3 card-trust border border-border rounded p-4 " + (structureData.scheduleATotal === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
+                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + (structureData.scheduleATotal === 0 ? "bg-destructive/10" : "bg-navy/5")}>
+                      <DollarSign className={"w-4 h-4 " + (structureData.scheduleATotal === 0 ? "text-destructive" : "text-navy")} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-navy text-sm">
+                          Schedule A: ${structureData.scheduleATotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} total assets
+                        </h3>
+                        {structureData.scheduleATotal === 0 && (
+                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                            Risk
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {structureData.scheduleATotal === 0
+                          ? 'No assets recorded in Schedule A — trust has no documented holdings.'
+                          : `${structureData.scheduleAItems} asset item${structureData.scheduleAItems === 1 ? '' : 's'} across all categories.`}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 

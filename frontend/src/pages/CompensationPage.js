@@ -42,6 +42,9 @@ export default function CompensationPage() {
   const [payments, setPayments] = useState([]);
   const [ytdData, setYtdData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [paymentsTotal, setPaymentsTotal] = useState(0);
+  const [loadingMorePayments, setLoadingMorePayments] = useState(false);
+  const PAGE_SIZE = 50;
   
   // Modal states
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -87,14 +90,21 @@ export default function CompensationPage() {
     setLoading(true);
     try {
       const [plansRes, paymentsRes, ytdRes, contextRes] = await Promise.all([
-        fetchWithAuth(`/compensation-plans?trust_id=${selectedTrust.trust_id}`),
-        fetchWithAuth(`/compensation-payments?trust_id=${selectedTrust.trust_id}`),
+        fetchWithAuth(`/compensation-plans?trust_id=${selectedTrust.trust_id}&limit=${PAGE_SIZE}`),
+        fetchWithAuth(`/compensation-payments?trust_id=${selectedTrust.trust_id}&limit=${PAGE_SIZE}`),
         fetchWithAuth(`/compensation-ytd?trust_id=${selectedTrust.trust_id}`),
         fetchWithAuth(`/guided-minutes/context?trust_id=${selectedTrust.trust_id}`)
       ]);
       
-      if (plansRes.ok) setPlans(await plansRes.json());
-      if (paymentsRes.ok) setPayments(await paymentsRes.json());
+      if (plansRes.ok) {
+        const plansData = await plansRes.json();
+        setPlans(plansData.items || []);
+      }
+      if (paymentsRes.ok) {
+        const paymentsData = await paymentsRes.json();
+        setPayments(paymentsData.items || []);
+        setPaymentsTotal(paymentsData.total || 0);
+      }
       if (ytdRes.ok) setYtdData(await ytdRes.json());
       
       // Get trustees list from context
@@ -106,6 +116,24 @@ export default function CompensationPage() {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLoadMorePayments = async () => {
+    if (!selectedTrust) return;
+    setLoadingMorePayments(true);
+    try {
+      const skip = payments.length;
+      const res = await fetchWithAuth(`/compensation-payments?trust_id=${selectedTrust.trust_id}&skip=${skip}&limit=${PAGE_SIZE}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPayments(prev => [...prev, ...(data.items || [])]);
+        setPaymentsTotal(data.total || 0);
+      }
+    } catch (error) {
+      console.error('Failed to load more payments:', error);
+    } finally {
+      setLoadingMorePayments(false);
     }
   };
 
@@ -543,7 +571,7 @@ export default function CompensationPage() {
                   <div>
                     <p className="label-trust mb-1">Payment History</p>
                     <h2 className="font-serif text-xl text-navy">
-                      {currentYear} Compensation Payments ({payments.filter(p => p.date?.startsWith(currentYear.toString())).length})
+                      Payment History ({payments.length})
                     </h2>
                   </div>
                 </div>
@@ -635,6 +663,18 @@ export default function CompensationPage() {
                         </div>
                       </div>
                     ))}
+                    {payments.length < paymentsTotal && (
+                      <div className="flex justify-center pt-4">
+                        <Button
+                          onClick={handleLoadMorePayments}
+                          disabled={loadingMorePayments}
+                          className="btn-secondary"
+                          data-testid="load-more-payments"
+                        >
+                          {loadingMorePayments ? 'Loading...' : `Load More (${paymentsTotal - payments.length} remaining)`}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -1,5 +1,5 @@
 # Schedule A router - handles trust asset ledger (Schedule A)
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -52,14 +52,16 @@ async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends
     await db.schedule_a_items.insert_one(item_doc)
     return ScheduleAItemResponse(**item_doc)
 
-@router.get("/schedule-a", response_model=List[ScheduleAItemResponse])
+@router.get("/schedule-a")
 async def get_schedule_a_items(
     trust_id: str, 
     category: Optional[str] = None, 
     status: Optional[str] = "active",  # Default to active only, use "all" for all assets
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     user: dict = Depends(get_current_user)
 ):
-    """Get all Schedule A items for a trust. Use status='all' to include disposed assets."""
+    """Get all Schedule A items for a trust. Use status='all' to include disposed assets (paginated)."""
     query = {"trust_id": trust_id, "user_id": user["user_id"]}
     if category:
         query["category"] = category
@@ -73,7 +75,8 @@ async def get_schedule_a_items(
         else:
             query["status"] = status
     
-    items = await db.schedule_a_items.find(query, {"_id": 0}).sort("category", 1).to_list(1000)
+    total = await db.schedule_a_items.count_documents(query)
+    items = await db.schedule_a_items.find(query, {"_id": 0}).sort("category", 1).skip(skip).limit(limit).to_list(limit)
     # Ensure backward compatibility - set defaults for items without status field
     for item in items:
         if "status" not in item:
@@ -86,7 +89,12 @@ async def get_schedule_a_items(
             item["disposition_date"] = None
         if "disposition_notes" not in item:
             item["disposition_notes"] = None
-    return [ScheduleAItemResponse(**item) for item in items]
+    return {
+        "items": [ScheduleAItemResponse(**item) for item in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 @router.get("/schedule-a/{item_id}", response_model=ScheduleAItemResponse)
 async def get_schedule_a_item(item_id: str, user: dict = Depends(get_current_user)):

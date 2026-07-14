@@ -34,7 +34,8 @@ import {
   FileText,
   Send,
   Mail,
-  Bot
+  Bot,
+  Trash2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -65,6 +66,9 @@ export default function DistributionsPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 50;
   
   // Approval modal state
   const [approvalModal, setApprovalModal] = useState(null);
@@ -78,6 +82,10 @@ export default function DistributionsPage() {
   // Send notice state
   const [sendingNotice, setSendingNotice] = useState({});
   const [sendNoticeResult, setSendNoticeResult] = useState({});
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     date: new Date(),
@@ -131,7 +139,7 @@ export default function DistributionsPage() {
     if (selectedTrust) {
       loadDistributions(debouncedSearch);
     }
-  }, [selectedTrust, debouncedSearch]);
+  }, [selectedTrust, debouncedSearch, filterStatus]);
 
   // Auto-open approval modal when arriving via ?approve=<id> deep-link
   const [autoApproveHandled, setAutoApproveHandled] = useState(false);
@@ -151,6 +159,27 @@ export default function DistributionsPage() {
     }
   }, [searchParams, distributions, autoApproveHandled]);
 
+  // Highlight deep-link: scroll to and flash a distribution row when arriving via ?highlight=<id>
+  const [highlightId, setHighlightId] = useState(null);
+  useEffect(() => {
+    const hlId = searchParams.get('highlight');
+    if (hlId && distributions.length > 0) {
+      setHighlightId(hlId);
+      // Clean URL
+      searchParams.delete('highlight');
+      setSearchParams(searchParams, { replace: true });
+      // Scroll to the row after render
+      setTimeout(() => {
+        const row = document.querySelector(`[data-testid="dist-row-${hlId}"]`);
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      // Clear highlight after 3 seconds
+      setTimeout(() => setHighlightId(null), 3000);
+    }
+  }, [searchParams, distributions]);
+
   const loadCategories = async () => {
     try {
       const response = await fetchWithAuth('/categories');
@@ -164,28 +193,48 @@ export default function DistributionsPage() {
     }
   };
 
-  const loadDistributions = async (search = '') => {
+  const loadDistributions = async (search = '', append = false) => {
     if (!selectedTrust) {
       setLoading(false);
       return;
     }
     
-    setLoading(true);
+    if (!append) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     try {
-      let url = `/distributions?trust_id=${selectedTrust.trust_id}`;
+      const skip = append ? distributions.length : 0;
+      let url = `/distributions?trust_id=${selectedTrust.trust_id}&skip=${skip}&limit=${PAGE_SIZE}`;
       if (search) {
         url += `&search=${encodeURIComponent(search)}`;
       }
+      if (filterStatus && filterStatus !== 'all') {
+        url += `&status=${encodeURIComponent(filterStatus)}`;
+      }
       const response = await fetchWithAuth(url);
       if (response.ok) {
-        setDistributions(await response.json());
+        const data = await response.json();
+        const items = data.items || [];
+        setTotalCount(data.total || 0);
+        if (append) {
+          setDistributions(prev => [...prev, ...items]);
+        } else {
+          setDistributions(items);
+        }
       }
     } catch (error) {
       console.error('Failed to load distributions:', error);
       showError(toast, error, { operation: 'load', page: 'Distributions' });
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    loadDistributions(debouncedSearch, true);
   };
 
   const handleCreateDistribution = async () => {
@@ -404,6 +453,36 @@ export default function DistributionsPage() {
       setSendNoticeResult(prev => ({ ...prev, [dist.distribution_id]: 'error' }));
     } finally {
       setSendingNotice(prev => ({ ...prev, [dist.distribution_id]: false }));
+    }
+  };
+
+  // Handle delete with read-only check
+  const handleDeleteClick = (dist) => {
+    if (isReadOnly) {
+      showUpgradeModal('delete a distribution', 'button_click', 'distributions_page');
+      return;
+    }
+    setDeleteConfirm(dist);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
+    try {
+      const response = await fetchWithAuth(`/distributions/${deleteConfirm.distribution_id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to delete distribution');
+      }
+      toast.success('Distribution deleted');
+      setDeleteConfirm(null);
+      loadDistributions();
+    } catch (error) {
+      showError(toast, error, { operation: 'delete', page: 'Distributions' });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -785,7 +864,7 @@ export default function DistributionsPage() {
                   {filteredDistributions.map((dist) => {
                     const status = dist.status === 'declined' ? 'declined' : (dist.approved_at ? 'approved' : 'review');
                     return (
-                    <tr key={dist.distribution_id} data-testid={`dist-row-${dist.distribution_id}`}>
+                    <tr key={dist.distribution_id} data-testid={`dist-row-${dist.distribution_id}`} className={highlightId === dist.distribution_id ? 'bg-gold/10 border-l-4 border-l-gold' : ''}>
                       <td>{formatDate(dist.date)}</td>
                       <td>
                         {dist.beneficiary_name || dist.beneficiary || '-'}
@@ -888,12 +967,34 @@ export default function DistributionsPage() {
                             <Bot className="w-3.5 h-3.5" />
                             <span className="hidden lg:inline">Draft Minutes</span>
                           </Link>
+                          <button
+                            onClick={() => handleDeleteClick(dist)}
+                            className="p-1 hover:bg-error/10 text-error"
+                            title="Delete distribution"
+                            data-testid={`delete-${dist.distribution_id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
                   )})}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Load More button */}
+          {distributions.length > 0 && distributions.length < totalCount && (
+            <div className="flex justify-center mt-6">
+              <Button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="btn-secondary"
+                data-testid="load-more-distributions"
+              >
+                {loadingMore ? 'Loading...' : `Load More (${totalCount - distributions.length} remaining)`}
+              </Button>
             </div>
           )}
         </div>
@@ -994,6 +1095,64 @@ export default function DistributionsPage() {
                     Approve Distribution
                   </>
                 )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="delete-confirm-modal">
+          <div className="bg-white p-6 w-full max-w-md corner-mark">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-serif text-xl text-navy">Delete Distribution</h2>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="text-navy hover:text-navy/70"
+                data-testid="close-delete-modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 bg-error/5 border border-error/10 mb-6">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Beneficiary</p>
+                  <p className="font-medium text-navy">{deleteConfirm.beneficiary_name || deleteConfirm.beneficiary}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Amount</p>
+                  <p className="font-mono text-navy">{formatCurrency(deleteConfirm.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Date</p>
+                  <p className="font-mono text-navy">{formatDate(deleteConfirm.date)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Category</p>
+                  <p className="text-navy">{deleteConfirm.purpose_classification || deleteConfirm.category}</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              Are you sure you want to delete this distribution record? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setDeleteConfirm(null)}
+                variant="outline"
+                className="flex-1 btn-secondary"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteConfirm}
+                disabled={deleteLoading}
+                className="flex-1 btn-primary"
+                data-testid="confirm-delete-btn"
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete Distribution'}
               </Button>
             </div>
           </div>

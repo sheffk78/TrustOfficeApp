@@ -39,6 +39,7 @@ import {
   GraduationCap,
   Shield,
   UserCheck,
+  HeartHandshake,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import PageHelpButton from '@/components/PageHelpButton';
@@ -89,6 +90,13 @@ const QUICK_ACTIONS = [
     icon: FileText,
     path: '/minutes/template/general_meeting',
     color: 'bg-gold/20 text-gold'
+  },
+  {
+    title: 'View Structures',
+    description: 'Manage trust entities and relationships',
+    icon: Building2,
+    path: '/structures',
+    color: 'bg-navy/10 text-navy'
   }
 ];
 
@@ -1029,6 +1037,58 @@ export default function DashboardPage() {
                   <SpendingThresholdCard />
                 </div>
               )}
+
+              {/* Money Section Quick Links */}
+              <div className="mb-8 card-trust" data-testid="money-section-links">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-gold/20 to-navy/10 flex items-center justify-center">
+                      <DollarSign className="w-5 h-5 text-gold" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-lg text-navy">Money</h3>
+                      <p className="text-sm text-muted-foreground">Track distributions, compensation, investments, and transactions</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <Link to="/transactions" className="p-3 text-left border border-border hover:border-gold transition-colors group">
+                    <div className="w-8 h-8 bg-navy/10 text-navy flex items-center justify-center mb-2">
+                      <Receipt className="w-4 h-4" />
+                    </div>
+                    <p className="font-medium text-sm text-navy group-hover:text-navy/70 transition-colors">Transactions</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Ledger & imports</p>
+                  </Link>
+                  <Link to="/distributions" className="p-3 text-left border border-border hover:border-gold transition-colors group">
+                    <div className="w-8 h-8 bg-success/10 text-success flex items-center justify-center mb-2">
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                    <p className="font-medium text-sm text-navy group-hover:text-navy/70 transition-colors">Distributions</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Beneficiary payments</p>
+                  </Link>
+                  <Link to="/compensation" className="p-3 text-left border border-border hover:border-gold transition-colors group">
+                    <div className="w-8 h-8 bg-navy/10 text-navy flex items-center justify-center mb-2">
+                      <Wallet className="w-4 h-4" />
+                    </div>
+                    <p className="font-medium text-sm text-navy group-hover:text-navy/70 transition-colors">Compensation</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Trustee payments</p>
+                  </Link>
+                  <Link to="/investments" className="p-3 text-left border border-border hover:border-gold transition-colors group">
+                    <div className="w-8 h-8 bg-gold/10 text-gold flex items-center justify-center mb-2">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <p className="font-medium text-sm text-navy group-hover:text-navy/70 transition-colors">Investments</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Holdings & returns</p>
+                  </Link>
+                  <Link to="/benevolence-log" className="p-3 text-left border border-border hover:border-gold transition-colors group">
+                    <div className="w-8 h-8 bg-success/10 text-success flex items-center justify-center mb-2">
+                      <HeartHandshake className="w-4 h-4" />
+                    </div>
+                    <p className="font-medium text-sm text-navy group-hover:text-navy/70 transition-colors">Benevolence</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Charitable giving log</p>
+                  </Link>
+                </div>
+              </div>
 
               {/* Top Row - Governance Score & Quick Actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

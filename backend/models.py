@@ -777,6 +777,7 @@ class ScheduleAItemUpdate(BaseModel):
     approximate_value: Optional[float] = Field(None, ge=0)
     date_conveyed: Optional[str] = None
     notes: Optional[str] = None
+    minutes_ref: Optional[str] = None
 
 class ScheduleAItemResponse(BaseModel):
     item_id: str

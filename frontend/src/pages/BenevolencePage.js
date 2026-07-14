@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { AttachMinutesDialog } from '@/components/AttachMinutesDialog';
@@ -34,7 +35,9 @@ import {
   X,
   MoreVertical,
   Link2,
-  FileText
+  FileText,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays } from 'date-fns';
 
@@ -67,7 +70,8 @@ const DATE_FILTER_OPTIONS = [
 
 export default function BenevolencePage() {
   const navigate = useNavigate();
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
+  const { showUpgradeModal } = useUpgradeModal();
   
   // Unified log state
   const [allRecords, setAllRecords] = useState([]);
@@ -82,7 +86,10 @@ export default function BenevolencePage() {
   
   // Modal states
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   
   // Attach minutes dialog state
   const [attachMinutesDialog, setAttachMinutesDialog] = useState({ open: false, recordId: null });
@@ -151,14 +158,12 @@ export default function BenevolencePage() {
           is_documented: !!(d.approved_at || d.minutes_record_id)
         }));
         
-        // Merge, avoiding duplicates by checking amount+date+recipient
+        // Merge, avoiding duplicates by unique ID (record_id / distribution_id)
+        // This replaces the fragile amount+date+name match which would wrongly
+        // merge two different $100 grants on the same day to the same person.
+        const existingIds = new Set(combinedRecords.map(r => r.id));
         distributions.forEach(dist => {
-          const isDuplicate = combinedRecords.some(r => 
-            r.amount === dist.amount && 
-            r.date === dist.date && 
-            r.recipient_name?.toLowerCase() === dist.recipient_name?.toLowerCase()
-          );
-          if (!isDuplicate) {
+          if (dist.id && !existingIds.has(dist.id)) {
             combinedRecords.push(dist);
           }
         });
@@ -315,6 +320,110 @@ export default function BenevolencePage() {
     });
   };
 
+  // Open edit dialog for a record (only grants — source === 'grant')
+  const handleEditClick = (record) => {
+    if (isReadOnly) {
+      showUpgradeModal('edit a benevolence record', 'button_click', 'benevolence_page');
+      return;
+    }
+    setEditingRecord(record);
+    setFormData({
+      beneficiary_name: record.beneficiary_name || record.recipient_name || '',
+      beneficiary_type: record.beneficiary_type || 'individual',
+      purpose: record.purpose || record.category || 'other',
+      purpose_description: record.purpose_description || record.description || '',
+      amount: String(record.amount || ''),
+      date: record.date || format(new Date(), 'yyyy-MM-dd'),
+      approved_by: record.approved_by || [],
+      approval_method: record.approval_method || 'unanimous',
+      notes: record.notes || '',
+      status: record.status || 'approved'
+    });
+    setEditDialogOpen(true);
+  };
+
+  // Submit edit for an existing grant record
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingRecord) return;
+    if (!formData.beneficiary_name || !formData.amount) {
+      toast.error('Recipient name and amount are required');
+      return;
+    }
+
+    setFormLoading(true);
+    try {
+      const payload = {
+        beneficiary_name: formData.beneficiary_name,
+        beneficiary_type: formData.beneficiary_type,
+        purpose: formData.purpose,
+        purpose_description: formData.purpose_description,
+        amount: parseFloat(formData.amount) || 0,
+        date: formData.date,
+        approved_by: formData.approved_by.length > 0 ? formData.approved_by : ['Trustee'],
+        approval_method: formData.approval_method,
+        notes: formData.notes,
+        status: formData.status
+      };
+
+      const response = await fetchWithAuth(`/benevolence/${editingRecord.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        toast.success('Benevolence record updated');
+        setEditDialogOpen(false);
+        setEditingRecord(null);
+        resetForm();
+        loadAllData();
+      } else {
+        const error = await response.json().catch(() => ({}));
+        showError(toast, new Error(error.detail || 'Failed to update record'), { operation: 'update', page: 'Benevolence' });
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'update', page: 'Benevolence' });
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // Delete a record (grant or distribution)
+  const handleDeleteClick = async (record) => {
+    if (isReadOnly) {
+      showUpgradeModal('delete a benevolence record', 'button_click', 'benevolence_page');
+      return;
+    }
+    const recipient = record.recipient_name || record.beneficiary_name || 'this record';
+    const amount = formatCurrency(record.amount);
+    if (!window.confirm(`Delete the benevolence record for ${recipient} (${amount})? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(record.id);
+    try {
+      // Grants use /benevolence/{record_id}, distributions use /distributions/{distribution_id}
+      const endpoint = record.source === 'distribution'
+        ? `/distributions/${record.id}`
+        : `/benevolence/${record.id}`;
+
+      const response = await fetchWithAuth(endpoint, { method: 'DELETE' });
+
+      if (response.ok) {
+        toast.success('Benevolence record deleted');
+        loadAllData();
+      } else {
+        const error = await response.json().catch(() => ({}));
+        showError(toast, new Error(error.detail || 'Failed to delete record'), { operation: 'delete', page: 'Benevolence' });
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'delete', page: 'Benevolence' });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const clearFilters = () => {
     setDateFilter('all');
     setSearchTerm('');
@@ -388,7 +497,13 @@ export default function BenevolencePage() {
                 ]}
                 taPrompt="Walk me through the Benevolence page and how to approve a request"
               />
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <Dialog open={dialogOpen} onOpenChange={(open) => {
+                if (open && isReadOnly) {
+                  showUpgradeModal('create a benevolence record', 'button_click', 'benevolence_page');
+                  return;
+                }
+                setDialogOpen(open);
+              }}>
                 <DialogTrigger asChild>
                   <Button className="btn-primary" data-testid="record-grant-btn">
                     <Plus className="w-4 h-4 mr-2" />
@@ -691,6 +806,33 @@ export default function BenevolencePage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
+                        {/* Edit / Delete Actions */}
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditClick(record)}
+                            disabled={deletingId === record.id}
+                            data-testid={`edit-btn-${record.id}`}
+                            title="Edit record"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(record)}
+                            disabled={deletingId === record.id}
+                            data-testid={`delete-btn-${record.id}`}
+                            title="Delete record"
+                          >
+                            {deletingId === record.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                         {/* Minutes Actions */}
                         {!record.is_documented && record.source === 'benevolence' && (
                           <DropdownMenu>
@@ -746,6 +888,116 @@ export default function BenevolencePage() {
           setAttachMinutesDialog({ open: false, recordId: null });
         }}
       />
+
+      {/* Edit Benevolence Record Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setEditingRecord(null);
+          resetForm();
+        }
+        setEditDialogOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-lg" data-testid="edit-grant-modal">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl text-navy">Edit Benevolence Record</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label className="label-trust">Recipient Name *</Label>
+                <Input
+                  value={formData.beneficiary_name}
+                  onChange={(e) => setFormData({ ...formData, beneficiary_name: e.target.value })}
+                  placeholder="Enter recipient name"
+                  className="input-trust mt-1"
+                  data-testid="edit-recipient-name"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="label-trust">Recipient Type</Label>
+                <Select value={formData.beneficiary_type} onValueChange={(v) => setFormData({ ...formData, beneficiary_type: v })}>
+                  <SelectTrigger className="input-trust mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BENEFICIARY_TYPES.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="label-trust">Purpose/Category</Label>
+                <Select value={formData.purpose} onValueChange={(v) => setFormData({ ...formData, purpose: v })}>
+                  <SelectTrigger className="input-trust mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PURPOSE_OPTIONS.map(p => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="label-trust">Amount *</Label>
+                <Input
+                  type="number"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  placeholder="0.00"
+                  className="input-trust mt-1"
+                  data-testid="edit-grant-amount"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="label-trust">Date</Label>
+                <Input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  className="input-trust mt-1"
+                />
+              </div>
+              <div className="col-span-2">
+                <Label className="label-trust">Description / Need</Label>
+                <Textarea
+                  value={formData.purpose_description}
+                  onChange={(e) => setFormData({ ...formData, purpose_description: e.target.value })}
+                  placeholder="Describe the need or purpose of this grant..."
+                  className="input-trust mt-1"
+                  rows={2}
+                />
+              </div>
+              <div className="col-span-2">
+                <Label className="label-trust">Notes (Optional)</Label>
+                <Textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Any additional notes..."
+                  className="input-trust mt-1"
+                  rows={2}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => {
+                setEditDialogOpen(false);
+                setEditingRecord(null);
+                resetForm();
+              }} className="btn-secondary">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={formLoading} className="btn-primary" data-testid="submit-edit-btn">
+                {formLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

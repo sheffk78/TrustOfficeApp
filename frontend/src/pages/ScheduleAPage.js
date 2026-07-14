@@ -56,6 +56,9 @@ export default function ScheduleAPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
   const [activeTab, setActiveTab] = useState('active');
+  const [assetsTotal, setAssetsTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 50;
   const [formData, setFormData] = useState({
     category: 'real_property',
     description: '',
@@ -63,7 +66,8 @@ export default function ScheduleAPage() {
     location: '',
     approximate_value: '',
     date_conveyed: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    minutes_ref: null
   });
   const [exporting, setExporting] = useState(false);
   
@@ -86,20 +90,33 @@ export default function ScheduleAPage() {
     }
   }, [selectedTrust, activeTab]);
 
-  const loadAssets = async () => {
+  const loadAssets = async (append = false) => {
     if (!selectedTrust) return;
-    setLoading(true);
+    if (!append) setLoading(true);
+    else setLoadingMore(true);
     try {
       const status = activeTab === 'all' ? 'all' : 'active';
-      const response = await fetchWithAuth(`/schedule-a?trust_id=${selectedTrust.trust_id}&status=${status}`);
+      const skip = append ? assets.length : 0;
+      const response = await fetchWithAuth(`/schedule-a?trust_id=${selectedTrust.trust_id}&status=${status}&skip=${skip}&limit=${PAGE_SIZE}`);
       if (response.ok) {
-        setAssets(await response.json());
+        const data = await response.json();
+        if (append) {
+          setAssets(prev => [...prev, ...(data.items || [])]);
+        } else {
+          setAssets(data.items || []);
+        }
+        setAssetsTotal(data.total || 0);
       }
     } catch (error) {
       console.error('Failed to load assets:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMoreAssets = () => {
+    loadAssets(true);
   };
 
   const loadSummary = async () => {
@@ -125,6 +142,15 @@ export default function ScheduleAPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate date_conveyed is a real date
+    if (formData.date_conveyed) {
+      const parsed = new Date(formData.date_conveyed);
+      if (isNaN(parsed.getTime())) {
+        toast.error('Date Conveyed is not a valid date');
+        return;
+      }
+    }
     
     const payload = {
       ...formData,
@@ -191,7 +217,8 @@ export default function ScheduleAPage() {
       location: asset.location,
       approximate_value: asset.approximate_value || '',
       date_conveyed: asset.date_conveyed,
-      notes: asset.notes
+      notes: asset.notes,
+      minutes_ref: asset.minutes_ref || null
     });
     setDialogOpen(true);
   };
@@ -268,7 +295,8 @@ export default function ScheduleAPage() {
       location: '',
       approximate_value: '',
       date_conveyed: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      minutes_ref: null
     });
   };
 
@@ -682,6 +710,20 @@ export default function ScheduleAPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Load More button for assets */}
+          {assets.length > 0 && assets.length < assetsTotal && (
+            <div className="flex justify-center mt-6">
+              <Button
+                onClick={handleLoadMoreAssets}
+                disabled={loadingMore}
+                className="btn-secondary"
+                data-testid="load-more-assets"
+              >
+                {loadingMore ? 'Loading...' : `Load More (${assetsTotal - assets.length} remaining)`}
+              </Button>
             </div>
           )}
         </div>

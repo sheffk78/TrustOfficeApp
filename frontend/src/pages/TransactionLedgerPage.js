@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -21,7 +22,7 @@ import {
   Plus, Search, Calendar as CalendarIcon, ArrowUpRight, ArrowDownLeft,
   FileSpreadsheet, Tag, Trash2, Filter, X, Upload, ChevronDown,
   ArrowUpDown, CheckSquare, Loader2,
-  AlertTriangle, Link2, FileText
+  AlertTriangle, Link2, FileText, Building2, Edit2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -46,7 +47,8 @@ const classificationColors = {
 };
 
 export default function TransactionLedgerPage() {
-  const { selectedTrust, trusts } = useAuth();
+  const navigate = useNavigate();
+  const { selectedTrust, trusts, isReadOnly } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
 
   // Core state
@@ -94,6 +96,17 @@ export default function TransactionLedgerPage() {
   const [selectedMinutesId, setSelectedMinutesId] = useState('');
   const [linking, setLinking] = useState(false);
 
+  // Edit transaction
+  const [showEdit, setShowEdit] = useState(false);
+  const [editingTxn, setEditingTxn] = useState(null);
+  const [editForm, setEditForm] = useState({
+    entity_id: '', date: '', amount: '', direction: 'outflow',
+    source_account: '', destination_account: '',
+    governance_classification: '', purpose_memo: '', other_note: ''
+  });
+  const [editDatePickerOpen, setEditDatePickerOpen] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const loadData = useCallback(async () => {
     if (!selectedTrust) return;
     setLoading(true);
@@ -105,7 +118,10 @@ export default function TransactionLedgerPage() {
         fetchWithAuth(`/minutes?trust_id=${selectedTrust.trust_id}`),
       ]);
       if (txnRes.ok) setTransactions(await txnRes.json());
-      if (entRes.ok) setEntities(await entRes.json());
+      if (entRes.ok) {
+        const entData = await entRes.json();
+        setEntities(entData.items || entData);
+      }
       if (alertsRes.ok) {
         const allAlerts = await alertsRes.json();
         setThresholdAlerts(allAlerts.filter(a => a.alert_type === 'spending_threshold_exceeded' && a.status === 'active'));
@@ -348,6 +364,69 @@ export default function TransactionLedgerPage() {
     }
   };
 
+  // ==================== EDIT TRANSACTION ====================
+  const openEdit = (txn) => {
+    if (isReadOnly) {
+      showUpgradeModal('edit transactions', 'button_click', 'transaction_ledger');
+      return;
+    }
+    setEditingTxn(txn);
+    setEditForm({
+      entity_id: txn.entity_id || '',
+      date: txn.date || '',
+      amount: String(txn.amount ?? ''),
+      direction: txn.direction || 'outflow',
+      source_account: txn.source_account || '',
+      destination_account: txn.destination_account || '',
+      governance_classification: txn.governance_classification || '',
+      purpose_memo: txn.purpose_memo || '',
+      other_note: txn.other_note || '',
+    });
+    setShowEdit(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingTxn) return;
+    if (!editForm.entity_id || !editForm.date || !editForm.amount || !editForm.governance_classification) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    if (editForm.governance_classification === 'Other' && !editForm.other_note.trim()) {
+      toast.error('A note is required for "Other" classification');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const res = await fetchWithAuth(`/transactions/${editingTxn.transaction_id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          entity_id: editForm.entity_id,
+          date: editForm.date,
+          amount: parseFloat(editForm.amount),
+          direction: editForm.direction,
+          source_account: editForm.source_account,
+          destination_account: editForm.destination_account,
+          governance_classification: editForm.governance_classification,
+          purpose_memo: editForm.purpose_memo,
+          other_note: editForm.other_note,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Failed to update transaction');
+      }
+      toast.success('Transaction updated');
+      setShowEdit(false);
+      setEditingTxn(null);
+      loadData();
+    } catch (e) {
+      if (e.message?.includes('subscription') || e.message?.includes('402')) showUpgradeModal();
+      showError(toast, e, { operation: 'update_transaction', page: 'TransactionLedger' });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   if (!selectedTrust) {
     return (
       <div className="main-layout">
@@ -477,6 +556,15 @@ export default function TransactionLedgerPage() {
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
+          ) : entities.length === 0 ? (
+            <div className="card-trust p-12 flex flex-col items-center justify-center text-center">
+              <Building2 className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-muted-foreground font-medium">No entities yet</p>
+              <p className="text-sm text-muted-foreground/70 mt-1 mb-4">Add a trust entity to start recording transactions.</p>
+              <Button onClick={() => navigate('/structures')} className="btn-primary">
+                <Building2 className="w-4 h-4 mr-2" /> Add Entity
+              </Button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 px-4">
               <FileSpreadsheet className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
@@ -499,7 +587,7 @@ export default function TransactionLedgerPage() {
                     <th className="p-3 text-left font-medium text-muted-foreground">Classification</th>
                     <th className="p-3 text-left font-medium text-muted-foreground">Memo</th>
                     <th className="p-3 text-center font-medium text-muted-foreground w-32">Threshold</th>
-                    <th className="p-3 text-center font-medium text-muted-foreground w-16"></th>
+                    <th className="p-3 text-center font-medium text-muted-foreground w-24">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -559,10 +647,16 @@ export default function TransactionLedgerPage() {
                         })()}
                       </td>
                       <td className="p-3 text-center">
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(t.transaction_id)}
-                          data-testid={`delete-txn-${t.transaction_id}`}>
-                          <Trash2 className="w-4 h-4 text-muted-foreground hover:text-error" />
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(t)}
+                            data-testid={`edit-txn-${t.transaction_id}`}>
+                            <Edit2 className="w-4 h-4 text-muted-foreground hover:text-navy" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(t.transaction_id)}
+                            data-testid={`delete-txn-${t.transaction_id}`}>
+                            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-error" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -840,6 +934,109 @@ export default function TransactionLedgerPage() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ==================== EDIT TRANSACTION DIALOG ==================== */}
+      <Dialog open={showEdit} onOpenChange={v => { setShowEdit(v); if (!v) setEditingTxn(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label className="label-trust">Entity *</Label>
+              <Select value={editForm.entity_id} onValueChange={v => setEditForm(f => ({ ...f, entity_id: v }))}>
+                <SelectTrigger data-testid="edit-entity-select"><SelectValue placeholder="Select entity" /></SelectTrigger>
+                <SelectContent>
+                  {entities.map(e => <SelectItem key={e.entity_id} value={e.entity_id}>{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="label-trust">Date *</Label>
+                <Popover open={editDatePickerOpen} onOpenChange={setEditDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start font-normal" data-testid="edit-date-btn">
+                      <CalendarIcon className="w-4 h-4 mr-2" />
+                      {editForm.date ? format(parseISO(editForm.date), 'MMM d, yyyy') : 'Pick date'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={editForm.date ? parseISO(editForm.date) : undefined}
+                      onSelect={d => { if (d) { setEditForm(f => ({ ...f, date: format(d, 'yyyy-MM-dd') })); setEditDatePickerOpen(false); } }} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <Label className="label-trust">Amount *</Label>
+                <Input type="number" step="0.01" min="0" placeholder="0.00" className="input-trust"
+                  value={editForm.amount} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                  data-testid="edit-amount-input" />
+              </div>
+            </div>
+
+            <div>
+              <Label className="label-trust">Direction *</Label>
+              <Select value={editForm.direction} onValueChange={v => setEditForm(f => ({ ...f, direction: v }))}>
+                <SelectTrigger data-testid="edit-direction-select"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DIRECTION_OPTIONS.map(d => (
+                    <SelectItem key={d.value} value={d.value}>
+                      <span className="flex items-center gap-2"><d.icon className={`w-4 h-4 ${d.color}`} /> {d.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="label-trust">Source Account</Label>
+                <Input placeholder="e.g. Trust Checking" className="input-trust" value={editForm.source_account}
+                  onChange={e => setEditForm(f => ({ ...f, source_account: e.target.value }))}
+                  data-testid="edit-source-input" />
+              </div>
+              <div>
+                <Label className="label-trust">Destination Account</Label>
+                <Input placeholder="e.g. Personal Account" className="input-trust" value={editForm.destination_account}
+                  onChange={e => setEditForm(f => ({ ...f, destination_account: e.target.value }))}
+                  data-testid="edit-dest-input" />
+              </div>
+            </div>
+
+            <div>
+              <Label className="label-trust">Governance Classification *</Label>
+              <Select value={editForm.governance_classification}
+                onValueChange={v => setEditForm(f => ({ ...f, governance_classification: v }))}>
+                <SelectTrigger data-testid="edit-classification-select"><SelectValue placeholder="Select classification" /></SelectTrigger>
+                <SelectContent>
+                  {CLASSIFICATIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {editForm.governance_classification === 'Other' && (
+              <div>
+                <Label className="label-trust">Note (required for "Other") *</Label>
+                <Input className="input-trust" value={editForm.other_note} onChange={e => setEditForm(f => ({ ...f, other_note: e.target.value }))}
+                  placeholder="Explain the nature of this transaction" data-testid="edit-other-note" />
+              </div>
+            )}
+
+            <div>
+              <Label className="label-trust">Purpose / Memo</Label>
+              <Textarea className="input-trust" placeholder="Describe the purpose of this transaction"
+                value={editForm.purpose_memo} onChange={e => setEditForm(f => ({ ...f, purpose_memo: e.target.value }))}
+                rows={2} data-testid="edit-memo-input" />
+            </div>
+
+            <Button className="w-full btn-primary" onClick={handleEditSave} disabled={savingEdit} data-testid="edit-submit-btn">
+              {savingEdit ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : 'Save Changes'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
