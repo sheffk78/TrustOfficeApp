@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { fetchWithAuth, getErrorMessage } from '@/utils/api';
 
 /**
@@ -59,13 +59,59 @@ export const useChatStream = () => {
   const [trustContext, setTrustContext] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamPhase, setStreamPhase] = useState(null); // 'thinking' | 'generating' | null
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const abortRef = useRef(null);
   const onDoneCallbackRef = useRef(null);
 
-  const sendMessage = useCallback(async (text, currentConversationId = null, currentMessages = [], onDone = null) => {
-    if (!text.trim()) return;
+  // Refs for values needed in event handlers (avoids stale closures)
+  const isStreamingRef = useRef(false);
+  const lastUserMessageRef = useRef(null); // { text, conversationId, messages, onDone }
+  const retryCountRef = useRef(0);
+  const lastAssistantMessageIdRef = useRef(null);
 
-    // Store the onDone callback for when the 'done' event arrives
+  // Keep isStreamingRef in sync with isStreaming state
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
+  // ─── Screen Wake Lock during AI streaming ─────────────────────────
+  // Prevents mobile screens from sleeping during long AI responses.
+  // Requires HTTPS (secure context). Failures are non-fatal.
+  useEffect(() => {
+    let wakeLock = null;
+
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && isStreaming) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+        } catch (err) {
+          // Wake Lock not available or denied — non-fatal
+          console.warn('[useChatStream] Wake Lock request failed:', err);
+        }
+      }
+    };
+
+    requestWakeLock();
+
+    return () => {
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+      }
+    };
+  }, [isStreaming]);
+
+  // ─── Core stream function (shared by sendMessage and retry) ─────────
+  const _streamMessage = useCallback(async ({
+    text,
+    currentConversationId = null,
+    currentMessages = [],
+    onDone = null,
+    isRetry = false,
+    assistantMessageId = null,
+  }) => {
+    if (!text.trim()) return null;
+
     onDoneCallbackRef.current = onDone;
 
     const userMessage = {
@@ -75,22 +121,33 @@ export const useChatStream = () => {
       timestamp: new Date().toISOString(),
     };
 
-    // Append user message immediately
-    const updatedMessages = [...currentMessages, userMessage];
+    let updatedMessages;
+    let assistantId = assistantMessageId || `ai-${Date.now()}`;
+
+    if (isRetry) {
+      // Retry: remove the interrupted assistant placeholder and the last user message,
+      // then re-append them so the UI shows a fresh attempt.
+      updatedMessages = currentMessages.filter(
+        msg => msg.id !== assistantId && msg.id !== userMessage.id
+      );
+      updatedMessages = [...updatedMessages, userMessage];
+      setIsReconnecting(true);
+    } else {
+      updatedMessages = [...currentMessages, userMessage];
+    }
+
     setMessages(updatedMessages);
     setLoading(true);
     setIsStreaming(true);
     setStreamPhase('thinking');
     setError(null);
 
-    // Create abort controller for this request
     const controller = new AbortController();
     abortRef.current = controller;
 
     // Create a placeholder assistant message that we'll update as tokens stream in
-    const assistantMessageId = `ai-${Date.now()}`;
     const placeholderAssistant = {
-      id: assistantMessageId,
+      id: assistantId,
       role: 'assistant',
       content: '',
       timestamp: new Date().toISOString(),
@@ -102,10 +159,12 @@ export const useChatStream = () => {
     };
 
     setMessages(prev => [...prev, placeholderAssistant]);
+    lastAssistantMessageIdRef.current = assistantId;
 
     // Track whether we've received the 'done' event
     let doneReceived = false;
     let streamEnded = false;
+    let newConvId = null;
 
     try {
       const body = {
@@ -129,7 +188,6 @@ export const useChatStream = () => {
       // Read the SSE stream
       const reader = response.body.getReader();
       let fullText = '';
-      let newConvId = null;
       let actionCardData = null;
       let citationNote = null;
       let unknownNote = null;
@@ -154,7 +212,7 @@ export const useChatStream = () => {
             setStreamPhase('generating');
             // Update the assistant message content incrementally
             setMessages(prev => prev.map(msg => {
-              if (msg.id !== assistantMessageId) return msg;
+              if (msg.id !== assistantId) return msg;
               return { ...msg, content: fullText };
             }));
             break;
@@ -184,7 +242,7 @@ export const useChatStream = () => {
 
             setMessages(prev => {
               const updated = prev.map(msg => {
-                if (msg.id !== assistantMessageId) return msg;
+                if (msg.id !== assistantId) return msg;
                 const finalActionCards = actionCards.map(card => ({
                   ...card,
                   message_index: prev.indexOf(msg),
@@ -216,7 +274,7 @@ export const useChatStream = () => {
             setError(data.message || 'An error occurred during streaming');
             // Finalize the placeholder
             setMessages(prev => prev.map(msg => {
-              if (msg.id !== assistantMessageId) return msg;
+              if (msg.id !== assistantId) return msg;
               if (!fullText) {
                 return {
                   ...msg,
@@ -232,26 +290,108 @@ export const useChatStream = () => {
 
       streamEnded = true;
 
-      // Safety net: if the stream ended but we never got a 'done' event
-      // (e.g., connection dropped), finalize the message anyway
+      // Safety net: if the stream ended but we never got a 'done' event,
+      // the connection likely dropped. Attempt reconnection.
       if (!doneReceived) {
-        console.warn('[useChatStream] Stream ended without done event, finalizing');
-        setMessages(prev => prev.map(msg => {
-          if (msg.id !== assistantMessageId) return msg;
-          return {
-            ...msg,
-            isStreaming: false,
-            content: fullText || 'The connection was interrupted. Please try again.',
-          };
-        }));
+        console.warn('[useChatStream] Stream ended without done event');
+
+        // Try polling for a completed response first, then retry if needed.
+        // Only attempt reconnection if we haven't exceeded max retries.
+        if (retryCountRef.current < 2 && lastUserMessageRef.current) {
+          const convIdToPoll = newConvId || currentConversationId || conversationId;
+
+          // First, try polling the "latest response" endpoint to see if the
+          // backend already finished generating while we were disconnected.
+          let pollSuccess = false;
+          if (convIdToPoll) {
+            try {
+              const pollResp = await fetchWithAuth(
+                `/ai/chat/conversations/${convIdToPoll}/latest`,
+                { method: 'GET' }
+              );
+              if (pollResp.ok) {
+                const pollData = await pollResp.json();
+                // Check if the latest assistant response is complete
+                if (pollData && pollData.role === 'assistant' && pollData.content && !pollData.is_streaming) {
+                  // The response completed while we were disconnected — display it.
+                  const pollActionCard = pollData.action_card || null;
+                  const pollActionCards = pollActionCard ? [{
+                    id: `action-${Date.now()}`,
+                    type: pollActionCard.type || '',
+                    data: pollActionCard.data || {},
+                    status: pollActionCard.confirmation_status || 'pending',
+                    requires_confirmation: pollActionCard.requires_confirmation ?? true,
+                    warning: pollActionCard.warning_summary || null,
+                    title: _deriveTitle(pollActionCard),
+                    summary: _deriveSummary(pollActionCard),
+                    amount: pollActionCard.data?.amount || null,
+                    message_index: null,
+                  }] : [];
+                  const pollCitations = _buildCitations(pollData.citation_note, pollData.unknown_note);
+
+                  setMessages(prev => prev.map(msg => {
+                    if (msg.id !== assistantId) return msg;
+                    return {
+                      ...msg,
+                      content: pollData.content,
+                      action_cards: pollActionCards,
+                      citations: pollCitations,
+                      caveat: pollData.caveat || null,
+                      isStreaming: false,
+                    };
+                  }));
+
+                  pollSuccess = true;
+                  console.info('[useChatStream] Recovered completed response via polling fallback');
+                }
+              }
+            } catch (pollErr) {
+              console.warn('[useChatStream] Polling fallback failed:', pollErr);
+            }
+          }
+
+          if (!pollSuccess) {
+            // Response wasn't complete — retry the original message.
+            retryCountRef.current += 1;
+            console.info(`[useChatStream] Auto-retrying (attempt ${retryCountRef.current}/2)`);
+
+            // Remove the interrupted assistant placeholder
+            setMessages(prev => prev.filter(msg => msg.id !== assistantId));
+
+            // Read the latest message list from state for the retry
+            const latestMessages = await new Promise(resolve => {
+              setMessages(prev => resolve(prev));
+            });
+
+            const lastMsg = lastUserMessageRef.current;
+            return _streamMessage({
+              text: lastMsg.text,
+              currentConversationId: newConvId || lastMsg.conversationId,
+              currentMessages: latestMessages,
+              onDone: lastMsg.onDone,
+              isRetry: true,
+              assistantMessageId: null, // new placeholder for the retry
+            });
+          }
+        } else {
+          // Max retries exceeded or no last message — finalize with error text
+          setMessages(prev => prev.map(msg => {
+            if (msg.id !== assistantId) return msg;
+            return {
+              ...msg,
+              isStreaming: false,
+              content: fullText || 'The connection was interrupted. Please try again.',
+            };
+          }));
+        }
       }
 
-      return { conversationId: newConvId, messages: [...updatedMessages, { id: assistantMessageId, content: fullText }] };
+      return { conversationId: newConvId, messages: [...updatedMessages, { id: assistantId, content: '' }] };
     } catch (err) {
       if (err.name === 'AbortError') {
         // User stopped the generation — keep partial response
         setMessages(prev => prev.map(msg => {
-          if (msg.id !== assistantMessageId) return msg;
+          if (msg.id !== assistantId) return msg;
           return {
             ...msg,
             isStreaming: false,
@@ -263,7 +403,7 @@ export const useChatStream = () => {
         setError(err.message || 'Failed to send message');
         // Clean up placeholder
         setMessages(prev => prev.map(msg => {
-          if (msg.id !== assistantMessageId) return msg;
+          if (msg.id !== assistantId) return msg;
           if (!msg.content) {
             return {
               ...msg,
@@ -279,10 +419,94 @@ export const useChatStream = () => {
       setLoading(false);
       setIsStreaming(false);
       setStreamPhase(null);
+      setIsReconnecting(false);
       abortRef.current = null;
       onDoneCallbackRef.current = null;
+      // Reset retry counter when we exit the streaming flow (success, abort, or error)
+      retryCountRef.current = 0;
+      lastAssistantMessageIdRef.current = null;
     }
   }, [conversationId]);
+
+  // ─── sendMessage (public wrapper around _streamMessage) ───────────
+  // Stores the last user message so retry/visibility handlers can re-send it.
+  const sendMessage = useCallback(async (text, currentConversationId = null, currentMessages = [], onDone = null) => {
+    // Store for potential retry on connection drop
+    lastUserMessageRef.current = {
+      text,
+      conversationId: currentConversationId,
+      onDone,
+    };
+    retryCountRef.current = 0; // fresh request — reset retry counter
+
+    return _streamMessage({
+      text,
+      currentConversationId,
+      currentMessages,
+      onDone,
+      isRetry: false,
+    });
+  }, [_streamMessage]);
+
+  // ─── handleRetry (used by visibilitychange handler) ───────────────
+  // Aborts any in-flight request, removes the interrupted assistant placeholder,
+  // and re-sends the last user message.
+  const handleRetry = useCallback(async () => {
+    if (!lastUserMessageRef.current) return;
+    if (retryCountRef.current >= 2) return;
+
+    // Abort any lingering fetch
+    if (abortRef.current) {
+      try { abortRef.current.abort(); } catch (e) { /* ignore */ }
+      abortRef.current = null;
+    }
+
+    // Remove the interrupted assistant placeholder if it exists
+    if (lastAssistantMessageIdRef.current) {
+      setMessages(prev => prev.filter(msg => msg.id !== lastAssistantMessageIdRef.current));
+    }
+
+    retryCountRef.current += 1;
+    const lastMsg = lastUserMessageRef.current;
+
+    // Read the latest messages from state
+    const latestMessages = await new Promise(resolve => {
+      setMessages(prev => resolve(prev));
+    });
+
+    return _streamMessage({
+      text: lastMsg.text,
+      currentConversationId: lastMsg.conversationId,
+      currentMessages: latestMessages,
+      onDone: lastMsg.onDone,
+      isRetry: true,
+    });
+  }, [_streamMessage]);
+
+  // ─── visibilitychange handler with auto-retry ────────────────────
+  // When the page becomes visible again while a stream was in progress
+  // but appears to have dropped, automatically retry the last user message.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Check if we were streaming and the connection may have dropped
+        if (isStreamingRef.current && lastUserMessageRef.current) {
+          // The stream likely dropped while backgrounded.
+          // Wait a moment for any pending reads to resolve, then check state.
+          setTimeout(() => {
+            if (isStreamingRef.current && lastUserMessageRef.current) {
+              // Still streaming but connection dropped — retry
+              console.info('[useChatStream] Tab became visible mid-stream, attempting auto-retry');
+              handleRetry();
+            }
+          }, 1000);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [handleRetry]);
 
   const stopStreaming = useCallback(() => {
     if (abortRef.current) {
@@ -347,6 +571,7 @@ export const useChatStream = () => {
     trustContext,
     isStreaming,
     streamPhase,
+    isReconnecting,
     sendMessage,
     stopStreaming,
     loadConversation,
