@@ -1064,3 +1064,27 @@ async def reset_admin_password(
 
     logger.info(f"API: Password reset for user {user_id}")
     return {"success": True, "message": "Password reset successfully"}
+
+
+@router.delete("/users/{user_id}/vault/documents/{doc_id}")
+async def admin_delete_vault_document(
+    user_id: str,
+    doc_id: str,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """Delete a vault document by doc_id. Requires admin API key."""
+    doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    await db.vault_documents.delete_one({"doc_id": doc_id, "user_id": user_id})
+
+    await log_api_action(
+        action="admin_delete_vault_document",
+        details={"target_user_id": user_id, "doc_id": doc_id, "title": doc.get("title", "")},
+        ip_address=get_client_ip(request),
+    )
+
+    logger.info(f"API: Admin deleted vault document {doc_id} for user {user_id}")
+    return {"success": True, "message": "Document deleted", "doc_id": doc_id}
