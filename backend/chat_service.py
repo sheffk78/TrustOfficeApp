@@ -774,6 +774,103 @@ def _format_vault_context(vault_docs: list, trust_document: dict | None) -> str:
     return "\n\n".join(sections) if sections else ""
 
 
+# ---------------------------------------------------------------------------
+# Compact context formatters — replace verbose json.dumps(indent=2) with
+# brief text summaries to reduce system prompt token count.
+# ---------------------------------------------------------------------------
+
+def _fmt_deadlines(items: list) -> str:
+    """Format upcoming deadlines as brief one-liners."""
+    if not items:
+        return "None"
+    return "\n".join(
+        f"- {d.get('type','task')} due {d.get('due_date','')}: {d.get('description','')}"
+        for d in items
+    )
+
+
+def _fmt_pending(items: list) -> str:
+    """Format pending items as brief one-liners."""
+    if not items:
+        return "None"
+    lines = []
+    for item in items:
+        due = item.get("due_date", item.get("date", ""))
+        lines.append(f"- {item.get('type','')}: {item.get('summary','')} ({due})")
+    return "\n".join(lines)
+
+
+def _fmt_activity(items: list) -> str:
+    """Format recent activity as brief one-liners."""
+    if not items:
+        return "None"
+    return "\n".join(
+        f"- {a.get('label','')} ({a.get('date','')})"
+        for a in items
+    )
+
+
+def _fmt_beneficiaries(items: list) -> str:
+    """Format active beneficiaries as brief one-liners."""
+    if not items:
+        return "None"
+    return "\n".join(
+        f"- {b.get('name','')}: {b.get('units',0)} units"
+        for b in items
+    )
+
+
+def _fmt_class_beneficiaries(items: list) -> str:
+    """Format class beneficiaries as brief one-liners."""
+    if not items:
+        return "None"
+    return "\n".join(
+        f"- {cb.get('label', cb.get('class_type',''))}: {cb.get('percentage',0)}% — {cb.get('description','')}"
+        for cb in items
+    )
+
+
+def _fmt_entities(items: list) -> str:
+    """Format entities as brief one-liners."""
+    if not items:
+        return "None"
+    lines = []
+    for e in items:
+        parts = [e.get("name", "")]
+        if e.get("entity_type"):
+            parts.append(f"({e['entity_type']})")
+        if e.get("governing_law"):
+            parts.append(f"[{e['governing_law']}]")
+        if e.get("ein"):
+            parts.append(f"EIN:{e['ein']}")
+        lines.append(f"- {' '.join(parts)}")
+    return "\n".join(lines)
+
+
+def _fmt_tax_deadlines(items: list) -> str:
+    """Format tax deadlines as brief one-liners."""
+    if not items:
+        return "None"
+    return "\n".join(
+        f"- {t.get('filing','')} due {t.get('due_date','')}"
+        for t in items
+    )
+
+
+def _fmt_history(history: list) -> str:
+    """Format conversation history as brief text (truncated)."""
+    if not history:
+        return "None"
+    lines = []
+    for m in history[-5:]:
+        role = m.get("role", "")
+        content = m.get("content", "")
+        if len(content) > 200:
+            content = content[:200] + "..."
+        lines.append(f"{role}: {content}")
+    return "\n".join(lines)
+
+
 async def generate_response(
     intent: str,
     entities: dict,
@@ -832,25 +929,25 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('hea
 {vault_section}
 
 ## Upcoming Deadlines (next 14 days)
-{json.dumps(ctx.get('upcoming_deadlines', []), indent=2)}
+{_fmt_deadlines(ctx.get('upcoming_deadlines', []))}
 
 ## Pending Items
-{json.dumps(ctx.get('pending_items', []), indent=2)}
+{_fmt_pending(ctx.get('pending_items', []))}
 
 ## Recent Activity (last 30 days)
-{json.dumps(ctx.get('recent_activity', []), indent=2)}
+{_fmt_activity(ctx.get('recent_activity', []))}
 
 ## Active Beneficiaries
-{json.dumps(ctx.get('beneficiaries', []), indent=2)}
+{_fmt_beneficiaries(ctx.get('beneficiaries', []))}
 
 ## Class Beneficiaries
-{json.dumps(ctx.get('class_beneficiaries', []), indent=2)}
+{_fmt_class_beneficiaries(ctx.get('class_beneficiaries', []))}
 
 ## Entities (Structures)
-{json.dumps(ctx.get('entities', []), indent=2)}
+{_fmt_entities(ctx.get('entities', []))}
 
 ## Tax Deadlines
-{json.dumps(ctx.get('tax_deadlines', []), indent=2)}
+{_fmt_tax_deadlines(ctx.get('tax_deadlines', []))}
 
 ## Money Summary
 Distributions: {_money.get('distributions_total', 0)} total, ${_money.get('distributions_ytd_amount', 0):,.2f} this year
@@ -865,10 +962,10 @@ Schedule A: {_struct.get('schedule_a_asset_count', 0)} assets, ${_struct.get('sc
 Communications: {_struct.get('communications_total', 0)} recorded, {_struct.get('communications_pending_action', 0)} pending action
 
 ## Knowledge Base
-{knowledge_context[:9500] if knowledge_context else "No knowledge base available."}
+{knowledge_context[:4500] if knowledge_context else "No knowledge base available."}
 
 ## Conversation History (recent)
-{json.dumps(conversation_history[-5:] if conversation_history else [], indent=2)}
+{_fmt_history(conversation_history)}
 
 ## Current Intent
 Intent: {intent}
@@ -1011,25 +1108,25 @@ Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('hea
 {vault_section}
 
 ## Upcoming Deadlines (next 14 days)
-{json.dumps(ctx.get('upcoming_deadlines', []), indent=2)}
+{_fmt_deadlines(ctx.get('upcoming_deadlines', []))}
 
 ## Pending Items
-{json.dumps(ctx.get('pending_items', []), indent=2)}
+{_fmt_pending(ctx.get('pending_items', []))}
 
 ## Recent Activity (last 30 days)
-{json.dumps(ctx.get('recent_activity', []), indent=2)}
+{_fmt_activity(ctx.get('recent_activity', []))}
 
 ## Active Beneficiaries
-{json.dumps(ctx.get('beneficiaries', []), indent=2)}
+{_fmt_beneficiaries(ctx.get('beneficiaries', []))}
 
 ## Class Beneficiaries
-{json.dumps(ctx.get('class_beneficiaries', []), indent=2)}
+{_fmt_class_beneficiaries(ctx.get('class_beneficiaries', []))}
 
 ## Entities (Structures)
-{json.dumps(ctx.get('entities', []), indent=2)}
+{_fmt_entities(ctx.get('entities', []))}
 
 ## Tax Deadlines
-{json.dumps(ctx.get('tax_deadlines', []), indent=2)}
+{_fmt_tax_deadlines(ctx.get('tax_deadlines', []))}
 
 ## Money Summary
 Distributions: {_money.get('distributions_total', 0)} total, ${_money.get('distributions_ytd_amount', 0):,.2f} this year
@@ -1044,10 +1141,10 @@ Schedule A: {_struct.get('schedule_a_asset_count', 0)} assets, ${_struct.get('sc
 Communications: {_struct.get('communications_total', 0)} recorded, {_struct.get('communications_pending_action', 0)} pending action
 
 ## Knowledge Base
-{knowledge_context[:9500] if knowledge_context else "No knowledge base available."}
+{knowledge_context[:4500] if knowledge_context else "No knowledge base available."}
 
 ## Conversation History (recent)
-{json.dumps(conversation_history[-5:] if conversation_history else [], indent=2)}
+{_fmt_history(conversation_history)}
 
 ## Current Intent
 Intent: {intent}

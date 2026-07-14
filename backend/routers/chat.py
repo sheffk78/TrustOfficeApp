@@ -8,6 +8,7 @@ import json
 import logging
 import re
 import uuid
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
@@ -1528,55 +1529,94 @@ async def _chat_stream_generator(
         # 4b. Send status event so frontend knows we're processing
         yield await _sse_event("status", {"phase": "thinking"})
 
-        # 5. Classify intent (non-streamed, fast)
-        intent_result = await classify_intent(message, None)
+        # 5. Classify intent AND build trust context in parallel
+        intent_task = asyncio.create_task(classify_intent(message, None))
+        trust_context = await build_trust_context(user_id, trust_id_resolved)
+        intent_result = await intent_task
+
         intent = intent_result.get("intent", "general_chat")
         entities = intent_result.get("entities", {})
 
-        # 6. Build trust context (DB queries, fast)
-        trust_context = await build_trust_context(user_id, trust_id_resolved)
-
-        # 7. Stream the response tokens
+        # 6. Stream the response tokens
         full_response_text = ""
-        async for chunk in generate_response_stream(
-            intent=intent,
-            entities=entities,
-            user_message=message,
-            trust_context=trust_context,
-            conversation_history=history_for_ai,
-            ai_client_module=None,
-        ):
-            full_response_text += chunk
-            yield await _sse_event("token", {"text": chunk})
-
-        # 8. Generate action card if needed (post-stream)
-        action_card = None
         try:
-            action_card = await generate_action_card(
-                intent, entities, message, trust_context, full_response_text
-            )
-        except Exception as e:
-            logger.warning(f"Action card generation failed: {e}")
+            async for chunk in generate_response_stream(
+                intent=intent,
+                entities=entities,
+                user_message=message,
+                trust_context=trust_context,
+                conversation_history=history_for_ai,
+                ai_client_module=None,
+            ):
+                full_response_text += chunk
+                yield await _sse_event("token", {"text": chunk})
+        except (asyncio.CancelledError, GeneratorExit):
+            # Client disconnected mid-stream — save partial response before propagating
+            if full_response_text:
+                user_msg_doc = ChatMessage(role="user", content=message)
+                partial_assistant = ChatMessage(
+                    role="assistant",
+                    content=full_response_text,
+                    action_card=None,
+                    citation_note=None,
+                    unknown_note=None,
+                    caveat=None,
+                )
+                now_partial = datetime.now(timezone.utc).isoformat()
+                await db.chat_conversations.update_one(
+                    {"conversation_id": conv_id, "user_id": user_id},
+                    {
+                        "$push": {
+                            "messages": {
+                                "$each": [
+                                    user_msg_doc.model_dump(),
+                                    partial_assistant.model_dump(),
+                                ]
+                            }
+                        },
+                        "$set": {"updated_at": now_partial},
+                        "$inc": {"message_count": 2},
+                    },
+                )
+                logger.info(f"CHAT_STREAM_DISCONNECT | user={user_id} | conversation={conv_id} | partial_len={len(full_response_text)}")
+            raise
 
-        # 9. Build citations
+        # 7. Build citations
         citation_note, unknown_note = build_citation_notes(trust_context, intent)
 
-        # 10. Determine caveat
+        # 8. Determine caveat
         caveat = None
         action_def = get_action(intent) if intent else None
-        if action_card or (action_def and action_def.get("requires_write")):
+        if action_def and action_def.get("requires_write"):
             caveat = "This proposed action should be reviewed with your legal or tax professional before execution."
 
-        # 11. Send done event with metadata
+        # 9. Send done event immediately — user sees response is complete
         yield await _sse_event("done", {
-            "action_card": action_card,
+            "action_card": None,
             "citation_note": citation_note,
             "unknown_note": unknown_note,
             "caveat": caveat,
             "intent": intent,
         })
 
-        # 12. Save messages to DB
+        # 10. Generate action card lazily (after done event) and send as separate event
+        action_card = None
+        try:
+            action_def_check = get_action(intent) if intent else None
+            if action_def_check and action_def_check.get("requires_write"):
+                action_card = await generate_action_card(
+                    intent, entities, message, trust_context, full_response_text
+                )
+                if action_card:
+                    # Send the action card as a separate SSE event so the
+                    # frontend can render it without blocking the done event.
+                    yield await _sse_event("action_card", {
+                        "action_card": action_card,
+                    })
+        except Exception as e:
+            logger.warning(f"Action card generation failed: {e}")
+
+        # 11. Save messages to DB
         user_msg_doc = ChatMessage(role="user", content=message)
 
         action_card_for_db = None
@@ -1619,6 +1659,57 @@ async def _chat_stream_generator(
     except Exception as e:
         logger.error(f"Chat stream error: {type(e).__name__}: {e}", exc_info=True)
         yield await _sse_event("error", {"message": "An error occurred while generating the response. Please try again."})
+
+
+@router.get("/chat/conversations/{conversation_id}/latest")
+async def get_latest_assistant_message(
+    conversation_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Polling endpoint for disconnected clients.
+
+    Returns the latest assistant message in a conversation. If the client
+    disconnected mid-stream and reconnected, they can poll this endpoint to
+    retrieve the assistant's response (full or partial).
+    """
+    conv = await db.chat_conversations.find_one(
+        {"conversation_id": conversation_id, "user_id": user["user_id"]},
+        {"_id": 0, "messages": 1, "updated_at": 1, "title": 1}
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    messages = conv.get("messages", [])
+    if not messages:
+        raise HTTPException(status_code=404, detail="No messages in this conversation")
+
+    # Walk backwards to find the latest assistant message
+    latest_assistant = None
+    latest_index = None
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i].get("role") == "assistant":
+            latest_assistant = messages[i]
+            latest_index = i
+            break
+
+    if not latest_assistant:
+        raise HTTPException(status_code=404, detail="No assistant message found")
+
+    return {
+        "conversation_id": conversation_id,
+        "message_index": latest_index,
+        "message": {
+            "role": "assistant",
+            "content": latest_assistant.get("content", ""),
+            "action_card": latest_assistant.get("action_card"),
+            "citation_note": latest_assistant.get("citation_note"),
+            "unknown_note": latest_assistant.get("unknown_note"),
+            "caveat": latest_assistant.get("caveat"),
+            "timestamp": latest_assistant.get("timestamp", ""),
+        },
+        "updated_at": conv.get("updated_at", ""),
+    }
 
 
 @router.post("/chat/stream")
