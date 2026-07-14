@@ -418,7 +418,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
 
     # 6. Active beneficiaries
     beneficiaries = await db.trust_unit_certificates.find(
-        {"trust_id": trust_id, "status": "active"},
+        {"trust_id": trust_id, "user_id": user_id, "status": "active"},
         {"_id": 0, "holder_name": 1, "units": 1}
     ).to_list(20)
     context["beneficiaries"] = [
@@ -467,7 +467,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
     ]
 
     # 7. Tax calendar
-    upcoming_tax = await db.tax_calendar_entries.find(
+    upcoming_tax = await db.tax_calendar.find(
         {
             "trust_id": trust_id,
             "user_id": user_id,

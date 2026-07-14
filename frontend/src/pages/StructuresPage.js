@@ -123,7 +123,7 @@ export default function StructuresPage() {
       const res = await fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}&skip=${skip}&limit=${PAGE_SIZE}`);
       if (res.ok) {
         const data = await res.json();
-        setEntities(prev => [...prev, ...(data.items || [])]);
+        setEntities(prev => [...prev, ...(data.items || data || [])]);
         setEntitiesTotal(data.total || 0);
       }
     } catch (error) {

@@ -22,7 +22,7 @@ const DEADLINE_LABELS = {
 const SECTION_EVENT_META = {
   distribution:            { icon: Send,           iconBg: 'bg-gold/10',  iconColor: 'text-gold',  accent: 'border-l-gold' },
   compensation_payment:    { icon: Wallet,         iconBg: 'bg-navy/5',    iconColor: 'text-navy',  accent: 'border-l-navy' },
-  investment:              { icon: TrendingUp,     iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', accent: 'border-l-emerald-600' },
+  investment:              { icon: TrendingUp,     iconBg: 'bg-gold/10',    iconColor: 'text-gold',    accent: 'border-l-gold' },
   entity_formation:        { icon: Layers,         iconBg: 'bg-navy/5',    iconColor: 'text-navy',  accent: 'border-l-navy' },
   schedule_a_conveyance:   { icon: Package,        iconBg: 'bg-gold/10',  iconColor: 'text-gold',  accent: 'border-l-gold' },
   communication:           { icon: MessageSquare,  iconBg: 'bg-navy/5',    iconColor: 'text-navy',  accent: 'border-l-navy' },
@@ -30,7 +30,7 @@ const SECTION_EVENT_META = {
 
 function FilingStatusBadge({ filingStatus, overdue }) {
   if (filingStatus === 'filed' || filingStatus === 'not_required') {
-    return <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">Filed</span>;
+    return <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-success/10 text-success">Filed</span>;
   }
   if (filingStatus === 'extended') {
     return <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold border border-warning text-warning">Extended</span>;
@@ -42,13 +42,13 @@ function FilingStatusBadge({ filingStatus, overdue }) {
 }
 
 function StatusIcon({ status, eventType }) {
-  if (status === 'completed') return <CheckCircle2 className="w-5 h-5 text-emerald-600" />;
+  if (status === 'completed') return <CheckCircle2 className="w-5 h-5 text-success" />;
   if (status === 'overdue') return <AlertTriangle className="w-5 h-5 text-red-600" />;
   return <Clock className="w-5 h-5 text-navy" />;
 }
 
 function statusBorderClass(status) {
-  if (status === 'completed') return 'border-l-emerald-600';
+  if (status === 'completed') return 'border-l-success';
   if (status === 'overdue') return 'border-l-red-600';
   return 'border-l-navy';
 }
@@ -143,7 +143,7 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
                   size="sm"
                   variant="outline"
                   onClick={() => setShowConfirm('filed')}
-                  className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                  className="border-success text-success hover:bg-success/5"
                   data-testid={`mark-filed-${event.entry_id}`}
                 >
                   <Check className="w-3.5 h-3.5 mr-1" aria-hidden="true" /> Mark Filed
@@ -226,7 +226,7 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
               <div className="flex items-center gap-3 flex-wrap">
                 <h3 className="font-medium text-navy text-sm sm:text-base">{label}</h3>
                 {status === 'completed' && (
-                  <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">Completed</span>
+                  <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-success/10 text-success">Completed</span>
                 )}
                 {status === 'upcoming' && (
                   <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold border border-navy/20 text-navy">Upcoming</span>
@@ -334,7 +334,7 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
                 </span>
               )}
               {event.completed_at && (
-                <span className="font-mono text-xs text-emerald-600">
+                <span className="font-mono text-xs text-success">
                   Completed: {formatDate(event.completed_at)}
                 </span>
               )}

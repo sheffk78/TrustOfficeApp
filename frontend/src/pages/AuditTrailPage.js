@@ -188,7 +188,7 @@ export default function AuditTrailPage() {
         const commRes = await fetchWithAuth(`/trusts/${trustId}/communications?limit=100`);
         if (commRes.ok) {
           const data = await commRes.json();
-          const comms = data.communications || [];
+          const comms = data.items || data.communications || [];
           comms.forEach(c => {
             allEvents.push({
               id: `comm-${c.comm_id}`,

@@ -204,6 +204,10 @@ export default function TransactionLedgerPage() {
 
   // ==================== DELETE ====================
   const handleDelete = async (id) => {
+    if (isReadOnly) {
+      showUpgradeModal('delete transactions', 'button_click', 'transaction_ledger_page');
+      return;
+    }
     if (!window.confirm('Delete this transaction? The audit trail will be preserved.')) return;
     try {
       const res = await fetchWithAuth(`/transactions/${id}`, { method: 'DELETE' });

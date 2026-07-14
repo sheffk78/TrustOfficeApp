@@ -216,7 +216,7 @@ export default function DistributionsPage() {
       const response = await fetchWithAuth(url);
       if (response.ok) {
         const data = await response.json();
-        const items = data.items || [];
+        const items = data.items || data || [];
         setTotalCount(data.total || 0);
         if (append) {
           setDistributions(prev => [...prev, ...items]);
@@ -404,7 +404,7 @@ export default function DistributionsPage() {
   });
 
   const totalAmount = filteredDistributions.reduce((sum, d) => sum + d.amount, 0);
-  const pendingCount = distributions.filter(d => !d.approved_at).length;
+  const pendingCount = distributions.filter(d => !d.approved_at && d.status !== 'declined').length;
 
   // Handle dialog open with read-only check
   const handleDialogOpenChange = (open) => {

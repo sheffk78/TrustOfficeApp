@@ -156,6 +156,7 @@ async def get_distributions(
         query["status"] = {"$ne": "declined"}
     elif status == "pending":
         query["approved_at"] = None
+        query["status"] = {"$ne": "declined"}
     elif status == "review":
         query["approved_at"] = None
         query["status"] = {"$ne": "declined"}

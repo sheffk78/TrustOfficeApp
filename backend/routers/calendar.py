@@ -296,7 +296,7 @@ async def get_calendar_events(
         })
 
     # 3c. Investments
-    investments = await db.investments.find(money_query, {"_id": 0}).to_list(1000)
+    investments = await db.investments.find({**money_query, "is_active": True}, {"_id": 0}).to_list(1000)
     for inv in investments:
         i_date = _safe_date(inv.get("purchase_date"), inv.get("created_at"))
         if not i_date:

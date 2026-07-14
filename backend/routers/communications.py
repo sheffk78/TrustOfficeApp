@@ -96,7 +96,7 @@ async def list_communications(
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
-    query = {"trust_id": trust_id}
+    query = {"trust_id": trust_id, "user_id": user["user_id"]}
     if comm_type:
         query["comm_type"] = comm_type
     if direction:
@@ -116,7 +116,7 @@ async def list_communications(
 
     # Count action items
     action_items = await db.communications.count_documents({
-        "trust_id": trust_id, "action_required": True, "action_completed": False
+        "trust_id": trust_id, "user_id": user["user_id"], "action_required": True, "action_completed": False
     })
 
     return {

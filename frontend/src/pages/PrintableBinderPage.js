@@ -154,12 +154,12 @@ const PrintableBinderPage = () => {
     setSectionDataLoading(true);
     try {
       if (sectionId === 'money' && !moneyData) {
-        const params = `?trust_id=${encodeURIComponent(selectedTrust)}`;
+        const params = `?trust_id=${encodeURIComponent(selectedTrust.trust_id)}`;
         const [txnsRes, distsRes, compRes, invRes] = await Promise.all([
-          fetchWithAuth(`/transactions${params}&limit=200`),
-          fetchWithAuth(`/distributions${params}&limit=200`),
-          fetchWithAuth(`/compensation-payments${params}&limit=200`),
-          fetchWithAuth(`/trusts/${encodeURIComponent(selectedTrust)}/investments`),
+          fetchWithAuth(`/transactions${params}`),
+          fetchWithAuth(`/distributions${params}`),
+          fetchWithAuth(`/compensation-payments${params}`),
+          fetchWithAuth(`/trusts/${encodeURIComponent(selectedTrust.trust_id)}/investments`),
         ]);
 
         let transactions = [];
@@ -213,12 +213,12 @@ const PrintableBinderPage = () => {
           summary: { totalInflows, totalOutflows, netFlow: totalInflows - totalOutflows, compTotal, distTotal },
         });
       } else if (sectionId === 'structure' && !structureData) {
-        const params = `?trust_id=${encodeURIComponent(selectedTrust)}`;
+        const params = `?trust_id=${encodeURIComponent(selectedTrust.trust_id)}`;
         const [entitiesRes, beneRes, schedRes, commRes] = await Promise.all([
-          fetchWithAuth(`/entities${params}&limit=200`),
+          fetchWithAuth(`/entities${params}`),
           fetchWithAuth(`/beneficiaries/dashboard${params}`),
-          fetchWithAuth(`/schedule-a${params}&status=all&limit=200`),
-          fetchWithAuth(`/trusts/${encodeURIComponent(selectedTrust)}/communications?limit=200`),
+          fetchWithAuth(`/schedule-a${params}`),
+          fetchWithAuth(`/trusts/${encodeURIComponent(selectedTrust.trust_id)}/communications?limit=200`),
         ]);
 
         let entities = [];

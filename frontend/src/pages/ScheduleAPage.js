@@ -101,9 +101,9 @@ export default function ScheduleAPage() {
       if (response.ok) {
         const data = await response.json();
         if (append) {
-          setAssets(prev => [...prev, ...(data.items || [])]);
+          setAssets(prev => [...prev, ...(data.items || data || [])]);
         } else {
-          setAssets(data.items || []);
+          setAssets(data.items || data || []);
         }
         setAssetsTotal(data.total || 0);
       }
@@ -190,6 +190,10 @@ export default function ScheduleAPage() {
   };
 
   const handleDelete = async (itemId) => {
+    if (isReadOnly) {
+      showUpgradeModal('delete assets', 'button_click', 'schedule_a_page');
+      return;
+    }
     if (!confirm('Are you sure you want to remove this asset from Trust Assets?')) return;
     
     try {
@@ -198,6 +202,8 @@ export default function ScheduleAPage() {
         toast.success('Asset removed');
         loadAssets();
         loadSummary();
+      } else {
+        showError(toast, new Error('Failed to delete asset'), { operation: 'delete', page: 'ScheduleA' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'delete', page: 'ScheduleA' });

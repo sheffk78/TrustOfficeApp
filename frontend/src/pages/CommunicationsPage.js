@@ -94,7 +94,7 @@ export default function CommunicationsPage() {
       ]);
       const cData = await commRes.json();
       if (commRes.ok) {
-        const items = cData.items || [];
+        const items = cData.items || cData || [];
         setCommTotal(cData.total || 0);
         if (append) {
           setCommunications(prev => [...prev, ...items]);

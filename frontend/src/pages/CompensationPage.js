@@ -98,7 +98,7 @@ export default function CompensationPage() {
       
       if (plansRes.ok) {
         const plansData = await plansRes.json();
-        setPlans(plansData.items || []);
+        setPlans(plansData.items || plansData || []);
       }
       if (paymentsRes.ok) {
         const paymentsData = await paymentsRes.json();
@@ -127,7 +127,7 @@ export default function CompensationPage() {
       const res = await fetchWithAuth(`/compensation-payments?trust_id=${selectedTrust.trust_id}&skip=${skip}&limit=${PAGE_SIZE}`);
       if (res.ok) {
         const data = await res.json();
-        setPayments(prev => [...prev, ...(data.items || [])]);
+        setPayments(prev => [...prev, ...(data.items || data || [])]);
         setPaymentsTotal(data.total || 0);
       }
     } catch (error) {
@@ -183,6 +183,10 @@ export default function CompensationPage() {
   };
 
   const handleDeletePlan = async (planId) => {
+    if (isReadOnly) {
+      showUpgradeModal('delete compensation plans', 'button_click', 'compensation_page');
+      return;
+    }
     if (!confirm('Delete this compensation plan?')) return;
     try {
       const response = await fetchWithAuth(`/compensation-plans/${planId}`, {
@@ -191,6 +195,8 @@ export default function CompensationPage() {
       if (response.ok) {
         toast.success('Plan deleted');
         loadData();
+      } else {
+        showError(toast, new Error('Failed to delete plan'), { operation: 'delete', page: 'Compensation' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'delete', page: 'Compensation' });
@@ -198,6 +204,10 @@ export default function CompensationPage() {
   };
 
   const handleCreatePayment = async () => {
+    if (isReadOnly) {
+      showUpgradeModal('record payments', 'button_click', 'compensation_page');
+      return;
+    }
     if (!selectedTrust || !paymentForm.amount) {
       toast.error('Amount is required');
       return;
@@ -223,6 +233,8 @@ export default function CompensationPage() {
           trustee_name: ''
         });
         loadData();
+      } else {
+        showError(toast, new Error('Failed to record payment'), { operation: 'record', page: 'Compensation' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'record', page: 'Compensation' });
@@ -230,6 +242,10 @@ export default function CompensationPage() {
   };
 
   const handleDeletePayment = async (paymentId) => {
+    if (isReadOnly) {
+      showUpgradeModal('delete payments', 'button_click', 'compensation_page');
+      return;
+    }
     if (!confirm('Delete this payment?')) return;
     try {
       const response = await fetchWithAuth(`/compensation-payments/${paymentId}`, {
@@ -238,6 +254,8 @@ export default function CompensationPage() {
       if (response.ok) {
         toast.success('Payment deleted');
         loadData();
+      } else {
+        showError(toast, new Error('Failed to delete payment'), { operation: 'delete', page: 'Compensation' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'delete', page: 'Compensation' });
@@ -245,6 +263,10 @@ export default function CompensationPage() {
   };
 
   const openEditPlan = (plan) => {
+    if (isReadOnly) {
+      showUpgradeModal('edit compensation plans', 'button_click', 'compensation_page');
+      return;
+    }
     setEditingPlan(plan);
     setPlanForm({
       annual_approved_amount: plan.annual_approved_amount || plan.annual_fee || '',

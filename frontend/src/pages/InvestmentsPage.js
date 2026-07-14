@@ -130,6 +130,10 @@ export default function InvestmentsPage() {
   };
 
   const deleteInvestment = async (id) => {
+    if (isReadOnly) {
+      showUpgradeModal('remove investments', 'button_click', 'investments_page');
+      return;
+    }
     if (!window.confirm('Remove this investment from the trust? This can be reversed later if needed.')) return;
     try {
       const res = await fetchWithAuth(`/investments/${id}`, {
@@ -140,6 +144,8 @@ export default function InvestmentsPage() {
       if (res.ok) {
         toast.success('Investment removed');
         loadData();
+      } else {
+        showError(toast, new Error('Failed to remove investment'), { operation: 'remove', page: 'Investments' });
       }
     } catch (e) {
       showError(toast, e, { operation: 'remove', page: 'Investments' });
@@ -396,33 +402,33 @@ export default function InvestmentsPage() {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <label className="block text-sm font-medium text-navy mb-1">Asset Name *</label>
+              <label className="label-trust">Asset Name *</label>
               <Input placeholder="Asset name" value={editForm.asset_name}
                 onChange={e => setEditForm({ ...editForm, asset_name: e.target.value })}
                 className="input-trust" data-testid="edit-inv-name" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-navy mb-1">Asset Type</label>
+              <label className="label-trust">Asset Type</label>
               <select value={editForm.asset_type} onChange={e => setEditForm({ ...editForm, asset_type: e.target.value })} className="input-trust w-full">
                 {Object.entries(ASSET_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-navy mb-1">Current Value ($)</label>
+                <label className="label-trust">Current Value ($)</label>
                 <Input type="number" placeholder="0.00" value={editForm.current_value}
                   onChange={e => setEditForm({ ...editForm, current_value: e.target.value })}
                   className="input-trust" data-testid="edit-inv-value" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-navy mb-1">Quantity</label>
+                <label className="label-trust">Quantity</label>
                 <Input placeholder="Quantity" value={editForm.quantity}
                   onChange={e => setEditForm({ ...editForm, quantity: e.target.value })}
                   className="input-trust" data-testid="edit-inv-quantity" />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-navy mb-1">Unit</label>
+              <label className="label-trust">Unit</label>
               <select value={editForm.unit} onChange={e => setEditForm({ ...editForm, unit: e.target.value })} className="input-trust w-full">
                 <option value="shares">Shares</option>
                 <option value="units">Units</option>
@@ -431,13 +437,13 @@ export default function InvestmentsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-navy mb-1">Custodian</label>
+              <label className="label-trust">Custodian</label>
               <Input placeholder="e.g. Fidelity, Schwab, Coinbase" value={editForm.custodian}
                 onChange={e => setEditForm({ ...editForm, custodian: e.target.value })}
                 className="input-trust" data-testid="edit-inv-custodian" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-navy mb-1">Notes</label>
+              <label className="label-trust">Notes</label>
               <textarea placeholder="Notes..." value={editForm.notes}
                 onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
                 className="w-full input-trust" rows={3} data-testid="edit-inv-notes" />
