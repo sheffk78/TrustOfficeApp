@@ -24,7 +24,7 @@ import os
 API_BASE = "https://api.trustoffice.app"
 APP_BASE = "https://app.trustoffice.app"
 TEST_EMAIL = "monitoring@trustoffice.app"
-TEST_PASSWORD = "TrustOfficeMonitor2024!"  # noqa: hardcoded test credential
+TEST_PASSWORD = "TrustOfficeCanary2024!"  # synced with backend/monitoring/canary.py
 LOCAL_FRONTEND_BUILD = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "frontend", "build",
