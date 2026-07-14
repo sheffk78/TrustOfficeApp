@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TrustOffice Platform Briefing</title>
+<style>
+@font-face {
+    font-family: 'CabinetGrotesk';
+    src: url('file:///Users/socializerender/.openclaw/workspace/Kit/life/brands/SocializeVideo/fonts/CabinetGrotesk-800.ttf') format('truetype');
+    font-weight: 800;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'CabinetGrotesk';
+    src: url('file:///Users/socializerender/.openclaw/workspace/Kit/life/brands/SocializeVideo/fonts/CabinetGrotesk-700.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'CabinetGrotesk';
+    src: url('file:///Users/socializerender/.openclaw/workspace/Kit/life/brands/SocializeVideo/fonts/CabinetGrotesk-500.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Satoshi';
+    src: url('file:///Users/socializerender/.openclaw/workspace/Kit/life/brands/SocializeVideo/fonts/Satoshi-400.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Satoshi';
+    src: url('file:///Users/socializerender/.openclaw/workspace/Kit/life/brands/SocializeVideo/fonts/Satoshi-500.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Satoshi';
+    src: url('file:///Users/socializerender/.openclaw/workspace/Kit/life/brands/SocializeVideo/fonts/Satoshi-700.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@page {
+    size: letter;
+    margin: 1in;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Satoshi', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #15151B;
+    background: #F7F5EF;
+    -webkit-font-smoothing: antialiased;
+}
+
+.top-bar {
+    border-top: 2px solid #00B4A6;
+    margin-bottom: 20px;
+    padding-top: 16px;
+}
+
+.doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(21, 21, 27, 0.12);
+}
+
+.doc-header-left {
+    flex: 1;
+}
+
+.wordmark {
+    font-family: 'CabinetGrotesk', sans-serif;
+    font-weight: 800;
+    font-size: 13pt;
+    letter-spacing: -0.02em;
+    color: #15151B;
+}
+
+.wordmark .dot {
+    color: #00B4A6;
+}
+
+.tagline {
+    font-family: 'Satoshi', sans-serif;
+    font-weight: 500;
+    font-size: 6pt;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #716E68;
+    margin-top: 2px;
+}
+
+.doc-header-right {
+    text-align: right;
+    font-size: 8pt;
+    color: #716E68;
+    line-height: 1.5;
+    font-family: 'Satoshi', sans-serif;
+    font-weight: 400;
+}
+
+h1 {
+    font-family: 'CabinetGrotesk', sans-serif;
+    font-weight: 800;
+    font-size: 22pt;
+    color: #15151B;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+}
+
+h2 {
+    font-family: 'CabinetGrotesk', sans-serif;
+    font-weight: 700;
+    font-size: 15pt;
+    color: #15151B;
+    margin-top: 24px;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(0, 180, 166, 0.3);
+}
+
+h3 {
+    font-family: 'CabinetGrotesk', sans-serif;
+    font-weight: 700;
+    font-size: 12pt;
+    color: #15151B;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+
+h4 {
+    font-family: 'CabinetGrotesk', sans-serif;
+    font-weight: 500;
+    font-size: 11pt;
+    color: #716E68;
+    margin-top: 14px;
+    margin-bottom: 6px;
+}
+
+p {
+    margin-bottom: 10px;
+    line-height: 1.65;
+}
+
+strong {
+    font-weight: 700;
+}
+
+ul.feature-list {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 12px;
+}
+
+ul.feature-list li {
+    padding-left: 18px;
+    position: relative;
+    margin-bottom: 6px;
+    line-height: 1.6;
+}
+
+ul.feature-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00B4A6;
+}
+
+.numbered-item {
+    padding-left: 24px;
+    position: relative;
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.numbered-item::before {
+    content: counter(item);
+    counter-increment: item;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: #00B4A6;
+    color: #15151B;
+    font-family: 'CabinetGrotesk', sans-serif;
+    font-weight: 700;
+    font-size: 9pt;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.numbered-container {
+    counter-reset: item;
+}
+
+table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 14px;
+    border: 1px solid rgba(21, 21, 27, 0.15);
+    border-radius: 4px;
+    overflow: hidden;
+    page-break-inside: avoid;
+}
+
+table.data-table th {
+    background: #EAE7DF;
+    padding: 8px 12px;
+    text-align: left;
+    font-family: 'CabinetGrotesk', sans-serif;
+    font-weight: 700;
+    font-size: 9.5pt;
+    color: #15151B;
+    border-bottom: 1px solid rgba(21, 21, 27, 0.15);
+}
+
+table.data-table td {
+    padding: 7px 12px;
+    font-size: 9.5pt;
+    line-height: 1.5;
+    border-bottom: 1px solid rgba(21, 21, 27, 0.08);
+    vertical-align: top;
+}
+
+table.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+pre.code-block {
+    background: #EAE7DF;
+    border: 1px solid rgba(21, 21, 27, 0.12);
+    border-left: 3px solid #00B4A6;
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+    font-size: 7.5pt;
+    line-height: 1.4;
+    overflow-x: auto;
+    white-space: pre;
+    page-break-inside: avoid;
+    margin-bottom: 14px;
+}
+
+.page-break {
+    page-break-after: always;
+}
+
+.doc-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 1in 0.4in 1in;
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Satoshi', sans-serif;
+    font-size: 7pt;
+    color: #716E68;
+}
+
+@media print {
+    body { margin: 0; padding: 0; }
+    .page-break { page-break-after: always; }
+    table { page-break-inside: avoid; }
+    pre { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar"></div>
+
+<div class="doc-header">
+    <div class="doc-header-left">
+        <div class="wordmark">Socialize<span class="dot">.</span>Video</div>
+        <div class="tagline">BUILT IN A SESSION. BUILT TO LAST.</div>
+    </div>
+    <div class="doc-header-right">
+        Socialize Video LLC<br>
+        13 E 450 S, Midway UT 84049<br>
+        jeff@socialize.video
+    </div>
+</div>
+
+<h1>TrustOffice Platform Briefing</h1>
+<p style="color: #716E68; font-size: 10pt; margin-bottom: 4px;"><strong>Prepared for:</strong> Meeting with Jake</p>
+<p style="color: #716E68; font-size: 10pt; margin-bottom: 4px;"><strong>Date:</strong> July 15, 2026</p>
+<p style="color: #716E68; font-size: 10pt; margin-bottom: 20px;"><strong>From:</strong> Jeff Kohler, Socialize Video / TrustOffice</p>
+
+<div class="numbered-container">
+<p># TrustOffice Platform Briefing</p>
+
+<p><strong>Prepared for:</strong> Meeting with Jake</p>
+<p><strong>Date:</strong> July 15, 2026</p>
+<p><strong>From:</strong> Jeff Kohler, Socialize Video / TrustOffice</p>
+
+<div class="page-break"></div>
+
+<h2>1. Infrastructure Overview</h2>
+
+<p>TrustOffice is an AI-powered trust governance platform that runs entirely on infrastructure we control. No shared SaaS backends, no multi-tenant black boxes, every component is ours, deployed from our own repositories, and auditable end to end.</p>
+
+<h3>Current Architecture</h3>
+
+<p>The system is composed of six primary layers, each with a clear responsibility:</p>
+
+<table class="data-table">
+<thead><tr>
+<th>Layer</th>
+<th>Technology</th>
+<th>Role</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Hosting</td>
+<td>VPS (Linux)</td>
+<td>Runs Hermes Agent, background workers, and supporting services</td>
+</tr>
+<tr>
+<td>App Deployment</td>
+<td>Railway</td>
+<td>Auto-deploys the TrustOffice web app on every git push to main</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>FastAPI (Python)</td>
+<td>REST API, AI orchestration, business logic, export endpoints</td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td>React (SPA)</td>
+<td>User-facing web chat portal at app.trustoffice.app</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>MongoDB</td>
+<td>Conversation history, user accounts, session state, metadata</td>
+</tr>
+<tr>
+<td>AI Layer</td>
+<td>OpenRouter</td>
+<td>Routes to Claude and Gemini models depending on task</td>
+</tr>
+</tbody></table>
+
+<p>Hermes Agent sits alongside the app stack on the VPS and handles autonomous operations, monitoring, scheduled tasks, content generation, and maintenance workflows. It uses <strong>profile-based isolation</strong>, meaning each Hermes profile operates in its own context with its own skills, memories, and configuration. Profiles cannot see or access each other's data. This means TrustOffice's autonomous operations are completely walled off from any other project running on the same machine.</p>
+
+<h3>How the Pieces Connect</h3>
+
+<pre class="code-block">
+                    ┌─────────────────────────────┐
+                    │      app.trustoffice.app     │
+                    │     (React SPA - Frontend)   │
+                    └──────────────┬──────────────┘
+                                   │ HTTPS / WSS
+                                   │
+                    ┌──────────────▼──────────────┐
+                    │    Railway (Auto-Deploy)     │
+                    │   ┌─────────────────────┐   │
+                    │   │  FastAPI Backend     │   │
+                    │   │  - REST API          │   │
+                    │   │  - AI Orchestration  │   │
+                    │   │  - Auth / Sessions   │   │
+                    │   │  - Export Endpoints  │   │
+                    │   └────────┬────────────┘   │
+                    └────────────┼────────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │       MongoDB            │
+                    │  - Conversations         │
+                    │  - User Accounts         │
+                    │  - Session State         │
+                    └────────────▲────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │      OpenRouter          │
+                    │  - Claude (Anthropic)    │
+                    │  - Gemini (Google)       │
+                    └──────────────────────────┘
+
+                    ┌─────────────────────────────┐
+                    │         VPS (Linux)          │
+                    │  ┌───────────────────────┐  │
+                    │  │   Hermes Agent         │  │
+                    │  │  ┌─────────────────┐  │  │
+                    │  │  │ Profile: Trust   │  │  │
+                    │  │  │ Office (isolated)│  │  │
+                    │  │  └─────────────────┘  │  │
+                    │  │  │ Profile: Other   │  │  │
+                    │  │  │ Projects (no     │  │  │
+                    │  │  │ cross-access)    │  │  │
+                    │  │  └─────────────────┘  │  │
+                    │  └───────────────────────┘  │
+                    │  - Background Workers       │
+                    │  - Monitoring / Canary      │
+                    │  - Scheduled Tasks          │
+                    └─────────────────────────────┘
+</pre>
+
+<p><strong>The flow, simply:</strong></p>
+
+<div class="numbered-item">A user visits <strong>app.trustoffice.app</strong>, the React SPA loads in their browser.</div>
+<div class="numbered-item">They authenticate (JWT-based) and start a chat session.</div>
+<div class="numbered-item">Each message is sent to the <strong>FastAPI backend</strong> on Railway via HTTPS.</div>
+<div class="numbered-item">The backend processes the message, calls <strong>OpenRouter</strong> to route to the appropriate AI model (Claude for complex reasoning, Gemini for faster tasks).</div>
+<div class="numbered-item">The AI response is streamed back to the user and stored in <strong>MongoDB</strong> for conversation history.</div>
+<div class="numbered-item"><strong>Hermes Agent</strong> on the VPS runs independently, monitoring health, handling scheduled tasks, and performing autonomous operations within its isolated TrustOffice profile.</div>
+
+<p>Railway auto-deploys mean every push to the main branch goes live within minutes. No manual deployment steps, no server SSH sessions. This keeps our release cycle fast and our deployment history fully auditable through git.</p>
+
+<div class="page-break"></div>
+
+<h2>2. Security Environment</h2>
+
+<p>Security is handled at two levels: <strong>external</strong> (how the system protects itself from the internet) and <strong>internal</strong> (how the system protects data between its own components and users).</p>
+
+<h3>External Security</h3>
+
+<table class="data-table">
+<thead><tr>
+<th>Control</th>
+<th>Implementation</th>
+<th>Status</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Transport Encryption</td>
+<td>Full TLS/HTTPS on all endpoints. No plaintext traffic accepted. SSL terminated at the Railway proxy layer.</td>
+<td>✅ Live</td>
+</tr>
+<tr>
+<td>CORS Policy</td>
+<td>Cross-Origin Resource Sharing is locked to specific allowed origins (trustoffice.app and app.trustoffice.app). Requests from any other domain are rejected.</td>
+<td>✅ Live</td>
+</tr>
+<tr>
+<td>User Authentication</td>
+<td>JWT (JSON Web Tokens) for all user sessions. Tokens are signed, time-limited, and validated on every API request.</td>
+<td>✅ Live</td>
+</tr>
+<tr>
+<td>Admin Access</td>
+<td>Admin API key required for all privileged operations (user management, system config, data exports). Separate from user JWT auth.</td>
+<td>✅ Live</td>
+</tr>
+<tr>
+<td>Input Validation</td>
+<td>All API endpoints validate and sanitize input via Pydantic models. No raw SQL or unvalidated payload acceptance.</td>
+<td>✅ Live</td>
+</tr>
+</tbody></table>
+
+<h3>Internal Security</h3>
+
+<p><strong>Profile-Based Isolation (Hermes Agent)</strong></p>
+
+<p>Hermes Agent runs multiple profiles on the same VPS, but each profile is completely sandboxed:</p>
+
+<ul class="feature-list">
+<li>Each profile has its own <strong>skills, memories, cron jobs, and configuration files</strong> stored in separate directory trees.</li>
+<li>Profiles <strong>cannot read, write, or access</strong> another profile's data. There is no shared state, no shared database, no shared API context.</li>
+<li>The TrustOffice profile has no visibility into any other project running on the machine, and vice versa.</li>
+</ul>
+
+<p>This means even if an attacker compromised one Hermes profile, they would have no path to TrustOffice data or operations through the agent layer.</p>
+
+<p><strong>Secrets Management</strong></p>
+
+<ul class="feature-list">
+<li>API keys, database credentials, and service tokens are stored as <strong>local environment variables</strong> on the VPS and Railway, never in the codebase, never in git, never exposed to the frontend.</li>
+<li>Secrets are injected at runtime from the hosting platform's encrypted secret store.</li>
+<li>No secrets are logged, cached in plain text, or transmitted in API responses.</li>
+</ul>
+
+<p><strong>Information Control Policies</strong></p>
+
+<ul class="feature-list">
+<li>User conversation data is stored in MongoDB and is <strong>scoped per user account</strong>. No user can access another user's conversations.</li>
+<li>Admin-level operations require the admin API key, user JWTs cannot escalate.</li>
+<li>All API responses are scoped to the authenticated user's own data. There is no global read access from the frontend.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>3. Recent Performance Fixes</h2>
+
+<p>Two issues were identified and <strong>fully resolved</strong> in tonight's deployment. Both fixes are live in production now.</p>
+
+<h3>Issue 1: Slow Response Times (2-3 minutes per query)</h3>
+
+<p><strong>What was happening:</strong> The FastAPI backend was making synchronous calls to the OpenRouter AI API. Because FastAPI runs on an async event loop, a synchronous HTTP call blocks the entire event loop, meaning no other request could be processed until the AI response came back. When multiple users were active, requests queued up and response times ballooned to 2-3 minutes.</p>
+
+<p><strong>What was fixed:</strong></p>
+
+<table class="data-table">
+<thead><tr>
+<th>Fix</th>
+<th>Description</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>`asyncio.to_thread` wrapper</td>
+<td>AI API calls are now executed in a thread pool via `asyncio.to_thread()`, freeing the event loop to handle other concurrent requests while waiting for AI responses.</td>
+</tr>
+<tr>
+<td>Parallelized intent classification</td>
+<td>The intent classification step (which determines how to route a query) was previously sequential. It now runs in parallel with the main AI call, cutting total round-trip time significantly.</td>
+</tr>
+<tr>
+<td>Reduced system prompt size</td>
+<td>The system prompt sent with each request was trimmed from a large context block to a lean, focused version. Less token overhead means faster AI responses and lower API costs.</td>
+</tr>
+</tbody></table>
+
+<p><strong>Result:</strong> Response times dropped from 2-3 minutes to <strong>under 15-20 seconds</strong> for typical queries. ✅ Deployed and live.</p>
+
+<h3>Issue 2: Mobile Browser Queries Failing on Navigation</h3>
+
+<p><strong>What was happening:</strong> When a mobile user sent a query and then switched to another app or tab, the browser would background the page and kill the active network connection. When they returned, the query appeared to have failed with no way to recover.</p>
+
+<p><strong>What was fixed:</strong></p>
+
+<table class="data-table">
+<thead><tr>
+<th>Fix</th>
+<th>Description</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Wake Lock API</td>
+<td>The app now requests a screen wake lock during active AI queries, preventing the device from sleeping and dropping the connection mid-request.</td>
+</tr>
+<tr>
+<td>`visibilitychange` handler</td>
+<td>When the user navigates away and returns, the app detects the visibility change and checks whether the in-flight request is still valid or needs to be retried.</td>
+</tr>
+<tr>
+<td>Auto-reconnection</td>
+<td>If the connection drops during a query, the app automatically attempts to reconnect and resume, no manual refresh required.</td>
+</tr>
+<tr>
+<td>Polling fallback</td>
+<td>If WebSocket streaming fails, the app falls back to HTTP polling to retrieve the response, ensuring the user still gets their answer.</td>
+</tr>
+</tbody></table>
+
+<p><strong>Result:</strong> Mobile users can now switch away from the tab and return without losing their query. The app recovers automatically. ✅ Deployed and live.</p>
+
+<div class="page-break"></div>
+
+<h2>4. Feature Roadmap</h2>
+
+<p>Below is an assessment of each feature Jake has asked about. Each is categorized by feasibility and estimated development effort.</p>
+
+<h3>4.1 File Upload / Download (Image Attachments in Chat)</h3>
+
+<p><strong>Status: Quick Win (1-2 days)</strong></p>
+
+<p><strong>Feasibility:</strong> Fully feasible. This is a well-understood pattern and the backend already has the API structure to support it.</p>
+
+<p><strong>Approach:</strong></p>
+
+<ul class="feature-list">
+<li>Add an image upload endpoint to the FastAPI backend that accepts multipart form data.</li>
+<li>Store uploaded images in cloud object storage (AWS S3, Cloudflare R2, or similar). We'd likely use Cloudflare R2 for zero egress fees and alignment with our existing Cloudflare infrastructure.</li>
+<li>Attach image references to chat messages in MongoDB (store the image URL alongside the message text).</li>
+<li>Frontend: Add a file picker / drag-and-drop zone in the chat composer. Display image thumbnails inline in the conversation thread.</li>
+<li>Images would be served via signed, time-limited URLs for security, no public read access.</li>
+</ul>
+
+<p><strong>What's needed:</strong></p>
+<ul class="feature-list">
+<li>Storage bucket setup (R2 or S3), 1-2 hours</li>
+<li>Backend upload endpoint + image attachment to messages, 4-6 hours</li>
+<li>Frontend file picker, preview, and display, 4-6 hours</li>
+<li>Security: signed URLs, file type validation, size limits, 1-2 hours</li>
+</ul>
+
+<p><strong>Total: ~1-2 days of focused development.</strong></p>
+
+<h3>4.2 User Notifications / Messaging</h3>
+
+<p><strong>Status: Medium Effort (1-2 weeks)</strong></p>
+
+<p><strong>Feasibility:</strong> Feasible with two approach options depending on the use case.</p>
+
+<p><strong>Option A, In-App Notifications (WebSocket-based, real-time):</strong></p>
+<ul class="feature-list">
+<li>Implement a WebSocket connection for each active user session.</li>
+<li>Server pushes notifications when relevant events occur (new report ready, task completed, etc.).</li>
+<li>Best for: active users who are currently in the app.</li>
+<li>Effort: ~3-5 days</li>
+</ul>
+
+<p><strong>Option B, Email Notifications (Polling + SMTP):</strong></p>
+<ul class="feature-list">
+<li>Backend checks for events on a schedule and sends email notifications via an email service (Brevo, SendGrid, or similar).</li>
+<li>Best for: users who aren't actively in the app but need to know when something is ready.</li>
+<li>Effort: ~2-3 days</li>
+</ul>
+
+<p><strong>Recommended:</strong> Start with Option B (email notifications) for immediate value, then add WebSocket-based in-app notifications as Phase 2. This gives Jake notification capability quickly without a heavy real-time infrastructure build.</p>
+
+<p><strong>What's needed for email notifications:</strong></p>
+<ul class="feature-list">
+<li>Email service integration (Brevo/SendGrid), 2 hours</li>
+<li>Notification trigger logic in backend, 1 day</li>
+<li>User notification preferences (opt-in/opt-out), 1 day</li>
+<li>Email templates, 1 day</li>
+<li>Testing, 1 day</li>
+</ul>
+
+<p><strong>Total: ~1 week for email notifications, ~2 weeks for full real-time in-app notifications.</strong></p>
+
+<h3>4.3 CSV Report Download Links</h3>
+
+<p><strong>Status: Quick Win (1-2 days)</strong></p>
+
+<p><strong>Feasibility:</strong> The backend already has data export infrastructure. CSV generation is straightforward, we can query MongoDB, format results as CSV, and serve via a download endpoint.</p>
+
+<p><strong>Approach:</strong></p>
+
+<ul class="feature-list">
+<li>Add a `/reports/export` endpoint that accepts parameters (date range, report type, filters).</li>
+<li>Backend queries MongoDB, formats results as CSV using Python's built-in `csv` module or `pandas`.</li>
+<li>Serve the CSV as a file download with appropriate `Content-Type` and `Content-Disposition` headers.</li>
+<li>Optionally: generate the CSV asynchronously, store it, and provide a time-limited download link (better for large reports).</li>
+</ul>
+
+<p><strong>Existing capabilities:</strong></p>
+<ul class="feature-list">
+<li>The backend already has export logic patterns in place for other data types.</li>
+<li>MongoDB aggregation pipelines are already used for data queries.</li>
+<li>JWT auth infrastructure means we can scope exports to the requesting user's data.</li>
+</ul>
+
+<p><strong>What's needed:</strong></p>
+<ul class="feature-list">
+<li>CSV export endpoint + formatting, 4-6 hours</li>
+<li>Frontend download button / link, 2-3 hours</li>
+<li>Testing + edge cases (large datasets, empty results), 2-3 hours</li>
+</ul>
+
+<p><strong>Total: ~1-2 days.</strong></p>
+
+<h3>4.4 PDF Generation + Download Links</h3>
+
+<p><strong>Status: Medium Effort (1-2 weeks)</strong></p>
+
+<p><strong>Feasibility:</strong> Fully feasible. PDF generation is more complex than CSV because it involves layout, styling, and potentially branded templates, but it's a well-trodden path.</p>
+
+<p><strong>Approach:</strong></p>
+
+<ul class="feature-list">
+<li>Use a Python PDF generation library. Two options:</li>
+</ul>
+<p>  - <strong>WeasyPrint</strong> (HTML/CSS → PDF): Best for branded, styled documents. We design the PDF as an HTML template with CSS, then render to PDF. Supports logos, tables, headers/footers.</p>
+<p>  - <strong>ReportLab</strong>: More programmatic, finer control over layout, but more code to write.</p>
+<ul class="feature-list">
+<li>Recommended: <strong>WeasyPrint</strong>, it lets us design PDFs as HTML templates, which is faster and produces cleaner results with less code.</li>
+<li>Add a `/reports/pdf` endpoint that accepts the same parameters as CSV export but returns a styled PDF.</li>
+<li>PDFs are generated on-demand and served as downloads. For large or complex reports, generate asynchronously and provide a download link.</li>
+</ul>
+
+<p><strong>What's needed:</strong></p>
+<ul class="feature-list">
+<li>PDF template design (HTML/CSS with TrustOffice branding), 1-2 days</li>
+<li>Backend PDF generation endpoint, 1 day</li>
+<li>Frontend download trigger, 2-3 hours</li>
+<li>Testing (layout, pagination, large reports), 1-2 days</li>
+</ul>
+
+<p><strong>Total: ~1 week for a polished, branded PDF export feature.</strong></p>
+
+<h3>Roadmap Summary</h3>
+
+<table class="data-table">
+<thead><tr>
+<th>Feature</th>
+<th>Status</th>
+<th>Estimated Effort</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>File upload / image attachments</td>
+<td>Quick Win</td>
+<td>1-2 days</td>
+</tr>
+<tr>
+<td>User notifications (email)</td>
+<td>Medium Effort</td>
+<td>~1 week</td>
+</tr>
+<tr>
+<td>User notifications (in-app real-time)</td>
+<td>Medium Effort</td>
+<td>~2 weeks</td>
+</tr>
+<tr>
+<td>CSV report download links</td>
+<td>Quick Win</td>
+<td>1-2 days</td>
+</tr>
+<tr>
+<td>PDF generation + download links</td>
+<td>Medium Effort</td>
+<td>~1 week</td>
+</tr>
+</tbody></table>
+
+<p><strong>If we were to prioritize:</strong> CSV export and file upload are the fastest wins. Both could be live within a week. PDF generation and email notifications would follow as the next sprint. In-app real-time notifications would be the largest build and could come after.</p>
+
+<div class="page-break"></div>
+
+<h2>5. E-Commerce Vision</h2>
+
+<p>Jake asked about how an e-commerce store would be built, how Hermes fits in, and what the reliability/privacy/security picture looks like. Here's the high-level vision.</p>
+
+<h3>Architecture Overview</h3>
+
+<p>The e-commerce store would be a <strong>separate storefront</strong> from the main TrustOffice app, a dedicated site (e.g., store.trustoffice.app) built for product browsing, checkout, and order management. It would integrate with TrustOffice's existing backend for shared user accounts and data.</p>
+
+<pre class="code-block">
+┌──────────────────────────────────────────────────────┐
+│                  store.trustoffice.app                 │
+│               (E-Commerce Frontend, React)            │
+│  - Product Catalog / Browsing                          │
+│  - Shopping Cart                                       │
+│  - Checkout (Stripe Checkout)                          │
+│  - Order History                                       │
+└────────────────────────┬─────────────────────────────┘
+                         │
+          ┌──────────────▼──────────────┐
+          │     Stripe Checkout          │
+          │  - Payment processing        │
+          │  - PCI-compliant (no card    │
+          │    data touches our servers) │
+          └──────────────┬──────────────┘
+                         │
+          ┌──────────────▼──────────────┐
+          │   TrustOffice Backend        │
+          │   (FastAPI - extended)       │
+          │  - Product/inventory API     │
+          │  - Order management          │
+          │  - Webhook receiver (Stripe) │
+          │  - Shared user auth (JWT)    │
+          └──────────────┬──────────────┘
+                         │
+          ┌──────────────▼──────────────┐
+          │        MongoDB               │
+          │  - Products                  │
+          │  - Orders                    │
+          │  - Inventory                 │
+          │  - User accounts (shared)    │
+          └──────────────────────────────┘
+
+          ┌──────────────────────────────┐
+          │     Hermes Agent (VPS)        │
+          │  - Inventory monitoring       │
+          │  - Order fulfillment          │
+          │  - Automated restocking       │
+          │  - Customer communications    │
+          │  - Sales reports / analytics  │
+          │  (Isolated profile, same      │
+          │   security model as main app) │
+          └──────────────────────────────┘
+</pre>
+
+<h3>Where Hermes Fits</h3>
+
+<p>Hermes Agent would serve as the <strong>autonomous operations layer</strong> for the store:</p>
+
+<ul class="feature-list">
+<li><strong>Inventory monitoring:</strong> Hermes tracks stock levels and alerts when products need restocking. Can automate reordering through supplier APIs.</li>
+<li><strong>Order fulfillment:</strong> When an order comes in via Stripe webhook, Hermes can trigger fulfillment workflows, generating shipping labels, notifying the fulfillment team, updating order status.</li>
+<li><strong>Customer communications:</strong> Hermes can send order confirmations, shipping notifications, and follow-up emails, all through the same secure notification infrastructure described in Section 4.2.</li>
+<li><strong>Sales analytics:</strong> Hermes can generate periodic sales reports, identify trends, and surface insights, all within its isolated profile.</li>
+<li><strong>Storefront management:</strong> Hermes can manage product listings, update pricing, and handle promotional content through scheduled or on-demand tasks.</li>
+</ul>
+
+<h3>Reliability</h3>
+
+<ul class="feature-list">
+<li><strong>Payment processing</strong> goes through Stripe Checkout, Stripe handles all PCI compliance, card data, and payment security. Card numbers never touch our servers.</li>
+<li><strong>Webhook reliability:</strong> Stripe webhooks are delivered with automatic retries. Our backend verifies webhook signatures to prevent spoofing.</li>
+<li><strong>Inventory consistency:</strong> Orders and inventory are managed in MongoDB with atomic operations to prevent overselling.</li>
+<li><strong>Deployment:</strong> The store frontend deploys on the same Railway auto-deploy pipeline as the main app, same fast, auditable release cycle.</li>
+</ul>
+
+<h3>Privacy & Security</h3>
+
+<p>The store inherits all of TrustOffice's existing security controls:</p>
+
+<ul class="feature-list">
+<li><strong>TLS/HTTPS</strong> on all endpoints</li>
+<li><strong>JWT authentication</strong> shared with the main app (single sign-on)</li>
+<li><strong>CORS locked</strong> to store.trustoffice.app</li>
+<li><strong>Profile isolation:</strong> Hermes's store operations run in a separate profile from the main TrustOffice agent profile, no cross-contamination of data or operations.</li>
+<li><strong>No card data storage:</strong> Stripe handles all payment data. We store order metadata (amount, items, status) but never card numbers, CVVs, or payment tokens.</li>
+<li><strong>Customer data:</strong> Order history and customer information are scoped to each user's account, same as conversation data in the main app.</li>
+</ul>
+
+<h3>Estimated Build Time</h3>
+
+<ul class="feature-list">
+<li><strong>MVP storefront + Stripe Checkout:</strong> 2-3 weeks</li>
+<li><strong>Hermes inventory/fulfillment integration:</strong> 1-2 weeks (can run in parallel with storefront build)</li>
+<li><strong>Customer notification system:</strong> 1 week (shared with the notification feature from Section 4.2)</li>
+</ul>
+
+<p><strong>Total: ~3-5 weeks for a fully functional e-commerce store with automated operations.</strong></p>
+
+<div class="page-break"></div>
+
+<h2>6. Monitoring & Reliability</h2>
+
+<p>Tonight's deployment didn't just fix bugs, it also added three new monitoring and reliability systems that are now running in production. These give us proactive visibility into the platform's health rather than waiting for a user to report a problem.</p>
+
+<h3>Synthetic Canary (AI Response Time Monitoring)</h3>
+
+<p><strong>What it does:</strong> An automated probe hits the TrustOffice AI chat endpoint every 30 minutes and measures the full response time, from request to completed AI response.</p>
+
+<p><strong>Why it matters:</strong> If response times start creeping up (the exact issue we just fixed), we know within 30 minutes, not when a user complains. The canary logs every check and alerts if response time exceeds a threshold.</p>
+
+<p><strong>Status:</strong> ✅ Live and running.</p>
+
+<h3>Post-Deploy Smoke Test</h3>
+
+<p><strong>What it does:</strong> After every deployment to Railway, an automated test suite runs <strong>9 endpoint checks</strong> against the production API:</p>
+
+<div class="numbered-item">Health check endpoint</div>
+<div class="numbered-item">User authentication (login)</div>
+<div class="numbered-item">Chat message send</div>
+<div class="numbered-item">Chat message retrieval</div>
+<div class="numbered-item">Conversation history</div>
+<div class="numbered-item">User profile</div>
+<div class="numbered-item">Admin endpoint (with API key)</div>
+<div class="numbered-item">Export endpoint</div>
+<div class="numbered-item">Static asset serving</div>
+
+<p><strong>Why it matters:</strong> If a deployment breaks something, we know immediately, not hours later when a user hits the broken endpoint. If any check fails, the deploy is flagged for review.</p>
+
+<p><strong>Status:</strong> ✅ Live and running on every deploy.</p>
+
+<h3>In-App Error Reporting</h3>
+
+<p><strong>What it does:</strong> Two complementary error capture systems:</p>
+
+<ul class="feature-list">
+<li><strong>Frontend crash capture:</strong> If the React SPA encounters an unhandled error or exception, it's automatically captured and logged before the user sees a generic error message. This includes the error stack trace, browser info, and the action that triggered it.</li>
+<li><strong>Backend error logging:</strong> All unhandled exceptions in the FastAPI backend are logged with full context, request details, user ID (if available), stack trace, and timestamp.</li>
+</ul>
+
+<p><strong>Why it matters:</strong> We see errors as they happen, with enough context to fix them, not vague "something broke" reports. Errors are centralized and can be reviewed in real time.</p>
+
+<p><strong>Status:</strong> ✅ Live and capturing.</p>
+
+<h3>Weekly Audit (New Checks)</h3>
+
+<p>A weekly automated audit now runs <strong>5 additional checks</strong> on top of the continuous monitoring:</p>
+
+<table class="data-table">
+<thead><tr>
+<th>Check</th>
+<th>What It Verifies</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>SSL/TLS certificate health</td>
+<td>Certificates are valid and not approaching expiration</td>
+</tr>
+<tr>
+<td>Database connection integrity</td>
+<td>MongoDB is reachable, responsive, and not showing connection pool exhaustion</td>
+</tr>
+<tr>
+<td>API endpoint availability</td>
+<td>All 9 critical endpoints respond within acceptable latency</td>
+</tr>
+<tr>
+<td>AI provider health</td>
+<td>OpenRouter is reachable and returning responses within expected timeframes</td>
+</tr>
+<tr>
+<td>Deployment freshness</td>
+<td>The production deployment matches the latest git commit on main (no stale deploys)</td>
+</tr>
+</tbody></table>
+
+<p><strong>Status:</strong> ✅ Scheduled and running weekly.</p>
+
+<div class="page-break"></div>
+
+<h2>Summary</h2>
+
+<table class="data-table">
+<thead><tr>
+<th>Topic</th>
+<th>Key Takeaway</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Infrastructure</td>
+<td>Fully owned stack, VPS + Railway + FastAPI + React + MongoDB + OpenRouter + Hermes. No shared SaaS dependencies. Profile-isolated agent operations.</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>TLS, CORS, JWT, admin API key externally. Profile isolation, local secrets, per-user data scoping internally.</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>Two critical issues (slow responses, mobile drops) are fixed and live. Response times down from 2-3 min to 15-20 sec. Mobile queries survive backgrounding.</td>
+</tr>
+<tr>
+<td>Features</td>
+<td>CSV export and file upload are quick wins (1-2 days each). PDF generation and email notifications are ~1 week each. Real-time in-app notifications are ~2 weeks.</td>
+</tr>
+<tr>
+<td>E-Commerce</td>
+<td>Separate storefront with Stripe Checkout, Hermes-managed operations, full security inheritance. ~3-5 week build for MVP.</td>
+</tr>
+<tr>
+<td>Monitoring</td>
+<td>Three new systems live: synthetic canary (30-min response monitoring), post-deploy smoke tests (9 checks), in-app error reporting. Weekly audit with 5 health checks.</td>
+</tr>
+</tbody></table>
+
+<div class="page-break"></div>
+
+<p>*Prepared by TrustOffice / Socialize Video*</p>
+<p>*July 14, 2026*</p>
+</div>
+
+</body>
+</html>
