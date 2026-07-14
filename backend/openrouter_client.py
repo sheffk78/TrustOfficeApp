@@ -18,6 +18,7 @@ Environment:
 import os
 import json
 import logging
+import asyncio
 import urllib.request
 import urllib.error
 from typing import Optional
@@ -105,7 +106,7 @@ def _call_openrouter(
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             response_data = json.loads(resp.read().decode('utf-8'))
 
         if 'error' in response_data:
@@ -311,7 +312,8 @@ async def call_openrouter_sonnet(
 ) -> str:
     """Convenience wrapper for complex drafting tasks (Sonnet-equivalent)."""
     try:
-        return _call_openrouter(
+        return await asyncio.to_thread(
+            _call_openrouter,
             model=OPENROUTER_DEFAULT_MODEL,
             system_prompt=system_prompt,
             user_content=user_content,
@@ -319,7 +321,13 @@ async def call_openrouter_sonnet(
             temperature=temperature
         )
     except OpenRouterUnavailableError:
-        return _fallback_call(system_prompt, user_content, max_tokens, temperature)
+        return await asyncio.to_thread(
+            _fallback_call,
+            system_prompt=system_prompt,
+            user_content=user_content,
+            max_tokens=max_tokens,
+            temperature=temperature
+        )
 
 
 async def call_openrouter_haiku(
@@ -330,7 +338,8 @@ async def call_openrouter_haiku(
 ) -> str:
     """Convenience wrapper for quick suggestion tasks (Haiku-equivalent)."""
     try:
-        return _call_openrouter(
+        return await asyncio.to_thread(
+            _call_openrouter,
             model=OPENROUTER_DEFAULT_MODEL,
             system_prompt=system_prompt,
             user_content=user_content,
@@ -338,7 +347,13 @@ async def call_openrouter_haiku(
             temperature=temperature
         )
     except OpenRouterUnavailableError:
-        return _fallback_call(system_prompt, user_content, max_tokens, temperature)
+        return await asyncio.to_thread(
+            _fallback_call,
+            system_prompt=system_prompt,
+            user_content=user_content,
+            max_tokens=max_tokens,
+            temperature=temperature
+        )
 
 
 async def ping_openrouter() -> bool:
@@ -346,7 +361,8 @@ async def ping_openrouter() -> bool:
     if not OPENROUTER_API_KEY:
         return False
     try:
-        _call_openrouter(
+        await asyncio.to_thread(
+            _call_openrouter,
             model=OPENROUTER_DEFAULT_MODEL,
             system_prompt="You are a helpful assistant.",
             user_content="Say 'pong' only.",
