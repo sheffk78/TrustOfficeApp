@@ -56,13 +56,12 @@ class TrustDocumentInput(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
-        # Only EIN confirmation letters (CP575) transfer automatically.
-        # Other documents (Declaration, Certificate, Binder Kit) require
-        # notarization/signing and must be uploaded manually by the user.
-        if v != "ein_confirmation":
+        # Accept all WingPoint document types for automatic delivery.
+        allowed = {"ein_confirmation", "declaration", "certification", "certification_general",
+                    "certification_banking", "binder_kit", "declaration_signed"}
+        if v not in allowed:
             raise ValueError(
-                f"Automatic document transfer is only available for EIN confirmation letters (CP575). "
-                f"Received: '{v}'. Other documents must be uploaded manually by the user."
+                f"Unknown document type: '{v}'. Allowed: {', '.join(sorted(allowed))}"
             )
         return v
 
@@ -96,7 +95,10 @@ class TrustDocumentsResponse(BaseModel):
 DOC_CATEGORIES = {
     "ein_confirmation": "ein_letter",
     "declaration": "trust_instrument",
+    "declaration_signed": "trust_instrument",
     "certification": "trust_instrument",
+    "certification_general": "trust_instrument",
+    "certification_banking": "banking",
     "binder_kit": "other",
 }
 MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB BSON limit
