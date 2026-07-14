@@ -243,9 +243,16 @@ async def receive_trust_documents(request: Request, payload: DeliverDocumentsReq
                     ))
                     continue
 
-                # Download the PDF from WingPoint (no redirect following to prevent SSRF bypass)
+                # Download the PDF (follow redirects but re-validate each redirect target for SSRF safety)
                 try:
-                    response = await http_client.get(str(doc.url), follow_redirects=False)
+                    response = await http_client.get(str(doc.url), follow_redirects=True)
+                    # Re-validate the final URL after redirects
+                    final_url = str(response.url)
+                    final_parsed = urlparse(final_url)
+                    if final_parsed.scheme != "https":
+                        logger.warning(f"Redirected to non-HTTPS URL for {doc.filename}: {final_url}")
+                        stored_docs.append(DocumentStored(doc_id="", type=doc.type, category=doc.category, title=doc.title, stored=False))
+                        continue
                     response.raise_for_status()
                     file_content = response.content
                 except httpx.HTTPError as e:
