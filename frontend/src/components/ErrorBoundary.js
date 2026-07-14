@@ -1,8 +1,12 @@
 import React from 'react';
+import { reportToErrorLog } from '@/utils/errors';
 
 /**
  * Error Boundary component — catches unhandled JS errors in child components
  * and displays a fallback UI instead of crashing the entire app.
+ * 
+ * Reports caught errors to POST /api/error-log with boundary: true so we can
+ * distinguish React render errors from window.onerror uncaught exceptions.
  * 
  * Usage: Wrap route-level components with <ErrorBoundary>...</ErrorBoundary>
  */
@@ -18,6 +22,23 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+
+    // Report to /api/error-log (MongoDB-backed, queryable via admin API)
+    // Includes componentStack and boundary: true to distinguish React render
+    // errors from window.onerror uncaught exceptions.
+    reportToErrorLog(
+      {
+        error_type: 'react_render_error',
+        error_message: error?.message || String(error) || 'Unknown render error',
+        stack: error?.stack || null,
+        url: window.location.href,
+        user_agent: navigator.userAgent,
+        component_stack: errorInfo?.componentStack || null,
+        boundary: true,
+        metadata: {},
+      },
+      'react_render_error'
+    );
   }
 
   handleReload = () => {

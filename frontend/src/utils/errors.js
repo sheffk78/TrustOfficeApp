@@ -33,6 +33,69 @@ export const SUPPORT_EMAIL = 'support@trustoffice.app';
 // Track if we've already set up the global uncaught error handler
 let _globalHandlerInstalled = false;
 
+// ---------------------------------------------------------------------------
+// In-app error logging (POST /api/error-log → MongoDB, queryable via admin API)
+// ---------------------------------------------------------------------------
+
+// Debounce: don't send more than 1 error per 5 seconds from the same source
+const ERROR_DEBOUNCE_MS = 5000;
+const _errorLogTimestamps = new Map(); // key → last-sent timestamp
+
+function _isDev() {
+  return (
+    process.env.NODE_ENV !== 'production' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  );
+}
+
+function _shouldDebounce(key) {
+  const now = Date.now();
+  const last = _errorLogTimestamps.get(key) || 0;
+  if (now - last < ERROR_DEBOUNCE_MS) return true;
+  _errorLogTimestamps.set(key, now);
+  return false;
+}
+
+/**
+ * Report an error to POST /api/error-log (MongoDB-backed, queryable).
+ * Fire-and-forget — never throws, never blocks the UI.
+ * Debounced to max 1 per 5 seconds per source key.
+ * Skipped in development (NODE_ENV !== 'production' or localhost).
+ *
+ * @param {object} data - Error data to send
+ * @param {string} debounceKey - Key for debouncing (defaults to error_type)
+ */
+export function reportToErrorLog(data, debounceKey = null) {
+  try {
+    if (_isDev()) return;
+
+    const key = debounceKey || data.error_type || 'unknown';
+    if (_shouldDebounce(key)) return;
+
+    const payload = {
+      error_type: data.error_type || 'uncaught_exception',
+      error_message: data.error_message || data.message || '',
+      stack_trace: data.stack || data.stack_trace || null,
+      url: data.url || window.location.href,
+      user_agent: data.user_agent || navigator.userAgent,
+      component_stack: data.component_stack || null,
+      boundary: data.boundary || false,
+      metadata: data.metadata || {},
+    };
+
+    // Use fetch with keepalive so it works even during page unload
+    fetch(`${API}/error-log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => { /* silent — never block on error reporting */ });
+  } catch {
+    // Error reporting must never throw
+  }
+}
+
 /**
  * Extract the most useful error message from a thrown error or Response.
  * Handles: Response objects, Error objects, plain strings, and nested detail objects.
@@ -187,16 +250,46 @@ export function installGlobalErrorHandlers() {
   _globalHandlerInstalled = true;
 
   window.addEventListener('error', (event) => {
+    // Report to /api/report-error (Discord alert pipeline)
     reportErrorToBackend(event.error || event.message, {
       operation: 'uncaught_exception',
       page: window.location.pathname,
     });
+
+    // Report to /api/error-log (MongoDB log, queryable via admin API)
+    reportToErrorLog({
+      error_type: 'uncaught_exception',
+      error_message: event.message || (event.error && event.error.message) || 'Uncaught error',
+      stack: (event.error && event.error.stack) || null,
+      url: window.location.href,
+      user_agent: navigator.userAgent,
+      metadata: {
+        filename: event.filename || null,
+        lineno: event.lineno || null,
+        colno: event.colno || null,
+      },
+    }, 'uncaught_exception');
   });
 
   window.addEventListener('unhandledrejection', (event) => {
-    reportErrorToBackend(event.reason, {
+    const reason = event.reason;
+    const message = (reason && reason.message) || String(reason) || 'Unhandled promise rejection';
+    const stack = (reason && reason.stack) || null;
+
+    // Report to /api/report-error (Discord alert pipeline)
+    reportErrorToBackend(reason, {
       operation: 'unhandled_promise_rejection',
       page: window.location.pathname,
     });
+
+    // Report to /api/error-log (MongoDB log, queryable via admin API)
+    reportToErrorLog({
+      error_type: 'unhandled_promise_rejection',
+      error_message: message,
+      stack: stack,
+      url: window.location.href,
+      user_agent: navigator.userAgent,
+      metadata: {},
+    }, 'unhandled_promise_rejection');
   });
 }

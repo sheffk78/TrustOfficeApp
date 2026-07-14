@@ -98,6 +98,9 @@ from routers.trust_admin_kits import router as trust_admin_kits_router
 # Error alerting: global exception handler + frontend error reporting endpoint
 from error_alerting import ErrorReporter
 from routers.error_reports import router as error_reports_router
+# In-app error logging (MongoDB-backed, queryable via admin API)
+from routers.error_log import router as error_log_router
+from routers.error_log import admin_router as error_log_admin_router
 
 # Import security middleware
 from security import (
@@ -188,6 +191,8 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/assessments/fiduciary-compliance/submit",
     # Frontend error reporting (auth-optional, no subscription needed)
     "/api/report-error",
+    # In-app error logging (auth-optional, no subscription needed)
+    "/api/error-log",
     # Admin notification endpoints (admin-only, no subscription check needed)
     "/api/admin/notifications",
     "/api/admin/notifications/unread-count",
@@ -394,6 +399,9 @@ app.include_router(trust_doc_analysis_router, prefix="/api")
 app.include_router(trust_admin_kits_router, prefix="/api")
 # Frontend error reporting endpoint (POST /api/report-error)
 app.include_router(error_reports_router, prefix="/api")
+# In-app error logging (POST /api/error-log + GET /api/admin-api/error-log)
+app.include_router(error_log_router, prefix="/api")
+app.include_router(error_log_admin_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -607,6 +615,13 @@ async def startup_event():
         await db.bank_statements.create_index([("trust_id", 1), ("user_id", 1)])
         await db.bank_statements.create_index([("account_id", 1), ("statement_period_end", -1)])
         await db.bank_statements.create_index("vault_document_id")
+
+        # Error logs indexes (in-app error reporting)
+        await db.error_logs.create_index("error_id", unique=True)
+        await db.error_logs.create_index([("timestamp", -1)])
+        await db.error_logs.create_index("resolved")
+        await db.error_logs.create_index("user_id", sparse=True)
+        await db.error_logs.create_index([("error_type", 1), ("timestamp", -1)])
         
         logger.info("Database indexes created/verified successfully")
         
