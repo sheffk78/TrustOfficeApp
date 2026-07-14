@@ -470,10 +470,12 @@ export default function TrustAdminKitsPage() {
             /* Reset layout for print */
             .flex.min-h-screen { display: block !important; }
             .flex-1 { width: 100% !important; max-width: 100% !important; }
-            .page-content { padding: 0 !important; }
+            .page-content { padding: 0.75in !important; }
             .max-w-3xl { max-width: 100% !important; }
             /* Remove card shadows/borders for clean print */
             [class*="Card"] { box-shadow: none !important; border: 1px solid #ccc !important; }
+            /* Suppress browser default headers/footers (URL, date, page numbers) */
+            @page { margin: 0; }
           }
         `}</style>
         <div className="page-header flex items-center justify-between">

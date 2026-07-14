@@ -281,7 +281,7 @@ elements.append(Paragraph(
 # Footer
 elements.append(Spacer(1, 24))
 elements.append(Paragraph(
-    "Trustee 101 · Module 1 · Lesson 3 · trustoffice.app",
+    "Trustee 101 · Module 1 · Lesson 3",
     footer_style))
 elements.append(Paragraph(
     "This checklist is educational, not legal advice. Consult your attorney for your specific situation.",

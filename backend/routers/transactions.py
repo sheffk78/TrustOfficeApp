@@ -1,5 +1,5 @@
 # Transactions router - Trust Transaction Ledger for structural separation tracking
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import Field
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -96,8 +96,8 @@ async def get_transactions(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     unclassified_only: bool = False,
-    limit: int = Field(200, ge=1, le=10000),
-    skip: int = Field(0, ge=0),
+    limit: int = Query(200, ge=1, le=10000),
+    skip: int = Query(0, ge=0),
     user: dict = Depends(get_current_user)
 ):
     """Get transactions for a trust, optionally filtered by entity"""
@@ -313,7 +313,7 @@ async def bulk_classify_transactions(req: BulkClassifyRequest, user: dict = Depe
 # ==================== SUMMARY / ANALYTICS ====================
 
 @router.get("/transactions/summary")
-async def get_transaction_summary(trust_id: str, days: int = Field(90, ge=1, le=3650), user: dict = Depends(get_current_user)):
+async def get_transaction_summary(trust_id: str, days: int = Query(90, ge=1, le=3650), user: dict = Depends(get_current_user)):
     """Get transaction summary per entity for a trust"""
     from datetime import timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -364,7 +364,7 @@ async def get_transaction_summary(trust_id: str, days: int = Field(90, ge=1, le=
 
 
 @router.get("/transactions/separation-dashboard")
-async def get_separation_dashboard(trust_id: str, days: int = Field(90, ge=1, le=3650), user: dict = Depends(get_current_user)):
+async def get_separation_dashboard(trust_id: str, days: int = Query(90, ge=1, le=3650), user: dict = Depends(get_current_user)):
     """Get full separation dashboard data: entities + transactions + alerts + inter-entity flows"""
     from datetime import timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")

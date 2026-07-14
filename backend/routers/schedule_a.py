@@ -327,11 +327,9 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     
     # Trust info
     trust_name = trust.get("name", "Private Trust")
-    current_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
     
     info_data = [
         ["Trust Name:", trust_name],
-        ["Date Prepared:", current_date],
         ["Total Assets:", str(len(items))],
         ["Total Estimated Value:", f"${total_value:,.2f}" if total_value else "Not disclosed"],
     ]

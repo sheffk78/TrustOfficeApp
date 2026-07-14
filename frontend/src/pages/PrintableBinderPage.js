@@ -65,13 +65,14 @@ const PRINT_STYLES = `
     left: 0;
     top: 0;
     width: 100%;
+    padding: 0.75in 0.75in 0.75in 1.5in;
   }
   .no-print { display: none !important; }
 
-  /* Letter-size optimization */
+  /* Suppress browser default headers/footers (URL, date, page numbers) */
   @page {
     size: letter;
-    margin: 0.75in 0.75in 0.75in 1.5in;
+    margin: 0;
   }
 
   /* Section divider specific */

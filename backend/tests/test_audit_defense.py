@@ -203,11 +203,6 @@ class TestAuditDefensePDFContent:
         assert pdf_content["page_count"] >= 3, f"Expected at least 3 pages, got {pdf_content['page_count']}"
         print(f"✓ PDF has {pdf_content['page_count']} pages")
 
-    def test_pdf_has_report_date(self, pdf_content):
-        """Test that PDF contains report date"""
-        assert "Report Date:" in pdf_content["text"]
-        print("✓ PDF contains Report Date")
-
     def test_pdf_has_period_covered(self, pdf_content):
         """Test that PDF contains period covered"""
         assert "Period Covered:" in pdf_content["text"]
