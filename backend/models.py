@@ -1096,6 +1096,29 @@ class ClassBeneficiaryResponse(BaseModel):
     notes: str
     created_at: str
 
+
+# ==================== BENEFICIARY MANAGEMENT MODELS ====================
+
+class BeneficiaryCreate(BaseModel):
+    trust_id: str
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    allocation_pct: Optional[float] = None
+    holder_type: str = "individual"
+    notes: Optional[str] = None
+
+class BeneficiaryUpdate(BaseModel):
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    notes: Optional[str] = None
+
+class SendCertificateRequest(BaseModel):
+    trust_id: str
+    beneficiary_name: str
+    email: Optional[str] = None
+    notes: Optional[str] = None
+
 class BeneficiaryDashboardResponse(BaseModel):
     trust_id: str
     trust_name: str
