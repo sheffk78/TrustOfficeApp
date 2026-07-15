@@ -1190,3 +1190,181 @@ async def admin_bulk_delete_users(
     )
 
     return {"results": results}
+
+
+# ==================== TRUST MANAGEMENT ====================
+
+
+@router.get("/users/{user_id}/trusts")
+async def get_user_trusts(
+    user_id: str,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """Get all trusts for a specific user with full details."""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    trusts = await db.trusts.find({"user_id": user_id}, {"_id": 0}).to_list(100)
+
+    await log_api_action(
+        action="get_user_trusts",
+        details={"target_user_id": user_id},
+        ip_address=get_client_ip(request),
+    )
+
+    return {
+        "user_id": user_id,
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "trust_count": len(trusts),
+        "trusts": trusts,
+    }
+
+
+@router.post("/users/{user_id}/trusts")
+async def create_user_trust(
+    user_id: str,
+    body: dict,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """Create a trust for a user via admin API."""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not body.get("name"):
+        raise HTTPException(status_code=400, detail="Trust name is required")
+
+    trust_id = f"trust_{uuid.uuid4().hex[:12]}"
+    jurisdiction = body.get("jurisdiction", "")
+    state_code = body.get("state_code", "")
+
+    if jurisdiction and len(jurisdiction) == 2 and jurisdiction.isalpha() and not state_code:
+        state_code = jurisdiction.upper()
+    if state_code and not jurisdiction:
+        jurisdiction = state_code.upper()
+
+    trust_doc = {
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "name": body["name"],
+        "trust_type": body.get("trust_type", "family"),
+        "jurisdiction": jurisdiction,
+        "role": body.get("role", "Trustee"),
+        "start_date": body.get("start_date"),
+        "trustees": body.get("trustees"),
+        "authority_clause": body.get("authority_clause"),
+        "ein": body.get("ein"),
+        "state_code": state_code,
+        "tax_year_end_month": body.get("tax_year_end_month"),
+        "tax_year_end_day": body.get("tax_year_end_day"),
+        "is_fiscal_year": body.get("tax_year_end_month") is not None and body.get("tax_year_end_day") is not None and (body.get("tax_year_end_month") != 12 or body.get("tax_year_end_day") != 31),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    await db.trusts.insert_one(trust_doc)
+
+    await log_api_action(
+        action="create_trust",
+        details={"target_user_id": user_id, "trust_id": trust_id, "trust_name": body["name"]},
+        ip_address=get_client_ip(request),
+    )
+
+    logger.info(f"API: Created trust {trust_id} ({body['name']}) for user {user_id}")
+    return {"trust_id": trust_id, "message": "Trust created successfully", "trust": trust_doc}
+
+
+# ==================== VAULT DOCUMENT UPLOAD ====================
+
+
+@router.post("/users/{user_id}/trusts/{trust_id}/vault/upload")
+async def upload_vault_document(
+    user_id: str,
+    trust_id: str,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """Upload a document to a user's trust vault via admin API. Multipart form: file, title, category, description, date."""
+    import uuid as _uuid
+
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found for this user")
+
+    form = await request.form()
+    upload_file = form.get("file")
+    title = form.get("title", "Untitled Document")
+    category = form.get("category", "other")
+    description = form.get("description", "")
+    date_str = form.get("date")
+
+    if not upload_file or not hasattr(upload_file, "read"):
+        raise HTTPException(status_code=400, detail="No file provided. Use multipart form data with 'file' field.")
+
+    content = await upload_file.read()
+    if len(content) > 16 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large. Maximum 16MB.")
+
+    VALID_CATEGORIES = {
+        "trust_instrument", "amendment", "schedule_a", "minutes",
+        "tax_return", "k1", "ein_letter", "financial_statement",
+        "appraisal", "notice", "insurance", "deed", "bank_statement",
+        "legal_opinion", "court_order", "other",
+    }
+    if category not in VALID_CATEGORIES:
+        category = "other"
+
+    content_type = upload_file.content_type or "application/octet-stream"
+    ext_map = {
+        "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png",
+        "image/gif": "gif", "image/webp": "webp", "image/tiff": "tiff",
+        "application/msword": "doc", "text/plain": "txt",
+    }
+    ext = ext_map.get(content_type, "bin")
+
+    doc_id = f"doc_{_uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
+
+    record = {
+        "doc_id": doc_id,
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "title": title,
+        "category": category,
+        "date": date_str,
+        "description": description,
+        "file_name": upload_file.filename,
+        "file_size": len(content),
+        "file_content": content,
+        "content_type": content_type,
+        "file_extension": ext,
+        "tags": [],
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    await db.vault_documents.insert_one(record)
+
+    await log_api_action(
+        action="upload_vault_document",
+        details={"target_user_id": user_id, "trust_id": trust_id, "doc_id": doc_id, "title": title, "category": category},
+        ip_address=get_client_ip(request),
+    )
+
+    logger.info(f"API: Uploaded vault document {doc_id} ({title}) for trust {trust_id}")
+    return {
+        "doc_id": doc_id,
+        "trust_id": trust_id,
+        "title": title,
+        "category": category,
+        "file_name": upload_file.filename,
+        "file_size": len(content),
+        "message": "Document uploaded to vault successfully",
+    }
