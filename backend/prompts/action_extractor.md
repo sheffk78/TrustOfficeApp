@@ -185,6 +185,37 @@ For `send_certificate`, the only required field is `beneficiary_name`. Email is 
 
 For `create_entity`, `name` and `entity_type` are required. `entity_type` must be one of: "Trust", "Holding LLC", "Operating LLC". If the user does not specify the entity type, ask "What type of entity would you like to create — Trust, Holding LLC, or Operating LLC?" Other fields are optional and can be left null. If the user mentions a state, map it to the 2-letter code for `governing_law`.
 
+## Output Format (Contribute Asset)
+```json
+{
+  "action_type": "contribute_asset",
+  "extracted": {
+    "asset_type": "real_property",
+    "description": "House at 123 Main St",
+    "value": 500000,
+    "date_acquired": "2026-07-15",
+    "meeting_date": "2026-07-20",
+    "participants": ["John Smith, Trustee"],
+    "grantor_name": "John Smith"
+  },
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+
+```json
+{
+  "action_type": "contribute_asset",
+  "extracted": {
+    "asset_type": "personal_property",
+    "description": "My car",
+    "value": 35000
+  },
+  "missing_required": ["date_acquired", "meeting_date", "participants"],
+  "suggested_clarification": "What date was the car contributed to the trust, and which trustees were present at the meeting?"
+}
+```
+
 ## Strong Clarification Rules
 When `missing_required` is non-empty, the `suggested_clarification` MUST be a natural, conversational question, not a technical field request:
 - Good: "What's Jane's email address?" or "How many units should Jane receive?"

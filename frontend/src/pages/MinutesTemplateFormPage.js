@@ -38,44 +38,44 @@ const parseCurrencyInput = (value) => {
 };
 
 const TEMPLATE_TITLES = {
-  'initial_trustee_meeting': 'Initial Trustee Meeting',
-  'general_meeting': 'General Meeting Minutes',
-  'distribution_to_beneficiaries': 'Distribution to Beneficiaries',
-  'acceptance_of_property': 'Accept Property into Trust',
-  'disposition_of_asset': 'Dispose / Sell Asset',
-  'appointment_additional_trustee': 'Appoint Additional Trustee',
-  'appointment_successor_trustee': 'Appoint Successor Trustee',
-  'designation_of_beneficiaries': 'Designate Beneficiaries',
-  'bank_account_authorization': 'Open Bank Account',
-  'change_of_situs': 'Change Trust Situs',
-  'benevolence_approval': 'Benevolence Assistance Approval',
+  'initial_trustee_meeting': 'Initial Trustee Resolution',
+  'general_meeting': 'General Meeting Resolution',
+  'distribution_to_beneficiaries': 'Resolution to Distribute to Beneficiaries',
+  'acceptance_of_property': 'Resolution to Accept Property into Trust',
+  'disposition_of_asset': 'Resolution to Dispose / Sell Asset',
+  'appointment_additional_trustee': 'Resolution to Appoint Additional Trustee',
+  'appointment_successor_trustee': 'Resolution to Appoint Successor Trustee',
+  'designation_of_beneficiaries': 'Resolution to Designate Beneficiaries',
+  'bank_account_authorization': 'Resolution to Open Bank Account',
+  'change_of_situs': 'Resolution to Change Trust Situs',
+  'benevolence_approval': 'Resolution to Approve Benevolence Assistance',
   // Batch 1 templates
-  'investment_policy': 'Investment Policy Approval',
-  'loan_authorization': 'Loan Authorization',
-  'insurance_authorization': 'Insurance Authorization',
-  'annual_review': 'Annual Review Meeting',
-  'quarterly_review': 'Quarterly Review Meeting',
-  'trustee_compensation': 'Trustee Compensation Approval',
-  'trustee_resignation': 'Trustee Resignation/Removal',
-  'beneficiary_request_denial': 'Beneficiary Request Denial',
-  'hems_distribution': 'HEMS Distribution',
-  'beneficiary_distribution_notice': 'Beneficiary Distribution Notice',
-  'beneficiary_loan': 'Loan to Beneficiary',
-  'evaluate_distribution': 'Evaluate Distribution Request',
+  'investment_policy': 'Resolution to Approve Investment Policy',
+  'loan_authorization': 'Resolution to Authorize Loan',
+  'insurance_authorization': 'Resolution to Authorize Insurance',
+  'annual_review': 'Annual Review Resolution',
+  'quarterly_review': 'Quarterly Review Resolution',
+  'trustee_compensation': 'Resolution to Approve Trustee Compensation',
+  'trustee_resignation': 'Resolution for Trustee Resignation/Removal',
+  'beneficiary_request_denial': 'Resolution to Deny Beneficiary Request',
+  'hems_distribution': 'Resolution for HEMS Distribution',
+  'beneficiary_distribution_notice': 'Resolution for Beneficiary Distribution Notice',
+  'beneficiary_loan': 'Resolution to Authorize Loan to Beneficiary',
+  'evaluate_distribution': 'Resolution to Evaluate Distribution Request',
   // Batch 2 templates
-  'trust_amendment': 'Trust Amendment',
-  'power_of_attorney': 'Power of Attorney Authorization',
-  'trust_termination': 'Trust Termination/Dissolution',
-  'real_estate_purchase': 'Real Estate Purchase Authorization',
-  'business_interest_acquisition': 'Business Interest Acquisition',
-  'real_estate_lease': 'Real Estate Lease Authorization',
-  'fiscal_year_election': 'Fiscal Year Election',
-  'tax_filing_authorization': 'Tax Filing Authorization',
-  'emergency_ratification': 'Emergency Action Ratification',
-  'conflict_of_interest': 'Conflict of Interest Disclosure',
-  'bill_of_sale': 'Bill of Sale',
-  'assignment_of_personal_property': 'Assignment of Personal Property',
-  'general_assignment': 'General Assignment'
+  'trust_amendment': 'Resolution to Amend Trust',
+  'power_of_attorney': 'Resolution to Authorize Power of Attorney',
+  'trust_termination': 'Resolution to Terminate/Dissolve Trust',
+  'real_estate_purchase': 'Resolution to Purchase Real Estate',
+  'business_interest_acquisition': 'Resolution to Acquire Business Interest',
+  'real_estate_lease': 'Resolution to Lease Real Estate',
+  'fiscal_year_election': 'Resolution for Fiscal Year Election',
+  'tax_filing_authorization': 'Resolution to Authorize Tax Filing',
+  'emergency_ratification': 'Resolution to Ratify Emergency Action',
+  'conflict_of_interest': 'Resolution to Disclose Conflict of Interest',
+  'bill_of_sale': 'Resolution & Bill of Sale',
+  'assignment_of_personal_property': 'Resolution to Assign Personal Property',
+  'general_assignment': 'Resolution for General Assignment'
 };
 
 const ASSET_CATEGORIES = [
@@ -453,6 +453,19 @@ export default function MinutesTemplateFormPage() {
       loadTrustEntityData();
     }
   }, [selectedTrust]);
+
+  // Pre-fill property acceptance data from URL parameters (coming from Schedule A page)
+  useEffect(() => {
+    if (templateType === 'acceptance_of_property') {
+      const assetName = searchParams.get('asset_name');
+      if (assetName) {
+        setPropertyData(prev => ({
+          ...prev,
+          property_description: assetName
+        }));
+      }
+    }
+  }, [templateType, searchParams]);
 
   // Load Schedule A assets when disposition template is selected
   useEffect(() => {

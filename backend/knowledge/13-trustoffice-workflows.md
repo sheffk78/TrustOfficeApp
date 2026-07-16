@@ -209,15 +209,37 @@ App path:
 
 Trust Assistant actions:
 - `add_asset` creates an asset action card.
+- `contribute_asset` is the recommended way to accept or contribute an asset into the trust. It creates both a Schedule A entry and an acceptance resolution minutes document in one step — the minutes include WHEREAS/RESOLVED language for the trustee resolution accepting the property. The minutes are created as draft and should be reviewed and finalized on the Minutes page.
 - `upload_document` stores deeds, titles, statements, or purchase/sale paperwork.
 - `log_minutes` documents acceptance, disposal, or major asset decisions.
 
 Audit-defense guidance:
 - Assets should have supporting documents in Vault when available.
 - Major asset acquisitions/disposals should be documented in Minutes.
+- For real property or business interests contributed to the trust, a conveyance document (bill of sale, assignment, or deed) should also be generated and stored in Vault to formally transfer title.
 
 Suggested answer shape:
-"Use Schedule A for the asset inventory and Vault for the supporting deed, title, or statement. For a major asset decision, record the trustee approval in Minutes."
+"Use Schedule A for the asset inventory and Vault for the supporting deed, title, or statement. For a major asset decision, record the trustee approval in Minutes. If you're contributing an asset to the trust, I can create both the Schedule A entry and the acceptance resolution minutes in one step — just say you want to contribute an asset."
+
+### Contributing an Asset to the Trust (contribute_asset)
+
+This is the recommended way to accept or contribute an asset into the trust. Unlike a plain `add_asset` (which only creates the Schedule A record), `contribute_asset` generates both a Schedule A entry AND an acceptance resolution minutes document in a single action, giving you the complete paper trail in one step.
+
+How it works:
+1. The user describes the asset they want to contribute (e.g., "I'm contributing my house to the trust," "put my website into the trust," "I want to transfer my business to the trust").
+2. The assistant creates a Schedule A entry with the asset details.
+3. The assistant simultaneously creates acceptance resolution minutes containing WHEREAS/RESOLVED language documenting the trustee's formal acceptance of the property into the trust.
+4. The minutes are saved as draft status — the user should review and finalize them on the Minutes page.
+
+For real property or business interests:
+- A conveyance document (bill of sale, assignment, or deed) should also be generated to formally transfer title. The assistant should suggest this and remind the user to upload the completed document to the Vault.
+
+Trigger phrases:
+- "I'm contributing my house to the trust"
+- "Put my website into the trust"
+- "I want to transfer my business to the trust"
+- "Contribute this asset to the trust"
+- "Add this property to the trust as a contribution"
 
 ## Workflow: Update Trust Settings and Tax Calendar
 
@@ -280,6 +302,7 @@ When the user describes a real-world activity, route to the most specific TrustO
 | Pay beneficiary | Distributions | Minutes, Vault, Transactions |
 | Pay trustee | Compensation | Minutes, Transactions, CPA review |
 | Add property/account | Schedule A | Vault, Minutes, Transactions |
+| Contribute/transfer asset | Schedule A + Minutes | Vault (conveyance doc), Transactions |
 | File taxes | Tax Calendar | Vault, Calendar task, CPA review |
 | Record decision | Minutes | Vault attachments, follow-up Calendar task |
 | Store paperwork | Vault | Related feature notes/attachments |

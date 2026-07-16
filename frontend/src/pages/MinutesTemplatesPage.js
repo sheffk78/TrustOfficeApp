@@ -38,6 +38,46 @@ const ICONS = {
   'gavel': Gavel
 };
 
+/** Resolution subtitles for templates that produce WHEREAS/RESOLVED text. */
+const RESOLUTION_SUBTITLES = {
+  'initial_trustee_meeting': 'Initial Trustee Resolution & Minutes',
+  'general_meeting': 'General Meeting & Resolutions',
+  'acceptance_of_property': 'Resolution to Accept Property into Trust',
+  'disposition_of_asset': 'Resolution to Dispose of Trust Asset',
+  'distribution_to_beneficiaries': 'Resolution to Distribute',
+  'appointment_additional_trustee': 'Resolution to Appoint Trustee',
+  'appointment_successor_trustee': 'Resolution to Appoint Successor',
+  'designation_of_beneficiaries': 'Resolution to Designate Beneficiaries',
+  'bank_account_authorization': 'Resolution to Open Bank Account',
+  'change_of_situs': 'Resolution to Change Situs',
+  'benevolence_approval': 'Resolution to Approve Assistance',
+  'investment_policy': 'Resolution to Approve Investment Policy',
+  'loan_authorization': 'Resolution to Authorize Loan',
+  'insurance_authorization': 'Resolution to Authorize Insurance',
+  'annual_review': 'Annual Review Resolution',
+  'quarterly_review': 'Quarterly Review Resolution',
+  'trustee_compensation': 'Resolution to Approve Compensation',
+  'trustee_resignation': 'Resolution for Trustee Resignation',
+  'beneficiary_request_denial': 'Resolution to Deny Request',
+  'hems_distribution': 'Resolution for HEMS Distribution',
+  'beneficiary_distribution_notice': 'Resolution for Distribution Notice',
+  'beneficiary_loan': 'Resolution to Authorize Beneficiary Loan',
+  'evaluate_distribution': 'Resolution to Evaluate Distribution',
+  'trust_amendment': 'Resolution to Amend Trust',
+  'power_of_attorney': 'Resolution to Authorize POA',
+  'trust_termination': 'Resolution to Terminate Trust',
+  'real_estate_purchase': 'Resolution to Purchase Real Estate',
+  'business_interest_acquisition': 'Resolution to Acquire Business Interest',
+  'real_estate_lease': 'Resolution to Lease Real Estate',
+  'fiscal_year_election': 'Resolution for Fiscal Year Election',
+  'tax_filing_authorization': 'Resolution to Authorize Tax Filing',
+  'emergency_ratification': 'Resolution to Ratify Emergency Action',
+  'conflict_of_interest': 'Resolution to Disclose Conflict',
+  'bill_of_sale': 'Resolution & Bill of Sale',
+  'assignment_of_personal_property': 'Resolution to Assign Property',
+  'general_assignment': 'Resolution for General Assignment',
+};
+
 export default function MinutesTemplatesPage() {
   const navigate = useNavigate();
   const { selectedTrust } = useAuth();
@@ -149,7 +189,10 @@ export default function MinutesTemplatesPage() {
                       <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-navy/70 transition-colors" />
                     </div>
                     <h3 className="font-serif text-lg text-navy mb-2">{template.name}</h3>
-                    <p className="text-sm text-muted-foreground">{template.description}</p>
+                    <p className="text-sm text-muted-foreground">{RESOLUTION_SUBTITLES[template.type] || template.description}</p>
+                    {RESOLUTION_SUBTITLES[template.type] && (
+                      <p className="text-xs text-muted-foreground/70 mt-1">{template.description}</p>
+                    )}
                   </button>
                 );
               })}

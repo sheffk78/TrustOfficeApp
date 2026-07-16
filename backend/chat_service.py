@@ -189,6 +189,7 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
                 ("transaction", "## Workflow: Track Trust Money Movement"),
                 ("schedule a", "## Workflow: Maintain Schedule A / Trust Assets"),
                 ("asset", "## Workflow: Maintain Schedule A / Trust Assets"),
+                ("contribute", "## Workflow: Maintain Schedule A / Trust Assets"),
                 ("settings", "## Workflow: Update Trust Settings and Tax Calendar"),
                 ("tax", "## Workflow: Update Trust Settings and Tax Calendar"),
             ],
@@ -259,7 +260,7 @@ async def extract_action_data(
 ) -> dict:
     """
     Extract structured data from the user message for creating records.
-    Only called for write-intents (add_asset, log_minutes, create_distribution, create_beneficiary, create_class_beneficiary, remove_class_beneficiary, create_entity).
+    Only called for write-intents (add_asset, contribute_asset, log_minutes, create_distribution, create_beneficiary, create_class_beneficiary, remove_class_beneficiary, create_entity).
     """
     from ai_client import ai_draft
 
@@ -661,6 +662,7 @@ VAULT_RELEVANT_INTENTS = {
     "upload_document",
     "log_minutes",
     "add_asset",
+    "contribute_asset",
     "check_deadlines",
     "health_check",
     "recommend_action",

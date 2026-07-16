@@ -8,6 +8,7 @@ const QUICK_CHIPS = [
   { label: 'Trust Health', message: 'How healthy is my trust right now?' },
   { label: "What's Next", message: 'What should I do next for my trust?' },
   { label: 'Log Minutes', message: 'Help me log minutes for a recent meeting' },
+  { label: 'Contribute Asset', message: 'I want to contribute an asset to the trust' },
   { label: 'Record Payment', message: 'Record a compensation payment to a trustee' },
   { label: 'Log Investment', message: "I need to record a new investment for the trust" },
   { label: 'Money Summary', message: 'Give me a summary of all money activity for my trust' },

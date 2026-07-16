@@ -405,6 +405,19 @@ ACTION_EXECUTION_MAP = {
             "ownership_pct": "notes",
         },
     },
+    "contribute_asset_preview": {
+        "endpoint_type": "contribute_asset",
+        "field_map": {
+            "asset_type": "category",
+            "description": "description",
+            "value": "approximate_value",
+            "date_acquired": "date_conveyed",
+            "meeting_date": "meeting_date",
+            "participants": "participants_text",
+            "grantor_name": "grantor_name",
+            "ownership_pct": "notes",
+        },
+    },
     "asset_update_preview": {
         "endpoint_type": "asset_update",
         "field_map": {
@@ -791,6 +804,156 @@ async def _execute_approved_action(
                 "endpoint": "minutes",
                 "status": "draft",
                 "review_link": f"/minutes/{result.minutes_id}/edit",
+            }
+
+        elif endpoint_type == "contribute_asset":
+            # Combined action: create a Schedule A item AND an acceptance-of-property
+            # minutes record in one transactional flow.
+            from routers.schedule_a import create_schedule_a_item as _create_asset
+            from routers.minutes import create_minutes as _create_minutes, generate_template_document
+            from models import ScheduleAItemCreate, AssetCategory, MinutesCreate, MinutesType
+            from fastapi import BackgroundTasks
+
+            # --- 0) Deduplication check — reject if an active asset with the same description already exists ---
+            property_description = mapped_data.get("description", "")
+            if property_description:
+                existing_asset = await db.schedule_a_items.find_one({
+                    "trust_id": trust_id,
+                    "user_id": user_id,
+                    "status": "active",
+                    "description": {"$regex": f"^{re.escape(property_description)}$", "$options": "i"},
+                })
+                if existing_asset:
+                    return {
+                        "success": False,
+                        "error": f"An active asset with the description '{property_description}' already exists on Schedule A. "
+                                 f"Use a different description or update the existing asset instead.",
+                        "endpoint": "contribute_asset",
+                    }
+
+            # --- 1) Create the Schedule A item (same pattern as the asset block) ---
+            category = mapped_data.pop("category", "other_property")
+            try:
+                category_enum = AssetCategory(category)
+            except ValueError:
+                category_enum = AssetCategory.other_property
+
+            # Build notes: include ownership_pct as a meaningful note if present
+            notes = mapped_data.get("notes", "")
+            ownership_pct = mapped_data.get("ownership_pct")
+            if ownership_pct is not None:
+                ownership_note = f"Ownership: {ownership_pct}%"
+                notes = f"{notes}\n{ownership_note}".strip() if notes else ownership_note
+
+            asset_create = ScheduleAItemCreate(
+                trust_id=trust_id,
+                category=category_enum,
+                description=property_description,
+                approximate_value=mapped_data.get("approximate_value"),
+                date_conveyed=mapped_data.get("date_conveyed", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                notes=notes,
+            )
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            asset_result = await _create_asset(item=asset_create, user=user_doc)
+            asset_id = asset_result.item_id
+
+            # --- 2) Create the acceptance-of-property minutes record ---
+            participants_text = mapped_data.get("participants_text", "")
+            if isinstance(participants_text, list):
+                participants_text = ", ".join(participants_text)
+
+            meeting_date = mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+            grantor_name = mapped_data.get("grantor_name", "")
+            property_value = mapped_data.get("approximate_value")
+            conveyance_date = mapped_data.get("date_conveyed", meeting_date)
+
+            # Dynamic decisions_text referencing the actual property being contributed
+            decisions_text = f"Acceptance of {property_description or 'property'} contributed to the trust" + (f" (value: ${property_value:,.2f})" if property_value else "")
+
+            # Clean template_data — remove dead fields that create_minutes does not process
+            template_data = {
+                "grantor_name": grantor_name,
+                "property_description": property_description,
+                "property_value": property_value,
+                "conveyance_date": conveyance_date,
+                "meeting_date": meeting_date,
+                "trustees_present": [p.strip() for p in participants_text.split(",") if p.strip()],
+            }
+
+            minutes_create = MinutesCreate(
+                trust_id=trust_id,
+                minutes_type=MinutesType.general,
+                meeting_date=meeting_date,
+                participants_text=participants_text,
+                decisions_text=decisions_text,
+                status="draft",
+                template_type="acceptance_of_property",
+                template_data=template_data,
+            )
+
+            # Fetch the trust document for generate_template_document
+            trust_doc = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+
+            try:
+                minutes_result = await _create_minutes(
+                    minutes=minutes_create,
+                    background_tasks=BackgroundTasks(),
+                    user=user_doc,
+                )
+            except Exception as minutes_exc:
+                # FIX 2 — Partial failure rollback: if minutes creation fails after
+                # the Schedule A item was already created, delete the orphaned item
+                # so we don't leave a dangling asset with no acceptance minutes.
+                logger.error(f"contribute_asset: minutes creation failed, rolling back Schedule A item {asset_id}: {minutes_exc}")
+                try:
+                    await db.schedule_a_items.delete_one({"item_id": asset_id, "user_id": user_id})
+                except Exception as del_exc:
+                    logger.error(f"contribute_asset: failed to delete orphaned Schedule A item {asset_id}: {del_exc}")
+                return {
+                    "success": False,
+                    "error": f"Failed to create acceptance minutes: {minutes_exc}. The Schedule A item was rolled back.",
+                    "endpoint": "contribute_asset",
+                }
+
+            # FIX 1 — Generate WHEREAS/RESOLVED formatted text and update the minutes record
+            try:
+                if trust_doc:
+                    generated_text = generate_template_document(trust_doc, "acceptance_of_property", template_data)
+                    if generated_text:
+                        await db.minutes_records.update_one(
+                            {"minutes_id": minutes_result.minutes_id},
+                            {"$set": {"decisions_text": generated_text}},
+                        )
+            except Exception as gen_exc:
+                logger.error(f"contribute_asset: failed to generate template document for minutes {minutes_result.minutes_id}: {gen_exc}")
+                # Non-fatal — the minutes record still has the dynamic decisions_text fallback
+
+            # FIX 3 — Set minutes_ref on the Schedule A item pointing to the minutes record
+            try:
+                await db.schedule_a_items.update_one(
+                    {"item_id": asset_id, "user_id": user_id},
+                    {"$set": {"minutes_ref": minutes_result.minutes_id}},
+                )
+            except Exception as ref_exc:
+                logger.error(f"contribute_asset: failed to set minutes_ref on Schedule A item {asset_id}: {ref_exc}")
+                # Non-fatal — both records exist but the link is missing
+
+            # --- 3) Update onboarding after both records are created ---
+            try:
+                from dependencies import auto_update_onboarding
+                await auto_update_onboarding(user_id, trust_id)
+            except Exception:
+                pass
+
+            return {
+                "success": True,
+                "schedule_a_id": asset_id,
+                "minutes_id": minutes_result.minutes_id,
+                "endpoint": "contribute_asset",
+                "status": "draft",
+                "review_link": f"/minutes/{minutes_result.minutes_id}/edit",
             }
 
         elif endpoint_type == "beneficiary":

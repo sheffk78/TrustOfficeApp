@@ -31,7 +31,9 @@ import {
   FileDown,
   ArrowRight,
   ExternalLink,
-  Ban
+  Ban,
+  Gavel,
+  X
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -70,6 +72,10 @@ export default function ScheduleAPage() {
     minutes_ref: null
   });
   const [exporting, setExporting] = useState(false);
+  
+  // Show a "create resolution" suggestion banner after adding an asset via direct CRUD
+  const [showResolutionPrompt, setShowResolutionPrompt] = useState(false);
+  const [recentAssetName, setRecentAssetName] = useState('');
   
   // Disposition modal state
   const [disposeDialogOpen, setDisposeDialogOpen] = useState(false);
@@ -180,6 +186,11 @@ export default function ScheduleAPage() {
         resetForm();
         loadAssets();
         loadSummary();
+        // After a NEW asset is added via direct CRUD, prompt the user to document it with a resolution
+        if (!editingAsset && formData.description) {
+          setRecentAssetName(formData.description);
+          setShowResolutionPrompt(true);
+        }
       } else {
         const errBody = await response.json().catch(() => ({}));
         showError(toast, new Error(errBody.detail || `Failed to save asset (${response.status})`), { operation: 'save', page: 'ScheduleA' });
@@ -415,6 +426,15 @@ export default function ScheduleAPage() {
                 <FileDown className="w-4 h-4 mr-2" />
                 {exporting ? 'Exporting...' : 'Export PDF'}
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate('/minutes/template/acceptance_of_property?from=schedule-a')}
+                data-testid="create-resolution-btn"
+                className="btn-gold"
+              >
+                <Gavel className="w-4 h-4 mr-2" />
+                Create Resolution
+              </Button>
               <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
                 <DialogTrigger asChild>
                   <Button className="btn-primary" data-testid="add-asset-btn">
@@ -527,6 +547,51 @@ export default function ScheduleAPage() {
               </Dialog>
             </div>
           </div>
+
+          {/* Resolution suggestion banner — shown after a direct asset add */}
+          {showResolutionPrompt && (
+            <div className="card-trust p-4 mb-6 border-gold/30" data-testid="resolution-prompt-banner">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-gold/10 flex items-center justify-center flex-shrink-0">
+                  <Gavel className="w-5 h-5 text-gold" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-serif text-navy text-sm font-semibold mb-1">
+                    Document this contribution with a trustee resolution?
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {recentAssetName ? `"${recentAssetName}" was ` : 'An asset was '}added directly to Trust Assets. 
+                    Generate a formal trustee resolution with WHEREAS/RESOLVED language to properly document the contribution into the trust.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      className="btn-gold"
+                      size="sm"
+                      onClick={() => navigate(`/minutes/template/acceptance_of_property?from=schedule-a${recentAssetName ? `&asset_name=${encodeURIComponent(recentAssetName)}` : ''}`)}
+                      data-testid="resolution-prompt-create"
+                    >
+                      <Gavel className="w-4 h-4 mr-2" />
+                      Create Resolution
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowResolutionPrompt(false)}
+                    >
+                      Maybe later
+                    </Button>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowResolutionPrompt(false)}
+                  className="text-muted-foreground hover:text-navy flex-shrink-0"
+                  aria-label="Dismiss"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Summary Cards */}
           {summary && (

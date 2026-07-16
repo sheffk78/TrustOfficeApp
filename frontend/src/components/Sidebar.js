@@ -40,7 +40,8 @@ import {
   GraduationCap,
   Briefcase,
   UserCheck,
-  ScrollText
+  ScrollText,
+  FilePlus
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -62,6 +63,7 @@ const NAV_GROUPS = [
   { key: 'governance', icon: BookOpen, label: 'Governance', items: [
     { path: '/calendar', icon: Calendar, label: 'Calendar' },
     { path: '/minutes', icon: FilePen, label: 'Minutes' },
+    { path: '/minutes/template/acceptance_of_property', icon: FilePlus, label: 'Contribute Asset', badge: 'NEW', tooltip: 'Contribute an asset via trustee resolution' },
   ]},
   { key: 'money', icon: Coins, label: 'Money', items: [
     { path: '/distributions', icon: Send, label: 'Distributions' },
@@ -344,6 +346,7 @@ export const Sidebar = () => {
                             className={`sidebar-item pl-6 py-2 ${isActive ? 'active' : ''}`}
                             onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
                             data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                            title={item.tooltip}
                           >
                             <ItemIcon className="w-4 h-4" />
                             <span className="flex items-center gap-2">
