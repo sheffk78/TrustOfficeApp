@@ -42,12 +42,14 @@ async def create_distribution(
     # on the distribution record for audit/review purposes.
 
     # Fix 9: Validate beneficiary against known beneficiaries (soft warning)
+    # Beneficiaries are stored in trust_unit_certificates, not db.beneficiaries
     beneficiary_not_verified = False
     if dist.beneficiary_name and dist.beneficiary_name.strip():
         escaped_name = re.escape(dist.beneficiary_name.strip())
-        beneficiary = await db.beneficiaries.find_one({
+        beneficiary = await db.trust_unit_certificates.find_one({
             "trust_id": dist.trust_id,
-            "name": {"$regex": f"^{escaped_name}$", "$options": "i"}
+            "holder_name": {"$regex": f"^{escaped_name}$", "$options": "i"},
+            "status": "active"
         })
         if not beneficiary:
             beneficiary_not_verified = True
@@ -126,11 +128,13 @@ async def validate_distribution_beneficiary(
     user: dict = Depends(get_current_user)
 ):
     """Check if a beneficiary name matches a known beneficiary of the trust"""
+    # Beneficiaries are stored in trust_unit_certificates, not db.beneficiaries
     escaped_name = re.escape(name.strip())
-    beneficiary = await db.beneficiaries.find_one({
+    beneficiary = await db.trust_unit_certificates.find_one({
         "trust_id": trust_id,
         "user_id": user["user_id"],
-        "name": {"$regex": f"^{escaped_name}$", "$options": "i"}
+        "holder_name": {"$regex": f"^{escaped_name}$", "$options": "i"},
+        "status": "active"
     })
     return {"valid": bool(beneficiary)}
 

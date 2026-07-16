@@ -782,8 +782,12 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
     if ein_doc_count > 0:
         updates["ein_doc_uploaded"] = True
     
-    # Check beneficiaries
-    beneficiary_count = await db.beneficiaries.count_documents({"trust_id": trust_id, "user_id": user_id})
+    # Check beneficiaries (stored in trust_unit_certificates, not db.beneficiaries)
+    beneficiary_count = await db.trust_unit_certificates.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active"
+    })
     if beneficiary_count > 0:
         updates["beneficiaries_added"] = True
     

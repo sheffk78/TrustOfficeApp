@@ -852,8 +852,12 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
         if bool(ein_doc_count > 0) != existing.get("ein_doc_uploaded"):
             updates["ein_doc_uploaded"] = ein_doc_count > 0
         
-        # Check beneficiaries
-        beneficiary_count = await db.beneficiaries.count_documents({"trust_id": trust_id, "user_id": user_id})
+        # Check beneficiaries (stored in trust_unit_certificates, not db.beneficiaries)
+        beneficiary_count = await db.trust_unit_certificates.count_documents({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "status": "active"
+        })
         if bool(beneficiary_count > 0) != existing.get("beneficiaries_added"):
             updates["beneficiaries_added"] = beneficiary_count > 0
         
