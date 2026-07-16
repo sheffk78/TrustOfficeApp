@@ -408,11 +408,10 @@ export default function MinutesDetailPage() {
                       <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-navy/5 dark:bg-gold/5 border border-navy/10 dark:border-gold/10">
                         <UserCircle className="w-4 h-4 text-navy dark:text-gold" />
                         <span className="text-sm">{p.trim()}</span>
-                        <span className="text-xs text-muted-foreground">(Trustee)</span>
                       </div>
                     ))}
                     {!minutes.participants_text && (
-                      <p className="text-sm text-muted-foreground italic">No trustees listed</p>
+                      <p className="text-sm text-muted-foreground italic">No participants listed</p>
                     )}
                   </div>
                 </div>

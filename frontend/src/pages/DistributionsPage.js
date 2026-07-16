@@ -269,7 +269,7 @@ export default function DistributionsPage() {
         date: formData.date.toISOString().split('T')[0],
         purpose_classification: formData.category,
         notes: formData.notes || '',
-        trustee_name: formData.trustee_name || selectedTrust?.trustees?.split(',')[0]?.trim() || '',
+        trustee_name: formData.trustee_name || (Array.isArray(selectedTrust?.trustees) ? selectedTrust.trustees[0] : String(selectedTrust?.trustees || '').split(',')[0])?.trim() || '',
         is_benevolence: formData.is_benevolence,
         benevolence_recipient_name: formData.is_benevolence ? formData.benevolence_recipient_name : null,
         benevolence_need_description: formData.is_benevolence ? formData.benevolence_need_description : null,
@@ -637,7 +637,9 @@ export default function DistributionsPage() {
                   <div>
                     <Label className="label-trust">Trustee</Label>
                     {(() => {
-                      const trusteeList = (selectedTrust?.trustees || '')
+                      const trusteeList = Array.isArray(selectedTrust?.trustees)
+                        ? selectedTrust.trustees
+                        : String(selectedTrust?.trustees || '')
                         .split(',')
                         .map(t => t.trim())
                         .filter(t => t);

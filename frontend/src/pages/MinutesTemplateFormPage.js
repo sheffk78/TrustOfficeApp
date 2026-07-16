@@ -556,8 +556,8 @@ export default function MinutesTemplateFormPage() {
               }));
             }
           } else if (selectedTrust?.trustees) {
-            // Fallback: use trust.trustees from auth context (comma-separated string)
-            const trustees = selectedTrust.trustees.split(',').map(t => t.trim()).filter(t => t);
+            // Fallback: use trust.trustees from auth context (array or comma-separated string)
+            const trustees = Array.isArray(selectedTrust.trustees) ? selectedTrust.trustees : String(selectedTrust.trustees || '').split(',').map(t => t.trim()).filter(t => t);
             if (trustees.length > 0) {
               setFormData(prev => ({
                 ...prev,
@@ -579,7 +579,7 @@ export default function MinutesTemplateFormPage() {
             }));
           }
           if (selectedTrust?.trustees) {
-            const trustees = selectedTrust.trustees.split(',').map(t => t.trim()).filter(t => t);
+            const trustees = Array.isArray(selectedTrust.trustees) ? selectedTrust.trustees : String(selectedTrust.trustees || '').split(',').map(t => t.trim()).filter(t => t);
             if (trustees.length > 0) {
               setFormData(prev => ({
                 ...prev,

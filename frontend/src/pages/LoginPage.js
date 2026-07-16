@@ -67,11 +67,11 @@ export default function LoginPage() {
       } else if (action === 'upgrade') {
         const params = new URLSearchParams({ wp: '1', action: 'upgrade' });
         if (plan) params.set('plan', plan);
-        navigate(`/billing?${params.toString()}`, { replace: true });
+        navigate(`/settings/billing?${params.toString()}`, { replace: true });
       } else if (action === 'resubscribe') {
-        navigate('/billing?wp=1&action=resubscribe', { replace: true });
+        navigate('/settings/billing?wp=1&action=resubscribe', { replace: true });
       } else if (action === 'update_payment') {
-        navigate('/billing?wp=1&action=update_payment', { replace: true });
+        navigate('/settings/billing?wp=1&action=update_payment', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });
       }
@@ -137,11 +137,11 @@ export default function LoginPage() {
         } else if (action === 'upgrade') {
           const params = new URLSearchParams({ wp: '1', action: 'upgrade' });
           if (plan) params.set('plan', plan);
-          navigate(`/billing?${params.toString()}`, { replace: true });
+          navigate(`/settings/billing?${params.toString()}`, { replace: true });
         } else if (action === 'resubscribe') {
-          navigate('/billing?wp=1&action=resubscribe', { replace: true });
+          navigate('/settings/billing?wp=1&action=resubscribe', { replace: true });
         } else if (action === 'update_payment') {
-          navigate('/billing?wp=1&action=update_payment', { replace: true });
+          navigate('/settings/billing?wp=1&action=update_payment', { replace: true });
         } else if (action === 'welcome') {
           navigate('/dashboard', { replace: true });
         } else {
