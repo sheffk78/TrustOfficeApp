@@ -308,7 +308,7 @@ export default function MinutesPage() {
                         </div>
                         <Button
                           size="sm"
-                          onClick={() => navigate(`/minutes/create?draft_id=${draft.minutes_id}`)}
+                          onClick={() => navigate(`/minutes/${draft.minutes_id}`)}
                           className="btn-primary text-xs ml-4"
                           data-testid={`continue-draft-${draft.minutes_id}`}
                         >
