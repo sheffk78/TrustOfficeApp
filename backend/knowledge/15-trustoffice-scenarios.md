@@ -423,6 +423,69 @@ Trust Assistant can:
 Best answer shape:
 "Compensation must be authorized by the trust instrument and reasonable for the work performed. Document the decision in Minutes first, then set up the plan in Compensation. I can draft the minutes and create the compensation plan for review."
 
+## Scenario: Trust Amendment or Modification
+
+Trigger phrases:
+- "Can I change my trust?"
+- "Can I modify the trust?"
+- "How do I amend the trust?"
+- "Can I add a beneficiary?"
+- "Can I add a non-family beneficiary?"
+- "Beneficiary becoming trustee"
+- "Dory wants to be trustee"
+- "Can a beneficiary also be trustee?"
+- "Can I remove a beneficiary?"
+- "Can I move an asset to another trust?"
+- "Change distribution standards"
+- "Modify the spendthrift clause"
+- "What can I change in an irrevocable trust?"
+- "Can the trust be changed if everyone agrees?"
+
+Primary goal:
+- Explain what modifications are possible, the consent requirements, and the proper process. Guide the trustee through the amendment without overstepping legal advice boundaries.
+
+Key principles to convey:
+1. "Irrevocable" does not mean "unchangeable" — most trusts include amendment mechanisms
+2. The amendment power (typically Section 38 or equivalent) is the master key: unanimous trustees + beneficiary consent for changes affecting vested interests
+3. The spendthrift clause must be addressed when changes touch beneficiary interests
+4. Always recommend attorney review for amendments
+
+Priority sequence:
+1. **Trust instrument** — check what amendment power exists and what requirements it imposes (unanimous trustees? beneficiary consent? Protector involvement?)
+2. **Identify the specific change** — what provision is being added, modified, or removed
+3. **Identify who must consent** — all trustees, all affected beneficiaries, and potentially the Protector
+4. **Minutes** — draft amendment minutes with the full text of the proposed change, the rationale, and the consent signatures
+5. **Vault** — store the executed amendment, beneficiary consent documents, and any attorney review correspondence
+6. **Update records** — Beneficiaries, Schedule A, Settings, or Certificates as needed
+7. **Professional review** — attorney for all amendments, CPA if tax-sensitive
+
+Trust Assistant can:
+- Draft amendment minutes, create follow-up tasks for consent collection and attorney review, update operational records after the amendment is executed.
+
+Best answer shape:
+"An irrevocable trust can still be amended if the trust instrument allows it. The amendment power — usually requiring unanimous trustees and beneficiary consent for changes affecting vested interests — is the mechanism. I can draft the amendment minutes for your review, but I'd strongly recommend having an attorney review the language before you finalize it."
+
+### Sub-Scenario: Beneficiary Becoming Trustee
+
+If a beneficiary is becoming trustee and wants to relinquish their beneficial interest:
+1. Explain the spendthrift clause obstacle — most trusts prevent beneficiaries from transferring or assigning their interests
+2. Recommend an amendment creating a specific exception for voluntary relinquishment upon becoming trustee
+3. The relinquishing beneficiary must sign written consent (can't be forced)
+4. The amendment must include an exception to the spendthrift clause
+5. After the amendment, the beneficiary delivers written relinquishment, Board approves redistribution, Certificates are reissued
+6. Offer to draft both the amendment minutes and the relinquishment language
+7. Strongly recommend attorney review
+
+### Sub-Scenario: Adding a Non-Lineal Beneficiary
+
+If the trustee wants to add a beneficiary who is not a blood relative:
+1. Check if the Protector's power is limited to lineal descendants (it usually is)
+2. The amendment power (Section 38 or equivalent) is the path — it's broader than the Protector's power
+3. All trustees must unanimously approve + all adult beneficiaries must consent (since shares are diluted)
+4. Record the amendment with the new beneficiary's name, relationship, and unit allocation
+5. Reissue Certificates of Beneficial Interest
+6. Recommend attorney review — adding non-lineal beneficiaries is a significant change
+
 ## Scenario Priority Rules
 
 If multiple scenarios apply, prioritize:
