@@ -11,6 +11,7 @@ import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
+import LegalTextRenderer from '@/components/LegalTextRenderer';
 import { format, parseISO } from 'date-fns';
 import { 
   ArrowLeft, 
@@ -38,6 +39,8 @@ export default function MinutesDetailPage() {
   const [minutes, setMinutes] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
   // Editable fields
@@ -123,6 +126,27 @@ export default function MinutesDetailPage() {
     } catch (error) {
       showError(toast, error, { operation: 'generate', page: 'MinutesDetail' });
       setPdfPreview({ show: false, loading: false, data: null, filename: '' });
+    }
+  };
+
+  const handleFinalize = async () => {
+    setFinalizing(true);
+    try {
+      const response = await fetchWithAuth(`/minutes/${minutesId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'finalized' })
+      });
+      if (response.ok) {
+        toast.success('Minutes finalized successfully. A permanent record has been created.');
+        setShowFinalizeConfirm(false);
+        loadMinutes();
+      } else {
+        toast.error('Failed to finalize minutes. Please try again. If the problem continues, contact support@trustoffice.app.');
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'finalize', page: 'MinutesDetail' });
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -249,19 +273,25 @@ export default function MinutesDetailPage() {
                 {selectedTrust?.name} • {isRetroactive ? `Meeting: ${formatDate(minutes.meeting_date)}` : formatDate(minutes.meeting_date)}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {!isEditing ? (
                 <>
                   {isDraft && (
                     <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="edit-minutes-btn">
                       <Pencil className="w-4 h-4 mr-2" />
-                      Edit
+                      Edit Draft
                     </Button>
                   )}
                   <Button variant="outline" onClick={handleViewPDF} data-testid="view-pdf-btn">
                     <Eye className="w-4 h-4 mr-2" />
                     View PDF
                   </Button>
+                  {isDraft && (
+                    <Button className="btn-primary" onClick={() => setShowFinalizeConfirm(true)} disabled={finalizing} data-testid="finalize-minutes-btn">
+                      <FileText className="w-4 h-4 mr-2" />
+                      {finalizing ? 'Finalizing...' : 'Finalize Minutes'}
+                    </Button>
+                  )}
                 </>
               ) : (
                 <>
@@ -276,6 +306,17 @@ export default function MinutesDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Draft Status Banner */}
+          {isDraft && !isEditing && (
+            <div className="mb-6 p-4 bg-warning/5 dark:bg-warning/10 border border-warning/20 dark:border-warning/30 rounded flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-warning dark:text-warning mt-0.5 shrink-0" />
+              <div className="text-sm text-warning dark:text-warning">
+                <p className="font-semibold">These minutes are in draft status</p>
+                <p className="mt-1">Review the content below and click <span className="font-bold">Finalize Minutes</span> when ready to create a permanent record. After finalizing, you can download a professional PDF.</p>
+              </div>
+            </div>
+          )}
 
           {/* Meeting Info Card */}
           <div className="card-trust p-6 mb-6">
@@ -460,9 +501,7 @@ export default function MinutesDetailPage() {
               />
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <pre className="whitespace-pre-wrap text-sm bg-muted/30 p-6 border border-border overflow-auto max-h-[600px]">
-                  {minutes.decisions_text || 'No content recorded.'}
-                </pre>
+                <LegalTextRenderer text={minutes.decisions_text} />
               </div>
             )}
           </div>
@@ -479,6 +518,30 @@ export default function MinutesDetailPage() {
         pdfBase64={pdfPreview.data}
         filename={pdfPreview.filename}
       />
+
+      {/* Finalize Confirmation Dialog */}
+      {showFinalizeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !finalizing && setShowFinalizeConfirm(false)}>
+          <div className="card-trust p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-xl text-navy dark:text-gold mb-3">Finalize These Minutes?</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+              Finalizing creates a permanent, unalterable record. To make changes after finalizing, you'll need to unfinalize with a documented reason.
+            </p>
+            <p className="text-sm text-muted-foreground mb-5">
+              After finalizing, you can download a professional PDF of the minutes.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowFinalizeConfirm(false)} disabled={finalizing}>
+                Cancel
+              </Button>
+              <Button className="btn-primary" onClick={handleFinalize} disabled={finalizing} data-testid="confirm-finalize-btn">
+                <FileText className="w-4 h-4 mr-2" />
+                {finalizing ? 'Finalizing...' : 'Yes, Finalize'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
