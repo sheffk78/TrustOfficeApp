@@ -1109,6 +1109,7 @@ export default function SettingsPage() {
           </div>
 
           {/* ============ PROFILE TAB ============ */}
+          </TabsContent>
           <TabsContent value="profile">
           {/* Trust Settings */}
           {selectedTrust && (
@@ -1686,6 +1687,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* ============ ACCOUNT TAB (part 2) ============ */}
+          <TabsContent value="account">
           {/* Trust Document Intelligence — extracted provisions from uploaded trust document */}
           {selectedTrust && (
             <div className="mb-8">
