@@ -60,7 +60,7 @@ export default function MinutesPage() {
 
   // Drafts state
   const [drafts, setDrafts] = useState([]);
-  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftsOpen, setDraftsOpen] = useState(true);
   const [draftsLoading, setDraftsLoading] = useState(false);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
