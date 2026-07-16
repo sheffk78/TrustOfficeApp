@@ -1104,20 +1104,20 @@ class BeneficiaryCreate(BaseModel):
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
-    allocation_pct: Optional[float] = None
+    allocation_pct: Optional[float] = Field(None, ge=0, le=100)
     holder_type: str = "individual"
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
 
 class BeneficiaryUpdate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
 
 class SendCertificateRequest(BaseModel):
     trust_id: str
     beneficiary_name: str
     email: Optional[str] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
 
 class BeneficiaryDashboardResponse(BaseModel):
     trust_id: str

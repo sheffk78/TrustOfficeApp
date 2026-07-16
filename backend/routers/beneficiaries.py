@@ -2,12 +2,13 @@
 Beneficiaries router - Beneficiary dashboard for trust unit allocations
 Migrated from server.py
 """
+import re
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 
-from dependencies import require_premium_feature, Feature, auto_update_onboarding
+from dependencies import require_premium_feature, require_write_access, Feature, auto_update_onboarding
 from database import db
 from models import (
     BeneficiaryDashboardResponse, BeneficiaryAllocation,
@@ -240,7 +241,7 @@ async def get_beneficiary_dashboard(
 @router.post("/create")
 async def create_beneficiary(
     data: BeneficiaryCreate,
-    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+    user: dict = Depends(require_write_access)
 ):
     """Add a beneficiary by issuing a trust unit certificate.
 
@@ -305,20 +306,19 @@ async def create_beneficiary(
 async def update_beneficiary(
     beneficiary_id: str,
     data: BeneficiaryUpdate,
-    trust_id: str = Query(..., description="Trust ID the certificate belongs to"),
-    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+    user: dict = Depends(require_write_access)
 ):
     """Update a beneficiary's contact info (email/phone/notes).
 
     The beneficiary_id path param is the certificate_id of an active
-    trust unit certificate.
+    trust unit certificate. The trust_id is derived from the certificate
+    record itself, so callers don't need to pass it separately.
     """
     user_id = user["user_id"]
 
     existing = await db.trust_unit_certificates.find_one(
         {
             "certificate_id": beneficiary_id,
-            "trust_id": trust_id,
             "user_id": user_id,
             "status": "active",
         },
@@ -326,6 +326,8 @@ async def update_beneficiary(
     )
     if not existing:
         raise HTTPException(status_code=404, detail="Beneficiary certificate not found")
+
+    trust_id = existing.get("trust_id")
 
     update_fields = {}
     if data.email is not None:
@@ -338,12 +340,12 @@ async def update_beneficiary(
     if update_fields:
         update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.trust_unit_certificates.update_one(
-            {"certificate_id": beneficiary_id},
+            {"certificate_id": beneficiary_id, "user_id": user_id, "trust_id": trust_id},
             {"$set": update_fields}
         )
 
     updated = await db.trust_unit_certificates.find_one(
-        {"certificate_id": beneficiary_id},
+        {"certificate_id": beneficiary_id, "user_id": user_id},
         {"_id": 0}
     )
     return updated
@@ -352,20 +354,19 @@ async def update_beneficiary(
 @router.delete("/{beneficiary_id}")
 async def delete_beneficiary(
     beneficiary_id: str,
-    trust_id: str = Query(..., description="Trust ID the certificate belongs to"),
-    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+    user: dict = Depends(require_write_access)
 ):
     """Remove (deactivate) a beneficiary.
 
     Marks the underlying trust unit certificate as inactive rather than
-    deleting the record, preserving an audit trail.
+    deleting the record, preserving an audit trail. The trust_id is
+    derived from the certificate record itself.
     """
     user_id = user["user_id"]
 
     existing = await db.trust_unit_certificates.find_one(
         {
             "certificate_id": beneficiary_id,
-            "trust_id": trust_id,
             "user_id": user_id,
             "status": "active",
         },
@@ -374,8 +375,10 @@ async def delete_beneficiary(
     if not existing:
         raise HTTPException(status_code=404, detail="Beneficiary certificate not found")
 
+    trust_id = existing.get("trust_id")
+
     await db.trust_unit_certificates.update_one(
-        {"certificate_id": beneficiary_id},
+        {"certificate_id": beneficiary_id, "user_id": user_id, "trust_id": trust_id},
         {"$set": {
             "status": "inactive",
             "deactivated_at": datetime.now(timezone.utc).isoformat(),
@@ -389,7 +392,7 @@ async def delete_beneficiary(
 @router.post("/send-certificate")
 async def send_beneficiary_certificate(
     data: SendCertificateRequest,
-    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+    user: dict = Depends(require_write_access)
 ):
     """Email a beneficiary their certificate notice.
 
@@ -408,7 +411,6 @@ async def send_beneficiary_certificate(
         raise HTTPException(status_code=404, detail="Trust not found")
 
     # Find active certificates for this holder (case-insensitive exact match)
-    import re
     holder_name = data.beneficiary_name
     certs = await db.trust_unit_certificates.find(
         {
