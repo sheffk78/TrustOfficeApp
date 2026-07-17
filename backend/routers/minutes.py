@@ -103,7 +103,11 @@ async def get_minutes(
     date_to: Optional[str] = None,
     user: dict = Depends(get_current_user)
 ):
-    """Get minutes with optional search and filters"""
+    """Get minutes with optional search and filters.
+    
+    Queries both minutes_records (direct-created) and minutes_templates 
+    (template-created) collections and merges results.
+    """
     query = {"user_id": user["user_id"]}
     if trust_id:
         query["trust_id"] = trust_id
@@ -129,8 +133,60 @@ async def get_minutes(
             {"decisions_text": {"$regex": search_term, "$options": "i"}}
         ]
     
+    # Fetch from minutes_records (direct-created minutes)
     minutes = await db.minutes_records.find(query, {"_id": 0}).sort("meeting_date", -1).to_list(1000)
-    return [MinutesResponse(**m) for m in minutes]
+    result = [MinutesResponse(**m) for m in minutes]
+    
+    # Also fetch from minutes_templates (template-created minutes)
+    # Normalize status filter: "finalized" in minutes_records maps to "final" in minutes_templates
+    template_query = {"user_id": user["user_id"]}
+    if trust_id:
+        template_query["trust_id"] = trust_id
+    if template_type:
+        template_query["template_type"] = template_type
+    if status:
+        # Map status between the two collections
+        if status == "finalized":
+            template_query["status"] = "final"
+        elif status == "draft":
+            template_query["status"] = "draft"
+        else:
+            template_query["status"] = status
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            date_query["$gte"] = date_from
+        if date_to:
+            date_query["$lte"] = date_to
+        template_query["meeting_date"] = date_query
+    
+    template_minutes = await db.minutes_templates.find(template_query, {"_id": 0}).sort("meeting_date", -1).to_list(1000)
+    
+    # Normalize template minutes to MinutesResponse format
+    for tm in template_minutes:
+        # Extract participant/decision info from template_data if available
+        tdata = tm.get("template_data", {})
+        participants = tdata.get("participants_text", tdata.get("trustee_name", ""))
+        decisions = tdata.get("decisions_text", tm.get("generated_document", "")[:200] if tm.get("generated_document") else "")
+        
+        normalized = MinutesResponse(
+            minutes_id=tm.get("minutes_id", ""),
+            trust_id=tm.get("trust_id", ""),
+            minutes_type=tm.get("template_type", "meeting"),
+            meeting_date=tm.get("meeting_date", tm.get("created_at", "")),
+            participants_text=participants,
+            decisions_text=decisions,
+            created_at=tm.get("created_at", ""),
+            updated_at=tm.get("updated_at"),
+            template_type=tm.get("template_type"),
+            template_data=tm.get("template_data"),
+            status=tm.get("status", "draft"),
+        )
+        result.append(normalized)
+    
+    # Sort combined results by meeting_date descending
+    result.sort(key=lambda m: m.meeting_date or "", reverse=True)
+    return result
 
 
 # ==================== STATIC-PATH MINUTES ENDPOINTS (must be before /minutes/{minutes_id}) ====================
@@ -493,9 +549,33 @@ async def get_minutes_by_id(minutes_id: str, user: dict = Depends(get_current_us
         {"minutes_id": minutes_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
-    if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
-    return MinutesResponse(**minutes)
+    if minutes:
+        return MinutesResponse(**minutes)
+    
+    # Fall back to minutes_templates collection (template-created minutes)
+    tm = await db.minutes_templates.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if tm:
+        tdata = tm.get("template_data", {})
+        participants = tdata.get("participants_text", tdata.get("trustee_name", ""))
+        decisions = tdata.get("decisions_text", tm.get("generated_document", "")[:200] if tm.get("generated_document") else "")
+        return MinutesResponse(
+            minutes_id=tm.get("minutes_id", ""),
+            trust_id=tm.get("trust_id", ""),
+            minutes_type=tm.get("template_type", "meeting"),
+            meeting_date=tm.get("meeting_date", tm.get("created_at", "")),
+            participants_text=participants,
+            decisions_text=decisions,
+            created_at=tm.get("created_at", ""),
+            updated_at=tm.get("updated_at"),
+            template_type=tm.get("template_type"),
+            template_data=tm.get("template_data"),
+            status=tm.get("status", "draft"),
+        )
+    
+    raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
 
 
 @router.put("/minutes/{minutes_id}")
@@ -967,6 +1047,30 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
         {"minutes_id": minutes_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
+    
+    # Fall back to minutes_templates collection
+    if not minutes:
+        tm = await db.minutes_templates.find_one(
+            {"minutes_id": minutes_id, "user_id": user["user_id"]},
+            {"_id": 0}
+        )
+        if tm:
+            # For template minutes, use the generated_document as the content
+            tdata = tm.get("template_data", {})
+            minutes = {
+                "minutes_id": tm.get("minutes_id", ""),
+                "trust_id": tm.get("trust_id", ""),
+                "minutes_type": tm.get("template_type", "meeting"),
+                "meeting_date": tm.get("meeting_date", tm.get("created_at", "")),
+                "participants_text": tdata.get("participants_text", tdata.get("trustee_name", "")),
+                "decisions_text": tm.get("generated_document", ""),
+                "created_at": tm.get("created_at", ""),
+                "template_type": tm.get("template_type"),
+                "template_data": tm.get("template_data"),
+                "status": tm.get("status", "draft"),
+                "generated_document": tm.get("generated_document", ""),
+            }
+    
     if not minutes:
         raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     
