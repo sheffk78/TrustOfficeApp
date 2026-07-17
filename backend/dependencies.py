@@ -162,7 +162,7 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
             trial_days_remaining=None,
             is_trial=True,
             is_active=True,
-            is_read_only=True,
+            is_read_only=False,  # Free plan allows writes — feature gating is at PLAN_FEATURES level
             stripe_customer_id=sub.get("stripe_customer_id"),
             stripe_subscription_id=sub.get("stripe_subscription_id"),
             current_period_end=sub.get("current_period_end"),

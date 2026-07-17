@@ -96,6 +96,7 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
     pinned_topics = ["15-trustoffice-scenarios", "14-trustoffice-page-playbooks", "13-trustoffice-workflows", "12-trustoffice-features"]
 
     topic_keywords = {
+        "16-minutes-types-and-templates": ["minutes", "meeting", "create minutes", "draft minutes", "initial minutes", "first meeting", "trustee meeting", "document a", "resolution", "annual review", "quarterly", "template"],
         "07-distributions": ["distribution", "distribute", "beneficiary payment", "hems", "pay beneficiary"],
         "05-trust-minutes": ["minutes", "meeting", "decision", "resolution", "document a decision"],
         "09-guided-minutes": ["draft minutes", "guided minutes", "meeting template"],
@@ -924,6 +925,7 @@ Trust: {trust_info.get('name', 'Unknown')}
 Type: {trust_info.get('type', 'Not specified')}
 Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
+Establishment Date: {trust_info.get('start_date', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Trustees: {trust_info.get('trustees', 'Not specified')}
 Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('health_score', {}).get('max_score', 115)} ({ctx.get('health_score', {}).get('color', 'red')})
@@ -1103,6 +1105,7 @@ Trust: {trust_info.get('name', 'Unknown')}
 Type: {trust_info.get('type', 'Not specified')}
 Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
 State: {trust_info.get('state_code', 'Not specified')}
+Establishment Date: {trust_info.get('start_date', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Trustees: {trust_info.get('trustees', 'Not specified')}
 Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('health_score', {}).get('max_score', 115)} ({ctx.get('health_score', {}).get('color', 'red')})
