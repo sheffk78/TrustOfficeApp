@@ -28,12 +28,13 @@ router = APIRouter(tags=["trusts"])
 async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user)):
     """
     Create a new trust.
-    
+
     Note: Uses get_current_user (not require_write_access) so that new users on the
     free plan can create their first trust during onboarding. Multiple-trust gating
     is enforced below via check_feature_access().
-    
+
     Feature Gate: MULTIPLE_TRUSTS
+    - Free/Forever Free: 10 trusts
     - Trustee: 1 trust
     - Estate: 5 trusts
     - Advisor: unlimited

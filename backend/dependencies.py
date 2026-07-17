@@ -323,14 +323,16 @@ PLAN_FEATURES = {
         Feature.DISTRIBUTIONS_BASIC,
         Feature.GOVERNANCE_BASIC,
         Feature.SINGLE_TRUST,
+        Feature.MULTIPLE_TRUSTS,
         # Trial gets limited features with watermark (legacy — existing trial users)
     },
     "free": {
-        # Free plan — same features as trial. Core trust management only.
+        # Free plan — core trust management, up to 10 trusts.
         Feature.MINUTES_BASIC,
         Feature.DISTRIBUTIONS_BASIC,
         Feature.GOVERNANCE_BASIC,
         Feature.SINGLE_TRUST,
+        Feature.MULTIPLE_TRUSTS,
     },
     "none": {
         # No features until they subscribe
@@ -412,11 +414,12 @@ PLAN_FEATURES = {
         Feature.MULTI_SIGNATURE,
     },
     "forever_free": {
-        # Free tier — limited features. Core trust management only.
+        # Free tier — core trust management, up to 10 trusts.
         Feature.MINUTES_BASIC,
         Feature.DISTRIBUTIONS_BASIC,
         Feature.GOVERNANCE_BASIC,
         Feature.SINGLE_TRUST,
+        Feature.MULTIPLE_TRUSTS,
     }
 }
 
@@ -424,15 +427,15 @@ PLAN_FEATURES = {
 
 PLAN_TRUST_LIMITS = {
     "none": 0,
-    "free": 1,
-    "forever_free": 1,
+    "free": 10,
+    "forever_free": 10,
     "trustee": 1,
     "estate": 5,
     "advisor": float('inf'),  # unlimited
     # Legacy (grandfathered)
     "monthly": 10,
     "annual": 10,
-    "trial": 1,
+    "trial": 10,
 }
 
 def get_trust_limit(plan_type: str, legacy_limit: Optional[int] = None) -> float:
