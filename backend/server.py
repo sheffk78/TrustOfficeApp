@@ -94,6 +94,7 @@ from routers.assessments import router as assessments_router
 from routers.chat import router as chat_router  # Trust Assistant
 from routers.trust_doc_analysis import router as trust_doc_analysis_router
 from routers.trust_admin_kits import router as trust_admin_kits_router
+from routers.page_agent import router as page_agent_router  # Page Agent LLM proxy
 
 # Error alerting: global exception handler + frontend error reporting endpoint
 from error_alerting import ErrorReporter
@@ -397,6 +398,8 @@ app.include_router(chat_router, prefix="/api")
 app.include_router(trust_doc_analysis_router, prefix="/api")
 # Trust Administration Kits — auto-gathered paperwork packets (vehicle retitle, bank, real estate, etc.)
 app.include_router(trust_admin_kits_router, prefix="/api")
+# Page Agent — authenticated LLM proxy for the onboarding Page Agent pilot
+app.include_router(page_agent_router, prefix="/api")
 # Frontend error reporting endpoint (POST /api/report-error)
 app.include_router(error_reports_router, prefix="/api")
 # In-app error logging (POST /api/error-log + GET /api/admin-api/error-log)

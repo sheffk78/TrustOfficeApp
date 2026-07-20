@@ -704,6 +704,12 @@ async def _execute_approved_action(
             return {"success": True, "record_id": result.item_id, "endpoint": "schedule-a"}
 
         elif endpoint_type == "asset_update":
+            # Route through the schedule_a router's update_schedule_a_item to
+            # enforce ownership verification and validation. Adds audit logging
+            # for the valuation update.
+            from routers.schedule_a import update_schedule_a_item as _update_asset
+            from models import ScheduleAItemUpdate
+
             # Look up the existing asset by description (fuzzy match)
             asset_desc = mapped_data.get("asset_description", "")
             if not asset_desc:
@@ -729,28 +735,55 @@ async def _execute_approved_action(
             if not existing:
                 return {"success": False, "error": f"Could not find an active asset matching '{asset_desc}'. Please check the description and try again."}
 
-            # Build update document
-            update_fields = {}
+            # Build the ScheduleAItemUpdate model with only provided fields
+            update_kwargs = {}
             if mapped_data.get("new_value") is not None:
-                update_fields["approximate_value"] = float(mapped_data["new_value"])
+                update_kwargs["approximate_value"] = float(mapped_data["new_value"])
             if mapped_data.get("new_description"):
-                update_fields["description"] = mapped_data["new_description"]
+                update_kwargs["description"] = mapped_data["new_description"]
             if mapped_data.get("notes"):
-                update_fields["notes"] = mapped_data["notes"]
+                update_kwargs["notes"] = mapped_data["notes"]
 
-            # Always record the valuation date and updated_at timestamp
+            # Always record the valuation date via notes append
             valuation_date = mapped_data.get("valuation_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            update_fields["last_valued_date"] = valuation_date
-            update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+            if "notes" in update_kwargs:
+                update_kwargs["notes"] = f"{update_kwargs['notes']} | Valuation date: {valuation_date}"
+            else:
+                update_kwargs["notes"] = f"Valuation date: {valuation_date}"
 
-            if not update_fields:
+            if not update_kwargs:
                 return {"success": False, "error": "No update fields provided."}
 
-            await db.schedule_a_items.update_one(
-                {"item_id": existing["item_id"]},
-                {"$set": update_fields}
-            )
-            return {"success": True, "record_id": existing["item_id"], "endpoint": "schedule-a"}
+            asset_update = ScheduleAItemUpdate(**update_kwargs)
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                await _update_asset(
+                    item_id=existing["item_id"],
+                    update=asset_update,
+                    user=user_doc,
+                )
+                # Audit log the asset valuation update
+                from utils.audit import log_audit_event
+                await log_audit_event(
+                    user_id=user_id,
+                    action="asset_updated",
+                    entity_type="schedule_a_item",
+                    entity_id=existing["item_id"],
+                    details={
+                        "trust_id": trust_id,
+                        "description": existing.get("description", ""),
+                        "fields_changed": list(update_kwargs.keys()),
+                        "valuation_date": valuation_date,
+                    },
+                )
+                return {"success": True, "record_id": existing["item_id"], "endpoint": "schedule-a"}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to update asset: {str(e)}"}
 
         elif endpoint_type == "minutes":
             # Route through the real minutes router to ensure validation,
@@ -1001,141 +1034,197 @@ async def _execute_approved_action(
                 return {"success": False, "error": f"Failed to create beneficiary: {str(e)}"}
 
         elif endpoint_type == "beneficiary_update":
-            # Find the existing beneficiary certificate by holder_name
+            # Route through the beneficiaries router's update_beneficiary to
+            # enforce ownership verification (certificate must be active and
+            # belong to the user). Adds audit logging for the change.
+            from routers.beneficiaries import update_beneficiary as _update_bene
+            from models import BeneficiaryUpdate
+
+            # Find the existing beneficiary certificate by holder_name (case-insensitive)
             existing = await db.trust_unit_certificates.find_one({
                 "trust_id": trust_id,
+                "user_id": user_id,
                 "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
                 "status": "active",
             })
             if not existing:
                 return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found. Use 'Create Beneficiary' to add them first."}
-            
-            update_fields = {}
+
+            # Build the BeneficiaryUpdate model with only provided fields
+            update_kwargs = {}
             if mapped_data.get("email"):
-                update_fields["email"] = mapped_data["email"]
+                update_kwargs["email"] = mapped_data["email"]
             if mapped_data.get("phone"):
-                update_fields["phone"] = mapped_data["phone"]
+                update_kwargs["phone"] = mapped_data["phone"]
             if mapped_data.get("notes"):
-                update_fields["notes"] = mapped_data["notes"]
-            
-            if update_fields:
-                await db.trust_unit_certificates.update_one(
-                    {"certificate_id": existing["certificate_id"]},
-                    {"$set": update_fields}
+                update_kwargs["notes"] = mapped_data["notes"]
+
+            if not update_kwargs:
+                return {"success": False, "error": "No update fields provided."}
+
+            bene_update = BeneficiaryUpdate(**update_kwargs)
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                await _update_beneficiary(
+                    beneficiary_id=existing["certificate_id"],
+                    data=bene_update,
+                    user=user_doc,
                 )
-            return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "updated"}
+                # Audit log the beneficiary update
+                from utils.audit import log_audit_event
+                await log_audit_event(
+                    user_id=user_id,
+                    action="beneficiary_updated",
+                    entity_type="trust_unit_certificate",
+                    entity_id=existing["certificate_id"],
+                    details={
+                        "trust_id": trust_id,
+                        "holder_name": existing.get("holder_name", ""),
+                        "fields_changed": list(update_kwargs.keys()),
+                    },
+                )
+                return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "updated"}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to update beneficiary: {str(e)}"}
 
         elif endpoint_type == "beneficiary_removal":
+            # Route through the beneficiaries router's delete_beneficiary to
+            # enforce ownership verification and preserve the audit trail
+            # (soft-delete: marks certificate inactive rather than deleting).
+            from routers.beneficiaries import delete_beneficiary as _delete_bene
+
             existing = await db.trust_unit_certificates.find_one({
                 "trust_id": trust_id,
+                "user_id": user_id,
                 "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
                 "status": "active",
             })
             if not existing:
                 return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found."}
-            
-            await db.trust_unit_certificates.update_one(
-                {"certificate_id": existing["certificate_id"]},
-                {"$set": {"status": "inactive", "deactivated_at": datetime.now(timezone.utc).isoformat()}}
-            )
-            return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "removed"}
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                await _delete_beneficiary(
+                    beneficiary_id=existing["certificate_id"],
+                    user=user_doc,
+                )
+                # Audit log the beneficiary removal
+                from utils.audit import log_audit_event
+                await log_audit_event(
+                    user_id=user_id,
+                    action="beneficiary_removed",
+                    entity_type="trust_unit_certificate",
+                    entity_id=existing["certificate_id"],
+                    details={
+                        "trust_id": trust_id,
+                        "holder_name": existing.get("holder_name", ""),
+                        "reason": mapped_data.get("reason", ""),
+                    },
+                )
+                return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "removed"}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to remove beneficiary: {str(e)}"}
 
         elif endpoint_type == "send_certificate":
-            # Look up the beneficiary's active certificate(s) and email them
+            # Route through the beneficiaries router's send_beneficiary_certificate
+            # to enforce trust ownership verification, certificate lookup, email
+            # validation, and communication logging. Adds audit logging.
+            from routers.beneficiaries import send_beneficiary_certificate as _send_cert
+            from models import SendCertificateRequest
+
             holder_name = mapped_data.get("holder_name", "")
             override_email = mapped_data.get("email", "")
 
-            # Find active certificates for this holder
-            certs = await db.trust_unit_certificates.find(
-                {
-                    "trust_id": trust_id,
-                    "holder_name": {"$regex": f"^{holder_name}$", "$options": "i"},
-                    "status": "active",
-                },
-                {"_id": 0}
-            ).to_list(100)
-
-            if not certs:
-                return {"success": False, "error": f"No active certificate found for beneficiary '{holder_name}'. Add them as a beneficiary first."}
-
-            # Aggregate units across all certificates for this holder
-            total_units = sum(c.get("units", 0) for c in certs)
-            first_cert = certs[0]
-            cert_number = first_cert.get("certificate_number", "N/A")
-            cert_email = override_email or first_cert.get("email", "")
-
-            if not cert_email:
-                return {"success": False, "error": f"No email address on file for '{holder_name}'. Provide an email address or update the beneficiary record first."}
-
-            # Get trust name and unit settings
-            trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "name": 1})
-            trust_name = trust.get("name", "Your Trust") if trust else "Your Trust"
-
-            settings = await db.trust_unit_settings.find_one({"trust_id": trust_id})
-            total_authorized = settings.get("total_authorized_units", 0) if settings else 0
-            unit_label = settings.get("unit_label", "Certificate Unit") if settings else "Certificate Unit"
-            percentage = (total_units / total_authorized * 100) if total_authorized > 0 else 0
-
-            # Get trustee name (the user's name)
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1})
-            from_name = user_doc.get("name", "Trustee") if user_doc else "Trustee"
-
-            # Send the certificate email
-            import email_service
-            result = await email_service.send_certificate_notice(
-                to_email=cert_email,
+            cert_req = SendCertificateRequest(
+                trust_id=trust_id,
                 beneficiary_name=holder_name,
-                trust_name=trust_name,
-                certificate_number=cert_number,
-                units=total_units,
-                unit_label=unit_label,
-                percentage=percentage,
-                issue_date=first_cert.get("issue_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                email=override_email if override_email else None,
                 notes=mapped_data.get("notes"),
-                from_user_name=from_name,
             )
 
-            # Log the communication
-            comm_doc = {
-                "communication_id": f"comm_{uuid.uuid4().hex[:12]}",
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "type": "email",
-                "subject": f"Certificate of Trust Units — {trust_name}",
-                "participants": [holder_name],
-                "notes": f"Certificate notice emailed to {holder_name} at {cert_email}. Certificate #{cert_number}, {total_units} units ({percentage:.2f}%).",
-                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.communications.insert_one(comm_doc)
-
-            return {
-                "success": True,
-                "record_id": first_cert["certificate_id"],
-                "endpoint": "certificate_notice",
-                "action": "emailed",
-                "email_sent_to": cert_email,
-                "units": total_units,
-                "percentage": round(percentage, 2),
-            }
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                result = await _send_cert(data=cert_req, user=user_doc)
+                # Audit log the certificate send
+                from utils.audit import log_audit_event
+                await log_audit_event(
+                    user_id=user_id,
+                    action="certificate_sent_via_chat",
+                    entity_type="trust_unit_certificate",
+                    entity_id=result.get("certificate_id", ""),
+                    details={
+                        "trust_id": trust_id,
+                        "beneficiary_name": holder_name,
+                        "email_sent_to": result.get("email_sent_to", ""),
+                        "units": result.get("units", 0),
+                        "percentage": result.get("percentage", 0),
+                        "source": "chat_assistant",
+                    },
+                )
+                return {
+                    "success": True,
+                    "record_id": result.get("certificate_id", ""),
+                    "endpoint": "certificate_notice",
+                    "action": "emailed",
+                    "email_sent_to": result.get("email_sent_to", ""),
+                    "units": result.get("units", 0),
+                    "percentage": result.get("percentage", 0),
+                }
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to send certificate: {str(e)}"}
 
         elif endpoint_type == "distribution_cancel":
-            # Find matching distribution
-            query = {"trust_id": trust_id}
+            # Route through the distributions router's delete_distribution to
+            # enforce ownership verification and audit logging. The chat "cancel"
+            # action maps to the canonical delete endpoint, which logs to the
+            # audit trail via log_audit_event.
+            from routers.distributions import delete_distribution as _delete_dist
+
+            # Find matching distribution by beneficiary name + optional amount/date
+            query = {"trust_id": trust_id, "user_id": user_id}
             if mapped_data.get("beneficiary_name"):
                 query["beneficiary_name"] = {"$regex": f"^{mapped_data['beneficiary_name']}$", "$options": "i"}
             if mapped_data.get("amount"):
                 query["amount"] = float(mapped_data["amount"])
-            
+
             existing = await db.distribution_records.find_one(query, sort=[("created_at", -1)])
             if not existing:
                 return {"success": False, "error": "Distribution not found matching those details."}
-            
-            await db.distribution_records.update_one(
-                {"distribution_id": existing["distribution_id"]},
-                {"$set": {"status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat()}}
-            )
-            return {"success": True, "record_id": existing["distribution_id"], "endpoint": "distributions", "action": "cancelled"}
+
+            # Governance check: cannot cancel an already-approved distribution
+            # without first revoking approval (status flow validation)
+            if existing.get("approved_at") and existing.get("status") != "cancelled":
+                return {
+                    "success": False,
+                    "error": "This distribution has already been approved and may have been executed. "
+                             "Please revoke approval on the Distributions page before cancelling.",
+                    "requires_action": "revoke_approval",
+                    "solvency_link": f"/distributions?approve={existing['distribution_id']}",
+                }
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                await _delete_dist(distribution_id=existing["distribution_id"], user=user_doc)
+                return {"success": True, "record_id": existing["distribution_id"], "endpoint": "distributions", "action": "cancelled"}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to cancel distribution: {str(e)}"}
 
         elif endpoint_type == "document_upload":
             # Route through the real vault router to ensure validation
@@ -1426,12 +1515,19 @@ async def _execute_approved_action(
                 return {"success": False, "error": f"Failed to create entity: {str(e)}"}
 
         elif endpoint_type == "settings_update":
+            # Route through the trusts router's update_trust to enforce
+            # ownership verification, field validation (EIN format, tax year
+            # end), jurisdiction/state_code auto-sync, and audit logging
+            # (update_trust calls log_audit_event internally).
+            from routers.trusts import update_trust as _update_trust
+            from models import TrustUpdate
+
             field = mapped_data.get("field", "")
             value = mapped_data.get("value", "")
             field_mapping = {
                 "name": "name",
                 "trust_type": "trust_type",
-                "formation_date": "formation_date",
+                "formation_date": "start_date",
                 "ein": "ein",
                 "jurisdiction": "jurisdiction",
                 "state_code": "state_code",
@@ -1439,66 +1535,136 @@ async def _execute_approved_action(
             db_field = field_mapping.get(field.lower().replace(" ", "_"))
             if not db_field:
                 return {"success": False, "error": f"Unknown field: {field}. Valid fields: name, trust_type, formation_date, ein, jurisdiction, state_code"}
-            
-            await db.trusts.update_one(
-                {"trust_id": trust_id, "user_id": user_id},
-                {"$set": {db_field: value}}
-            )
-            return {"success": True, "record_id": trust_id, "endpoint": "trusts", "action": "updated", "field": db_field}
+
+            # Build the TrustUpdate model with only the provided field
+            update_kwargs = {db_field: value}
+            try:
+                trust_update = TrustUpdate(**update_kwargs)
+            except Exception as ve:
+                return {"success": False, "error": f"Invalid value for field '{field}': {str(ve)}"}
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                await _update_trust(
+                    trust_id=trust_id,
+                    update=trust_update,
+                    user=user_doc,
+                )
+                # update_trust already logs to audit trail via log_audit_event,
+                # but we add a chat-specific audit entry for traceability.
+                from utils.audit import log_audit_event
+                await log_audit_event(
+                    user_id=user_id,
+                    action="trust_settings_updated_via_chat",
+                    entity_type="trust",
+                    entity_id=trust_id,
+                    details={
+                        "field_changed": db_field,
+                        "source": "chat_assistant",
+                    },
+                )
+                return {"success": True, "record_id": trust_id, "endpoint": "trusts", "action": "updated", "field": db_field}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to update trust settings: {str(e)}"}
 
         elif endpoint_type == "alert_dismiss":
+            # Route through the governance router's dismiss_insight to enforce
+            # trust ownership verification. Adds audit logging for the dismissal.
+            from routers.governance import dismiss_insight as _dismiss_insight
+            from models import DismissedInsightCreate
+
             criterion = mapped_data.get("criterion_name", "")
             if not criterion:
                 return {"success": False, "error": "No criterion name provided to dismiss."}
-            
-            await db.dismissed_insights.update_one(
-                {"trust_id": trust_id, "criterion_name": criterion},
-                {"$set": {
-                    "trust_id": trust_id,
-                    "criterion_name": criterion,
-                    "user_id": user_id,
-                    "dismissed_at": datetime.now(timezone.utc).isoformat(),
-                }},
-                upsert=True
-            )
-            return {"success": True, "endpoint": "insights", "action": "dismissed", "criterion": criterion}
+
+            dismiss_req = DismissedInsightCreate(trust_id=trust_id, criterion_name=criterion)
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                await _dismiss_insight(req=dismiss_req, user=user_doc)
+                # Audit log the alert dismissal
+                from utils.audit import log_audit_event
+                await log_audit_event(
+                    user_id=user_id,
+                    action="alert_dismissed_via_chat",
+                    entity_type="governance_insight",
+                    entity_id=criterion,
+                    details={
+                        "trust_id": trust_id,
+                        "criterion_name": criterion,
+                        "source": "chat_assistant",
+                    },
+                )
+                return {"success": True, "endpoint": "insights", "action": "dismissed", "criterion": criterion}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to dismiss insight: {str(e)}"}
 
         elif endpoint_type == "class_beneficiary":
-            cb_id = f"cb_{uuid.uuid4().hex[:16]}"
-            class_type = mapped_data.get("class_type", "custom")
-            class_type_label = {
-                "children": "Children (including after-born)",
-                "descendants": "Descendants",
-                "issue": "Issue (lineal descendants)",
-                "heirs": "Heirs",
-                "heirs_at_law": "Heirs at Law",
-                "blood_relatives": "Blood Relatives",
-                "per_stirpes": "Per Stirpes (by branch)",
-                "per_capita": "Per Capita (by head)",
-                "custom": "Custom Class",
-            }.get(class_type, class_type)
+            # Route through the beneficiaries router's create_class_beneficiary
+            # to enforce trust ownership verification and class_type validation
+            # via the ClassBeneficiaryType enum. Adds audit logging.
+            from routers.beneficiaries import create_class_beneficiary as _create_cb
+            from models import ClassBeneficiaryCreate, ClassBeneficiaryType
 
-            cb_doc = {
-                "class_beneficiary_id": cb_id,
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "class_type": class_type,
-                "class_type_label": class_type_label,
-                "description": mapped_data.get("description", ""),
-                "percentage": float(mapped_data.get("percentage", 0)),
-                "notes": mapped_data.get("notes", ""),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.class_beneficiaries.insert_one(cb_doc)
-            # Update onboarding checklist
+            class_type_raw = mapped_data.get("class_type", "custom")
             try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-            return {"success": True, "record_id": cb_id, "endpoint": "class-beneficiaries", "action": "created"}
+                class_type_enum = ClassBeneficiaryType(class_type_raw)
+            except ValueError:
+                class_type_enum = ClassBeneficiaryType.custom
+
+            cb_create = ClassBeneficiaryCreate(
+                trust_id=trust_id,
+                class_type=class_type_enum,
+                description=mapped_data.get("description", ""),
+                percentage=float(mapped_data.get("percentage", 0)),
+                notes=mapped_data.get("notes", ""),
+            )
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                result = await _create_cb(data=cb_create, user=user_doc)
+                cb_id = result.get("class_beneficiary_id", "")
+                # Audit log the class beneficiary creation
+                from utils.audit import log_audit_event
+                await log_audit_event(
+                    user_id=user_id,
+                    action="class_beneficiary_created_via_chat",
+                    entity_type="class_beneficiary",
+                    entity_id=cb_id,
+                    details={
+                        "trust_id": trust_id,
+                        "class_type": class_type_enum.value,
+                        "percentage": float(mapped_data.get("percentage", 0)),
+                        "source": "chat_assistant",
+                    },
+                )
+                # Update onboarding checklist
+                try:
+                    from dependencies import auto_update_onboarding
+                    await auto_update_onboarding(user_id, trust_id)
+                except Exception:
+                    pass
+                return {"success": True, "record_id": cb_id, "endpoint": "class-beneficiaries", "action": "created"}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to create class beneficiary: {str(e)}"}
 
         elif endpoint_type == "class_beneficiary_removal":
+            # Route through the beneficiaries router's delete_class_beneficiary
+            # to enforce ownership verification (user_id match). Adds audit logging.
+            from routers.beneficiaries import delete_class_beneficiary as _delete_cb
+
             class_type = mapped_data.get("class_type", "")
             existing = await db.class_beneficiaries.find_one({
                 "trust_id": trust_id,
@@ -1507,8 +1673,34 @@ async def _execute_approved_action(
             })
             if not existing:
                 return {"success": False, "error": f"Class beneficiary '{class_type}' not found for this trust."}
-            await db.class_beneficiaries.delete_one({"class_beneficiary_id": existing["class_beneficiary_id"]})
-            return {"success": True, "record_id": existing["class_beneficiary_id"], "endpoint": "class-beneficiaries", "action": "removed"}
+
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if not user_doc:
+                user_doc = {"user_id": user_id, "email": "", "name": ""}
+            try:
+                await _delete_cb(
+                    class_beneficiary_id=existing["class_beneficiary_id"],
+                    user=user_doc,
+                )
+                # Audit log the class beneficiary removal
+                from utils.audit import log_audit_event
+                await log_audit_event(
+                    user_id=user_id,
+                    action="class_beneficiary_removed_via_chat",
+                    entity_type="class_beneficiary",
+                    entity_id=existing["class_beneficiary_id"],
+                    details={
+                        "trust_id": trust_id,
+                        "class_type": class_type,
+                        "reason": mapped_data.get("reason", ""),
+                        "source": "chat_assistant",
+                    },
+                )
+                return {"success": True, "record_id": existing["class_beneficiary_id"], "endpoint": "class-beneficiaries", "action": "removed"}
+            except HTTPException as e:
+                return {"success": False, "error": e.detail}
+            except Exception as e:
+                return {"success": False, "error": f"Failed to remove class beneficiary: {str(e)}"}
 
         return {"success": False, "error": f"Unhandled endpoint type: {endpoint_type}"}
 

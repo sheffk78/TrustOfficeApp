@@ -1,9 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Component } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowRight, ArrowLeft, Users, ChevronDown, Plus, X, Loader2, Sparkles } from 'lucide-react';
+import PageAgentAssistant from '@/components/PageAgentAssistant';
+
+// Feature flag: only render the Page Agent pilot when explicitly enabled.
+const PAGE_AGENT_ENABLED = process.env.REACT_APP_ENABLE_PAGE_AGENT === 'true';
+
+// Local error boundary — renders null on error so the onboarding flow
+// isn't blocked if the Page Agent integration crashes during render.
+class PageAgentErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error) {
+    console.error('[PageAgentErrorBoundary] render crashed:', error);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
 
 // Valid trust type keys - used to validate extracted fields before pre-filling
 const VALID_TRUST_TYPES = [
@@ -90,6 +113,10 @@ export default function OnboardingConfirmStep({
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const prefilledRef = useRef(false);
+
+  // Ref for the form container — passed to PageAgentAssistant so the agent
+  // is restricted to interacting only with elements inside this form.
+  const formContainerRef = useRef(null);
 
   // Pre-fill the form once when extractedFields arrive from the backend.
   // Uses a ref flag so we never overwrite user edits on subsequent renders.
@@ -194,7 +221,7 @@ export default function OnboardingConfirmStep({
         <span className="font-mono text-xs uppercase tracking-widest">Back</span>
       </button>
 
-      <div className="card-trust corner-mark mb-8">
+      <div className="card-trust corner-mark mb-8" ref={formContainerRef}>
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
@@ -459,6 +486,20 @@ export default function OnboardingConfirmStep({
           </Button>
         </div>
       </div>
+
+      {/* Page Agent pilot — only renders when REACT_APP_ENABLE_PAGE_AGENT === 'true' */}
+      {PAGE_AGENT_ENABLED && (
+        <PageAgentErrorBoundary>
+          <PageAgentAssistant
+            containerRef={formContainerRef}
+            trustData={trustData}
+            setTrustData={setTrustData}
+            trusteeNames={trusteeNames}
+            setTrusteeNames={setTrusteeNames}
+            extractedFields={extractedFields}
+          />
+        </PageAgentErrorBoundary>
+      )}
     </div>
   );
 }
