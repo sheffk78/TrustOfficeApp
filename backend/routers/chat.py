@@ -32,6 +32,20 @@ from action_registry import requires_confirmation, get_action, ACTION_REGISTRY
 router = APIRouter(prefix="/ai", tags=["ai", "chat"])
 logger = logging.getLogger(__name__)
 
+
+class _MockRequest:
+    """Minimal mock of starlette.Request for calling router functions that
+    expect ``request: Request`` and call ``await request.json()``.
+
+    Used to route chat's internal minutes-update writes through the service
+    layer's ``update_minutes`` endpoint instead of touching MongoDB directly.
+    """
+    def __init__(self, json_data: dict):
+        self._json_data = json_data
+
+    async def json(self) -> dict:
+        return self._json_data
+
 # Rate limit config: handled by the middleware in security.py
 # Chat-specific limits
 MAX_MESSAGE_LENGTH = 5000
@@ -941,7 +955,10 @@ async def _execute_approved_action(
                 # so we don't leave a dangling asset with no acceptance minutes.
                 logger.error(f"contribute_asset: minutes creation failed, rolling back Schedule A item {asset_id}: {minutes_exc}")
                 try:
-                    await db.schedule_a_items.delete_one({"item_id": asset_id, "user_id": user_id})
+                    # Route through the schedule_a router's delete endpoint
+                    # to enforce ownership verification and audit logging.
+                    from routers.schedule_a import delete_schedule_a_item as _delete_asset
+                    await _delete_asset(item_id=asset_id, user=user_doc)
                 except Exception as del_exc:
                     logger.error(f"contribute_asset: failed to delete orphaned Schedule A item {asset_id}: {del_exc}")
                 return {
@@ -955,9 +972,14 @@ async def _execute_approved_action(
                 if trust_doc:
                     generated_text = generate_template_document(trust_doc, "acceptance_of_property", template_data)
                     if generated_text:
-                        await db.minutes_records.update_one(
-                            {"minutes_id": minutes_result.minutes_id},
-                            {"$set": {"decisions_text": generated_text}},
+                        # Route through the minutes router's update_minutes endpoint
+                        # to enforce ownership verification and validation.
+                        from routers.minutes import update_minutes as _update_minutes
+                        mock_req = _MockRequest({"decisions_text": generated_text})
+                        await _update_minutes(
+                            minutes_id=minutes_result.minutes_id,
+                            request=mock_req,
+                            user=user_doc,
                         )
             except Exception as gen_exc:
                 logger.error(f"contribute_asset: failed to generate template document for minutes {minutes_result.minutes_id}: {gen_exc}")
@@ -965,9 +987,15 @@ async def _execute_approved_action(
 
             # FIX 3 — Set minutes_ref on the Schedule A item pointing to the minutes record
             try:
-                await db.schedule_a_items.update_one(
-                    {"item_id": asset_id, "user_id": user_id},
-                    {"$set": {"minutes_ref": minutes_result.minutes_id}},
+                # Route through the schedule_a router's update endpoint to
+                # enforce ownership verification and validation.
+                from routers.schedule_a import update_schedule_a_item as _update_asset
+                from models import ScheduleAItemUpdate as _SAItemUpdate
+                ref_update = _SAItemUpdate(minutes_ref=minutes_result.minutes_id)
+                await _update_asset(
+                    item_id=asset_id,
+                    update=ref_update,
+                    user=user_doc,
                 )
             except Exception as ref_exc:
                 logger.error(f"contribute_asset: failed to set minutes_ref on Schedule A item {asset_id}: {ref_exc}")
