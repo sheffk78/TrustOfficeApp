@@ -92,6 +92,12 @@ export default function OnboardingPage() {
   // Skip document flag - when user skips upload and fills manually
   const [skipDocument, setSkipDocument] = useState(false);
 
+  // Ref guard: the route guard should only redirect on the INITIAL trust check
+  // (when the page first loads). Once the user is actively in the onboarding
+  // flow, creating a trust via handleSkipDoc/handleDocUpload must NOT re-trigger
+  // the redirect — otherwise step 3 (OnboardingConfirmStep) never renders.
+  const initialTrustCheckDone = useRef(false);
+
   // Progress hint cycling for the analyzing screen
   const [hintIndex, setHintIndex] = useState(0);
   const progressHints = [
@@ -162,7 +168,20 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!checkingTrusts && trusts && trusts.length > 0 && !isSubscriptionExpired) {
-      navigate('/dashboard', { replace: true });
+      // Only redirect on the initial trust check when the page first loads.
+      // Once the user has entered the onboarding flow (handleSkipDoc /
+      // handleDocUpload), subsequent trust list updates from loadTrusts()
+      // must NOT re-trigger this redirect — otherwise the confirm step
+      // (step 3) never renders because the guard fires before setStep(3).
+      if (!initialTrustCheckDone.current) {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+    // Mark the initial check as done once we have a definitive trusts list
+    // and the first render cycle completes. checkingTrusts === false means
+    // loadTrusts() has resolved at least once.
+    if (!checkingTrusts) {
+      initialTrustCheckDone.current = true;
     }
   }, [checkingTrusts, trusts, navigate, isSubscriptionExpired]);
 
