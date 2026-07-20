@@ -1,31 +1,28 @@
-import { useState, useEffect, useRef, Component } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowRight, ArrowLeft, Users, ChevronDown, Plus, X, Loader2, Sparkles } from 'lucide-react';
 import PageAgentAssistant from '@/components/PageAgentAssistant';
+import PageAgentErrorBoundary from '@/components/PageAgentErrorBoundary';
 
 // Feature flag: only render the Page Agent pilot when explicitly enabled.
 const PAGE_AGENT_ENABLED = process.env.REACT_APP_ENABLE_PAGE_AGENT === 'true';
 
-// Local error boundary — renders null on error so the onboarding flow
-// isn't blocked if the Page Agent integration crashes during render.
-class PageAgentErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(error) {
-    console.error('[PageAgentErrorBoundary] render crashed:', error);
-  }
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children;
-  }
+// PII masking — must match PageAgentAssistant's internal maskPII so the
+// system instructions embed masked extracted fields identically.
+function maskPII(content) {
+  if (!content || typeof content !== 'string') return content;
+  let masked = content;
+  masked = masked.replace(/\b\d{3}-\d{2}-\d{4}\b/g, 'XXX-XX-XXXX');
+  masked = masked.replace(/\b\d{2}-\d{7}\b/g, 'XX-XXXXXXX');
+  masked = masked.replace(/\b(?:\d[ -]*){13,19}\d\b/g, (m) => {
+    const digits = m.replace(/\D/g, '');
+    if (digits.length >= 13 && digits.length <= 19) return '[CARD REDACTED]';
+    return m;
+  });
+  return masked;
 }
 
 // Valid trust type keys - used to validate extracted fields before pre-filling
@@ -117,6 +114,66 @@ export default function OnboardingConfirmStep({
   // Ref for the form container — passed to PageAgentAssistant so the agent
   // is restricted to interacting only with elements inside this form.
   const formContainerRef = useRef(null);
+
+  // ---------------- Page Agent system instructions ----------------
+  // Onboarding-specific instructions are defined here and passed as a prop to
+  // the shared PageAgentAssistant component. The extractedFields are masked
+  // and embedded so the agent can read them without leaking PII.
+  const systemInstructions = useMemo(() => {
+    return `
+You are the TrustOffice Onboarding Page Agent, embedded in the "Review Your
+Trust Details" form on step 3 of trust onboarding. Your ONLY job is to help
+the user fill in draft values for the form fields and explain what each
+field means.
+
+ABSOLUTE RULES:
+1. NEVER submit the form. Do not click, tap, or otherwise activate the
+   "Confirm and Create Trust" button (data-testid="confirm-create-trust-btn").
+   That button finalizes the trust and is reserved for the user.
+2. NEVER click the "Back" button (data-testid="confirm-back-btn").
+3. You may ONLY interact with elements inside the onboarding confirm form
+   container. Do not navigate away, open menus, or touch anything outside
+   that container.
+4. Never run arbitrary JavaScript. The execute_javascript tool is disabled.
+5. Never ask for or reveal sensitive PII that is not already visible on the
+   page. If the user asks you to fill an SSN, EIN, or credit card number,
+   fill it ONLY from the provided extracted fields — never invent values.
+6. Do not modify the trust once the user clicks "Confirm and Create Trust".
+   If the form has been submitted, stop and tell the user.
+
+WHAT YOU CAN DO:
+- Fill form fields from the extracted data the user provides in their
+  instruction, or from the \`extractedFields\` JSON I will pass you.
+- Explain what a field means (e.g. "What trust type should I select?").
+- Suggest a value for a field based on the trust document data.
+- Clear a field the user asks to clear.
+
+HOW TO FILL:
+- Trust Name input: data-testid="confirm-trust-name-input"
+- Trust Type (Radix Select): use the select_radix_option tool with
+  testid="confirm-trust-type-select" and optionText = the visible label
+  (e.g. "Revocable Living Trust", "Irrevocable Family Trust"). Do NOT try
+  to use selectOption on this — it is not a native <select>.
+- State/Jurisdiction (native select): data-testid="confirm-jurisdiction-input"
+  — use the normal selectOption action.
+- Trustee Name inputs: data-testid="confirm-trustee-name-0",
+  data-testid="confirm-trustee-name-1", etc. (one per trustee)
+- Grantor Name: data-testid="confirm-grantor-name-input"
+- Formation Date: data-testid="confirm-formation-date-input"
+- EIN: data-testid="confirm-ein-input" (under "Advanced settings" — click
+  the "Advanced settings" toggle button first to reveal it)
+- Tax Year End Month (Radix Select): use select_radix_option with
+  testid="confirm-tax-month-select" and optionText like "DEC (Calendar)".
+- Tax Year End Day: data-testid="confirm-tax-day-input"
+- Description: data-testid="confirm-description-input"
+
+When you fill a field, briefly tell the user what you set and why. If a
+requested value is missing from the extracted data, say so — do not guess.
+
+Available extracted fields from the user's trust document:
+${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
+`.trim();
+  }, [extractedFields]);
 
   // Pre-fill the form once when extractedFields arrive from the backend.
   // Uses a ref flag so we never overwrite user edits on subsequent renders.
@@ -492,11 +549,16 @@ export default function OnboardingConfirmStep({
         <PageAgentErrorBoundary>
           <PageAgentAssistant
             containerRef={formContainerRef}
+            systemInstructions={systemInstructions}
+            pageName="Onboarding"
             trustData={trustData}
             setTrustData={setTrustData}
             trusteeNames={trusteeNames}
             setTrusteeNames={setTrusteeNames}
             extractedFields={extractedFields}
+            placeholder='e.g. "Fill in the trust name from my document"'
+            idleMessage='Ready. Type an instruction like "Fill in the trust name from my document".'
+            helpText='The agent can fill draft values from your document and explain fields. It will never submit the form — you review and confirm yourself.'
           />
         </PageAgentErrorBoundary>
       )}

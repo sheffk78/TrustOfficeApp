@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
@@ -19,6 +19,8 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth, API } from '@/utils/api';
+import PageAgentAssistant from '@/components/PageAgentAssistant';
+import PageAgentErrorBoundary from '@/components/PageAgentErrorBoundary';
 import { 
   Plus, 
   Search,
@@ -53,6 +55,9 @@ function useDebounce(value, delay) {
 
   return debouncedValue;
 }
+
+// Feature flag: only render the Page Agent pilot when explicitly enabled.
+const PAGE_AGENT_ENABLED = process.env.REACT_APP_ENABLE_PAGE_AGENT === 'true';
 
 export default function DistributionsPage() {
   const navigate = useNavigate();
@@ -106,6 +111,103 @@ export default function DistributionsPage() {
   const debouncedBeneficiary = useDebounce(formData.beneficiary, 500);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
+
+  // Ref for the "New Distribution" dialog form container — passed to
+  // PageAgentAssistant so the agent is restricted to interacting only with
+  // elements inside this form. It does NOT cover the approval modal,
+  // delete modal, or the distributions table.
+  const distributionFormRef = useRef(null);
+
+  // ---------------- Page Agent system instructions ----------------
+  // Distributions-specific instructions. The agent can help fill in draft
+  // values for a new distribution (amount, beneficiary, category, notes,
+  // dates, type, trustee, benevolence fields) but must NEVER submit the
+  // distribution or approve/decline an existing one. Those are fiduciary
+  // actions reserved for the user.
+  const pageAgentInstructions = useMemo(() => {
+    return `
+You are the TrustOffice Distributions Page Agent, embedded in the "New
+Distribution" dialog form. Your ONLY job is to help the user fill in draft
+values for the form fields and explain what each field means. You operate
+inside the dialog that opens when the user clicks "Add Distribution".
+
+ABSOLUTE RULES:
+1. NEVER submit the form. Do not click, tap, or otherwise activate the
+   "Create Distribution" button (data-testid="submit-distribution-btn").
+   Creating a distribution is a fiduciary action reserved for the user.
+2. NEVER click the "Add Distribution" button (data-testid="add-distribution-btn")
+   or the dialog trigger — the dialog is already open when you are active.
+3. NEVER approve or decline a distribution. Do not click any element with
+   data-testid starting with "approve-" or "decline-". Do not click
+   "Approve Distribution" (data-testid="confirm-approval-btn") in the
+   approval modal. Do not check the solvency or recusal checkboxes
+   (data-testid="solvency-checkbox", data-testid="recusal-checkbox").
+   Approval is a fiduciary action reserved for the user.
+4. NEVER delete a distribution. Do not click any element with data-testid
+   starting with "delete-" or the "confirm-delete-btn" button.
+5. NEVER send a distribution notice. Do not click any element with
+   data-testid starting with "send-notice-".
+6. You may ONLY interact with elements inside the "New Distribution" dialog
+   form container. Do not navigate away, open menus, close the dialog, or
+   touch anything outside that container (no table rows, no approval modal,
+   no delete modal, no filters, no search).
+7. Never run arbitrary JavaScript. The execute_javascript tool is disabled.
+8. Never ask for or reveal sensitive PII that is not already visible on the
+   page. Never invent beneficiary names, EINs, SSNs, or credit card numbers.
+9. If the user asks you to submit, approve, decline, delete, or send a
+   notice, refuse and explain that those are fiduciary actions reserved
+   for the user.
+
+WHAT YOU CAN DO:
+- Fill form fields from values the user provides in their instruction.
+- Explain what a field means (e.g. "What category should I select?").
+- Suggest a value for a field based on the user's instruction.
+- Clear a field the user asks to clear.
+- Toggle the "Benevolence Distribution" switch
+  (data-testid="benevolence-toggle") if the user asks to mark the
+  distribution as benevolence, and then fill the revealed benevolence
+  fields. Do NOT toggle it off unless the user explicitly asks.
+
+HOW TO FILL:
+- Date (calendar popover trigger): data-testid="dist-date-picker"
+  — this is a Radix Popover with a Calendar inside. Click the trigger to
+  open it, then click the desired day cell in the calendar grid. The
+  calendar shows the current month; use the month navigation arrows if
+  needed. After selecting a day, the popover closes automatically.
+- Amount (number input): data-testid="dist-amount-input"
+- Beneficiary (text input): data-testid="dist-beneficiary-input"
+- Type (Radix Select): use the select_radix_option tool with
+  testid="dist-type-select" and optionText = the visible label
+  (e.g. "Trust Distribution", "Loan", "Gift").
+- Category (Radix Select): use the select_radix_option tool with
+  testid="dist-category-select" and optionText = the exact visible label
+  of the category. The available categories are loaded dynamically; if the
+  dropdown is empty or the requested category is not listed, tell the user.
+- Trustee (Radix Select, only when multiple trustees exist):
+  use select_radix_option with testid="dist-trustee-select" and the
+  trustee's name as optionText. If there is only one trustee or none,
+  the field is a read-only input (data-testid="dist-trustee-input") — do
+  not try to change it.
+- Status (Radix Select): use select_radix_option with
+  testid="dist-status-select" and optionText = "Pending Review",
+  "Approved", or "Declined". NOTE: setting status to "Approved" here only
+  changes the draft form field — it does NOT approve the distribution.
+  Actual approval requires the solvency + recusal modal, which you must
+  never touch.
+- Benevolence toggle (Switch): data-testid="benevolence-toggle"
+- Benevolence Recipient Name: data-testid="benevolence-recipient-input"
+  (only visible after toggling benevolence on)
+- Benevolence Need Description: data-testid="benevolence-need-input"
+  (only visible after toggling benevolence on)
+- Benevolence Notes: data-testid="benevolence-notes-input"
+  (only visible after toggling benevolence on)
+- Notes (textarea): data-testid="dist-notes-input"
+
+When you fill a field, briefly tell the user what you set and why. If a
+requested value is missing or unclear, say so — do not guess. Always remind
+the user that they must review and submit the form themselves.
+`.trim();
+  }, []);
 
   useEffect(() => {
     loadCategories();
@@ -537,7 +639,7 @@ export default function DistributionsPage() {
                 <DialogHeader>
                   <DialogTitle className="font-serif text-2xl text-navy">New Distribution</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 mt-4">
+                <div className="space-y-4 mt-4" ref={distributionFormRef}>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="label-trust">Date *</Label>
@@ -774,6 +876,22 @@ export default function DistributionsPage() {
                   >
                     {formLoading ? 'Creating...' : 'Create Distribution'}
                   </Button>
+
+                  {/* Page Agent pilot — only renders when REACT_APP_ENABLE_PAGE_AGENT === 'true'.
+                      Restricted to the dialog form container via distributionFormRef.
+                      The agent can fill draft values but NEVER submit/approve/delete. */}
+                  {PAGE_AGENT_ENABLED && (
+                    <PageAgentErrorBoundary>
+                      <PageAgentAssistant
+                        containerRef={distributionFormRef}
+                        systemInstructions={pageAgentInstructions}
+                        pageName="Distributions"
+                        placeholder='e.g. "Fill in $500 to John Smith as a Trust Distribution"'
+                        idleMessage='Ready. Type an instruction like "Fill in $500 to John Smith".'
+                        helpText='The agent can fill draft values for the form and explain fields. It will never submit, approve, or delete — those are fiduciary actions you must take yourself.'
+                      />
+                    </PageAgentErrorBoundary>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>

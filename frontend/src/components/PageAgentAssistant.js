@@ -1,35 +1,44 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { PageAgent, tool } from 'page-agent';
 import { z } from 'zod/v4';
 import { API } from '@/utils/api';
 
 /**
- * PageAgentAssistant — Page Agent pilot integration for the TrustOffice
- * onboarding "Confirm" step.
+ * PageAgentAssistant — reusable Page Agent integration component.
  *
- * The agent is restricted to the OnboardingConfirmStep form container via
- * `interactiveWhitelist`, so it can only fill/draft fields inside that form.
- * It is NEVER allowed to submit — the system instructions forbid clicking
- * the confirm button, and the `execute_javascript` tool is disabled.
+ * The agent is restricted to the provided container via `interactiveWhitelist`,
+ * so it can only fill/draft fields inside that container. It is NEVER allowed
+ * to submit — the system instructions forbid clicking submit/approve buttons,
+ * and the `execute_javascript` tool is disabled.
  *
  * All LLM calls route through the backend proxy at `/api/page-agent/llm/chat/completions`,
  * which authenticates the JWT and appends the OpenRouter API key server-side.
  *
  * Props:
- *   trustData        — current trust data state from OnboardingPage
- *   setTrustData     — setter for trust data
- *   trusteeNames     — array of trustee name strings
- *   setTrusteeNames  — setter for trustee names array
- *   extractedFields  — AI-extracted fields from backend document analysis
- *   containerRef     — ref to the OnboardingConfirmStep form container DOM element
+ *   containerRef            — ref to the form container DOM element (interactiveWhitelist target)
+ *   systemInstructions      — page-specific system instructions string (REQUIRED)
+ *   pageName                — short page name for console logging (e.g. "Distributions", "Onboarding")
+ *   extractedFields         — optional dynamic fields passed to the agent via getPageInstructions
+ *   placeholder            — optional placeholder text for the instruction input
+ *   idleMessage            — optional idle status message
+ *   helpText              — optional help text shown below the input
+ *
+ * Legacy props (OnboardingConfirmStep, optional — kept for backward compat):
+ *   trustData, setTrustData, trusteeNames, setTrusteeNames
  */
 export default function PageAgentAssistant({
-  trustData,
-  setTrustData,
-  trusteeNames,
-  setTrusteeNames,
-  extractedFields,
   containerRef,
+  systemInstructions,
+  pageName = 'Page',
+  extractedFields,
+  placeholder = 'Type an instruction for the agent…',
+  idleMessage = 'Ready. Type an instruction for the agent.',
+  helpText = 'The agent can fill draft values and explain fields. It will never submit the form — you review and confirm yourself.',
+  // Legacy props (unused by Distributions, kept for onboarding compat)
+  trustData: _trustData,
+  setTrustData: _setTrustData,
+  trusteeNames: _trusteeNames,
+  setTrusteeNames: _setTrusteeNames,
 }) {
   const agentRef = useRef(null);
   const [status, setStatus] = useState('idle'); // idle | thinking | acting | done | error
@@ -39,7 +48,7 @@ export default function PageAgentAssistant({
   const [agentError, setAgentError] = useState(null);
 
   // ---------------- PII masking for page content ----------------
-  // NOTE: Must be defined before SYSTEM_INSTRUCTIONS, which references it.
+  // NOTE: Must be defined before any code that references it.
   // In dev mode hoisting makes order irrelevant, but the minified production
   // build enforces TDZ — "Cannot access 'v' before initialization".
   const maskPII = useCallback((content) => {
@@ -60,82 +69,11 @@ export default function PageAgentAssistant({
 
   const transformPageContent = useCallback((content) => maskPII(content), [maskPII]);
 
-  // ---------------- System instructions ----------------
-  const SYSTEM_INSTRUCTIONS = `
-You are the TrustOffice Onboarding Page Agent, embedded in the "Review Your
-Trust Details" form on step 3 of trust onboarding. Your ONLY job is to help
-the user fill in draft values for the form fields and explain what each
-field means.
-
-ABSOLUTE RULES:
-1. NEVER submit the form. Do not click, tap, or otherwise activate the
-   "Confirm and Create Trust" button (data-testid="confirm-create-trust-btn").
-   That button finalizes the trust and is reserved for the user.
-2. NEVER click the "Back" button (data-testid="confirm-back-btn").
-3. You may ONLY interact with elements inside the onboarding confirm form
-   container. Do not navigate away, open menus, or touch anything outside
-   that container.
-4. Never run arbitrary JavaScript. The execute_javascript tool is disabled.
-5. Never ask for or reveal sensitive PII that is not already visible on the
-   page. If the user asks you to fill an SSN, EIN, or credit card number,
-   fill it ONLY from the provided extracted fields — never invent values.
-6. Do not modify the trust once the user clicks "Confirm and Create Trust".
-   If the form has been submitted, stop and tell the user.
-
-WHAT YOU CAN DO:
-- Fill form fields from the extracted data the user provides in their
-  instruction, or from the \`extractedFields\` JSON I will pass you.
-- Explain what a field means (e.g. "What trust type should I select?").
-- Suggest a value for a field based on the trust document data.
-- Clear a field the user asks to clear.
-
-HOW TO FILL:
-- Trust Name input: data-testid="confirm-trust-name-input"
-- Trust Type (Radix Select): use the select_radix_option tool with
-  testid="confirm-trust-type-select" and optionText = the visible label
-  (e.g. "Revocable Living Trust", "Irrevocable Family Trust"). Do NOT try
-  to use selectOption on this — it is not a native <select>.
-- State/Jurisdiction (native select): data-testid="confirm-jurisdiction-input"
-  — use the normal selectOption action.
-- Trustee Name inputs: data-testid="confirm-trustee-name-0",
-  data-testid="confirm-trustee-name-1", etc. (one per trustee)
-- Grantor Name: data-testid="confirm-grantor-name-input"
-- Formation Date: data-testid="confirm-formation-date-input"
-- EIN: data-testid="confirm-ein-input" (under "Advanced settings" — click
-  the "Advanced settings" toggle button first to reveal it)
-- Tax Year End Month (Radix Select): use select_radix_option with
-  testid="confirm-tax-month-select" and optionText like "DEC (Calendar)".
-- Tax Year End Day: data-testid="confirm-tax-day-input"
-- Description: data-testid="confirm-description-input"
-
-When you fill a field, briefly tell the user what you set and why. If a
-requested value is missing from the extracted data, say so — do not guess.
-
-Available extracted fields from the user's trust document:
-${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
-`.trim();
-
-  // ---------------- customFetch: attach JWT + credentials ----------------
-  const customFetch = useCallback(async (url, options = {}) => {
-    const token = localStorage.getItem('auth_token');
-    const headers = new Headers(options.headers || {});
-    headers.set('Content-Type', 'application/json');
-    headers.set('Accept', 'application/json');
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-    const merged = {
-      ...options,
-      headers,
-      credentials: 'include',
-    };
-    return fetch(url, merged);
-  }, []);
-
   // ---------------- Custom tool: Radix Select bridge ----------------
   // Page Agent's built-in selectOption only works on native <select> elements.
   // TrustOffice uses Radix UI Select (button trigger + portal dropdown) for
-  // trust type and tax month. This custom tool:
+  // trust type, tax month, distribution type, category, status, trustee.
+  // This custom tool:
   //   1. Finds the Radix trigger by data-testid
   //   2. Clicks it to open the dropdown (portal renders at document.body)
   //   3. Finds the option by visible text in the portal
@@ -148,7 +86,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
       'NOT a native <select>. Pass the data-testid of the trigger element and the exact visible text of the option to select.',
     inputSchema: z.object({
       testid: z.string().describe('The data-testid attribute value of the Radix Select trigger button'),
-      optionText: z.string().describe('The exact visible text of the option to select (e.g. "Revocable Living Trust")'),
+      optionText: z.string().describe('The exact visible text of the option to select (e.g. "Trust Distribution")'),
     }),
     execute: async function (input, { signal }) {
       const { testid, optionText } = input;
@@ -191,6 +129,23 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
     },
   });
 
+  // ---------------- customFetch: attach JWT + credentials ----------------
+  const customFetch = useCallback(async (url, options = {}) => {
+    const token = localStorage.getItem('auth_token');
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
+    headers.set('Accept', 'application/json');
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    const merged = {
+      ...options,
+      headers,
+      credentials: 'include',
+    };
+    return fetch(url, merged);
+  }, []);
+
   // ---------------- Initialize agent on mount ----------------
   useEffect(() => {
     let cancelled = false;
@@ -201,12 +156,16 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
         setAgentError('Form container not ready.');
         return;
       }
+      if (!systemInstructions) {
+        setAgentError('Missing systemInstructions prop.');
+        return;
+      }
       try {
         agent = new PageAgent({
           model: 'google/gemini-2.5-flash-lite',
           baseURL: `${API}/page-agent/llm`,
           customFetch,
-          // Restrict all interaction to the onboarding confirm form container.
+          // Restrict all interaction to the provided form container.
           interactiveWhitelist: [containerRef.current],
           // Disable arbitrary JS execution for safety.
           customTools: {
@@ -217,22 +176,22 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
           maxSteps: 12,
           transformPageContent,
           instructions: {
-            system: SYSTEM_INSTRUCTIONS,
+            system: systemInstructions,
             // Dynamic page instructions re-evaluated each step, so the agent
             // sees updated extractedFields even if they arrive after init.
             getPageInstructions: () => {
-              if (!extractedFields || Object.keys(extractedFields).length === 0) return undefined;
-              return `\nCurrent extracted fields (latest):\n${maskPII(JSON.stringify(extractedFields, null, 2))}`;
+              if (!extractedFields || (typeof extractedFields === 'object' && Object.keys(extractedFields).length === 0)) return undefined;
+              return `\nCurrent context fields (latest):\n${maskPII(typeof extractedFields === 'string' ? extractedFields : JSON.stringify(extractedFields, null, 2))}`;
             },
           },
         });
         if (cancelled) return;
         agentRef.current = agent;
         setStatus('idle');
-        setStatusMessage('Ready. Type an instruction like "Fill in the trust name from my document".');
+        setStatusMessage(idleMessage);
       } catch (e) {
         if (cancelled) return;
-        console.error('[PageAgent] init failed:', e);
+        console.error(`[PageAgent:${pageName}] init failed:`, e);
         setAgentError(`Failed to initialize Page Agent: ${e?.message || e}`);
         setStatus('error');
       }
@@ -248,7 +207,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
           agentRef.current.dispose();
         }
       } catch (e) {
-        console.warn('[PageAgent] dispose failed:', e);
+        console.warn(`[PageAgent:${pageName}] dispose failed:`, e);
       }
       agentRef.current = null;
     };
@@ -270,9 +229,6 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
     setHistory((h) => [...h, { role: 'user', text: trimmed, ts: Date.now() }]);
 
     try {
-      // Page Agent exposes status callbacks via options or events; we
-      // approximate "acting" with a short timer since execute() is the
-      // blocking call. If the agent exposes a status hook, prefer it.
       const actingTimer = setTimeout(() => {
         setStatus('acting');
         setStatusMessage('Agent is acting on the form…');
@@ -283,7 +239,6 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
 
       setStatus('done');
       setStatusMessage('Done.');
-      // Page Agent's execute() returns { success, data, history }.
       const resultText =
         typeof result === 'string'
           ? result
@@ -293,7 +248,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
         { role: 'assistant', text: resultText, ts: Date.now() },
       ]);
     } catch (e) {
-      console.error('[PageAgent] execute failed:', e);
+      console.error(`[PageAgent:${pageName}] execute failed:`, e);
       setStatus('error');
       setStatusMessage('Agent error.');
       setAgentError(`Agent failed: ${e?.message || e}`);
@@ -302,7 +257,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
         { role: 'assistant', text: `⚠️ ${e?.message || e}`, ts: Date.now(), error: true },
       ]);
     }
-  }, []);
+  }, [pageName]);
 
   // ---------------- UI ----------------
   const handleSubmit = (e) => {
@@ -392,7 +347,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
           type="text"
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
-          placeholder='e.g. "Fill in the trust name from my document"'
+          placeholder={placeholder}
           data-testid="page-agent-instruction-input"
           disabled={status === 'thinking' || status === 'acting'}
           style={{
@@ -423,8 +378,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
       </form>
 
       <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#64748b' }}>
-        The agent can fill draft values from your document and explain fields.
-        It will never submit the form — you review and confirm yourself.
+        {helpText}
       </p>
     </div>
   );
