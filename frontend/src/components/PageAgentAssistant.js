@@ -38,6 +38,28 @@ export default function PageAgentAssistant({
   const [history, setHistory] = useState([]); // [{ role, text, ts }]
   const [agentError, setAgentError] = useState(null);
 
+  // ---------------- PII masking for page content ----------------
+  // NOTE: Must be defined before SYSTEM_INSTRUCTIONS, which references it.
+  // In dev mode hoisting makes order irrelevant, but the minified production
+  // build enforces TDZ — "Cannot access 'v' before initialization".
+  const maskPII = useCallback((content) => {
+    if (!content || typeof content !== 'string') return content;
+    let masked = content;
+    // SSN: XXX-XX-XXXX
+    masked = masked.replace(/\b\d{3}-\d{2}-\d{4}\b/g, 'XXX-XX-XXXX');
+    // EIN: XX-XXXXXXX (employer id)
+    masked = masked.replace(/\b\d{2}-\d{7}\b/g, 'XX-XXXXXXX');
+    // Credit card numbers: 13-19 digit runs, optionally grouped by 4
+    masked = masked.replace(/\b(?:\d[ -]*){13,19}\d\b/g, (m) => {
+      const digits = m.replace(/\D/g, '');
+      if (digits.length >= 13 && digits.length <= 19) return '[CARD REDACTED]';
+      return m;
+    });
+    return masked;
+  }, []);
+
+  const transformPageContent = useCallback((content) => maskPII(content), [maskPII]);
+
   // ---------------- System instructions ----------------
   const SYSTEM_INSTRUCTIONS = `
 You are the TrustOffice Onboarding Page Agent, embedded in the "Review Your
@@ -92,25 +114,6 @@ requested value is missing from the extracted data, say so — do not guess.
 Available extracted fields from the user's trust document:
 ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
 `.trim();
-
-  // ---------------- PII masking for page content ----------------
-  const maskPII = useCallback((content) => {
-    if (!content || typeof content !== 'string') return content;
-    let masked = content;
-    // SSN: XXX-XX-XXXX
-    masked = masked.replace(/\b\d{3}-\d{2}-\d{4}\b/g, 'XXX-XX-XXXX');
-    // EIN: XX-XXXXXXX (employer id)
-    masked = masked.replace(/\b\d{2}-\d{7}\b/g, 'XX-XXXXXXX');
-    // Credit card numbers: 13-19 digit runs, optionally grouped by 4
-    masked = masked.replace(/\b(?:\d[ -]*){13,19}\d\b/g, (m) => {
-      const digits = m.replace(/\D/g, '');
-      if (digits.length >= 13 && digits.length <= 19) return '[CARD REDACTED]';
-      return m;
-    });
-    return masked;
-  }, []);
-
-  const transformPageContent = useCallback((content) => maskPII(content), [maskPII]);
 
   // ---------------- customFetch: attach JWT + credentials ----------------
   const customFetch = useCallback(async (url, options = {}) => {
