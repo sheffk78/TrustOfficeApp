@@ -171,6 +171,26 @@ export default function PageAgentAssistant({
           customTools: {
             execute_javascript: null, // disabled — security
             select_radix_option: radixSelectTool, // bridge for Radix UI Selects
+            // Override ask_user to prevent blocking — our UI doesn't support
+            // mid-execution back-and-forth. Instead, tell the agent to use best
+            // judgment and report the limitation in its final response.
+            ask_user: tool({
+              description:
+                'Ask the user a clarifying question. ' +
+                'Use this when you need the user to choose between options or provide information you cannot determine from the page.',
+              inputSchema: z.object({
+                question: z.string().describe('The question to ask the user'),
+              }),
+              execute: async (input) => {
+                return (
+                  `The user cannot respond mid-task. Use your best judgment: ` +
+                  `pick the closest matching option from what's available, ` +
+                  `or skip the field if nothing fits. ` +
+                  `Mention this limitation in your final response. ` +
+                  `Original question was: "${input.question}"`
+                );
+              },
+            }),
           },
           enableMask: true,
           maxSteps: 12,
