@@ -576,20 +576,19 @@ async def get_current_user(request: Request) -> dict:
                 if not token_iat:
                     # Reject tokens without 'iat' claim — they bypass revocation checks
                     raise HTTPException(status_code=401, detail="Invalid token: missing issued-at claim")
-                if token_iat:
-                    from datetime import datetime as dt
-                    if isinstance(token_iat, (int, float)):
-                        token_issued = dt.fromtimestamp(token_iat, tz=timezone.utc)
-                    else:
-                        token_issued = token_iat
-                    revocation_time = user_revocation.get("created_at")
-                    if revocation_time:
-                        if isinstance(revocation_time, str):
-                            revocation_time = dt.fromisoformat(revocation_time)
-                        if hasattr(revocation_time, 'tzinfo') and revocation_time.tzinfo is None:
-                            revocation_time = revocation_time.replace(tzinfo=timezone.utc)
-                        if token_issued < revocation_time:
-                            raise HTTPException(status_code=401, detail="Token revoked")
+                from datetime import datetime as dt
+                if isinstance(token_iat, (int, float)):
+                    token_issued = dt.fromtimestamp(token_iat, tz=timezone.utc)
+                else:
+                    token_issued = token_iat
+                revocation_time = user_revocation.get("created_at")
+                if revocation_time:
+                    if isinstance(revocation_time, str):
+                        revocation_time = dt.fromisoformat(revocation_time)
+                    if hasattr(revocation_time, 'tzinfo') and revocation_time.tzinfo is None:
+                        revocation_time = revocation_time.replace(tzinfo=timezone.utc)
+                    if token_issued < revocation_time:
+                        raise HTTPException(status_code=401, detail="Token revoked")
         
         user = await db.users.find_one({"user_id": payload["user_id"]}, {"_id": 0})
         if user:

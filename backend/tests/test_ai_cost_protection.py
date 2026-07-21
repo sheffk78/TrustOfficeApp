@@ -14,7 +14,8 @@ import pytest
 import requests
 import os
 import time
-from datetime import datetime, timezone
+import jwt as pyjwt
+from datetime import datetime, timezone, timedelta
 
 # Get BASE_URL - use localhost for testing to avoid external rate limits
 BASE_URL = os.environ.get('TEST_BASE_URL', 'http://localhost:8001')
@@ -24,9 +25,22 @@ DEMO_EMAIL = "demo@trustoffice.com"
 DEMO_PASSWORD = "demopassword"
 ADMIN_EMAIL = "jeff@socialize.video"
 
-# Admin JWT - generated with correct JWT_SECRET from backend/.env
-# Valid for 7 days from generation
-ADMIN_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoidXNlcl9kMmRkYTVlYjQwYzEiLCJlbWFpbCI6ImplZmZAc29jaWFsaXplLnZpZGVvIiwiZXhwIjoxNzc0Njc1MzI1LCJpYXQiOjE3NzQwNzA1MjV9._3w9JISuuQ4vDxtv5EDZ9neNFLlv5baDeuiC3lyCG-U"
+
+def _generate_admin_jwt() -> str:
+    """Dynamically generate an admin JWT signed with the current JWT_SECRET.
+
+    Replaces the previous hardcoded token, which became invalid after the
+    JWT secret rotation. Uses the same pattern as the fallback path in
+    test_usage_endpoint_returns_200_for_admin.
+    """
+    JWT_SECRET = os.environ.get('JWT_SECRET', 'test-secret-do-not-use-in-prod')
+    payload = {
+        'user_id': 'user_d2dda5eb40c1',
+        'email': ADMIN_EMAIL,
+        'exp': datetime.now(timezone.utc) + timedelta(days=7),
+        'iat': datetime.now(timezone.utc),
+    }
+    return pyjwt.encode(payload, JWT_SECRET, algorithm='HS256')
 
 
 class TestAICostProtection:
@@ -56,9 +70,9 @@ class TestAICostProtection:
     
     @pytest.fixture(scope="class")
     def admin_headers(self):
-        """Headers with admin user auth (using provided JWT)"""
+        """Headers with admin user auth (JWT generated dynamically from JWT_SECRET)"""
         return {
-            "Authorization": f"Bearer {ADMIN_JWT}",
+            "Authorization": f"Bearer {_generate_admin_jwt()}",
             "Content-Type": "application/json"
         }
     
