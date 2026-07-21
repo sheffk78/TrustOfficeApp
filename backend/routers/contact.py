@@ -1,7 +1,7 @@
 """
 Contact router - Public contact form submissions
 """
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime, timezone
 from typing import Optional
@@ -13,6 +13,7 @@ import time
 
 from database import db
 from email_service import email_service
+from routers.admin import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -287,12 +288,13 @@ Reference: {submission_id}
 async def get_contact_submissions(
     status: Optional[str] = None,
     limit: int = 50,
-    skip: int = 0
+    skip: int = 0,
+    admin: dict = Depends(require_admin)
 ):
     """
     Admin endpoint to retrieve contact submissions.
-    TODO: Add admin authentication
     """
+    limit = min(limit, 100)  # Cap to prevent bulk data extraction
     query = {}
     if status:
         query["status"] = status

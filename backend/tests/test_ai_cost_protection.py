@@ -190,7 +190,7 @@ class TestAICostProtection:
             # Try to regenerate admin token
             import jwt
             from datetime import datetime, timezone, timedelta
-            JWT_SECRET = 'kP9mX2vL8nQ4rT6wY0zA3bC5dE7fG1hI9jK2lM4nO6pQ8rS0tU2vW4xY6zA8bC0d'
+            JWT_SECRET = os.environ.get('JWT_SECRET', 'test-secret-do-not-use-in-prod')
             payload = {
                 'user_id': 'user_d2dda5eb40c1',
                 'email': 'jeff@socialize.video',

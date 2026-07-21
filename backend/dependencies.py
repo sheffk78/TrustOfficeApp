@@ -573,6 +573,9 @@ async def get_current_user(request: Request) -> dict:
             if user_revocation:
                 # Check if this token was issued BEFORE the revocation
                 token_iat = payload.get("iat")
+                if not token_iat:
+                    # Reject tokens without 'iat' claim — they bypass revocation checks
+                    raise HTTPException(status_code=401, detail="Invalid token: missing issued-at claim")
                 if token_iat:
                     from datetime import datetime as dt
                     if isinstance(token_iat, (int, float)):

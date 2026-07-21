@@ -76,6 +76,10 @@ async def get_analysis_status(
     user: dict = Depends(get_current_user)
 ):
     """Lightweight status check for polling. Filters by doc_id if provided."""
+    # Verify trust ownership
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
     query = {"trust_id": trust_id}
     if doc_id:
         query["vault_document_id"] = doc_id

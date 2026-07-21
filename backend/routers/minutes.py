@@ -62,17 +62,20 @@ async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTas
     
     # Link to distribution if provided
     if minutes.distribution_id:
-        await db.distribution_records.update_one(
-            {"distribution_id": minutes.distribution_id},
+        result = await db.distribution_records.update_one(
+            {"distribution_id": minutes.distribution_id, "user_id": user["user_id"]},
             {"$set": {"minutes_record_id": minutes_id}}
         )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Distribution record not found or does not belong to your account")
     
-    # Link to compensation payment if provided
     if minutes.compensation_payment_id:
-        await db.compensation_payments.update_one(
-            {"payment_id": minutes.compensation_payment_id},
+        result = await db.compensation_payments.update_one(
+            {"payment_id": minutes.compensation_payment_id, "user_id": user["user_id"]},
             {"$set": {"minutes_record_id": minutes_id}}
         )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Compensation payment record not found or does not belong to your account")
     
     # Only update onboarding when finalized (not drafts)
     if minutes.status == "finalized":

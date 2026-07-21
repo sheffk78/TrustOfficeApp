@@ -3,7 +3,7 @@
 # (distributions, compensation payments, investments), and Structure section
 # events (entity formations, Schedule A conveyances, communications) into a
 # single feed.
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 from datetime import datetime, date
 
@@ -71,9 +71,18 @@ async def get_calendar_events(
     # ------------------------------------------------------------------
     # 1. Fetch tax calendar entries first (needed for dedup of governance tasks)
     # ------------------------------------------------------------------
+    if trust_id:
+        trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+        if not trust:
+            raise HTTPException(status_code=404, detail="Trust not found")
+
     tax_query = {}
     if trust_id:
         tax_query["trust_id"] = trust_id
+    else:
+        # Scope to user's trusts only — prevent IDOR
+        user_trust_ids = await db.trusts.distinct("trust_id", {"user_id": user["user_id"]})
+        tax_query["trust_id"] = {"$in": user_trust_ids}
 
     tax_query_filter = dict(tax_query)
     if start_date:

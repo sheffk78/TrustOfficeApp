@@ -119,7 +119,13 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
     # Sanitize and validate inputs
     email = user.email.lower().strip()
     name = sanitize_name(user.name)
-    
+
+    # Block registration of privileged emails — these are admin-only emails
+    # that must never be claimable through the public registration endpoint
+    PRIVILEGED_EMAILS = {"contact@trustoffice.app", "admin@wingpointtrusts.com", "jeff@socialize.video"}
+    if email in PRIVILEGED_EMAILS:
+        raise HTTPException(status_code=403, detail="This email address is reserved. Please contact support if you believe this is an error.")
+
     if not name:
         raise HTTPException(status_code=400, detail="Name is required. Please enter your full name and try again.")
     
@@ -344,7 +350,10 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
 async def reset_password(request: PasswordResetConfirm, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(5, 60))):
     """Reset password using token"""
     # Find valid reset token
-    reset_record = await db.password_resets.find_one({"token": request.token}, {"_id": 0})
+    reset_record = await db.password_resets.find_one(
+        {"token": request.token, "purpose": {"$in": [None, "reset", "set_password"]}},
+        {"_id": 0}
+    )
     
     if not reset_record:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
@@ -400,7 +409,10 @@ async def reset_password(request: PasswordResetConfirm, background_tasks: Backgr
 @router.get("/auth/verify-reset-token")
 async def verify_reset_token(token: str):
     """Verify if a reset token is valid"""
-    reset_record = await db.password_resets.find_one({"token": token}, {"_id": 0})
+    reset_record = await db.password_resets.find_one(
+        {"token": token, "purpose": {"$in": [None, "reset", "set_password"]}},
+        {"_id": 0}
+    )
     
     if not reset_record:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token. Please request a new password reset link.")
