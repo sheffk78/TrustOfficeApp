@@ -143,8 +143,8 @@ async def log_audit(partner_id: str, action: str, wingpoint_ref: str, details: d
 # Map WingPoint packages to recommended TrustOffice tiers
 PACKAGE_TO_PLAN = {
     "single_trust": "trustee",      # 1 trust → Trustee ($79/mo, 1 trust)
-    "estate_bundle": "estate",      # 2 trusts → Estate ($149/mo, 5 trusts)
-    "builder_bundle": "estate",     # 4 trusts → Estate ($149/mo, 5 trusts covers it)
+    "estate_bundle": "estate",      # 2 trusts → Estate ($149/mo, 8 trusts)
+    "builder_bundle": "estate",     # 4 trusts → Estate ($149/mo, 8 trusts covers it)
 }
 
 # Human-readable plan names for API response
@@ -791,7 +791,7 @@ async def provision_trustoffice(
     if _prelim_limit != float('inf'):
         _current_trust_count = await db.trusts.count_documents({"user_id": user_id})
         if _current_trust_count > _prelim_limit:
-            _prelim_plan = "estate" if _current_trust_count <= 5 else "advisor"
+            _prelim_plan = "estate" if _current_trust_count <= 8 else "advisor"
     action_plan_param = f"&plan={_prelim_plan}"
     set_password_url = f"{frontend_url}/wingpoint?action=set_password&token={set_password_token}{coupon_param}{action_plan_param}"
 

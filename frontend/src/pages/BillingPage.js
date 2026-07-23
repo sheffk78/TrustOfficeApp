@@ -47,11 +47,11 @@ const TIERS = [
     name: 'Estate Plan',
     monthly: 149,
     annual: 1490,
-    trustLimit: 'Up to 5 trusts',
+    trustLimit: 'Up to 8 trusts',
     popular: true,
     features: [
       'Everything in Trustee',
-      'Up to 5 trusts & entities',
+      'Up to 8 trusts & entities',
       'Multi-trust dashboard',
       'Recurring task automation',
       'Minutes & distribution management',

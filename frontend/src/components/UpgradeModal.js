@@ -31,8 +31,8 @@ const TIERS = [
     name: 'Estate',
     monthly: 149,
     annual: 1490,
-    tagline: 'Up to 5 trusts, multi-trust dashboard',
-    trustLimit: 'Up to 5 trusts'
+    tagline: 'Up to 8 trusts, multi-trust dashboard',
+    trustLimit: 'Up to 8 trusts'
   },
   {
     id: 'advisor',

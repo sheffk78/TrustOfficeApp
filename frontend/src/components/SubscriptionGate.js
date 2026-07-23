@@ -143,7 +143,7 @@ export const FullSubscriptionGate = ({ children }) => {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Estate ($149/mo): up to 5 trusts, multi-trust dashboard
+                Estate ($149/mo): up to 8 trusts, multi-trust dashboard
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />

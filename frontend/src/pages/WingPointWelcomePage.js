@@ -24,7 +24,7 @@ const WINGPOINT_PACKAGES = [
  credits: '2 trust credits',
  plan: 'Estate',
  planPrice: '$149/mo',
- features: ['Up to 5 trusts', 'Multi-trust dashboard', 'Recurring task automation', 'Everything in Trustee'],
+ features: ['Up to 8 trusts', 'Multi-trust dashboard', 'Recurring task automation', 'Everything in Trustee'],
  },
  {
  name: 'Builder Bundle',
@@ -32,7 +32,7 @@ const WINGPOINT_PACKAGES = [
  credits: '4 trust credits',
  plan: 'Estate',
  planPrice: '$149/mo',
- features: ['Up to 5 trusts', 'Multi-trust dashboard', 'Recurring task automation', 'Everything in Trustee'],
+ features: ['Up to 8 trusts', 'Multi-trust dashboard', 'Recurring task automation', 'Everything in Trustee'],
  },
 ];
 
@@ -760,7 +760,7 @@ function LoggedInAction({ subscription, navigate, plan }) {
  />
  <div className="p-4 bg-gold/10 border border-gold/30">
  <p className="text-sm text-navy">
- <strong>Tip:</strong> The Trustee plan ($79/mo) is right for a single trust. The Estate plan ($149/mo) manages up to 5 trusts and is recommended if you purchased the Estate or Builder Bundle.
+ <strong>Tip:</strong> The Trustee plan ($79/mo) is right for a single trust. The Estate plan ($149/mo) manages up to 8 trusts and is recommended if you purchased the Estate or Builder Bundle.
  </p>
  </div>
  </div>

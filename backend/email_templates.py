@@ -66,7 +66,7 @@ def get_trust_limit_text(plan_type: str, legacy_trust_limit: int | None = None) 
 
     Tiers:
       - trustee:  '1 trust or entity'
-      - estate:  'Up to 5 trusts & entities'
+      - estate:  'Up to 8 trusts & entities'
       - advisor: 'Unlimited trusts & entities'
       - Legacy grandfathered (monthly/annual with legacy_trust_limit=10):
           'Up to 10 trusts & entities (grandfathered)'
@@ -80,7 +80,7 @@ def get_trust_limit_text(plan_type: str, legacy_trust_limit: int | None = None) 
     if pt == "trustee":
         return "1 trust or entity"
     elif pt == "estate":
-        return "Up to 5 trusts & entities"
+        return "Up to 8 trusts & entities"
     elif pt == "advisor":
         return "Unlimited trusts & entities"
     elif pt in ("monthly", "annual"):

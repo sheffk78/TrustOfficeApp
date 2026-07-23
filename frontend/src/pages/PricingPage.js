@@ -67,13 +67,13 @@ const TIERS = [
   {
     id: 'estate',
     name: 'Estate',
-    tagline: 'Up to 5 trusts, multi-trust dashboard',
+    tagline: 'Up to 8 trusts, multi-trust dashboard',
     monthly: 149,
     annual: 1490,
-    trustLimit: 'Up to 5 trusts',
+    trustLimit: 'Up to 8 trusts',
     popular: true, // "Most Popular" badge
     features: [
-      'Up to 5 trusts & entities',
+      'Up to 8 trusts & entities',
       'Everything in Trustee',
       'Multi-trust dashboard',
       'Recurring task automation',
@@ -111,7 +111,7 @@ const TIERS = [
 // Feature comparison rows for the table below the cards
 // Each row: { label, trustee, estate, advisor } where values are true (check) / false (dash) / string
 const COMPARISON_ROWS = [
-  { label: 'Trust records', trustee: '1', estate: '5', advisor: 'Unlimited' },
+  { label: 'Trust records', trustee: '1', estate: '8', advisor: 'Unlimited' },
   { label: 'Guided minutes templates', trustee: true, estate: true, advisor: true },
   { label: 'Schedule A asset tracking', trustee: true, estate: true, advisor: true },
   { label: 'Distribution management', trustee: true, estate: true, advisor: true },
@@ -130,7 +130,7 @@ const COMPARISON_ROWS = [
 // WingPoint plan descriptions shown on the pre-selected plan card.
 const WP_PLAN_DESCRIPTIONS = {
   trustee: 'Perfect for your single WingPoint trust. Manage one trust with full access to documents and amendments.',
-  estate: 'Ideal if you have WingPoints Estate Bundle. Manage up to 5 trusts for family, properties, or business entities.',
+  estate: 'Ideal if you have WingPoints Estate Bundle. Manage up to 8 trusts for family, properties, or business entities.',
   advisor: 'For WingPoint Builder Bundle customers managing multiple trusts. Unlimited trusts, priority support.'
 };
 

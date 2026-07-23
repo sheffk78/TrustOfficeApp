@@ -36,7 +36,7 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
     Feature Gate: MULTIPLE_TRUSTS
     - Free/Forever Free: 10 trusts
     - Trustee: 1 trust
-    - Estate: 5 trusts
+    - Estate: 8 trusts
     - Advisor: unlimited
     - Legacy monthly/annual: 10 trusts (grandfathered)
     """

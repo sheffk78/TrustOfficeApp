@@ -430,7 +430,7 @@ PLAN_TRUST_LIMITS = {
     "free": 10,
     "forever_free": 10,
     "trustee": 1,
-    "estate": 5,
+    "estate": 8,
     "advisor": float('inf'),  # unlimited
     # Legacy (grandfathered)
     "monthly": 10,
