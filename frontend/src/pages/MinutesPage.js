@@ -22,7 +22,8 @@ import {
   Eye,
   Loader2,
   Pencil,
-  Bot
+  Bot,
+  Trash2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
@@ -137,6 +138,22 @@ export default function MinutesPage() {
       showError(toast, error, { operation: 'generate', page: 'Minutes' });
     } finally {
       setPdfLoadingId(null);
+    }
+  };
+
+  const handleDeleteMinutes = async (minutesId) => {
+    if (!window.confirm('Delete this draft? This cannot be undone.')) return;
+    try {
+      const response = await fetchWithAuth(`/minutes/${minutesId}`, { method: 'DELETE' });
+      if (response.ok) {
+        toast.success('Minutes deleted.');
+        loadMinutes(searchQuery);
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        toast.error(errBody.detail || 'Failed to delete minutes.');
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'delete', page: 'Minutes' });
     }
   };
 
@@ -476,6 +493,20 @@ export default function MinutesPage() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{details}</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          {entry.status === 'draft' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteMinutes(entry.minutes_id);
+                              }}
+                              className="text-error hover:bg-error/10 text-xs"
+                              data-testid={`delete-${entry.minutes_id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"

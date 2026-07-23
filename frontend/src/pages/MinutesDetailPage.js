@@ -28,7 +28,8 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
-  FilePenLine
+  FilePenLine,
+  Trash2
 } from 'lucide-react';
 
 export default function MinutesDetailPage() {
@@ -41,6 +42,8 @@ export default function MinutesDetailPage() {
   const [saving, setSaving] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
   // Editable fields
@@ -147,6 +150,26 @@ export default function MinutesDetailPage() {
       showError(toast, error, { operation: 'finalize', page: 'MinutesDetail' });
     } finally {
       setFinalizing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const response = await fetchWithAuth(`/minutes/${minutesId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        toast.success('Minutes deleted successfully.');
+        navigate('/minutes');
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        toast.error(errBody.detail || 'Failed to delete minutes. Please try again.');
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'delete', page: 'MinutesDetail' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -290,6 +313,12 @@ export default function MinutesDetailPage() {
                     <Button className="btn-primary" onClick={() => setShowFinalizeConfirm(true)} disabled={finalizing} data-testid="finalize-minutes-btn">
                       <FileText className="w-4 h-4 mr-2" />
                       {finalizing ? 'Finalizing...' : 'Finalize Minutes'}
+                    </Button>
+                  )}
+                  {isDraft && (
+                    <Button variant="ghost" onClick={() => setShowDeleteConfirm(true)} disabled={deleting} className="text-error hover:bg-error/10" data-testid="delete-minutes-btn">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Draft
                     </Button>
                   )}
                 </>
@@ -536,6 +565,27 @@ export default function MinutesDetailPage() {
               <Button className="btn-primary" onClick={handleFinalize} disabled={finalizing} data-testid="confirm-finalize-btn">
                 <FileText className="w-4 h-4 mr-2" />
                 {finalizing ? 'Finalizing...' : 'Yes, Finalize'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !deleting && setShowDeleteConfirm(false)}>
+          <div className="card-trust p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-xl text-navy dark:text-gold mb-3">Delete This Draft?</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              This will permanently delete the draft minutes. This cannot be undone. Finalized minutes cannot be deleted.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={deleting} data-testid="confirm-delete-btn">
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deleting ? 'Deleting...' : 'Yes, Delete'}
               </Button>
             </div>
           </div>

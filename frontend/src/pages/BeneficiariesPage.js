@@ -508,6 +508,7 @@ export default function BeneficiariesPage() {
 
     try {
       const relationship = personForm.relationship || '';
+      const isCharity = relationship === 'Charity';
       const notesText = relationship ? `Relationship to grantor: ${relationship}` : '';
       const response = await fetchWithAuth('/trust-units/certificates', {
         method: 'POST',
@@ -515,7 +516,7 @@ export default function BeneficiariesPage() {
           trust_id: selectedTrust.trust_id,
           holder_name: personForm.name,
           holder_identifier: null,
-          holder_type: 'individual',
+          holder_type: isCharity ? 'charity' : 'individual',
           email: null,
           phone: null,
           units: units,

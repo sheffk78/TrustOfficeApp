@@ -13,7 +13,6 @@ import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
-import TrustDocumentSummary from '@/components/TrustDocumentSummary';
 import { 
   User,
   Building2,
@@ -996,18 +995,16 @@ export default function SettingsPage() {
           {/* ============ PEOPLE TAB ============ */}
           <TabsContent value="people">
                 {/* Successor Trustee */}
-                <div className="p-4 border border-navy/10 bg-navy/5">
-                  <div className="flex items-start gap-3 mb-4">
-                    <Shield className="w-5 h-5 text-navy mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-navy">Successor Trustee</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Designate who steps in if the trustee can no longer serve.
-                      </p>
-                    </div>
+                <div className="card-trust mb-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Shield className="w-5 h-5 text-navy" />
+                    <h2 className="font-serif text-xl text-navy">Successor Trustee</h2>
                   </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Designate who steps in if the trustee can no longer serve.
+                  </p>
 
-                  <div data-section="successor-trustee" className="space-y-3">
+                  <div data-section="successor-trustee" className="space-y-6">
                     <div>
                       <Label className="label-trust">Successor Trustee Name</Label>
                       <Input
@@ -1063,18 +1060,16 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Grantor */}
-                <div className="p-4 border border-navy/10 bg-navy/5">
-                  <div className="flex items-start gap-3 mb-4">
-                    <Users className="w-5 h-5 text-navy mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-navy">Grantor</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        The person who created the trust.
-                      </p>
-                    </div>
+                <div className="card-trust mb-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Users className="w-5 h-5 text-navy" />
+                    <h2 className="font-serif text-xl text-navy">Grantor</h2>
                   </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    The person who created the trust.
+                  </p>
 
-                  <div data-section="grantor" className="space-y-3">
+                  <div data-section="grantor" className="space-y-6">
                     <div>
                       <Label className="label-trust">Grantor Name</Label>
                       <Input
@@ -1090,18 +1085,16 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Key Contacts */}
-                <div className="p-4 border border-navy/10 bg-navy/5">
-                  <div className="flex items-start gap-3 mb-4">
-                    <Mail className="w-5 h-5 text-navy mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-navy">Key Contacts</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Trusted professionals associated with this trust.
-                      </p>
-                    </div>
+                <div className="card-trust mb-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Mail className="w-5 h-5 text-navy" />
+                    <h2 className="font-serif text-xl text-navy">Key Contacts</h2>
                   </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Trusted professionals associated with this trust.
+                  </p>
 
-                  <div data-section="key-contacts" className="space-y-4">
+                  <div data-section="key-contacts" className="space-y-6">
                     <div>
                       <Label className="label-trust">Trust Attorney</Label>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-1">
@@ -1130,18 +1123,16 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Successor Instructions */}
-                <div className="p-4 border border-navy/10 bg-navy/5">
-                  <div className="flex items-start gap-3 mb-4">
-                    <FileText className="w-5 h-5 text-navy mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-navy">Successor Instructions</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        A letter of guidance and document location for your successor trustee.
-                      </p>
-                    </div>
+                <div className="card-trust mb-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <FileText className="w-5 h-5 text-navy" />
+                    <h2 className="font-serif text-xl text-navy">Successor Instructions</h2>
                   </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    A letter of guidance and document location for your successor trustee.
+                  </p>
 
-                  <div data-section="successor-instructions" className="space-y-3">
+                  <div data-section="successor-instructions" className="space-y-6">
                     <div>
                       <Label className="label-trust">Letter of Guidance for Successor Trustee</Label>
                       <textarea
@@ -1164,6 +1155,21 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Save button for People tab */}
+                {selectedTrust && (
+                  <div className="flex items-center justify-end pt-4 border-t border-navy/10">
+                    <Button
+                      onClick={handleUpdateTrust}
+                      disabled={loading}
+                      className="btn-primary"
+                      data-testid="save-people-settings"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {loading ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </div>
+                )}
           </TabsContent>
 
           {/* ============ COMPLIANCE TAB ============ */}
@@ -1684,13 +1690,6 @@ export default function SettingsPage() {
           </div>
 
           {/* ============ PROFILE TAB ============ */}
-          {/* Trust Document Intelligence — extracted provisions from uploaded trust document */}
-          {selectedTrust && (
-            <div className="mb-8">
-              <TrustDocumentSummary trustId={selectedTrust.trust_id} />
-            </div>
-          )}
-
           {/* Billing Section */}
           <div className="card-trust mb-8">
             <div className="flex items-center gap-2 mb-4">
