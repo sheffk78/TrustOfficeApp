@@ -153,19 +153,20 @@ export default function DashboardPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  // WingPoint welcome modal — show on first visit when ?wp=1 or not yet dismissed
+  // WingPoint welcome modal — show ONLY for WingPoint-provisioned users
+  // Triggered by ?wp=1 param (set by WingPoint redirect flow) or a wp_origin flag on the user
   useEffect(() => {
     const wpParam = searchParams.get('wp');
     const dismissed = localStorage.getItem('wp_welcome_dismissed');
-    const hasTrusts = trusts && trusts.length > 0;
+    const isWpUser = user?.wp_origin === true || user?.wp_origin === 'true';
 
-    if (wpParam === '1' || (!dismissed && hasTrusts)) {
+    if (wpParam === '1' || (isWpUser && !dismissed)) {
       setShowWpWelcome(true);
       setWpBannerVisible(false);
-    } else if (dismissed && hasTrusts) {
+    } else if (isWpUser && dismissed) {
       setWpBannerVisible(true);
     }
-  }, [searchParams, trusts]);
+  }, [searchParams, user]);
 
   useEffect(() => {
     if (trustsLoading) return;
