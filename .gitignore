@@ -189,3 +189,4 @@ credentials.json
 *.key
 .credentials
 .railway/
+test_reports/
