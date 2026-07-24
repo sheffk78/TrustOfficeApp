@@ -211,7 +211,11 @@ export default function TransactionLedgerPage() {
     if (!window.confirm('Delete this transaction? The audit trail will be preserved.')) return;
     try {
       const res = await fetchWithAuth(`/transactions/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || 'Failed to delete transaction'), { operation: 'delete', page: 'TransactionLedger' });
+        return;
+      }
       toast.success('Transaction deleted');
       loadData();
     } catch (e) {

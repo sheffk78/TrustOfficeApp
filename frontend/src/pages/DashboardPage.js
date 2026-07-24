@@ -241,13 +241,19 @@ export default function DashboardPage() {
 
   const dismissOnboarding = async () => {
     try {
-      await fetchWithAuth('/onboarding/dismiss', { method: 'POST' });
+      const res = await fetchWithAuth('/onboarding/dismiss', { method: 'POST' });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        toast.error(errBody.detail || 'Failed to dismiss. Please try again.');
+        return;
+      }
       setDashboard(prev => ({
         ...prev,
         onboarding_state: { ...prev.onboarding_state, checklist_dismissed: true }
       }));
     } catch (error) {
       console.error('Failed to dismiss onboarding:', error);
+      toast.error('Failed to dismiss. Please try again.');
     }
   };
 
@@ -754,9 +760,17 @@ export default function DashboardPage() {
                 <div className="mb-6">
                   <button
                     onClick={async () => {
-                      await fetchWithAuth('/onboarding/dismiss', { method: 'DELETE' });
-                      // Refresh dashboard to re-fetch onboarding state
-                      window.location.reload();
+                      try {
+                        const res = await fetchWithAuth('/onboarding/dismiss', { method: 'DELETE' });
+                        if (!res.ok) {
+                          const errBody = await res.json().catch(() => ({}));
+                          toast.error(errBody.detail || 'Failed to restore checklist.');
+                          return;
+                        }
+                        window.location.reload();
+                      } catch (error) {
+                        toast.error('Failed to restore checklist. Please try again.');
+                      }
                     }}
                     className="text-sm text-navy/60 hover:text-navy font-mono flex items-center gap-1.5"
                   >

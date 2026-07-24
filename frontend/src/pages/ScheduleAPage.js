@@ -214,7 +214,8 @@ export default function ScheduleAPage() {
         loadAssets();
         loadSummary();
       } else {
-        showError(toast, new Error('Failed to delete asset'), { operation: 'delete', page: 'ScheduleA' });
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || 'Failed to delete asset'), { operation: 'delete', page: 'ScheduleA' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'delete', page: 'ScheduleA' });
