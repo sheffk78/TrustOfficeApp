@@ -420,6 +420,13 @@ PLAN_FEATURES = {
         Feature.GOVERNANCE_BASIC,
         Feature.SINGLE_TRUST,
         Feature.MULTIPLE_TRUSTS,
+        Feature.BENEFICIARY_DASHBOARD,
+        Feature.TRUST_UNITS,
+        Feature.GOVERNANCE_HISTORY,
+        Feature.ADVANCED_TEMPLATES,
+        Feature.PDF_NO_WATERMARK,
+        Feature.CSV_EXPORT,
+        Feature.BENEVOLENCE_MODE,
     }
 }
 
