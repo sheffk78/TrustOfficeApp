@@ -6,13 +6,17 @@ marketing form. Tracks them through: new → engaged → warm → converted → 
 import csv
 import io
 import re
+import os
 import uuid
+import json
+import hmac
+import hashlib
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, PlainTextResponse
 from pydantic import BaseModel, EmailStr
 
 from database import db
@@ -20,6 +24,7 @@ from routers.admin import require_admin
 from discord_service import notify_new_lead, notify_lead_stage_change
 from email_service import email_service
 from routers.notifications import create_notification
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +82,7 @@ LEAD_SOURCES = [
     "trust-governance-system",
     "manual",
     "direct",
+    "facebook-lead-ad",
 ]
 
 # ==================== SCHEMAS ====================
@@ -233,6 +239,7 @@ def calculate_lead_score(lead: dict) -> int:
         "blog-article-pdf": 2,           # Low intent — casual blog reader
         "direct": 1,                    # Unknown / direct traffic
         "manual": 0,                    # Manually entered
+        "facebook-lead-ad": 7,          # Paid lead form submission
     }
     score += SOURCE_QUALITY.get(source, 1)
 
@@ -311,6 +318,7 @@ def get_score_breakdown(lead: dict) -> dict:
         "blog-article-pdf": 2,
         "direct": 1,
         "manual": 0,
+        "facebook-lead-ad": 7,
     }
     source_score = SOURCE_QUALITY.get(source, 1)
 
@@ -594,7 +602,269 @@ async def tidycal_webhook(request: Request):
     return {"success": True, "lead_id": lead_id, "is_returning": False}
 
 
-# ==================== ANALYTICS ENDPOINT ====================
+# ==================== FACEBOOK LEAD ADS WEBHOOK ====================
+
+# Verify token for Facebook webhook subscription verification.
+# Set via Railway env var FB_WEBHOOK_VERIFY_TOKEN.
+# Facebook sends this during the initial webhook setup to confirm ownership.
+FB_WEBHOOK_VERIFY_TOKEN = os.environ.get("FB_WEBHOOK_VERIFY_TOKEN", "")
+FB_PAGE_ACCESS_TOKEN = os.environ.get("FB_PAGE_ACCESS_TOKEN", "")
+FB_APP_ID = os.environ.get("FB_APP_ID", "")
+FB_APP_SECRET = os.environ.get("FB_APP_SECRET", "")
+
+
+@router.get("/facebook-webhook", include_in_schema=False)
+async def facebook_webhook_verify(
+    request: Request,
+    hub_mode: Optional[str] = Query(None, alias="hub.mode"),
+    hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token"),
+    hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
+):
+    """
+    Facebook webhook verification endpoint.
+    Facebook sends a GET request with hub.mode=subscribe, hub.verify_token=<your token>,
+    and hub.challenge=<a string>. We verify the token and return the challenge.
+    This is called once during webhook setup in the Meta Developer dashboard.
+    """
+    if hub_mode == "subscribe" and hub_verify_token == FB_WEBHOOK_VERIFY_TOKEN:
+        logger.info("Facebook webhook verification successful")
+        return PlainTextResponse(hub_challenge)
+    else:
+        logger.warning(
+            f"Facebook webhook verification failed — mode={hub_mode}, "
+            f"token_match={hub_verify_token == FB_WEBHOOK_VERIFY_TOKEN}"
+        )
+        raise HTTPException(status_code=403, detail="Webhook verification failed")
+
+
+@router.post("/facebook-webhook", include_in_schema=False)
+async def facebook_webhook_handler(request: Request):
+    """
+    Facebook Lead Ads webhook endpoint.
+    Called by Facebook in real-time when someone submits a lead form on your ad.
+    
+    Flow:
+    1. Facebook sends a webhook event with leadgen_id
+    2. We fetch the actual form data from Facebook's Graph API using the Page Access Token
+    3. We create/update a lead in the CRM with source="facebook-lead-ad"
+    4. Discord notification + welcome email fire automatically
+    
+    No auth required — Facebook signs the payload with X-Hub-Signature-256.
+    We verify the signature using the App Secret for security.
+    """
+    try:
+        body = await request.body()
+        payload = json.loads(body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    # Verify X-Hub-Signature-256 header for security
+    if FB_APP_SECRET:
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        if not _verify_facebook_signature(body, signature, FB_APP_SECRET):
+            logger.warning("Facebook webhook signature verification failed")
+            raise HTTPException(status_code=403, detail="Signature verification failed")
+
+    # Facebook webhook payload structure:
+    # {"entry": [{"changes": [{"field": "leadgen", "value": {"leadgen_id": "xxx", "page_id": "yyy", "form_id": "zzz"}}]}], "object": "page"}
+    if payload.get("object") != "page":
+        logger.info(f"Facebook webhook received non-page object: {payload.get('object')}")
+        return {"success": True, "message": "Ignored non-page object"}
+
+    entries = payload.get("entry", [])
+    results = []
+
+    for entry in entries:
+        page_id = entry.get("id")
+        changes = entry.get("changes", [])
+
+        for change in changes:
+            if change.get("field") != "leadgen":
+                continue
+
+            leadgen_data = change.get("value", {})
+            leadgen_id = leadgen_data.get("leadgen_id")
+            form_id = leadgen_data.get("form_id")
+
+            if not leadgen_id:
+                logger.warning("Facebook webhook: leadgen_id missing from payload")
+                continue
+
+            if not FB_PAGE_ACCESS_TOKEN:
+                logger.error("FB_PAGE_ACCESS_TOKEN not set — cannot fetch lead data from Facebook")
+                results.append({"leadgen_id": leadgen_id, "success": False, "error": "No page access token"})
+                continue
+
+            # Fetch the actual lead data from Facebook Graph API
+            lead_data = await _fetch_facebook_lead_data(leadgen_id, FB_PAGE_ACCESS_TOKEN)
+
+            if not lead_data:
+                logger.error(f"Failed to fetch lead data for leadgen_id={leadgen_id}")
+                results.append({"leadgen_id": leadgen_id, "success": False, "error": "Graph API fetch failed"})
+                continue
+
+            # Extract name and email from the form data
+            field_data = lead_data.get("field_data", [])
+            name = ""
+            email = ""
+            phone = ""
+            city = ""
+            for field in field_data:
+                field_name = field.get("name", "").lower()
+                values = field.get("values", [])
+                value = values[0] if values else ""
+
+                if field_name in ("full_name", "name", "first_name"):
+                    name = value
+                elif field_name in ("email", "work_email", "personal_email"):
+                    email = value
+                elif field_name in ("phone_number", "phone", "mobile"):
+                    phone = value
+                elif field_name == "city":
+                    city = value
+
+            if not name:
+                name = lead_data.get("name", "Unknown")
+
+            if not email:
+                logger.warning(f"Facebook lead {leadgen_id} has no email — storing with leadgen_id only")
+                # Still create the lead so we don't lose it
+                email = f"fb_lead_{leadgen_id}@no-email.local"
+
+            email = email.strip().lower()
+
+            # Check if lead already exists by email
+            existing = await db.leads.find_one({"email": email})
+            if existing:
+                await db.leads.update_one(
+                    {"email": email},
+                    {"$set": {
+                        "name": name or existing.get("name", "Unknown"),
+                        "source": "facebook-lead-ad",
+                        "phone": phone or existing.get("phone"),
+                        "city": city or existing.get("city"),
+                        "facebook_leadgen_id": leadgen_id,
+                        "facebook_form_id": form_id,
+                        "facebook_page_id": page_id,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }}
+                )
+                lead_id = existing["lead_id"]
+                await _log_activity(lead_id, "facebook_lead", f"Lead form submitted via Facebook Ad (leadgen_id: {leadgen_id})")
+                logger.info(f"Facebook lead updated: {lead_id} — {email}")
+                results.append({"leadgen_id": leadgen_id, "lead_id": lead_id, "success": True, "is_returning": True})
+                continue
+
+            # Create new lead
+            now = datetime.now(timezone.utc)
+            lead_id = f"lead_{uuid.uuid4().hex[:12]}"
+
+            lead_doc = {
+                "lead_id": lead_id,
+                "email": email,
+                "name": name,
+                "source": "facebook-lead-ad",
+                "lead_type": "email_capture",
+                "phone": phone,
+                "city": city,
+                "facebook_leadgen_id": leadgen_id,
+                "facebook_form_id": form_id,
+                "facebook_page_id": page_id,
+                "utm_source": "facebook",
+                "utm_medium": "paid-social",
+                "utm_campaign": f"meta-lead-ad-{form_id}" if form_id else "meta-lead-ad",
+                "stage": "new",
+                "manual_stage_override": False,
+                "booked_call": False,
+                "lessons_watched": 0,
+                "subscription_status": None,
+                "last_login": None,
+                "notes": "",
+                "next_action": "Follow up on Facebook lead form submission",
+                "score": 70,  # Paid lead form = high intent
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+
+            await db.leads.insert_one(lead_doc)
+            await _log_activity(lead_id, "created", f"Lead captured via Facebook Lead Ad (form: {form_id})")
+            await _log_activity(lead_id, "facebook_lead", f"Lead form submitted via Facebook Ad (leadgen_id: {leadgen_id})")
+
+            # Send Discord notification
+            await notify_new_lead(
+                name=name,
+                email=email,
+                source="facebook-lead-ad",
+                lead_stage="new"
+            )
+
+            # Create in-app notification
+            await create_notification(
+                type="new_lead",
+                title=f"New Facebook lead: {name}",
+                body=f"Source: Facebook Lead Ad · Phone: {phone or 'N/A'}",
+                lead_id=lead_id,
+                lead_email=email,
+                lead_name=name,
+            )
+
+            # Send welcome email (fire-and-forget — only if we have a real email)
+            if email and not email.endswith("@no-email.local"):
+                try:
+                    course_url = f"{email_service.app_url}/courses/trustee-101"
+                    await email_service.send_lead_welcome(
+                        to_email=email,
+                        name=name,
+                        course_url=course_url
+                    )
+                    await _log_activity(lead_id, "email", "Sent welcome email")
+                except Exception as e:
+                    logger.warning(f"Failed to send welcome email to {email}: {e}")
+
+            logger.info(f"Facebook lead captured: {lead_id} — {name} — {email}")
+            results.append({"leadgen_id": leadgen_id, "lead_id": lead_id, "success": True, "is_returning": False})
+
+    return {"success": True, "processed": len(results), "results": results}
+
+
+def _verify_facebook_signature(payload: bytes, signature: str, app_secret: str) -> bool:
+    """
+    Verify the X-Hub-Signature-256 header sent by Facebook.
+    Facebook computes HMAC-SHA256 of the request body using the App Secret
+    and sends it as 'sha256=<hex_digest>'.
+    """
+    if not signature or not signature.startswith("sha256="):
+        return False
+    expected = signature.split("=", 1)[1]
+    computed = hmac.new(
+        app_secret.encode("utf-8"),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, computed)
+
+
+async def _fetch_facebook_lead_data(leadgen_id: str, access_token: str) -> Optional[dict]:
+    """
+    Fetch lead data from Facebook Graph API.
+    Endpoint: GET /{leadgen_id}?fields=field_data,name
+    """
+    url = f"https://graph.facebook.com/v18.0/{leadgen_id}"
+    params = {
+        "fields": "field_data,name",
+        "access_token": access_token,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Facebook Graph API error for leadgen_id={leadgen_id}: {e.response.status_code} {e.response.text[:200]}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to fetch Facebook lead data for {leadgen_id}: {e}")
+        return None
 
 
 @router.get("/analytics")
