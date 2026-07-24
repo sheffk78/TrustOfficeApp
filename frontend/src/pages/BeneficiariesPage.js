@@ -272,6 +272,9 @@ export default function BeneficiariesPage() {
         setShowSettingsModal(false);
         loadCertificatesData();
         loadOverviewData();
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to save settings (${response.status})`), { operation: 'save', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'Beneficiaries' });
@@ -903,7 +906,13 @@ export default function BeneficiariesPage() {
                                           <span className="font-mono text-sm text-navy dark:text-gold">{cert.certificate_number}</span>
                                           <span className="text-sm text-muted-foreground">{cert.units} units</span>
                                         </div>
-                                        <span className="text-xs text-muted-foreground font-mono">Issued {formatDate(cert.issue_date)}</span>
+                                        <div className="flex items-center gap-3">
+                                          <Button variant="ghost" size="sm" onClick={() => openEditModal(cert)} data-testid={`edit-cert-${cert.certificate_id}`}>
+                                            <Pencil className="w-3.5 h-3.5" />
+                                            <span className="ml-1 text-xs">Edit</span>
+                                          </Button>
+                                          <span className="text-xs text-muted-foreground font-mono">Issued {formatDate(cert.issue_date)}</span>
+                                        </div>
                                       </div>
                                     ))}
                                   </div>
@@ -1450,7 +1459,7 @@ export default function BeneficiariesPage() {
               />
               <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
                 <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                This is the maximum number of units that can be issued. Cannot be less than currently issued units.
+                This is the maximum number of units that can be issued. Cannot be less than currently issued units ({summary?.total_issued_units || 0} currently issued).
               </p>
             </div>
             <div>
