@@ -648,25 +648,23 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
 
 @router.delete("/minutes/{minutes_id}")
 async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_access)):
-    # Get the minutes record before deleting (for cascade)
+    # Try minutes_records first (direct-created minutes)
     minutes = await db.minutes_records.find_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
     )
-    if not minutes:
-        raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
     
-    if minutes.get("status") == "finalized":
-        raise HTTPException(
-            status_code=403,
-            detail="Finalized minutes cannot be deleted. This protects the legal record chain."
-        )
-    
-    result = await db.minutes_records.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
-    
-    # Cascade: unlink any transactions that referenced these minutes
     if minutes:
+        if minutes.get("status") == "finalized":
+            raise HTTPException(
+                status_code=403,
+                detail="Finalized minutes cannot be deleted. This protects the legal record chain."
+            )
+        
+        result = await db.minutes_records.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
+        
+        # Cascade: unlink any transactions that referenced these minutes
         await db.transactions.update_many(
             {"linked_minutes_id": minutes_id, "user_id": user["user_id"]},
             {"$set": {"linked_minutes_id": None}}
@@ -678,10 +676,30 @@ async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_acc
             {"_id": 0}
         ).to_list(100)
         for txn in affected_txns:
-            # Re-run alert checks (will re-create threshold alert if applicable)
             await check_transaction_alerts(txn)
+        
+        return {"message": "Minutes deleted"}
     
-    return {"message": "Minutes deleted"}
+    # Not in minutes_records — try minutes_templates (template-created minutes)
+    template = await db.minutes_templates.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    
+    if template:
+        if template.get("status") == "final":
+            raise HTTPException(
+                status_code=403,
+                detail="Finalized minutes cannot be deleted. This protects the legal record chain."
+            )
+        
+        result = await db.minutes_templates.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
+        
+        return {"message": "Minutes deleted"}
+    
+    # Not found in either collection
+    raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
 
 def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = False) -> bytes:
     """Generate a professional legal-style PDF for minutes record with proper formatting"""

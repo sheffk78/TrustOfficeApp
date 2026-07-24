@@ -206,6 +206,11 @@ export default function DashboardPage() {
   // Load upcoming tax deadlines for dashboard widget
   const loadTaxDeadlines = async () => {
     if (!selectedTrust) return;
+    if (selectedTrust.benevolence_enabled) {
+      setTaxDeadlines([]);
+      setTaxDeadlinesLoading(false);
+      return;
+    }
     setTaxDeadlinesLoading(true);
     try {
       const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/tax-calendar/upcoming?days=90`);
@@ -349,7 +354,7 @@ export default function DashboardPage() {
       { id: 'ein_doc', label: 'Add EIN letter to vault', done: onboarding.ein_doc_uploaded, action: '/vault', priority: 6 },
       { id: 'formation_date', label: 'Add formation date', done: onboarding.formation_date_added, action: '/settings#formation-date', priority: 7 },
       { id: 'ein', label: 'Enter your EIN', done: onboarding.ein_entered, action: '/settings#ein', priority: 8 },
-      { id: 'calendar', label: 'Review your tax calendar', done: onboarding.calendar_set, action: '/calendar', priority: 9 },
+      { id: 'calendar', label: 'Review your tax calendar', done: onboarding.calendar_set || selectedTrust?.benevolence_enabled, action: '/calendar', priority: 9 },
     ];
 
     const completed = steps.filter(s => s.done).length;
@@ -948,8 +953,8 @@ export default function DashboardPage() {
                 );
               })()}
 
-              {/* Tax Calendar Widget */}
-              {selectedTrust && (
+              {/* Tax Calendar Widget — hidden when benevolence mode (508c3) is enabled */}
+              {selectedTrust && !selectedTrust.benevolence_enabled && (
                 <div className="mb-8 card-trust corner-mark">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">

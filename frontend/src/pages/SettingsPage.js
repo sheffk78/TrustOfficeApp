@@ -704,7 +704,7 @@ export default function SettingsPage() {
             <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
               <TabsTrigger value="profile">Trust Profile</TabsTrigger>
               <TabsTrigger value="people">People</TabsTrigger>
-              <TabsTrigger value="compliance">Tax & Compliance</TabsTrigger>
+              <TabsTrigger value="compliance">Governance</TabsTrigger>
               <TabsTrigger value="account">Account & Billing</TabsTrigger>
             </TabsList>
 
@@ -987,6 +987,18 @@ export default function SettingsPage() {
                     </p>
                   )}
                 </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-navy/10 mt-6">
+                  <Button
+                    onClick={handleUpdateTrust}
+                    disabled={loading}
+                    className="btn-primary"
+                    data-testid="save-trust-profile-btn"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {loading ? 'Saving...' : 'Save Trust Profile'}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -1176,7 +1188,12 @@ export default function SettingsPage() {
           <TabsContent value="compliance">
           {/* Compliance tab — only shown when a trust is selected */}
           {selectedTrust && (
-            <>
+            <div className="card-trust mb-8">
+              <div className="flex items-center gap-2 mb-6">
+                <Shield className="w-5 h-5 text-navy" />
+                <h2 className="font-serif text-xl text-navy">Governance</h2>
+              </div>
+              <div className="space-y-6">
               {/* Governance Settings — Spending Threshold */}
               <div className="pt-4 border-t border-navy/10" data-section="governance">
                   <div className="flex items-center gap-2 mb-4">
@@ -1287,7 +1304,8 @@ export default function SettingsPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-            </>
+              </div>
+            </div>
           )}
           </TabsContent>
 
@@ -1369,326 +1387,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Create New Trust Section */}
-          <div className="card-trust mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Plus className="w-5 h-5 text-navy" />
-                <h2 className="font-serif text-xl text-navy">Create New Trust</h2>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Add another trust or organization to your account. Each trust has its own minutes, assets, distributions, and governance tracking.
-            </p>
-            <Dialog open={createTrustOpen} onOpenChange={setCreateTrustOpen}>
-              <DialogTrigger asChild>
-                <Button className="btn-primary" data-testid="create-trust-btn">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create New Trust
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="font-serif text-xl text-navy">Create New Trust</DialogTitle>
-                  <DialogDescription>
-                    Set up a new trust entity. You can add more details after creation.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div>
-                    <Label className="label-trust">Trust Name *</Label>
-                    <Input
-                      value={newTrustData.name}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, name: e.target.value })}
-                      className="mt-1 input-trust"
-                      placeholder="e.g., Smith Family Trust"
-                      data-testid="new-trust-name"
-                    />
-                  </div>
-                  <div>
-                    <Label className="label-trust">Trust Type</Label>
-                    <Select 
-                      value={newTrustData.trust_type} 
-                      onValueChange={(v) => setNewTrustData({ ...newTrustData, trust_type: v })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="revocable_living">Revocable Living Trust</SelectItem>
-                        <SelectItem value="irrevocable_family">Irrevocable Family Trust</SelectItem>
-                        <SelectItem value="family">Family Trust (Legacy)</SelectItem>
-                        <SelectItem value="charitable">Charitable Trust</SelectItem>
-                        <SelectItem value="charitable_remainder">Charitable Remainder Trust</SelectItem>
-                        <SelectItem value="business">Business Trust</SelectItem>
-                        <SelectItem value="ecclesiastical">Religious/Charitable Trust</SelectItem>
-                        <SelectItem value="special_needs">Special Needs Trust</SelectItem>
-                        <SelectItem value="spendthrift">Spendthrift Trust</SelectItem>
-                        <SelectItem value="testamentary">Testamentary Trust</SelectItem>
-                        <SelectItem value="life_insurance">Life Insurance Trust</SelectItem>
-                        <SelectItem value="land">Land Trust</SelectItem>
-                        <SelectItem value="institutional">Institutional Trust</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="label-trust">State / Jurisdiction *</Label>
-                    <Select 
-                      value={newTrustData.jurisdiction}
-                      onValueChange={(v) => setNewTrustData({ ...newTrustData, jurisdiction: v })}
-                    >
-                      <SelectTrigger className="mt-1 input-trust" data-testid="new-trust-jurisdiction">
-                        <SelectValue placeholder="Select state..." />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        <SelectItem value="AL">Alabama</SelectItem>
-                        <SelectItem value="AK">Alaska</SelectItem>
-                        <SelectItem value="AZ">Arizona</SelectItem>
-                        <SelectItem value="AR">Arkansas</SelectItem>
-                        <SelectItem value="CA">California</SelectItem>
-                        <SelectItem value="CO">Colorado</SelectItem>
-                        <SelectItem value="CT">Connecticut</SelectItem>
-                        <SelectItem value="DE">Delaware</SelectItem>
-                        <SelectItem value="FL">Florida</SelectItem>
-                        <SelectItem value="GA">Georgia</SelectItem>
-                        <SelectItem value="HI">Hawaii</SelectItem>
-                        <SelectItem value="ID">Idaho</SelectItem>
-                        <SelectItem value="IL">Illinois</SelectItem>
-                        <SelectItem value="IN">Indiana</SelectItem>
-                        <SelectItem value="IA">Iowa</SelectItem>
-                        <SelectItem value="KS">Kansas</SelectItem>
-                        <SelectItem value="KY">Kentucky</SelectItem>
-                        <SelectItem value="LA">Louisiana</SelectItem>
-                        <SelectItem value="ME">Maine</SelectItem>
-                        <SelectItem value="MD">Maryland</SelectItem>
-                        <SelectItem value="MA">Massachusetts</SelectItem>
-                        <SelectItem value="MI">Michigan</SelectItem>
-                        <SelectItem value="MN">Minnesota</SelectItem>
-                        <SelectItem value="MS">Mississippi</SelectItem>
-                        <SelectItem value="MO">Missouri</SelectItem>
-                        <SelectItem value="MT">Montana</SelectItem>
-                        <SelectItem value="NE">Nebraska</SelectItem>
-                        <SelectItem value="NV">Nevada</SelectItem>
-                        <SelectItem value="NH">New Hampshire</SelectItem>
-                        <SelectItem value="NJ">New Jersey</SelectItem>
-                        <SelectItem value="NM">New Mexico</SelectItem>
-                        <SelectItem value="NY">New York</SelectItem>
-                        <SelectItem value="NC">North Carolina</SelectItem>
-                        <SelectItem value="ND">North Dakota</SelectItem>
-                        <SelectItem value="OH">Ohio</SelectItem>
-                        <SelectItem value="OK">Oklahoma</SelectItem>
-                        <SelectItem value="OR">Oregon</SelectItem>
-                        <SelectItem value="PA">Pennsylvania</SelectItem>
-                        <SelectItem value="RI">Rhode Island</SelectItem>
-                        <SelectItem value="SC">South Carolina</SelectItem>
-                        <SelectItem value="SD">South Dakota</SelectItem>
-                        <SelectItem value="TN">Tennessee</SelectItem>
-                        <SelectItem value="TX">Texas</SelectItem>
-                        <SelectItem value="UT">Utah</SelectItem>
-                        <SelectItem value="VT">Vermont</SelectItem>
-                        <SelectItem value="VA">Virginia</SelectItem>
-                        <SelectItem value="WA">Washington</SelectItem>
-                        <SelectItem value="WV">West Virginia</SelectItem>
-                        <SelectItem value="WI">Wisconsin</SelectItem>
-                        <SelectItem value="WY">Wyoming</SelectItem>
-                        <SelectItem value="DC">District of Columbia</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Trust Start Date</Label>
-                    <Input
-                      type="date"
-                      value={newTrustData.start_date}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, start_date: e.target.value })}
-                      className="mt-1 input-trust"
-                      data-testid="new-trust-start-date"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Date the trust was established</p>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Trustees</Label>
-                    <div className="space-y-2 mt-1">
-                      {newTrustData.trustees.map((trustee, index) => (
-                        <div key={index} className="flex gap-2">
-                          <Input
-                            value={trustee}
-                            onChange={(e) => updateNewTrustee(index, e.target.value)}
-                            className="input-trust"
-                            placeholder={`Trustee ${index + 1} name`}
-                            data-testid={`new-trust-trustee-${index}`}
-                          />
-                          {newTrustData.trustees.length > 1 && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => removeNewTrustee(index)} className="shrink-0">
-                              Remove
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      <Button type="button" variant="outline" size="sm" onClick={addNewTrustee} className="mt-2">
-                        + Add Trustee
-                      </Button>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="label-trust">Authority Clause (from DOT)</Label>
-                    <Textarea
-                      value={newTrustData.authority_clause}
-                      onChange={(e) => setNewTrustData({ ...newTrustData, authority_clause: e.target.value })}
-                      className="mt-1 input-trust min-h-[80px]"
-                      placeholder="Paste the authority/powers clause from your Declaration of Trust..."
-                      data-testid="new-trust-authority"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">This will be referenced in minutes and other documents</p>
-                  </div>
-
-                  <div className="border-t border-navy/10 pt-4">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Tax & Compliance</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="label-trust">EIN</Label>
-                        <Input
-                          value={newTrustData.ein}
-                          onChange={(e) => setNewTrustData({ ...newTrustData, ein: formatEIN(e.target.value) })}
-                          className="mt-1 input-trust"
-                          placeholder="XX-XXXXXXX"
-                          data-testid="new-trust-ein"
-                        />
-                      </div>
-                      <div>
-                        <Label className="label-trust">State / Jurisdiction</Label>
-                        <Select 
-                          value={newTrustData.state_code} 
-                          onValueChange={(v) => setNewTrustData({ ...newTrustData, state_code: v })}
-                        >
-                          <SelectTrigger className="mt-1 input-trust" data-testid="new-trust-state">
-                            <SelectValue placeholder="Select state..." />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-72">
-                            <SelectItem value="AL">Alabama</SelectItem>
-                            <SelectItem value="AK">Alaska</SelectItem>
-                            <SelectItem value="AZ">Arizona</SelectItem>
-                            <SelectItem value="AR">Arkansas</SelectItem>
-                            <SelectItem value="CA">California</SelectItem>
-                            <SelectItem value="CO">Colorado</SelectItem>
-                            <SelectItem value="CT">Connecticut</SelectItem>
-                            <SelectItem value="DE">Delaware</SelectItem>
-                            <SelectItem value="FL">Florida</SelectItem>
-                            <SelectItem value="GA">Georgia</SelectItem>
-                            <SelectItem value="HI">Hawaii</SelectItem>
-                            <SelectItem value="ID">Idaho</SelectItem>
-                            <SelectItem value="IL">Illinois</SelectItem>
-                            <SelectItem value="IN">Indiana</SelectItem>
-                            <SelectItem value="IA">Iowa</SelectItem>
-                            <SelectItem value="KS">Kansas</SelectItem>
-                            <SelectItem value="KY">Kentucky</SelectItem>
-                            <SelectItem value="LA">Louisiana</SelectItem>
-                            <SelectItem value="ME">Maine</SelectItem>
-                            <SelectItem value="MD">Maryland</SelectItem>
-                            <SelectItem value="MA">Massachusetts</SelectItem>
-                            <SelectItem value="MI">Michigan</SelectItem>
-                            <SelectItem value="MN">Minnesota</SelectItem>
-                            <SelectItem value="MS">Mississippi</SelectItem>
-                            <SelectItem value="MO">Missouri</SelectItem>
-                            <SelectItem value="MT">Montana</SelectItem>
-                            <SelectItem value="NE">Nebraska</SelectItem>
-                            <SelectItem value="NV">Nevada</SelectItem>
-                            <SelectItem value="NH">New Hampshire</SelectItem>
-                            <SelectItem value="NJ">New Jersey</SelectItem>
-                            <SelectItem value="NM">New Mexico</SelectItem>
-                            <SelectItem value="NY">New York</SelectItem>
-                            <SelectItem value="NC">North Carolina</SelectItem>
-                            <SelectItem value="ND">North Dakota</SelectItem>
-                            <SelectItem value="OH">Ohio</SelectItem>
-                            <SelectItem value="OK">Oklahoma</SelectItem>
-                            <SelectItem value="OR">Oregon</SelectItem>
-                            <SelectItem value="PA">Pennsylvania</SelectItem>
-                            <SelectItem value="RI">Rhode Island</SelectItem>
-                            <SelectItem value="SC">South Carolina</SelectItem>
-                            <SelectItem value="SD">South Dakota</SelectItem>
-                            <SelectItem value="TN">Tennessee</SelectItem>
-                            <SelectItem value="TX">Texas</SelectItem>
-                            <SelectItem value="UT">Utah</SelectItem>
-                            <SelectItem value="VT">Vermont</SelectItem>
-                            <SelectItem value="VA">Virginia</SelectItem>
-                            <SelectItem value="WA">Washington</SelectItem>
-                            <SelectItem value="WV">West Virginia</SelectItem>
-                            <SelectItem value="WI">Wisconsin</SelectItem>
-                            <SelectItem value="WY">Wyoming</SelectItem>
-                            <SelectItem value="DC">District of Columbia</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="label-trust">Tax Year End — Month</Label>
-                        <Select 
-                          value={newTrustData.tax_year_end_month} 
-                          onValueChange={(v) => setNewTrustData({ ...newTrustData, tax_year_end_month: v })}
-                        >
-                          <SelectTrigger className="mt-1 input-trust">
-                            <SelectValue placeholder="Month" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="12">DEC (Calendar)</SelectItem>
-                            <SelectItem value="1">JAN</SelectItem>
-                            <SelectItem value="2">FEB</SelectItem>
-                            <SelectItem value="3">MAR</SelectItem>
-                            <SelectItem value="4">APR</SelectItem>
-                            <SelectItem value="5">MAY</SelectItem>
-                            <SelectItem value="6">JUN</SelectItem>
-                            <SelectItem value="7">JUL</SelectItem>
-                            <SelectItem value="8">AUG</SelectItem>
-                            <SelectItem value="9">SEP</SelectItem>
-                            <SelectItem value="10">OCT</SelectItem>
-                            <SelectItem value="11">NOV</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="label-trust">Day</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={31}
-                          value={newTrustData.tax_year_end_day}
-                          onChange={(e) => setNewTrustData({ ...newTrustData, tax_year_end_day: e.target.value })}
-                          className="mt-1 input-trust"
-                          placeholder="31"
-                          data-testid="new-trust-tax-day"
-                        />
-                      </div>
-                    </div>
-                    {newTrustData.tax_year_end_month && newTrustData.tax_year_end_day && 
-                     !(Number(newTrustData.tax_year_end_month) === 12 && Number(newTrustData.tax_year_end_day) === 31) && (
-                      <p className="text-xs text-muted-foreground mt-3">
-                        Fiscal year — tax deadlines will be calculated from this date.
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCreateTrustOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    className="btn-primary" 
-                    onClick={handleCreateTrust}
-                    disabled={createTrustLoading}
-                    data-testid="confirm-create-trust-btn"
-                  >
-                    {createTrustLoading ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Plus className="w-4 h-4 mr-2" />
-                    )}
-                    Create Trust
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-
+          {/* ============ PROFILE TAB ============ */}
+          {/* Billing Section */}
           {/* ============ PROFILE TAB ============ */}
           {/* Billing Section */}
           <div className="card-trust mb-8">
