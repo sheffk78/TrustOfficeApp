@@ -530,16 +530,20 @@ Amount: ${amount}
         self,
         to_email: str,
         name: str,
-        course_url: str
+        course_url: str,
+        booking_url: str = ""
     ) -> Dict[str, Any]:
-        """Send welcome email to new lead (Trustee 101 signup or checklist download)"""
+        """Send welcome email to new lead with optional book-a-call CTA"""
+        template_data = {
+            "name": name or "there",
+            "course_url": course_url
+        }
+        if booking_url:
+            template_data["booking_url"] = booking_url
         return await self.send_templated_email(
             to_email=to_email,
             template_name="lead_welcome",
-            template_data={
-                "name": name or "there",
-                "course_url": course_url
-            },
+            template_data=template_data,
             to_name=name,
             tag="lead_welcome",
             metadata={"email_type": "lead_welcome"}

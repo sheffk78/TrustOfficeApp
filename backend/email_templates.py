@@ -6,6 +6,33 @@ Centralized email templates for easy editing
 from typing import Dict, Any
 from datetime import datetime
 
+
+def _booking_cta_html(booking_url: str) -> str:
+    """Render a 'Book a Call' CTA section if booking_url is provided."""
+    if not booking_url:
+        return ""
+    return f"""
+            <div style="background-color: #f0f4ff; border-left: 4px solid #D5AD36; padding: 20px; margin: 25px 0;">
+              <h3 style="color: #010079; margin-top: 0;">Want to see how TrustOffice works for your trust?</h3>
+              <p>Book a free discovery call with Jeff Kohler, founder of TrustOffice. He'll walk you through the platform and answer any questions about your specific situation.</p>
+              <p style="text-align: center; margin: 20px 0;">
+                <a href="{booking_url}" class="button">Book a Call with Jeff</a>
+              </p>
+            </div>
+    """
+
+
+def _booking_cta_text(booking_url: str) -> str:
+    """Render a 'Book a Call' CTA section for plain text if booking_url is provided."""
+    if not booking_url:
+        return ""
+    return f"""
+Want to see how TrustOffice works for your trust?
+Book a free discovery call with Jeff Kohler, founder of TrustOffice.
+Schedule here: {booking_url}
+"""
+
+
 # Base template style
 BASE_STYLE = """
 <style>
@@ -138,7 +165,7 @@ The TrustOffice Team
     "lead_welcome": {
         "subject": lambda data: f"Welcome to Trustee 101, {data.get('name', 'there')}!",
         "html": lambda data: _base_template(f"""
-            <h2>Welcome to Trustee 101 🎉</h2>
+            <h2>Welcome to Trustee 101</h2>
             <p>Hi {data.get('name', 'there')},</p>
             <p>Thanks for signing up! You now have access to <strong>Trustee 101</strong> — a free 9-lesson course designed to help you navigate your role as a trustee with confidence.</p>
 
@@ -160,7 +187,9 @@ The TrustOffice Team
 
             <p>Each lesson takes 5–16 minutes. Go at your own pace.</p>
 
-            <p>If you ever have questions, just reply to this email.</p>
+            {_booking_cta_html(data.get('booking_url', ''))}
+
+            <p>If you have questions, just reply to this email.</p>
 
             <p>Best regards,<br>The TrustOffice Team</p>
         """),
@@ -183,6 +212,8 @@ What You'll Learn:
 - Trust taxes, investments, and beneficiary communication
 
 Each lesson takes 5-16 minutes. Go at your own pace.
+
+{_booking_cta_text(data.get('booking_url', ''))}
 
 Best regards,
 The TrustOffice Team

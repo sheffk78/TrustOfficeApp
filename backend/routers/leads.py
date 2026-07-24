@@ -709,6 +709,10 @@ async def facebook_webhook_handler(request: Request):
             email = ""
             phone = ""
             city = ""
+            job_title = ""
+            situation = ""
+            looking_for_system = ""
+            custom_answers = {}
             for field in field_data:
                 field_name = field.get("name", "").lower()
                 values = field.get("values", [])
@@ -722,6 +726,14 @@ async def facebook_webhook_handler(request: Request):
                     phone = value
                 elif field_name == "city":
                     city = value
+                elif field_name in ("job_title", "title", "position"):
+                    job_title = value
+                elif "situation" in field_name or "best_describes" in field_name:
+                    situation = value.replace("_", " ")
+                elif "looking" in field_name and "system" in field_name:
+                    looking_for_system = value
+                else:
+                    custom_answers[field.get("name", field_name)] = value
 
             if not name:
                 name = lead_data.get("name", "Unknown")
@@ -733,8 +745,10 @@ async def facebook_webhook_handler(request: Request):
 
             email = email.strip().lower()
 
-            # Check if lead already exists by email
-            existing = await db.leads.find_one({"email": email})
+            # Check if lead already exists by leadgen_id (primary) or email (fallback)
+            existing = await db.leads.find_one({"facebook_leadgen_id": leadgen_id})
+            if not existing and email and not email.endswith("@no-email.local"):
+                existing = await db.leads.find_one({"email": email})
             if existing:
                 await db.leads.update_one(
                     {"email": email},
@@ -743,6 +757,10 @@ async def facebook_webhook_handler(request: Request):
                         "source": "facebook-lead-ad",
                         "phone": phone or existing.get("phone"),
                         "city": city or existing.get("city"),
+                        "job_title": job_title or existing.get("job_title"),
+                        "situation": situation or existing.get("situation"),
+                        "looking_for_system": looking_for_system or existing.get("looking_for_system"),
+                        "custom_form_answers": custom_answers if custom_answers else existing.get("custom_form_answers", {}),
                         "facebook_leadgen_id": leadgen_id,
                         "facebook_form_id": form_id,
                         "facebook_page_id": page_id,
@@ -767,6 +785,10 @@ async def facebook_webhook_handler(request: Request):
                 "lead_type": "email_capture",
                 "phone": phone,
                 "city": city,
+                "job_title": job_title,
+                "situation": situation,
+                "looking_for_system": looking_for_system,
+                "custom_form_answers": custom_answers,
                 "facebook_leadgen_id": leadgen_id,
                 "facebook_form_id": form_id,
                 "facebook_page_id": page_id,
@@ -780,7 +802,7 @@ async def facebook_webhook_handler(request: Request):
                 "subscription_status": None,
                 "last_login": None,
                 "notes": "",
-                "next_action": "Follow up on Facebook lead form submission",
+                "next_action": "Call the lead, then send booking link",
                 "score": 70,  # Paid lead form = high intent
                 "created_at": now.isoformat(),
                 "updated_at": now.isoformat(),
@@ -790,13 +812,37 @@ async def facebook_webhook_handler(request: Request):
             await _log_activity(lead_id, "created", f"Lead captured via Facebook Lead Ad (form: {form_id})")
             await _log_activity(lead_id, "facebook_lead", f"Lead form submitted via Facebook Ad (leadgen_id: {leadgen_id})")
 
-            # Send Discord notification
-            await notify_new_lead(
-                name=name,
-                email=email,
-                source="facebook-lead-ad",
-                lead_stage="new"
-            )
+            # Send Discord notification with full lead details for immediate follow-up
+            try:
+                discord_fields = [
+                    {"name": "Name", "value": name or "Not provided", "inline": True},
+                    {"name": "Email", "value": email, "inline": True},
+                    {"name": "Source", "value": "Facebook Lead Ad", "inline": True},
+                ]
+                if phone:
+                    discord_fields.append({"name": "Phone", "value": phone, "inline": True})
+                if job_title:
+                    discord_fields.append({"name": "Title", "value": job_title, "inline": True})
+                if situation:
+                    discord_fields.append({"name": "Situation", "value": situation, "inline": False})
+                if looking_for_system:
+                    discord_fields.append({"name": "Looking for system?", "value": looking_for_system, "inline": True})
+
+                from discord_service import send_discord_message, DISCORD_LEADS_WEBHOOK_URL, NAVY
+                if DISCORD_LEADS_WEBHOOK_URL:
+                    await send_discord_message(
+                        webhook_url=DISCORD_LEADS_WEBHOOK_URL,
+                        content=f"**NEW FACEBOOK LEAD** — {name} | {phone or 'no phone'} | {email}",
+                        embeds=[{
+                            "title": f"New Facebook Lead: {name}",
+                            "color": NAVY,
+                            "fields": discord_fields,
+                            "footer": {"text": "TrustOffice Lead Management — Call them now!"},
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }]
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to send Discord notification for Facebook lead: {e}")
 
             # Create in-app notification
             await create_notification(
@@ -808,16 +854,18 @@ async def facebook_webhook_handler(request: Request):
                 lead_name=name,
             )
 
-            # Send welcome email (fire-and-forget — only if we have a real email)
+            # Send welcome email with book-a-call CTA (fire-and-forget — only if we have a real email)
             if email and not email.endswith("@no-email.local"):
                 try:
                     course_url = f"{email_service.app_url}/courses/trustee-101"
+                    booking_url = "https://trustoffice.app/book-a-call/"
                     await email_service.send_lead_welcome(
                         to_email=email,
                         name=name,
-                        course_url=course_url
+                        course_url=course_url,
+                        booking_url=booking_url
                     )
-                    await _log_activity(lead_id, "email", "Sent welcome email")
+                    await _log_activity(lead_id, "email", "Sent welcome email with book-a-call link")
                 except Exception as e:
                     logger.warning(f"Failed to send welcome email to {email}: {e}")
 
