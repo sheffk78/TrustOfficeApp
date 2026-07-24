@@ -24,50 +24,56 @@ async def gather_risk_findings(
     """
     risks: List[dict] = []
 
-    # === TAX RISK (with severity graduation) ===
-    tax_entries = await db.tax_calendar.find(
-        {"trust_id": trust_id, "tax_year": today.year, "filing_status": "pending"},
-        {"_id": 0},
-    ).sort("due_date", 1).to_list(20)
+    # Benevolence mode (508c3) trusts are exempt from tax filing requirements.
+    # Skip all tax-related risk findings so the health score is not penalized.
+    is_benevolence = trust.get("benevolence_enabled", False)
 
-    for e in tax_entries:
-        due = date.fromisoformat(e["due_date"])
-        days = (due - today).days
-        if days < 0:
-            abs_days = abs(days)
-            if abs_days > 30:
-                severity = "critical"
-            else:
-                severity = "high"
-            risks.append({
-                "type": "tax_deadline",
-                "severity": severity,
-                "title": f"Overdue: {e['description']}",
-                "detail": f"Was due {abs_days} days ago ({e['due_date']})",
-                "action": "File immediately or request extension",
-                "module": "tax_calendar",
-                "deeplink": "/tax-calendar",
-            })
-        elif days <= 14:
-            risks.append({
-                "type": "tax_deadline",
-                "severity": "medium",
-                "title": f"Upcoming: {e['description']}",
-                "detail": f"Due in {days} days ({e['due_date']})",
-                "action": "Prepare filing or engage accountant",
-                "module": "tax_calendar",
-                "deeplink": "/tax-calendar",
-            })
-        elif days <= 30:
-            risks.append({
-                "type": "tax_deadline",
-                "severity": "low",
-                "title": f"Upcoming: {e['description']}",
-                "detail": f"Due in {days} days ({e['due_date']})",
-                "action": "Prepare filing or engage accountant",
-                "module": "tax_calendar",
-                "deeplink": "/tax-calendar",
-            })
+    # === TAX RISK (with severity graduation) ===
+    # Skip tax risk findings for benevolence (508c3) trusts — they are tax-exempt
+    if not is_benevolence:
+        tax_entries = await db.tax_calendar.find(
+            {"trust_id": trust_id, "tax_year": today.year, "filing_status": "pending"},
+            {"_id": 0},
+        ).sort("due_date", 1).to_list(20)
+
+        for e in tax_entries:
+            due = date.fromisoformat(e["due_date"])
+            days = (due - today).days
+            if days < 0:
+                abs_days = abs(days)
+                if abs_days > 30:
+                    severity = "critical"
+                else:
+                    severity = "high"
+                risks.append({
+                    "type": "tax_deadline",
+                    "severity": severity,
+                    "title": f"Overdue: {e['description']}",
+                    "detail": f"Was due {abs_days} days ago ({e['due_date']})",
+                    "action": "File immediately or request extension",
+                    "module": "tax_calendar",
+                    "deeplink": "/tax-calendar",
+                })
+            elif days <= 14:
+                risks.append({
+                    "type": "tax_deadline",
+                    "severity": "medium",
+                    "title": f"Upcoming: {e['description']}",
+                    "detail": f"Due in {days} days ({e['due_date']})",
+                    "action": "Prepare filing or engage accountant",
+                    "module": "tax_calendar",
+                    "deeplink": "/tax-calendar",
+                })
+            elif days <= 30:
+                risks.append({
+                    "type": "tax_deadline",
+                    "severity": "low",
+                    "title": f"Upcoming: {e['description']}",
+                    "detail": f"Due in {days} days ({e['due_date']})",
+                    "action": "Prepare filing or engage accountant",
+                    "module": "tax_calendar",
+                    "deeplink": "/tax-calendar",
+                })
 
     # === STATE COMPLIANCE RISK (with severity graduation) ===
     state_code = trust.get("state_code")
@@ -148,7 +154,11 @@ async def gather_risk_findings(
         })
 
     # === DOCUMENT VAULT RISK (with severity graduation) ===
-    critical_cats = ["trust_instrument", "schedule_a", "minutes", "tax_return"]
+    # Benevolence (508c3) trusts are tax-exempt — don't require tax_return in vault
+    if is_benevolence:
+        critical_cats = ["trust_instrument", "schedule_a", "minutes"]
+    else:
+        critical_cats = ["trust_instrument", "schedule_a", "minutes", "tax_return"]
     present_cats = set()
     async for doc in db.vault_documents.find({"trust_id": trust_id}):
         present_cats.add(doc.get("category", "other"))
@@ -247,7 +257,8 @@ async def gather_risk_findings(
             })
 
     # === EIN / TAX PROFILE ===
-    if not trust.get("ein"):
+    # Benevolence (508c3) trusts may not need an EIN for tax filing purposes
+    if not is_benevolence and not trust.get("ein"):
         risks.append({
             "type": "no_ein",
             "severity": "low",
