@@ -77,6 +77,7 @@ class PlanType(str, Enum):
     trustee = "trustee"
     estate = "estate"
     advisor = "advisor"
+    wingpoint = "wingpoint"  # WingPoint exclusive annual plan
     free = "free"
     forever_free = "forever_free"
     # Legacy (for migration compatibility)

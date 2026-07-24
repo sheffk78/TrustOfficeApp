@@ -83,6 +83,7 @@ const planDisplayName = (planType) => {
     case 'trustee': return 'Trustee Plan';
     case 'estate': return 'Estate Plan';
     case 'advisor': return 'Advisor Plan';
+    case 'wingpoint': return 'WingPoint Annual';
     case 'monthly': return 'Trustee Plan (Legacy)';
     case 'annual': return 'Trustee Plan (Legacy)';
     case 'forever_free':

@@ -413,6 +413,20 @@ PLAN_FEATURES = {
         Feature.WHITE_LABEL_BINDER,
         Feature.MULTI_SIGNATURE,
     },
+    "wingpoint": {
+        # WingPoint exclusive annual plan — Estate-level features, unlimited trusts
+        Feature.MINUTES_BASIC,
+        Feature.DISTRIBUTIONS_BASIC,
+        Feature.GOVERNANCE_BASIC,
+        Feature.PDF_NO_WATERMARK,
+        Feature.CSV_EXPORT,
+        Feature.BENEVOLENCE_MODE,
+        Feature.BENEFICIARY_DASHBOARD,
+        Feature.TRUST_UNITS,
+        Feature.GOVERNANCE_HISTORY,
+        Feature.ADVANCED_TEMPLATES,
+        Feature.MULTIPLE_TRUSTS,
+    },
     "forever_free": {
         # Free tier — core trust management, up to 10 trusts.
         Feature.MINUTES_BASIC,
@@ -439,6 +453,7 @@ PLAN_TRUST_LIMITS = {
     "trustee": 1,
     "estate": 8,
     "advisor": float('inf'),  # unlimited
+    "wingpoint": float('inf'),  # unlimited — WingPoint exclusive annual plan
     # Legacy (grandfathered)
     "monthly": 10,
     "annual": 10,

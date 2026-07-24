@@ -40,6 +40,7 @@ STRIPE_ESTATE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ESTATE_MONTHLY_PRICE_ID'
 STRIPE_ESTATE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ESTATE_ANNUAL_PRICE_ID')
 STRIPE_ADVISOR_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ADVISOR_MONTHLY_PRICE_ID')
 STRIPE_ADVISOR_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ADVISOR_ANNUAL_PRICE_ID')
+STRIPE_WINGPOINT_ANNUAL_PRICE_ID = os.environ.get('STRIPE_WINGPOINT_ANNUAL_PRICE_ID')
 
 # Price ID lookup: (plan_type, billing_period) -> stripe_price_id
 PRICE_IDS = {
@@ -49,6 +50,7 @@ PRICE_IDS = {
     ("estate", "annual"): STRIPE_ESTATE_ANNUAL_PRICE_ID,
     ("advisor", "monthly"): STRIPE_ADVISOR_MONTHLY_PRICE_ID,
     ("advisor", "annual"): STRIPE_ADVISOR_ANNUAL_PRICE_ID,
+    ("wingpoint", "annual"): STRIPE_WINGPOINT_ANNUAL_PRICE_ID,
 }
 
 # Amount lookup (for payment_transactions logging)
@@ -56,7 +58,7 @@ PLAN_AMOUNTS = {
     ("trustee", "monthly"): 79.00,
     ("trustee", "annual"): 790.00,
     ("estate", "monthly"): 149.00,
-    ("estate", "annual"): 1490.00,
+    ("wingpoint", "annual"): 1188.00,
     ("advisor", "monthly"): 399.00,
     ("advisor", "annual"): 3990.00,
     # Legacy
@@ -262,7 +264,7 @@ async def get_subscription_features(user: dict = Depends(get_current_user)):
 async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depends(get_current_user)):
     """Create a Stripe checkout session for subscription"""
     # Support both new 3-tier system and legacy 2-plan system
-    valid_new_plans = ["trustee", "estate", "advisor"]
+    valid_new_plans = ["trustee", "estate", "advisor", "wingpoint"]
     valid_legacy_plans = ["monthly", "annual"]
     valid_periods = ["monthly", "annual"]
     
@@ -274,7 +276,11 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         if billing_period not in valid_periods:
             raise HTTPException(status_code=400, detail="Invalid billing period. Choose 'monthly' or 'annual'.")
     else:
-        raise HTTPException(status_code=400, detail="Invalid plan type. Choose 'trustee', 'estate', or 'advisor'.")
+        raise HTTPException(status_code=400, detail="Invalid plan type. Choose 'trustee', 'estate', 'advisor', or 'wingpoint'.")
+
+    # WingPoint plan is annual-only
+    if checkout.plan_type == "wingpoint" and billing_period != "annual":
+        raise HTTPException(status_code=400, detail="WingPoint plan is annual-only.")
     
     # Get price_id from lookup
     if checkout.plan_type in valid_new_plans:
@@ -286,7 +292,7 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         price_id = STRIPE_MONTHLY_PRICE_ID if checkout.plan_type == "monthly" else STRIPE_ANNUAL_PRICE_ID
     
     # Get amount for logging
-    _amount_fallbacks = {"trustee": 79.00, "estate": 149.00, "advisor": 399.00, "monthly": 79.00, "annual": 790.00}
+    _amount_fallbacks = {"trustee": 79.00, "estate": 149.00, "advisor": 399.00, "wingpoint": 1188.00, "monthly": 79.00, "annual": 790.00}
     amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 79.00))
     
     # Get or create subscription to get/create stripe customer

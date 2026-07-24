@@ -46,12 +46,14 @@ STRIPE_ESTATE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ESTATE_MONTHLY_PRICE_ID'
 STRIPE_ESTATE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ESTATE_ANNUAL_PRICE_ID')
 STRIPE_ADVISOR_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ADVISOR_MONTHLY_PRICE_ID')
 STRIPE_ADVISOR_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ADVISOR_ANNUAL_PRICE_ID')
+STRIPE_WINGPOINT_ANNUAL_PRICE_ID = os.environ.get('STRIPE_WINGPOINT_ANNUAL_PRICE_ID')
 
 TRUSTOFFICE_PRICE_IDS = {
     STRIPE_MONTHLY_PRICE_ID, STRIPE_ANNUAL_PRICE_ID,
     STRIPE_TRUSTEE_MONTHLY_PRICE_ID, STRIPE_TRUSTEE_ANNUAL_PRICE_ID,
     STRIPE_ESTATE_MONTHLY_PRICE_ID, STRIPE_ESTATE_ANNUAL_PRICE_ID,
     STRIPE_ADVISOR_MONTHLY_PRICE_ID, STRIPE_ADVISOR_ANNUAL_PRICE_ID,
+    STRIPE_WINGPOINT_ANNUAL_PRICE_ID,
 }
 
 # Map price ID -> plan label for revenue breakdowns
@@ -64,6 +66,7 @@ PRICE_ID_TO_PLAN_LABEL = {
     STRIPE_ESTATE_ANNUAL_PRICE_ID: "estate_annual",
     STRIPE_ADVISOR_MONTHLY_PRICE_ID: "advisor_monthly",
     STRIPE_ADVISOR_ANNUAL_PRICE_ID: "advisor_annual",
+    STRIPE_WINGPOINT_ANNUAL_PRICE_ID: "wingpoint_annual",
 }
 
 def _get_price_id(line):
@@ -1136,7 +1139,8 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
     trustee_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "trustee"})
     estate_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "estate"})
     advisor_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "advisor"})
-    revenue_estimate = (monthly_subs * 79) + (annual_subs * 790 / 12) + (trustee_subs * 79) + (estate_subs * 149) + (advisor_subs * 399)
+    wingpoint_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "wingpoint"})
+    revenue_estimate = (monthly_subs * 79) + (annual_subs * 790 / 12) + (trustee_subs * 79) + (estate_subs * 149) + (advisor_subs * 399) + (wingpoint_subs * 99)
     
     # Real Stripe revenue data
     stripe_total_revenue_cents = 0
@@ -1172,8 +1176,8 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
         
         # Calculate MRR from active subscriptions
         # Monthly: $79/mo, Annual: $790/yr ≈ $65.83/mo
-        # Trustee: $79/mo, Estate: $149/mo, Advisor: $399/mo
-        stripe_mrr_cents = (monthly_subs * 7900) + (annual_subs * 6583) + (trustee_subs * 7900) + (estate_subs * 14900) + (advisor_subs * 39900)
+        # Trustee: $79/mo, Estate: $149/mo, Advisor: $399/mo, WingPoint: $99/mo
+        stripe_mrr_cents = (monthly_subs * 7900) + (annual_subs * 6583) + (trustee_subs * 7900) + (estate_subs * 14900) + (advisor_subs * 39900) + (wingpoint_subs * 9900)
         stripe_arr_cents = stripe_mrr_cents * 12
         
     except stripe.StripeError as e:

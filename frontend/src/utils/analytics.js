@@ -85,6 +85,7 @@ const TIER_PRICES = {
   trustee: { monthly: 79, annual: 790 },
   estate: { monthly: 149, annual: 1490 },
   advisor: { monthly: 399, annual: 3990 },
+  wingpoint: { annual: 1188 }, // WingPoint is annual-only
   // Legacy compat — old single-tier plans treated as Trustee
   monthly: { monthly: 79, annual: 790 },
   annual: { monthly: 79, annual: 790 },

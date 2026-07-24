@@ -145,6 +145,7 @@ PACKAGE_TO_PLAN = {
     "single_trust": "trustee",      # 1 trust → Trustee ($79/mo, 1 trust)
     "estate_bundle": "estate",      # 2 trusts → Estate ($149/mo, 8 trusts)
     "builder_bundle": "estate",     # 4 trusts → Estate ($149/mo, 8 trusts covers it)
+    "wingpoint_annual": "wingpoint", # WingPoint exclusive annual plan
 }
 
 # Human-readable plan names for API response
@@ -154,6 +155,7 @@ PLAN_DISPLAY_NAMES = {
     "trustee": "Trustee",
     "estate": "Estate",
     "advisor": "Advisor",
+    "wingpoint": "WingPoint Annual",
     "monthly": "Legacy Monthly",
     "annual": "Legacy Annual",
     "trial": "Trial",

@@ -83,6 +83,8 @@ def get_trust_limit_text(plan_type: str, legacy_trust_limit: int | None = None) 
         return "Up to 8 trusts & entities"
     elif pt == "advisor":
         return "Unlimited trusts & entities"
+    elif pt == "wingpoint":
+        return "Unlimited trusts & entities"
     elif pt in ("monthly", "annual"):
         # Legacy plans without explicit limit
         return "Up to 10 trusts & entities (grandfathered)"

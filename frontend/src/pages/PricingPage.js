@@ -131,7 +131,8 @@ const COMPARISON_ROWS = [
 const WP_PLAN_DESCRIPTIONS = {
   trustee: 'Perfect for your single WingPoint trust. Manage one trust with full access to documents and amendments.',
   estate: 'Ideal if you have WingPoints Estate Bundle. Manage up to 8 trusts for family, properties, or business entities.',
-  advisor: 'For WingPoint Builder Bundle customers managing multiple trusts. Unlimited trusts, priority support.'
+  advisor: 'For WingPoint Builder Bundle customers managing multiple trusts. Unlimited trusts, priority support.',
+  wingpoint: 'Your exclusive WingPoint plan: unlimited trusts at a special annual rate not available on our public pricing page.'
 };
 
 export default function PricingPage() {
@@ -308,24 +309,80 @@ export default function PricingPage() {
         <section className="pb-6 px-8" data-testid="wp-welcome-banner">
           <div className="max-w-3xl mx-auto bg-navy text-white rounded-lg p-8 text-center">
             <h2 className="font-serif text-3xl mb-4" data-testid="wp-banner-headline">
-              Your trust is ready. Choose your management plan to access it.
+              Your trust is ready. Activate it with your exclusive WingPoint plan.
             </h2>
             <p className="text-base text-white/80 max-w-2xl mx-auto mb-6 leading-relaxed">
-              You purchased your trust through WingPoint. TrustOffice is where that trust lives, managed, updated, and accessible whenever you need it. Your monthly plan covers ongoing trust management: amendments, beneficiary updates, secure document storage, and access to your trust documents.
+              You purchased your trust through WingPoint. TrustOffice is where that trust lives, managed, updated, and accessible whenever you need it. As a WingPoint customer, you get unlimited trusts at a special annual rate not available to the public.
             </p>
             <div className="inline-block bg-gold/20 text-white px-5 py-3 rounded-full text-sm font-medium mb-3">
-              $50 off your first month, courtesy of WingPoint, already applied at checkout.
+              Unlimited trusts for $99/mo, billed annually. WingPoint exclusive.
             </div>
             <p className="text-sm text-white/60 mt-2">
-              We have highlighted our recommendation based on your WingPoint purchase.
+              This special rate is available to WingPoint customers only. Annual commitment required.
             </p>
           </div>
         </section>
       )}
 
       {/* WingPoint Pre-Selected Plan Card (only when ?wp=1 AND ?plan=XX) */}
-      {wingPointPlan && TIERS.find((t) => t.id === wingPointPlan) && (() => {
+      {wingPointPlan && (() => {
+        // WingPoint exclusive plan (not in TIERS — annual only, $99/mo, unlimited trusts)
+        if (wingPointPlan === 'wingpoint') {
+          return (
+            <section className="pb-8 px-8" data-testid="wp-preselected-card">
+              <div className="max-w-3xl mx-auto">
+                <div className="card-trust corner-mark p-8 border-2 border-gold relative">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
+                    WingPoint Exclusive
+                  </div>
+                  <div className="text-center mt-4">
+                    <h2 className="font-serif text-3xl text-navy mb-2">WingPoint Annual</h2>
+                    <p className="text-base text-muted-foreground mb-4 max-w-xl mx-auto">
+                      {WP_PLAN_DESCRIPTIONS['wingpoint']}
+                    </p>
+                    <div className="flex items-baseline justify-center gap-1 mb-2">
+                      <span className="font-serif text-5xl text-navy">$99</span>
+                      <span className="text-muted-foreground">/mo</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">billed annually ($1,188/year)</p>
+                    <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium mb-6">
+                      Unlimited trusts. Annual commitment required.
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleCheckout('wingpoint', 'annual')}
+                    disabled={loading !== null}
+                    className="w-full btn-primary text-lg py-6"
+                    data-testid="wp-confirm-plan-btn"
+                  >
+                    {loading === 'wingpoint' ? 'Loading...' : 'Start Your WingPoint Plan'}
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                  <div className="text-center mt-4">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      This exclusive rate renews annually. If you cancel, you won't be able to get this pricing again.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (pricingTiersRef.current) {
+                          pricingTiersRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }}
+                      className="text-sm text-navy hover:underline font-medium"
+                      data-testid="wp-see-other-plans-link"
+                    >
+                      See public plans
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          );
+        }
+        // Standard tier plan (trustee/estate/advisor)
         const wpTier = TIERS.find((t) => t.id === wingPointPlan);
+        if (!wpTier) return null;
         const wpPrice = formatPrice(wpTier);
         return (
           <section className="pb-8 px-8" data-testid="wp-preselected-card">
