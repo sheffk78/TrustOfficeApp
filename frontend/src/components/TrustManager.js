@@ -664,10 +664,10 @@ export const TrustManager = ({ embedded = false }) => {
 
       {/* Toolbar */}
       <div className="card-trust mb-6">
-        {/* Search + Sort row */}
-        <div className="flex flex-col md:flex-row gap-3 mb-3">
+        {/* Single-line toolbar: Search + Sort + Group + Filters */}
+        <div className="flex flex-col md:flex-row flex-wrap items-center gap-3">
           {/* Search */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-navy/30" />
             <Input
               type="text"
@@ -722,56 +722,54 @@ export const TrustManager = ({ embedded = false }) => {
             <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-navy/40 pointer-events-none" />
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-navy/40 pointer-events-none" />
           </div>
-        </div>
 
-        {/* Filter chips row */}
-        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-navy/10">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 border text-xs font-mono uppercase tracking-wider transition-colors ${
-              showFilters || hasActiveFilters
-                ? 'border-gold bg-gold/10 text-navy'
-                : 'border-navy/20 text-navy hover:border-navy/40'
-            }`}
-          >
-            <Filter className="w-3.5 h-3.5" />
-            Filters
-            {hasActiveFilters && (
-              <span className="bg-gold text-navy px-1.5 py-0.5 text-[9px] font-bold">
-                {[filterType, filterStatus, debouncedSearch].filter(Boolean).length}
-              </span>
-            )}
-          </button>
-
-          {/* Active filter chips */}
-          {filterType && (
-            <FilterChip
-              label={`Type: ${getTrustTypeLabel(filterType)}`}
-              active
-              onClear={() => setFilterType(null)}
-            />
-          )}
-          {filterStatus && (
-            <FilterChip
-              label={`Score: ${STATUS_TIERS.find((s) => s.key === filterStatus)?.label || filterStatus}`}
-              active
-              onClear={() => setFilterStatus(null)}
-            />
-          )}
-          {debouncedSearch && (
-            <FilterChip
-              label={`Search: "${debouncedSearch}"`}
-              active
-              onClear={() => setSearchQuery('')}
-            />
-          )}
-
-          {hasActiveFilters && (
+          {/* Filter toggle + active chips inline */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={clearFilters}
-              className="text-xs text-navy/50 hover:text-error font-mono ml-1"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 border text-xs font-mono uppercase tracking-wider transition-colors ${
+                showFilters || hasActiveFilters
+                  ? 'border-gold bg-gold/10 text-navy'
+                  : 'border-navy/20 text-navy hover:border-navy/40'
+              }`}
             >
-              Clear all
+              <Filter className="w-3.5 h-3.5" />
+              Filters
+              {hasActiveFilters && (
+                <span className="bg-gold text-navy px-1.5 py-0.5 text-[9px] font-bold">
+                  {[filterType, filterStatus, debouncedSearch].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+
+            {filterType && (
+              <FilterChip
+                label={`Type: ${getTrustTypeLabel(filterType)}`}
+                active
+                onClear={() => setFilterType(null)}
+              />
+            )}
+            {filterStatus && (
+              <FilterChip
+                label={`Score: ${STATUS_TIERS.find((s) => s.key === filterStatus)?.label || filterStatus}`}
+                active
+                onClear={() => setFilterStatus(null)}
+              />
+            )}
+            {debouncedSearch && (
+              <FilterChip
+                label={`Search: "${debouncedSearch}"`}
+                active
+                onClear={() => setSearchQuery('')}
+              />
+            )}
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="text-xs text-navy/50 hover:text-error font-mono ml-1"
+              >
+                Clear all
             </button>
           )}
 
@@ -794,6 +792,7 @@ export const TrustManager = ({ embedded = false }) => {
               </button>
             </div>
           )}
+          </div>
         </div>
 
         {/* Expanded filter panel */}
