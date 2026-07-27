@@ -267,7 +267,11 @@ export default function AdminPage() {
     try {
       let url = `/admin/leads?page=${leadsPage}&limit=20`;
       if (leadsSearch) url += `&search=${encodeURIComponent(leadsSearch)}`;
-      if (leadsStageFilter !== 'all') url += `&stage=${leadsStageFilter}`;
+      if (leadsStageFilter === 'booked_call') {
+        url += `&booked_call=true`;
+      } else if (leadsStageFilter !== 'all') {
+        url += `&stage=${leadsStageFilter}`;
+      }
       
       const response = await fetchWithAuth(url);
       if (response.ok) {
@@ -1680,6 +1684,7 @@ export default function AdminPage() {
                     <div className="flex flex-wrap gap-2 mb-4">
                       {[
                         { key: 'all', label: 'All', count: leadsStageCounts.all },
+                        { key: 'booked_call', label: '📞 Booked Call', count: leadsStageCounts.booked_call },
                         { key: 'new', label: 'New', count: leadsStageCounts.new },
                         { key: 'engaged', label: 'Engaged', count: leadsStageCounts.engaged },
                         { key: 'warm', label: 'Warm', count: leadsStageCounts.warm },
@@ -1779,7 +1784,14 @@ export default function AdminPage() {
                                     />
                                   </td>
                                   <td className="py-3 px-4">
-                                    <p className="font-medium text-navy dark:text-white">{lead.name || '—'}</p>
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="font-medium text-navy dark:text-white">{lead.name || '—'}</p>
+                                      {lead.booked_call && (
+                                        <span title={`Discovery call scheduled${lead.booked_call_at ? ': ' + new Date(lead.booked_call_at).toLocaleString() : ''}`} className="inline-flex items-center gap-0.5 text-[10px] font-medium text-gold bg-gold/10 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                          📞 Call
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="py-3 px-4 text-sm text-muted-foreground">{lead.email}</td>
                                   <td className="py-3 px-4">
@@ -2044,6 +2056,28 @@ export default function AdminPage() {
                         <p className="text-lg font-bold text-navy dark:text-white">{selectedLead.lessons_watched || 0}/9</p>
                       </div>
                     </div>
+
+                    {/* Discovery Call Booked */}
+                    {selectedLead.booked_call && (
+                      <div className="p-3 border border-gold/30 bg-gold/5 rounded">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-base">📞</span>
+                          <span className="text-sm font-medium text-navy dark:text-white">Discovery Call Scheduled</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedLead.booked_call_at
+                            ? new Date(selectedLead.booked_call_at).toLocaleString(undefined, {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                timeZoneName: 'short'
+                              })
+                            : 'Date not available'}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Score Breakdown */}
                     {selectedLead.score_breakdown && (

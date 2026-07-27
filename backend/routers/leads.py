@@ -1174,6 +1174,7 @@ async def list_leads(
     source: Optional[str] = Query(None, description="Filter by source (e.g. trustee-101-landing-page)"),
     lead_type: Optional[str] = Query(None, description="Filter by type: email_capture, paid_subscriber"),
     search: Optional[str] = Query(None, description="Search by name or email"),
+    booked_call: Optional[bool] = Query(None, description="Filter leads who booked a discovery call"),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_order: str = Query("desc", description="Sort order: asc or desc"),
     page: int = Query(1, ge=1),
@@ -1197,6 +1198,9 @@ async def list_leads(
     if lead_type:
         query["lead_type"] = lead_type
 
+    if booked_call is not None:
+        query["booked_call"] = booked_call
+
     if search:
         escaped = re.escape(search)
         query["$or"] = [
@@ -1216,6 +1220,7 @@ async def list_leads(
     for s in LEAD_STAGES:
         stage_counts[s] = await db.leads.count_documents({"stage": s})
     stage_counts["all"] = total
+    stage_counts["booked_call"] = await db.leads.count_documents({"booked_call": True})
 
     return {
         "leads": leads,
