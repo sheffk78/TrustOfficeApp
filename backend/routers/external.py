@@ -681,20 +681,20 @@ async def provision_trustoffice(
             else:
                 raise
 
-        # Create free subscription for new user (only if we actually created the user)
+        # Create subscription for new user (none plan — must subscribe for access)
         if is_new_user:
             await db.subscriptions.insert_one({
                 "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
                 "user_id": user_id,
-                "plan_type": "free",
-                "status": "active",
+                "plan_type": "none",
+                "status": "expired",
                 "trial_start_date": None,
                 "trial_end_date": None,
                 "stripe_customer_id": None,
                 "stripe_subscription_id": None,
                 "created_at": now.isoformat(),
                 "updated_at": now.isoformat(),
-                "notes": "Free individual trustee account — WingPoint provisioned",
+                "notes": "WingPoint provisioned — user must subscribe for access",
                 "coupon_code": request.coupon_code,
                 "source": "wingpoint",
                 "wingpoint_ref": request.wingpoint_ref,

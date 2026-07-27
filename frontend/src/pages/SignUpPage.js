@@ -227,9 +227,9 @@ export default function SignUpPage() {
 
       // Track signup conversion for Google Ads + GA4
       trackSignupConversion();
-      trackTrialStarted({ origin: 'signup_page' });
 
-      navigate('/onboarding');
+      // New users must subscribe — route to pricing page
+      navigate('/pricing');
     } catch (error) {
       console.error('Signup error:', error);
       const msg = error.message || 'Could not create your account. Please try again or contact support@trustoffice.app for help.';

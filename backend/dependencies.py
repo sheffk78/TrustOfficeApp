@@ -105,21 +105,20 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
     
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
     
-    # If no subscription exists, create one (free plan for all individual trustees)
+    # If no subscription exists, create a "none" plan (read-only until paid)
     if not sub:
-        # Free plan is read-only — users must upgrade to a paid plan for write access
         sub = {
             "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
             "user_id": user_id,
-            "plan_type": "free",
-            "status": "active",
+            "plan_type": "none",
+            "status": "expired",
             "trial_start_date": None,
             "trial_end_date": None,
             "stripe_customer_id": None,
             "stripe_subscription_id": None,
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
-            "notes": "Free individual trustee account"
+            "notes": "No free plan — user must subscribe for access"
         }
         await db.subscriptions.insert_one(sub)
     
