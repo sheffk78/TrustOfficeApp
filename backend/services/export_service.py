@@ -13,6 +13,9 @@ import zipfile
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+
 from database import db
 
 
@@ -342,3 +345,130 @@ def _build_zip(trust_name: str, exported_at: str, data: dict) -> bytes:
                 json.dumps(records, indent=2, default=str),
             )
     return zip_buffer.getvalue()
+
+
+# ==================== EXCEL EXPORT ====================
+
+# Header style for Excel sheets
+_HEADER_FONT = Font(bold=True, color="FFFFFF")
+_HEADER_FILL = PatternFill(start_color="1F3864", end_color="1F3864", fill_type="solid")
+_HEADER_ALIGN = Alignment(horizontal="left", vertical="center")
+
+
+def _style_header_row(ws, row: int = 1, col_count: int = 0):
+    """Apply the standard navy header style to the first row."""
+    for col in range(1, col_count + 1):
+        cell = ws.cell(row=row, column=col)
+        cell.font = _HEADER_FONT
+        cell.fill = _HEADER_FILL
+        cell.alignment = _HEADER_ALIGN
+
+
+async def export_health_scores_to_excel(trust_id: str, user_id: str) -> dict:
+    """Export all health score snapshots for a trust to an .xlsx workbook.
+
+    Returns {format, exported_at, trust_id, trust_name, xlsx_bytes, filename, snapshot_count}.
+    Raises ValueError if trust not found.
+
+    The workbook contains one sheet ("Health Scores") with one row per snapshot:
+    calculated_at, score_value, color, base_score, risk_penalty, plus per-criterion
+    columns (points / max_points / achieved) flattened from criteria_breakdown.
+    """
+    trust = await get_owned_trust(trust_id, user_id)
+    if not trust:
+        raise ValueError("Trust not found")
+
+    trust_name = trust.get("name", "Unnamed Trust")
+    exported_at = _now()
+
+    snapshots = await db.health_score_snapshots.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0},
+    ).sort("calculated_at", -1).to_list(5000)
+
+    wb = Workbook()
+    ws = wb.active
+    assert ws is not None  # wb.active is never None for a fresh Workbook
+    ws.title = "Health Scores"
+
+    # Collect the union of all criterion names (preserving first-seen order)
+    criterion_names: list = []
+    seen: set = set()
+    for snap in snapshots:
+        for crit in snap.get("criteria_breakdown") or []:
+            name = crit.get("name", "")
+            if name and name not in seen:
+                seen.add(name)
+                criterion_names.append(name)
+
+    base_headers = [
+        "Calculated At",
+        "Score Value",
+        "Color",
+        "Base Score",
+        "Risk Penalty",
+        "Risk Findings (Critical)",
+        "Risk Findings (High)",
+        "Risk Findings (Medium)",
+        "Risk Findings (Low)",
+    ]
+    # Per-criterion: three columns each (points, max, achieved)
+    crit_headers = []
+    for name in criterion_names:
+        crit_headers.extend([f"{name} — Points", f"{name} — Max", f"{name} — Achieved"])
+
+    headers = base_headers + crit_headers
+    ws.append(headers)
+    _style_header_row(ws, row=1, col_count=len(headers))
+
+    for snap in snapshots:
+        rf = snap.get("risk_findings_count") or {}
+        row = [
+            snap.get("calculated_at", ""),
+            snap.get("score_value", ""),
+            snap.get("color", ""),
+            snap.get("base_score", ""),
+            snap.get("risk_penalty", ""),
+            rf.get("critical", 0),
+            rf.get("high", 0),
+            rf.get("medium", 0),
+            rf.get("low", 0),
+        ]
+        # Build a lookup so missing criteria still produce blank cells
+        crit_map = {
+            c.get("name", ""): c for c in (snap.get("criteria_breakdown") or [])
+        }
+        for name in criterion_names:
+            c = crit_map.get(name, {})
+            row.append(c.get("points", ""))
+            row.append(c.get("max_points", ""))
+            row.append("Yes" if c.get("achieved") else ("No" if "achieved" in c else ""))
+        ws.append(row)
+
+    # Auto-size columns (capped) for readability
+    for col_idx, col_cells in enumerate(ws.columns, start=1):
+        max_len = max(
+            (len(str(cell.value)) for cell in col_cells if cell.value is not None),
+            default=0,
+        )
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = min(
+            max_len + 2, 40
+        )
+
+    # Freeze the header row
+    ws.freeze_panes = "A2"
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    xlsx_bytes = buffer.getvalue()
+
+    date_str = exported_at[:10]
+    return {
+        "format": "xlsx",
+        "exported_at": exported_at,
+        "trust_id": trust_id,
+        "trust_name": trust_name,
+        "xlsx_bytes": xlsx_bytes,
+        "filename": f"health_scores_{trust_id}_{date_str}.xlsx",
+        "snapshot_count": len(snapshots),
+    }

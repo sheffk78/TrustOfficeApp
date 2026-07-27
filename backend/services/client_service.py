@@ -54,15 +54,43 @@ async def get_client(client_id: str, user_id: str) -> Optional[dict]:
 
 
 async def list_clients(user_id: str) -> List[dict]:
-    """List all clients for a user, with trust_count computed."""
-    cursor = db.clients.find({"user_id": user_id}, {"_id": 0})
-    clients = await cursor.to_list(length=None)
-    # Compute trust_count for each client
-    for client in clients:
-        count = await db.trusts.count_documents(
-            {"client_id": client["client_id"], "user_id": user_id}
-        )
-        client["trust_count"] = count
+    """List all clients for a user, with trust_count computed.
+
+    Uses a single aggregation pipeline with $lookup to avoid N+1 queries
+    (one count_documents call per client).
+    """
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {
+            "$lookup": {
+                "from": "trusts",
+                "let": {"cid": "$client_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$and": [
+                                    {"$eq": ["$user_id", user_id]},
+                                    {"$eq": ["$client_id", "$$cid"]},
+                                ]
+                            }
+                        }
+                    },
+                    {"$count": "count"},
+                ],
+                "as": "trust_counts",
+            }
+        },
+        {
+            "$addFields": {
+                "trust_count": {
+                    "$ifNull": [{"$arrayElemAt": ["$trust_counts.count", 0]}, 0]
+                }
+            }
+        },
+        {"$project": {"_id": 0, "trust_counts": 0}},
+    ]
+    clients = await db.clients.aggregate(pipeline).to_list(length=None)
     return clients
 
 

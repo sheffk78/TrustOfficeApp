@@ -363,6 +363,7 @@ async def generate_beneficiary_report(trust_id: str, user_id: str) -> dict:
         "category_label": "Beneficiary Report",
         "date": now[:10],
         "description": f"Auto-generated beneficiary report with {len(beneficiaries)} beneficiaries",
+        "beneficiary_count": len(beneficiaries),
         "storage_provider": "trustoffice",
         "storage_url": None,
         "storage_path": None,
@@ -411,8 +412,6 @@ async def list_reports(trust_id: str, user_id: str) -> list:
             "doc_id": d["doc_id"],
             "generated_at": d.get("created_at", ""),
             "trust_name": trust_name,
-            "beneficiary_count": d.get("description", "").split("with ")[-1].split(" ")[0]
-                if "with" in (d.get("description") or "")
-                else "0",
+            "beneficiary_count": d.get("beneficiary_count", 0),
         })
     return results

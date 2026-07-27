@@ -173,9 +173,6 @@ async def get_educational_resources(trust_id: str, user_id: str) -> dict:
 
     # --- Courses (Trustee 101) ---
     # Check if user has any course enrollment/lead
-    enrollment = await db.course_leads.find_one(
-        {"email": {"$exists": True}}, {"_id": 0}
-    )
     # We look up the user's email from the user record
     user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1})
     user_email = (user_doc or {}).get("email", "")
