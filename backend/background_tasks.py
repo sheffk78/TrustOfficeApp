@@ -101,9 +101,122 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
+        # Schedule TidyCal booking sync every 5 minutes
+        self.scheduler.add_job(
+            self.sync_tidycal_bookings,
+            trigger=IntervalTrigger(minutes=5),
+            id='tidycal_sync',
+            name='Sync TidyCal bookings to CRM leads',
+            replace_existing=True
+        )
+
         self.scheduler.start()
         logger.info("Background task runner started with APScheduler")
         
+    async def sync_tidycal_bookings(self):
+        """
+        Poll TidyCal API for bookings and sync them to CRM leads.
+        Runs every 5 minutes. Matches bookings to leads by email and sets
+        booked_call=True with the scheduled date/time.
+        Creates new leads for bookings that don't match an existing lead.
+        """
+        import httpx
+
+        token = os.environ.get('TIDYCAL_API_TOKEN')
+        if not token:
+            logger.debug("TIDYCAL_API_TOKEN not set — skipping TidyCal sync")
+            return
+
+        try:
+            resp = await asyncio.to_thread(
+                httpx.get,
+                "https://tidycal.com/api/bookings?cancelled=false",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=15.0,
+            )
+            resp.raise_for_status()
+            bookings = resp.json().get("data", [])
+        except Exception as e:
+            logger.warning(f"TidyCal sync failed: {e}")
+            return
+
+        now = datetime.now(timezone.utc).isoformat()
+        created = 0
+        updated = 0
+
+        for b in bookings:
+            contact = b.get("contact", {})
+            email = (contact.get("email") or "").strip().lower()
+            name = contact.get("name", "Unknown")
+            starts_at = b.get("starts_at")
+
+            if not email:
+                continue
+
+            existing = await self.db.leads.find_one({"email": email})
+
+            if existing:
+                if existing.get("booked_call") and existing.get("booked_call_at"):
+                    continue  # Already synced
+
+                await self.db.leads.update_one(
+                    {"email": email},
+                    {"$set": {
+                        "name": name,
+                        "booked_call": True,
+                        "booked_call_at": starts_at,
+                        "source": "booked-call",
+                        "updated_at": now,
+                    }}
+                )
+                await self.db.lead_activities.insert_one({
+                    "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+                    "lead_id": existing["lead_id"],
+                    "action_type": "booked_call",
+                    "content": f"Booked a TrustOffice Discovery Call at {starts_at} (TidyCal sync)",
+                    "created_at": now,
+                })
+                updated += 1
+            else:
+                lead_id = f"lead_{uuid.uuid4().hex[:12]}"
+                await self.db.leads.insert_one({
+                    "lead_id": lead_id,
+                    "email": email,
+                    "name": name,
+                    "source": "booked-call",
+                    "lead_type": "email_capture",
+                    "stage": "new",
+                    "manual_stage_override": False,
+                    "booked_call": True,
+                    "booked_call_at": starts_at,
+                    "lessons_watched": 0,
+                    "subscription_status": None,
+                    "last_login": None,
+                    "notes": "",
+                    "next_action": "Prepare for upcoming discovery call",
+                    "score": 70,
+                    "created_at": now,
+                    "updated_at": now,
+                })
+                await self.db.lead_activities.insert_one({
+                    "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+                    "lead_id": lead_id,
+                    "action_type": "created",
+                    "content": "Lead captured via TidyCal booking (API sync)",
+                    "created_at": now,
+                })
+                await self.db.lead_activities.insert_one({
+                    "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+                    "lead_id": lead_id,
+                    "action_type": "booked_call",
+                    "content": f"Booked a TrustOffice Discovery Call at {starts_at} (TidyCal sync)",
+                    "created_at": now,
+                })
+                created += 1
+
+        if created or updated:
+            logger.info(f"TidyCal sync: {created} created, {updated} updated, {len(bookings)} total bookings")
+
     async def stop(self):
         """Stop the background task runner"""
         self.running = False
