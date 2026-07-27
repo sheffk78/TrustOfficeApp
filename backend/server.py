@@ -48,6 +48,13 @@ from dependencies import (
 from routers.distributions import router as distributions_router
 from migrations.onboarding_fields import OnboardingMigration
 from routers.governance import router as governance_router
+from routers.meetings import router as meetings_router
+from routers.clients import router as clients_router
+from routers.health import router as health_router
+from routers.deadlines import router as deadlines_router
+from routers.beneficiary_reports import router as beneficiary_reports_router
+from routers.educational import router as educational_router
+from routers.exports_enhanced import router as exports_enhanced_router
 from routers.minutes import router as minutes_router
 from routers.schedule_a import router as schedule_a_router
 from routers.compensation import router as compensation_router
@@ -354,6 +361,13 @@ app.include_router(distributions_router, prefix="/api")
 app.include_router(benevolence_router, prefix="/api")
 app.include_router(compensation_router, prefix="/api")
 app.include_router(governance_router, prefix="/api")
+app.include_router(meetings_router, prefix="/api")
+app.include_router(clients_router, prefix="/api")
+app.include_router(health_router, prefix="/api")
+app.include_router(deadlines_router, prefix="/api")
+app.include_router(beneficiary_reports_router, prefix="/api")
+app.include_router(educational_router, prefix="/api")
+app.include_router(exports_enhanced_router, prefix="/api")
 app.include_router(subscriptions_router, prefix="/api")
 app.include_router(exports_router, prefix="/api")
 app.include_router(expenses_router, prefix="/api")

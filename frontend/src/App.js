@@ -34,6 +34,14 @@ import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
 import StatsPage from "@/pages/StatsPage";
 import StateCompliancePage from "@/pages/StateCompliancePage";
+import MeetingAgenda from "@/pages/MeetingAgenda";
+import MinutesEditor from "@/pages/MinutesEditor";
+import ApprovalFlow from "@/pages/ApprovalFlow";
+import MeetingHistory from "@/pages/MeetingHistory";
+import ClientsListPage from "@/pages/ClientsListPage";
+import ClientDashboard from "@/pages/ClientDashboard";
+import HealthDashboard from "@/pages/HealthDashboard";
+import DeadlineDashboard from "@/pages/DeadlineDashboard";
 import InvestmentsPage from "@/pages/InvestmentsPage";
 import CommunicationsPage from "@/pages/CommunicationsPage";
 import VaultPage from "@/pages/VaultPage";
@@ -41,6 +49,8 @@ import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import PrintableBinderPage from "@/pages/PrintableBinderPage";
 import SuccessorPacketPage from "@/pages/SuccessorPacketPage";
 import TrustAssistantPage from "@/pages/TrustAssistantPage";
+import BeneficiaryReportPage from "@/pages/BeneficiaryReportPage";
+import ExportDashboard from "@/pages/ExportDashboard";
 import WingPointWelcomePage from "@/pages/WingPointWelcomePage";
 import WingPointRedirect from "@/pages/WingPointRedirect";
 import NotFoundPage from "@/pages/NotFoundPage";
@@ -296,6 +306,56 @@ const AppRouter = () => {
       <Route path="/governance" element={
         <SubscriptionProtectedRoute>
           <GovernancePage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/governance/agendas/:agendaId" element={
+        <SubscriptionProtectedRoute>
+          <MeetingAgenda />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/governance/minutes/:minutesId" element={
+        <SubscriptionProtectedRoute>
+          <MinutesEditor />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/governance/approvals/:trustId" element={
+        <SubscriptionProtectedRoute>
+          <ApprovalFlow />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/governance/history/:trustId" element={
+        <SubscriptionProtectedRoute>
+          <MeetingHistory />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/clients" element={
+        <SubscriptionProtectedRoute>
+          <ClientsListPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/clients/:clientId" element={
+        <SubscriptionProtectedRoute>
+          <ClientDashboard />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/health" element={
+        <SubscriptionProtectedRoute>
+          <HealthDashboard />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/deadlines" element={
+        <SubscriptionProtectedRoute>
+          <DeadlineDashboard />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/beneficiary-reports" element={
+        <SubscriptionProtectedRoute>
+          <BeneficiaryReportPage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/exports" element={
+        <SubscriptionProtectedRoute>
+          <ExportDashboard />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/tax-calendar" element={

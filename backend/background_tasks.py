@@ -74,6 +74,15 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
+        # Schedule deadline reminder emails daily at 8 AM UTC
+        self.scheduler.add_job(
+            self.send_deadline_reminders,
+            trigger=CronTrigger(hour=8, minute=0, timezone='UTC'),
+            id='deadline_reminders',
+            name='Send compliance deadline reminder emails',
+            replace_existing=True
+        )
+
         # Schedule lead re-engagement check every 6 hours
         self.scheduler.add_job(
             self.send_lead_reengagement_emails,
@@ -506,7 +515,117 @@ class BackgroundTaskRunner:
 
         result = await calculate_health_score(trust_id, user_id, save_snapshot=True)
         return result
-    
+
+    async def send_deadline_reminders(self) -> int:
+        """
+        Check upcoming deadlines and send reminder emails for any whose
+        days_remaining matches one of their reminder_days_before thresholds.
+
+        Sent thresholds are tracked per-deadline in reminder_sent_days so each
+        threshold fires at most once per deadline.
+        """
+        logger.info("Running deadline reminder job")
+
+        try:
+            from email_service import email_service
+
+            if not email_service.is_configured:
+                logger.warning("Email service not configured — skipping deadline reminders")
+                return 0
+
+            today = datetime.now(timezone.utc).date()
+            reminders_sent = 0
+
+            # All active deadlines (not completed/waived)
+            cursor = self.db.deadlines.find(
+                {"status": {"$nin": ["completed", "waived"]}},
+                {"_id": 0},
+            )
+            deadlines = await cursor.to_list(5000)
+
+            # Cache lookups
+            trust_cache: dict = {}
+            user_cache: dict = {}
+
+            for deadline in deadlines:
+                try:
+                    due_raw = deadline.get("due_date")
+                    if not due_raw:
+                        continue
+                    try:
+                        due = datetime.fromisoformat(str(due_raw).replace("Z", "+00:00")).date()
+                    except (ValueError, TypeError):
+                        continue
+
+                    days_remaining = (due - today).days
+                    if days_remaining < 0:
+                        continue  # overdue handled separately
+
+                    thresholds = deadline.get("reminder_days_before") or []
+                    already_sent = set(deadline.get("reminder_sent_days") or [])
+
+                    if days_remaining not in thresholds or days_remaining in already_sent:
+                        continue
+
+                    # Resolve trust (cached)
+                    trust_id = deadline.get("trust_id")
+                    if trust_id not in trust_cache:
+                        trust_cache[trust_id] = await self.db.trusts.find_one(
+                            {"trust_id": trust_id}, {"_id": 0}
+                        )
+                    trust = trust_cache[trust_id]
+                    if not trust:
+                        continue
+
+                    # Resolve recipient user (cached)
+                    user_id = deadline.get("user_id")
+                    if user_id not in user_cache:
+                        user_cache[user_id] = await self.db.users.find_one(
+                            {"user_id": user_id}, {"_id": 0}
+                        )
+                    recipient = user_cache[user_id]
+                    if not recipient or not recipient.get("email"):
+                        continue
+
+                    await email_service.send_templated_email(
+                        to_email=recipient["email"],
+                        template_name="task_reminder",
+                        template_data={
+                            "user_name": recipient.get("name") or recipient.get("email").split("@")[0],
+                            "trust_name": trust.get("trust_name", "your trust"),
+                            "task_type": deadline.get("title", "Compliance Deadline"),
+                            "due_date": due.isoformat(),
+                            "description": (
+                                f"{deadline.get('description', '')} "
+                                f"({days_remaining} day{'s' if days_remaining != 1 else ''} remaining)"
+                            ).strip(),
+                        },
+                        to_name=recipient.get("name"),
+                        tag="deadline_reminder",
+                    )
+
+                    # Mark this threshold as sent
+                    await self.db.deadlines.update_one(
+                        {"deadline_id": deadline["deadline_id"]},
+                        {
+                            "$addToSet": {"reminder_sent_days": days_remaining},
+                            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
+                        },
+                    )
+                    reminders_sent += 1
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to send deadline reminder for {deadline.get('deadline_id')}: {e}"
+                    )
+
+            logger.info(f"Deadline reminders complete: {reminders_sent} emails sent")
+            return reminders_sent
+
+        except Exception as e:
+            logger.error(f"Error in deadline reminder job: {e}")
+            return 0
+
     async def _log_audit(
         self,
         user_id: str,
@@ -569,9 +688,22 @@ async def run_health_snapshots() -> int:
     runner = BackgroundTaskRunner()
     runner.client = AsyncIOMotorClient(MONGO_URL)
     runner.db = runner.client[DB_NAME]
-    
+
     try:
         result = await runner.create_daily_health_snapshots()
+        return result
+    finally:
+        runner.client.close()
+
+
+async def run_deadline_reminders() -> int:
+    """Manual trigger for deadline reminders"""
+    runner = BackgroundTaskRunner()
+    runner.client = AsyncIOMotorClient(MONGO_URL)
+    runner.db = runner.client[DB_NAME]
+
+    try:
+        result = await runner.send_deadline_reminders()
         return result
     finally:
         runner.client.close()

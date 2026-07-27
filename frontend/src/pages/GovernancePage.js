@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
+import EducationalPanel from '@/components/EducationalPanel';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { format, parseISO, subDays } from 'date-fns';
@@ -685,6 +686,11 @@ export default function GovernancePage() {
                   </div>
                 </div>
                 <HiddenInsightsPanel trustId={selectedTrust?.trust_id} />
+              </div>
+
+              {/* Educational Resources */}
+              <div className="mt-8">
+                <EducationalPanel trustId={selectedTrust?.trust_id} healthScore={governance?.total_score} />
               </div>
             </>
           )}

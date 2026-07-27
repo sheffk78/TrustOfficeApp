@@ -1670,3 +1670,358 @@ class SpendingThresholdConfig(BaseModel):
 
 class GovernanceSettings(BaseModel):
     spending_threshold: Optional[SpendingThresholdConfig] = None
+
+
+# ==================== CLIENT MODELS ====================
+
+class ClientCreate(BaseModel):
+    """Create a client profile (denormalized aggregated view from trusts)"""
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    wingpoint_ref: Optional[str] = None  # WingPoint reference ID
+
+class ClientUpdate(BaseModel):
+    """Update client profile"""
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    wingpoint_ref: Optional[str] = None
+
+class ClientResponse(BaseModel):
+    """Client profile response with aggregated trust data"""
+    client_id: str
+    name: str
+    email: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    wingpoint_ref: Optional[str] = None
+    trust_count: int = 0
+    created_at: str
+    updated_at: Optional[str] = None
+
+class ClientTrustSummary(BaseModel):
+    """Summary of a trust within a client's portfolio"""
+    trust_id: str
+    trust_name: str
+    trust_type: str
+    jurisdiction: Optional[str] = None
+    governance_score: Optional[int] = None
+    health_color: Optional[str] = None
+    created_at: str
+
+class ClientDetailResponse(BaseModel):
+    """Detailed client view with all trusts"""
+    client_id: str
+    name: str
+    email: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    wingpoint_ref: Optional[str] = None
+    trusts: List[ClientTrustSummary] = []
+    created_at: str
+    updated_at: Optional[str] = None
+
+class ClientHealthSummary(BaseModel):
+    """Client-level health score aggregation"""
+    client_id: str
+    trust_count: int
+    average_health_score: Optional[float] = None
+    trusts_by_health_color: dict = {}  # {"red": 2, "yellow": 1, "green": 3}
+    total_overdue_tasks: int = 0
+    upcoming_deadlines_count: int = 0
+    calculated_at: str
+
+
+# ==================== MEETING & AGENDA MODELS ====================
+
+class AgendaItemType(str, Enum):
+    """Types of agenda items"""
+    review_financials = "review_financials"
+    review_distributions = "review_distributions"
+    review_compensation = "review_compensation"
+    review_beneficiaries = "review_beneficiaries"
+    compliance_check = "compliance_check"
+    asset_review = "asset_review"
+    tax_planning = "tax_planning"
+    strategy_discussion = "strategy_discussion"
+    other = "other"
+
+class MeetingAgendaItemCreate(BaseModel):
+    """Create a single agenda item"""
+    item_type: AgendaItemType
+    title: str
+    description: Optional[str] = None
+    duration_minutes: Optional[int] = Field(None, ge=1, le=240)
+    priority: str = "normal"  # "low", "normal", "high"
+
+class MeetingAgendaItemResponse(BaseModel):
+    """Agenda item response"""
+    agenda_item_id: str
+    item_type: str
+    title: str
+    description: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    priority: str
+    completed: bool = False
+    created_at: str
+
+class MeetingAgendaCreate(BaseModel):
+    """Create a meeting agenda"""
+    trust_id: str
+    meeting_type: MinutesType = MinutesType.quarterly
+    scheduled_date: str
+    estimated_duration_minutes: int = Field(60, ge=15, le=480)
+    agenda_items: List[MeetingAgendaItemCreate] = []
+    notes: Optional[str] = None
+    location: Optional[str] = None
+    virtual_meeting_link: Optional[str] = None
+
+class MeetingAgendaUpdate(BaseModel):
+    """Update meeting agenda"""
+    scheduled_date: Optional[str] = None
+    estimated_duration_minutes: Optional[int] = Field(None, ge=15, le=480)
+    agenda_items: Optional[List[MeetingAgendaItemCreate]] = None
+    notes: Optional[str] = None
+    location: Optional[str] = None
+    virtual_meeting_link: Optional[str] = None
+    status: Optional[str] = None
+
+class MeetingAgendaResponse(BaseModel):
+    """Meeting agenda response"""
+    agenda_id: str
+    trust_id: str
+    meeting_type: str
+    scheduled_date: str
+    estimated_duration_minutes: int
+    agenda_items: List[MeetingAgendaItemResponse] = []
+    notes: Optional[str] = None
+    location: Optional[str] = None
+    virtual_meeting_link: Optional[str] = None
+    status: str = "scheduled"  # "scheduled", "completed", "cancelled"
+    created_at: str
+    updated_at: Optional[str] = None
+
+class MeetingCreate(BaseModel):
+    """Create a meeting record (links agenda to minutes)"""
+    trust_id: str
+    agenda_id: str
+    meeting_type: MinutesType = MinutesType.quarterly
+    actual_meeting_date: str
+    attendees: List[str] = []
+    other_attendees: List[str] = []
+    location: Optional[str] = None
+    virtual_meeting_link: Optional[str] = None
+    notes: Optional[str] = None
+
+class MeetingResponse(BaseModel):
+    """Meeting record response"""
+    meeting_id: str
+    trust_id: str
+    agenda_id: str
+    meeting_type: str
+    actual_meeting_date: str
+    attendees: List[str] = []
+    other_attendees: List[str] = []
+    location: Optional[str] = None
+    virtual_meeting_link: Optional[str] = None
+    notes: Optional[str] = None
+    status: str = "completed"  # "scheduled", "in_progress", "completed", "cancelled"
+    linked_minutes_id: Optional[str] = None
+    created_at: str
+    updated_at: Optional[str] = None
+
+
+# ==================== MINUTES APPROVAL WORKFLOW MODELS ====================
+
+class ApprovalStatus(str, Enum):
+    """Approval workflow status"""
+    draft = "draft"
+    pending_review = "pending_review"
+    under_review = "under_review"
+    changes_requested = "changes_requested"
+    approved = "approved"
+    rejected = "rejected"
+    finalized = "finalized"
+
+class ApprovalRole(str, Enum):
+    """Roles in the approval workflow"""
+    drafter = "drafter"
+    reviewer = "reviewer"
+    approver = "approver"
+
+class MinutesApprovalStatusCreate(BaseModel):
+    """Create approval workflow status for minutes"""
+    minutes_id: str
+    trust_id: str
+    current_status: ApprovalStatus = ApprovalStatus.draft
+    drafter_user_id: str
+    reviewer_user_id: Optional[str] = None
+    approver_user_id: Optional[str] = None
+    due_date: Optional[str] = None
+    priority: str = "normal"  # "low", "normal", "high"
+
+class MinutesApprovalStatusUpdate(BaseModel):
+    """Update approval workflow status"""
+    current_status: Optional[ApprovalStatus] = None
+    reviewer_user_id: Optional[str] = None
+    approver_user_id: Optional[str] = None
+    due_date: Optional[str] = None
+    priority: Optional[str] = None
+    changes_requested_note: Optional[str] = None
+    rejection_reason: Optional[str] = None
+
+class ApprovalActionLog(BaseModel):
+    """Single action in the approval workflow"""
+    action: str  # "created", "submitted", "reviewed", "approved", "rejected", "changes_requested", "finalized"
+    performed_by_user_id: str
+    performed_by_name: str
+    performed_by_role: ApprovalRole
+    timestamp: str
+    note: Optional[str] = None
+
+class MinutesApprovalStatusResponse(BaseModel):
+    """Approval workflow status response"""
+    approval_id: str
+    minutes_id: str
+    trust_id: str
+    current_status: str
+    drafter_user_id: str
+    drafter_name: str
+    reviewer_user_id: Optional[str] = None
+    reviewer_name: Optional[str] = None
+    approver_user_id: Optional[str] = None
+    approver_name: Optional[str] = None
+    due_date: Optional[str] = None
+    priority: str
+    action_log: List[ApprovalActionLog] = []
+    changes_requested_note: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    created_at: str
+    updated_at: Optional[str] = None
+
+class ApprovalWorkflowSummary(BaseModel):
+    """High-level workflow status for a trust"""
+    trust_id: str
+    pending_approvals_count: int = 0
+    overdue_approvals_count: int = 0
+    recently_completed_approvals: List[dict] = []
+    calculated_at: str
+
+
+# ==================== DEADLINE MODELS ====================
+
+class DeadlineCategory(str, Enum):
+    """Categories of compliance deadlines"""
+    quarterly_review = "quarterly_review"
+    annual_review = "annual_review"
+    tax_filing_1041 = "tax_filing_1041"
+    tax_filing_k1 = "tax_filing_k1"
+    estimated_tax_payment = "estimated_tax_payment"
+    state_compliance = "state_compliance"
+    beneficiary_notification = "beneficiary_notification"
+    trustee_compensation_review = "trustee_compensation_review"
+    insurance_compliance = "insurance_compliance"
+    document_retention = "document_retention"
+    other = "other"
+
+class DeadlinePriority(str, Enum):
+    """Priority levels for deadlines"""
+    critical = "critical"
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+class DeadlineStatus(str, Enum):
+    """Status of a deadline"""
+    upcoming = "upcoming"
+    due_soon = "due_soon"
+    overdue = "overdue"
+    completed = "completed"
+    waived = "waived"
+
+class DeadlineCreate(BaseModel):
+    """Create a compliance deadline"""
+    trust_id: str
+    category: DeadlineCategory
+    title: str
+    description: Optional[str] = None
+    due_date: str
+    priority: DeadlinePriority = DeadlinePriority.high
+    recurrence: Optional[str] = None  # "once", "quarterly", "annual", "monthly"
+    recurrence_end_date: Optional[str] = None
+    reminder_days_before: List[int] = [30, 14, 7, 3, 1]
+    is_statutory: bool = False  # True for legal/statutory deadlines
+    state_specific: Optional[str] = None  # State code if state-specific deadline
+    reference_document: Optional[str] = None  # Minutes ID or document reference
+    notes: Optional[str] = None
+
+class DeadlineUpdate(BaseModel):
+    """Update a deadline"""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    priority: Optional[DeadlinePriority] = None
+    status: Optional[DeadlineStatus] = None
+    recurrence: Optional[str] = None
+    recurrence_end_date: Optional[str] = None
+    reminder_days_before: Optional[List[int]] = None
+    completion_date: Optional[str] = None
+    completion_notes: Optional[str] = None
+    notes: Optional[str] = None
+
+class DeadlineResponse(BaseModel):
+    """Deadline response"""
+    deadline_id: str
+    trust_id: str
+    trust_name: Optional[str] = None
+    category: str
+    title: str
+    description: Optional[str] = None
+    due_date: str
+    priority: str
+    status: str = "upcoming"
+    recurrence: Optional[str] = None
+    recurrence_end_date: Optional[str] = None
+    reminder_days_before: List[int] = []
+    is_statutory: bool = False
+    state_specific: Optional[str] = None
+    reference_document: Optional[str] = None
+    completion_date: Optional[str] = None
+    completion_notes: Optional[str] = None
+    notes: Optional[str] = None
+    days_remaining: Optional[int] = None
+    is_overdue: bool = False
+    created_at: str
+    updated_at: Optional[str] = None
+
+class DeadlineSummary(BaseModel):
+    """Summary of deadlines for a trust"""
+    trust_id: str
+    total_deadlines: int
+    upcoming_count: int = 0
+    due_soon_count: int = 0
+    overdue_count: int = 0
+    completed_count: int = 0
+    by_category: dict = {}
+    by_priority: dict = {}
+    next_deadline: Optional[DeadlineResponse] = None
+    calculated_at: str
+
+class ClientDeadlineSummary(BaseModel):
+    """Client-level deadline summary (multi-trust view)"""
+    client_id: str
+    email: str
+    trust_count: int
+    total_deadlines: int
+    upcoming_count: int = 0
+    due_soon_count: int = 0
+    overdue_count: int = 0
+    critical_count: int = 0
+    next_deadline: Optional[DeadlineResponse] = None
+    calculated_at: str
