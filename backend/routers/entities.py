@@ -159,28 +159,25 @@ async def create_relationship(rel: EntityRelationshipCreate, user: dict = Depend
 
     # Cycle detection: check if child_entity is already an ancestor of parent_entity
     async def would_create_cycle(db, parent_id, child_id, user_id):
-        """Check if creating parent_id -> child_id would create a cycle."""
+        """Check if creating parent_id -> child_id would create a cycle using BFS."""
         visited = set()
-        # Walk up from parent: does parent's ancestry include child?
-        # If child_id is already an ancestor of parent_id, adding parent->child creates a cycle
-        current = parent_id
-        while current:
+        queue = [parent_id]
+        while queue:
+            current = queue.pop(0)
             if current in visited:
-                break  # already detected cycle in existing data
+                continue
             visited.add(current)
-            # Find relationships where current entity is the CHILD (i.e., find its parents)
+            # Find relationships where current entity is the CHILD (find its parents)
             parent_rels = await db.entity_relationships.find(
                 {"child_entity_id": current, "user_id": user_id},
                 {"parent_entity_id": 1, "_id": 0}
             ).to_list(None)
-            parents = [r["parent_entity_id"] for r in parent_rels]
-            if child_id in parents:
-                return True  # child is already an ancestor of parent -> cycle!
-            # Move up to the first parent and continue traversal
-            if parents:
-                current = parents[0]
-            else:
-                current = None
+            for r in parent_rels:
+                parent = r["parent_entity_id"]
+                if parent == child_id:
+                    return True  # child is already an ancestor -> cycle!
+                if parent not in visited:
+                    queue.append(parent)
         return False
 
     if await would_create_cycle(db, rel.parent_entity_id, rel.child_entity_id, user["user_id"]):

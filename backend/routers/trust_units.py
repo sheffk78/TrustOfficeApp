@@ -321,6 +321,8 @@ async def update_unit_certificate(
         update_fields["holder_identifier"] = update.holder_identifier
     if update.holder_type is not None:
         update_fields["holder_type"] = update.holder_type
+    if update.holder_trust_id is not None:
+        update_fields["holder_trust_id"] = update.holder_trust_id
     if update.notes is not None:
         update_fields["notes"] = update.notes
     if update.email is not None:
@@ -363,10 +365,72 @@ async def update_unit_certificate(
         {"certificate_id": certificate_id},
         {"_id": 0}
     )
-    
+
+    # Auto-link sync: handle holder_type / holder_trust_id changes
+    try:
+        old_type = cert.get("holder_type")
+        new_type = update_fields.get("holder_type", old_type)
+
+        if new_type != "trust":
+            # Changed away from trust (or was never trust) — remove auto-link
+            await db.entity_relationships.delete_many({
+                "certificate_id": certificate_id,
+                "source": "certificate_autolink",
+                "user_id": user["user_id"]
+            })
+        elif new_type == "trust":
+            # Type is trust — check if holder_trust_id changed
+            old_holder_trust_id = cert.get("holder_trust_id")
+            new_holder_trust_id = update_fields.get("holder_trust_id", old_holder_trust_id)
+
+            if new_holder_trust_id != old_holder_trust_id:
+                # Remove old auto-link
+                await db.entity_relationships.delete_many({
+                    "certificate_id": certificate_id,
+                    "source": "certificate_autolink",
+                    "user_id": user["user_id"]
+                })
+                # Create new auto-link if holder_trust_id is set
+                if new_holder_trust_id:
+                    trust_entity = await db.entities.find_one(
+                        {"trust_id": cert["trust_id"], "entity_type": "Trust", "user_id": user["user_id"]},
+                        {"_id": 0}
+                    )
+                    holder_entity = await db.entities.find_one(
+                        {"trust_id": new_holder_trust_id, "entity_type": "Trust", "user_id": user["user_id"]},
+                        {"_id": 0}
+                    )
+                    if trust_entity and holder_entity:
+                        existing = await db.entity_relationships.find_one({
+                            "parent_entity_id": holder_entity["entity_id"],
+                            "child_entity_id": trust_entity["entity_id"],
+                            "relationship_type": "receives_distributions_from",
+                            "user_id": user["user_id"]
+                        })
+                        if not existing:
+                            total_authorized = settings["total_authorized_units"]
+                            ownership_pct = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 100
+                            rel_doc = {
+                                "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
+                                "parent_entity_id": holder_entity["entity_id"],
+                                "child_entity_id": trust_entity["entity_id"],
+                                "relationship_type": "receives_distributions_from",
+                                "ownership_percentage": ownership_pct,
+                                "trust_id": holder_entity["trust_id"],
+                                "user_id": user["user_id"],
+                                "source": "certificate_autolink",
+                                "certificate_id": certificate_id,
+                                "notes": "",
+                                "created_at": datetime.now(timezone.utc).isoformat()
+                            }
+                            await db.entity_relationships.insert_one(rel_doc)
+    except Exception:
+        # Auto-link sync failure should not block the certificate update
+        pass
+
     total_authorized = settings["total_authorized_units"]
     percentage = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
-    
+
     return TrustUnitCertificateResponse(**updated_cert, percentage=round(percentage, 4))
 
 

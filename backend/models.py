@@ -453,6 +453,8 @@ class EntityRelationshipResponse(BaseModel):
     relationship_type: str
     ownership_percentage: Optional[float] = None
     notes: str
+    source: Optional[str] = None
+    certificate_id: Optional[str] = None
     created_at: str
 
 
@@ -493,6 +495,7 @@ class TrustUnitCertificateUpdate(BaseModel):
     holder_name: Optional[str] = None
     holder_identifier: Optional[str] = None
     holder_type: Optional[str] = None
+    holder_trust_id: Optional[str] = None
     units: Optional[float] = None
     status: Optional[CertificateStatus] = None
     notes: Optional[str] = None
