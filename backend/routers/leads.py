@@ -474,12 +474,14 @@ async def capture_lead(lead: LeadCapture):
     # Send welcome email (fire-and-forget — non-blocking)
     try:
         course_url = f"{email_service.app_url}/courses/trustee-101"
+        booking_url = "https://trustoffice.app/book-a-call/"
         await email_service.send_lead_welcome(
             to_email=email,
             name=name,
-            course_url=course_url
+            course_url=course_url,
+            booking_url=booking_url
         )
-        await _log_activity(lead_id, "email", "Sent welcome email")
+        await _log_activity(lead_id, "email", "Sent welcome email with book-a-call link")
     except Exception as e:
         logger.warning(f"Failed to send welcome email to {email}: {e}")
 
