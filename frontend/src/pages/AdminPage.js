@@ -1753,7 +1753,7 @@ export default function AdminPage() {
                         )}
 
                         <div className="overflow-x-auto">
-                          <table className="w-full min-w-[900px]">
+                          <table className="w-full min-w-[1000px]">
                             <thead>
                               <tr className="border-b border-navy/10 dark:border-white/10">
                                 <th className="w-8 py-3 px-2">
@@ -1820,7 +1820,7 @@ export default function AdminPage() {
                                       <span className="text-xs text-muted-foreground">{lead.score}</span>
                                     </div>
                                   </td>
-                                  <td className="py-3 px-3 text-xs text-muted-foreground max-w-[160px] truncate">
+                                  <td className="py-3 px-3 text-xs text-muted-foreground whitespace-nowrap">
                                     {lead.next_action || '—'}
                                   </td>
                                   <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">{lead.source || '—'}</td>
