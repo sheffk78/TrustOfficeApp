@@ -1753,24 +1753,24 @@ export default function AdminPage() {
                         )}
 
                         <div className="overflow-x-auto">
-                          <table className="w-full">
+                          <table className="w-full min-w-[900px]">
                             <thead>
                               <tr className="border-b border-navy/10 dark:border-white/10">
-                                <th className="w-10 py-3 px-2">
+                                <th className="w-8 py-3 px-2">
                                   <Checkbox
                                     checked={leads.length > 0 && selectedLeadIds.size === leads.length}
                                     onCheckedChange={toggleSelectAllLeads}
                                     aria-label="Select all leads"
                                   />
                                 </th>
-                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Name</th>
-                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Email</th>
-                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Stage</th>
-                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Score</th>
-                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Next Action</th>
-                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Source</th>
-                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Created</th>
-                                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                                <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Name</th>
+                                <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Email</th>
+                                <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Stage</th>
+                                <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Score</th>
+                                <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Next Action</th>
+                                <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Source</th>
+                                <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Created</th>
+                                <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1783,9 +1783,9 @@ export default function AdminPage() {
                                       aria-label={`Select ${lead.name || lead.email}`}
                                     />
                                   </td>
-                                  <td className="py-3 px-4">
+                                  <td className="py-3 px-3">
                                     <div className="flex items-center gap-1.5">
-                                      <p className="font-medium text-navy dark:text-white">{lead.name || '—'}</p>
+                                      <p className="font-medium text-navy dark:text-white whitespace-nowrap">{lead.name || '—'}</p>
                                       {lead.booked_call && (
                                         <span title={`Discovery call scheduled${lead.booked_call_at ? ': ' + new Date(lead.booked_call_at).toLocaleString() : ''}`} className="inline-flex items-center gap-0.5 text-[10px] font-medium text-gold bg-gold/10 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                           📞 Call
@@ -1793,8 +1793,8 @@ export default function AdminPage() {
                                       )}
                                     </div>
                                   </td>
-                                  <td className="py-3 px-4 text-sm text-muted-foreground">{lead.email}</td>
-                                  <td className="py-3 px-4">
+                                  <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap max-w-[200px] truncate">{lead.email}</td>
+                                  <td className="py-3 px-3">
                                     <Badge className={
                                       lead.stage === 'new' ? 'bg-blue-100 text-blue-800' :
                                       lead.stage === 'engaged' ? 'bg-purple-100 text-purple-800' :
@@ -1805,9 +1805,9 @@ export default function AdminPage() {
                                       {lead.stage_label || lead.stage}
                                     </Badge>
                                   </td>
-                                  <td className="py-3 px-4">
+                                  <td className="py-3 px-3">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                      <div className="w-14 h-2 bg-gray-200 rounded-full overflow-hidden">
                                         <div
                                           className={`h-full rounded-full ${
                                             lead.score >= 70 ? 'bg-success' :
@@ -1820,14 +1820,14 @@ export default function AdminPage() {
                                       <span className="text-xs text-muted-foreground">{lead.score}</span>
                                     </div>
                                   </td>
-                                  <td className="py-3 px-4 text-xs text-muted-foreground max-w-[200px] truncate">
+                                  <td className="py-3 px-3 text-xs text-muted-foreground max-w-[160px] truncate">
                                     {lead.next_action || '—'}
                                   </td>
-                                  <td className="py-3 px-4 text-sm text-muted-foreground">{lead.source || '—'}</td>
-                                  <td className="py-3 px-4 text-sm text-muted-foreground">
+                                  <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">{lead.source || '—'}</td>
+                                  <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">
                                     {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
                                   </td>
-                                  <td className="py-3 px-4">
+                                  <td className="py-3 px-3">
                                     <div className="flex gap-1">
                                       <button
                                         onClick={() => fetchLeadDetail(lead.lead_id)}
