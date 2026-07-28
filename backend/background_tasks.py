@@ -153,6 +153,10 @@ class BackgroundTaskRunner:
             if not email:
                 continue
 
+            # Skip Jeff's own test bookings
+            if email in ("sheffk78@gmail.com", "jeff@socialize.video"):
+                continue
+
             existing = await self.db.leads.find_one({"email": email})
 
             if existing:
@@ -169,6 +173,19 @@ class BackgroundTaskRunner:
                         "updated_at": now,
                     }}
                 )
+                # Format next_action in Mountain Time
+                try:
+                    from datetime import datetime as dt_cls, timezone as tz_cls, timedelta as td_cls
+                    booking_dt = dt_cls.fromisoformat(starts_at.replace("Z", "+00:00"))
+                    mt_time = booking_dt.astimezone(tz_cls(td_cls(hours=-6)))
+                    mt_str = mt_time.strftime("%b %d, %I:%M %p MT").replace(" 0", " ")
+                    next_action = f"Booked: {mt_str}"
+                except:
+                    next_action = "Prepare for upcoming discovery call"
+                await self.db.leads.update_one(
+                    {"email": email},
+                    {"$set": {"next_action": next_action}}
+                )
                 await self.db.lead_activities.insert_one({
                     "activity_id": f"act_{uuid.uuid4().hex[:12]}",
                     "lead_id": existing["lead_id"],
@@ -178,6 +195,15 @@ class BackgroundTaskRunner:
                 })
                 updated += 1
             else:
+                # Format next_action in Mountain Time
+                try:
+                    from datetime import datetime as dt_cls, timezone as tz_cls, timedelta as td_cls
+                    booking_dt = dt_cls.fromisoformat(starts_at.replace("Z", "+00:00"))
+                    mt_time = booking_dt.astimezone(tz_cls(td_cls(hours=-6)))
+                    mt_str = mt_time.strftime("%b %d, %I:%M %p MT").replace(" 0", " ")
+                    next_action = f"Booked: {mt_str}"
+                except:
+                    next_action = "Prepare for upcoming discovery call"
                 lead_id = f"lead_{uuid.uuid4().hex[:12]}"
                 await self.db.leads.insert_one({
                     "lead_id": lead_id,
@@ -193,7 +219,7 @@ class BackgroundTaskRunner:
                     "subscription_status": None,
                     "last_login": None,
                     "notes": "",
-                    "next_action": "Prepare for upcoming discovery call",
+                    "next_action": next_action,
                     "score": 70,
                     "created_at": now,
                     "updated_at": now,
