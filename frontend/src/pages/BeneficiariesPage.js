@@ -94,7 +94,7 @@ const OwnershipPieChart = ({ beneficiaries, totalAuthorized }) => {
 
 // ========== MAIN PAGE COMPONENT ==========
 export default function BeneficiariesPage() {
-  const { selectedTrust, isReadOnly } = useAuth();
+  const { selectedTrust, isReadOnly, trusts } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
   const [activeTab, setActiveTab] = useState('beneficiaries');
   
@@ -114,6 +114,7 @@ export default function BeneficiariesPage() {
     holder_name: '',
     holder_identifier: '',
     holder_type: 'individual',
+    holder_trust_id: '',
     email: '',
     phone: '',
     units: '',
@@ -224,6 +225,7 @@ export default function BeneficiariesPage() {
         holder_name: editing.holder_name,
         holder_identifier: editing.holder_identifier || '',
         holder_type: editing.holder_type || 'individual',
+        holder_trust_id: editing.holder_trust_id || '',
         email: editing.email || '',
         phone: editing.phone || '',
         units: editing.units.toString(),
@@ -290,6 +292,10 @@ export default function BeneficiariesPage() {
       toast.error('Holder name and units are required');
       return;
     }
+    if (certificateForm.holder_type === 'trust' && !certificateForm.holder_trust_id) {
+      toast.error('Please select a trust from the dropdown');
+      return;
+    }
     
     const units = parseFloat(certificateForm.units);
     if (!editingCertificate && summary && units > summary.remaining_units) {
@@ -309,6 +315,7 @@ export default function BeneficiariesPage() {
           trust_id: selectedTrust.trust_id,
           ...certificateForm,
           holder_identifier: sanitizeOptional(certificateForm.holder_identifier),
+          holder_trust_id: sanitizeOptional(certificateForm.holder_trust_id),
           email: sanitizeOptional(certificateForm.email),
           phone: sanitizeOptional(certificateForm.phone),
           notes: sanitizeOptional(certificateForm.notes),
@@ -560,6 +567,7 @@ export default function BeneficiariesPage() {
       holder_name: '',
       holder_identifier: '',
       holder_type: 'individual',
+      holder_trust_id: '',
       email: '',
       phone: '',
       units: '',
@@ -579,6 +587,7 @@ export default function BeneficiariesPage() {
       holder_name: certificate.holder_name,
       holder_identifier: certificate.holder_identifier || '',
       holder_type: certificate.holder_type || 'individual',
+      holder_trust_id: certificate.holder_trust_id || '',
       email: certificate.email || '',
       phone: certificate.phone || '',
       units: certificate.units.toString(),
@@ -1199,21 +1208,67 @@ export default function BeneficiariesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label className="label-trust">Holder Name *</Label>
-              <Input
-                value={certificateForm.holder_name}
-                onChange={(e) => setCertificateForm({ ...certificateForm, holder_name: e.target.value })}
-                placeholder="John Smith or Smith Family Trust"
-                className="mt-1"
-                data-testid="holder-name-input"
-              />
-            </div>
+            {/* Holder Name / Trust Picker (conditional on holder_type) */}
+            {certificateForm.holder_type === 'trust' && trusts && trusts.length > 0 ? (
+              <div>
+                <Label className="label-trust">Select Trust *</Label>
+                <Select
+                  value={certificateForm.holder_trust_id}
+                  onValueChange={(v) => {
+                    const trust = trusts.find(t => t.trust_id === v);
+                    const trustName = trust ? (trust.trust_name || trust.name || 'Unknown Trust') : '';
+                    setCertificateForm({ ...certificateForm, holder_trust_id: v, holder_name: trustName });
+                  }}
+                >
+                  <SelectTrigger className="mt-1" data-testid="holder-trust-select">
+                    <SelectValue placeholder="Choose a trust..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trusts.filter(t => t.trust_id !== selectedTrust?.trust_id).map(t => (
+                      <SelectItem key={t.trust_id} value={t.trust_id}>
+                        {t.trust_name || t.name || 'Unknown Trust'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1.5">
+                  <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span>Selecting a trust will automatically create a beneficiary relationship in the Structures hierarchy. The trust's name auto-fills the holder name for display.</span>
+                </p>
+              </div>
+            ) : (
+              <div>
+                <Label className="label-trust">Holder Name *</Label>
+                <Input
+                  value={certificateForm.holder_name}
+                  onChange={(e) => setCertificateForm({ ...certificateForm, holder_name: e.target.value })}
+                  placeholder="John Smith or Smith Family Trust"
+                  className="mt-1"
+                  data-testid="holder-name-input"
+                />
+              </div>
+            )}
             <div>
               <Label className="label-trust">Holder Type</Label>
               <Select
                 value={certificateForm.holder_type}
-                onValueChange={(v) => setCertificateForm({ ...certificateForm, holder_type: v })}
+                onValueChange={(v) => {
+                  const updates = { holder_type: v };
+                  // Switching to "trust" — auto-select if user has exactly one other trust
+                  if (v === 'trust' && trusts && trusts.length === 1 && trusts[0].trust_id === selectedTrust?.trust_id) {
+                    // Only trust is the current one; no cross-trust option available
+                    updates.holder_trust_id = '';
+                    updates.holder_name = '';
+                  } else if (v === 'trust' && trusts && trusts.length === 2) {
+                    // Two trusts total: one is the current (issuer), auto-select the other
+                    const otherTrust = trusts.find(t => t.trust_id !== selectedTrust?.trust_id);
+                    if (otherTrust) {
+                      updates.holder_trust_id = otherTrust.trust_id;
+                      updates.holder_name = otherTrust.trust_name || otherTrust.name || 'Unknown Trust';
+                    }
+                  }
+                  setCertificateForm({ ...certificateForm, ...updates });
+                }}
               >
                 <SelectTrigger className="mt-1" data-testid="holder-type-select">
                   <SelectValue />
@@ -1228,6 +1283,12 @@ export default function BeneficiariesPage() {
                   <SelectItem value="other">Other Entity</SelectItem>
                 </SelectContent>
               </Select>
+              {certificateForm.holder_type === 'trust' && trusts && trusts.length <= 1 && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1.5">
+                  <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span>You need at least two trusts to make one a beneficiary of another. Create another trust first, or use "Other Entity" with a free-text name.</span>
+                </p>
+              )}
             </div>
             <div>
               <Label className="label-trust">Holder Identifier (Optional)</Label>

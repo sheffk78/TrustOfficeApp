@@ -482,6 +482,7 @@ class TrustUnitCertificateCreate(BaseModel):
     holder_name: str
     holder_identifier: Optional[str] = None
     holder_type: str = "individual"  # "individual", "trust", "llc", "corporation", "charity", "estate", "other"
+    holder_trust_id: Optional[str] = None  # When holder_type="trust", links to an actual trust record
     units: float
     issue_date: str
     notes: str = ""
@@ -504,6 +505,7 @@ class TrustUnitCertificateResponse(BaseModel):
     holder_name: str
     holder_identifier: Optional[str]
     holder_type: str = "individual"
+    holder_trust_id: Optional[str] = None
     units: float
     percentage: float
     issue_date: str

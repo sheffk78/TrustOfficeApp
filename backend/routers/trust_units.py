@@ -222,6 +222,7 @@ async def create_unit_certificate(
         "holder_name": certificate.holder_name,
         "holder_identifier": certificate.holder_identifier,
         "holder_type": certificate.holder_type,
+        "holder_trust_id": certificate.holder_trust_id,
         "email": certificate.email,
         "phone": certificate.phone,
         "units": units,
@@ -235,6 +236,47 @@ async def create_unit_certificate(
     }
     
     await db.trust_unit_certificates.insert_one(cert_doc)
+    
+    # Auto-link entity relationship when holder_type="trust" and holder_trust_id is set
+    if certificate.holder_type == "trust" and certificate.holder_trust_id:
+        try:
+            # Get the trust's own entity (the trust this certificate belongs to)
+            trust_entity = await db.entities.find_one(
+                {"trust_id": certificate.trust_id, "entity_type": "Trust", "user_id": user["user_id"]},
+                {"_id": 0}
+            )
+            # Get the holder trust's entity
+            holder_entity = await db.entities.find_one(
+                {"trust_id": certificate.holder_trust_id, "entity_type": "Trust", "user_id": user["user_id"]},
+                {"_id": 0}
+            )
+            
+            if trust_entity and holder_entity:
+                # Check if relationship already exists (don't duplicate)
+                existing = await db.entity_relationships.find_one({
+                    "parent_entity_id": holder_entity["entity_id"],
+                    "child_entity_id": trust_entity["entity_id"],
+                    "relationship_type": "receives_distributions_from",
+                    "user_id": user["user_id"]
+                })
+                if not existing:
+                    rel_doc = {
+                        "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
+                        "parent_entity_id": holder_entity["entity_id"],
+                        "child_entity_id": trust_entity["entity_id"],
+                        "relationship_type": "receives_distributions_from",
+                        "ownership_percentage": (units / total_authorized * 100) if total_authorized > 0 else 100,
+                        "trust_id": holder_entity["trust_id"],
+                        "user_id": user["user_id"],
+                        "source": "certificate_autolink",
+                        "certificate_id": certificate_id,
+                        "notes": "",
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    await db.entity_relationships.insert_one(rel_doc)
+        except Exception:
+            # Gracefully handle errors — certificate is already created, just skip auto-link
+            pass
     
     # Record the transfer (issuance)
     transfer_doc = {
@@ -411,6 +453,13 @@ async def revoke_unit_certificate(
     }
     await db.trust_unit_transfers.insert_one(transfer_doc)
     
+    # Remove auto-linked entity relationships when certificate is revoked
+    await db.entity_relationships.delete_many({
+        "certificate_id": certificate_id,
+        "source": "certificate_autolink",
+        "user_id": user["user_id"]
+    })
+    
     updated_cert = await db.trust_unit_certificates.find_one(
         {"certificate_id": certificate_id},
         {"_id": 0}
@@ -421,6 +470,36 @@ async def revoke_unit_certificate(
     percentage = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
     
     return TrustUnitCertificateResponse(**updated_cert, percentage=round(percentage, 4))
+
+
+# ==================== DELETE ====================
+
+@router.delete("/trust-units/certificates/{certificate_id}")
+async def delete_unit_certificate(
+    certificate_id: str,
+    user: dict = Depends(require_write_access)
+):
+    """Delete a unit certificate and remove any auto-linked entity relationships."""
+    cert = await db.trust_unit_certificates.find_one(
+        {"certificate_id": certificate_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+
+    # Delete the certificate
+    await db.trust_unit_certificates.delete_one(
+        {"certificate_id": certificate_id, "user_id": user["user_id"]}
+    )
+
+    # Remove auto-linked entity relationships for this certificate
+    await db.entity_relationships.delete_many({
+        "certificate_id": certificate_id,
+        "source": "certificate_autolink",
+        "user_id": user["user_id"]
+    })
+
+    return {"message": "Certificate deleted"}
 
 
 # ==================== TRANSFERS ====================
@@ -482,6 +561,7 @@ async def create_unit_transfer(
                 "holder_name": transfer.from_holder,
                 "holder_identifier": from_cert.get("holder_identifier"),
                 "holder_type": from_cert.get("holder_type", "individual"),
+                "holder_trust_id": from_cert.get("holder_trust_id"),
                 "email": from_cert.get("email"),
                 "phone": from_cert.get("phone"),
                 "units": remaining_units,
@@ -523,6 +603,7 @@ async def create_unit_transfer(
             "holder_name": transfer.to_holder,
             "holder_identifier": existing_to_cert.get("holder_identifier"),
             "holder_type": existing_to_cert.get("holder_type", "individual"),
+            "holder_trust_id": existing_to_cert.get("holder_trust_id"),
             "email": existing_to_cert.get("email"),
             "phone": existing_to_cert.get("phone"),
             "units": combined_units,
@@ -547,6 +628,7 @@ async def create_unit_transfer(
             "holder_name": transfer.to_holder,
             "holder_identifier": None,
             "holder_type": "individual",
+            "holder_trust_id": None,
             "email": None,
             "phone": None,
             "units": units,
@@ -927,6 +1009,7 @@ async def create_certificates_from_beneficiary_designation(minutes_id: str, user
             "holder_name": name,
             "holder_identifier": None,
             "holder_type": "individual",
+            "holder_trust_id": None,
             "email": None,
             "phone": None,
             "units": units,
