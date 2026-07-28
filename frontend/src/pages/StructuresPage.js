@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -29,7 +29,10 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   AlertTriangle,
-  FileDown
+  FileDown,
+  Layers,
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -50,11 +53,14 @@ const RELATIONSHIP_TYPES = [
 export default function StructuresPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, trusts } = useAuth();
   
   // Tab state from URL
   const activeTab = searchParams.get('tab') || 'entities';
   
+  // View mode: 'per-trust' (default) or 'all-trusts'
+  const [viewMode, setViewMode] = useState('per-trust');
+
   // Data state
   const [entities, setEntities] = useState([]);
   const [relationships, setRelationships] = useState([]);
@@ -65,12 +71,28 @@ export default function StructuresPage() {
   const [entitiesTotal, setEntitiesTotal] = useState(0);
   const [loadingMoreEntities, setLoadingMoreEntities] = useState(false);
   const PAGE_SIZE = 50;
+  const GLOBAL_LIMIT = 200;
   
   // Modal states
   const [showEntityModal, setShowEntityModal] = useState(false);
   const [showRelationshipModal, setShowRelationshipModal] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   
+  // Search filter state
+  const [entitySearch, setEntitySearch] = useState('');
+
+  // Relationship modal trust filter (all-trusts mode)
+  const [relModalTrustFilter, setRelModalTrustFilter] = useState('');
+
+  // Trust-to-Trust mode toggle (all-trusts mode) — enables cross-trust relationships between trust-type entities
+  const [isTrustToTrust, setIsTrustToTrust] = useState(false);
+
+  // Collapsible trust group state for hierarchy tree (all-trusts mode)
+  const [collapsedTrustGroups, setCollapsedTrustGroups] = useState({});
+
+  // Entity modal trust picker (all-trusts mode)
+  const [entityModalTrustId, setEntityModalTrustId] = useState('');
+
   // Form states
   const [newEntity, setNewEntity] = useState({
     name: '',
@@ -86,17 +108,45 @@ export default function StructuresPage() {
     notes: ''
   });
 
+  // Build trustMap from AuthContext trusts (trust_id → trust_name)
+  const trustMap = useMemo(() => {
+    const map = {};
+    if (trusts && trusts.length > 0) {
+      trusts.forEach(t => {
+        map[t.trust_id] = t.trust_name || t.name || 'Unknown Trust';
+      });
+    }
+    return map;
+  }, [trusts]);
+
+  // Helper: get trust name for an entity
+  const getTrustName = useCallback((trustId) => {
+    return trustMap[trustId] || 'Unknown Trust';
+  }, [trustMap]);
+
   // Load data
   const loadData = useCallback(async () => {
-    if (!selectedTrust) {
+    // In per-trust mode, require selectedTrust
+    if (viewMode === 'per-trust' && !selectedTrust) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
+      let entitiesUrl, relsUrl;
+      if (viewMode === 'all-trusts') {
+        // Global mode: no trust_id param, use higher limit
+        entitiesUrl = `/entities?limit=${GLOBAL_LIMIT}`;
+        relsUrl = `/entity-relationships?limit=${GLOBAL_LIMIT}`;
+      } else {
+        // Per-trust mode: existing behavior
+        entitiesUrl = `/entities?trust_id=${selectedTrust.trust_id}&limit=${PAGE_SIZE}`;
+        relsUrl = `/entity-relationships?trust_id=${selectedTrust.trust_id}&limit=${PAGE_SIZE}`;
+      }
+      
       const [entitiesRes, relsRes] = await Promise.all([
-        fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}&limit=${PAGE_SIZE}`),
-        fetchWithAuth(`/entity-relationships?trust_id=${selectedTrust.trust_id}&limit=${PAGE_SIZE}`)
+        fetchWithAuth(entitiesUrl),
+        fetchWithAuth(relsUrl)
       ]);
       
       if (entitiesRes.ok) {
@@ -113,14 +163,20 @@ export default function StructuresPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedTrust]);
+  }, [selectedTrust, viewMode]);
 
   const handleLoadMoreEntities = async () => {
-    if (!selectedTrust) return;
+    if (viewMode === 'per-trust' && !selectedTrust) return;
     setLoadingMoreEntities(true);
     try {
       const skip = entities.length;
-      const res = await fetchWithAuth(`/entities?trust_id=${selectedTrust.trust_id}&skip=${skip}&limit=${PAGE_SIZE}`);
+      let url;
+      if (viewMode === 'all-trusts') {
+        url = `/entities?skip=${skip}&limit=${GLOBAL_LIMIT}`;
+      } else {
+        url = `/entities?trust_id=${selectedTrust.trust_id}&skip=${skip}&limit=${PAGE_SIZE}`;
+      }
+      const res = await fetchWithAuth(url);
       if (res.ok) {
         const data = await res.json();
         setEntities(prev => [...prev, ...(data.items || data || [])]);
@@ -134,12 +190,10 @@ export default function StructuresPage() {
   };
 
   useEffect(() => {
-    if (selectedTrust) {
-      loadData();
-    }
-  }, [selectedTrust, loadData]);
+    loadData();
+  }, [loadData]);
 
-  // Load separation dashboard data when tab is active
+  // Load separation dashboard data when tab is active (per-trust only)
   const loadSeparationData = useCallback(async () => {
     if (!selectedTrust) return;
     setSepLoading(true);
@@ -150,8 +204,8 @@ export default function StructuresPage() {
   }, [selectedTrust]);
 
   useEffect(() => {
-    if (activeTab === 'separation' && selectedTrust) loadSeparationData();
-  }, [activeTab, selectedTrust, loadSeparationData]);
+    if (activeTab === 'separation' && selectedTrust && viewMode === 'per-trust') loadSeparationData();
+  }, [activeTab, selectedTrust, loadSeparationData, viewMode]);
 
   const handleDownloadAuditReport = async () => {
     if (!selectedTrust) return;
@@ -178,12 +232,38 @@ export default function StructuresPage() {
 
   // Tab change handler - updates URL
   const handleTabChange = (value) => {
+    // Prevent switching to separation tab in all-trusts mode
+    if (value === 'separation' && viewMode === 'all-trusts') return;
     setSearchParams({ tab: value });
+  };
+
+  // View mode toggle handler
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    // If switching to all-trusts while on separation tab, switch to entities
+    if (mode === 'all-trusts' && activeTab === 'separation') {
+      setSearchParams({ tab: 'entities' });
+    }
   };
 
   // Entity CRUD
   const handleCreateEntity = async () => {
-    if (!selectedTrust || !newEntity.name) {
+    // Determine trust_id based on view mode
+    let trustId;
+    if (viewMode === 'all-trusts') {
+      if (!entityModalTrustId) {
+        toast.error('Please select a trust');
+        return;
+      }
+      trustId = entityModalTrustId;
+    } else {
+      if (!selectedTrust || !newEntity.name) {
+        toast.error('Entity name is required');
+        return;
+      }
+      trustId = selectedTrust.trust_id;
+    }
+    if (!newEntity.name) {
       toast.error('Entity name is required');
       return;
     }
@@ -192,7 +272,7 @@ export default function StructuresPage() {
       const response = await fetchWithAuth('/entities', {
         method: 'POST',
         body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
+          trust_id: trustId,
           ...newEntity
         })
       });
@@ -200,6 +280,7 @@ export default function StructuresPage() {
         toast.success('Entity created');
         setShowEntityModal(false);
         setNewEntity({ name: '', entity_type: 'Trust', legal_name: '', governing_law: '' });
+        setEntityModalTrustId('');
         loadData();
       } else {
         const error = await response.json().catch(() => ({}));
@@ -214,7 +295,32 @@ export default function StructuresPage() {
 
   // Relationship CRUD
   const handleCreateRelationship = async () => {
-    if (!selectedTrust || !newRelationship.parent_entity_id || !newRelationship.child_entity_id) {
+    // Determine trust_id based on view mode
+    let trustId;
+    if (viewMode === 'all-trusts') {
+      // Trust-to-Trust mode: use parent entity's trust_id (backend allows cross-trust for trust-type entities)
+      if (isTrustToTrust) {
+        const parentEntity = getEntityById(newRelationship.parent_entity_id);
+        if (!parentEntity) {
+          toast.error('Please select a valid parent entity');
+          return;
+        }
+        trustId = parentEntity.trust_id;
+      } else {
+        if (!relModalTrustFilter) {
+          toast.error('Please select a trust');
+          return;
+        }
+        trustId = relModalTrustFilter;
+      }
+    } else {
+      if (!selectedTrust) {
+        toast.error('Please select a trust');
+        return;
+      }
+      trustId = selectedTrust.trust_id;
+    }
+    if (!newRelationship.parent_entity_id || !newRelationship.child_entity_id) {
       toast.error('Please select both entities');
       return;
     }
@@ -225,7 +331,7 @@ export default function StructuresPage() {
     setFormLoading(true);
     try {
       const payload = {
-        trust_id: selectedTrust.trust_id,
+        trust_id: trustId,
         ...newRelationship,
         ownership_percentage: newRelationship.ownership_percentage 
           ? parseFloat(newRelationship.ownership_percentage) 
@@ -245,7 +351,21 @@ export default function StructuresPage() {
           ownership_percentage: '',
           notes: ''
         });
+        setRelModalTrustFilter('');
+        setIsTrustToTrust(false);
         loadData();
+      } else if (response.status === 400) {
+        // Cycle detection / circular hierarchy error — don't close modal, keep form state
+        const error = await response.json().catch(() => ({}));
+        const detail = error.detail || '';
+        const isCycleError = /circular|cycle|hierarchy/i.test(detail) ||
+                            /circular|cycle|hierarchy/i.test(JSON.stringify(error));
+        if (isCycleError) {
+          toast.error('Cannot create this relationship — it would create a circular trust hierarchy');
+        } else {
+          showError(toast, new Error(detail || 'Failed to create relationship'), { operation: 'create', page: 'Structures' });
+        }
+        // Keep modal open and form state intact so user can adjust
       } else {
         const error = await response.json().catch(() => ({}));
         showError(toast, new Error(error.detail || 'Failed to create relationship'), { operation: 'create', page: 'Structures' });
@@ -325,7 +445,23 @@ export default function StructuresPage() {
       .filter(item => item.entity);
   };
 
-  const renderTreeNode = (entity, level = 0) => {
+  // Detect cross-trust relationships (parent entity's trust_id !== child entity's trust_id)
+  const hasCrossTrustRelationships = useMemo(() => {
+    if (viewMode !== 'all-trusts') return false;
+    return relationships.some(rel => {
+      const parent = entities.find(e => e.entity_id === rel.parent_entity_id);
+      const child = entities.find(e => e.entity_id === rel.child_entity_id);
+      return parent && child && parent.trust_id !== child.trust_id;
+    });
+  }, [viewMode, relationships, entities]);
+
+  // renderTreeNode with cycle detection via visited Set + trust-to-trust visual distinction
+  const renderTreeNode = (entity, level = 0, visited = new Set()) => {
+    // Cycle detection: if we've already visited this entity, stop recursing
+    if (visited.has(entity.entity_id)) return null;
+    const nextVisited = new Set(visited);
+    nextVisited.add(entity.entity_id);
+
     const children = getChildren(entity.entity_id);
     
     return (
@@ -339,25 +475,79 @@ export default function StructuresPage() {
             <p className="font-mono text-xs text-muted-foreground">{entity.entity_type}</p>
           </div>
         </div>
-        {children.map(({ relationship, entity: childEntity }) => (
-          <div key={relationship.relationship_id}>
-            <div className="ml-4 flex items-center gap-2 py-1 text-sm text-muted-foreground">
-              <ArrowRight className="w-3 h-3" />
-              <span className="font-mono text-xs">{formatRelationshipType(relationship.relationship_type)}</span>
-              {relationship.ownership_percentage && (
-                <span className="badge-trust">{relationship.ownership_percentage}%</span>
-              )}
+        {children.map(({ relationship, entity: childEntity }) => {
+          // Detect trust-to-trust relationship (both entities are entity_type === "Trust")
+          const isTrustToTrustEdge = entity.entity_type === 'Trust' && childEntity.entity_type === 'Trust';
+          // Show "Beneficiary (100%)" for trust-to-trust receives_distributions_from, otherwise formatted type
+          const edgeLabel = isTrustToTrustEdge && relationship.relationship_type === 'receives_distributions_from'
+            ? 'Beneficiary (100%)'
+            : formatRelationshipType(relationship.relationship_type);
+          return (
+            <div key={relationship.relationship_id}>
+              <div className={`ml-4 flex items-center gap-2 py-1 text-sm ${isTrustToTrustEdge ? 'text-purple-600' : 'text-muted-foreground'}`}>
+                {isTrustToTrustEdge ? (
+                  <GitBranch className="w-3 h-3" />
+                ) : (
+                  <ArrowRight className="w-3 h-3" />
+                )}
+                <span className={`font-mono text-xs ${isTrustToTrustEdge ? 'font-semibold' : ''}`}>{edgeLabel}</span>
+                {relationship.ownership_percentage && !isTrustToTrustEdge && (
+                  <span className="badge-trust">{relationship.ownership_percentage}%</span>
+                )}
+              </div>
+              {renderTreeNode(childEntity, level + 1, nextVisited)}
             </div>
-            {renderTreeNode(childEntity, level + 1)}
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
 
+  // Group root entities by trust_id (for all-trusts mode, when NO cross-trust relationships exist)
+  const groupedRoots = useMemo(() => {
+    if (viewMode !== 'all-trusts') return null;
+    // If cross-trust relationships exist, don't group by trust — show full tree without headers
+    if (hasCrossTrustRelationships) return null;
+    const rootEntities = buildTree();
+    const groups = {};
+    rootEntities.forEach(entity => {
+      const tid = entity.trust_id || 'unknown';
+      if (!groups[tid]) groups[tid] = [];
+      groups[tid].push(entity);
+    });
+    return groups;
+  }, [viewMode, entities, relationships, hasCrossTrustRelationships]);
+
+  // Toggle collapse for trust group
+  const toggleTrustGroup = (trustId) => {
+    setCollapsedTrustGroups(prev => ({ ...prev, [trustId]: !prev[trustId] }));
+  };
+
+  // Count total entities per trust (for group headers)
+  const countEntitiesByTrust = useCallback((trustId) => {
+    return entities.filter(e => (e.trust_id || 'unknown') === trustId).length;
+  }, [entities]);
+
+  // Filter entities by search query (client-side, both modes)
+  const filteredEntities = useMemo(() => {
+    if (!entitySearch.trim()) return entities;
+    const query = entitySearch.toLowerCase().trim();
+    return entities.filter(e => e.name?.toLowerCase().includes(query));
+  }, [entities, entitySearch]);
+
+  // Prepare StructuralMap data — prepend trust name in all-trusts mode
+  const structuralMapEntities = useMemo(() => {
+    if (viewMode !== 'all-trusts') return entities;
+    return entities.map(e => ({
+      ...e,
+      name: `${getTrustName(e.trust_id)} — ${e.name}`
+    }));
+  }, [entities, viewMode, getTrustName]);
+
   const rootEntities = buildTree();
 
-  if (!selectedTrust) {
+  // Empty state: only show when per-trust mode AND no selectedTrust
+  if (viewMode === 'per-trust' && !selectedTrust) {
     return (
       <div className="main-layout" data-testid="structures-page">
         <Sidebar />
@@ -402,6 +592,31 @@ export default function StructuresPage() {
             </div>
           </div>
 
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-1 mb-6 p-1 bg-muted rounded-lg w-fit" data-testid="view-mode-toggle">
+            <button
+              onClick={() => handleViewModeChange('per-trust')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'per-trust'
+                  ? 'bg-white text-navy shadow-sm'
+                  : 'text-muted-foreground hover:text-navy'
+              }`}
+            >
+              This Trust
+            </button>
+            <button
+              onClick={() => handleViewModeChange('all-trusts')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'all-trusts'
+                  ? 'bg-white text-navy shadow-sm'
+                  : 'text-muted-foreground hover:text-navy'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              All Trusts
+            </button>
+          </div>
+
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <div className="flex items-center justify-between mb-6">
@@ -412,9 +627,18 @@ export default function StructuresPage() {
                 <TabsTrigger value="hierarchy" data-testid="tab-hierarchy">
                   <GitBranch className="w-4 h-4 mr-2" /> Hierarchy
                 </TabsTrigger>
-                <TabsTrigger value="separation" data-testid="tab-separation" className="relative">
+                <TabsTrigger 
+                  value="separation" 
+                  data-testid="tab-separation" 
+                  className={`relative ${viewMode === 'all-trusts' ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                  disabled={viewMode === 'all-trusts'}
+                  title={viewMode === 'all-trusts' ? 'Select a specific trust to view separation analysis' : ''}
+                >
                   <ShieldAlert className="w-4 h-4 mr-2" /> Separation
-                  {separationData?.alert_summary?.total_active > 0 && (
+                  {viewMode === 'all-trusts' && (
+                    <span className="ml-1 text-[10px] text-muted-foreground">(per-trust only)</span>
+                  )}
+                  {viewMode !== 'all-trusts' && separationData?.alert_summary?.total_active > 0 && (
                     <span className="ml-1.5 w-5 h-5 rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center">
                       {separationData.alert_summary.total_active}
                     </span>
@@ -425,15 +649,27 @@ export default function StructuresPage() {
               {/* Action button changes based on tab */}
               {activeTab === 'entities' ? (
                 <Button 
-                  onClick={() => setShowEntityModal(true)} 
+                  onClick={() => {
+                    // Set default trust for entity modal in all-trusts mode
+                    if (viewMode === 'all-trusts') {
+                      setEntityModalTrustId(selectedTrust?.trust_id || '');
+                    }
+                    setShowEntityModal(true);
+                  }} 
                   className="btn-primary"
                   data-testid="create-entity-btn"
                 >
                   <Plus className="w-4 h-4 mr-2" /> New Entity
                 </Button>
               ) : activeTab === 'hierarchy' ? (
-                <Button 
-                  onClick={() => setShowRelationshipModal(true)} 
+                <Button
+                  onClick={() => {
+                    // Set default trust filter for relationship modal in all-trusts mode
+                    if (viewMode === 'all-trusts') {
+                      setRelModalTrustFilter(selectedTrust?.trust_id || (trusts[0]?.trust_id || ''));
+                    }
+                    setShowRelationshipModal(true);
+                  }} 
                   className="btn-primary"
                   disabled={entities.length < 2}
                   data-testid="add-relationship-btn"
@@ -455,6 +691,18 @@ export default function StructuresPage() {
 
             {/* Entities Tab */}
             <TabsContent value="entities">
+              {/* Search input — works in both modes */}
+              <div className="mb-4 relative">
+                <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  value={entitySearch}
+                  onChange={(e) => setEntitySearch(e.target.value)}
+                  placeholder="Search entities by name..."
+                  className="pl-9 input-trust max-w-md"
+                  data-testid="entity-search"
+                />
+              </div>
+
               {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[1, 2, 3].map(i => (
@@ -465,20 +713,26 @@ export default function StructuresPage() {
                     </div>
                   ))}
                 </div>
-              ) : entities.length === 0 ? (
+              ) : filteredEntities.length === 0 ? (
                 <div className="card-trust text-center py-12" data-testid="entities-empty-state">
                   <Building2 className="w-12 h-12 text-navy/30 mx-auto mb-4" />
-                  <h3 className="font-serif text-xl text-navy mb-2">No Entities Yet</h3>
+                  <h3 className="font-serif text-xl text-navy mb-2">
+                    {entitySearch ? 'No Matching Entities' : 'No Entities Yet'}
+                  </h3>
                   <p className="text-muted-foreground mb-4">
-                    Add your first trust or LLC to get started
+                    {entitySearch 
+                      ? 'Try a different search term' 
+                      : 'Add your first trust or LLC to get started'}
                   </p>
-                  <Button onClick={() => setShowEntityModal(true)} className="btn-secondary">
-                    Create Entity
-                  </Button>
+                  {!entitySearch && (
+                    <Button onClick={() => setShowEntityModal(true)} className="btn-secondary">
+                      Create Entity
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {entities.map(entity => (
+                  {filteredEntities.map(entity => (
                     <div 
                       key={entity.entity_id}
                       onClick={() => navigate(`/entities/${entity.entity_id}`)}
@@ -491,6 +745,16 @@ export default function StructuresPage() {
                         </div>
                         <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-navy transition-colors" />
                       </div>
+                      
+                      {/* Trust-name badge (all-trusts mode only) */}
+                      {viewMode === 'all-trusts' && entity.trust_id && (
+                        <span 
+                          className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-navy/10 text-navy mb-2"
+                          data-testid={`trust-badge-${entity.entity_id}`}
+                        >
+                          {getTrustName(entity.trust_id)}
+                        </span>
+                      )}
                       
                       <h3 className="font-serif text-lg text-navy mb-1">{entity.name}</h3>
                       <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest mb-3">
@@ -525,7 +789,7 @@ export default function StructuresPage() {
                 </div>
               )}
               {/* Load More button for entities */}
-              {entities.length > 0 && entities.length < entitiesTotal && (
+              {filteredEntities.length > 0 && filteredEntities.length < entitiesTotal && !entitySearch && (
                 <div className="flex justify-center mt-6">
                   <Button
                     onClick={handleLoadMoreEntities}
@@ -572,7 +836,7 @@ export default function StructuresPage() {
                     <h2 className="font-serif text-lg text-navy mb-4 flex items-center gap-2">
                       <GitBranch className="w-5 h-5" /> Structural Map
                     </h2>
-                    <StructuralMap entities={entities} relationships={relationships} />
+                    <StructuralMap entities={structuralMapEntities} relationships={relationships} />
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -581,7 +845,55 @@ export default function StructuresPage() {
                     <h2 className="font-serif text-lg text-navy mb-4 flex items-center gap-2">
                       <GitBranch className="w-5 h-5" /> Hierarchy Tree
                     </h2>
-                    {rootEntities.length === 0 ? (
+                    {viewMode === 'all-trusts' && groupedRoots ? (
+                      /* All-trusts mode (no cross-trust relationships): group by trust with collapsible headers */
+                      <div className="space-y-4">
+                        {Object.entries(groupedRoots).map(([trustId, trustRoots]) => {
+                          const trustName = getTrustName(trustId === 'unknown' ? null : trustId);
+                          const entityCount = countEntitiesByTrust(trustId);
+                          const isCollapsed = collapsedTrustGroups[trustId];
+                          return (
+                            <div key={trustId} className="border border-navy/10 rounded-lg overflow-hidden">
+                              <div
+                                className="flex items-center gap-2 px-4 py-3 bg-navy/5 cursor-pointer hover:bg-navy/10 transition-colors"
+                                onClick={() => toggleTrustGroup(trustId)}
+                                data-testid={`trust-group-header-${trustId}`}
+                              >
+                                {isCollapsed ? (
+                                  <ChevronRight className="w-4 h-4 text-navy" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-navy" />
+                                )}
+                                <Layers className="w-4 h-4 text-navy" />
+                                <span className="font-medium text-navy">
+                                  {trustName} ({entityCount} {entityCount === 1 ? 'entity' : 'entities'})
+                                </span>
+                              </div>
+                              {!isCollapsed && (
+                                <div className="p-4 space-y-2">
+                                  {trustRoots.map(entity => renderTreeNode(entity))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : viewMode === 'all-trusts' && hasCrossTrustRelationships ? (
+                      /* All-trusts mode WITH cross-trust relationships: show full tree without trust group headers.
+                         Trust badges on entity cards already show which trust each entity belongs to. */
+                      <div>
+                        {rootEntities.length === 0 ? (
+                          <div className="text-center py-8">
+                            <p className="text-muted-foreground mb-2">All entities are linked in a hierarchy</p>
+                            {entities.map(e => renderTreeNode(e))}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {rootEntities.map(entity => renderTreeNode(entity))}
+                          </div>
+                        )}
+                      </div>
+                    ) : rootEntities.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-muted-foreground">All entities are linked</p>
                         {entities.map(e => renderTreeNode(e))}
@@ -816,12 +1128,36 @@ export default function StructuresPage() {
       <MobileBottomNav />
 
       {/* Create Entity Modal */}
-      <Dialog open={showEntityModal} onOpenChange={setShowEntityModal}>
+      <Dialog open={showEntityModal} onOpenChange={(open) => {
+        setShowEntityModal(open);
+        if (!open) setEntityModalTrustId('');
+      }}>
         <DialogContent className="sm:max-w-md" data-testid="entity-modal">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl text-navy">Create New Entity</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Trust picker — all-trusts mode only */}
+            {viewMode === 'all-trusts' && (
+              <div>
+                <Label className="label-trust">Trust *</Label>
+                <Select 
+                  value={entityModalTrustId} 
+                  onValueChange={(v) => setEntityModalTrustId(v)}
+                >
+                  <SelectTrigger className="input-trust mt-1">
+                    <SelectValue placeholder="Select a trust" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trusts.map(t => (
+                      <SelectItem key={t.trust_id} value={t.trust_id}>
+                        {t.trust_name || t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label className="label-trust">Entity Name *</Label>
               <Input
@@ -877,12 +1213,89 @@ export default function StructuresPage() {
       </Dialog>
 
       {/* Create Relationship Modal */}
-      <Dialog open={showRelationshipModal} onOpenChange={setShowRelationshipModal}>
+      <Dialog open={showRelationshipModal} onOpenChange={(open) => {
+        setShowRelationshipModal(open);
+        if (!open) {
+          setRelModalTrustFilter('');
+          setIsTrustToTrust(false);
+          setNewRelationship({
+            parent_entity_id: '',
+            child_entity_id: '',
+            relationship_type: 'owns',
+            ownership_percentage: '',
+            notes: ''
+          });
+        }
+      }}>
         <DialogContent className="sm:max-w-md" data-testid="relationship-modal">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl text-navy">Add Relationship</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Trust-to-Trust toggle — all-trusts mode only */}
+            {viewMode === 'all-trusts' && (
+              <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-3" data-testid="trust-to-trust-toggle-section">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isTrustToTrust}
+                    onChange={(e) => {
+                      setIsTrustToTrust(e.target.checked);
+                      // Reset entity selections when toggling modes
+                      setNewRelationship(prev => ({ ...prev, parent_entity_id: '', child_entity_id: '' }));
+                      // Default relationship type for trust-to-trust
+                      if (e.target.checked) {
+                        setNewRelationship(prev => ({ ...prev, relationship_type: 'receives_distributions_from' }));
+                      } else {
+                        setNewRelationship(prev => ({ ...prev, relationship_type: 'owns' }));
+                      }
+                    }}
+                    className="w-4 h-4 accent-purple-600"
+                    data-testid="trust-to-trust-checkbox"
+                  />
+                  <GitBranch className="w-4 h-4 text-purple-600" />
+                  <span className="text-sm font-medium text-navy">Trust-to-Trust Relationship</span>
+                </label>
+                <p className="text-xs text-muted-foreground mt-1 ml-6">
+                  {isTrustToTrust
+                    ? 'Select trust-type entities from any trust. Relationship type defaults to "Receives Distributions From".'
+                    : 'Enable to create cross-trust relationships between trust entities (e.g., beneficiary distributions).'}
+                </p>
+              </div>
+            )}
+            {/* Trust filter — all-trusts mode only, hidden when Trust-to-Trust is enabled */}
+            {viewMode === 'all-trusts' && !isTrustToTrust && (
+              <div>
+                <Label className="label-trust">Trust (filter entities) *</Label>
+                <Select 
+                  value={relModalTrustFilter} 
+                  onValueChange={(v) => {
+                    setRelModalTrustFilter(v);
+                    // Reset entity selections when trust filter changes
+                    setNewRelationship(prev => ({ ...prev, parent_entity_id: '', child_entity_id: '' }));
+                  }}
+                >
+                  <SelectTrigger className="input-trust mt-1">
+                    <SelectValue placeholder="Select a trust to filter entities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trusts.map(t => (
+                      <SelectItem key={t.trust_id} value={t.trust_id}>
+                        {t.trust_name || t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Parent and child entities must be from the same trust
+                </p>
+              </div>
+            )}
+            {viewMode === 'all-trusts' && isTrustToTrust && (
+              <p className="text-xs text-purple-600 font-medium">
+                Trust-to-Trust mode: showing all trust-type entities across all trusts
+              </p>
+            )}
             <div>
               <Label className="label-trust">Parent Entity *</Label>
               <Select value={newRelationship.parent_entity_id} onValueChange={(v) => setNewRelationship({ ...newRelationship, parent_entity_id: v })}>
@@ -890,11 +1303,25 @@ export default function StructuresPage() {
                   <SelectValue placeholder="Select parent entity" />
                 </SelectTrigger>
                 <SelectContent>
-                  {entities.map(e => (
-                    <SelectItem key={e.entity_id} value={e.entity_id}>
-                      {e.name} ({e.entity_type})
-                    </SelectItem>
-                  ))}
+                  {entities
+                    .filter(e => {
+                      if (viewMode === 'all-trusts') {
+                        if (isTrustToTrust) {
+                          // Trust-to-Trust: show only entity_type === "Trust" from ALL trusts
+                          return e.entity_type === 'Trust';
+                        }
+                        return relModalTrustFilter ? e.trust_id === relModalTrustFilter : false;
+                      }
+                      return true;
+                    })
+                    .map(e => (
+                      <SelectItem key={e.entity_id} value={e.entity_id}>
+                        {isTrustToTrust
+                          ? `${getTrustName(e.trust_id)} — ${e.name} (Trust)`
+                          : `${e.name} (${e.entity_type})`
+                        }
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -920,12 +1347,24 @@ export default function StructuresPage() {
                 <SelectContent>
                   {entities
                     .filter(e => e.entity_id !== newRelationship.parent_entity_id)
+                    .filter(e => {
+                      if (viewMode === 'all-trusts') {
+                        if (isTrustToTrust) {
+                          // Trust-to-Trust: show only entity_type === "Trust" from ALL trusts
+                          return e.entity_type === 'Trust';
+                        }
+                        return relModalTrustFilter ? e.trust_id === relModalTrustFilter : false;
+                      }
+                      return true;
+                    })
                     .map(e => (
                       <SelectItem key={e.entity_id} value={e.entity_id}>
-                        {e.name} ({e.entity_type})
+                        {isTrustToTrust
+                          ? `${getTrustName(e.trust_id)} — ${e.name} (Trust)`
+                          : `${e.name} (${e.entity_type})`
+                        }
                       </SelectItem>
-                    ))
-                  }
+                    ))}
                 </SelectContent>
               </Select>
             </div>

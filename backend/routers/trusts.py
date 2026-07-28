@@ -311,8 +311,19 @@ async def delete_trust(trust_id: str, user: dict = Depends(require_write_access)
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
     # Delete related data (comprehensive cascade)
+    # Capture entity IDs before deletion for cross-trust relationship cleanup
+    entity_ids = [e["entity_id"] async for e in db.entities.find({"trust_id": trust_id}, {"entity_id": 1, "_id": 0})]
+
     await db.entities.delete_many({"trust_id": trust_id})
     await db.entity_relationships.delete_many({"trust_id": trust_id})
+    # Also delete cross-trust relationships that reference this trust's entities
+    if entity_ids:
+        await db.entity_relationships.delete_many({
+            "$or": [
+                {"parent_entity_id": {"$in": entity_ids}},
+                {"child_entity_id": {"$in": entity_ids}}
+            ]
+        })
     await db.governance_tasks.delete_many({"trust_id": trust_id})
     await db.minutes_records.delete_many({"trust_id": trust_id})
     await db.minutes_templates.delete_many({"trust_id": trust_id})
