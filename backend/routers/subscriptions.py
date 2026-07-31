@@ -722,7 +722,7 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid webhook signature. The request could not be verified as coming from Stripe.")
 
     # Check if this event was already processed
-    event_id = event.get("id")
+    event_id = event.id
     if event_id:
         existing = await db.webhook_events.find_one({"event_id": event_id})
         if existing:
@@ -733,12 +733,12 @@ async def stripe_webhook(request: Request):
         # Record the event as processing
         await db.webhook_events.insert_one({
             "event_id": event_id,
-            "type": event.get("type"),
+            "type": event.type,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "status": "processing"
         })
 
-    event_type = event["type"]
+    event_type = event.type
     logger.info(f"Stripe webhook received: {event_type}")
 
     # Helper to get user info from stripe customer ID
