@@ -760,7 +760,7 @@ async def stripe_webhook(request: Request):
     try:
         # ========== CHECKOUT COMPLETED (New subscription) ==========
         if event_type == "checkout.session.completed":
-            session = event["data"]["object"]
+            session = event.data.object
             user_id = session.get("metadata", {}).get("user_id")
             plan_type = session.get("metadata", {}).get("plan_type", "monthly")
             billing_period = session.get("metadata", {}).get("billing_period")
@@ -868,8 +868,8 @@ async def stripe_webhook(request: Request):
 
         # ========== SUBSCRIPTION UPDATED ==========
         elif event_type == "customer.subscription.updated":
-            subscription = event["data"]["object"]
-            previous_attributes = event["data"].get("previous_attributes", {})
+            subscription = event.data.object
+            previous_attributes = getattr(event.data, "previous_attributes", {}) or {}
             customer_id = subscription.get("customer")
 
             user, sub = await get_user_by_customer_id(customer_id)
@@ -944,7 +944,7 @@ async def stripe_webhook(request: Request):
 
         # ========== SUBSCRIPTION DELETED (fully canceled) ==========
         elif event_type == "customer.subscription.deleted":
-            subscription = event["data"]["object"]
+            subscription = event.data.object
             await db.subscriptions.update_one(
                 {"stripe_subscription_id": subscription["id"]},
                 {"$set": {
@@ -956,7 +956,7 @@ async def stripe_webhook(request: Request):
 
         # ========== INVOICE PAID (renewal) ==========
         elif event_type == "invoice.paid":
-            invoice = event["data"]["object"]
+            invoice = event.data.object
             customer_id = invoice.get("customer")
 
             # Skip if this is the first invoice (handled by checkout.session.completed)
@@ -997,7 +997,7 @@ async def stripe_webhook(request: Request):
 
         # ========== INVOICE PAYMENT FAILED ==========
         elif event_type == "invoice.payment_failed":
-            invoice = event["data"]["object"]
+            invoice = event.data.object
             customer_id = invoice.get("customer")
 
             user, sub = await get_user_by_customer_id(customer_id)
