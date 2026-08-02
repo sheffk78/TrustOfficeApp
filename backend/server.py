@@ -538,7 +538,16 @@ async def startup_event():
         # External API indexes (WingPoint integration)
         await db.external_provisions.create_index("wingpoint_ref", unique=True)
         await db.external_provisions.create_index("user_id")
-        await db.external_provisions.create_index("idem_key", unique=True)
+        # Older records may predate idempotency tracking and have a missing or
+        # null idem_key. A plain unique index treats all of those as the same
+        # value and fails startup with E11000. Only real string keys participate
+        # in uniqueness; current provisioning writes always provide one.
+        await db.external_provisions.create_index(
+            "idem_key",
+            name="idem_key_1",
+            unique=True,
+            partialFilterExpression={"idem_key": {"$type": "string"}},
+        )
         await db.external_provisions.create_index("email")
         await db.external_api_audit.create_index([("partner_id", 1), ("timestamp", 1)])
         await db.external_api_audit.create_index("timestamp", expireAfterSeconds=7776000)  # 90 days TTL
