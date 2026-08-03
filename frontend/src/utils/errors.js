@@ -239,6 +239,25 @@ export function showError(toast, error, context = {}) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Global uncaught error / unhandled rejection detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect a cross-origin "Script error." — the browser's deliberately generic
+ * error for a throw from a different origin (third-party script: tracker, ad,
+ * widget). These carry no stack and no actionable message, so they are almost
+ * always NOT our code and should not page Discord as a real bug.
+ */
+function _isThirdPartyScriptError(event) {
+  // "Script error." is the canonical cross-origin message
+  const msg = (event && (event.message || (event.error && event.error.message))) || '';
+  if (!/script error/i.test(msg)) return false;
+  // A real in-app error almost always carries a stack; cross-origin ones don't.
+  const stack = (event.error && event.error.stack) || '';
+  return !stack || stack.length < 30;
+}
+
 /**
  * Install global uncaught error and unhandled rejection handlers.
  * Call once at app startup (e.g., in App.js or index.js).
@@ -250,11 +269,16 @@ export function installGlobalErrorHandlers() {
   _globalHandlerInstalled = true;
 
   window.addEventListener('error', (event) => {
-    // Report to /api/report-error (Discord alert pipeline)
-    reportErrorToBackend(event.error || event.message, {
-      operation: 'uncaught_exception',
-      page: window.location.pathname,
-    });
+    // Third-party cross-origin "Script error." → log to MongoDB but DO NOT
+    // fire the Discord alert pipeline (it's noise, not our bug).
+    const isThirdParty = _isThirdPartyScriptError(event);
+    if (!isThirdParty) {
+      // Report to /api/report-error (Discord alert pipeline)
+      reportErrorToBackend(event.error || event.message, {
+        operation: 'uncaught_exception',
+        page: window.location.pathname,
+      });
+    }
 
     // Report to /api/error-log (MongoDB log, queryable via admin API)
     reportToErrorLog({
@@ -267,6 +291,7 @@ export function installGlobalErrorHandlers() {
         filename: event.filename || null,
         lineno: event.lineno || null,
         colno: event.colno || null,
+        third_party_script_error: isThirdParty,
       },
     }, 'uncaught_exception');
   });
