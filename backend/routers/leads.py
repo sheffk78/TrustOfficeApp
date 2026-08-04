@@ -95,11 +95,22 @@ class LeadCapture(BaseModel):
     """
     name: str
     email: EmailStr
+    phone: Optional[str] = None
     source: str = "trustee-101-landing-page"
     utm_source: Optional[str] = None
     utm_campaign: Optional[str] = None
     utm_medium: Optional[str] = None
     referrer: Optional[str] = None  # document.referrer from the browser
+
+
+def _normalize_phone(value: Optional[str]) -> Optional[str]:
+    """Keep optional lead phone values safe and usable for callbacks."""
+    if not value:
+        return None
+    phone = value.strip()
+    if not phone or len(phone) > 32 or not re.fullmatch(r"[0-9+().\-\s]+", phone):
+        return None
+    return phone
 
 
 class LeadUpdate(BaseModel):
@@ -412,6 +423,7 @@ async def capture_lead(lead: LeadCapture):
     email = lead.email.strip().lower()
     name = lead.name.strip()
     source = lead.source or "trustee-101-landing-page"
+    phone = _normalize_phone(lead.phone)
 
     # Check if lead already exists by email
     existing = await db.leads.find_one({"email": email})
@@ -422,6 +434,7 @@ async def capture_lead(lead: LeadCapture):
             {"$set": {
                 "name": name,
                 "source": source,
+                **({"phone": phone} if phone else {}),
                 "utm_source": lead.utm_source,
                 "utm_campaign": lead.utm_campaign,
                 "utm_medium": lead.utm_medium,
@@ -443,6 +456,7 @@ async def capture_lead(lead: LeadCapture):
         "email": email,
         "name": name,
         "source": source,
+        "phone": phone,
         "lead_type": "email_capture",
         "utm_source": lead.utm_source,
         "utm_campaign": lead.utm_campaign,
@@ -468,7 +482,8 @@ async def capture_lead(lead: LeadCapture):
         name=name,
         email=email,
         source=source,
-        lead_stage="new"
+        lead_stage="new",
+        phone=phone
     )
 
     # Send welcome email (fire-and-forget — non-blocking)

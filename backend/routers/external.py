@@ -11,6 +11,7 @@ Endpoints:
 - POST /external/provision-trustoffice/dry-run — Preview without persisting
 - POST /external/provision-trustoffice/resend   — Resend welcome email (fresh token)
 - GET  /external/provision-trustoffice/status   — Check provisioning status by wingpoint_ref
+- GET  /external/lookup-user                   — Check if a TrustOffice user exists for an email
 
 See: WINGPOINT-TRUSTOFFICE-INTEGRATION-PROPOSAL-v3.md
 """
@@ -1113,6 +1114,81 @@ async def provision_status(
         "has_set_password": has_password,
         "last_login": last_login,
         "created_at": provision.get("created_at"),
+    }
+
+
+# ==================== USER LOOKUP ====================
+
+@router.get("/lookup-user")
+async def lookup_user(
+    email: str,
+    partner: dict = Depends(verify_external_api_key)
+):
+    """
+    Check if a TrustOffice user already exists for a given email.
+
+    WingPoint uses this to decide whether to pass existing_trustoffice_user_id
+    when provisioning, so it doesn't create a duplicate account when a customer
+    used a different email on TrustOffice than on WingPoint.
+
+    Query params:
+    - email (required): the email address to look up
+
+    Response 200: { "found": true, "user_id": "...", "email": "...",
+                    "has_subscription": bool, "trust_count": N }
+    Response 404: { "found": false }
+    """
+    partner_id = partner["partner_id"]
+    await check_rate_limit(partner_id)
+
+    normalized_email = email.lower().strip()
+    logger.info(f"LookupUser: email={normalized_email} partner={partner_id}")
+
+    user = await db.users.find_one({"email": normalized_email}, {"_id": 0})
+
+    if not user:
+        await log_audit(
+            partner_id,
+            action="lookup_user",
+            wingpoint_ref=normalized_email,
+            details={"email": normalized_email, "found": False},
+            status="not_found",
+        )
+        raise HTTPException(status_code=404, detail={"found": False})
+
+    user_id = user["user_id"]
+
+    # Trust count for this user
+    trust_count = await db.trusts.count_documents({"user_id": user_id})
+
+    # Subscription state — has_subscription is true if they have a non-"none" plan
+    has_subscription = False
+    try:
+        sub_state = await get_subscription_state(user_id)
+        has_subscription = sub_state.plan_type not in ("none", "forever_free", "free")
+    except Exception as e:
+        logger.warning(f"LookupUser: get_subscription_state failed for {user_id}: {e}")
+
+    await log_audit(
+        partner_id,
+        action="lookup_user",
+        wingpoint_ref=normalized_email,
+        details={
+            "email": normalized_email,
+            "found": True,
+            "user_id": user_id,
+            "has_subscription": has_subscription,
+            "trust_count": trust_count,
+        },
+        status="success",
+    )
+
+    return {
+        "found": True,
+        "user_id": user_id,
+        "email": user.get("email", normalized_email),
+        "has_subscription": has_subscription,
+        "trust_count": trust_count,
     }
 
 

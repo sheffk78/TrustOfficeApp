@@ -531,12 +531,14 @@ Amount: ${amount}
         to_email: str,
         name: str,
         course_url: str,
-        booking_url: str = ""
+        booking_url: str = "",
+        phone_request: bool = True
     ) -> Dict[str, Any]:
         """Send welcome email to new lead with optional book-a-call CTA"""
         template_data = {
             "name": name or "there",
-            "course_url": course_url
+            "course_url": course_url,
+            "phone_request": phone_request
         }
         if booking_url:
             template_data["booking_url"] = booking_url

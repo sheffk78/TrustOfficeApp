@@ -7,7 +7,7 @@ from typing import Dict, Any
 from datetime import datetime
 
 
-def _booking_cta_html(booking_url: str) -> str:
+def _booking_cta_html(booking_url: str, phone_request: bool = True) -> str:
     """Render a 'Book a Call' CTA section if booking_url is provided."""
     if not booking_url:
         return ""
@@ -15,6 +15,7 @@ def _booking_cta_html(booking_url: str) -> str:
             <div style="background-color: #f0f4ff; border-left: 4px solid #D5AD36; padding: 20px; margin: 25px 0;">
               <h3 style="color: #010079; margin-top: 0;">Want to see how TrustOffice works for your trust?</h3>
               <p>Book a free discovery call with Jeff Kohler, founder of TrustOffice. He'll walk you through the platform and answer any questions about your specific situation.</p>
+              {f"<p>If you'd rather talk by phone, reply with the best number to reach you and Jeff can call.</p>" if phone_request else ""}
               <p style="text-align: center; margin: 20px 0;">
                 <a href="{booking_url}" class="button">Book a Call with Jeff</a>
               </p>
@@ -22,7 +23,7 @@ def _booking_cta_html(booking_url: str) -> str:
     """
 
 
-def _booking_cta_text(booking_url: str) -> str:
+def _booking_cta_text(booking_url: str, phone_request: bool = True) -> str:
     """Render a 'Book a Call' CTA section for plain text if booking_url is provided."""
     if not booking_url:
         return ""
@@ -30,6 +31,7 @@ def _booking_cta_text(booking_url: str) -> str:
 Want to see how TrustOffice works for your trust?
 Book a free discovery call with Jeff Kohler, founder of TrustOffice.
 Schedule here: {booking_url}
+{"If you'd rather talk by phone, reply with the best number to reach you and Jeff can call." if phone_request else ""}
 """
 
 
@@ -187,7 +189,7 @@ The TrustOffice Team
 
             <p>Each lesson takes 5–16 minutes. Go at your own pace.</p>
 
-            {_booking_cta_html(data.get('booking_url', ''))}
+            {_booking_cta_html(data.get('booking_url', ''), data.get('phone_request', True))}
 
             <p>If you have questions, just reply to this email.</p>
 
@@ -213,7 +215,7 @@ What You'll Learn:
 
 Each lesson takes 5-16 minutes. Go at your own pace.
 
-{_booking_cta_text(data.get('booking_url', ''))}
+{_booking_cta_text(data.get('booking_url', ''), data.get('phone_request', True))}
 
 Best regards,
 The TrustOffice Team

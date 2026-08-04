@@ -75,7 +75,8 @@ async def notify_new_lead(
     name: str,
     email: str,
     source: str,
-    lead_stage: str = "new"
+    lead_stage: str = "new",
+    phone: Optional[str] = None
 ) -> Dict[str, Any]:
     """Send a new lead notification to the leads Discord channel."""
     if not DISCORD_LEADS_WEBHOOK_URL:
@@ -88,6 +89,7 @@ async def notify_new_lead(
         "fields": [
             {"name": "Name", "value": name or "Not provided", "inline": True},
             {"name": "Email", "value": email, "inline": True},
+            {"name": "Phone", "value": phone or "Not provided", "inline": True},
             {"name": "Source", "value": source or "direct", "inline": True},
             {"name": "Stage", "value": lead_stage.replace("_", " ").title(), "inline": True},
         ],
