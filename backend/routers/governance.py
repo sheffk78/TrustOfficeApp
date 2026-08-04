@@ -162,12 +162,22 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
     one_year_ago = (now - timedelta(days=365))
     twelve_months_ago = one_year_ago
 
-    # 1. Quarterly Minutes
-    quarterly_minutes = await db.minutes_records.count_documents({
+    # 1. Quarterly Minutes — count both minutes_records (direct-created) and
+    # finalized minutes_templates (created via template flow, e.g. Getting Started).
+    # Without this, users who complete initial minutes through onboarding still see
+    # "Missing Q Minutes" because their minutes are in minutes_templates, not minutes_records.
+    quarterly_minutes_records = await db.minutes_records.count_documents({
         "trust_id": trust_id,
         "user_id": user_id,
         "created_at": {"$gte": quarter_start.isoformat()}
     })
+    quarterly_minutes_templates = await db.minutes_templates.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "created_at": {"$gte": quarter_start.isoformat()},
+        "status": {"$in": ["final", "finalized", "draft"]}
+    })
+    quarterly_minutes = quarterly_minutes_records + quarterly_minutes_templates
 
     # 2. Task Compliance
     total_tasks = await db.governance_tasks.count_documents({
@@ -769,6 +779,9 @@ async def get_dashboard_stats(trust_id: str, user_id: str) -> DashboardStats:
     total_decisions = await db.minutes_records.count_documents({
         "trust_id": trust_id,
         "user_id": user_id
+    }) + await db.minutes_templates.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
     })
     
     pending_reviews = await db.governance_tasks.count_documents({
@@ -902,7 +915,7 @@ async def get_recent_activity(user_id: str, trust_id: str, limit: int = 10) -> L
     """Get recent activity for a trust."""
     activities = []
     
-    # Recent minutes
+    # Recent minutes (from both minutes_records and minutes_templates)
     minutes = await db.minutes_records.find(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0}
@@ -913,6 +926,21 @@ async def get_recent_activity(user_id: str, trust_id: str, limit: int = 10) -> L
             "type": "minutes",
             "id": m.get("minutes_id"),
             "title": f"{m.get('minutes_type', 'Meeting').replace('_', ' ').title()} Minutes",
+            "date": m.get("meeting_date") or m.get("created_at", "")[:10],
+            "created_at": m.get("created_at", "")
+        })
+    
+    # Also include template-based minutes (created via Getting Started / template flow)
+    template_minutes = await db.minutes_templates.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    for m in template_minutes:
+        activities.append({
+            "type": "minutes",
+            "id": m.get("minutes_id"),
+            "title": f"{m.get('template_type', 'Meeting').replace('_', ' ').title()} Minutes",
             "date": m.get("meeting_date") or m.get("created_at", "")[:10],
             "created_at": m.get("created_at", "")
         })
