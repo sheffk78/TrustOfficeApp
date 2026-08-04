@@ -15,6 +15,7 @@ const xhrPost = (url, data, headers = {}) => {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url, true);
+    xhr.withCredentials = true; // send cookies (session_token fallback)
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('Accept', 'application/json');
     Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
