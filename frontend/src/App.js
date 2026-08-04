@@ -53,6 +53,7 @@ import BeneficiaryReportPage from "@/pages/BeneficiaryReportPage";
 import ExportDashboard from "@/pages/ExportDashboard";
 import WingPointWelcomePage from "@/pages/WingPointWelcomePage";
 import WingPointRedirect from "@/pages/WingPointRedirect";
+import ConnectWingPoint from "@/pages/ConnectWingPoint";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -184,6 +185,8 @@ const AppRouter = () => {
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/register" element={<SignUpPage />} />
       <Route path="/wingpoint" element={<WingPointRedirect />} />
+      {/* Connect to WingPoint — account linking flow (public, checks auth internally) */}
+      <Route path="/connect/wingpoint" element={<ConnectWingPoint />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/affiliate" element={<AffiliatePage />} />
       <Route path="/help" element={<Navigate to="/dashboard" replace />} />

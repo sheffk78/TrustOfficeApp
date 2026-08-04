@@ -3,18 +3,28 @@ from fastapi import APIRouter, HTTPException, Depends, Response, Request, Backgr
 from fastapi.responses import RedirectResponse
 from datetime import datetime, timezone, timedelta
 from typing import Optional
+from pydantic import BaseModel
 import uuid
 import secrets
 import logging
 import os
 import httpx
 import re
+import jwt
 import urllib.parse
 from collections import defaultdict
 from time import time
 
 from database import db
-from dependencies import get_current_user, hash_password, verify_password, create_jwt_token, JWT_EXPIRATION_HOURS
+from dependencies import (
+    get_current_user,
+    hash_password,
+    verify_password,
+    create_jwt_token,
+    JWT_EXPIRATION_HOURS,
+    JWT_SECRET,
+    JWT_ALGORITHM,
+)
 from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, ProfileUpdate
 from email_service import email_service
 from security import InputSanitizer
@@ -818,3 +828,98 @@ async def google_callback(request: Request, response: Response, code: str = None
     except Exception as e:
         logger.error(f"Unexpected error during Google OAuth: {e}")
         return RedirectResponse(url=f"{frontend_url}/login?error=unexpected_error")
+
+
+# ==================== WINGPOINT CONNECT FLOW ====================
+#
+# Simple account-linking flow (NOT full OAuth):
+#   1. WingPoint redirects user to https://app.trustoffice.app/connect/wingpoint
+#      with redirect_url, wp_ref, trust_name query params.
+#   2. TrustOffice frontend checks login state.
+#      - Logged in  -> show confirmation page.
+#      - Not logged -> show login form, then confirmation page.
+#   3. User clicks "Confirm Connection" -> frontend calls
+#      POST /api/auth/connect/wingpoint/confirm with the JWT + wp_ref.
+#   4. Backend validates the user, mints a short-lived connect_token (5 min)
+#      signed with a shared secret, and returns it.
+#   5. Frontend redirects back to WingPoint's redirect_url with
+#      ?trustoffice_user_id=...&connect_token=...
+#   6. WingPoint verifies the connect_token using the shared secret and
+#      links the accounts. No email guessing required.
+
+# Shared secret for signing connect_tokens. WingPoint can verify with the same secret.
+# Prefer a dedicated CONNECT_TOKEN_SECRET, fall back to EXTERNAL_API_KEY, then JWT_SECRET.
+CONNECT_TOKEN_SECRET = (
+    os.environ.get("CONNECT_TOKEN_SECRET")
+    or os.environ.get("EXTERNAL_API_KEY")
+    or os.environ.get("TRUSTOFFICE_EXTERNAL_API_KEY")
+    or JWT_SECRET
+)
+CONNECT_TOKEN_TTL_MINUTES = 5
+
+
+class WingPointConnectConfirm(BaseModel):
+    """Request body for POST /auth/connect/wingpoint/confirm"""
+    wp_ref: Optional[str] = None
+    trust_name: Optional[str] = None
+
+
+@router.post("/auth/connect/wingpoint/confirm")
+async def connect_wingpoint_confirm(
+    body: WingPointConnectConfirm,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Confirm a WingPoint connection for the authenticated user.
+
+    Returns a short-lived connect_token (JWT, 5 min TTL) signed with the
+    shared CONNECT_TOKEN_SECRET. WingPoint verifies this token server-side
+    to confirm the TrustOffice user identity — no email guessing needed.
+
+    Requires an active TrustOffice session (JWT in Authorization header or
+    session cookie). Subscription state is NOT checked — this is an auth/
+    account-linking flow, not app functionality.
+    """
+    user_id = user.get("user_id")
+    email = user.get("email")
+    if not user_id or not email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # Mint a short-lived connect_token. WingPoint verifies the signature
+    # using the shared secret (CONNECT_TOKEN_SECRET / EXTERNAL_API_KEY).
+    now = datetime.now(timezone.utc)
+    connect_payload = {
+        "user_id": user_id,
+        "email": email,
+        "wp_ref": body.wp_ref,
+        "trust_name": body.trust_name,
+        "type": "wingpoint_connect",
+        "iat": now,
+        "exp": now + timedelta(minutes=CONNECT_TOKEN_TTL_MINUTES),
+    }
+    connect_token = jwt.encode(
+        connect_payload,
+        CONNECT_TOKEN_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
+
+    # Audit the connection confirmation
+    await log_audit_event(
+        user_id,
+        "wingpoint_connect_confirmed",
+        "user",
+        user_id,
+        {"wp_ref": body.wp_ref, "trust_name": body.trust_name},
+    )
+
+    logger.info(
+        f"WingPoint connect confirmed for user {user_id} ({email}) "
+        f"wp_ref={body.wp_ref}"
+    )
+
+    return {
+        "trustoffice_user_id": user_id,
+        "email": email,
+        "connect_token": connect_token,
+        "expires_in": CONNECT_TOKEN_TTL_MINUTES * 60,
+    }

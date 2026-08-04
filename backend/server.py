@@ -176,6 +176,7 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
     "/api/auth/verify-reset-token",
+    "/api/auth/connect/wingpoint/confirm",
     "/api/subscription",
     "/api/subscription/create-checkout",
     "/api/subscription/verify-payment",
@@ -228,6 +229,7 @@ WRITE_EXEMPT_PATHS = {
     "/api/auth/session",
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
+    "/api/auth/connect/wingpoint/confirm",
     "/api/auth/profile",  # Allow profile updates
     "/api/trusts",  # Allow trust creation — first trust is needed for onboarding; multiple-trust gate is enforced in the route handler
     "/api/demo/seed",  # Allow demo data seeding — onboarding feature for new users
