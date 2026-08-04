@@ -424,8 +424,10 @@ ACTION_EXECUTION_MAP = {
         "field_map": {
             "asset_type": "category",
             "description": "description",
+            "asset_name": "description",
             "value": "approximate_value",
             "date_acquired": "date_conveyed",
+            "contribution_date": "date_conveyed",
             "meeting_date": "meeting_date",
             "participants": "participants_text",
             "grantor_name": "grantor_name",
@@ -623,6 +625,16 @@ async def _execute_approved_action(
         "record_compensation_payment_preview": "compensation_payment_preview",
         "setup_compensation_preview": "compensation_plan_preview",
         "add_investment_preview": "investment_preview",
+        # The AI sometimes returns the intent name instead of the *_preview type.
+        # Map common intent-name → execution-map key aliases so approve still works.
+        "contribute_asset": "contribute_asset_preview",
+        "add_asset": "asset_preview",
+        "update_asset": "asset_update_preview",
+        "log_minutes": "minutes_preview",
+        "create_distribution": "distribution_preview",
+        "setup_compensation": "compensation_plan_preview",
+        "record_compensation_payment": "compensation_payment_preview",
+        "add_investment": "investment_preview",
     }
     card_type = TYPE_ALIASES.get(card_type, card_type)
     
@@ -1783,6 +1795,11 @@ async def confirm_action(
 
     if request.action == "edit" and request.edited_data:
         # Merge edited data into the existing action card data
+        for key, value in request.edited_data.items():
+            update_fields[f"messages.{message_index}.action_card.data.{key}"] = value
+    elif request.action == "approve" and request.edited_data:
+        # Allow approve to also carry corrected/ supplemental data (e.g. meeting
+        # metadata for contribute_asset that the AI extractor did not capture).
         for key, value in request.edited_data.items():
             update_fields[f"messages.{message_index}.action_card.data.{key}"] = value
 

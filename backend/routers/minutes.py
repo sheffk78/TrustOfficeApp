@@ -1129,7 +1129,7 @@ def generate_template_document(trust: dict, template_type: str, template_data: d
     meeting_time = template_data.get("meeting_time", "10:00 AM")
     meeting_type = template_data.get("meeting_type", "unanimous_written_consent")
     trustees_present = template_data.get("trustees_present", trustee_names)
-    trust_formation_date = template_data.get("trust_formation_date") or template_data.get("trust_indenture_date", "[Date of Trust Formation]")
+    trust_formation_date = template_data.get("trust_formation_date") or template_data.get("trust_indenture_date") or trust.get("start_date", "[Date of Trust Formation]")
     
     # Format ISO dates (yyyy-MM-dd) to human-readable for the document
     def _fmt_date(d):
@@ -1147,6 +1147,9 @@ def generate_template_document(trust: dict, template_type: str, template_data: d
     # Format time from 24h (HH:MM) to 12h with AM/PM
     def _fmt_time(t):
         if not t:
+            return t
+        # Already formatted (e.g. "10:00 AM") — return as-is
+        if isinstance(t, str) and ("AM" in t or "PM" in t):
             return t
         try:
             h, m = t.split(":")
@@ -1384,6 +1387,9 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     # Format time from 24h to 12h with AM/PM
     def _fmt_time_12h(t):
         if not t:
+            return t
+        # Already formatted (e.g. "10:00 AM") — return as-is
+        if isinstance(t, str) and ("AM" in t or "PM" in t):
             return t
         try:
             h, m = t.split(":")
