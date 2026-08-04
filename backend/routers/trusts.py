@@ -130,6 +130,39 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
         
         await db.trusts.insert_one(trust_doc)
         
+        # Auto-cleanup demo data when user creates their first REAL trust.
+        # This prevents demo beneficiaries from blocking unit allocation on the user's real trust.
+        existing_real = await db.trusts.count_documents({
+            "user_id": user["user_id"],
+            "is_demo": {"$ne": True},
+            "trust_id": {"$ne": trust_id}
+        })
+        if existing_real == 0:
+            # This is the user's first real trust — delete all demo data
+            demo_trusts = await db.trusts.find(
+                {"user_id": user["user_id"], "is_demo": True},
+                {"_id": 0, "trust_id": 1}
+            ).to_list(100)
+            demo_trust_ids = [t["trust_id"] for t in demo_trusts]
+            if demo_trust_ids:
+                await db.trust_unit_certificates.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.trust_unit_transfers.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.trust_units_settings.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.vault_documents.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.governance_tasks.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.tax_calendar.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.minutes_records.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.minutes_templates.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.entities.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.benevolence_logs.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.compensation_payments.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.bank_accounts.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.bank_statements.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.distributions.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.investments.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                await db.trusts.delete_many({"trust_id": {"$in": demo_trust_ids}})
+                logger.info(f"Cleaned up {len(demo_trust_ids)} demo trusts for user {user['user_id']} (first real trust created)")
+        
         # Create initial governance tasks — compensate (rollback trust) on failure
         try:
             await create_initial_governance_tasks(trust_id, user["user_id"])

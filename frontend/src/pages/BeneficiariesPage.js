@@ -976,6 +976,22 @@ export default function BeneficiariesPage() {
                   </div>
                 </div>
               </div>
+              
+              {/* Fully Allocated Warning */}
+              {summary && summary.remaining_units === 0 && (
+                <div className="mb-4 p-4 border-2 border-gold/40 bg-gold/5 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-mono text-xs font-medium text-navy mb-1">All {summary.settings?.total_authorized_units || 100} units are allocated</p>
+                    <p className="text-sm text-muted-foreground mb-2">To add another beneficiary, increase the authorized units or cancel an existing certificate.</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setShowSettingsModal(true)} className="font-mono text-xs">
+                        <Settings className="w-3.5 h-3.5 mr-1" /> Increase Authorized Units
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Certificates List */}
               <div className="card-trust overflow-hidden">
