@@ -690,10 +690,7 @@ def _should_include_vault_context(intent: str, user_message: str) -> bool:
     Returns True if:
     - The intent is inherently document-relevant (evaluate_distribution, review_document, etc.)
     - OR the user message contains trigger keywords suggesting they're asking about their own docs
-
-    Returns False for:
-    - general_chat (greetings, casual)
-    - ask_knowledge about abstract concepts with no document references
+    - Returns False for casual/abstract questions (pricing, onboarding, general knowledge)
     """
     if intent in VAULT_RELEVANT_INTENTS:
         return True
@@ -701,62 +698,153 @@ def _should_include_vault_context(intent: str, user_message: str) -> bool:
     return any(kw in msg_lower for kw in VAULT_TRIGGER_KEYWORDS)
 
 
-def _format_vault_context(vault_docs: list, trust_document: dict | None) -> str:
+# ---------------------------------------------------------------------------
+# Field-level gating for trust document analysis
+# ---------------------------------------------------------------------------
+# Instead of always injecting ALL extracted fields, we scope which field
+# groups are relevant based on intent + message keywords. This keeps the
+# system prompt lean — a user asking about pricing doesn't need trustee
+# powers and distribution rules burned into every turn.
+
+# Field groups — each maps to keys in the trust_document context dict
+TD_BASELINE_FIELDS = {"grantor", "trust_type"}
+TD_DISTRIBUTION_FIELDS = {
+    "distribution_standard", "distribution_standard_type",
+    "distribution_article", "distribution_rules",
+}
+TD_AUTHORITY_FIELDS = {
+    "trustee_powers", "trustee_powers_detail",
+    "removal_provisions", "termination_rules",
+}
+TD_BENEFICIARY_FIELDS = {"beneficiary_names"}
+
+# Intent → field groups (in addition to baseline)
+TD_INTENT_FIELD_MAP: dict[str, set[str]] = {
+    "evaluate_distribution": TD_BASELINE_FIELDS | TD_DISTRIBUTION_FIELDS | TD_BENEFICIARY_FIELDS,
+    "create_distribution": TD_BASELINE_FIELDS | TD_DISTRIBUTION_FIELDS | TD_BENEFICIARY_FIELDS,
+    "log_minutes": TD_BASELINE_FIELDS | TD_AUTHORITY_FIELDS,
+    "create_beneficiary": TD_BASELINE_FIELDS | TD_BENEFICIARY_FIELDS | TD_DISTRIBUTION_FIELDS,
+    "update_beneficiary": TD_BASELINE_FIELDS | TD_BENEFICIARY_FIELDS | TD_DISTRIBUTION_FIELDS,
+    "review_document": TD_BASELINE_FIELDS | TD_DISTRIBUTION_FIELDS | TD_AUTHORITY_FIELDS | TD_BENEFICIARY_FIELDS,
+    "upload_document": TD_BASELINE_FIELDS | TD_DISTRIBUTION_FIELDS | TD_AUTHORITY_FIELDS | TD_BENEFICIARY_FIELDS,
+    "health_check": TD_BASELINE_FIELDS | TD_DISTRIBUTION_FIELDS | TD_AUTHORITY_FIELDS | TD_BENEFICIARY_FIELDS,
+    "recommend_action": TD_BASELINE_FIELDS | TD_DISTRIBUTION_FIELDS | TD_AUTHORITY_FIELDS | TD_BENEFICIARY_FIELDS,
+    "check_deadlines": TD_BASELINE_FIELDS,
+    "add_asset": TD_BASELINE_FIELDS | TD_AUTHORITY_FIELDS,
+    "contribute_asset": TD_BASELINE_FIELDS | TD_AUTHORITY_FIELDS,
+}
+
+# Keyword triggers for field-group expansion in general_chat
+TD_DISTRIBUTION_KEYWORDS = [
+    "distribution", "distribute", "pay", "payment", "withdraw",
+    "discretionary", "mandatory", "income", "principal", "hem",
+    "beneficiary request", "distribution request",
+]
+TD_AUTHORITY_KEYWORDS = [
+    "power", "authority", "trustee power", "removal", "remove trustee",
+    "terminate", "termination", "amend", "amendment",
+]
+TD_BENEFICIARY_KEYWORDS = [
+    "beneficiary", "beneficiaries", "heir", "remainder",
+]
+
+
+def _get_trust_doc_scope(intent: str, user_message: str) -> set[str] | None:
+    """Determine which trust document fields to include in the prompt.
+
+    Returns a set of field names, or None to include everything
+    (used when vault context is fully relevant).
+    """
+    # When the vault gate is open, include all fields
+    if _should_include_vault_context(intent, user_message):
+        return None  # None = include everything
+
+    # Otherwise, scope to baseline + keyword-matched groups
+    fields = set(TD_BASELINE_FIELDS)
+    msg_lower = user_message.lower()
+
+    if any(kw in msg_lower for kw in TD_DISTRIBUTION_KEYWORDS):
+        fields |= TD_DISTRIBUTION_FIELDS
+    if any(kw in msg_lower for kw in TD_AUTHORITY_KEYWORDS):
+        fields |= TD_AUTHORITY_FIELDS
+    if any(kw in msg_lower for kw in TD_BENEFICIARY_KEYWORDS):
+        fields |= TD_BENEFICIARY_FIELDS
+
+    # Intent-specific expansion even when vault gate is closed
+    intent_fields = TD_INTENT_FIELD_MAP.get(intent)
+    if intent_fields:
+        fields |= intent_fields
+
+    return fields
+
+
+def _format_vault_context(vault_docs: list, trust_document: dict | None, doc_scope: set[str] | None = None) -> str:
     """Format vault document metadata + trust document analysis into a prompt section.
 
-    Tier 1: Trust document analysis (always included when available — it's already extracted
-            structured data, just a few hundred tokens).
+    Tier 1: Trust document analysis (included when available, scoped by doc_scope).
     Tier 2: Vault document list (titles, categories, descriptions — no file content).
+
+    Args:
+        doc_scope: Set of field names to include, or None to include everything.
+                   Used for field-level gating to avoid bloating the prompt with
+                   irrelevant trust document details.
     """
     sections = []
 
-    # --- Tier 1: AI-extracted trust document analysis ---
+    # --- Tier 1: AI-extracted trust document analysis (field-scoped) ---
     if trust_document:
+        # Helper: check if a field is in scope
+        def _in_scope(field: str) -> bool:
+            return doc_scope is None or field in doc_scope
+
         td_lines = ["## Trust Document Analysis (AI-Extracted)"]
-        if trust_document.get("grantor"):
+        if _in_scope("grantor") and trust_document.get("grantor"):
             td_lines.append(f"Grantor: {trust_document['grantor']}")
-        if trust_document.get("trust_type"):
+        if _in_scope("trust_type") and trust_document.get("trust_type"):
             td_lines.append(f"Trust Type: {trust_document['trust_type']}")
-        if trust_document.get("distribution_standard"):
+        if _in_scope("distribution_standard") and trust_document.get("distribution_standard"):
             td_lines.append(f"Distribution Standard: {trust_document['distribution_standard']}")
-        if trust_document.get("distribution_standard_type"):
+        if _in_scope("distribution_standard") and trust_document.get("distribution_standard_type"):
             td_lines.append(f"Distribution Standard Type: {trust_document['distribution_standard_type']}")
-        if trust_document.get("distribution_article"):
+        if _in_scope("distribution_standard") and trust_document.get("distribution_article"):
             td_lines.append(f"Distribution Article: {trust_document['distribution_article']}")
-        if trust_document.get("beneficiary_names"):
+        if _in_scope("beneficiary_names") and trust_document.get("beneficiary_names"):
             td_lines.append(f"Named Beneficiaries: {', '.join(trust_document['beneficiary_names'])}")
-        if trust_document.get("removal_provisions"):
+        if _in_scope("removal_provisions") and trust_document.get("removal_provisions"):
             td_lines.append(f"Trustee Removal: {trust_document['removal_provisions']}")
-        if trust_document.get("termination_rules"):
+        if _in_scope("termination_rules") and trust_document.get("termination_rules"):
             td_lines.append(f"Termination Rules: {trust_document['termination_rules']}")
 
-        dist_rules = trust_document.get("distribution_rules", {})
-        if dist_rules:
-            if dist_rules.get("specific_purposes"):
-                td_lines.append(f"Permitted Distribution Purposes: {', '.join(dist_rules['specific_purposes'])}")
-            if dist_rules.get("amount_guidance"):
-                td_lines.append(f"Amount Guidance: {dist_rules['amount_guidance']}")
-            if dist_rules.get("needs_based_factors"):
-                td_lines.append(f"Needs-Based Factors: {', '.join(dist_rules['needs_based_factors'])}")
-            if dist_rules.get("equal_treatment_requirement"):
-                td_lines.append(f"Equal Treatment: {dist_rules['equal_treatment_requirement']}")
-            if dist_rules.get("article_reference"):
-                td_lines.append(f"Distribution Rules Article: {dist_rules['article_reference']}")
+        if _in_scope("distribution_rules"):
+            dist_rules = trust_document.get("distribution_rules", {})
+            if dist_rules:
+                if dist_rules.get("specific_purposes"):
+                    td_lines.append(f"Permitted Distribution Purposes: {', '.join(dist_rules['specific_purposes'])}")
+                if dist_rules.get("amount_guidance"):
+                    td_lines.append(f"Amount Guidance: {dist_rules['amount_guidance']}")
+                if dist_rules.get("needs_based_factors"):
+                    td_lines.append(f"Needs-Based Factors: {', '.join(dist_rules['needs_based_factors'])}")
+                if dist_rules.get("equal_treatment_requirement"):
+                    td_lines.append(f"Equal Treatment: {dist_rules['equal_treatment_requirement']}")
+                if dist_rules.get("article_reference"):
+                    td_lines.append(f"Distribution Rules Article: {dist_rules['article_reference']}")
 
-        powers = trust_document.get("trustee_powers", [])
-        if powers:
-            td_lines.append("Trustee Powers:")
-            for p in powers[:10]:
-                td_lines.append(f"  - {p.get('power', '')} ({p.get('article', '')})")
+        if _in_scope("trustee_powers"):
+            powers = trust_document.get("trustee_powers", [])
+            if powers:
+                td_lines.append("Trustee Powers:")
+                for p in powers[:10]:
+                    td_lines.append(f"  - {p.get('power', '')} ({p.get('article', '')})")
 
-        powers_detail = trust_document.get("trustee_powers_detail", {})
-        if powers_detail:
-            if powers_detail.get("investment_powers"):
-                td_lines.append(f"Investment Powers: {powers_detail['investment_powers']}")
-            if powers_detail.get("discretion_powers"):
-                td_lines.append(f"Discretion Powers: {powers_detail['discretion_powers']}")
-            if powers_detail.get("spendthrift_provisions"):
-                td_lines.append(f"Spendthrift Provisions: {powers_detail['spendthrift_provisions']}")
+        if _in_scope("trustee_powers_detail"):
+            powers_detail = trust_document.get("trustee_powers_detail", {})
+            if powers_detail:
+                if powers_detail.get("investment_powers"):
+                    td_lines.append(f"Investment Powers: {powers_detail['investment_powers']}")
+                if powers_detail.get("discretion_powers"):
+                    td_lines.append(f"Discretion Powers: {powers_detail['discretion_powers']}")
+                if powers_detail.get("spendthrift_provisions"):
+                    td_lines.append(f"Spendthrift Provisions: {powers_detail['spendthrift_provisions']}")
 
         sections.append("\n".join(td_lines))
 
@@ -905,18 +993,20 @@ async def generate_response(
     # Build the system prompt with context
     knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
 
-    # --- Intelligent vault context gate ---
+    # --- Intelligent vault context gate with field-level scoping ---
     # Only include vault documents when the intent or message suggests relevance.
-    # This avoids bloating every prompt with document metadata for casual/abstract questions.
+    # Trust document analysis is included when available, but field-scoped to
+    # avoid bloating the prompt with irrelevant details (e.g., trustee powers
+    # when the user is asking about pricing).
     vault_section = ""
     trust_doc = ctx.get("trust_document")
+    doc_scope = _get_trust_doc_scope(intent, user_message)
     if _should_include_vault_context(intent, user_message):
         vault_docs = ctx.get("vault_documents", [])
-        vault_section = _format_vault_context(vault_docs, trust_doc)
+        vault_section = _format_vault_context(vault_docs, trust_doc, doc_scope=None)
     elif trust_doc:
-        # Even for non-document intents, include the trust document analysis if available.
-        # It's small structured data and gives the AI baseline awareness of the trust instrument.
-        vault_section = _format_vault_context([], trust_doc)
+        # Include scoped trust document analysis for baseline awareness.
+        vault_section = _format_vault_context([], trust_doc, doc_scope=doc_scope)
 
     system_prompt = f"""{CHAT_SYSTEM_PROMPT}
 
@@ -1087,14 +1177,15 @@ async def generate_response_stream(
     _struct = ctx.get("structure_summary", {})
     _entity_types = ", ".join(f"{v} {k}" for k, v in _struct.get("entity_type_counts", {}).items()) or "None"
 
-    # --- Intelligent vault context gate (same logic as non-streaming) ---
+    # --- Intelligent vault context gate with field-level scoping (same as non-streaming) ---
     vault_section = ""
     trust_doc = ctx.get("trust_document")
+    doc_scope = _get_trust_doc_scope(intent, user_message)
     if _should_include_vault_context(intent, user_message):
         vault_docs = ctx.get("vault_documents", [])
-        vault_section = _format_vault_context(vault_docs, trust_doc)
+        vault_section = _format_vault_context(vault_docs, trust_doc, doc_scope=None)
     elif trust_doc:
-        vault_section = _format_vault_context([], trust_doc)
+        vault_section = _format_vault_context([], trust_doc, doc_scope=doc_scope)
 
     # For streaming mode: ask the AI to respond in natural markdown (no JSON wrapper).
     # Action card data is extracted separately if needed.
