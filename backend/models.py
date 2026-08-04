@@ -1070,6 +1070,9 @@ class OnboardingState(BaseModel):
     calendar_set: bool = False
     checklist_dismissed: bool = False
     successor_trustee_added: bool = False
+    # Manual overrides — tracks which steps the user manually toggled.
+    # Auto-detection skips these fields, preserving the user's choice.
+    manual_overrides: dict = {}
 
 
 # ==================== BENEFICIARY DASHBOARD MODELS ====================

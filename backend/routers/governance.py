@@ -819,6 +819,8 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
     
     # Auto-check based on actual data if trust_id provided
     # Bidirectional: sets True when data exists, resets False when data is gone
+    # Manual overrides skip auto-detection — user's choice is preserved.
+    manual_overrides = existing.get("manual_overrides", {})
     if trust_id:
         updates = {}
         
@@ -827,12 +829,12 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
         if trust:
             has_formation = bool(trust.get("start_date"))
             has_ein = bool(trust.get("ein"))
-            if has_formation != existing.get("formation_date_added"):
+            if "formation_date_added" not in manual_overrides and has_formation != existing.get("formation_date_added"):
                 updates["formation_date_added"] = has_formation
-            if has_ein != existing.get("ein_entered"):
+            if "ein_entered" not in manual_overrides and has_ein != existing.get("ein_entered"):
                 updates["ein_entered"] = has_ein
             has_successor = bool(trust.get("successor_trustee_name"))
-            if has_successor != existing.get("successor_trustee_added"):
+            if "successor_trustee_added" not in manual_overrides and has_successor != existing.get("successor_trustee_added"):
                 updates["successor_trustee_added"] = has_successor
         
         # Check document uploads in vault
@@ -841,7 +843,7 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
             "user_id": user_id,
             "category": {"$in": ["trust_instrument", "trust_document", "declaration_of_trust"]}
         })
-        if bool(trust_doc_count > 0) != existing.get("trust_doc_uploaded"):
+        if "trust_doc_uploaded" not in manual_overrides and bool(trust_doc_count > 0) != existing.get("trust_doc_uploaded"):
             updates["trust_doc_uploaded"] = trust_doc_count > 0
         
         ein_doc_count = await db.vault_documents.count_documents({
@@ -849,7 +851,7 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
             "user_id": user_id,
             "category": {"$in": ["ein_letter", "irs_notice"]}
         })
-        if bool(ein_doc_count > 0) != existing.get("ein_doc_uploaded"):
+        if "ein_doc_uploaded" not in manual_overrides and bool(ein_doc_count > 0) != existing.get("ein_doc_uploaded"):
             updates["ein_doc_uploaded"] = ein_doc_count > 0
         
         # Check beneficiaries (stored in trust_unit_certificates, not db.beneficiaries)
@@ -858,12 +860,12 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
             "user_id": user_id,
             "status": "active"
         })
-        if bool(beneficiary_count > 0) != existing.get("beneficiaries_added"):
+        if "beneficiaries_added" not in manual_overrides and bool(beneficiary_count > 0) != existing.get("beneficiaries_added"):
             updates["beneficiaries_added"] = beneficiary_count > 0
         
         # Check assets (via entities) — auto-created entity from trust creation counts
         entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
-        if bool(entity_count > 0) != existing.get("assets_added"):
+        if "assets_added" not in manual_overrides and bool(entity_count > 0) != existing.get("assets_added"):
             updates["assets_added"] = entity_count > 0
         
         # Check governance tasks (calendar) — only count tasks the USER created,
@@ -875,14 +877,14 @@ async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> 
             "user_id": user_id,
             "task_type": {"$nin": list(auto_seeded_types | {"custom"})}
         })
-        if bool(user_task_count > 0) != existing.get("calendar_set"):
+        if "calendar_set" not in manual_overrides and bool(user_task_count > 0) != existing.get("calendar_set"):
             updates["calendar_set"] = user_task_count > 0
         
         # Check minutes (both records from unified flow and templates from template form)
         minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
         templates_count = await db.minutes_templates.count_documents({"trust_id": trust_id, "user_id": user_id})
         has_minutes = minutes_count > 0 or templates_count > 0
-        if has_minutes != existing.get("minutes_generated"):
+        if "minutes_generated" not in manual_overrides and has_minutes != existing.get("minutes_generated"):
             updates["minutes_generated"] = has_minutes
         
         if updates:
@@ -1018,10 +1020,18 @@ async def get_onboarding(user: dict = Depends(get_current_user)):
 
 @router.patch("/onboarding")
 async def update_onboarding(updates: dict, user: dict = Depends(get_current_user)):
-    """Update onboarding state"""
+    """Update onboarding state — records manual overrides for toggled fields."""
     allowed_fields = ["formation_date_added", "ein_entered", "trust_doc_uploaded", "ein_doc_uploaded", "beneficiaries_added", "assets_added", "minutes_generated", "calendar_set", "checklist_dismissed", "successor_trustee_added"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Record which fields were manually set — auto-detection will skip these
+    existing = await db.user_onboarding.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    manual_overrides = existing.get("manual_overrides", {}) if existing else {}
+    for field in update_data:
+        if field != "updated_at" and field != "checklist_dismissed":
+            manual_overrides[field] = True
+    update_data["manual_overrides"] = manual_overrides
     
     await db.user_onboarding.update_one(
         {"user_id": user["user_id"]},

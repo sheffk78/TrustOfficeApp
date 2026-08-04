@@ -239,6 +239,28 @@ export default function DashboardPage() {
     }
   };
 
+  const toggleOnboardingStep = async (field, currentValue) => {
+    try {
+      const res = await fetchWithAuth('/onboarding', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: !currentValue }),
+      });
+      if (!res.ok) {
+        toast.error('Failed to update. Please try again.');
+        return;
+      }
+      // Update local state immediately
+      setDashboard(prev => ({
+        ...prev,
+        onboarding_state: { ...prev.onboarding_state, [field]: !currentValue }
+      }));
+    } catch (error) {
+      console.error('Failed to toggle onboarding step:', error);
+      toast.error('Failed to update. Please try again.');
+    }
+  };
+
   const dismissOnboarding = async () => {
     try {
       const res = await fetchWithAuth('/onboarding/dismiss', { method: 'POST' });
@@ -352,15 +374,15 @@ export default function DashboardPage() {
 
     // Field names must match backend OnboardingState model (backend/models.py L1045)
     const steps = [
-      { id: 'trust_doc', label: 'Add your trust document', done: onboarding.trust_doc_uploaded, action: '/vault', priority: 1 },
-      { id: 'beneficiaries', label: 'Add beneficiaries', done: onboarding.beneficiaries_added, action: '/beneficiaries', priority: 2 },
-      { id: 'successor_trustee', label: 'Name a successor trustee', done: onboarding.successor_trustee_added, action: '/settings#successor-trustee', priority: 3 },
-      { id: 'assets', label: 'Add your trust assets', done: onboarding.assets_added, action: '/schedule-a', priority: 4 },
-      { id: 'minutes', label: 'Hold your first trustee meeting', done: onboarding.minutes_generated, action: '/minutes/create?type=initial_trustee_meeting', priority: 5 },
-      { id: 'ein_doc', label: 'Add EIN letter to vault', done: onboarding.ein_doc_uploaded, action: '/vault', priority: 6 },
-      { id: 'formation_date', label: 'Add formation date', done: onboarding.formation_date_added, action: '/settings#formation-date', priority: 7 },
-      { id: 'ein', label: 'Enter your EIN', done: onboarding.ein_entered, action: '/settings#ein', priority: 8 },
-      { id: 'calendar', label: 'Review your tax calendar', done: onboarding.calendar_set || selectedTrust?.benevolence_enabled, action: '/calendar', priority: 9 },
+      { id: 'trust_doc', label: 'Add your trust document', done: onboarding.trust_doc_uploaded, action: '/vault', priority: 1, field: 'trust_doc_uploaded' },
+      { id: 'beneficiaries', label: 'Add beneficiaries', done: onboarding.beneficiaries_added, action: '/beneficiaries', priority: 2, field: 'beneficiaries_added' },
+      { id: 'successor_trustee', label: 'Name a successor trustee', done: onboarding.successor_trustee_added, action: '/settings#successor-trustee', priority: 3, field: 'successor_trustee_added' },
+      { id: 'assets', label: 'Add your trust assets', done: onboarding.assets_added, action: '/schedule-a', priority: 4, field: 'assets_added' },
+      { id: 'minutes', label: 'Hold your first trustee meeting', done: onboarding.minutes_generated, action: '/minutes/create?type=initial_trustee_meeting', priority: 5, field: 'minutes_generated' },
+      { id: 'ein_doc', label: 'Add EIN letter to vault', done: onboarding.ein_doc_uploaded, action: '/vault', priority: 6, field: 'ein_doc_uploaded' },
+      { id: 'formation_date', label: 'Add formation date', done: onboarding.formation_date_added, action: '/settings#formation-date', priority: 7, field: 'formation_date_added' },
+      { id: 'ein', label: 'Enter your EIN', done: onboarding.ein_entered, action: '/settings#ein', priority: 8, field: 'ein_entered' },
+      { id: 'calendar', label: 'Review your tax calendar', done: onboarding.calendar_set || selectedTrust?.benevolence_enabled, action: '/calendar', priority: 9, field: 'calendar_set' },
     ];
 
     const completed = steps.filter(s => s.done).length;
@@ -717,36 +739,45 @@ export default function DashboardPage() {
                         <h4 className="font-mono text-xs uppercase tracking-widest text-navy/60 mb-2">Setup Steps</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {onboardingProgress.allSteps.map((step, index) => (
-                            <button
+                            <div
                               key={step.id}
-                              onClick={() => {
-                                if (step.done) return;
-                                navigate(step.action);
-                              }}
                               className={`p-4 border text-left transition-colors ${
                                 step.done
-                                  ? 'border-success/30 bg-success/5 cursor-default'
-                                  : 'border-navy/20 hover:border-navy/40 cursor-pointer'
+                                  ? 'border-success/30 bg-success/5'
+                                  : 'border-navy/20 hover:border-navy/40'
                               }`}
                               data-testid={`onboarding-step-${step.id}`}
                             >
                               <div className="flex items-center gap-2 mb-1">
                                 {step.done ? (
-                                  <CheckCircle2 className="w-4 h-4 text-success" />
+                                  <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
                                 ) : (
-                                  <Circle className="w-4 h-4 text-muted-foreground" />
+                                  <Circle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                 )}
                                 <span className="font-mono text-[10px] text-muted-foreground">#{step.priority}</span>
-                                <span className={`font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy'}`}>
+                                <button
+                                  onClick={() => navigate(step.action)}
+                                  className={`flex-1 text-left font-mono text-xs font-medium ${step.done ? 'text-success line-through' : 'text-navy hover:underline'}`}
+                                >
                                   {step.label}
-                                </span>
-                                {step.done && (
-                                  <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-success/60">
-                                    Done
-                                  </span>
-                                )}
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleOnboardingStep(step.field, step.done);
+                                  }}
+                                  className={`flex-shrink-0 ml-auto px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                                    step.done
+                                      ? 'text-muted-foreground hover:text-navy border border-navy/20 hover:border-navy/40'
+                                      : 'text-success/70 hover:text-success border border-success/30 hover:border-success/50'
+                                  }`}
+                                  data-testid={`onboarding-toggle-${step.id}`}
+                                  title={step.done ? 'Uncheck this step' : 'Mark as done'}
+                                >
+                                  {step.done ? 'Uncheck' : 'Done'}
+                                </button>
                               </div>
-                            </button>
+                            </div>
                           ))}
                         </div>
                       </div>
