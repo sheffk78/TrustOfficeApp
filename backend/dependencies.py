@@ -615,12 +615,15 @@ async def get_current_user(request: Request) -> dict:
         if user:
             return user
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
+        pass  # fall through to session cookie/DB lookup
     except jwt.InvalidTokenError:
-        pass
+        pass  # fall through to session cookie/DB lookup
     
-    # Try session token
-    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    # Try session token — use the cookie value, not the Bearer JWT string
+    session_lookup_token = session_token or token
+    if not session_lookup_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    session = await db.user_sessions.find_one({"session_token": session_lookup_token}, {"_id": 0})
     if session:
         expires_at = session.get("expires_at")
         if isinstance(expires_at, str):
