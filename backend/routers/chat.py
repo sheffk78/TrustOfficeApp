@@ -414,7 +414,9 @@ ACTION_EXECUTION_MAP = {
         "field_map": {
             "asset_type": "category",
             "description": "description",
+            "asset_name": "description",
             "value": "approximate_value",
+            "asset_value": "approximate_value",
             "date_acquired": "date_conveyed",
             "ownership_pct": "notes",
         },
@@ -426,6 +428,7 @@ ACTION_EXECUTION_MAP = {
             "description": "description",
             "asset_name": "description",
             "value": "approximate_value",
+            "asset_value": "approximate_value",
             "date_acquired": "date_conveyed",
             "contribution_date": "date_conveyed",
             "meeting_date": "meeting_date",
