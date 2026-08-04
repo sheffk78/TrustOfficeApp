@@ -1122,25 +1122,67 @@ async def provision_status(
 
 async def fire_activation_webhook(user_id: str, event_type: str):
     """
-    Fire an activation webhook to WingPoint if this user was provisioned via external API.
-    
-    event_type: "password_set" | "first_login"
-    
-    Looks up the external_provisions record for this user_id, then POSTs
-    a signed payload to the partner's webhook_url (if configured).
+    Fire an activation webhook to WingPoint for this user.
+
+    event_type: "password_set" | "first_login" | "signup_completed"
+
+    Works for BOTH admin-provisioned users (external_provisions record
+    exists) and self-service signups (no provision record — falls back to
+    the user document, which carries wp_ref for WingPoint-referred users).
+
+    For self-service users with no wp_ref, the webhook is skipped silently
+    (they were not referred by WingPoint).
     """
     import httpx
-    
-    # Find the provision record for this user
+
+    # Find the provision record for this user (admin-provisioned flow)
     provision = await db.external_provisions.find_one(
         {"user_id": user_id},
         {"_id": 0, "request_payload": 0}
     )
-    
+
+    # Fall back to the user document for self-service signups
     if not provision:
-        # Not a WingPoint-provisioned user — skip silently
-        return
-    
+        user_doc = await db.users.find_one(
+            {"user_id": user_id},
+            {"_id": 0, "password_hash": 0}
+        )
+        if not user_doc:
+            return
+
+        wp_ref = user_doc.get("wp_ref")
+        if not wp_ref:
+            # Not a WingPoint-referred user — skip silently
+            return
+
+        # Build a provision-like dict from the user document
+        provision = {
+            "user_id": user_id,
+            "email": user_doc.get("email"),
+            "trust_id": user_doc.get("trust_id"),
+            "trust_name": user_doc.get("wp_trust_name"),
+            "wingpoint_ref": wp_ref,
+            "partner_id": "wingpoint",
+            "is_new_user": True,
+            "created_at": user_doc.get("created_at"),
+        }
+        # Fetch password/last_login separately if needed
+        if event_type in ("password_set", "first_login"):
+            pw_user = await db.users.find_one(
+                {"user_id": user_id},
+                {"password_hash": 1, "last_login": 1}
+            )
+            provision["email_status"] = None
+            _has_password = bool(pw_user and pw_user.get("password_hash"))
+            _last_login = pw_user.get("last_login") if pw_user else None
+        else:
+            _has_password = None
+            _last_login = None
+    else:
+        # Admin-provisioned — fetch password/last_login from user record
+        _has_password = None
+        _last_login = None
+
     # Get partner config to find the webhook URL and secret
     partner_id = provision.get("partner_id", "wingpoint")
     partner = await db.partner_api_keys.find_one(
@@ -1179,9 +1221,14 @@ async def fire_activation_webhook(user_id: str, event_type: str):
     elif event_type == "first_login":
         payload["message"] = "User has logged in for the first time."
         # Add last_login timestamp from user record
-        user = await db.users.find_one({"user_id": user_id}, {"last_login": 1})
-        if user and user.get("last_login"):
-            payload["last_login"] = user["last_login"]
+        if _last_login:
+            payload["last_login"] = _last_login
+        else:
+            user = await db.users.find_one({"user_id": user_id}, {"last_login": 1})
+            if user and user.get("last_login"):
+                payload["last_login"] = user["last_login"]
+    elif event_type == "signup_completed":
+        payload["message"] = "User has completed self-service signup."
     
     # Sign the payload with HMAC-SHA256
     payload_json = json.dumps(payload, sort_keys=True)

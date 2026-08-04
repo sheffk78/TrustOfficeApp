@@ -244,7 +244,18 @@ export default function SignUpPage() {
   const handleGoogleSignUp = () => {
     // Use TrustOffice's own Google OAuth (branded consent screen)
     const redirectAfter = '/onboarding';
-    window.location.href = `${API_URL}/api/auth/google/login?redirect=${encodeURIComponent(redirectAfter)}`;
+    // Pass WingPoint attribution through the OAuth state so the backend
+    // can store wp_ref on the user doc and fire the signup_completed webhook.
+    const wpRef = sessionStorage.getItem('wp_ref') || '';
+    const wpTrustName = sessionStorage.getItem('wp_trust_name') || '';
+    let url = `${API_URL}/api/auth/google/login?redirect=${encodeURIComponent(redirectAfter)}`;
+    if (wpRef) {
+      url += `&wp_ref=${encodeURIComponent(wpRef)}`;
+    }
+    if (wpTrustName) {
+      url += `&wp_trust_name=${encodeURIComponent(wpTrustName)}`;
+    }
+    window.location.href = url;
   };
 
   return (

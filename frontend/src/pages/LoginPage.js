@@ -333,7 +333,23 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{' '}
-                <Link to="/signup" className="text-navy font-medium hover:text-navy/70" data-testid="signup-link">
+                <Link to={(() => {
+                  // Forward WingPoint attribution params to the signup page
+                  const wpRef = searchParams.get('wp_ref');
+                  const trustName = searchParams.get('trust_name');
+                  const plan = searchParams.get('plan');
+                  const coupon = searchParams.get('coupon');
+                  const isWingPoint = wpRef || plan === 'wingpoint';
+                  if (isWingPoint) {
+                    const params = new URLSearchParams();
+                    params.set('ref', 'wp');
+                    if (wpRef) params.set('wp_ref', wpRef);
+                    if (trustName) params.set('trust_name', trustName);
+                    if (coupon) params.set('coupon', coupon);
+                    return `/signup?${params.toString()}`;
+                  }
+                  return '/signup';
+                })()} className="text-navy font-medium hover:text-navy/70" data-testid="signup-link">
                   Create Account
                 </Link>
               </p>

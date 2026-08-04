@@ -187,7 +187,12 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
         to_email=user.email,
         user_name=user.name
     )
-    
+
+    # Fire signup_completed webhook to WingPoint if this was a WingPoint-referred signup
+    if user.wp_ref:
+        from routers.external import fire_activation_webhook
+        background_tasks.add_task(fire_activation_webhook, user_id, "signup_completed")
+
     # Note: No longer adding to Mailercloud trial list — trial model removed
     
     return UserResponse(
@@ -570,18 +575,29 @@ async def google_login(request: Request):
     # Get the redirect URL from query params (where to go after successful auth)
     redirect_after = request.query_params.get("redirect", "/onboarding")
     
+    # Capture WingPoint ref (if signup originated from WingPoint landing page)
+    wp_ref = request.query_params.get("wp_ref")
+    wp_trust_name = request.query_params.get("wp_trust_name")
+    
     # Generate state token for CSRF protection
     state = secrets.token_urlsafe(32)
     
     # Store state with redirect info (expires in 10 minutes)
+    state_doc = {
+        "state": state,
+        "redirect_after": redirect_after,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+    }
+    # Preserve WingPoint attribution through the OAuth round-trip
+    if wp_ref:
+        state_doc["wp_ref"] = wp_ref
+    if wp_trust_name:
+        state_doc["wp_trust_name"] = wp_trust_name
+
     await db.oauth_states.update_one(
         {"state": state},
-        {"$set": {
-            "state": state,
-            "redirect_after": redirect_after,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
-        }},
+        {"$set": state_doc},
         upsert=True
     )
     
@@ -633,7 +649,10 @@ async def google_callback(request: Request, response: Response, code: str = None
         return RedirectResponse(url=f"{frontend_url}/login?error=state_expired")
     
     redirect_after = state_record.get("redirect_after", "/onboarding")
-    
+    # Pull WingPoint attribution from the OAuth state (set at login initiation)
+    oauth_wp_ref = state_record.get("wp_ref")
+    oauth_wp_trust_name = state_record.get("wp_trust_name")
+
     # Delete used state
     await db.oauth_states.delete_one({"state": state})
     
@@ -702,7 +721,10 @@ async def google_callback(request: Request, response: Response, code: str = None
                 "name": google_user.get("name", "User"),
                 "picture": google_user.get("picture"),
                 "google_id": google_user.get("id"),
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                # Preserve WingPoint attribution from OAuth state
+                "wp_ref": oauth_wp_ref or None,
+                "wp_trust_name": oauth_wp_trust_name or None,
             }
             await db.users.insert_one(user_doc)
             
@@ -730,6 +752,14 @@ async def google_callback(request: Request, response: Response, code: str = None
                 )
             except Exception as e:
                 logger.error(f"Failed to send welcome email: {e}")
+            
+            # Fire signup_completed webhook to WingPoint if this was a WingPoint-referred signup
+            if oauth_wp_ref:
+                try:
+                    from routers.external import fire_activation_webhook
+                    await fire_activation_webhook(user_id, "signup_completed")
+                except Exception as e:
+                    logger.error(f"Failed to fire signup_completed webhook for Google OAuth user {user_id}: {e}")
             
             # Note: No longer adding Google OAuth user to Mailercloud trial list — trial model removed
             # add_to_trial_list call removed
