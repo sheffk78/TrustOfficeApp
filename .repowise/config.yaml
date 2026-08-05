@@ -1,0 +1,8 @@
+provider: ollama
+model: qwen3:8b
+embedder: ollama
+embedding_model: nomic-embed-text
+max_tokens: 16384
+wiki_style: comprehensive
+language: en
+reasoning: auto

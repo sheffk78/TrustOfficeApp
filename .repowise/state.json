@@ -1,0 +1,51 @@
+{
+  "last_sync_commit": "407024d5f55447d8e57437ea1d3280769285ec87",
+  "total_pages": 455,
+  "provider": "ollama",
+  "model": "qwen3:8b",
+  "docs_mode": "llm",
+  "docs_enabled": true,
+  "run_mode": "standard",
+  "git_tier": "full",
+  "include_submodules": false,
+  "total_tokens": 38906,
+  "phase_timings": {
+    "traverse": 1.77,
+    "parse": 0.31,
+    "tsconfig": 0.01,
+    "graph.ts_index": 0.01,
+    "graph.imports": 1.64,
+    "graph.type_refs": 0.0,
+    "graph.heritage": 0.0,
+    "graph.calls": 0.04,
+    "co_change": 2.18,
+    "dynamic_hints": 0.45,
+    "graph.metrics": 0.43,
+    "graph.communities": 0.12,
+    "git": 35.87,
+    "external_systems": 0.01,
+    "dead_code": 0.48,
+    "health": 16.51,
+    "decisions": 117.38,
+    "knowledge_graph.skeleton": 0.01,
+    "graph.flows": 0.0
+  },
+  "knowledge_graph": {
+    "version": "1.0.0",
+    "node_count": 994,
+    "layer_count": 8,
+    "tour_steps": 12,
+    "has_summaries": true,
+    "fingerprint": "bcde00e09491d382"
+  },
+  "onboarding_slots_offered": [
+    "active_landscape",
+    "getting_started",
+    "glossary",
+    "how_it_works",
+    "key_concepts"
+  ],
+  "store_format_version": 2,
+  "written_by_version": "0.39.0",
+  "config_fingerprint": "104b0d2db4f4d13a09e8d702d53994cacf4505ae6ba188b0ad290e0f9ab4e586"
+}

@@ -471,6 +471,9 @@ class WingPointProvisionRequest(BaseModel):
     # Control flags
     dry_run: bool = False
     resend: bool = False
+    # When WingPoint passes the user's actual TrustOffice user_id (connect flow),
+    # link the trust to that account instead of matching by email alone.
+    existing_trustoffice_user_id: Optional[str] = None
 
     @field_validator("jurisdiction")
     @classmethod
@@ -643,6 +646,8 @@ async def provision_trustoffice(
 
     # ---- FIND OR CREATE USER ----
     existing_user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not existing_user and request.existing_trustoffice_user_id:
+        existing_user = await db.users.find_one({"user_id": request.existing_trustoffice_user_id}, {"_id": 0})
     is_new_user = existing_user is None
 
     if existing_user:
