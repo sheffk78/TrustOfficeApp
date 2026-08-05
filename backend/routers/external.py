@@ -645,9 +645,14 @@ async def provision_trustoffice(
     now = datetime.now(timezone.utc)
 
     # ---- FIND OR CREATE USER ----
-    existing_user = await db.users.find_one({"email": email}, {"_id": 0})
-    if not existing_user and request.existing_trustoffice_user_id:
+    # existing_trustoffice_user_id takes PRIORITY over email — the connect flow
+    # passes the user's actual TrustOffice user_id after they authenticate, so
+    # we must link the trust to that account regardless of which email is on file.
+    existing_user = None
+    if request.existing_trustoffice_user_id:
         existing_user = await db.users.find_one({"user_id": request.existing_trustoffice_user_id}, {"_id": 0})
+    if not existing_user:
+        existing_user = await db.users.find_one({"email": email}, {"_id": 0})
     is_new_user = existing_user is None
 
     if existing_user:
