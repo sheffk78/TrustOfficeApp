@@ -84,28 +84,33 @@ class SubscriptionState(BaseModel):
     cancel_at_period_end: Optional[bool] = None
 
 
-async def get_subscription_state(user_id: str) -> SubscriptionState:
-    """
-    Get normalized subscription state for a user.
-    Returns a consistent SubscriptionState object with all computed fields.
-    This is the single source of truth for subscription status across all modules.
-    """
-    now = datetime.now(timezone.utc)
-    
-    # Check if user has a forever free account or is an admin
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "is_admin": 1})
-    user_email = user.get("email", "").lower() if user else ""
-    is_admin = user.get("is_admin", False) if user else False
-    
-    # Primary admin always gets access
-    PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
-    is_primary_admin = user_email == PRIMARY_ADMIN_EMAIL
-    
-    is_forever_free = user_email in FOREVER_FREE_EMAILS or is_admin or is_primary_admin
-    
+PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
+
+
+def _parse_iso_datetime(date_str: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO date string into a timezone-aware datetime, or None on failure."""
+    if not date_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _resolve_effective_plan_type(sub: dict, is_forever_free: bool) -> str:
+    """Map legacy/trial/free plan types based on forever-free eligibility."""
+    raw_plan = sub.get("plan_type")
+    if raw_plan in ("trial", "forever_free", "free"):
+        return "forever_free" if is_forever_free else "free"
+    return raw_plan or "trial"
+
+
+async def _ensure_subscription_exists(user_id: str, now: datetime) -> dict:
+    """Fetch subscription for user, creating a 'none' placeholder if missing."""
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
-    
-    # If no subscription exists, create a "none" plan (read-only until paid)
     if not sub:
         sub = {
             "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
@@ -121,83 +126,158 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
             "notes": "No free plan — user must subscribe for access"
         }
         await db.subscriptions.insert_one(sub)
-    
-    # Map legacy trial accounts to 'free'; forever_free only for admin/FOREVER_FREE_EMAILS accounts
-    if sub.get("plan_type") == "trial":
-        effective_plan_type = "forever_free" if is_forever_free else "free"
-    elif sub.get("plan_type") == "forever_free":
-        effective_plan_type = "forever_free" if is_forever_free else "free"
-    elif sub.get("plan_type") == "free":
-        effective_plan_type = "forever_free" if is_forever_free else "free"
+    return sub
+
+
+def _build_forever_free_state(user_id: str, sub: dict) -> SubscriptionState:
+    """Build SubscriptionState for a forever-free user."""
+    return SubscriptionState(
+        user_id=user_id,
+        subscription_id=sub.get("subscription_id"),
+        plan_type="forever_free",
+        status="active",
+        trial_start_date=None,
+        trial_end_date=None,
+        trial_days_remaining=None,
+        is_trial=False,
+        is_active=True,
+        is_read_only=False,
+        stripe_customer_id=None,
+        stripe_subscription_id=None,
+        current_period_end=None,
+        cancel_at_period_end=None,
+    )
+
+
+def _apply_gift_fields_to_free_state(state: SubscriptionState, sub: dict, now: datetime):
+    """Apply gifted fields and expiration checks to a free-plan state (in-place)."""
+    if not sub.get("gifted"):
+        return
+
+    state.is_gifted = True
+    state.gift_type = sub.get("gift_type", "14day")
+
+    gift_end = sub.get("gift_end_date")
+    if gift_end:
+        end = _parse_iso_datetime(gift_end)
+        if end:
+            state.gift_days_remaining = max(0, (end - now).days)
+            if end < now:
+                state.status = "expired"
+                state.is_active = False
+                state.is_read_only = True
+                state.is_trial = False
+    elif sub.get("trial_end_date"):
+        end = _parse_iso_datetime(sub["trial_end_date"])
+        if end:
+            state.gift_days_remaining = max(0, (end - now).days)
+
+
+def _build_free_state(user_id: str, sub: dict, now: datetime) -> SubscriptionState:
+    """Build SubscriptionState for a free-plan user, including gift handling."""
+    state = SubscriptionState(
+        user_id=user_id,
+        subscription_id=sub.get("subscription_id"),
+        plan_type="free",
+        status="active",
+        trial_start_date=sub.get("trial_start_date"),
+        trial_end_date=sub.get("trial_end_date"),
+        trial_days_remaining=None,
+        is_trial=True,
+        is_active=True,
+        is_read_only=False,
+        stripe_customer_id=sub.get("stripe_customer_id"),
+        stripe_subscription_id=sub.get("stripe_subscription_id"),
+        current_period_end=sub.get("current_period_end"),
+        cancel_at_period_end=sub.get("cancel_at_period_end"),
+    )
+    _apply_gift_fields_to_free_state(state, sub, now)
+    return state
+
+
+def _apply_active_status(state: SubscriptionState):
+    """Mark state as active paid subscription."""
+    state.is_active = True
+    state.is_read_only = False
+    state.is_trial = False
+    state.trial_days_remaining = None
+
+
+def _apply_trial_status(state: SubscriptionState, sub: dict, now: datetime):
+    """Apply trialing status with trial-end validation."""
+    trial_end = _parse_iso_datetime(sub.get("trial_end_date"))
+    if not trial_end:
+        state.is_active = False
+        state.is_read_only = True
+        state.trial_days_remaining = 0
+        return
+
+    days_remaining = (trial_end - now).days
+    state.trial_days_remaining = max(0, days_remaining)
+    state.is_trial = True
+
+    if trial_end >= now:
+        state.is_active = True
+        state.is_read_only = False
     else:
-        effective_plan_type = sub.get("plan_type", "trial")
-    
-    if effective_plan_type == "forever_free":
-        return SubscriptionState(
-            user_id=user_id,
-            subscription_id=sub.get("subscription_id"),
-            plan_type="forever_free",
-            status="active",
-            trial_start_date=None,
-            trial_end_date=None,
-            trial_days_remaining=None,
-            is_trial=False,
-            is_active=True,
-            is_read_only=False,
-            stripe_customer_id=None,
-            stripe_subscription_id=None,
-            current_period_end=None,
-            cancel_at_period_end=None,
-        )
-    
-    if effective_plan_type == "free":
-        state = SubscriptionState(
-            user_id=user_id,
-            subscription_id=sub.get("subscription_id"),
-            plan_type="free",
-            status="active",
-            trial_start_date=sub.get("trial_start_date"),
-            trial_end_date=sub.get("trial_end_date"),
-            trial_days_remaining=None,
-            is_trial=True,
-            is_active=True,
-            is_read_only=False,  # Free plan allows writes — feature gating is at PLAN_FEATURES level
-            stripe_customer_id=sub.get("stripe_customer_id"),
-            stripe_subscription_id=sub.get("stripe_subscription_id"),
-            current_period_end=sub.get("current_period_end"),
-            cancel_at_period_end=sub.get("cancel_at_period_end"),
-        )
-        # Gifted free users — set gift messaging fields and check expiration
-        if sub.get("gifted"):
-            state.is_gifted = True
-            state.gift_type = sub.get("gift_type", "14day")
-            gift_end = sub.get("gift_end_date")
-            if gift_end:
-                try:
-                    end = datetime.fromisoformat(gift_end.replace('Z', '+00:00'))
-                    if end.tzinfo is None:
-                        end = end.replace(tzinfo=timezone.utc)
-                    state.gift_days_remaining = max(0, (end - now).days)
-                    if end < now:
-                        # Gift expired — switch to expired status
-                        state.status = "expired"
-                        state.is_active = False
-                        state.is_read_only = True
-                        state.is_trial = False
-                except (ValueError, TypeError, AttributeError):
-                    pass
-            elif sub.get("trial_end_date"):
-                # Legacy trial — use trial_end_date for days remaining
-                try:
-                    end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
-                    if end.tzinfo is None:
-                        end = end.replace(tzinfo=timezone.utc)
-                    state.gift_days_remaining = max(0, (end - now).days)
-                except:
-                    pass
-        return state
-    
-    # Initialize state with base values
+        state.status = "expired"
+        state.is_active = False
+        state.is_read_only = True
+
+
+def _apply_inactive_status(state: SubscriptionState):
+    """Mark state as inactive (canceled, expired, past_due, or unknown)."""
+    state.is_active = False
+    state.is_read_only = True
+    state.is_trial = False
+
+
+def _apply_gifted_override(state: SubscriptionState, sub: dict, now: datetime):
+    """Apply gifted display fields and expiry check for paid plans (in-place)."""
+    if not sub.get("gifted") or state.is_gifted:
+        return
+
+    state.is_gifted = True
+    state.gift_type = sub.get("gift_type", "14day")
+
+    gift_end = _parse_iso_datetime(sub.get("gift_end_date"))
+    if not gift_end:
+        state.gift_days_remaining = None
+        return
+
+    state.gift_days_remaining = max(0, (gift_end - now).days)
+
+    # If gift expired and no active paid subscription, mark as expired
+    has_active_paid_sub = sub.get("stripe_subscription_id") or sub.get("plan_type") in (
+        "monthly", "annual", "trustee", "estate", "advisor"
+    )
+    if gift_end < now and not has_active_paid_sub:
+        state.status = "expired"
+        state.is_active = False
+        state.is_read_only = True
+        state.is_trial = False
+
+
+_STATUS_HANDLERS = {
+    "active": _apply_active_status,
+    "trialing": _apply_trial_status,
+}
+
+
+def _apply_status(state: SubscriptionState, sub: dict, now: datetime):
+    """Apply the correct status handler based on subscription status."""
+    handler = _STATUS_HANDLERS.get(sub["status"])
+    if handler:
+        if sub["status"] == "trialing":
+            handler(state, sub, now)
+        else:
+            handler(state)
+    else:
+        _apply_inactive_status(state)
+
+
+def _build_paid_state(user_id: str, sub: dict, now: datetime) -> SubscriptionState:
+    """Build SubscriptionState for a paid/trial subscription with status-based logic."""
     state = SubscriptionState(
         user_id=user_id,
         subscription_id=sub.get("subscription_id"),
@@ -212,79 +292,38 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
         current_period_end=sub.get("current_period_end"),
         cancel_at_period_end=sub.get("cancel_at_period_end"),
     )
-    
-    # Determine active status based on subscription type
-    if sub["status"] == "active":
-        # Active paid subscription
-        state.is_active = True
-        state.is_read_only = False
-        state.is_trial = False
-        state.trial_days_remaining = None
-        
-    elif sub["status"] == "trialing" and sub.get("trial_end_date"):
-        # Trial subscription - check if still valid
-        try:
-            trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
-            if trial_end.tzinfo is None:
-                trial_end = trial_end.replace(tzinfo=timezone.utc)
-            
-            days_remaining = (trial_end - now).days
-            state.trial_days_remaining = max(0, days_remaining)
-            state.is_trial = True
-            
-            if trial_end >= now:
-                # Trial is still active
-                state.is_active = True
-                state.is_read_only = False
-            else:
-                # Trial expired
-                state.status = "expired"
-                state.is_active = False
-                state.is_read_only = True
-                
-        except (ValueError, TypeError, AttributeError):
-            # Invalid date - treat as expired
-            state.status = "expired"
-            state.is_active = False
-            state.is_read_only = True
-            state.trial_days_remaining = 0
-            
-    elif sub["status"] in ["canceled", "expired", "past_due"]:
-        # Inactive subscription
-        state.is_active = False
-        state.is_read_only = True
-        state.is_trial = False
-        
-    else:
-        # Unknown status - default to read-only for safety
-        state.is_active = False
-        state.is_read_only = True
-    
-    # Gifted subscription handling — override display fields for gift messaging
-    # This runs for all plan types that reach the main path
-    if sub.get("gifted") and not state.is_gifted:
-        state.is_gifted = True
-        gift_type = sub.get("gift_type", "14day")
-        state.gift_type = gift_type
-        
-        # Compute gift days remaining and check expiry
-        gift_end = sub.get("gift_end_date")
-        if gift_end:
-            try:
-                end = datetime.fromisoformat(gift_end.replace('Z', '+00:00'))
-                if end.tzinfo is None:
-                    end = end.replace(tzinfo=timezone.utc)
-                state.gift_days_remaining = max(0, (end - now).days)
-                # If gift has expired and no active paid subscription, mark as expired
-                if end < now and not sub.get("stripe_subscription_id") and sub.get("plan_type") not in ("monthly", "annual", "trustee", "estate", "advisor"):
-                    state.status = "expired"
-                    state.is_active = False
-                    state.is_read_only = True
-                    state.is_trial = False
-            except (ValueError, TypeError, AttributeError):
-                state.gift_days_remaining = None
-    
+
+    _apply_status(state, sub, now)
+    _apply_gifted_override(state, sub, now)
     return state
+
+
+async def get_subscription_state(user_id: str) -> SubscriptionState:
+    """
+    Get normalized subscription state for a user.
+    Returns a consistent SubscriptionState object with all computed fields.
+    This is the single source of truth for subscription status across all modules.
+    """
+    now = datetime.now(timezone.utc)
+
+    # Check if user has a forever free account or is an admin
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "is_admin": 1})
+    user_email = user.get("email", "").lower() if user else ""
+    is_admin = user.get("is_admin", False) if user else False
+
+    is_primary_admin = user_email == PRIMARY_ADMIN_EMAIL
+    is_forever_free = user_email in FOREVER_FREE_EMAILS or is_admin or is_primary_admin
+
+    sub = await _ensure_subscription_exists(user_id, now)
+    effective_plan_type = _resolve_effective_plan_type(sub, is_forever_free)
+
+    if effective_plan_type == "forever_free":
+        return _build_forever_free_state(user_id, sub)
+
+    if effective_plan_type == "free":
+        return _build_free_state(user_id, sub, now)
+
+    return _build_paid_state(user_id, sub, now)
 
 
 
@@ -565,52 +604,75 @@ def create_jwt_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_current_user(request: Request) -> dict:
-    session_token = request.cookies.get("session_token")
-    auth_header = request.headers.get("Authorization")
-    
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-    elif session_token:
-        token = session_token
+async def _check_jwt_revocation(jti: Optional[str], user_id: Optional[str], payload: dict):
+    """Check if a JWT has been revoked via jti or user-wide revocation. Raises 401 if revoked."""
+    if jti:
+        revoked = await db.jwt_revocations.find_one({"jti": jti})
+        if revoked:
+            raise HTTPException(status_code=401, detail="Token revoked")
+
+    if not user_id:
+        return
+
+    user_revocation = await db.jwt_revocations.find_one({"user_id": user_id, "jti": "all"})
+    if not user_revocation:
+        return
+
+    # Check if this token was issued BEFORE the revocation
+    token_iat = payload.get("iat")
+    if not token_iat:
+        raise HTTPException(status_code=401, detail="Invalid token: missing issued-at claim")
+
+    from datetime import datetime as dt
+    if isinstance(token_iat, (int, float)):
+        token_issued = dt.fromtimestamp(token_iat, tz=timezone.utc)
     else:
+        token_issued = token_iat
+
+    revocation_time = user_revocation.get("created_at")
+    if revocation_time:
+        if isinstance(revocation_time, str):
+            revocation_time = dt.fromisoformat(revocation_time)
+        if hasattr(revocation_time, 'tzinfo') and revocation_time.tzinfo is None:
+            revocation_time = revocation_time.replace(tzinfo=timezone.utc)
+        if token_issued < revocation_time:
+            raise HTTPException(status_code=401, detail="Token revoked")
+
+
+def _extract_token(request: Request) -> Optional[str]:
+    """Extract JWT token from Authorization header or session cookie."""
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header.split(" ")[1]
+    return request.cookies.get("session_token")
+
+
+async def _lookup_session_user(session_token: str) -> Optional[dict]:
+    """Look up a user by session token, checking expiry. Returns user dict or None."""
+    session = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
+    if not session:
+        return None
+
+    expires_at = session.get("expires_at")
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    return await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+
+
+async def get_current_user(request: Request) -> dict:
+    token = _extract_token(request)
+    if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
+
     # Try JWT token first
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        
-        # Check if token has been revoked (e.g. after password reset)
-        jti = payload.get("jti")
-        if jti:
-            revoked = await db.jwt_revocations.find_one({"jti": jti})
-            if revoked:
-                raise HTTPException(status_code=401, detail="Token revoked")
-        
-        # Also check for user-wide revocation (password reset revokes all tokens)
-        user_id = payload.get("user_id")
-        if user_id:
-            user_revocation = await db.jwt_revocations.find_one({"user_id": user_id, "jti": "all"})
-            if user_revocation:
-                # Check if this token was issued BEFORE the revocation
-                token_iat = payload.get("iat")
-                if not token_iat:
-                    # Reject tokens without 'iat' claim — they bypass revocation checks
-                    raise HTTPException(status_code=401, detail="Invalid token: missing issued-at claim")
-                from datetime import datetime as dt
-                if isinstance(token_iat, (int, float)):
-                    token_issued = dt.fromtimestamp(token_iat, tz=timezone.utc)
-                else:
-                    token_issued = token_iat
-                revocation_time = user_revocation.get("created_at")
-                if revocation_time:
-                    if isinstance(revocation_time, str):
-                        revocation_time = dt.fromisoformat(revocation_time)
-                    if hasattr(revocation_time, 'tzinfo') and revocation_time.tzinfo is None:
-                        revocation_time = revocation_time.replace(tzinfo=timezone.utc)
-                    if token_issued < revocation_time:
-                        raise HTTPException(status_code=401, detail="Token revoked")
-        
+        await _check_jwt_revocation(payload.get("jti"), payload.get("user_id"), payload)
         user = await db.users.find_one({"user_id": payload["user_id"]}, {"_id": 0})
         if user:
             return user
@@ -618,60 +680,50 @@ async def get_current_user(request: Request) -> dict:
         pass  # fall through to session cookie/DB lookup
     except jwt.InvalidTokenError:
         pass  # fall through to session cookie/DB lookup
-    
+    except HTTPException:
+        raise  # revocation 401 must propagate
+
     # Try session token — use the cookie value, not the Bearer JWT string
-    session_lookup_token = session_token or token
-    if not session_lookup_token:
+    session_token = request.cookies.get("session_token") or token
+    if not session_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    session = await db.user_sessions.find_one({"session_token": session_lookup_token}, {"_id": 0})
-    if session:
-        expires_at = session.get("expires_at")
-        if isinstance(expires_at, str):
-            expires_at = datetime.fromisoformat(expires_at)
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if expires_at < datetime.now(timezone.utc):
-            raise HTTPException(status_code=401, detail="Session expired")
-        
-        user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
-        if user:
-            return user
-    
+
+    user = await _lookup_session_user(session_token)
+    if user:
+        return user
+
     raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def _is_subscription_active(sub: dict) -> bool:
+    """Check if a raw subscription doc represents an active (non-expired) subscription."""
+    if sub["status"] == "active":
+        return True
+    if sub["status"] == "trialing":
+        trial_end = _parse_iso_datetime(sub.get("trial_end_date"))
+        if trial_end and trial_end >= datetime.now(timezone.utc):
+            return True
+    return False
 
 
 async def should_show_watermark(user_id: str) -> bool:
     """Check if watermark should be shown on PDFs."""
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
-    
     if not sub:
         return True
-    
-    is_subscribed = False
-    if sub["status"] == "active":
-        is_subscribed = True
-    elif sub["status"] == "trialing" and sub.get("trial_end_date"):
-        try:
-            trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
-            if trial_end.tzinfo is None:
-                trial_end = trial_end.replace(tzinfo=timezone.utc)
-            is_subscribed = trial_end >= datetime.now(timezone.utc)
-        except (ValueError, TypeError, AttributeError):
-            is_subscribed = False
-    
-    if not is_subscribed:
+
+    if not _is_subscription_active(sub):
         return True
-    
+
     user_prefs = await db.user_preferences.find_one({"user_id": user_id}, {"_id": 0})
     hide_watermark = user_prefs.get("hide_watermark", False) if user_prefs else False
-    
     return not hide_watermark
 
 
 async def check_subscription_active(user: dict = Depends(get_current_user)) -> dict:
     """Dependency that checks if user has active subscription."""
     sub = await db.subscriptions.find_one({"user_id": user["user_id"]}, {"_id": 0})
-    
+
     if not sub:
         now = datetime.now(timezone.utc)
         sub = {
@@ -688,32 +740,20 @@ async def check_subscription_active(user: dict = Depends(get_current_user)) -> d
             "notes": "New signup — subscribe to activate"
         }
         await db.subscriptions.insert_one(sub)
-        # No active subscription — will be caught below
-    
-    
-    if sub["status"] == "active":
+
+    if _is_subscription_active(sub):
         return user
-    
-    if sub["status"] == "trialing" and sub.get("trial_end_date"):
-        trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
-        if trial_end.tzinfo is None:
-            trial_end = trial_end.replace(tzinfo=timezone.utc)
-        
-        if trial_end >= datetime.now(timezone.utc):
-            return user
-        
+
+    if sub["status"] == "trialing":
         raise HTTPException(
             status_code=402,
             detail="Trial expired. Please subscribe to continue using TrustOffice."
         )
-    
-    if sub["status"] in ["canceled", "expired", "past_due"]:
-        raise HTTPException(
-            status_code=402,
-            detail="Subscription inactive. Please subscribe to continue using TrustOffice."
-        )
-    
-    return user
+
+    raise HTTPException(
+        status_code=402,
+        detail="Subscription inactive. Please subscribe to continue using TrustOffice."
+    )
 
 
 async def require_write_access(user: dict = Depends(get_current_user)) -> dict:
