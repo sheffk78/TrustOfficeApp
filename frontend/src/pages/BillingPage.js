@@ -5,120 +5,23 @@ import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/api';
-import { 
-  CreditCard, 
-  Check,
-  Clock,
-  AlertTriangle,
+import {
+  CreditCard,
   ArrowLeft,
-  Loader2,
-  Calendar,
-  Gift,
-  XCircle,
-  RefreshCw,
-  ArrowUpCircle,
-  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { showError } from '@/utils/errors';
 import PageHelpButton from '@/components/PageHelpButton';
 
-// Phase 3: 3-tier pricing structure (Trustee, Estate, Advisor)
-// Each tier supports both monthly and annual billing periods.
-// Annual price = monthly × 10 (2 months free).
-const TIERS = [
-  {
-    id: 'trustee',
-    name: 'Trustee Plan',
-    monthly: 79,
-    annual: 790,
-    trustLimit: '1 trust',
-    features: [
-      '1 trust record',
-      'Governance health tracking',
-      'Minutes & distribution management',
-      'PDF generation',
-      'CSV data export',
-      'Priority support'
-    ]
-  },
-  {
-    id: 'estate',
-    name: 'Estate Plan',
-    monthly: 149,
-    annual: 1490,
-    trustLimit: 'Up to 8 trusts',
-    popular: true,
-    features: [
-      'Everything in Trustee',
-      'Up to 8 trusts & entities',
-      'Multi-trust dashboard',
-      'Recurring task automation',
-      'Minutes & distribution management',
-      'PDF generation & CSV export'
-    ]
-  },
-  {
-    id: 'advisor',
-    name: 'Advisor Plan',
-    monthly: 399,
-    annual: 3990,
-    trustLimit: 'Unlimited trusts',
-    features: [
-      'Everything in Estate',
-      'Unlimited trusts & entities',
-      'Client view',
-      'White-label binder export',
-      'Multi-signature approvals',
-      'Dedicated account manager'
-    ]
-  }
-];
-
-// WingPoint-exclusive plan — only shown to WingPoint customers (is_wingpoint).
-// NOT added to the public TIERS array to prevent it leaking to non-WingPoint users.
-const WINGPOINT_TIER = {
-  id: 'wingpoint',
-  name: 'WingPoint Annual',
-  annual: 1188,
-  trustLimit: 'Unlimited trusts',
-  features: [
-    'Unlimited trusts & entities',
-    'AI-powered guided minutes',
-    '31 professional document templates',
-    'Governance Health Score & compliance calendar',
-    'Minutes ↔ Money integration',
-    'Priority support'
-  ]
-};
-
-// Map subscription plan_type to a display name.
-// Handles the new tiers (trustee/estate/advisor) AND legacy values
-// (monthly/annual) which are now grandfathered Trustee plans.
-const planDisplayName = (planType) => {
-  switch (planType) {
-    case 'trustee': return 'Trustee Plan';
-    case 'estate': return 'Estate Plan';
-    case 'advisor': return 'Advisor Plan';
-    case 'wingpoint': return 'WingPoint Annual';
-    case 'monthly': return 'Trustee Plan (Legacy)';
-    case 'annual': return 'Trustee Plan (Legacy)';
-    case 'forever_free':
-    case 'free':
-      return 'Free Plan';
-    case 'trial':
-      return 'Free Plan';
-    default:
-      return planType || 'Unknown';
-  }
-};
-
-// Return the tier price for a given billing period.
-const tierPriceFor = (tierId, period) => {
-  const tier = TIERS.find((t) => t.id === tierId);
-  if (!tier) return null;
-  return period === 'annual' ? tier.annual : tier.monthly;
-};
+// Extracted pricing config + components (frontend/src/pages/billing/)
+import { TIERS, WINGPOINT_TIER, planDisplayName, tierPriceFor } from './billing/pricingConfig';
+import PlanCard from './billing/PlanCard';
+import WingPointPlanCard from './billing/WingPointPlanCard';
+import BillingPeriodToggle from './billing/BillingPeriodToggle';
+import WingPointBanners from './billing/WingPointBanners';
+import SubscriptionStatusCard from './billing/SubscriptionStatusCard';
+import TierChangeSection from './billing/TierChangeSection';
+import BillingFAQ from './billing/BillingFAQ';
 
 export default function BillingPage() {
   const navigate = useNavigate();
@@ -139,6 +42,8 @@ export default function BillingPage() {
   const wpParam = searchParams.get('wp');
   const isWp = wpParam === '1';
   const planCardRefs = useRef({});
+
+  const registerCardRef = (tierId) => (el) => { planCardRefs.current[tierId] = el; };
 
   useEffect(() => {
     loadSubscription();
@@ -335,94 +240,7 @@ export default function BillingPage() {
     });
   };
 
-  const getStatusBadge = () => {
-    if (!subscription) return null;
-    
-    const status = subscription.status;
-    const cancelAtPeriodEnd = subscription.cancel_at_period_end;
-    
-    if (status === 'active' && cancelAtPeriodEnd) {
-      return (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-warning/10 text-warning border border-warning/20">
-          <Clock className="w-4 h-4" />
-          <span className="font-mono text-xs uppercase">Canceling</span>
-        </div>
-      );
-    }
-    
-    switch (status) {
-      case 'active':
-        if (subscription?.is_gifted) {
-          return (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gold/20 text-gold border border-gold/30">
-              <Gift className="w-4 h-4" />
-              <span className="font-mono text-xs uppercase">
-                Gifted
-              </span>
-            </div>
-          );
-        }
-        if (subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial' || subscription?.plan_type === 'free') {
-          return (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
-              <Check className="w-4 h-4" />
-              <span className="font-mono text-xs uppercase">
-                Free Access
-              </span>
-            </div>
-          );
-        }
-        return (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
-            <Check className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase">Active</span>
-          </div>
-        );
-      case 'trialing':
-        if (subscription?.is_gifted) {
-          return (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gold/20 text-gold border border-gold/30">
-              <Gift className="w-4 h-4" />
-              <span className="font-mono text-xs uppercase">
-                Gifted
-              </span>
-            </div>
-          );
-        }
-        return (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-success/10 text-success border border-success/20">
-            <Check className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase">
-              Free Access
-            </span>
-          </div>
-        );
-      case 'expired':
-        return (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-error/10 text-error border border-error/20">
-            <AlertTriangle className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase">Access Expired</span>
-          </div>
-        );
-      case 'past_due':
-        return (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-warning/10 text-warning border border-warning/20">
-            <AlertTriangle className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase">Payment Due</span>
-          </div>
-        );
-      case 'canceled':
-        return (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted text-muted-foreground border border-border">
-            <XCircle className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase">Canceled</span>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
+  // ── Derived subscription predicates ──────────────────────────
   const isFreePlan = subscription?.plan_type === 'forever_free' || subscription?.plan_type === 'trial' || subscription?.plan_type === 'none' || subscription?.plan_type === 'free';
   const isActivePaidSubscription = subscription?.status === 'active' && !isFreePlan;
   const isCanceling = subscription?.cancel_at_period_end;
@@ -449,162 +267,16 @@ export default function BillingPage() {
     !isCanceling &&
     (currentTierIndex < TIERS.length - 1 || currentBillingPeriod === 'monthly');
 
-  // Trust limit display for the current subscription.
-  const trustLimitLabel = () => {
-    if (isGrandfathered) {
-      return `Grandfathered: ${legacyTrustLimit} trusts`;
-    }
-    const tier = TIERS.find((t) => t.id === normalizedPlanType);
-    return tier ? tier.trustLimit : '—';
-  };
+  // Shared ref-callback factory for plan/tier cards.
+  const tierCardRef = (tierId) => registerCardRef(tierId);
 
   return (
     <div className="main-layout" data-testid="billing-page">
       <Sidebar />
       <main className="main-content dot-grid">
         <div className="page-container max-w-4xl">
-          {/* WingPoint upgrade banner */}
-          {actionParam === 'upgrade' && !isWp && (
-            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-upgrade-banner">
-              <ArrowUpCircle className="w-5 h-5 text-navy flex-shrink-0" />
-              <p className="text-sm text-navy font-medium">
-                Upgrade your plan to manage all your trusts.
-              </p>
-            </div>
-          )}
-
-          {/* WingPoint upgrade banner (enhanced for ?wp=1) */}
-          {actionParam === 'upgrade' && isWp && (
-            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg" data-testid="wp-upgrade-banner">
-              <div className="flex items-start gap-3">
-                <ArrowUpCircle className="w-5 h-5 text-navy flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-navy mb-1">
-                    You have more trusts than your current plan supports.
-                  </p>
-                  <p className="text-sm text-navy/80 mb-2">
-                    Your WingPoint purchase included additional trust credits, but your current plan covers fewer trusts than you now have. To access all your trusts, upgrade to a higher plan.
-                  </p>
-                  <p className="text-sm text-success font-medium mb-3">
-                    Your $50 WingPoint coupon still applies if you upgrade now.
-                  </p>
-                  <Button
-                    onClick={() => {
-                      const tierSection = document.querySelector('[data-testid="tier-change-section"]');
-                      if (tierSection) tierSection.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="btn-primary"
-                    data-testid="wp-upgrade-cta"
-                  >
-                    <ArrowUpCircle className="w-4 h-4 mr-2" />
-                    Upgrade My Plan
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* WingPoint resubscribe banner */}
-          {actionParam === 'resubscribe' && !isWp && (
-            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-resubscribe-banner">
-              <RefreshCw className="w-5 h-5 text-navy flex-shrink-0" />
-              <p className="text-sm text-navy font-medium flex-1">
-                Your new trust has been added. Reactivate your subscription to manage all your trusts.
-              </p>
-              <Button
-                onClick={() => {
-                  const reactivateBtn = document.querySelector('[data-testid="reactivate-btn"]');
-                  if (reactivateBtn) {
-                    reactivateBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  } else {
-                    const statusCard = document.querySelector('[data-testid="subscription-status-card"]');
-                    if (statusCard) statusCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  }
-                }}
-                variant="outline"
-                size="sm"
-                className="border-gold/40 text-navy hover:bg-gold/10"
-                data-testid="wp-resubscribe-cta"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Reactivate
-              </Button>
-            </div>
-          )}
-
-          {/* WingPoint resubscribe banner (enhanced for ?wp=1) */}
-          {actionParam === 'resubscribe' && isWp && (
-            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-resubscribe-banner">
-              <RefreshCw className="w-5 h-5 text-navy flex-shrink-0" />
-              <p className="text-sm text-navy font-medium flex-1">
-                Your new WingPoint trust has been added. Reactivate your subscription to manage all your trusts.
-              </p>
-              <Button
-                onClick={() => {
-                  const reactivateBtn = document.querySelector('[data-testid="reactivate-btn"]');
-                  if (reactivateBtn) {
-                    reactivateBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  } else {
-                    const statusCard = document.querySelector('[data-testid="subscription-status-card"]');
-                    if (statusCard) statusCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  }
-                }}
-                variant="outline"
-                size="sm"
-                className="border-gold/40 text-navy hover:bg-gold/10"
-                data-testid="wp-resubscribe-cta"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Reactivate
-              </Button>
-            </div>
-          )}
-
-          {/* WingPoint update payment banner */}
-          {actionParam === 'update_payment' && !isWp && (
-            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-update-payment-banner">
-              <CreditCard className="w-5 h-5 text-navy flex-shrink-0" />
-              <p className="text-sm text-navy font-medium flex-1">
-                Your trust has been added. Update your payment method to keep your subscription active.
-              </p>
-              <Button
-                onClick={() => {
-                  const manageBtn = document.querySelector('[data-testid="manage-billing-btn"]');
-                  if (manageBtn) manageBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }}
-                variant="outline"
-                size="sm"
-                className="border-gold/40 text-navy hover:bg-gold/10"
-                data-testid="wp-update-payment-cta"
-              >
-                <CreditCard className="w-4 h-4 mr-2" />
-                Update Payment
-              </Button>
-            </div>
-          )}
-
-          {/* WingPoint update payment banner (enhanced for ?wp=1) */}
-          {actionParam === 'update_payment' && isWp && (
-            <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-update-payment-banner">
-              <CreditCard className="w-5 h-5 text-navy flex-shrink-0" />
-              <p className="text-sm text-navy font-medium flex-1">
-                Your WingPoint trust has been added. Update your payment method to keep your subscription active.
-              </p>
-              <Button
-                onClick={() => {
-                  const manageBtn = document.querySelector('[data-testid="manage-billing-btn"]');
-                  if (manageBtn) manageBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }}
-                variant="outline"
-                size="sm"
-                className="border-gold/40 text-navy hover:bg-gold/10"
-                data-testid="wp-update-payment-cta"
-              >
-                <CreditCard className="w-4 h-4 mr-2" />
-                Update Payment
-              </Button>
-            </div>
-          )}
+          {/* WingPoint contextual banners (upgrade / resubscribe / update_payment) */}
+          <WingPointBanners actionParam={actionParam} isWp={isWp} />
 
           {/* Back Button */}
           <Button 
@@ -666,547 +338,94 @@ export default function BillingPage() {
             </div>
             {/* Pricing Plans for no-subscription state */}
             <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
-            {/* Phase 3: billing period toggle for the no-subscription plan picker */}
-            <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
-                <button
-                  type="button"
-                  onClick={() => setPickerBillingPeriod('monthly')}
-                  className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${pickerBillingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
-                >
-                  Monthly
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPickerBillingPeriod('annual')}
-                  className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${pickerBillingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
-                >
-                  Annual <span className="ml-1 text-xs text-success">2 months free</span>
-                </button>
-              </div>
-            </div>
+            <BillingPeriodToggle value={pickerBillingPeriod} onChange={setPickerBillingPeriod} />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {TIERS.map(tier => (
-                <div
+                <PlanCard
                   key={tier.id}
-                  ref={(el) => { planCardRefs.current[tier.id] = el; }}
-                  className={`card-trust relative ${tier.popular ? 'border-gold/30 bg-gold/5' : ''} ${targetPlan === tier.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
-                  data-testid={`plan-card-${tier.id}`}
-                >
-                  {tier.popular && (
-                    <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
-                      Most Popular
-                    </div>
-                  )}
-                  <h3 className="font-serif text-xl text-navy mb-2">{tier.name}</h3>
-                  <p className="text-xs text-muted-foreground mb-3">{tier.trustLimit}</p>
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <span className="font-mono text-4xl text-navy">
-                      ${pickerBillingPeriod === 'annual' ? tier.annual : tier.monthly}
-                    </span>
-                    <span className="text-muted-foreground">/{pickerBillingPeriod === 'annual' ? 'year' : 'month'}</span>
-                  </div>
-                  {pickerBillingPeriod === 'annual' && (
-                    <p className="text-xs text-success mb-3 font-medium">
-                      Save ${tier.monthly * 2} (2 months free)
-                    </p>
-                  )}
-                  <ul className="space-y-3 mb-6">
-                    {tier.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm">
-                        <Check className="w-4 h-4 text-success flex-shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    onClick={() => handleSubscribe(tier.id, pickerBillingPeriod)}
-                    className={`w-full ${tier.popular ? 'btn-primary' : 'btn-secondary'}`}
-                    disabled={processing}
-                    data-testid={`subscribe-${tier.id}-btn`}
-                  >
-                    {processing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Subscribe to {tier.name}
-                      </>
-                    )}
-                  </Button>
-                </div>
+                  tier={tier}
+                  billingPeriod={pickerBillingPeriod}
+                  onSubscribe={handleSubscribe}
+                  processing={processing}
+                  isTargetPlan={targetPlan === tier.id}
+                  cardRef={tierCardRef(tier.id)}
+                />
               ))}
             </div>
             {/* WingPoint-exclusive plan card — only for WingPoint customers */}
             {user?.is_wingpoint && (
-              <div
-                ref={(el) => { planCardRefs.current[WINGPOINT_TIER.id] = el; }}
-                className={`card-trust relative border-gold/40 bg-gold/5 mb-8 ${targetPlan === WINGPOINT_TIER.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
-                data-testid={`plan-card-${WINGPOINT_TIER.id}`}
-              >
-                <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
-                  WingPoint Exclusive
-                </div>
-                <h3 className="font-serif text-xl text-navy mb-2">{WINGPOINT_TIER.name}</h3>
-                <p className="text-xs text-muted-foreground mb-3">{WINGPOINT_TIER.trustLimit}</p>
-                <div className="flex items-baseline gap-1 mb-2">
-                  <span className="font-mono text-4xl text-navy">$99</span>
-                  <span className="text-muted-foreground">/month</span>
-                </div>
-                <p className="text-xs text-success mb-3 font-medium">
-                  $1,188/year · billed annually · 2 months free vs public pricing
-                </p>
-                <ul className="space-y-3 mb-6">
-                  {WINGPOINT_TIER.features.map((feature, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm">
-                      <Check className="w-4 h-4 text-success flex-shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  onClick={() => handleSubscribe('wingpoint', 'annual')}
-                  className="w-full btn-primary"
-                  disabled={processing}
-                  data-testid="subscribe-wingpoint-btn"
-                >
-                  {processing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Subscribe to WingPoint Annual
-                    </>
-                  )}
-                </Button>
-              </div>
+              <WingPointPlanCard
+                onSubscribe={handleSubscribe}
+                processing={processing}
+                isTargetPlan={targetPlan === WINGPOINT_TIER.id}
+                cardRef={tierCardRef(WINGPOINT_TIER.id)}
+              />
             )}
             </>
           ) : (
             <>
               {/* Current Subscription Status */}
-              <div className="card-trust corner-mark mb-8" data-testid="subscription-status-card">
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    <p className="label-trust mb-2">Current Plan</p>
-                    <h2 className="font-serif text-2xl text-navy">
-                      {planDisplayName(subscription?.plan_type)}
-                    </h2>
-                    {isActivePaidSubscription && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {subscription?.billing_period === 'annual' ? 'Annual billing' : 'Monthly billing'}
-                        {' · '}
-                        {trustLimitLabel()}
-                      </p>
-                    )}
-                    {isGrandfathered && (
-                      <p className="text-xs text-success mt-1 font-medium">
-                        Grandfathered: {legacyTrustLimit} trusts at your current price
-                      </p>
-                    )}
-                  </div>
-                  {getStatusBadge()}
-                </div>
+              <SubscriptionStatusCard
+                subscription={subscription}
+                isFreePlan={isFreePlan}
+                isActivePaidSubscription={isActivePaidSubscription}
+                isCanceling={isCanceling}
+                isGrandfathered={isGrandfathered}
+                legacyTrustLimit={legacyTrustLimit}
+                normalizedPlanType={normalizedPlanType}
+                canUpgrade={canUpgrade}
+                formatDate={formatDate}
+                actionLoading={actionLoading}
+                onReactivate={handleReactivate}
+                onManageBilling={handleManageBilling}
+                onCancel={handleCancel}
+              />
 
-                {/* Free Plan Info */}
-                {isFreePlan && (
-                  <div className="p-4 bg-success/5 border border-success/10 mb-6">
-                    <div className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-navy">
-                          Core Features Only
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          You have full access to trust management, minutes, distributions, and governance tools. Upgrade to a paid plan for team features, priority support, and dedicated account management.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Subscription Details Grid (paid plans only) */}
-                {isActivePaidSubscription && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-subtle-bg border border-border">
-                    <div>
-                      <p className="label-trust text-xs mb-1">
-                        {isCanceling ? 'Access Until' : 'Next Billing Date'}
-                      </p>
-                      <p className="font-mono text-sm text-navy flex items-center gap-2" data-testid="billing-date">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        {formatDate(subscription.current_period_end) || 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="label-trust text-xs mb-1">
-                        {subscription?.billing_period === 'annual' ? 'Annual Cost' : 'Monthly Cost'}
-                      </p>
-                      <p className="font-mono text-sm text-navy">
-                        {(() => {
-                          // Resolve the price for the current tier + billing period.
-                          // Legacy monthly/annual map to the Trustee tier price.
-                          const price = tierPriceFor(normalizedPlanType, subscription?.billing_period || 'monthly');
-                          if (price == null) return 'N/A';
-                          const periodLabel = subscription?.billing_period === 'annual' ? '/year' : '/month';
-                          return `$${price}${periodLabel}`;
-                        })()}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-
-
-                {/* Expired Access Warning */}
-                {subscription?.status === 'expired' && (
-                  <div className="p-4 bg-error/10 border border-error/20 mb-6">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-error">Your free access has ended</p>
-                        <p className="text-sm text-error/80 mt-1">
-                          Subscribe now to continue using TrustOffice. Your data is safe and will be available once you subscribe.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Cancellation Notice */}
-                {isCanceling && (
-                  <div className="p-4 bg-warning/10 border border-warning/20 mb-6">
-                    <div className="flex items-start gap-3">
-                      <Clock className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-warning">Subscription canceling</p>
-                        <p className="text-sm text-warning/80 mt-1">
-                          Your subscription is set to cancel on {formatDate(subscription.current_period_end)}. 
-                          You'll retain full access until then.
-                        </p>
-                        <Button
-                          onClick={handleReactivate}
-                          variant="outline"
-                          size="sm"
-                          className="mt-3 border-warning text-warning hover:bg-warning/10"
-                          disabled={actionLoading === 'reactivate'}
-                          data-testid="reactivate-btn"
-                        >
-                          {actionLoading === 'reactivate' ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                          )}
-                          Keep My Subscription
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Active Paid Subscription Actions (not for free plan) */}
-                {isActivePaidSubscription && !isCanceling && (
-                  <div className="flex flex-wrap gap-3">
-                    {canUpgrade && (
-                      <Button
-                        onClick={() => {
-                          const tierSection = document.querySelector('[data-testid="tier-change-section"]');
-                          if (tierSection) tierSection.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        className="btn-primary"
-                        data-testid="change-plan-btn"
-                      >
-                        <ArrowUpCircle className="w-4 h-4 mr-2" />
-                        Change Plan
-                      </Button>
-                    )}
-                    
-                    <Button
-                      onClick={handleManageBilling}
-                      variant="outline"
-                      disabled={actionLoading === 'portal'}
-                      data-testid="manage-billing-btn"
-                    >
-                      {actionLoading === 'portal' ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                      )}
-                      Manage Payment Method
-                    </Button>
-                    
-                    <Button
-                      onClick={handleCancel}
-                      variant="ghost"
-                      className="text-muted-foreground hover:text-error"
-                      disabled={actionLoading === 'cancel'}
-                      data-testid="cancel-subscription-btn"
-                    >
-                      {actionLoading === 'cancel' ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <XCircle className="w-4 h-4 mr-2" />
-                      )}
-                      Cancel Subscription
-                    </Button>
-                  </div>
-                )}
-
-                {/* Phase 3: Tier change section for active paid subscriptions.
-                    Lets an existing subscriber switch to Trustee/Estate/Advisor
-                    (or switch billing period) via the change-plan endpoint. */}
-                {isActivePaidSubscription && !isCanceling && (
-                  <div className="mt-8" data-testid="tier-change-section">
-                    <h3 className="font-serif text-xl text-navy mb-1">Change Your Plan</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Upgrade or downgrade at any time. Changes are prorated for the remainder of your billing cycle.
-                    </p>
-                    <div className="flex justify-center mb-6">
-                      <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
-                        <button
-                          type="button"
-                          onClick={() => setChangePlanBillingPeriod('monthly')}
-                          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${changePlanBillingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
-                        >
-                          Monthly
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setChangePlanBillingPeriod('annual')}
-                          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${changePlanBillingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
-                        >
-                          Annual
-                          <span className="ml-1 text-xs opacity-70">2 months free</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {TIERS.map((tier) => {
-                        const isCurrentTier = tier.id === normalizedPlanType;
-                        const isUpgrade = TIERS.findIndex((t) => t.id === tier.id) > currentTierIndex;
-                        return (
-                          <div
-                            key={tier.id}
-                            ref={(el) => { planCardRefs.current[tier.id] = el; }}
-                            className={`card-trust relative p-6 ${tier.popular ? 'border-gold/40' : ''} ${isCurrentTier ? 'ring-2 ring-navy' : ''} ${targetPlan === tier.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
-                            data-testid={`tier-change-card-${tier.id}`}
-                          >
-                            {tier.popular && !isCurrentTier && (
-                              <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
-                                Most Popular
-                              </div>
-                            )}
-                            {isCurrentTier && (
-                              <div className="absolute top-0 right-0 bg-navy text-white px-3 py-1 font-mono text-xs uppercase">
-                                Current
-                              </div>
-                            )}
-                            <h4 className="font-serif text-lg text-navy mb-1">{tier.name}</h4>
-                            <p className="text-xs text-muted-foreground mb-3">{tier.trustLimit}</p>
-                            <div className="flex items-baseline gap-1 mb-2">
-                              <span className="font-mono text-2xl text-navy">
-                                ${changePlanBillingPeriod === 'annual' ? tier.annual : tier.monthly}
-                              </span>
-                              <span className="text-muted-foreground text-sm">
-                                /{changePlanBillingPeriod === 'annual' ? 'year' : 'month'}
-                              </span>
-                            </div>
-                            <Button
-                              onClick={() => handleChangePlan(tier.id, changePlanBillingPeriod)}
-                              disabled={(isCurrentTier && changePlanBillingPeriod === currentBillingPeriod) || actionLoading === 'change-plan'}
-                              variant={isUpgrade ? 'default' : 'outline'}
-                              className={`w-full mt-3 ${isUpgrade ? 'btn-primary' : ''}`}
-                              data-testid={`change-to-${tier.id}-btn`}
-                            >
-                              {actionLoading === 'change-plan' ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : null}
-                              {isCurrentTier && changePlanBillingPeriod === currentBillingPeriod
-                                ? 'Current Plan'
-                                : isCurrentTier && changePlanBillingPeriod !== currentBillingPeriod
-                                ? `Switch to ${changePlanBillingPeriod === 'annual' ? 'Annual' : 'Monthly'}`
-                                : isUpgrade ? 'Upgrade' : 'Switch'}
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Phase 3: Tier change section for active paid subscriptions. */}
+              {isActivePaidSubscription && !isCanceling && (
+                <TierChangeSection
+                  billingPeriod={changePlanBillingPeriod}
+                  onBillingPeriodChange={setChangePlanBillingPeriod}
+                  normalizedPlanType={normalizedPlanType}
+                  currentTierIndex={currentTierIndex}
+                  currentBillingPeriod={currentBillingPeriod}
+                  targetPlan={targetPlan}
+                  onChangePlan={handleChangePlan}
+                  actionLoading={actionLoading}
+                  cardRef={tierCardRef}
+                />
+              )}
 
               {/* Pricing Plans — Show for free plan, expired, or non-active subscriptions */}
               {(isFreePlan || !isActivePaidSubscription) && (
                 <>
                   <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
-                  {/* Phase 3: billing period toggle for the no-subscription plan picker */}
-                  <div className="flex justify-center mb-6">
-                    <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
-                      <button
-                        type="button"
-                        onClick={() => setPickerBillingPeriod('monthly')}
-                        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${pickerBillingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
-                      >
-                        Monthly
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPickerBillingPeriod('annual')}
-                        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${pickerBillingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
-                      >
-                        Annual <span className="ml-1 text-xs text-success">2 months free</span>
-                      </button>
-                    </div>
-                  </div>
+                  <BillingPeriodToggle value={pickerBillingPeriod} onChange={setPickerBillingPeriod} />
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     {TIERS.map(tier => (
-                      <div 
+                      <PlanCard
                         key={tier.id}
-                        className={`card-trust relative ${tier.popular ? 'border-gold/30 bg-gold/5' : ''}`}
-                        data-testid={`plan-card-${tier.id}`}
-                      >
-                        {tier.popular && (
-                          <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
-                            Most Popular
-                          </div>
-                        )}
-                        <h3 className="font-serif text-xl text-navy mb-2">{tier.name}</h3>
-                        <p className="text-xs text-muted-foreground mb-3">{tier.trustLimit}</p>
-                        <div className="flex items-baseline gap-1 mb-4">
-                          <span className="font-mono text-4xl text-navy">
-                            ${pickerBillingPeriod === 'annual' ? tier.annual : tier.monthly}
-                          </span>
-                          <span className="text-muted-foreground">/{pickerBillingPeriod === 'annual' ? 'year' : 'month'}</span>
-                        </div>
-                        {pickerBillingPeriod === 'annual' && (
-                          <p className="text-xs text-success mb-3 font-medium">
-                            Save ${tier.monthly * 2} (2 months free)
-                          </p>
-                        )}
-                        
-                        <ul className="space-y-3 mb-6">
-                          {tier.features.map((feature, i) => (
-                            <li key={i} className="flex items-center gap-2 text-sm">
-                              <Check className="w-4 h-4 text-success flex-shrink-0" />
-                              <span>{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        
-                        <Button 
-                          onClick={() => handleSubscribe(tier.id, pickerBillingPeriod)}
-                          className={`w-full ${tier.popular ? 'btn-primary' : 'btn-secondary'}`}
-                          disabled={processing}
-                          data-testid={`subscribe-${tier.id}-btn`}
-                        >
-                          {processing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <CreditCard className="w-4 h-4 mr-2" />
-                              Subscribe to {tier.name}
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                        tier={tier}
+                        billingPeriod={pickerBillingPeriod}
+                        onSubscribe={handleSubscribe}
+                        processing={processing}
+                        cardRef={tierCardRef(tier.id)}
+                      />
                     ))}
                   </div>
                   {/* WingPoint-exclusive plan card — only for WingPoint customers */}
                   {user?.is_wingpoint && (
-                    <div
-                      ref={(el) => { planCardRefs.current[WINGPOINT_TIER.id] = el; }}
-                      className={`card-trust relative border-gold/40 bg-gold/5 mb-8 ${targetPlan === WINGPOINT_TIER.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
-                      data-testid={`plan-card-${WINGPOINT_TIER.id}`}
-                    >
-                      <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
-                        WingPoint Exclusive
-                      </div>
-                      <h3 className="font-serif text-xl text-navy mb-2">{WINGPOINT_TIER.name}</h3>
-                      <p className="text-xs text-muted-foreground mb-3">{WINGPOINT_TIER.trustLimit}</p>
-                      <div className="flex items-baseline gap-1 mb-2">
-                        <span className="font-mono text-4xl text-navy">$99</span>
-                        <span className="text-muted-foreground">/month</span>
-                      </div>
-                      <p className="text-xs text-success mb-3 font-medium">
-                        $1,188/year · billed annually · 2 months free vs public pricing
-                      </p>
-                      <ul className="space-y-3 mb-6">
-                        {WINGPOINT_TIER.features.map((feature, i) => (
-                          <li key={i} className="flex items-center gap-2 text-sm">
-                            <Check className="w-4 h-4 text-success flex-shrink-0" />
-                            <span>{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <Button
-                        onClick={() => handleSubscribe('wingpoint', 'annual')}
-                        className="w-full btn-primary"
-                        disabled={processing}
-                        data-testid="subscribe-wingpoint-btn"
-                      >
-                        {processing ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="w-4 h-4 mr-2" />
-                            Subscribe to WingPoint Annual
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    <WingPointPlanCard
+                      onSubscribe={handleSubscribe}
+                      processing={processing}
+                      isTargetPlan={targetPlan === WINGPOINT_TIER.id}
+                      cardRef={tierCardRef(WINGPOINT_TIER.id)}
+                    />
                   )}
                 </>
               )}
 
-              {/* Billing FAQ */}
-              <div className="card-trust">
-                <h3 className="font-serif text-lg text-navy mb-4">Frequently Asked Questions</h3>
-                <div className="space-y-4 text-sm">
-                  <div>
-                    <p className="font-medium text-navy">What happens when I cancel?</p>
-                    <p className="text-muted-foreground mt-1">
-                      You'll retain full access until the end of your current billing period. After that, you won't be charged again.
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-navy">Can I switch between plans?</p>
-                    <p className="text-muted-foreground mt-1">
-                      Yes! You can upgrade, downgrade, or switch between monthly and annual billing at any time. Changes are prorated for your current billing cycle.
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-navy">Is my data safe after cancellation?</p>
-                    <p className="text-muted-foreground mt-1">
-                      Your data is retained for 90 days after cancellation. You can resubscribe at any time to regain access.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Support Info */}
-              <div className="mt-8 text-center text-sm text-muted-foreground">
-                <p>
-                  Questions about billing?{' '}
-                  <a href="mailto:support@trustoffice.app" className="text-navy hover:text-navy/70">
-                    Contact support
-                  </a>
-                </p>
-                <p className="mt-2 flex items-center justify-center gap-2">
-                  <CreditCard className="w-4 h-4" />
-                  Payments processed securely through Stripe
-                </p>
-              </div>
+              <BillingFAQ />
             </>
           )}
         </div>
