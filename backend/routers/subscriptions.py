@@ -725,6 +725,305 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
 
 # ==================== STRIPE WEBHOOK ====================
 
+
+# ==================== STRIPE WEBHOOK EVENT HANDLERS ====================
+
+async def _webhook_checkout_session_completed(event) -> None:
+    """Handle Stripe webhook event: checkout.session.completed."""
+    session = event.data.object
+    user_id = session.get("metadata", {}).get("user_id")
+    plan_type = session.get("metadata", {}).get("plan_type", "monthly")
+    billing_period = session.get("metadata", {}).get("billing_period")
+    
+    # For legacy plans, billing_period wasn't in metadata — infer from plan_type
+    if not billing_period and plan_type in ("monthly", "annual"):
+        billing_period = plan_type
+
+    if user_id:
+        # Determine if this is a legacy plan that needs grandfathering
+        update_set = {
+            "plan_type": plan_type,
+            "billing_period": billing_period,
+            "status": "active",
+            "stripe_subscription_id": session.get("subscription"),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        # Grandfather legacy monthly/annual subscribers with 10-trust limit
+        if plan_type in ("monthly", "annual"):
+            update_set["legacy_trust_limit"] = 10
+
+        # Update subscription status
+        await db.subscriptions.update_one(
+            {"user_id": user_id},
+            {
+                "$set": update_set,
+                "$unset": {
+                    "gifted": "",
+                    "gift_type": "",
+                    "gift_start_date": "",
+                    "gift_end_date": "",
+                    "gifted_at": ""
+                }
+            },
+            upsert=True
+        )
+
+        # Update payment transaction
+        await db.payment_transactions.update_one(
+            {"session_id": session["id"]},
+            {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+
+        # Process referral conversion - apply reward to referrer
+        try:
+            from routers.referrals import process_referral_conversion
+            referral_result = await process_referral_conversion(user_id)
+            if referral_result:
+                logger.info(f"Referral conversion processed for user {user_id}: {referral_result}")
+        except Exception as e:
+            logger.error(f"Failed to process referral conversion: {e}")
+
+        # Send activation email
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        amount = str(int(PLAN_AMOUNTS.get((plan_type, billing_period), 79.00)))
+        if user and email_service.is_configured:
+            try:
+                # Get subscription details from Stripe
+                stripe_sub = stripe.Subscription.retrieve(session.get("subscription"))
+                next_billing = format_date(stripe_sub.current_period_end)
+
+                await email_service.send_subscription_activated(
+                    to_email=user["email"],
+                    user_name=user.get("name", ""),
+                    plan_type=plan_type,
+                    amount=amount,
+                    next_billing_date=next_billing,
+                    legacy_trust_limit=10 if plan_type in ("monthly", "annual") else None
+                )
+
+                # Send admin notification about new purchase
+                await email_service.send_admin_new_purchase_notification(
+                    customer_email=user["email"],
+                    customer_name=user.get("name", ""),
+                    plan_type=plan_type,
+                    amount=amount
+                )
+            except Exception as e:
+                logger.error(f"Failed to send activation email: {e}")
+
+        # Mark lead as subscribed in CRM (if they were captured as a lead first)
+        if user:
+            try:
+                from routers.leads import mark_lead_as_subscribed
+                await mark_lead_as_subscribed(
+                    email=user["email"],
+                    user_id=user_id,
+                )
+            except Exception as e:
+                logger.error(f"Failed to mark lead as subscribed: {e}")
+
+        # Add to Mailercloud paid members list
+        if user:
+            try:
+                mailercloud_result = await add_to_paid_list(
+                    email=user["email"],
+                    name=user.get("name", "")
+                )
+                if mailercloud_result and mailercloud_result.get("success"):
+                    logger.info(f"Added {user['email']} to Mailercloud paid list")
+                else:
+                    logger.warning(f"Could not add {user['email']} to Mailercloud: {mailercloud_result}")
+            except Exception as e:
+                logger.error(f"Failed to add to Mailercloud paid list: {e}")
+
+    # ========== SUBSCRIPTION UPDATED ==========
+    
+
+
+async def _webhook_customer_subscription_updated(event) -> None:
+    """Handle Stripe webhook event: customer.subscription.updated."""
+    subscription = event.data.object
+    previous_attributes = getattr(event.data, "previous_attributes", {}) or {}
+    customer_id = subscription.get("customer")
+
+    user, sub = await get_user_by_customer_id(customer_id)
+    if not user:
+        return {"status": "ok", "message": "User not found"}
+
+    # Check if plan changed (upgrade)
+    if "items" in previous_attributes:
+        old_price = previous_attributes.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
+        new_price = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
+
+        if old_price and new_price and old_price != new_price:
+            # Determine plan types using new + legacy lookup
+            old_plan_info = PRICE_ID_TO_PLAN.get(old_price)
+            if not old_plan_info:
+                legacy = LEGACY_PRICE_MAP.get(old_price)
+                old_plan_info = (legacy[0], legacy[1]) if legacy else ("monthly", None)
+            new_plan_info = PRICE_ID_TO_PLAN.get(new_price)
+            if not new_plan_info:
+                legacy = LEGACY_PRICE_MAP.get(new_price)
+                new_plan_info = (legacy[0], legacy[1]) if legacy else ("monthly", None)
+            
+            old_plan = old_plan_info[0]
+            new_plan = new_plan_info[0]
+            new_billing_period = new_plan_info[1]
+
+            # Build update set
+            update_set = {
+                "plan_type": new_plan,
+                "billing_period": new_billing_period,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            # If migrating from a legacy plan, preserve the 10-trust grandfathering
+            old_price_in_legacy = old_price in LEGACY_PRICE_MAP
+            new_price_in_legacy = new_price in LEGACY_PRICE_MAP
+            if old_price_in_legacy and new_price_in_legacy:
+                update_set["legacy_trust_limit"] = 10
+
+            # Update database
+            await db.subscriptions.update_one(
+                {"user_id": user["user_id"]},
+                {"$set": update_set}
+            )
+
+            # Send upgrade email
+            if email_service.is_configured:
+                try:
+                    await email_service.send_subscription_upgraded(
+                        to_email=user["email"],
+                        user_name=user.get("name", ""),
+                        old_plan=old_plan,
+                        new_plan=new_plan
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send upgrade email: {e}")
+
+    # Check if cancel_at_period_end changed (cancellation scheduled)
+    if "cancel_at_period_end" in previous_attributes:
+        if subscription.get("cancel_at_period_end") and not previous_attributes.get("cancel_at_period_end"):
+            # Subscription scheduled for cancellation
+            access_until = format_date(subscription.get("current_period_end"))
+
+            if email_service.is_configured:
+                try:
+                    await email_service.send_subscription_canceled(
+                        to_email=user["email"],
+                        user_name=user.get("name", ""),
+                        access_until=access_until
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send cancellation email: {e}")
+
+    # ========== SUBSCRIPTION DELETED (fully canceled) ==========
+    
+
+
+async def _webhook_customer_subscription_deleted(event) -> None:
+    """Handle Stripe webhook event: customer.subscription.deleted."""
+    subscription = event.data.object
+    await db.subscriptions.update_one(
+        {"stripe_subscription_id": subscription["id"]},
+        {"$set": {
+            "status": "canceled",
+            "stripe_subscription_id": None,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    # ========== INVOICE PAID (renewal) ==========
+    
+
+
+async def _webhook_invoice_paid(event) -> None:
+    """Handle Stripe webhook event: invoice.paid."""
+    invoice = event.data.object
+    customer_id = invoice.get("customer")
+
+    # Skip if this is the first invoice (handled by checkout.session.completed)
+    if invoice.get("billing_reason") == "subscription_create":
+        return {"status": "ok", "message": "Initial invoice, skipping"}
+
+    user, sub = await get_user_by_customer_id(customer_id)
+    if not user:
+        return {"status": "ok", "message": "User not found"}
+
+    # Ensure subscription is active
+    await db.subscriptions.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "status": "active",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    # Send renewal email
+    if email_service.is_configured and invoice.get("billing_reason") == "subscription_cycle":
+        try:
+            # Get next billing date from subscription
+            stripe_sub = stripe.Subscription.retrieve(invoice.get("subscription"))
+            next_billing = format_date(stripe_sub.current_period_end)
+            amount = format_amount(invoice.get("amount_paid", 0))
+            plan_type = sub.get("plan_type", "monthly")
+
+            await email_service.send_subscription_renewed(
+                to_email=user["email"],
+                user_name=user.get("name", ""),
+                plan_type=plan_type,
+                amount=amount,
+                next_billing_date=next_billing
+            )
+        except Exception as e:
+            logger.error(f"Failed to send renewal email: {e}")
+
+    # ========== INVOICE PAYMENT FAILED ==========
+    
+
+
+async def _webhook_invoice_payment_failed(event) -> None:
+    """Handle Stripe webhook event: invoice.payment_failed."""
+    invoice = event.data.object
+    customer_id = invoice.get("customer")
+
+    user, sub = await get_user_by_customer_id(customer_id)
+    if user:
+        # Update subscription status
+        await db.subscriptions.update_one(
+            {"stripe_customer_id": customer_id},
+            {"$set": {
+                "status": "past_due",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+
+        # Send payment failed email
+        if email_service.is_configured:
+            try:
+                amount = format_amount(invoice.get("amount_due", 0))
+                next_attempt = invoice.get("next_payment_attempt")
+                retry_date = format_date(next_attempt) if next_attempt else None
+
+                await email_service.send_payment_failed(
+                    to_email=user["email"],
+                    user_name=user.get("name", ""),
+                    amount=amount,
+                    retry_date=retry_date
+                )
+            except Exception as e:
+                logger.error(f"Failed to send payment failed email: {e}")
+
+
+
+
+WEBHOOK_EVENT_DISPATCH = {
+    "checkout.session.completed": _webhook_checkout_session_completed,
+    "customer.subscription.updated": _webhook_customer_subscription_updated,
+    "customer.subscription.deleted": _webhook_customer_subscription_deleted,
+    "invoice.paid": _webhook_invoice_paid,
+    "invoice.payment_failed": _webhook_invoice_payment_failed,
+}
+
 @router.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
     """Handle Stripe webhook events for subscription lifecycle"""
@@ -757,292 +1056,12 @@ async def stripe_webhook(request: Request):
 
     event_type = event.type
     logger.info(f"Stripe webhook received: {event_type}")
-
-    # Helper to get user info from stripe customer ID
-    async def get_user_by_customer_id(customer_id: str):
-        sub = await db.subscriptions.find_one({"stripe_customer_id": customer_id}, {"_id": 0})
-        if sub:
-            user = await db.users.find_one({"user_id": sub["user_id"]}, {"_id": 0})
-            return user, sub
-        return None, None
-
-    # Helper to format date from timestamp
-    def format_date(timestamp: int) -> str:
-        return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime('%B %d, %Y')
-
-    # Helper to format amount
-    def format_amount(amount_cents: int) -> str:
-        return f"{amount_cents / 100:.2f}"
-
     try:
-        # ========== CHECKOUT COMPLETED (New subscription) ==========
-        if event_type == "checkout.session.completed":
-            session = event.data.object
-            user_id = session.get("metadata", {}).get("user_id")
-            plan_type = session.get("metadata", {}).get("plan_type", "monthly")
-            billing_period = session.get("metadata", {}).get("billing_period")
-            
-            # For legacy plans, billing_period wasn't in metadata — infer from plan_type
-            if not billing_period and plan_type in ("monthly", "annual"):
-                billing_period = plan_type
-
-            if user_id:
-                # Determine if this is a legacy plan that needs grandfathering
-                update_set = {
-                    "plan_type": plan_type,
-                    "billing_period": billing_period,
-                    "status": "active",
-                    "stripe_subscription_id": session.get("subscription"),
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }
-                # Grandfather legacy monthly/annual subscribers with 10-trust limit
-                if plan_type in ("monthly", "annual"):
-                    update_set["legacy_trust_limit"] = 10
-
-                # Update subscription status
-                await db.subscriptions.update_one(
-                    {"user_id": user_id},
-                    {
-                        "$set": update_set,
-                        "$unset": {
-                            "gifted": "",
-                            "gift_type": "",
-                            "gift_start_date": "",
-                            "gift_end_date": "",
-                            "gifted_at": ""
-                        }
-                    },
-                    upsert=True
-                )
-
-                # Update payment transaction
-                await db.payment_transactions.update_one(
-                    {"session_id": session["id"]},
-                    {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
-                )
-
-                # Process referral conversion - apply reward to referrer
-                try:
-                    from routers.referrals import process_referral_conversion
-                    referral_result = await process_referral_conversion(user_id)
-                    if referral_result:
-                        logger.info(f"Referral conversion processed for user {user_id}: {referral_result}")
-                except Exception as e:
-                    logger.error(f"Failed to process referral conversion: {e}")
-
-                # Send activation email
-                user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-                amount = str(int(PLAN_AMOUNTS.get((plan_type, billing_period), 79.00)))
-                if user and email_service.is_configured:
-                    try:
-                        # Get subscription details from Stripe
-                        stripe_sub = stripe.Subscription.retrieve(session.get("subscription"))
-                        next_billing = format_date(stripe_sub.current_period_end)
-
-                        await email_service.send_subscription_activated(
-                            to_email=user["email"],
-                            user_name=user.get("name", ""),
-                            plan_type=plan_type,
-                            amount=amount,
-                            next_billing_date=next_billing,
-                            legacy_trust_limit=10 if plan_type in ("monthly", "annual") else None
-                        )
-
-                        # Send admin notification about new purchase
-                        await email_service.send_admin_new_purchase_notification(
-                            customer_email=user["email"],
-                            customer_name=user.get("name", ""),
-                            plan_type=plan_type,
-                            amount=amount
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to send activation email: {e}")
-
-                # Mark lead as subscribed in CRM (if they were captured as a lead first)
-                if user:
-                    try:
-                        from routers.leads import mark_lead_as_subscribed
-                        await mark_lead_as_subscribed(
-                            email=user["email"],
-                            user_id=user_id,
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to mark lead as subscribed: {e}")
-
-                # Add to Mailercloud paid members list
-                if user:
-                    try:
-                        mailercloud_result = await add_to_paid_list(
-                            email=user["email"],
-                            name=user.get("name", "")
-                        )
-                        if mailercloud_result and mailercloud_result.get("success"):
-                            logger.info(f"Added {user['email']} to Mailercloud paid list")
-                        else:
-                            logger.warning(f"Could not add {user['email']} to Mailercloud: {mailercloud_result}")
-                    except Exception as e:
-                        logger.error(f"Failed to add to Mailercloud paid list: {e}")
-
-        # ========== SUBSCRIPTION UPDATED ==========
-        elif event_type == "customer.subscription.updated":
-            subscription = event.data.object
-            previous_attributes = getattr(event.data, "previous_attributes", {}) or {}
-            customer_id = subscription.get("customer")
-
-            user, sub = await get_user_by_customer_id(customer_id)
-            if not user:
-                return {"status": "ok", "message": "User not found"}
-
-            # Check if plan changed (upgrade)
-            if "items" in previous_attributes:
-                old_price = previous_attributes.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
-                new_price = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
-
-                if old_price and new_price and old_price != new_price:
-                    # Determine plan types using new + legacy lookup
-                    old_plan_info = PRICE_ID_TO_PLAN.get(old_price)
-                    if not old_plan_info:
-                        legacy = LEGACY_PRICE_MAP.get(old_price)
-                        old_plan_info = (legacy[0], legacy[1]) if legacy else ("monthly", None)
-                    new_plan_info = PRICE_ID_TO_PLAN.get(new_price)
-                    if not new_plan_info:
-                        legacy = LEGACY_PRICE_MAP.get(new_price)
-                        new_plan_info = (legacy[0], legacy[1]) if legacy else ("monthly", None)
-                    
-                    old_plan = old_plan_info[0]
-                    new_plan = new_plan_info[0]
-                    new_billing_period = new_plan_info[1]
-
-                    # Build update set
-                    update_set = {
-                        "plan_type": new_plan,
-                        "billing_period": new_billing_period,
-                        "updated_at": datetime.now(timezone.utc).isoformat()
-                    }
-                    # If migrating from a legacy plan, preserve the 10-trust grandfathering
-                    old_price_in_legacy = old_price in LEGACY_PRICE_MAP
-                    new_price_in_legacy = new_price in LEGACY_PRICE_MAP
-                    if old_price_in_legacy and new_price_in_legacy:
-                        update_set["legacy_trust_limit"] = 10
-
-                    # Update database
-                    await db.subscriptions.update_one(
-                        {"user_id": user["user_id"]},
-                        {"$set": update_set}
-                    )
-
-                    # Send upgrade email
-                    if email_service.is_configured:
-                        try:
-                            await email_service.send_subscription_upgraded(
-                                to_email=user["email"],
-                                user_name=user.get("name", ""),
-                                old_plan=old_plan,
-                                new_plan=new_plan
-                            )
-                        except Exception as e:
-                            logger.error(f"Failed to send upgrade email: {e}")
-
-            # Check if cancel_at_period_end changed (cancellation scheduled)
-            if "cancel_at_period_end" in previous_attributes:
-                if subscription.get("cancel_at_period_end") and not previous_attributes.get("cancel_at_period_end"):
-                    # Subscription scheduled for cancellation
-                    access_until = format_date(subscription.get("current_period_end"))
-
-                    if email_service.is_configured:
-                        try:
-                            await email_service.send_subscription_canceled(
-                                to_email=user["email"],
-                                user_name=user.get("name", ""),
-                                access_until=access_until
-                            )
-                        except Exception as e:
-                            logger.error(f"Failed to send cancellation email: {e}")
-
-        # ========== SUBSCRIPTION DELETED (fully canceled) ==========
-        elif event_type == "customer.subscription.deleted":
-            subscription = event.data.object
-            await db.subscriptions.update_one(
-                {"stripe_subscription_id": subscription["id"]},
-                {"$set": {
-                    "status": "canceled",
-                    "stripe_subscription_id": None,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-
-        # ========== INVOICE PAID (renewal) ==========
-        elif event_type == "invoice.paid":
-            invoice = event.data.object
-            customer_id = invoice.get("customer")
-
-            # Skip if this is the first invoice (handled by checkout.session.completed)
-            if invoice.get("billing_reason") == "subscription_create":
-                return {"status": "ok", "message": "Initial invoice, skipping"}
-
-            user, sub = await get_user_by_customer_id(customer_id)
-            if not user:
-                return {"status": "ok", "message": "User not found"}
-
-            # Ensure subscription is active
-            await db.subscriptions.update_one(
-                {"user_id": user["user_id"]},
-                {"$set": {
-                    "status": "active",
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-
-            # Send renewal email
-            if email_service.is_configured and invoice.get("billing_reason") == "subscription_cycle":
-                try:
-                    # Get next billing date from subscription
-                    stripe_sub = stripe.Subscription.retrieve(invoice.get("subscription"))
-                    next_billing = format_date(stripe_sub.current_period_end)
-                    amount = format_amount(invoice.get("amount_paid", 0))
-                    plan_type = sub.get("plan_type", "monthly")
-
-                    await email_service.send_subscription_renewed(
-                        to_email=user["email"],
-                        user_name=user.get("name", ""),
-                        plan_type=plan_type,
-                        amount=amount,
-                        next_billing_date=next_billing
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to send renewal email: {e}")
-
-        # ========== INVOICE PAYMENT FAILED ==========
-        elif event_type == "invoice.payment_failed":
-            invoice = event.data.object
-            customer_id = invoice.get("customer")
-
-            user, sub = await get_user_by_customer_id(customer_id)
-            if user:
-                # Update subscription status
-                await db.subscriptions.update_one(
-                    {"stripe_customer_id": customer_id},
-                    {"$set": {
-                        "status": "past_due",
-                        "updated_at": datetime.now(timezone.utc).isoformat()
-                    }}
-                )
-
-                # Send payment failed email
-                if email_service.is_configured:
-                    try:
-                        amount = format_amount(invoice.get("amount_due", 0))
-                        next_attempt = invoice.get("next_payment_attempt")
-                        retry_date = format_date(next_attempt) if next_attempt else None
-
-                        await email_service.send_payment_failed(
-                            to_email=user["email"],
-                            user_name=user.get("name", ""),
-                            amount=amount,
-                            retry_date=retry_date
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to send payment failed email: {e}")
+        handler = WEBHOOK_EVENT_DISPATCH.get(event_type)
+        if handler:
+            await handler(event)
+        else:
+            logger.info(f"Unhandled webhook event type: {event_type}")
 
     except Exception as e:
         if event_id:
@@ -1060,3 +1079,4 @@ async def stripe_webhook(request: Request):
         )
 
     return {"status": "ok", "event_type": event_type}
+
