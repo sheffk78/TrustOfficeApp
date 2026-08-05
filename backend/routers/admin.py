@@ -635,6 +635,51 @@ async def grant_access(
         return {"message": f"{request.plan_type} access granted to {user['email']}"}
 
 
+COLLECTIONS_TO_CLEAN = [
+    "trusts", "entities", "entity_relationships",
+    "minutes_records", "minutes_templates",
+    "distribution_records", "compensation_plans", "compensation_payments",
+    "governance_tasks", "schedule_a_items",
+    "trust_units_settings", "trust_unit_certificates", "trust_unit_transfers",
+    "benevolence_records", "health_score_snapshots",
+    "user_onboarding", "user_preferences", "notification_preferences",
+    "subscriptions", "user_sessions", "password_resets",
+    "referral_codes", "ai_usage_tracking", "ai_suggestion_cache",
+]
+
+
+async def _cancel_stripe_for_user(user_id: str):
+    """Cancel Stripe subscription and delete customer for a user before deletion."""
+    user = await db.users.find_one({"user_id": user_id})
+    if not user:
+        return
+
+    sub = await db.subscriptions.find_one({"user_id": user_id})
+    stripe_sub_id = sub.get("stripe_subscription_id") if sub else None
+    if stripe_sub_id:
+        try:
+            stripe.Subscription.modify(stripe_sub_id, cancel_at_period_end=True)
+            logger.info(f"Cancelled Stripe subscription {stripe_sub_id} for deleted user {user_id}")
+        except stripe.StripeError as e:
+            logger.warning(f"Failed to cancel Stripe subscription {stripe_sub_id} for user {user_id}: {e}")
+
+    stripe_customer_id = user.get("stripe_customer_id")
+    if stripe_customer_id:
+        try:
+            stripe.Customer.delete(stripe_customer_id)
+            logger.info(f"Deleted Stripe customer {stripe_customer_id} for user {user_id}")
+        except stripe.StripeError as e:
+            logger.warning(f"Failed to delete Stripe customer {stripe_customer_id}: {e}")
+
+
+async def _delete_user_data(user_id: str):
+    """Delete all user data from all collections + referral tracking + the user record."""
+    for collection in COLLECTIONS_TO_CLEAN:
+        await db[collection].delete_many({"user_id": user_id})
+    await db.referral_tracking.delete_many({"referee_user_id": user_id})
+    await db.users.delete_one({"user_id": user_id})
+
+
 @router.delete("/customers/{user_id}")
 async def delete_customer(
     user_id: str,
@@ -647,86 +692,34 @@ async def delete_customer(
     """
     if not confirm:
         raise HTTPException(status_code=400, detail="Please confirm deletion with confirm=true")
-    
+
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    
     if not user:
         raise HTTPException(status_code=404, detail="Customer not found")
-    
+
     # Don't allow deleting the primary admin
     if user.get("email", "").lower() == "contact@trustoffice.app":
         raise HTTPException(status_code=400, detail="Cannot delete primary admin")
-    
+
     # Don't allow admins to delete themselves
     if user_id == admin["user_id"]:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
-    
+
     # Cancel Stripe subscription before deleting DB records
-    user = await db.users.find_one({"user_id": user_id})
-    if user:
-        stripe_sub_id = None
-        sub = await db.subscriptions.find_one({"user_id": user_id})
-        if sub:
-            stripe_sub_id = sub.get("stripe_subscription_id")
-        
-        if stripe_sub_id:
-            try:
-                stripe.Subscription.modify(stripe_sub_id, cancel_at_period_end=True)
-                logger.info(f"Cancelled Stripe subscription {stripe_sub_id} for deleted user {user_id}")
-            except stripe.StripeError as e:
-                logger.warning(f"Failed to cancel Stripe subscription {stripe_sub_id} for user {user_id}: {e}")
-                # Don't block deletion — but log prominently
-        
-        stripe_customer_id = user.get("stripe_customer_id")
-        if stripe_customer_id:
-            try:
-                stripe.Customer.delete(stripe_customer_id)
-                logger.info(f"Deleted Stripe customer {stripe_customer_id} for user {user_id}")
-            except stripe.StripeError as e:
-                logger.warning(f"Failed to delete Stripe customer {stripe_customer_id}: {e}")
+    await _cancel_stripe_for_user(user_id)
 
     # Delete all user data
-    collections_to_clean = [
-        "trusts",
-        "entities",
-        "entity_relationships",
-        "minutes_records",
-        "minutes_templates",
-        "distribution_records",
-        "compensation_plans",
-        "compensation_payments",
-        "governance_tasks",
-        "schedule_a_items",
-        "trust_units_settings",
-        "trust_unit_certificates",
-        "trust_unit_transfers",
-        "benevolence_records",
-        "health_score_snapshots",
-        "user_onboarding",
-        "user_preferences",
-        "notification_preferences",
-        "subscriptions",
-        "user_sessions",
-        "password_resets",
-        "referral_codes",
-        "ai_usage_tracking",
-        "ai_suggestion_cache"
-    ]
-    
     deleted_counts = {}
-    for collection in collections_to_clean:
+    for collection in COLLECTIONS_TO_CLEAN:
         result = await db[collection].delete_many({"user_id": user_id})
         if result.deleted_count > 0:
             deleted_counts[collection] = result.deleted_count
-    
-    # Also clean up referral tracking where they're the referee
+
     await db.referral_tracking.delete_many({"referee_user_id": user_id})
-    
-    # Delete the user
     await db.users.delete_one({"user_id": user_id})
-    
+
     logger.info(f"Admin {admin['email']} deleted user {user['email']} (user_id: {user_id})")
-    
+
     return {
         "message": f"User {user['email']} and all associated data deleted",
         "deleted_records": deleted_counts
@@ -735,6 +728,17 @@ async def delete_customer(
 
 class BulkDeleteRequest(BaseModel):
     user_ids: List[str]
+
+
+def _is_protected_user(user: dict, admin_user_id: str) -> Optional[str]:
+    """Check if a user is protected from deletion. Returns reason string or None."""
+    if user.get("email", "").lower() in {"contact@trustoffice.app"}:
+        return "protected account"
+    if user.get("is_admin"):
+        return "admin account"
+    if user.get("user_id") == admin_user_id:
+        return "cannot delete self"
+    return None
 
 
 @router.post("/customers/bulk-delete")
@@ -748,113 +752,42 @@ async def bulk_delete_customers(
     """
     if not request.user_ids:
         raise HTTPException(status_code=400, detail="No user IDs provided")
-    
+
     if len(request.user_ids) > 100:
         raise HTTPException(status_code=400, detail="Cannot delete more than 100 accounts at once")
-    
+
     # Filter out protected accounts
-    protected_emails = {"contact@trustoffice.app"}
     users_to_delete = []
     skipped = []
-    
+
     for user_id in request.user_ids:
-        user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "is_admin": 1})
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "is_admin": 1, "user_id": 1})
         if not user:
             skipped.append({"user_id": user_id, "reason": "not found"})
             continue
-        
-        # Skip primary admin
-        if user.get("email", "").lower() in protected_emails:
-            skipped.append({"user_id": user_id, "email": user["email"], "reason": "protected account"})
+
+        reason = _is_protected_user(user, admin["user_id"])
+        if reason:
+            skipped.append({"user_id": user_id, "email": user.get("email"), "reason": reason})
             continue
-        
-        # Skip admins
-        if user.get("is_admin"):
-            skipped.append({"user_id": user_id, "email": user["email"], "reason": "admin account"})
-            continue
-        
-        # Skip self-deletion
-        if user_id == admin["user_id"]:
-            skipped.append({"user_id": user_id, "email": user["email"], "reason": "cannot delete self"})
-            continue
-        
+
         users_to_delete.append({"user_id": user_id, "email": user["email"]})
-    
+
     if not users_to_delete:
         raise HTTPException(status_code=400, detail="No deletable accounts found")
-    
-    # Collections to clean for each user
-    collections_to_clean = [
-        "trusts",
-        "entities",
-        "entity_relationships",
-        "minutes_records",
-        "minutes_templates",
-        "distribution_records",
-        "compensation_plans",
-        "compensation_payments",
-        "governance_tasks",
-        "schedule_a_items",
-        "trust_units_settings",
-        "trust_unit_certificates",
-        "trust_unit_transfers",
-        "benevolence_records",
-        "health_score_snapshots",
-        "user_onboarding",
-        "user_preferences",
-        "notification_preferences",
-        "subscriptions",
-        "user_sessions",
-        "password_resets",
-        "referral_codes",
-        "ai_usage_tracking",
-        "ai_suggestion_cache"
-    ]
-    
+
     deleted_count = 0
     deleted_emails = []
-    
+
     for user_data in users_to_delete:
         user_id = user_data["user_id"]
-        
-        # Cancel Stripe subscription before deleting DB records
-        bulk_user = await db.users.find_one({"user_id": user_id})
-        if bulk_user:
-            stripe_sub_id = None
-            bulk_sub = await db.subscriptions.find_one({"user_id": user_id})
-            if bulk_sub:
-                stripe_sub_id = bulk_sub.get("stripe_subscription_id")
-            
-            if stripe_sub_id:
-                try:
-                    stripe.Subscription.modify(stripe_sub_id, cancel_at_period_end=True)
-                    logger.info(f"Cancelled Stripe subscription {stripe_sub_id} for deleted user {user_id}")
-                except stripe.StripeError as e:
-                    logger.warning(f"Failed to cancel Stripe subscription {stripe_sub_id} for user {user_id}: {e}")
-            
-            stripe_customer_id = bulk_user.get("stripe_customer_id")
-            if stripe_customer_id:
-                try:
-                    stripe.Customer.delete(stripe_customer_id)
-                    logger.info(f"Deleted Stripe customer {stripe_customer_id} for user {user_id}")
-                except stripe.StripeError as e:
-                    logger.warning(f"Failed to delete Stripe customer {stripe_customer_id}: {e}")
-        
-        # Delete all user data from collections
-        for collection in collections_to_clean:
-            await db[collection].delete_many({"user_id": user_id})
-        
-        # Clean up referral tracking
-        await db.referral_tracking.delete_many({"referee_user_id": user_id})
-        
-        # Delete the user
-        await db.users.delete_one({"user_id": user_id})
-        
+        await _cancel_stripe_for_user(user_id)
+        await _delete_user_data(user_id)
         deleted_count += 1
         deleted_emails.append(user_data["email"])
-    
+
     logger.info(f"Admin {admin['email']} bulk deleted {deleted_count} users: {deleted_emails}")
-    
+
     return {
         "message": f"Successfully deleted {deleted_count} account(s)",
         "deleted_count": deleted_count,
@@ -1097,6 +1030,51 @@ async def fix_referral(
 
 # ==================== SYSTEM STATS ====================
 
+def _fetch_stripe_all_time_revenue() -> tuple:
+    """Fetch all-time paid invoices from Stripe. Returns (total_revenue_cents, transactions, customer_ids)."""
+    total_revenue_cents = 0
+    total_transactions = 0
+    customer_ids = set()
+
+    try:
+        all_invoices = stripe.Invoice.list(
+            status="paid",
+            limit=100,
+            created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())}
+        )
+        for inv in all_invoices.auto_paging_iter():
+            try:
+                if not _is_trustoffice_invoice(inv):
+                    continue
+                amount = inv.amount_paid or inv.total or 0
+                total_revenue_cents += amount
+                total_transactions += 1
+                customer_id = getattr(inv, 'customer', None)
+                if customer_id:
+                    customer_ids.add(customer_id)
+            except Exception as inv_err:
+                logger.warning(f"Skipping invoice in stats: {inv_err}")
+                continue
+    except stripe.StripeError as e:
+        logger.error(f"Stripe API error in /admin/stats: {e}")
+    except Exception as e:
+        logger.error(f"Error fetching Stripe data in /admin/stats: {e}")
+
+    return total_revenue_cents, total_transactions, customer_ids
+
+
+def _compute_revenue_estimate(sub_counts: dict) -> float:
+    """Compute rough monthly revenue estimate from subscription plan counts."""
+    rates = {"monthly": 79, "annual": 790 / 12, "trustee": 79, "estate": 149, "advisor": 399, "wingpoint": 99}
+    return sum(sub_counts.get(plan, 0) * rate for plan, rate in rates.items())
+
+
+def _compute_mrr_cents(sub_counts: dict) -> int:
+    """Compute MRR in cents from subscription plan counts."""
+    rates = {"monthly": 7900, "annual": 6583, "trustee": 7900, "estate": 14900, "advisor": 39900, "wingpoint": 9900}
+    return sum(sub_counts.get(plan, 0) * rate for plan, rate in rates.items())
+
+
 @router.get("/stats", response_model=SystemStats)
 async def get_system_stats(admin: dict = Depends(require_admin)):
     """
@@ -1105,86 +1083,40 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
     """
     now = datetime.now(timezone.utc)
     thirty_days_ago = (now - timedelta(days=30)).isoformat()
-    
+
     # User counts
     total_users = await db.users.count_documents({})
     admin_count = await db.users.count_documents({"is_admin": True})
     new_users_30d = await db.users.count_documents({"created_at": {"$gte": thirty_days_ago}})
-    
+
     logger.info(f"Admin stats: total_users={total_users}, admin_count={admin_count}")
-    
+
     # Subscription counts
     active_subscriptions = await db.subscriptions.count_documents({"status": "active"})
     trial_users = await db.subscriptions.count_documents({"status": "trialing"})
     expired_trials = await db.subscriptions.count_documents({"status": "expired"})
-    
-    # Gifted users count — active gifted subscriptions (not expired)
-    gifted_users = await db.subscriptions.count_documents({
-        "gifted": True,
-        "status": {"$ne": "expired"}
-    })
-    expired_gifts = await db.subscriptions.count_documents({
-        "gifted": True,
-        "status": "expired"
-    })
-    
+
+    # Gifted users count
+    gifted_users = await db.subscriptions.count_documents({"gifted": True, "status": {"$ne": "expired"}})
+    expired_gifts = await db.subscriptions.count_documents({"gifted": True, "status": "expired"})
+
     # Content counts
     total_trusts = await db.trusts.count_documents({})
     total_minutes = await db.minutes_records.count_documents({})
     total_distributions = await db.distribution_records.count_documents({})
-    
-    # Revenue estimate (rough calculation from DB)
-    monthly_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
-    annual_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "annual"})
-    trustee_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "trustee"})
-    estate_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "estate"})
-    advisor_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "advisor"})
-    wingpoint_subs = await db.subscriptions.count_documents({"status": "active", "plan_type": "wingpoint"})
-    revenue_estimate = (monthly_subs * 79) + (annual_subs * 790 / 12) + (trustee_subs * 79) + (estate_subs * 149) + (advisor_subs * 399) + (wingpoint_subs * 99)
-    
+
+    # Subscription plan counts for revenue
+    plan_counts = {}
+    for plan in ("monthly", "annual", "trustee", "estate", "advisor", "wingpoint"):
+        plan_counts[plan] = await db.subscriptions.count_documents({"status": "active", "plan_type": plan})
+
+    revenue_estimate = _compute_revenue_estimate(plan_counts)
+
     # Real Stripe revenue data
-    stripe_total_revenue_cents = 0
-    stripe_mrr_cents = 0
-    stripe_arr_cents = 0
-    stripe_paid_customers = 0
-    stripe_total_transactions = 0
-    
-    try:
-        # Fetch all-time paid invoices from Stripe for total revenue
-        all_invoices = stripe.Invoice.list(
-            status="paid",
-            limit=100,
-            created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())}
-        )
-        
-        customer_ids = set()
-        for inv in all_invoices.auto_paging_iter():
-            try:
-                if not _is_trustoffice_invoice(inv):
-                    continue
-                amount = inv.amount_paid or inv.total or 0
-                stripe_total_revenue_cents += amount
-                stripe_total_transactions += 1
-                customer_id = getattr(inv, 'customer', None)
-                if customer_id:
-                    customer_ids.add(customer_id)
-            except Exception as inv_err:
-                logger.warning(f"Skipping invoice in stats: {inv_err}")
-                continue
-        
-        stripe_paid_customers = len(customer_ids)
-        
-        # Calculate MRR from active subscriptions
-        # Monthly: $79/mo, Annual: $790/yr ≈ $65.83/mo
-        # Trustee: $79/mo, Estate: $149/mo, Advisor: $399/mo, WingPoint: $99/mo
-        stripe_mrr_cents = (monthly_subs * 7900) + (annual_subs * 6583) + (trustee_subs * 7900) + (estate_subs * 14900) + (advisor_subs * 39900) + (wingpoint_subs * 9900)
-        stripe_arr_cents = stripe_mrr_cents * 12
-        
-    except stripe.StripeError as e:
-        logger.error(f"Stripe API error in /admin/stats: {e}")
-    except Exception as e:
-        logger.error(f"Error fetching Stripe data in /admin/stats: {e}")
-    
+    stripe_total_revenue_cents, stripe_total_transactions, customer_ids = _fetch_stripe_all_time_revenue()
+    stripe_mrr_cents = _compute_mrr_cents(plan_counts)
+    stripe_arr_cents = stripe_mrr_cents * 12
+
     return SystemStats(
         total_users=total_users,
         active_subscriptions=active_subscriptions,
@@ -1201,14 +1133,117 @@ async def get_system_stats(admin: dict = Depends(require_admin)):
         stripe_total_revenue_cents=stripe_total_revenue_cents,
         stripe_mrr_cents=stripe_mrr_cents,
         stripe_arr_cents=stripe_arr_cents,
-        stripe_paid_customers=stripe_paid_customers,
+        stripe_paid_customers=len(customer_ids),
         stripe_total_transactions=stripe_total_transactions,
-        monthly_subs=monthly_subs,
-        annual_subs=annual_subs,
+        monthly_subs=plan_counts["monthly"],
+        annual_subs=plan_counts["annual"],
     )
 
 
 # ==================== REVENUE ENDPOINT ====================
+
+_PRESET_DATE_RANGES = {
+    "today": lambda now: (now.replace(hour=0, minute=0, second=0, microsecond=0), now),
+    "this_week": lambda now: ((now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0), now),
+    "this_month": lambda now: (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0), now),
+    "last_30_days": lambda now: (now - timedelta(days=30), now),
+    "last_90_days": lambda now: (now - timedelta(days=90), now),
+    "all_time": lambda now: (datetime(2020, 1, 1, tzinfo=timezone.utc), now),
+}
+
+
+def _resolve_date_range(preset: str, start_date: Optional[str], end_date: Optional[str], now: datetime) -> tuple:
+    """Resolve (start_dt, end_dt) from preset or custom dates. Raises HTTPException on invalid input."""
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            if end_dt <= start_dt:
+                raise HTTPException(status_code=400, detail="end_date must be after start_date")
+            return start_dt, end_dt
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format.")
+
+    builder = _PRESET_DATE_RANGES.get(preset, _PRESET_DATE_RANGES["last_30_days"])
+    return builder(now)
+
+
+def _detect_plan_type(inv) -> str:
+    """Detect plan type from a Stripe invoice's line items."""
+    try:
+        for line in inv.lines.data:
+            price_id = _get_price_id(line)
+            if price_id and price_id in PRICE_ID_TO_PLAN_LABEL:
+                return PRICE_ID_TO_PLAN_LABEL[price_id]
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _get_customer_email(inv, customer_id: str) -> str:
+    """Fetch customer email from Stripe or invoice fallback."""
+    try:
+        if customer_id:
+            customer = stripe.Customer.retrieve(customer_id)
+            return customer.email or ""
+        return getattr(inv, 'customer_email', '') or ""
+    except Exception:
+        return getattr(inv, 'customer_email', '') or ""
+
+
+def _process_invoice(inv, customer_ids: set, revenue_by_month: defaultdict, subscriptions_by_plan: dict) -> dict:
+    """Process a single Stripe invoice and return a transaction dict, or None if not TrustOffice."""
+    if not _is_trustoffice_invoice(inv):
+        return None
+
+    amount = inv.amount_paid or inv.total or 0
+    customer_id = getattr(inv, 'customer', None)
+    if customer_id:
+        customer_ids.add(customer_id)
+
+    inv_date = datetime.fromtimestamp(inv.created, tz=timezone.utc)
+    month_key = inv_date.strftime("%Y-%m")
+    revenue_by_month[month_key] += amount
+
+    plan_type = _detect_plan_type(inv)
+    subscriptions_by_plan[plan_type] = subscriptions_by_plan.get(plan_type, 0) + 1
+
+    customer_email = _get_customer_email(inv, customer_id)
+
+    return {
+        "date": inv_date.isoformat(),
+        "customer_email": customer_email,
+        "amount_cents": amount,
+        "plan": plan_type,
+        "status": inv.status,
+        "invoice_id": inv.id,
+    }
+
+
+async def _fetch_period_revenue(now: datetime) -> dict:
+    """Fetch revenue for today, this week, this month, and all time from Stripe."""
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    periods = {
+        "today": today_start,
+        "week": week_start,
+        "month": month_start,
+        "all_time": datetime(2020, 1, 1, tzinfo=timezone.utc),
+    }
+
+    revenue = {k: 0 for k in periods}
+    for label, start_dt in periods.items():
+        try:
+            data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(start_dt.timestamp())})
+            for inv in data.auto_paging_iter():
+                if _is_trustoffice_invoice(inv):
+                    revenue[label] += inv.amount_paid or inv.total or 0
+        except stripe.StripeError as e:
+            logger.error(f"Stripe API error fetching {label} revenue: {e}")
+    return revenue
+
 
 @router.get("/revenue")
 async def get_revenue_data(
@@ -1221,44 +1256,11 @@ async def get_revenue_data(
     Get detailed revenue data from Stripe for the admin dashboard.
     Includes customer-level transaction data (admin only).
     """
-    # Determine date range
     now = datetime.now(timezone.utc)
-    if start_date and end_date:
-        try:
-            start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
-            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
-            if end_dt <= start_dt:
-                raise HTTPException(status_code=400, detail="end_date must be after start_date")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format.")
-    else:
-        # Use preset
-        if preset == "today":
-            start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            end_dt = now
-        elif preset == "this_week":
-            days_since_monday = now.weekday()
-            start_dt = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
-            end_dt = now
-        elif preset == "this_month":
-            start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            end_dt = now
-        elif preset == "last_30_days":
-            start_dt = now - timedelta(days=30)
-            end_dt = now
-        elif preset == "last_90_days":
-            start_dt = now - timedelta(days=90)
-            end_dt = now
-        elif preset == "all_time":
-            start_dt = datetime(2020, 1, 1, tzinfo=timezone.utc)
-            end_dt = now
-        else:
-            start_dt = now - timedelta(days=30)
-            end_dt = now
-    
+    start_dt, end_dt = _resolve_date_range(preset, start_date, end_date, now)
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
-    
+
     total_revenue_cents = 0
     total_transactions = 0
     customer_ids = set()
@@ -1266,14 +1268,15 @@ async def get_revenue_data(
     subscriptions_by_plan = {"monthly": 0, "annual": 0}
     recent_transactions = []
     stripe_error = None
-    
+
     try:
         if not stripe.api_key:
             raise stripe.error.AuthenticationError("Stripe API key not configured (STRIPE_SECRET_KEY missing)")
+
         has_more = True
         starting_after = None
         invoice_count = 0
-        
+
         while has_more and invoice_count < 5000:
             params = {
                 "status": "paid",
@@ -1282,129 +1285,56 @@ async def get_revenue_data(
             }
             if starting_after:
                 params["starting_after"] = starting_after
-            
+
             invoices = stripe.Invoice.list(**params)
-            
+
             for inv in invoices.data:
-                if not _is_trustoffice_invoice(inv):
+                txn = _process_invoice(inv, customer_ids, revenue_by_month, subscriptions_by_plan)
+                if txn is None:
                     continue
                 invoice_count += 1
-                amount = inv.amount_paid or inv.total or 0
-                total_revenue_cents += amount
+                total_revenue_cents += txn["amount_cents"]
                 total_transactions += 1
-                
-                # Stripe Invoice uses .customer (not .customer_id) for the customer ID
-                customer_id = getattr(inv, 'customer', None)
-                if customer_id:
-                    customer_ids.add(customer_id)
-                
-                # Revenue by month
-                inv_date = datetime.fromtimestamp(inv.created, tz=timezone.utc)
-                month_key = inv_date.strftime("%Y-%m")
-                revenue_by_month[month_key] += amount
-                
-                # Plan detection — use full 3-tier price ID lookup
-                plan_type = "unknown"
-                try:
-                    for line in inv.lines.data:
-                        price_id = _get_price_id(line)
-                        if price_id and price_id in PRICE_ID_TO_PLAN_LABEL:
-                            plan_type = PRICE_ID_TO_PLAN_LABEL[price_id]
-                            break
-                except Exception:
-                    plan_type = "unknown"  # fallback
-                
-                subscriptions_by_plan[plan_type] = subscriptions_by_plan.get(plan_type, 0) + 1
-                
-                # Customer email (admin can see)
-                customer_email = ""
-                try:
-                    if customer_id:
-                        customer = stripe.Customer.retrieve(customer_id)
-                        customer_email = customer.email or ""
-                    else:
-                        customer_email = getattr(inv, 'customer_email', '') or ""
-                except Exception:
-                    customer_email = getattr(inv, 'customer_email', '') or ""
-                
-                recent_transactions.append({
-                    "date": inv_date.isoformat(),
-                    "customer_email": customer_email,
-                    "amount_cents": amount,
-                    "plan": plan_type,
-                    "status": inv.status,
-                    "invoice_id": inv.id,
-                })
-            
+                recent_transactions.append(txn)
+
             has_more = invoices.has_more
             if has_more and invoices.data:
                 starting_after = invoices.data[-1].id
             else:
                 break
-                
+
     except stripe.StripeError as e:
         logger.error(f"Stripe API error in /admin/revenue: {e}")
         stripe_error = str(e)
     except Exception as e:
         logger.error(f"Error fetching revenue data: {e}")
         stripe_error = str(e)
-    
+
     # Sort recent transactions by date descending
     recent_transactions.sort(key=lambda t: t["date"], reverse=True)
     recent_transactions = recent_transactions[:100]
-    
+
     # Format revenue by month
     revenue_by_month_list = [
         {"month": k, "amount_cents": v}
         for k, v in sorted(revenue_by_month.items())
     ]
-    
+
     # Calculate MRR and ARR from DB subscriptions
     monthly_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
     annual_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "annual"})
     mrr_cents = (monthly_active * 7900) + (annual_active * 6583)
     arr_cents = mrr_cents * 12
-    
+
     # Period-specific revenue
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
-    revenue_today_cents = 0
-    revenue_this_week_cents = 0
-    revenue_this_month_cents = 0
-    revenue_all_time_cents = 0
-    
+    period_revenue = {"today": 0, "week": 0, "month": 0, "all_time": 0}
     if not stripe_error:
-        try:
-            today_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(today_start.timestamp())})
-            for inv in today_data.auto_paging_iter():
-                if _is_trustoffice_invoice(inv):
-                    revenue_today_cents += inv.amount_paid or inv.total or 0
-            
-            week_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(week_start.timestamp())})
-            for inv in week_data.auto_paging_iter():
-                if _is_trustoffice_invoice(inv):
-                    revenue_this_week_cents += inv.amount_paid or inv.total or 0
-            
-            month_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(month_start.timestamp())})
-            for inv in month_data.auto_paging_iter():
-                if _is_trustoffice_invoice(inv):
-                    revenue_this_month_cents += inv.amount_paid or inv.total or 0
-            
-            all_time_data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())})
-            for inv in all_time_data.auto_paging_iter():
-                if _is_trustoffice_invoice(inv):
-                    revenue_all_time_cents += inv.amount_paid or inv.total or 0
-        except stripe.StripeError as e:
-            logger.error(f"Stripe API error fetching period revenue: {e}")
-            if not stripe_error:
-                stripe_error = str(e)
-    
+        period_revenue = await _fetch_period_revenue(now)
+
     avg_revenue_per_customer_cents = (
         total_revenue_cents // len(customer_ids) if len(customer_ids) > 0 else 0
     )
-    
+
     return {
         "total_revenue_cents": total_revenue_cents,
         "total_revenue_formatted": f"${total_revenue_cents / 100:,.2f}",
@@ -1418,14 +1348,14 @@ async def get_revenue_data(
         "avg_revenue_per_customer_formatted": f"${avg_revenue_per_customer_cents / 100:,.2f}",
         "revenue_by_month": revenue_by_month_list,
         "subscriptions_by_plan": subscriptions_by_plan,
-        "revenue_today_cents": revenue_today_cents,
-        "revenue_today_formatted": f"${revenue_today_cents / 100:,.2f}",
-        "revenue_this_week_cents": revenue_this_week_cents,
-        "revenue_this_week_formatted": f"${revenue_this_week_cents / 100:,.2f}",
-        "revenue_this_month_cents": revenue_this_month_cents,
-        "revenue_this_month_formatted": f"${revenue_this_month_cents / 100:,.2f}",
-        "revenue_all_time_cents": revenue_all_time_cents,
-        "revenue_all_time_formatted": f"${revenue_all_time_cents / 100:,.2f}",
+        "revenue_today_cents": period_revenue["today"],
+        "revenue_today_formatted": f"${period_revenue['today'] / 100:,.2f}",
+        "revenue_this_week_cents": period_revenue["week"],
+        "revenue_this_week_formatted": f"${period_revenue['week'] / 100:,.2f}",
+        "revenue_this_month_cents": period_revenue["month"],
+        "revenue_this_month_formatted": f"${period_revenue['month'] / 100:,.2f}",
+        "revenue_all_time_cents": period_revenue["all_time"],
+        "revenue_all_time_formatted": f"${period_revenue['all_time'] / 100:,.2f}",
         "monthly_subs": monthly_active,
         "annual_subs": annual_active,
         "recent_transactions": recent_transactions,
