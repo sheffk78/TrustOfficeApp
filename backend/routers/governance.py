@@ -303,222 +303,269 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
     }
 
 
+def _parse_trust_created_age(trust_created_at: Optional[str], now: datetime) -> bool:
+    """Check if trust is new (created <90 days ago). Returns False if no valid date."""
+    if not trust_created_at:
+        return False
+    try:
+        if "T" in trust_created_at:
+            created = datetime.fromisoformat(trust_created_at.replace("Z", "+00:00"))
+        else:
+            created = datetime.fromisoformat(trust_created_at).replace(tzinfo=timezone.utc)
+        return (now - created).days < 90
+    except (ValueError, TypeError):
+        return False
+
+
+def _parse_asset_valuation_date(valuation_ref_str: str) -> Optional[datetime]:
+    """Parse an asset valuation/conveyance date string, returning None on failure."""
+    if not valuation_ref_str:
+        return None
+    try:
+        if "T" in valuation_ref_str:
+            return datetime.fromisoformat(valuation_ref_str.replace("Z", "+00:00"))
+        return datetime.fromisoformat(valuation_ref_str).replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def _is_asset_stale(asset: dict, twelve_months_ago: datetime) -> bool:
+    """Check if a single asset's valuation is stale (>12 months old or missing)."""
+    valuation_ref_str = asset.get("last_valued_date") or asset.get("date_conveyed")
+    if not valuation_ref_str:
+        return True
+    valuation_ref = _parse_asset_valuation_date(valuation_ref_str)
+    if valuation_ref is None:
+        return True
+    return valuation_ref < twelve_months_ago
+
+
+def _compute_quarterly_minutes_criterion(data: dict) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Quarterly Minutes."""
+    mp = CRITERIA_CONFIG["Quarterly Minutes"]["max_points"]
+    achieved = data["quarterly_minutes"] > 0
+    points = mp if achieved else 0
+    criterion = HealthScoreCriterion(
+        name="Quarterly Minutes",
+        description="Minutes generated this quarter",
+        points=points, max_points=mp, achieved=achieved, no_data=False
+    )
+    return criterion, points
+
+
+def _compute_task_compliance_criterion(data: dict) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Task Compliance."""
+    mp = CRITERIA_CONFIG["Task Compliance"]["max_points"]
+    total_tasks = data["total_tasks"]
+    overdue_tasks = data["overdue_tasks"]
+    if total_tasks > 0:
+        task_compliance = overdue_tasks == 0
+        points = mp if task_compliance else max(0, mp - (overdue_tasks * 3))
+    else:
+        task_compliance = None
+        points = 0
+    criterion = HealthScoreCriterion(
+        name="Task Compliance",
+        description="No overdue governance tasks" if total_tasks > 0 else "No governance tasks tracked yet",
+        points=points, max_points=mp,
+        achieved=task_compliance if task_compliance is not None else False,
+        no_data=total_tasks == 0
+    )
+    return criterion, points
+
+
+def _compute_compensation_criterion(data: dict) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Compensation Alignment."""
+    mp = CRITERIA_CONFIG["Compensation Alignment"]["max_points"]
+    comp_plan = data["comp_plan"]
+    if comp_plan:
+        aligned = data["ytd_total"] <= data["approved_amount"]
+        points = mp if aligned else 0
+    else:
+        aligned = None
+        points = 0
+    criterion = HealthScoreCriterion(
+        name="Compensation Alignment",
+        description="YTD compensation within approved plan" if comp_plan else "No compensation plan set up yet",
+        points=points, max_points=mp,
+        achieved=aligned if aligned is not None else False,
+        no_data=comp_plan is None
+    )
+    return criterion, points
+
+
+def _compute_distribution_criterion(data: dict) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Distribution Documentation."""
+    mp = CRITERIA_CONFIG["Distribution Documentation"]["max_points"]
+    dist_count = data["dist_count"]
+    benevolence_dists = data["benevolence_dists"]
+    benevolence_count = len(benevolence_dists)
+    incomplete = _count_incomplete_benevolence(benevolence_dists)
+
+    if dist_count == 0:
+        return HealthScoreCriterion(
+            name="Distribution Documentation", description="No distributions logged",
+            points=0, max_points=mp, achieved=False, no_data=True,
+        ), 0
+
+    if benevolence_count > 0 and incomplete > 0:
+        ratio = (benevolence_count - incomplete) / benevolence_count
+        points = int(mp * (0.5 + 0.5 * ratio))
+        desc = f"Distributions logged; {incomplete}/{benevolence_count} benevolence distributions need documentation"
+    else:
+        points = mp
+        if benevolence_count > 0:
+            desc = f"All distributions documented ({benevolence_count} benevolence distributions fully documented)"
+        else:
+            desc = "Distributions logged"
+
+    return HealthScoreCriterion(
+        name="Distribution Documentation", description=desc,
+        points=points, max_points=mp, achieved=True, no_data=False,
+    ), points
+
+
+def _count_incomplete_benevolence(benevolence_dists: list) -> int:
+    """Count distributions with incomplete benevolence documentation."""
+    incomplete = 0
+    for bd in benevolence_dists:
+        if not bd.get("benevolence_recipient_name") or not bd.get("benevolence_need_description"):
+            incomplete += 1
+        elif not bd.get("approved_at") and not bd.get("minutes_record_id"):
+            incomplete += 1
+    return incomplete
+
+
+def _compute_annual_review_criterion(data: dict, now: datetime) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Annual Review."""
+    mp = CRITERIA_CONFIG["Annual Review"]["max_points"]
+    annual_done = data["annual_review"] is not None
+    points = mp if annual_done else 0
+    is_new_trust = _parse_trust_created_age(data.get("trust_created_at"), now)
+    criterion = HealthScoreCriterion(
+        name="Annual Review",
+        description="Annual review completed in last 12 months" if not is_new_trust else "Annual review not due yet — schedule it for later",
+        points=points, max_points=mp, achieved=annual_done, no_data=is_new_trust
+    )
+    return criterion, points
+
+
+def _compute_asset_valuation_criterion(data: dict) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Asset Valuation Freshness."""
+    mp = CRITERIA_CONFIG["Asset Valuation Freshness"]["max_points"]
+    active_assets = data["active_assets"]
+    twelve_months_ago = data["twelve_months_ago"]
+    total_assets = len(active_assets)
+
+    if total_assets == 0:
+        criterion = HealthScoreCriterion(
+            name="Asset Valuation Freshness", description="No assets on Schedule A yet",
+            points=0, max_points=mp, achieved=False, no_data=True
+        )
+        return criterion, 0
+
+    stale_count = sum(1 for a in active_assets if _is_asset_stale(a, twelve_months_ago))
+    fresh_count = total_assets - stale_count
+    if stale_count == 0:
+        points = mp
+        achieved = True
+    else:
+        points = int(mp * fresh_count / total_assets)
+        achieved = False
+    desc = f"{stale_count} of {total_assets} asset(s) need re-valuation (last valued >12 months ago)"
+    criterion = HealthScoreCriterion(
+        name="Asset Valuation Freshness", description=desc,
+        points=points, max_points=mp, achieved=achieved, no_data=False
+    )
+    return criterion, points
+
+
+def _compute_transaction_classification_criterion(data: dict) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Transaction Classification."""
+    mp = CRITERIA_CONFIG["Transaction Classification"]["max_points"]
+    total_txns = data["total_txns"]
+    classified_txns = data["classified_txns"]
+    if total_txns == 0:
+        return HealthScoreCriterion(
+            name="Transaction Classification", description="No transactions to classify yet",
+            points=0, max_points=mp, achieved=False, no_data=True
+        ), 0
+
+    ratio = classified_txns / total_txns
+    points = int(mp * ratio)
+    achieved = ratio >= 1.0
+    desc = f"{classified_txns}/{total_txns} transactions classified"
+    return HealthScoreCriterion(
+        name="Transaction Classification", description=desc,
+        points=points, max_points=mp, achieved=achieved, no_data=False
+    ), points
+
+
+def _compute_separation_alert_criterion(data: dict) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Separation Alert Health."""
+    mp = CRITERIA_CONFIG["Separation Alert Health"]["max_points"]
+    total_txns = data["total_txns"]
+    active_alert_count = data["active_alert_count"]
+
+    if total_txns == 0:
+        return HealthScoreCriterion(
+            name="Separation Alert Health", description="No transactions to monitor for separation yet",
+            points=0, max_points=mp, achieved=False, no_data=True
+        ), 0
+
+    if active_alert_count == 0:
+        return HealthScoreCriterion(
+            name="Separation Alert Health", description="No active separation alerts",
+            points=mp, max_points=mp, achieved=True, no_data=False
+        ), mp
+
+    points = max(0, mp - active_alert_count * 3)
+    desc = f"{active_alert_count} active separation alert(s)"
+    return HealthScoreCriterion(
+        name="Separation Alert Health", description=desc,
+        points=points, max_points=mp, achieved=False, no_data=False
+    ), points
+
+
+def _score_to_color(final_score: int) -> HealthColor:
+    """Map a numeric score to a HealthColor."""
+    if final_score >= 96:
+        return HealthColor.green
+    if final_score >= 72:
+        return HealthColor.yellow
+    return HealthColor.red
+
+
 def _compute_health_score(data: dict) -> dict:
     """Pure sync: compute criteria, points, color from gathered data. No DB calls."""
     now = data["now"]
     criteria = []
     total_score = 0
 
-    # 1. Quarterly Minutes (+15)
-    mp = CRITERIA_CONFIG["Quarterly Minutes"]["max_points"]
-    quarterly_achieved = data["quarterly_minutes"] > 0
-    q_points = mp if quarterly_achieved else 0
-    criteria.append(HealthScoreCriterion(
-        name="Quarterly Minutes",
-        description="Minutes generated this quarter",
-        points=q_points,
-        max_points=mp,
-        achieved=quarterly_achieved,
-        no_data=False
-    ))
-    total_score += q_points
+    # 1–8: compute each criterion via dedicated helpers
+    c, pts = _compute_quarterly_minutes_criterion(data)
+    criteria.append(c); total_score += pts
 
-    # 2. Task Compliance (+15)
-    mp = CRITERIA_CONFIG["Task Compliance"]["max_points"]
-    total_tasks = data["total_tasks"]
-    overdue_tasks = data["overdue_tasks"]
-    if total_tasks > 0:
-        task_compliance = overdue_tasks == 0
-        task_points = mp if task_compliance else max(0, mp - (overdue_tasks * 3))
-    else:
-        task_compliance = None
-        task_points = 0
-    criteria.append(HealthScoreCriterion(
-        name="Task Compliance",
-        description="No overdue governance tasks" if total_tasks > 0 else "No governance tasks tracked yet",
-        points=task_points,
-        max_points=mp,
-        achieved=task_compliance if task_compliance is not None else False,
-        no_data=total_tasks == 0
-    ))
-    total_score += task_points
+    c, pts = _compute_task_compliance_criterion(data)
+    criteria.append(c); total_score += pts
 
-    # 3. Compensation Alignment (+15)
-    mp = CRITERIA_CONFIG["Compensation Alignment"]["max_points"]
-    comp_plan = data["comp_plan"]
-    if comp_plan:
-        comp_aligned = data["ytd_total"] <= data["approved_amount"]
-        comp_points = mp if comp_aligned else 0
-    else:
-        comp_aligned = None
-        comp_points = 0
-    criteria.append(HealthScoreCriterion(
-        name="Compensation Alignment",
-        description="YTD compensation within approved plan" if comp_plan else "No compensation plan set up yet",
-        points=comp_points,
-        max_points=mp,
-        achieved=comp_aligned if comp_aligned is not None else False,
-        no_data=comp_plan is None
-    ))
-    total_score += comp_points
+    c, pts = _compute_compensation_criterion(data)
+    criteria.append(c); total_score += pts
 
-    # 4. Distribution Documentation (+15)
-    mp = CRITERIA_CONFIG["Distribution Documentation"]["max_points"]
-    dist_count = data["dist_count"]
-    benevolence_dists = data["benevolence_dists"]
-    benevolence_count = len(benevolence_dists)
-    incomplete_benevolence = 0
-    for bd in benevolence_dists:
-        if not bd.get("benevolence_recipient_name") or not bd.get("benevolence_need_description"):
-            incomplete_benevolence += 1
-        elif not bd.get("approved_at") and not bd.get("minutes_record_id"):
-            incomplete_benevolence += 1
+    c, pts = _compute_distribution_criterion(data)
+    criteria.append(c); total_score += pts
 
-    if dist_count == 0:
-        dist_documented = False
-        dist_points = 0
-        dist_description = "No distributions logged"
-    elif benevolence_count > 0 and incomplete_benevolence > 0:
-        dist_documented = True
-        completeness_ratio = (benevolence_count - incomplete_benevolence) / benevolence_count
-        dist_points = int(mp * (0.5 + 0.5 * completeness_ratio))
-        dist_description = f"Distributions logged; {incomplete_benevolence}/{benevolence_count} benevolence distributions need documentation"
-    else:
-        dist_documented = True
-        dist_points = mp
-        if benevolence_count > 0:
-            dist_description = f"All distributions documented ({benevolence_count} benevolence distributions fully documented)"
-        else:
-            dist_description = "Distributions logged"
-    criteria.append(HealthScoreCriterion(
-        name="Distribution Documentation",
-        description=dist_description,
-        points=dist_points,
-        max_points=mp,
-        achieved=dist_documented,
-        no_data=dist_count == 0
-    ))
-    total_score += dist_points
+    c, pts = _compute_annual_review_criterion(data, now)
+    criteria.append(c); total_score += pts
 
-    # 5. Annual Review (+15)
-    mp = CRITERIA_CONFIG["Annual Review"]["max_points"]
-    annual_done = data["annual_review"] is not None
-    annual_points = mp if annual_done else 0
-    # Suppress insight for new trusts (created <90 days ago) — no annual review is due yet
-    trust_created_at = data.get("trust_created_at")
-    is_new_trust = False
-    if trust_created_at:
-        try:
-            created = datetime.fromisoformat(trust_created_at.replace("Z", "+00:00")) if "T" in trust_created_at else datetime.fromisoformat(trust_created_at).replace(tzinfo=timezone.utc)
-            is_new_trust = (now - created).days < 90
-        except (ValueError, TypeError):
-            pass
-    criteria.append(HealthScoreCriterion(
-        name="Annual Review",
-        description="Annual review completed in last 12 months" if not is_new_trust else "Annual review not due yet — schedule it for later",
-        points=annual_points,
-        max_points=mp,
-        achieved=annual_done,
-        no_data=is_new_trust
-    ))
-    total_score += annual_points
+    c, pts = _compute_asset_valuation_criterion(data)
+    criteria.append(c); total_score += pts
 
-    # 6. Asset Valuation Freshness (+15)
-    mp = CRITERIA_CONFIG["Asset Valuation Freshness"]["max_points"]
-    active_assets = data["active_assets"]
-    twelve_months_ago = data["twelve_months_ago"]
-    total_assets = len(active_assets)
-    if total_assets == 0:
-        av_points = 0
-        av_achieved = False
-        av_desc = "No assets on Schedule A yet"
-        av_no_data = True
-    else:
-        stale_count = 0
-        for asset in active_assets:
-            valuation_ref_str = asset.get("last_valued_date") or asset.get("date_conveyed")
-            if not valuation_ref_str:
-                stale_count += 1
-                continue
-            try:
-                valuation_ref = datetime.fromisoformat(valuation_ref_str.replace("Z", "+00:00")) if "T" in valuation_ref_str else datetime.fromisoformat(valuation_ref_str).replace(tzinfo=timezone.utc)
-            except (ValueError, TypeError):
-                stale_count += 1
-                continue
-            if valuation_ref < twelve_months_ago:
-                stale_count += 1
-        fresh_count = total_assets - stale_count
-        if stale_count == 0:
-            av_points = mp
-            av_achieved = True
-        else:
-            av_points = int(mp * fresh_count / total_assets)
-            av_achieved = False
-        av_desc = f"{stale_count} of {total_assets} asset(s) need re-valuation (last valued >12 months ago)"
-        av_no_data = False
-    criteria.append(HealthScoreCriterion(
-        name="Asset Valuation Freshness",
-        description=av_desc,
-        points=av_points,
-        max_points=mp,
-        achieved=av_achieved,
-        no_data=av_no_data
-    ))
-    total_score += av_points
+    c, pts = _compute_transaction_classification_criterion(data)
+    criteria.append(c); total_score += pts
 
-    # 7. Transaction Classification (+15)
-    mp = CRITERIA_CONFIG["Transaction Classification"]["max_points"]
-    total_txns = data["total_txns"]
-    classified_txns = data["classified_txns"]
-    if total_txns == 0:
-        tc_points = 0
-        tc_achieved = False
-        tc_desc = "No transactions to classify yet"
-        tc_no_data = True
-    else:
-        classified_ratio = classified_txns / total_txns
-        tc_points = int(mp * classified_ratio)
-        tc_achieved = classified_ratio >= 1.0
-        tc_desc = f"{classified_txns}/{total_txns} transactions classified"
-        tc_no_data = False
-    criteria.append(HealthScoreCriterion(
-        name="Transaction Classification",
-        description=tc_desc,
-        points=tc_points,
-        max_points=mp,
-        achieved=tc_achieved,
-        no_data=tc_no_data
-    ))
-    total_score += tc_points
-
-    # 8. Separation Alert Health (+15)
-    mp = CRITERIA_CONFIG["Separation Alert Health"]["max_points"]
-    total_txns = data["total_txns"]
-    active_alert_count = data["active_alert_count"]
-    if total_txns == 0:
-        sa_points = 0
-        sa_achieved = False
-        sa_desc = "No transactions to monitor for separation yet"
-        sa_no_data = True
-    elif active_alert_count == 0:
-        sa_points = mp
-        sa_achieved = True
-        sa_desc = "No active separation alerts"
-        sa_no_data = False
-    else:
-        sa_points = max(0, mp - active_alert_count * 3)
-        sa_achieved = False
-        sa_desc = f"{active_alert_count} active separation alert(s)"
-        sa_no_data = False
-    criteria.append(HealthScoreCriterion(
-        name="Separation Alert Health",
-        description=sa_desc,
-        points=sa_points,
-        max_points=mp,
-        achieved=sa_achieved,
-        no_data=sa_no_data
-    ))
-    total_score += sa_points
+    c, pts = _compute_separation_alert_criterion(data)
+    criteria.append(c); total_score += pts
 
     # --- Risk Penalty (separate from criteria) ---
     risk_findings = data.get("risk_findings", [])
@@ -536,13 +583,7 @@ def _compute_health_score(data: dict) -> dict:
     else:
         final_score = max(0, base_score + total_penalty)
 
-    # Color from final_score
-    if final_score >= 96:
-        color = HealthColor.green
-    elif final_score >= 72:
-        color = HealthColor.yellow
-    else:
-        color = HealthColor.red
+    color = _score_to_color(final_score)
 
     return {
         "criteria": criteria,
@@ -810,104 +851,103 @@ async def get_dashboard_stats(trust_id: str, user_id: str) -> DashboardStats:
     )
 
 
+_ONBOARDING_DEFAULTS = {
+    "user_id": None,
+    "formation_date_added": False,
+    "ein_entered": False,
+    "trust_doc_uploaded": False,
+    "ein_doc_uploaded": False,
+    "beneficiaries_added": False,
+    "assets_added": False,
+    "minutes_generated": False,
+    "calendar_set": False,
+    "checklist_dismissed": False,
+    "successor_trustee_added": False
+}
+
+_AUTO_SEEDED_TASK_TYPES = {"annual_review", "quarterly_review", "compensation_review", "asset_revaluation"}
+
+
+def _should_update(existing_val: bool, detected: bool, manual_overrides: dict, key: str) -> bool:
+    """Check if an onboarding field should be updated (not manually overridden, and value changed)."""
+    return key not in manual_overrides and detected != existing_val
+
+
+async def _detect_onboarding_updates(user_id: str, trust_id: str, existing: dict) -> dict:
+    """Check actual DB data and return fields that need updating."""
+    updates = {}
+    manual_overrides = existing.get("manual_overrides", {})
+
+    # Trust profile fields
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+    if trust:
+        checks = [
+            ("formation_date_added", bool(trust.get("start_date"))),
+            ("ein_entered", bool(trust.get("ein"))),
+            ("successor_trustee_added", bool(trust.get("successor_trustee_name"))),
+        ]
+        for key, detected in checks:
+            if _should_update(existing.get(key), detected, manual_overrides, key):
+                updates[key] = detected
+
+    # Document uploads
+    doc_checks = [
+        ("trust_doc_uploaded", ["trust_instrument", "trust_document", "declaration_of_trust"]),
+        ("ein_doc_uploaded", ["ein_letter", "irs_notice"]),
+    ]
+    for key, categories in doc_checks:
+        count = await db.vault_documents.count_documents({
+            "trust_id": trust_id, "user_id": user_id, "category": {"$in": categories}
+        })
+        if _should_update(existing.get(key), count > 0, manual_overrides, key):
+            updates[key] = count > 0
+
+    # Beneficiaries
+    beneficiary_count = await db.trust_unit_certificates.count_documents({
+        "trust_id": trust_id, "user_id": user_id, "status": "active"
+    })
+    if _should_update(existing.get("beneficiaries_added"), beneficiary_count > 0, manual_overrides, "beneficiaries_added"):
+        updates["beneficiaries_added"] = beneficiary_count > 0
+
+    # Assets via entities
+    entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
+    if _should_update(existing.get("assets_added"), entity_count > 0, manual_overrides, "assets_added"):
+        updates["assets_added"] = entity_count > 0
+
+    # Calendar — only count user-created tasks, not auto-seeded ones
+    user_task_count = await db.governance_tasks.count_documents({
+        "trust_id": trust_id, "user_id": user_id,
+        "task_type": {"$nin": list(_AUTO_SEEDED_TASK_TYPES | {"custom"})}
+    })
+    if _should_update(existing.get("calendar_set"), user_task_count > 0, manual_overrides, "calendar_set"):
+        updates["calendar_set"] = user_task_count > 0
+
+    # Minutes
+    minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
+    templates_count = await db.minutes_templates.count_documents({"trust_id": trust_id, "user_id": user_id})
+    has_minutes = minutes_count > 0 or templates_count > 0
+    if _should_update(existing.get("minutes_generated"), has_minutes, manual_overrides, "minutes_generated"):
+        updates["minutes_generated"] = has_minutes
+
+    return updates
+
+
 async def get_onboarding_state(user_id: str, trust_id: Optional[str] = None) -> OnboardingState:
     """Get user's onboarding state, auto-updating based on their activity."""
     existing = await db.user_onboarding.find_one({"user_id": user_id}, {"_id": 0})
-    
+
     if not existing:
-        existing = {
-            "user_id": user_id,
-            "formation_date_added": False,
-            "ein_entered": False,
-            "trust_doc_uploaded": False,
-            "ein_doc_uploaded": False,
-            "beneficiaries_added": False,
-            "assets_added": False,
-            "minutes_generated": False,
-            "calendar_set": False,
-            "checklist_dismissed": False,
-            "successor_trustee_added": False
-        }
+        existing = dict(_ONBOARDING_DEFAULTS, user_id=user_id)
         await db.user_onboarding.insert_one(existing)
-    
+
     # Auto-check based on actual data if trust_id provided
-    # Bidirectional: sets True when data exists, resets False when data is gone
-    # Manual overrides skip auto-detection — user's choice is preserved.
-    manual_overrides = existing.get("manual_overrides", {})
     if trust_id:
-        updates = {}
-        
-        # Check trust profile completion (formation date + EIN)
-        trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
-        if trust:
-            has_formation = bool(trust.get("start_date"))
-            has_ein = bool(trust.get("ein"))
-            if "formation_date_added" not in manual_overrides and has_formation != existing.get("formation_date_added"):
-                updates["formation_date_added"] = has_formation
-            if "ein_entered" not in manual_overrides and has_ein != existing.get("ein_entered"):
-                updates["ein_entered"] = has_ein
-            has_successor = bool(trust.get("successor_trustee_name"))
-            if "successor_trustee_added" not in manual_overrides and has_successor != existing.get("successor_trustee_added"):
-                updates["successor_trustee_added"] = has_successor
-        
-        # Check document uploads in vault
-        trust_doc_count = await db.vault_documents.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "category": {"$in": ["trust_instrument", "trust_document", "declaration_of_trust"]}
-        })
-        if "trust_doc_uploaded" not in manual_overrides and bool(trust_doc_count > 0) != existing.get("trust_doc_uploaded"):
-            updates["trust_doc_uploaded"] = trust_doc_count > 0
-        
-        ein_doc_count = await db.vault_documents.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "category": {"$in": ["ein_letter", "irs_notice"]}
-        })
-        if "ein_doc_uploaded" not in manual_overrides and bool(ein_doc_count > 0) != existing.get("ein_doc_uploaded"):
-            updates["ein_doc_uploaded"] = ein_doc_count > 0
-        
-        # Check beneficiaries (stored in trust_unit_certificates, not db.beneficiaries)
-        beneficiary_count = await db.trust_unit_certificates.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "status": "active"
-        })
-        if "beneficiaries_added" not in manual_overrides and bool(beneficiary_count > 0) != existing.get("beneficiaries_added"):
-            updates["beneficiaries_added"] = beneficiary_count > 0
-        
-        # Check assets (via entities) — auto-created entity from trust creation counts
-        entity_count = await db.entities.count_documents({"trust_id": trust_id, "user_id": user_id})
-        if "assets_added" not in manual_overrides and bool(entity_count > 0) != existing.get("assets_added"):
-            updates["assets_added"] = entity_count > 0
-        
-        # Check governance tasks (calendar) — only count tasks the USER created,
-        # NOT the auto-seeded ones from create_initial_governance_tasks
-        # (annual_review, quarterly_review, compensation_review, asset_revaluation)
-        auto_seeded_types = {"annual_review", "quarterly_review", "compensation_review", "asset_revaluation"}
-        user_task_count = await db.governance_tasks.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "task_type": {"$nin": list(auto_seeded_types | {"custom"})}
-        })
-        if "calendar_set" not in manual_overrides and bool(user_task_count > 0) != existing.get("calendar_set"):
-            updates["calendar_set"] = user_task_count > 0
-        
-        # Check minutes (both records from unified flow and templates from template form)
-        minutes_count = await db.minutes_records.count_documents({"trust_id": trust_id, "user_id": user_id})
-        templates_count = await db.minutes_templates.count_documents({"trust_id": trust_id, "user_id": user_id})
-        has_minutes = minutes_count > 0 or templates_count > 0
-        if "minutes_generated" not in manual_overrides and has_minutes != existing.get("minutes_generated"):
-            updates["minutes_generated"] = has_minutes
-        
+        updates = await _detect_onboarding_updates(user_id, trust_id, existing)
         if updates:
             updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-            await db.user_onboarding.update_one(
-                {"user_id": user_id},
-                {"$set": updates}
-            )
+            await db.user_onboarding.update_one({"user_id": user_id}, {"$set": updates})
             existing = await db.user_onboarding.find_one({"user_id": user_id}, {"_id": 0})
-    
+
     return OnboardingState(**existing)
 
 
