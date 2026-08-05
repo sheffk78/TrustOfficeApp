@@ -2,12 +2,12 @@ import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { 
-  LayoutDashboard, 
-  FilePen, 
-  Coins, 
-  Receipt, 
-  Scale, 
+import {
+  LayoutDashboard,
+  FilePen,
+  Coins,
+  Receipt,
+  Scale,
   Settings,
   LogOut,
   Menu,
@@ -99,6 +99,210 @@ const ALL_ITEMS = NAV_GROUPS.flatMap(g => g.items);
 const SIDEBAR_SCROLL_KEY = 'sidebar-scroll';
 const SIDEBAR_GROUPS_KEY = 'sidebar-expanded-groups';
 
+// Paths that match by prefix (not just exact equality)
+const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities']);
+
+/**
+ * Check whether a nav item path matches the current pathname.
+ * Exact match always wins. For paths in PREFIX_PATHS, also matches by prefix.
+ */
+const isPathActive = (itemPath, pathname) => {
+  if (pathname === itemPath) return true;
+  // /entities matches the /structures group (same nav section)
+  if (itemPath === '/structures' && (pathname.startsWith('/structures') || pathname.startsWith('/entities'))) {
+    return true;
+  }
+  if (itemPath === '/minutes' && pathname.startsWith('/minutes')) return true;
+  // /course matches by prefix so sub-routes highlight the nav item
+  if (itemPath === '/course' && pathname.startsWith('/course')) return true;
+  return false;
+};
+
+/**
+ * Check whether an item is visible given the current trust's benevolence flag.
+ */
+const isItemVisible = (item, selectedTrust) => {
+  if (item.requiresBenevolence && !selectedTrust?.benevolence_enabled) return false;
+  return true;
+};
+
+/**
+ * Resolve the link target path for a single-item (no children) nav group.
+ */
+const resolveSingleGroupPath = (groupKey) => {
+  switch (groupKey) {
+    case 'dashboard': return '/dashboard';
+    case 'score': return '/governance';
+    case 'trust-assistant': return '/trust-assistant';
+    case 'course': return '/course';
+    default: return '/settings';
+  }
+};
+
+// ─── Sub-components ────────────────────────────────────────────────
+
+const NavBadge = ({ badge, variant = 'gold' }) => {
+  const base = 'px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider';
+  const styles = variant === 'solid'
+    ? 'bg-gold text-navy font-bold'
+    : 'bg-gold/20 text-gold';
+  return <span className={`${base} ${styles}`}>{badge}</span>;
+};
+
+const StandaloneNavItem = ({ group, pathname, onClick }) => {
+  const GroupIcon = group.icon;
+  const path = resolveSingleGroupPath(group.key);
+  const isActive = isPathActive(path, pathname);
+
+  return (
+    <div>
+      <Link
+        to={path}
+        className={`sidebar-item ${group.standout ? 'sidebar-item-standout' : ''} ${isActive ? 'active' : ''}`}
+        onClick={onClick}
+        data-testid={`nav-${group.key}`}
+      >
+        <GroupIcon className={`w-5 h-5 ${group.standout ? 'text-gold' : ''}`} />
+        <span className="flex items-center gap-2">
+          {group.label}
+          {group.badge && <NavBadge badge={group.badge} variant="solid" />}
+        </span>
+      </Link>
+      {/* Divider after Trustee 101 separates hero items from core nav */}
+      {group.key === 'course' && <div className="sidebar-section-divider" />}
+    </div>
+  );
+};
+
+const NavGroupItem = ({ group, pathname, selectedTrust, isExpanded, onToggle, onLinkClick }) => {
+  const GroupIcon = group.icon;
+  const visibleItems = group.items.filter(item => isItemVisible(item, selectedTrust));
+  const hasActiveChild = visibleItems.some(item => isPathActive(item.path, pathname));
+
+  return (
+    <div className="mb-1">
+      <button
+        onClick={() => onToggle(group.key)}
+        className={`sidebar-item w-full justify-between ${hasActiveChild ? 'text-gold' : ''}`}
+        data-testid={`nav-group-${group.key}`}
+        aria-expanded={isExpanded}
+      >
+        <div className="flex items-center gap-3">
+          <GroupIcon className="w-5 h-5" />
+          <span>{group.label}</span>
+        </div>
+        <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+      </button>
+
+      {isExpanded && (
+        <div className="ml-4 border-l border-white/10">
+          {visibleItems.map((item) => {
+            const ItemIcon = item.icon;
+            const isActive = isPathActive(item.path, pathname);
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`sidebar-item pl-6 py-2 ${isActive ? 'active' : ''}`}
+                onClick={onLinkClick}
+                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                title={item.tooltip}
+              >
+                <ItemIcon className="w-4 h-4" />
+                <span className="flex items-center gap-2">
+                  {item.label}
+                  {item.badge && <NavBadge badge={item.badge} />}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StaffLink = ({ to, label, badge, icon: Icon, pathname, onClick, testId }) => {
+  const isActive = pathname === to;
+  return (
+    <Link
+      to={to}
+      className={`sidebar-item ${isActive ? 'active' : ''}`}
+      onClick={onClick}
+      data-testid={testId}
+    >
+      <Icon className="w-5 h-5" />
+      <span className="flex items-center gap-2">
+        {label}
+        <NavBadge badge={badge} />
+      </span>
+    </Link>
+  );
+};
+
+const TrustSelector = ({ trusts, selectedTrust, onSelect }) => (
+  <div className="sidebar-trust-selector">
+    <p className="font-mono text-[9px] uppercase tracking-widest text-white/40 mb-2">
+      Active Trust
+    </p>
+    <DropdownMenu>
+      <DropdownMenuTrigger className="w-full text-left p-3 bg-white/5 hover:bg-white/10 flex items-center justify-between border border-white/15" data-testid="trust-selector">
+        <span className="font-mono text-sm text-white truncate">
+          {selectedTrust?.name || 'Select Trust'}
+        </span>
+        <ChevronDown className="w-4 h-4 text-white/60" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {trusts.map((trust) => (
+          <DropdownMenuItem
+            key={trust.trust_id}
+            onClick={() => onSelect(trust)}
+            className="font-mono text-sm"
+            data-testid={`trust-option-${trust.trust_id}`}
+          >
+            {trust.name}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  </div>
+);
+
+const UserSection = ({ user, onLogout }) => (
+  <div className="p-4 border-t border-white/10">
+    {/* Notification center moved to Admin page */}
+    <div className="flex items-center gap-3 mb-4">
+      {user?.picture ? (
+        <img src={user.picture} alt={user.name} className="w-10 h-10 object-cover" />
+      ) : (
+        <div className="w-10 h-10 bg-gold flex items-center justify-center">
+          <span className="font-serif font-bold text-[#010079]">
+            {user?.name?.charAt(0) || 'U'}
+          </span>
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-white text-sm font-medium truncate">{user?.name}</p>
+        <p className="font-mono text-[10px] text-white/40 truncate">{user?.email}</p>
+      </div>
+    </div>
+
+    {/* Theme Toggle */}
+    <ThemeToggle className="text-white/60 hover:text-white w-full mb-3" />
+
+    <button
+      onClick={onLogout}
+      className="flex items-center gap-2 text-white/60 hover:text-white w-full"
+      data-testid="logout-btn"
+    >
+      <LogOut className="w-4 h-4" />
+      <span className="font-mono text-xs uppercase tracking-widest">Sign Out</span>
+    </button>
+  </div>
+);
+
+// ─── Main component ────────────────────────────────────────────────
+
 export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -106,17 +310,14 @@ export const Sidebar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef(null);
   const scrollTimer = useRef(null);
-  
+
   // Determine which group should be expanded based on current route
-  const activeGroup = NAV_GROUPS.find(g => 
-    g.items.some(item => 
-      location.pathname === item.path || 
-      (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
-      (item.path === '/structures' && location.pathname.startsWith('/structures')) ||
-      (item.path === '/structures' && location.pathname.startsWith('/entities'))
+  const activeGroup = NAV_GROUPS.find(g =>
+    g.items.some(item =>
+      isPathActive(item.path, location.pathname)
     )
   )?.key || null;
-  
+
   // Initialize expandedGroups from sessionStorage (survives remount) or fall back to active group
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
@@ -181,7 +382,7 @@ export const Sidebar = () => {
       } catch (e) { /* ignore */ }
     }
   };
-  
+
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
 
   const handleLogout = async () => {
@@ -189,8 +390,9 @@ export const Sidebar = () => {
     navigate('/');
   };
 
-  const handleTrustSelect = (trust) => {
-    setSelectedTrust(trust);
+  const handleLinkClick = () => {
+    saveScrollPosition();
+    setMobileOpen(false);
   };
 
   return (
@@ -205,7 +407,7 @@ export const Sidebar = () => {
       </button>
 
       {/* Mobile overlay */}
-      <div 
+      <div
         className={`sidebar-overlay ${mobileOpen ? 'open' : ''}`}
         onClick={() => setMobileOpen(false)}
       />
@@ -223,7 +425,7 @@ export const Sidebar = () => {
         {/* Logo */}
         <div className="p-6 border-b border-white/10">
           <Link to="/dashboard" className="block">
-            <img 
+            <img
               src="/assets/trustoffice-logo-vertical.svg"
               alt="TrustOffice"
               className="h-8 cursor-pointer hover:opacity-80 transition-opacity"
@@ -234,206 +436,72 @@ export const Sidebar = () => {
 
         {/* Trust selector */}
         {trusts.length > 0 && (
-          <div className="sidebar-trust-selector">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-white/40 mb-2">
-              Active Trust
-            </p>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="w-full text-left p-3 bg-white/5 hover:bg-white/10 flex items-center justify-between border border-white/15" data-testid="trust-selector">
-                <span className="font-mono text-sm text-white truncate">
-                  {selectedTrust?.name || 'Select Trust'}
-                </span>
-                <ChevronDown className="w-4 h-4 text-white/60" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                {trusts.map((trust) => (
-                  <DropdownMenuItem
-                    key={trust.trust_id}
-                    onClick={() => handleTrustSelect(trust)}
-                    className="font-mono text-sm"
-                    data-testid={`trust-option-${trust.trust_id}`}
-                  >
-                    {trust.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <TrustSelector
+            trusts={trusts}
+            selectedTrust={selectedTrust}
+            onSelect={setSelectedTrust}
+          />
         )}
 
         {/* Navigation */}
         <nav ref={navRef} onScroll={handleNavScroll} className="flex-1 py-4 overflow-y-auto">
           {NAV_GROUPS.map((group) => {
-            const GroupIcon = group.icon;
             const isExpanded = expandedGroups[group.key];
-            
-            // Single-item groups (Dashboard, Trust Assistant, Score, Settings) render directly
+
+            // Single-item groups render directly
             if (group.items.length === 0) {
-              const path = group.key === 'dashboard' ? '/dashboard' 
-                : group.key === 'score' ? '/governance' 
-                : group.key === 'trust-assistant' ? '/trust-assistant'
-                : group.key === 'course' ? '/course'
-                : '/settings';
-              const isActive = location.pathname === path || (path === '/course' && location.pathname.startsWith('/course'));
-              
               return (
-                <div key={group.key}>
-                  <Link
-                    to={path}
-                    className={`sidebar-item ${group.standout ? 'sidebar-item-standout' : ''} ${isActive ? 'active' : ''}`}
-                    onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
-                    data-testid={`nav-${group.key}`}
-                  >
-                    <GroupIcon className={`w-5 h-5 ${group.standout ? 'text-gold' : ''}`} />
-                    <span className="flex items-center gap-2">
-                      {group.label}
-                      {group.badge && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold text-navy font-bold">
-                          {group.badge}
-                        </span>
-                      )}
-                    </span>
-                  </Link>
-                  {/* Divider after Trustee 101 separates hero items from core nav */}
-                  {group.key === 'course' && (
-                    <div className="sidebar-section-divider" />
-                  )}
-                </div>
+                <StandaloneNavItem
+                  key={group.key}
+                  group={group}
+                  pathname={location.pathname}
+                  onClick={handleLinkClick}
+                />
               );
             }
-            
+
             // Grouped items with accordion
-            const hasActiveChild = group.items.some(item => {
-              if (item.requiresBenevolence && !selectedTrust?.benevolence_enabled) return false;
-              return location.pathname === item.path || 
-                (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
-                (item.path === '/structures' && location.pathname.startsWith('/structures')) ||
-                (item.path === '/structures' && location.pathname.startsWith('/entities'));
-            });
-            
             return (
-              <div key={group.key} className="mb-1">
-                <button
-                  onClick={() => toggleGroup(group.key)}
-                  className={`sidebar-item w-full justify-between ${hasActiveChild ? 'text-gold' : ''}`}
-                  data-testid={`nav-group-${group.key}`}
-                  aria-expanded={isExpanded}
-                >
-                  <div className="flex items-center gap-3">
-                    <GroupIcon className="w-5 h-5" />
-                    <span>{group.label}</span>
-                  </div>
-                  <ChevronRight 
-                    className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
-                  />
-                </button>
-                
-                {isExpanded && (
-                  <div className="ml-4 border-l border-white/10">
-                    {group.items
-                      .filter(item => !item.requiresBenevolence || selectedTrust?.benevolence_enabled)
-                      .map((item) => {
-                        const ItemIcon = item.icon;
-                        const isActive = location.pathname === item.path || 
-                          (item.path === '/minutes' && location.pathname.startsWith('/minutes')) ||
-                          (item.path === '/structures' && location.pathname.startsWith('/structures')) ||
-                          (item.path === '/structures' && location.pathname.startsWith('/entities'));
-                        
-                        return (
-                          <Link
-                            key={item.path}
-                            to={item.path}
-                            className={`sidebar-item pl-6 py-2 ${isActive ? 'active' : ''}`}
-                            onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
-                            data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                            title={item.tooltip}
-                          >
-                            <ItemIcon className="w-4 h-4" />
-                            <span className="flex items-center gap-2">
-                              {item.label}
-                              {item.badge && (
-                                <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
-                                  {item.badge}
-                                </span>
-                              )}
-                            </span>
-                          </Link>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
+              <NavGroupItem
+                key={group.key}
+                group={group}
+                pathname={location.pathname}
+                selectedTrust={selectedTrust}
+                isExpanded={isExpanded}
+                onToggle={toggleGroup}
+                onLinkClick={handleLinkClick}
+              />
             );
           })}
-          
+
           {/* Admin link - only visible to admins */}
           {isAdmin && (
-            <Link
+            <StaffLink
               to="/admin"
-              className={`sidebar-item ${location.pathname === '/admin' ? 'active' : ''}`}
-              onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
-              data-testid="nav-admin"
-            >
-              <Crown className="w-5 h-5" />
-              <span className="flex items-center gap-2">
-                Admin
-                <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
-                  staff
-                </span>
-              </span>
-            </Link>
+              label="Admin"
+              badge="staff"
+              icon={Crown}
+              pathname={location.pathname}
+              onClick={handleLinkClick}
+              testId="nav-admin"
+            />
           )}
-          
+
           {/* Stats link - visible to stats users. Appears next to Admin */}
-          {(user?.is_stats_user) && (
-            <Link
+          {user?.is_stats_user && (
+            <StaffLink
               to="/stats"
-              className={`sidebar-item ${location.pathname === '/stats' ? 'active' : ''}`}
-              onClick={() => { saveScrollPosition(); setMobileOpen(false); }}
-              data-testid="nav-stats"
-            >
-              <BarChart3 className="w-5 h-5" />
-              <span className="flex items-center gap-2">
-                Stats
-                <span className="px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider bg-gold/20 text-gold">
-                  view
-                </span>
-              </span>
-            </Link>
+              label="Stats"
+              badge="view"
+              icon={BarChart3}
+              pathname={location.pathname}
+              onClick={handleLinkClick}
+              testId="nav-stats"
+            />
           )}
         </nav>
 
-        {/* User section */}
-        <div className="p-4 border-t border-white/10">
-          {/* Notification center moved to Admin page */}
-          <div className="flex items-center gap-3 mb-4">
-            {user?.picture ? (
-              <img src={user.picture} alt={user.name} className="w-10 h-10 object-cover" />
-            ) : (
-              <div className="w-10 h-10 bg-gold flex items-center justify-center">
-                <span className="font-serif font-bold text-[#010079]">
-                  {user?.name?.charAt(0) || 'U'}
-                </span>
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-medium truncate">{user?.name}</p>
-              <p className="font-mono text-[10px] text-white/40 truncate">{user?.email}</p>
-            </div>
-          </div>
-          
-          {/* Theme Toggle */}
-          <ThemeToggle className="text-white/60 hover:text-white w-full mb-3" />
-          
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-white/60 hover:text-white w-full"
-            data-testid="logout-btn"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase tracking-widest">Sign Out</span>
-          </button>
-        </div>
+        <UserSection user={user} onLogout={handleLogout} />
       </aside>
     </>
   );
