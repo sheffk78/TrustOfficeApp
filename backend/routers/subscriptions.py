@@ -281,6 +281,23 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
     # WingPoint plan is annual-only
     if checkout.plan_type == "wingpoint" and billing_period != "annual":
         raise HTTPException(status_code=400, detail="WingPoint plan is annual-only.")
+
+    # WingPoint eligibility guard — only WingPoint customers can purchase
+    # the wingpoint plan. Checks wp_ref, source, or created_via on the
+    # user document. Prevents non-WingPoint users from accessing the
+    # discounted rate via a direct API call.
+    if checkout.plan_type == "wingpoint":
+        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+        is_wingpoint = user_doc and (
+            user_doc.get("wp_ref")
+            or user_doc.get("source") == "wingpoint"
+            or user_doc.get("created_via") == "wingpoint_provision"
+        )
+        if not is_wingpoint:
+            raise HTTPException(
+                status_code=403,
+                detail="The WingPoint plan is only available to WingPoint customers."
+            )
     
     # Get price_id from lookup
     if checkout.plan_type in valid_new_plans:

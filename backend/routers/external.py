@@ -648,6 +648,12 @@ async def provision_trustoffice(
     if existing_user:
         user_id = existing_user["user_id"]
         logger.info(f"Provision: Adding trust to existing user {user_id} ({email})")
+        # Ensure WingPoint attribution is stamped on the existing user
+        if not existing_user.get("wp_ref") and request.wingpoint_ref:
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$set": {"wp_ref": request.wingpoint_ref}},
+            )
     else:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
         user_doc = {
@@ -659,6 +665,7 @@ async def provision_trustoffice(
             "created_at": now.isoformat(),
             "created_via": "wingpoint_provision",
             "source": "wingpoint",
+            "wp_ref": request.wingpoint_ref,
             "grantor_first_name": request.grantor_first_name,
             "grantor_middle_name": request.grantor_middle_name,
             "grantor_last_name": request.grantor_last_name,

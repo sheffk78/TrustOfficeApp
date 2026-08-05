@@ -210,7 +210,9 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
         email=user.email,
         name=user.name,
         picture=None,
-        created_at=user_doc["created_at"]
+        created_at=user_doc["created_at"],
+        wp_ref=user_doc.get("wp_ref"),
+        is_wingpoint=bool(user_doc.get("wp_ref")),
     )
 
 
@@ -523,7 +525,13 @@ async def get_me(user: dict = Depends(get_current_user)):
         picture=user.get("picture"),
         created_at=user.get("created_at", ""),
         is_admin=is_admin,
-        is_stats_user=is_stats_user
+        is_stats_user=is_stats_user,
+        wp_ref=user.get("wp_ref"),
+        is_wingpoint=bool(
+            user.get("wp_ref")
+            or user.get("source") == "wingpoint"
+            or user.get("created_via") == "wingpoint_provision"
+        ),
     )
 
 
@@ -902,6 +910,15 @@ async def connect_wingpoint_confirm(
         CONNECT_TOKEN_SECRET,
         algorithm=JWT_ALGORITHM,
     )
+
+    # Persist wp_ref on the user doc so the WingPoint attribution survives
+    # beyond the JWT. Without this, /auth/me can't detect WingPoint customers
+    # who connected (the wp_ref was only in the connect_token JWT, never saved).
+    if body.wp_ref:
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"wp_ref": body.wp_ref}},
+        )
 
     # Audit the connection confirmation
     await log_audit_event(
