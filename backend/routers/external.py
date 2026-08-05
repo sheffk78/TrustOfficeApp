@@ -778,10 +778,20 @@ async def provision_trustoffice(
     }
 
     # Check for duplicate trust from same wingpoint_ref (race condition guard)
-    _existing_trust = await db.trusts.find_one({"wingpoint_ref": request.wingpoint_ref}, {"trust_id": 1, "_id": 0})
+    _existing_trust = await db.trusts.find_one({"wingpoint_ref": request.wingpoint_ref}, {"trust_id": 1, "user_id": 1, "_id": 0})
     if _existing_trust:
-        logger.info(f"Provision: Duplicate trust for wingpoint_ref={request.wingpoint_ref}, using existing trust {_existing_trust['trust_id']}")
         trust_id = _existing_trust["trust_id"]
+        # If the trust exists but is linked to a DIFFERENT user (e.g. admin provision
+        # created it under a new user, then connect flow re-provisions with the
+        # customer's actual TrustOffice user_id), re-link it to the correct user.
+        if _existing_trust.get("user_id") != user_id:
+            await db.trusts.update_one(
+                {"trust_id": trust_id},
+                {"$set": {"user_id": user_id, "updated_at": now.isoformat()}},
+            )
+            logger.info(f"Provision: Re-linked trust {trust_id} from user {_existing_trust.get('user_id')} to {user_id}")
+        else:
+            logger.info(f"Provision: Duplicate trust for wingpoint_ref={request.wingpoint_ref}, using existing trust {trust_id}")
     else:
         await db.trusts.insert_one(trust_doc)
         logger.info(f"Provision: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
