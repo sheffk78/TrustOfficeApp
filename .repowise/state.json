@@ -1,6 +1,6 @@
 {
-  "last_sync_commit": "407024d5f55447d8e57437ea1d3280769285ec87",
-  "total_pages": 455,
+  "last_sync_commit": "74b905939217555188047088d076e850557efa0d",
+  "total_pages": 497,
   "provider": "ollama",
   "model": "qwen3:8b",
   "docs_mode": "llm",
@@ -32,11 +32,11 @@
   },
   "knowledge_graph": {
     "version": "1.0.0",
-    "node_count": 994,
-    "layer_count": 8,
+    "node_count": 1235,
+    "layer_count": 9,
     "tour_steps": 12,
     "has_summaries": true,
-    "fingerprint": "bcde00e09491d382"
+    "fingerprint": "e474161465970115"
   },
   "onboarding_slots_offered": [
     "active_landscape",
@@ -47,5 +47,8 @@
   ],
   "store_format_version": 2,
   "written_by_version": "0.39.0",
-  "config_fingerprint": "104b0d2db4f4d13a09e8d702d53994cacf4505ae6ba188b0ad290e0f9ab4e586"
+  "config_fingerprint": "104b0d2db4f4d13a09e8d702d53994cacf4505ae6ba188b0ad290e0f9ab4e586",
+  "last_full_rescore_at": 1785958545.0,
+  "last_docs_commit": "74b905939217555188047088d076e850557efa0d",
+  "renderer_fingerprint": "3ccf0a761d6507c15360006a197bf56cd6d46c2698c8ae631ca6b789b87f06c4:2d6407057d94311810c91100d0497e1dc2b78aa2fab0fa8e08e4e8e789045f72"
 }

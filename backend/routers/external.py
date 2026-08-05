@@ -496,6 +496,71 @@ class WingPointProvisionRequest(BaseModel):
         return f"{cleaned[:2]}-{cleaned[2:]}"
 
 
+class LinkTrustRequest(BaseModel):
+    """Link a trust to an existing TrustOffice user — no email lookup, no user creation.
+    
+    Used by the WingPoint connect callback after the user has authenticated on
+    TrustOffice. The trustoffice_user_id is guaranteed by the connect token JWT.
+    """
+    trustoffice_user_id: str = Field(..., description="The user's actual TrustOffice user_id (from connect token)")
+    wingpoint_ref: str = Field(..., description="Unique WingPoint reference")
+    trust_name: str
+    trust_type: Literal[
+        "FAMILY_TRUST", "BUSINESS_TRUST", "PROPERTY_TRUST",
+        "MINISTRY_TRUST", "GENERAL_TRUST"
+    ] = "FAMILY_TRUST"
+    jurisdiction: str = Field(..., max_length=2, description="2-letter US state code")
+    ein: Optional[str] = None
+    trust_formation_date: Optional[str] = None
+    entity_type: Literal["irrevocable_trust"] = "irrevocable_trust"
+    role_for_trust: Literal["grantor", "trustee"] = "trustee"
+    
+    # Trustee
+    trustee_first_name: Optional[str] = None
+    trustee_middle_name: Optional[str] = None
+    trustee_last_name: Optional[str] = None
+    trustee_suffix: Optional[str] = None
+    trustee_full_name: Optional[str] = None
+    use_wingpoint_trustee: bool = False
+    
+    # Address
+    mailing_address_line1: Optional[str] = None
+    mailing_address_line2: Optional[str] = None
+    mailing_city: Optional[str] = None
+    mailing_state: Optional[str] = None
+    mailing_zip: Optional[str] = None
+    mailing_county: Optional[str] = None
+    
+    # Bank + docs
+    bank_name: Optional[str] = None
+    has_irs_confirmation: Optional[bool] = None
+    has_declaration: Optional[bool] = None
+    has_certification: Optional[bool] = None
+    has_binder_kit: Optional[bool] = None
+    
+    # Metadata
+    source_package: Optional[Literal["single_trust", "estate_bundle", "builder_bundle"]] = None
+    coupon_code: Optional[str] = Field(None, pattern=r'^[A-Za-z0-9_-]+$', max_length=50)
+    
+    @field_validator("jurisdiction")
+    @classmethod
+    def validate_jurisdiction(cls, v):
+        v = v.strip().upper()
+        if not re.match(r"^[A-Z]{2}$", v):
+            raise ValueError("jurisdiction must be a 2-letter US state code")
+        return v
+    
+    @field_validator("ein")
+    @classmethod
+    def validate_ein(cls, v):
+        if v is None:
+            return v
+        cleaned = re.sub(r"[^0-9]", "", v)
+        if len(cleaned) != 9:
+            raise ValueError("EIN must be 9 digits")
+        return f"{cleaned[:2]}-{cleaned[2:]}"
+
+
 class ResendActivationRequest(BaseModel):
     """Resend welcome email for an existing provisioning."""
     wingpoint_ref: str
@@ -1575,3 +1640,159 @@ async def fire_activation_webhook(user_id: str, event_type: str):
             partner_id, user_id, provision, webhook_url,
             f"webhook_{event_type}_failed", now, error=str(e),
         )
+
+
+# ==================== LINK TRUST (Authenticate-First Flow) ====================
+
+@router.post("/link-trust")
+async def link_trust(
+    request: LinkTrustRequest,
+    partner: dict = Depends(verify_external_api_key),
+):
+    """Link a trust to an existing TrustOffice user.
+    
+    This is the authenticate-first endpoint: WingPoint calls this AFTER the user
+    has authenticated on TrustOffice and we have their real user_id from the
+    connect token. No email lookup, no user creation, no welcome email.
+    
+    If a trust already exists for this wingpoint_ref (from a prior admin provision
+    to a phantom user), it is re-linked to the authenticated user_id.
+    """
+    partner_id = partner["partner_id"]
+    user_id = request.trustoffice_user_id
+    logger.info(f"LinkTrust: START wingpoint_ref={request.wingpoint_ref} user_id={user_id} trust_name='{request.trust_name}'")
+    
+    # Verify the user exists
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail={
+            "error": f"TrustOffice user {user_id} not found",
+            "message": "The connect token's user_id does not match any TrustOffice account."
+        })
+    
+    now = datetime.now(timezone.utc)
+    
+    # Map trust type
+    to_trust_type = WINGPOINT_TRUST_TYPE_MAP.get(request.trust_type, "family")
+    
+    # Build trustee string
+    trustee_parts = [
+        request.trustee_first_name, request.trustee_middle_name,
+        request.trustee_last_name, request.trustee_suffix,
+    ]
+    trustee_str = " ".join(p for p in trustee_parts if p) or request.trustee_full_name or ""
+    
+    # Build trust doc
+    trust_id = f"trust_{uuid.uuid4().hex[:12]}"
+    trust_doc = {
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "wingpoint_ref": request.wingpoint_ref,
+        "name": request.trust_name,
+        "trust_type": to_trust_type,
+        "entity_type": request.entity_type,
+        "jurisdiction": request.jurisdiction,
+        "role": request.role_for_trust,
+        "start_date": request.trust_formation_date,
+        "trustees": trustee_str,
+        "ein": request.ein,
+        "state_code": request.jurisdiction,
+        "source": "wingpoint",
+        "use_wingpoint_trustee": request.use_wingpoint_trustee,
+        "trustee_first_name": request.trustee_first_name,
+        "trustee_middle_name": request.trustee_middle_name,
+        "trustee_last_name": request.trustee_last_name,
+        "trustee_suffix": request.trustee_suffix,
+        "trustee_full_name": request.trustee_full_name,
+        "mailing_address_line1": request.mailing_address_line1,
+        "mailing_address_line2": request.mailing_address_line2,
+        "mailing_city": request.mailing_city,
+        "mailing_state": request.mailing_state,
+        "mailing_zip": request.mailing_zip,
+        "mailing_county": request.mailing_county,
+        "bank_name": request.bank_name,
+        "has_irs_confirmation": request.has_irs_confirmation,
+        "has_declaration": request.has_declaration,
+        "has_certification": request.has_certification,
+        "has_binder_kit": request.has_binder_kit,
+        "source_package": request.source_package,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+    }
+    
+    # Check if trust already exists for this wingpoint_ref — re-link if so
+    existing_trust = await db.trusts.find_one(
+        {"wingpoint_ref": request.wingpoint_ref},
+        {"trust_id": 1, "user_id": 1, "_id": 0}
+    )
+    if existing_trust:
+        existing_trust_id = existing_trust["trust_id"]
+        if existing_trust.get("user_id") != user_id:
+            # Re-link to the authenticated user
+            await db.trusts.update_one(
+                {"trust_id": existing_trust_id},
+                {"$set": {"user_id": user_id, "updated_at": now.isoformat()}},
+            )
+            logger.info(f"LinkTrust: Re-linked trust {existing_trust_id} from user {existing_trust.get('user_id')} to {user_id}")
+        else:
+            logger.info(f"LinkTrust: Trust {existing_trust_id} already linked to user {user_id}")
+        trust_id = existing_trust_id
+    else:
+        await db.trusts.insert_one(trust_doc)
+        logger.info(f"LinkTrust: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
+    
+    # Create entity record (same as provision path)
+    entity_id = f"entity_{uuid.uuid4().hex[:12]}"
+    entity_doc = {
+        "entity_id": entity_id,
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "name": request.trust_name,
+        "entity_type": "Trust",
+        "legal_name": request.trust_name,
+        "formation_date": request.trust_formation_date,
+        "governing_law": request.jurisdiction or "",
+        "ein": request.ein,
+        "trustee_names": trustee_str,
+        "beneficiary_standard": "",
+        "article_ref_distribution": "",
+        "article_ref_compensation": "",
+        "article_ref_amendment": "",
+        "oversight_required": False,
+        "member_names": "",
+        "manager_names": "",
+        "article_ref_authority": "",
+        "article_ref_profit_distribution": "",
+        "created_at": now.isoformat(),
+    }
+    _existing_entity = await db.entities.find_one({"trust_id": trust_id}, {"_id": 1})
+    if not _existing_entity:
+        try:
+            await db.entities.insert_one(entity_doc)
+            logger.info(f"LinkTrust: Created entity {entity_id} for trust {trust_id}")
+        except Exception as e:
+            logger.warning(f"LinkTrust: Failed to create entity for trust {trust_id}: {e}")
+    
+    # Audit log
+    await log_audit(
+        partner_id=partner_id,
+        action="link_trust",
+        wingpoint_ref=request.wingpoint_ref,
+        details={
+            "user_id": user_id,
+            "trust_id": trust_id,
+            "trust_name": request.trust_name,
+            "re_linked": existing_trust is not None,
+        },
+        status="success",
+    )
+    
+    logger.info(f"LinkTrust: COMPLETE wingpoint_ref={request.wingpoint_ref} user_id={user_id} trust_id={trust_id}")
+    
+    return {
+        "ok": True,
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "trust_name": request.trust_name,
+        "re_linked": existing_trust is not None,
+    }
