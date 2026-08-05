@@ -1009,6 +1009,41 @@ async def provision_trustoffice(
     trust_doc = _build_trust_doc(request, user_id, to_trust_type, trustee_str, trust_id, now)
     trust_id = await _create_trust(request, trust_doc, trust_id, user_id, now)
 
+    # ---- AUTO-CREATE ENTITY RECORD (matches in-app trust creation) ----
+    # The in-app path calls _create_trust_entity which inserts into db.entities.
+    # WingPoint provision must do the same so the trust appears in Structures.
+    entity_id = f"entity_{uuid.uuid4().hex[:12]}"
+    entity_doc = {
+        "entity_id": entity_id,
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "name": request.trust_name,
+        "entity_type": "Trust",
+        "legal_name": request.trust_name,
+        "formation_date": request.trust_formation_date,
+        "governing_law": request.jurisdiction or "",
+        "ein": request.ein,
+        "trustee_names": trustee_str,
+        "beneficiary_standard": "",
+        "article_ref_distribution": "",
+        "article_ref_compensation": "",
+        "article_ref_amendment": "",
+        "oversight_required": False,
+        "member_names": "",
+        "manager_names": "",
+        "article_ref_authority": "",
+        "article_ref_profit_distribution": "",
+        "created_at": now.isoformat(),
+    }
+    # Avoid duplicate entity for same trust
+    _existing_entity = await db.entities.find_one({"trust_id": trust_id}, {"_id": 1})
+    if not _existing_entity:
+        try:
+            await db.entities.insert_one(entity_doc)
+            logger.info(f"Provision: Created entity {entity_id} for trust {trust_id}")
+        except Exception as e:
+            logger.warning(f"Provision: Failed to create entity for trust {trust_id}: {e}")
+
     # ---- GENERATE SET-PASSWORD TOKEN (7-day expiry) ----
     set_password_token, expires_at = await _generate_set_password_token(user_id, now)
 
