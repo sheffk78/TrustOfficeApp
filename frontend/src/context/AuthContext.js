@@ -5,6 +5,10 @@ const API = `${BACKEND_URL}/api`;
 
 const AuthContext = createContext(null);
 
+const PRIMARY_ADMIN_EMAIL = 'contact@trustoffice.app';
+
+// ==================== Auth helpers ====================
+
 // Helper to get auth headers including localStorage token as fallback
 const getAuthHeaders = () => {
   const token = localStorage.getItem('auth_token');
@@ -17,6 +21,199 @@ const getAuthHeaders = () => {
 // Check if we have a token to validate (synchronous check)
 const hasStoredToken = () => {
   return localStorage.getItem('auth_token') !== null;
+};
+
+// Named predicate: is the given email the primary admin?
+const isPrimaryAdmin = (email) => {
+  return Boolean(email) && email.toLowerCase() === PRIMARY_ADMIN_EMAIL;
+};
+
+// Named predicate: are we currently on an OAuth callback route?
+const isOAuthCallbackRoute = () => {
+  const hash = window.location.hash;
+  const pathname = window.location.pathname;
+  return (
+    (hash && hash.includes('session_id=')) ||
+    pathname === '/auth/callback' ||
+    pathname === '/auth/google/callback'
+  );
+};
+
+// Named predicate: has the auth check already completed with a known user?
+const isAuthCheckAlreadyDone = (authCheckComplete, user) => {
+  return authCheckComplete && Boolean(user);
+};
+
+// Canonical admin override subscription state
+const buildAdminSubscriptionState = () => ({
+  is_active: true,
+  is_read_only: false,
+  status: 'active',
+  plan_type: 'forever_free',
+  is_trial: false,
+  trust_count: 0,
+  trust_limit: 999,
+  needs_upgrade: false,
+});
+
+// Default subscription state used on API error so the app doesn't hang
+const DEFAULT_ERROR_SUBSCRIPTION = Object.freeze({
+  is_active: false,
+  is_read_only: true,
+  trust_count: 0,
+  trust_limit: 0,
+  needs_upgrade: false,
+});
+
+// Apply the error subscription state to the setters
+const applyErrorSubscriptionState = (setSubscription, setSubscriptionExpired, setIsReadOnly) => {
+  setSubscription({ ...DEFAULT_ERROR_SUBSCRIPTION });
+  setSubscriptionExpired(true);
+  setIsReadOnly(true);
+};
+
+// Parse a fetch response as JSON, tolerant of empty bodies (mobile-friendly).
+// Returns `{}` for empty bodies; throws Error('Invalid server response') on bad JSON.
+const parseJsonResponse = async (response) => {
+  const responseText = await response.text();
+  if (!responseText) {
+    return {};
+  }
+  try {
+    return JSON.parse(responseText);
+  } catch (e) {
+    throw new Error('Invalid server response');
+  }
+};
+
+// ==================== useAuthActions hook ====================
+// Encapsulates the auth action callbacks (login/register/logout/exchange/seed)
+// so the AuthProvider component body stays flat and readable.
+
+const useAuthActions = ({
+  setUser,
+  setTrusts,
+  setSelectedTrust,
+  loadTrustsInternal,
+}) => {
+  const login = useCallback(async (email, password) => {
+    // Use a simple fetch approach that works reliably on mobile
+    const url = `${API}/auth/login`;
+    const body = JSON.stringify({ email, password });
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include',
+      body: body
+    });
+
+    const data = await parseJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Login failed');
+    }
+
+    // Store token in localStorage
+    if (data.token) {
+      localStorage.setItem('auth_token', data.token);
+    }
+    setUser(data.user);
+    return data;
+  }, [setUser]);
+
+  const register = useCallback(async (email, password, name) => {
+    // Use a simple fetch approach that works reliably on mobile
+    const url = `${API}/auth/register`;
+    const body = JSON.stringify({ email, password, name });
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: body
+    });
+
+    const data = await parseJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Registration failed');
+    }
+
+    return data;
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await fetch(`${API}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: getAuthHeaders()
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('selected_trust_id');
+    setUser(null);
+    setTrusts([]);
+    setSelectedTrust(null);
+  }, [setUser, setTrusts, setSelectedTrust]);
+
+  const exchangeAuthCode = useCallback(async (code) => {
+    // Security: Exchange one-time authorization code for JWT.
+    // This replaces the old JWT-in-URL OAuth flow and the session_id (Emergent) flow.
+    const response = await fetch(`${API}/auth/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ code })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Auth code exchange failed');
+    }
+
+    const data = await response.json();
+
+    // Security: Store token in localStorage for Authorization header fallback.
+    // The HttpOnly session_cookie is also set by the backend response.
+    if (data.token) {
+      localStorage.setItem('auth_token', data.token);
+    }
+
+    setUser(data.user);
+    return data;
+  }, [setUser]);
+
+  const seedDemoData = useCallback(async () => {
+    try {
+      const response = await fetch(`${API}/demo/seed`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await loadTrustsInternal();
+        return result;
+      }
+      return { seeded: false, message: 'Request failed' };
+    } catch (error) {
+      console.error('Failed to seed demo data:', error);
+      return { seeded: false, message: error.message };
+    }
+  }, [loadTrustsInternal]);
+
+  return { login, register, logout, exchangeAuthCode, seedDemoData };
 };
 
 export const AuthProvider = ({ children }) => {
@@ -34,32 +231,22 @@ export const AuthProvider = ({ children }) => {
 
   // Load the normalized subscription state from the new endpoint
   const loadSubscriptionState = useCallback(async (userEmail = null) => {
-    
+
     // ADMIN OVERRIDE: If user is primary admin, always grant full access
-    const PRIMARY_ADMIN_EMAIL = 'contact@trustoffice.app';
-    if (userEmail?.toLowerCase() === PRIMARY_ADMIN_EMAIL) {
-      const adminState = {
-        is_active: true,
-        is_read_only: false,
-        status: 'active',
-        plan_type: 'forever_free',
-        is_trial: false,
-        trust_count: 0,
-        trust_limit: 999,
-        needs_upgrade: false
-      };
+    if (isPrimaryAdmin(userEmail)) {
+      const adminState = buildAdminSubscriptionState();
       setSubscription(adminState);
       setSubscriptionExpired(false);
       setIsReadOnly(false);
       return adminState;
     }
-    
+
     try {
       const response = await fetch(`${API}/subscription/state`, {
         credentials: 'include',
         headers: getAuthHeaders()
       });
-      
+
       if (response.ok) {
         const state = await response.json();
         setSubscription(state);
@@ -69,16 +256,12 @@ export const AuthProvider = ({ children }) => {
       } else {
         console.error('[AuthContext] Subscription API returned:', response.status);
         // Set default state on error so the app doesn't hang
-        setSubscription({ is_active: false, is_read_only: true, trust_count: 0, trust_limit: 0, needs_upgrade: false });
-        setSubscriptionExpired(true);
-        setIsReadOnly(true);
+        applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
       }
     } catch (error) {
       console.error('[AuthContext] Failed to load subscription state:', error);
       // Set default state on error so the app doesn't hang
-      setSubscription({ is_active: false, is_read_only: true, trust_count: 0, trust_limit: 0, needs_upgrade: false });
-      setSubscriptionExpired(true);
-      setIsReadOnly(true);
+      applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
     }
     return null;
   }, []);
@@ -91,9 +274,7 @@ export const AuthProvider = ({ children }) => {
   const checkAuth = useCallback(async () => {
     // CRITICAL: If returning from OAuth callback path, skip the /me check.
     // AuthCallback will handle the token and establish the session.
-    if (window.location.hash?.includes('session_id=') || 
-        window.location.pathname === '/auth/callback' ||
-        window.location.pathname === '/auth/google/callback') {
+    if (isOAuthCallbackRoute()) {
       setLoading(false);
       setTrustsLoading(false);
       return;
@@ -106,9 +287,9 @@ export const AuthProvider = ({ children }) => {
       authCheckComplete.current = true;
       return;
     }
-    
+
     // Prevent duplicate auth checks - but allow if we have a token and no user
-    if (authCheckComplete.current && user) {
+    if (isAuthCheckAlreadyDone(authCheckComplete.current, user)) {
       return;
     }
 
@@ -117,14 +298,14 @@ export const AuthProvider = ({ children }) => {
         credentials: 'include',
         headers: getAuthHeaders()
       });
-      
+
       if (!response.ok) {
         throw new Error('Not authenticated');
       }
-      
+
       const userData = await response.json();
       setUser(userData);
-      
+
       // Load trusts and subscription after authentication
       await loadTrustsInternal();
       await loadSubscriptionState(userData.email);
@@ -136,7 +317,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       authCheckComplete.current = true;
     }
-  }, [loadSubscriptionState]);
+  }, [loadSubscriptionState, user]);
 
   // Internal function that doesn't depend on state
   const loadTrustsInternal = async (forceSelectNew = false) => {
@@ -146,11 +327,11 @@ export const AuthProvider = ({ children }) => {
         credentials: 'include',
         headers: getAuthHeaders()
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setTrusts(data);
-        
+
         // Select first trust if none selected, or if forced
         if (data.length > 0 && (!selectedTrust || forceSelectNew)) {
           const storedTrustId = localStorage.getItem('selected_trust_id');
@@ -173,142 +354,12 @@ export const AuthProvider = ({ children }) => {
     await loadTrustsInternal();
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    // Use a simple fetch approach that works reliably on mobile
-    const url = `${API}/auth/login`;
-    const body = JSON.stringify({ email, password });
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      credentials: 'include',
-      body: body
-    });
-    
-    // Read response text first (more reliable than .json() on mobile)
-    const responseText = await response.text();
-    let data = {};
-    
-    if (responseText) {
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error('Invalid server response');
-      }
-    }
-    
-    if (!response.ok) {
-      throw new Error(data.detail || 'Login failed');
-    }
-    
-    // Store token in localStorage
-    if (data.token) {
-      localStorage.setItem('auth_token', data.token);
-    }
-    setUser(data.user);
-    return data;
-  }, []);
-
-  const register = useCallback(async (email, password, name) => {
-    // Use a simple fetch approach that works reliably on mobile
-    const url = `${API}/auth/register`;
-    const body = JSON.stringify({ email, password, name });
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: body
-    });
-    
-    // Read response text first (more reliable than .json() on mobile)
-    const responseText = await response.text();
-    let data = {};
-    
-    if (responseText) {
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error('Invalid server response');
-      }
-    }
-    
-    if (!response.ok) {
-      throw new Error(data.detail || 'Registration failed');
-    }
-    
-    return data;
-  }, []);
-
-  const logout = useCallback(async () => {
-    try {
-      await fetch(`${API}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: getAuthHeaders()
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('selected_trust_id');
-    setUser(null);
-    setTrusts([]);
-    setSelectedTrust(null);
-  }, []);
-
-  const exchangeAuthCode = useCallback(async (code) => {
-    // Security: Exchange one-time authorization code for JWT.
-    // This replaces the old JWT-in-URL OAuth flow and the session_id (Emergent) flow.
-    const response = await fetch(`${API}/auth/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ code })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Auth code exchange failed');
-    }
-    
-    const data = await response.json();
-    
-    // Security: Store token in localStorage for Authorization header fallback.
-    // The HttpOnly session_cookie is also set by the backend response.
-    if (data.token) {
-      localStorage.setItem('auth_token', data.token);
-    }
-    
-    setUser(data.user);
-    return data;
-  }, []);
-
-  const seedDemoData = useCallback(async () => {
-    try {
-      const response = await fetch(`${API}/demo/seed`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: getAuthHeaders()
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        await loadTrustsInternal();
-        return result;
-      }
-      return { seeded: false, message: 'Request failed' };
-    } catch (error) {
-      console.error('Failed to seed demo data:', error);
-      return { seeded: false, message: error.message };
-    }
-  }, []);
+  const { login, register, logout, exchangeAuthCode, seedDemoData } = useAuthActions({
+    setUser,
+    setTrusts,
+    setSelectedTrust,
+    loadTrustsInternal,
+  });
 
   useEffect(() => {
     checkAuth();
@@ -318,23 +369,23 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const handleSubscriptionExpired = () => {
       // Don't mark admin as expired
-      if (user?.email?.toLowerCase() === 'contact@trustoffice.app') return;
+      if (isPrimaryAdmin(user?.email)) return;
       setSubscriptionExpired(true);
       setIsReadOnly(true);
       loadSubscriptionState(user?.email);
     };
-    
-    const handleSubscriptionReadOnly = (event) => {
+
+    const handleSubscriptionReadOnly = () => {
       // Don't mark admin as read-only
-      if (user?.email?.toLowerCase() === 'contact@trustoffice.app') return;
+      if (isPrimaryAdmin(user?.email)) return;
       setIsReadOnly(true);
       // Optionally refresh subscription state
       loadSubscriptionState(user?.email);
     };
-    
+
     window.addEventListener('subscription-expired', handleSubscriptionExpired);
     window.addEventListener('subscription-readonly', handleSubscriptionReadOnly);
-    
+
     return () => {
       window.removeEventListener('subscription-expired', handleSubscriptionExpired);
       window.removeEventListener('subscription-readonly', handleSubscriptionReadOnly);
