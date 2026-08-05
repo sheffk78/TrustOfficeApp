@@ -778,6 +778,94 @@ def _get_trust_doc_scope(intent: str, user_message: str) -> set[str] | None:
     return fields
 
 
+def _format_distribution_rules(dist_rules: dict, td_lines: list) -> None:
+    """Append distribution-rule lines to td_lines when present."""
+    if not dist_rules:
+        return
+    if dist_rules.get("specific_purposes"):
+        td_lines.append(f"Permitted Distribution Purposes: {', '.join(dist_rules['specific_purposes'])}")
+    if dist_rules.get("amount_guidance"):
+        td_lines.append(f"Amount Guidance: {dist_rules['amount_guidance']}")
+    if dist_rules.get("needs_based_factors"):
+        td_lines.append(f"Needs-Based Factors: {', '.join(dist_rules['needs_based_factors'])}")
+    if dist_rules.get("equal_treatment_requirement"):
+        td_lines.append(f"Equal Treatment: {dist_rules['equal_treatment_requirement']}")
+    if dist_rules.get("article_reference"):
+        td_lines.append(f"Distribution Rules Article: {dist_rules['article_reference']}")
+
+
+def _format_trustee_powers_detail(powers_detail: dict, td_lines: list) -> None:
+    """Append trustee-power detail lines to td_lines when present."""
+    if not powers_detail:
+        return
+    if powers_detail.get("investment_powers"):
+        td_lines.append(f"Investment Powers: {powers_detail['investment_powers']}")
+    if powers_detail.get("discretion_powers"):
+        td_lines.append(f"Discretion Powers: {powers_detail['discretion_powers']}")
+    if powers_detail.get("spendthrift_provisions"):
+        td_lines.append(f"Spendthrift Provisions: {powers_detail['spendthrift_provisions']}")
+
+
+def _format_trust_doc_analysis(trust_document: dict, doc_scope: set[str] | None = None) -> str | None:
+    """Format the AI-extracted trust document analysis section (Tier 1).
+
+    Args:
+        doc_scope: Set of field names to include, or None to include everything.
+    """
+    def _in_scope(field: str) -> bool:
+        return doc_scope is None or field in doc_scope
+
+    td_lines = ["## Trust Document Analysis (AI-Extracted)"]
+    if _in_scope("grantor") and trust_document.get("grantor"):
+        td_lines.append(f"Grantor: {trust_document['grantor']}")
+    if _in_scope("trust_type") and trust_document.get("trust_type"):
+        td_lines.append(f"Trust Type: {trust_document['trust_type']}")
+    if _in_scope("distribution_standard") and trust_document.get("distribution_standard"):
+        td_lines.append(f"Distribution Standard: {trust_document['distribution_standard']}")
+    if _in_scope("distribution_standard") and trust_document.get("distribution_standard_type"):
+        td_lines.append(f"Distribution Standard Type: {trust_document['distribution_standard_type']}")
+    if _in_scope("distribution_standard") and trust_document.get("distribution_article"):
+        td_lines.append(f"Distribution Article: {trust_document['distribution_article']}")
+    if _in_scope("beneficiary_names") and trust_document.get("beneficiary_names"):
+        td_lines.append(f"Named Beneficiaries: {', '.join(trust_document['beneficiary_names'])}")
+    if _in_scope("removal_provisions") and trust_document.get("removal_provisions"):
+        td_lines.append(f"Trustee Removal: {trust_document['removal_provisions']}")
+    if _in_scope("termination_rules") and trust_document.get("termination_rules"):
+        td_lines.append(f"Termination Rules: {trust_document['termination_rules']}")
+
+    if _in_scope("distribution_rules"):
+        _format_distribution_rules(trust_document.get("distribution_rules", {}), td_lines)
+
+    if _in_scope("trustee_powers"):
+        powers = trust_document.get("trustee_powers", [])
+        if powers:
+            td_lines.append("Trustee Powers:")
+            for p in powers[:10]:
+                td_lines.append(f"  - {p.get('power', '')} ({p.get('article', '')})")
+
+    if _in_scope("trustee_powers_detail"):
+        _format_trustee_powers_detail(trust_document.get("trustee_powers_detail", {}), td_lines)
+
+    return "\n".join(td_lines)
+
+
+def _format_vault_doc_list(vault_docs: list) -> str | None:
+    """Format the vault document metadata section (Tier 2)."""
+    if not vault_docs:
+        return None
+    vault_lines = ["## Vault Documents"]
+    for d in vault_docs:
+        parts = [f"- **{d.get('title', 'Untitled')}**"]
+        if d.get("category_label"):
+            parts.append(f" [{d['category_label']}]")
+        if d.get("date"):
+            parts.append(f" ({d['date']})")
+        if d.get("description"):
+            parts.append(f" — {d['description']}")
+        vault_lines.append("".join(parts))
+    return "\n".join(vault_lines)
+
+
 def _format_vault_context(vault_docs: list, trust_document: dict | None, doc_scope: set[str] | None = None) -> str:
     """Format vault document metadata + trust document analysis into a prompt section.
 
@@ -793,74 +881,14 @@ def _format_vault_context(vault_docs: list, trust_document: dict | None, doc_sco
 
     # --- Tier 1: AI-extracted trust document analysis (field-scoped) ---
     if trust_document:
-        # Helper: check if a field is in scope
-        def _in_scope(field: str) -> bool:
-            return doc_scope is None or field in doc_scope
-
-        td_lines = ["## Trust Document Analysis (AI-Extracted)"]
-        if _in_scope("grantor") and trust_document.get("grantor"):
-            td_lines.append(f"Grantor: {trust_document['grantor']}")
-        if _in_scope("trust_type") and trust_document.get("trust_type"):
-            td_lines.append(f"Trust Type: {trust_document['trust_type']}")
-        if _in_scope("distribution_standard") and trust_document.get("distribution_standard"):
-            td_lines.append(f"Distribution Standard: {trust_document['distribution_standard']}")
-        if _in_scope("distribution_standard") and trust_document.get("distribution_standard_type"):
-            td_lines.append(f"Distribution Standard Type: {trust_document['distribution_standard_type']}")
-        if _in_scope("distribution_standard") and trust_document.get("distribution_article"):
-            td_lines.append(f"Distribution Article: {trust_document['distribution_article']}")
-        if _in_scope("beneficiary_names") and trust_document.get("beneficiary_names"):
-            td_lines.append(f"Named Beneficiaries: {', '.join(trust_document['beneficiary_names'])}")
-        if _in_scope("removal_provisions") and trust_document.get("removal_provisions"):
-            td_lines.append(f"Trustee Removal: {trust_document['removal_provisions']}")
-        if _in_scope("termination_rules") and trust_document.get("termination_rules"):
-            td_lines.append(f"Termination Rules: {trust_document['termination_rules']}")
-
-        if _in_scope("distribution_rules"):
-            dist_rules = trust_document.get("distribution_rules", {})
-            if dist_rules:
-                if dist_rules.get("specific_purposes"):
-                    td_lines.append(f"Permitted Distribution Purposes: {', '.join(dist_rules['specific_purposes'])}")
-                if dist_rules.get("amount_guidance"):
-                    td_lines.append(f"Amount Guidance: {dist_rules['amount_guidance']}")
-                if dist_rules.get("needs_based_factors"):
-                    td_lines.append(f"Needs-Based Factors: {', '.join(dist_rules['needs_based_factors'])}")
-                if dist_rules.get("equal_treatment_requirement"):
-                    td_lines.append(f"Equal Treatment: {dist_rules['equal_treatment_requirement']}")
-                if dist_rules.get("article_reference"):
-                    td_lines.append(f"Distribution Rules Article: {dist_rules['article_reference']}")
-
-        if _in_scope("trustee_powers"):
-            powers = trust_document.get("trustee_powers", [])
-            if powers:
-                td_lines.append("Trustee Powers:")
-                for p in powers[:10]:
-                    td_lines.append(f"  - {p.get('power', '')} ({p.get('article', '')})")
-
-        if _in_scope("trustee_powers_detail"):
-            powers_detail = trust_document.get("trustee_powers_detail", {})
-            if powers_detail:
-                if powers_detail.get("investment_powers"):
-                    td_lines.append(f"Investment Powers: {powers_detail['investment_powers']}")
-                if powers_detail.get("discretion_powers"):
-                    td_lines.append(f"Discretion Powers: {powers_detail['discretion_powers']}")
-                if powers_detail.get("spendthrift_provisions"):
-                    td_lines.append(f"Spendthrift Provisions: {powers_detail['spendthrift_provisions']}")
-
-        sections.append("\n".join(td_lines))
+        td_section = _format_trust_doc_analysis(trust_document, doc_scope)
+        if td_section:
+            sections.append(td_section)
 
     # --- Tier 2: Vault document metadata ---
-    if vault_docs:
-        vault_lines = ["## Vault Documents"]
-        for d in vault_docs:
-            parts = [f"- **{d.get('title', 'Untitled')}**"]
-            if d.get("category_label"):
-                parts.append(f" [{d['category_label']}]")
-            if d.get("date"):
-                parts.append(f" ({d['date']})")
-            if d.get("description"):
-                parts.append(f" — {d['description']}")
-            vault_lines.append("".join(parts))
-        sections.append("\n".join(vault_lines))
+    vault_section = _format_vault_doc_list(vault_docs)
+    if vault_section:
+        sections.append(vault_section)
 
     return "\n\n".join(sections) if sections else ""
 
@@ -962,42 +990,8 @@ def _fmt_history(history: list) -> str:
     return "\n".join(lines)
 
 
-async def generate_response(
-    intent: str,
-    entities: dict,
-    user_message: str,
-    trust_context: dict,
-    conversation_history: list,
-    ai_client_module,
-) -> dict:
-    """
-    Generate the AI response based on the classified intent, trust context,
-    and conversation history. Returns a structured response dict.
-    """
-    from ai_client import ai_draft
-
-    action_def = get_action(intent) or ACTION_REGISTRY.get("general_chat", {})
-    requires_write = action_def.get("requires_write", False)
-    needs_confirm = action_def.get("confirmation_required", False)
-    action_type_value = action_def.get("type", f"{intent}_preview")
-
-    # Format trust context
-    ctx = trust_context
-    trust_info = ctx.get("trust", {})
-
-    # Precompute summary strings for the prompt
-    _money = ctx.get("money_summary", {})
-    _struct = ctx.get("structure_summary", {})
-    _entity_types = ", ".join(f"{v} {k}" for k, v in _struct.get("entity_type_counts", {}).items()) or "None"
-
-    # Build the system prompt with context
-    knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
-
-    # --- Intelligent vault context gate with field-level scoping ---
-    # Only include vault documents when the intent or message suggests relevance.
-    # Trust document analysis is included when available, but field-scoped to
-    # avoid bloating the prompt with irrelevant details (e.g., trustee powers
-    # when the user is asking about pricing).
+def _build_vault_section(ctx: dict, intent: str, user_message: str) -> str:
+    """Compute the vault/trust-document prompt section shared by both response paths."""
     vault_section = ""
     trust_doc = ctx.get("trust_document")
     doc_scope = _get_trust_doc_scope(intent, user_message)
@@ -1007,8 +1001,40 @@ async def generate_response(
     elif trust_doc:
         # Include scoped trust document analysis for baseline awareness.
         vault_section = _format_vault_context([], trust_doc, doc_scope=doc_scope)
+    return vault_section
 
-    system_prompt = f"""{CHAT_SYSTEM_PROMPT}
+
+def _build_system_prompt(
+    intent: str,
+    user_message: str,
+    trust_context: dict,
+    conversation_history: list,
+    *,
+    stream_mode: bool = False,
+) -> str:
+    """Assemble the full system prompt shared by generate_response and generate_response_stream.
+
+    Args:
+        stream_mode: When True, emit streaming-mode instructions (natural markdown, no JSON).
+    """
+    action_def = get_action(intent) or ACTION_REGISTRY.get("general_chat", {})
+    requires_write = action_def.get("requires_write", False)
+    needs_confirm = action_def.get("confirmation_required", False)
+    action_type_value = action_def.get("type", f"{intent}_preview")
+
+    ctx = trust_context
+    trust_info = ctx.get("trust", {})
+
+    _money = ctx.get("money_summary", {})
+    _struct = ctx.get("structure_summary", {})
+    _entity_types = ", ".join(f"{v} {k}" for k, v in _struct.get("entity_type_counts", {}).items()) or "None"
+
+    knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
+    vault_section = _build_vault_section(ctx, intent, user_message)
+
+    health = ctx.get("health_score", {})
+
+    shared_header = f"""{CHAT_SYSTEM_PROMPT}
 
 ## Current Trust Context
 Trust: {trust_info.get('name', 'Unknown')}
@@ -1018,7 +1044,7 @@ State: {trust_info.get('state_code', 'Not specified')}
 Establishment Date: {trust_info.get('start_date', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Trustees: {trust_info.get('trustees', 'Not specified')}
-Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('health_score', {}).get('max_score', 115)} ({ctx.get('health_score', {}).get('color', 'red')})
+Defensibility Score: {health.get('total', 0)}/{health.get('max_score', 115)} ({health.get('color', 'red')})
 
 {vault_section}
 
@@ -1064,31 +1090,63 @@ Communications: {_struct.get('communications_total', 0)} recorded, {_struct.get(
 ## Current Intent
 Intent: {intent}
 Requires write: {requires_write}
-Confirmation required: {needs_confirm}
+"""
 
-Respond as the Trust Assistant. Include:
-1. "What I'm basing this on" — cite specific data from the context above
-2. "What I don't know" — call out information gaps
-3. Caveat language for any action proposals
+    if stream_mode:
+        return shared_header + """
+Respond as the Trust Assistant directly to the user. Write your response in clear, well-formatted markdown. Use headings (##), bullet points, bold text, and numbered lists where appropriate. Be conversational but professional.
 
 When referencing trust document details, cite the specific article/section if available
 (e.g., "According to your trust instrument, Article 4, Section 4.2...").
 If vault documents are listed, reference them by title when relevant to the user's question.
 
-Format your response as JSON:
-{{
-  "message": "Your main response text to the user",
-  "action_card": {{
-    "type": "{action_type_value}" if requires_write else null,
-    "data": {{...extracted action fields}},
-    "requires_confirmation": {str(needs_confirm).lower()}
-  }} or null,
-  "citation_note": "What I'm basing this on...",
-  "unknown_note": "What I don't know...",
-  "caveat": "You should review this with your legal or tax professional..."
-}}
+If you are proposing an action (distribution, minutes, adding a beneficiary, etc.), describe what you would do in your response text. The system will generate a separate action card for the user to review.
+
+Do NOT wrap your response in JSON. Do NOT include code blocks around your entire response. Write naturally.
 """
 
+    return (
+        shared_header
+        + f'Confirmation required: {needs_confirm}\n\n'
+        + 'Respond as the Trust Assistant. Include:\n'
+        + '1. "What I\'m basing this on" — cite specific data from the context above\n'
+        + '2. "What I don\'t know" — call out information gaps\n'
+        + "3. Caveat language for any action proposals\n\n"
+        + "When referencing trust document details, cite the specific article/section if available\n"
+        + '(e.g., "According to your trust instrument, Article 4, Section 4.2...").\n'
+        + "If vault documents are listed, reference them by title when relevant to the user's question.\n\n"
+        + "Format your response as JSON:\n"
+        + "{\n"
+        + '  "message": "Your main response text to the user",\n'
+        + '  "action_card": {\n'
+        + f'    "type": "{action_type_value}" if requires_write else null,\n'
+        + "    \"data\": {...extracted action fields},\n"
+        + f'    "requires_confirmation": {str(needs_confirm).lower()}\n'
+        + "  } or null,\n"
+        + '  "citation_note": "What I\'m basing this on...",\n'
+        + '  "unknown_note": "What I don\'t know...",\n'
+        + '  "caveat": "You should review this with your legal or tax professional..."\n'
+        + "}\n"
+    )
+
+
+async def generate_response(
+    intent: str,
+    entities: dict,
+    user_message: str,
+    trust_context: dict,
+    conversation_history: list,
+    ai_client_module,
+) -> dict:
+    """
+    Generate the AI response based on the classified intent, trust context,
+    and conversation history. Returns a structured response dict.
+    """
+    from ai_client import ai_draft
+
+    system_prompt = _build_system_prompt(
+        intent, user_message, trust_context, conversation_history, stream_mode=False
+    )
     user_content = f"User message: {user_message}"
 
     try:
@@ -1165,98 +1223,9 @@ async def generate_response_stream(
     """
     from ai_client import ai_draft_stream
 
-    action_def = get_action(intent) or ACTION_REGISTRY.get("general_chat", {})
-    requires_write = action_def.get("requires_write", False)
-
-    ctx = trust_context
-    trust_info = ctx.get("trust", {})
-    knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
-
-    # Precompute summary strings for the prompt
-    _money = ctx.get("money_summary", {})
-    _struct = ctx.get("structure_summary", {})
-    _entity_types = ", ".join(f"{v} {k}" for k, v in _struct.get("entity_type_counts", {}).items()) or "None"
-
-    # --- Intelligent vault context gate with field-level scoping (same as non-streaming) ---
-    vault_section = ""
-    trust_doc = ctx.get("trust_document")
-    doc_scope = _get_trust_doc_scope(intent, user_message)
-    if _should_include_vault_context(intent, user_message):
-        vault_docs = ctx.get("vault_documents", [])
-        vault_section = _format_vault_context(vault_docs, trust_doc, doc_scope=None)
-    elif trust_doc:
-        vault_section = _format_vault_context([], trust_doc, doc_scope=doc_scope)
-
-    # For streaming mode: ask the AI to respond in natural markdown (no JSON wrapper).
-    # Action card data is extracted separately if needed.
-    system_prompt = f"""{CHAT_SYSTEM_PROMPT}
-
-## Current Trust Context
-Trust: {trust_info.get('name', 'Unknown')}
-Type: {trust_info.get('type', 'Not specified')}
-Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
-State: {trust_info.get('state_code', 'Not specified')}
-Establishment Date: {trust_info.get('start_date', 'Not specified')}
-Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
-Trustees: {trust_info.get('trustees', 'Not specified')}
-Defensibility Score: {ctx.get('health_score', {}).get('total', 0)}/{ctx.get('health_score', {}).get('max_score', 115)} ({ctx.get('health_score', {}).get('color', 'red')})
-
-{vault_section}
-
-## Upcoming Deadlines (next 14 days)
-{_fmt_deadlines(ctx.get('upcoming_deadlines', []))}
-
-## Pending Items
-{_fmt_pending(ctx.get('pending_items', []))}
-
-## Recent Activity (last 30 days)
-{_fmt_activity(ctx.get('recent_activity', []))}
-
-## Active Beneficiaries
-{_fmt_beneficiaries(ctx.get('beneficiaries', []))}
-
-## Class Beneficiaries
-{_fmt_class_beneficiaries(ctx.get('class_beneficiaries', []))}
-
-## Entities (Structures)
-{_fmt_entities(ctx.get('entities', []))}
-
-## Tax Deadlines
-{_fmt_tax_deadlines(ctx.get('tax_deadlines', []))}
-
-## Money Summary
-Distributions: {_money.get('distributions_total', 0)} total, ${_money.get('distributions_ytd_amount', 0):,.2f} this year
-Compensation: {_money.get('compensation_active_plans', 0)} active plans, ${_money.get('compensation_ytd_paid', 0):,.2f} paid YTD
-Investments: {_money.get('investments_count', 0)} assets, ${_money.get('investments_total_value', 0):,.2f} total value
-Recent transactions: {_money.get('recent_transactions_30d', 0)} in last 30 days
-
-## Structure Summary
-Entities: {_struct.get('entity_count', 0)} ({_entity_types})
-Beneficiaries: {_struct.get('beneficiary_count', 0)}
-Schedule A: {_struct.get('schedule_a_asset_count', 0)} assets, ${_struct.get('schedule_a_total_value', 0):,.2f} total
-Communications: {_struct.get('communications_total', 0)} recorded, {_struct.get('communications_pending_action', 0)} pending action
-
-## Knowledge Base
-{knowledge_context[:4500] if knowledge_context else "No knowledge base available."}
-
-## Conversation History (recent)
-{_fmt_history(conversation_history)}
-
-## Current Intent
-Intent: {intent}
-Requires write: {requires_write}
-
-Respond as the Trust Assistant directly to the user. Write your response in clear, well-formatted markdown. Use headings (##), bullet points, bold text, and numbered lists where appropriate. Be conversational but professional.
-
-When referencing trust document details, cite the specific article/section if available
-(e.g., "According to your trust instrument, Article 4, Section 4.2...").
-If vault documents are listed, reference them by title when relevant to the user's question.
-
-If you are proposing an action (distribution, minutes, adding a beneficiary, etc.), describe what you would do in your response text. The system will generate a separate action card for the user to review.
-
-Do NOT wrap your response in JSON. Do NOT include code blocks around your entire response. Write naturally.
-"""
-
+    system_prompt = _build_system_prompt(
+        intent, user_message, trust_context, conversation_history, stream_mode=True
+    )
     user_content = f"User message: {user_message}"
 
     async for chunk in ai_draft_stream(
@@ -1300,14 +1269,95 @@ async def generate_action_card(
     return None
 
 
+def _money_citations(money: dict) -> list:
+    """Citation lines for the money section summary."""
+    out = []
+    if not money:
+        return out
+    if money.get("distributions_total", 0) > 0:
+        out.append(f"Distributions: {money['distributions_total']} total, ${money.get('distributions_ytd_amount', 0):,.2f} YTD")
+    if money.get("compensation_active_plans", 0) > 0:
+        out.append(f"Compensation: {money['compensation_active_plans']} active plan(s), ${money.get('compensation_ytd_paid', 0):,.2f} paid YTD")
+    if money.get("investments_count", 0) > 0:
+        out.append(f"Investments: {money['investments_count']} holding(s), ${money.get('investments_total_value', 0):,.2f} total")
+    if money.get("recent_transactions_30d", 0) > 0:
+        out.append(f"Transactions: {money['recent_transactions_30d']} in last 30 days")
+    return out
+
+
+def _structure_citations(struct: dict) -> list:
+    """Citation lines for the structure section summary."""
+    out = []
+    if not struct:
+        return out
+    if struct.get("entity_count", 0) > 0:
+        out.append(f"Entities: {struct['entity_count']} structure(s)")
+    if struct.get("schedule_a_asset_count", 0) > 0:
+        out.append(f"Schedule A: {struct['schedule_a_asset_count']} asset(s), ${struct.get('schedule_a_total_value', 0):,.2f} total")
+    if struct.get("communications_total", 0) > 0:
+        out.append(f"Communications: {struct['communications_total']} recorded, {struct.get('communications_pending_action', 0)} pending action")
+    return out
+
+
+def _trust_doc_citations(trust_doc: dict) -> list:
+    """Citation lines for the AI-extracted trust document analysis."""
+    out = []
+    if not trust_doc:
+        return out
+    if trust_doc.get("distribution_standard"):
+        out.append(f"Trust instrument: {trust_doc.get('distribution_standard_type', 'distribution standard')} standard")
+    if trust_doc.get("distribution_article"):
+        out.append(f"Distribution provisions: {trust_doc['distribution_article']}")
+    if trust_doc.get("beneficiary_names"):
+        out.append(f"Named beneficiaries from trust instrument: {', '.join(trust_doc['beneficiary_names'][:5])}")
+    return out
+
+
+def _vault_citations(vault_docs: list, intent: str, user_message: str) -> list:
+    """Citation lines for vault documents, only when vault context was relevant."""
+    out = []
+    if not vault_docs:
+        return out
+    if not _should_include_vault_context(intent, user_message):
+        return out
+    doc_titles = [d.get("title", "") for d in vault_docs if d.get("title")]
+    if doc_titles:
+        out.append(f"Vault documents referenced: {', '.join(doc_titles[:5])}")
+    return out
+
+
+def _money_unknowns(money: dict) -> list:
+    """Unknown/gap lines for the money section summary."""
+    if not money:
+        return ["Money section data unavailable"]
+    out = []
+    if money.get("investments_count", 0) == 0:
+        out.append("No investment holdings tracked — portfolio allocation unknown")
+    if money.get("compensation_active_plans", 0) == 0:
+        out.append("No active trustee compensation plan on file")
+    return out
+
+
+def _structure_unknowns(struct: dict) -> list:
+    """Unknown/gap lines for the structure section summary."""
+    if not struct:
+        return ["Structure section data unavailable"]
+    out = []
+    if struct.get("schedule_a_asset_count", 0) == 0:
+        out.append("No Schedule A assets recorded — trust inventory unknown")
+    if struct.get("communications_pending_action", 0) > 0:
+        out.append(f"{struct['communications_pending_action']} communication(s) with pending actions")
+    return out
+
+
 def build_citation_notes(trust_context: dict, intent: str) -> tuple:
     """
     Build citation_note and unknown_note from the trust context.
     Returns (citation_note, unknown_note).
     """
     ctx = trust_context
-    citations = []
-    unknowns = []
+    citations: list = []
+    unknowns: list = []
 
     trust_info = ctx.get("trust", {})
     if trust_info.get("name") and trust_info.get("name") != "Unknown Trust":
@@ -1325,44 +1375,18 @@ def build_citation_notes(trust_context: dict, intent: str) -> tuple:
     if beneficiaries:
         citations.append(f"{len(beneficiaries)} active beneficiary record(s)")
 
-    # Money section citations
     money = ctx.get("money_summary", {})
-    if money:
-        if money.get("distributions_total", 0) > 0:
-            citations.append(f"Distributions: {money['distributions_total']} total, ${money.get('distributions_ytd_amount', 0):,.2f} YTD")
-        if money.get("compensation_active_plans", 0) > 0:
-            citations.append(f"Compensation: {money['compensation_active_plans']} active plan(s), ${money.get('compensation_ytd_paid', 0):,.2f} paid YTD")
-        if money.get("investments_count", 0) > 0:
-            citations.append(f"Investments: {money['investments_count']} holding(s), ${money.get('investments_total_value', 0):,.2f} total")
-        if money.get("recent_transactions_30d", 0) > 0:
-            citations.append(f"Transactions: {money['recent_transactions_30d']} in last 30 days")
+    citations.extend(_money_citations(money))
 
-    # Structure section citations
     struct = ctx.get("structure_summary", {})
-    if struct:
-        if struct.get("entity_count", 0) > 0:
-            citations.append(f"Entities: {struct['entity_count']} structure(s)")
-        if struct.get("schedule_a_asset_count", 0) > 0:
-            citations.append(f"Schedule A: {struct['schedule_a_asset_count']} asset(s), ${struct.get('schedule_a_total_value', 0):,.2f} total")
-        if struct.get("communications_total", 0) > 0:
-            citations.append(f"Communications: {struct['communications_total']} recorded, {struct.get('communications_pending_action', 0)} pending action")
+    citations.extend(_structure_citations(struct))
 
-    # Trust document analysis citations
     trust_doc = ctx.get("trust_document", {})
-    if trust_doc:
-        if trust_doc.get("distribution_standard"):
-            citations.append(f"Trust instrument: {trust_doc.get('distribution_standard_type', 'distribution standard')} standard")
-        if trust_doc.get("distribution_article"):
-            citations.append(f"Distribution provisions: {trust_doc['distribution_article']}")
-        if trust_doc.get("beneficiary_names"):
-            citations.append(f"Named beneficiaries from trust instrument: {', '.join(trust_doc['beneficiary_names'][:5])}")
+    citations.extend(_trust_doc_citations(trust_doc))
 
-    # Vault document citations (only when vault context was relevant)
-    vault_docs = ctx.get("vault_documents", [])
-    if vault_docs and _should_include_vault_context(intent, ctx.get("_user_message", "")):
-        doc_titles = [d.get("title", "") for d in vault_docs if d.get("title")]
-        if doc_titles:
-            citations.append(f"Vault documents referenced: {', '.join(doc_titles[:5])}")
+    citations.extend(_vault_citations(
+        ctx.get("vault_documents", []), intent, ctx.get("_user_message", "")
+    ))
 
     # Unknowns
     if not trust_info.get("jurisdiction"):
@@ -1374,23 +1398,8 @@ def build_citation_notes(trust_context: dict, intent: str) -> tuple:
     if not trust_doc:
         unknowns.append("No trust instrument has been uploaded and analyzed yet")
 
-    # Money section unknowns
-    if money:
-        if money.get("investments_count", 0) == 0:
-            unknowns.append("No investment holdings tracked — portfolio allocation unknown")
-        if money.get("compensation_active_plans", 0) == 0:
-            unknowns.append("No active trustee compensation plan on file")
-    else:
-        unknowns.append("Money section data unavailable")
-
-    # Structure section unknowns
-    if struct:
-        if struct.get("schedule_a_asset_count", 0) == 0:
-            unknowns.append("No Schedule A assets recorded — trust inventory unknown")
-        if struct.get("communications_pending_action", 0) > 0:
-            unknowns.append(f"{struct['communications_pending_action']} communication(s) with pending actions")
-    else:
-        unknowns.append("Structure section data unavailable")
+    unknowns.extend(_money_unknowns(money))
+    unknowns.extend(_structure_unknowns(struct))
 
     return (
         "; ".join(citations) if citations else None,
