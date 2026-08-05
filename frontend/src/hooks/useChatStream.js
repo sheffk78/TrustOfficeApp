@@ -51,6 +51,111 @@ async function parseSSEStream(reader, onEvent) {
   }
 }
 
+// ─── Extracted helpers (module-scope, not recreated per render) ──────
+
+/**
+ * Build an action cards array from a backend action card object.
+ * Shared by stream 'done' handler, polling fallback, and loadConversation.
+ */
+function buildActionCards(actionCardData) {
+  if (!actionCardData) return [];
+  return [{
+    id: `action-${Date.now()}`,
+    type: actionCardData.type || '',
+    data: actionCardData.data || {},
+    status: actionCardData.confirmation_status || 'pending',
+    requires_confirmation: actionCardData.requires_confirmation ?? true,
+    warning: actionCardData.warning_summary || null,
+    title: _deriveTitle(actionCardData),
+    summary: _deriveSummary(actionCardData),
+    amount: actionCardData.data?.amount || null,
+    message_index: null,
+  }];
+}
+
+/**
+ * Build citations array from backend citation/unknown note fields.
+ */
+function buildCitationsFromNotes(citationNote, unknownNote) {
+  const citations = [];
+  if (citationNote) {
+    citations.push({ source: citationNote, relevance: 'What this answer is based on' });
+  }
+  if (unknownNote) {
+    citations.push({ source: unknownNote, relevance: 'What is uncertain' });
+  }
+  return citations.length > 0 ? citations : [];
+}
+
+/**
+ * Finalize the streaming assistant placeholder by applying updates.
+ * If content is empty, substitute a fallback message.
+ */
+function finalizePlaceholder(setMessages, assistantId, updates) {
+  setMessages(prev => prev.map(msg => {
+    if (msg.id !== assistantId) return msg;
+    return { ...msg, ...updates, isStreaming: false };
+  }));
+}
+
+/**
+ * Read the latest messages from React state (via the functional updater trick).
+ */
+function readLatestMessages(setMessages) {
+  return new Promise(resolve => {
+    setMessages(prev => resolve(prev));
+  });
+}
+
+/**
+ * Attempt to recover a completed response by polling the "latest response" endpoint.
+ * Returns true if a completed response was found and applied, false otherwise.
+ */
+async function pollForCompletedResponse({
+  convIdToPoll,
+  assistantId,
+  setMessages,
+}) {
+  if (!convIdToPoll) return false;
+  try {
+    const pollResp = await fetchWithAuth(
+      `/ai/chat/conversations/${convIdToPoll}/latest`,
+      { method: 'GET' }
+    );
+    if (!pollResp.ok) return false;
+
+    const pollData = await pollResp.json();
+    const isCompleteResponse =
+      pollData && pollData.role === 'assistant' &&
+      pollData.content && !pollData.is_streaming;
+    if (!isCompleteResponse) return false;
+
+    // The response completed while we were disconnected — display it.
+    const pollActionCards = buildActionCards(pollData.action_card || null);
+    const pollCitations = buildCitationsFromNotes(
+      pollData.citation_note, pollData.unknown_note
+    );
+
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== assistantId) return msg;
+      return {
+        ...msg,
+        content: pollData.content,
+        action_cards: pollActionCards,
+        citations: pollCitations,
+        caveat: pollData.caveat || null,
+        isStreaming: false,
+      };
+    }));
+
+    console.info('[useChatStream] Recovered completed response via polling fallback');
+    return true;
+  } catch (pollErr) {
+    console.warn('[useChatStream] Polling fallback failed:', pollErr);
+    return false;
+  }
+}
+
 export const useChatStream = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -188,10 +293,6 @@ export const useChatStream = () => {
       // Read the SSE stream
       const reader = response.body.getReader();
       let fullText = '';
-      let actionCardData = null;
-      let citationNote = null;
-      let unknownNote = null;
-      let caveatText = null;
 
       await parseSSEStream(reader, (eventType, data) => {
         switch (eventType) {
@@ -217,28 +318,12 @@ export const useChatStream = () => {
             }));
             break;
 
-          case 'done':
+          case 'done': {
             doneReceived = true;
-            actionCardData = data.action_card;
-            citationNote = data.citation_note;
-            unknownNote = data.unknown_note;
-            caveatText = data.caveat;
-
-            // Finalize the assistant message with metadata
-            const actionCards = actionCardData ? [{
-              id: `action-${Date.now()}`,
-              type: actionCardData.type || '',
-              data: actionCardData.data || {},
-              status: actionCardData.confirmation_status || 'pending',
-              requires_confirmation: actionCardData.requires_confirmation ?? true,
-              warning: actionCardData.warning_summary || null,
-              title: _deriveTitle(actionCardData),
-              summary: _deriveSummary(actionCardData),
-              amount: actionCardData.data?.amount || null,
-              message_index: null,
-            }] : [];
-
-            const citations = _buildCitations(citationNote, unknownNote);
+            const actionCards = buildActionCards(data.action_card);
+            const citations = buildCitationsFromNotes(
+              data.citation_note, data.unknown_note
+            );
 
             setMessages(prev => {
               const updated = prev.map(msg => {
@@ -252,7 +337,7 @@ export const useChatStream = () => {
                   content: fullText,
                   action_cards: finalActionCards,
                   citations,
-                  caveat: caveatText,
+                  caveat: data.caveat,
                   isStreaming: false,
                 };
               });
@@ -269,21 +354,14 @@ export const useChatStream = () => {
               onDoneCallbackRef.current = null;
             }
             break;
+          }
 
           case 'error':
             setError(data.message || 'An error occurred during streaming');
             // Finalize the placeholder
-            setMessages(prev => prev.map(msg => {
-              if (msg.id !== assistantId) return msg;
-              if (!fullText) {
-                return {
-                  ...msg,
-                  content: 'I encountered an error while generating this response. Please try again.',
-                  isStreaming: false,
-                };
-              }
-              return { ...msg, isStreaming: false };
-            }));
+            finalizePlaceholder(setMessages, assistantId, {
+              content: fullText || 'I encountered an error while generating this response. Please try again.',
+            });
             break;
         }
       });
@@ -292,103 +370,52 @@ export const useChatStream = () => {
 
       // Safety net: if the stream ended but we never got a 'done' event,
       // the connection likely dropped. Attempt reconnection.
-      if (!doneReceived) {
+      const canRetry = retryCountRef.current < 2 && lastUserMessageRef.current;
+      if (!doneReceived && canRetry) {
         console.warn('[useChatStream] Stream ended without done event');
 
-        // Try polling for a completed response first, then retry if needed.
-        // Only attempt reconnection if we haven't exceeded max retries.
-        if (retryCountRef.current < 2 && lastUserMessageRef.current) {
-          const convIdToPoll = newConvId || currentConversationId || conversationId;
+        const convIdToPoll = newConvId || currentConversationId || conversationId;
 
-          // First, try polling the "latest response" endpoint to see if the
-          // backend already finished generating while we were disconnected.
-          let pollSuccess = false;
-          if (convIdToPoll) {
-            try {
-              const pollResp = await fetchWithAuth(
-                `/ai/chat/conversations/${convIdToPoll}/latest`,
-                { method: 'GET' }
-              );
-              if (pollResp.ok) {
-                const pollData = await pollResp.json();
-                // Check if the latest assistant response is complete
-                if (pollData && pollData.role === 'assistant' && pollData.content && !pollData.is_streaming) {
-                  // The response completed while we were disconnected — display it.
-                  const pollActionCard = pollData.action_card || null;
-                  const pollActionCards = pollActionCard ? [{
-                    id: `action-${Date.now()}`,
-                    type: pollActionCard.type || '',
-                    data: pollActionCard.data || {},
-                    status: pollActionCard.confirmation_status || 'pending',
-                    requires_confirmation: pollActionCard.requires_confirmation ?? true,
-                    warning: pollActionCard.warning_summary || null,
-                    title: _deriveTitle(pollActionCard),
-                    summary: _deriveSummary(pollActionCard),
-                    amount: pollActionCard.data?.amount || null,
-                    message_index: null,
-                  }] : [];
-                  const pollCitations = _buildCitations(pollData.citation_note, pollData.unknown_note);
+        // First, try polling the "latest response" endpoint to see if the
+        // backend already finished generating while we were disconnected.
+        const pollSuccess = await pollForCompletedResponse({
+          convIdToPoll,
+          assistantId,
+          setMessages,
+        });
 
-                  setMessages(prev => prev.map(msg => {
-                    if (msg.id !== assistantId) return msg;
-                    return {
-                      ...msg,
-                      content: pollData.content,
-                      action_cards: pollActionCards,
-                      citations: pollCitations,
-                      caveat: pollData.caveat || null,
-                      isStreaming: false,
-                    };
-                  }));
+        if (!pollSuccess) {
+          // Response wasn't complete — retry the original message.
+          retryCountRef.current += 1;
+          console.info(`[useChatStream] Auto-retrying (attempt ${retryCountRef.current}/2)`);
 
-                  pollSuccess = true;
-                  console.info('[useChatStream] Recovered completed response via polling fallback');
-                }
-              }
-            } catch (pollErr) {
-              console.warn('[useChatStream] Polling fallback failed:', pollErr);
-            }
-          }
+          // Remove the interrupted assistant placeholder
+          setMessages(prev => prev.filter(msg => msg.id !== assistantId));
 
-          if (!pollSuccess) {
-            // Response wasn't complete — retry the original message.
-            retryCountRef.current += 1;
-            console.info(`[useChatStream] Auto-retrying (attempt ${retryCountRef.current}/2)`);
+          // Read the latest message list from state for the retry
+          const latestMessages = await readLatestMessages(setMessages);
 
-            // Remove the interrupted assistant placeholder
-            setMessages(prev => prev.filter(msg => msg.id !== assistantId));
-
-            // Read the latest message list from state for the retry
-            const latestMessages = await new Promise(resolve => {
-              setMessages(prev => resolve(prev));
-            });
-
-            const lastMsg = lastUserMessageRef.current;
-            return _streamMessage({
-              text: lastMsg.text,
-              currentConversationId: newConvId || lastMsg.conversationId,
-              currentMessages: latestMessages,
-              onDone: lastMsg.onDone,
-              isRetry: true,
-              assistantMessageId: null, // new placeholder for the retry
-            });
-          }
-        } else {
-          // Max retries exceeded or no last message — finalize with error text
-          setMessages(prev => prev.map(msg => {
-            if (msg.id !== assistantId) return msg;
-            return {
-              ...msg,
-              isStreaming: false,
-              content: fullText || 'The connection was interrupted. Please try again.',
-            };
-          }));
+          const lastMsg = lastUserMessageRef.current;
+          return _streamMessage({
+            text: lastMsg.text,
+            currentConversationId: newConvId || lastMsg.conversationId,
+            currentMessages: latestMessages,
+            onDone: lastMsg.onDone,
+            isRetry: true,
+            assistantMessageId: null, // new placeholder for the retry
+          });
         }
+      } else if (!doneReceived && !canRetry) {
+        // Max retries exceeded or no last message — finalize with error text
+        finalizePlaceholder(setMessages, assistantId, {
+          content: fullText || 'The connection was interrupted. Please try again.',
+        });
       }
 
       return { conversationId: newConvId, messages: [...updatedMessages, { id: assistantId, content: '' }] };
     } catch (err) {
-      if (err.name === 'AbortError') {
+      const isAbort = err.name === 'AbortError';
+      if (isAbort) {
         // User stopped the generation — keep partial response
         setMessages(prev => prev.map(msg => {
           if (msg.id !== assistantId) return msg;
@@ -470,9 +497,7 @@ export const useChatStream = () => {
     const lastMsg = lastUserMessageRef.current;
 
     // Read the latest messages from state
-    const latestMessages = await new Promise(resolve => {
-      setMessages(prev => resolve(prev));
-    });
+    const latestMessages = await readLatestMessages(setMessages);
 
     return _streamMessage({
       text: lastMsg.text,
@@ -518,28 +543,16 @@ export const useChatStream = () => {
     setConversationId(conv.conversation_id);
     // Transform backend conversation messages to frontend format
     const formattedMessages = (conv.messages || []).map((msg, index) => {
-      const actionCard = msg.action_card || null;
-      const actionCards = actionCard ? [{
-        id: `action-${index}`,
-        type: actionCard.type || '',
-        data: actionCard.data || {},
-        status: actionCard.confirmation_status || 'pending',
-        requires_confirmation: actionCard.requires_confirmation ?? true,
-        warning: actionCard.warning_summary || null,
-        title: _deriveTitle(actionCard),
-        summary: _deriveSummary(actionCard),
-        amount: actionCard.data?.amount || null,
-        message_index: index,
-      }] : [];
+      const actionCards = buildActionCards(msg.action_card || null);
 
       return {
         id: msg.id || `msg-${index}`,
         role: msg.role,
         content: msg.content || '',
         timestamp: msg.timestamp || '',
-        action_cards: actionCards,
+        action_cards: actionCards.map(card => ({ ...card, message_index: index })),
         video_cards: msg.video_cards || [],
-        citations: _buildCitations(msg.citation_note, msg.unknown_note),
+        citations: buildCitationsFromNotes(msg.citation_note, msg.unknown_note),
         caveat: msg.caveat || null,
       };
     });
@@ -609,16 +622,4 @@ function _deriveSummary(actionCard) {
   if (type.includes('minutes')) return `${d.minutes_type || ''} meeting on ${d.meeting_date || 'TBD'} with ${(d.participants || []).join(', ') || 'participants TBD'}`;
   if (type.includes('beneficiary')) return `${d.name || 'Beneficiary'}${d.allocation_pct ? ` — ${d.allocation_pct}% allocation` : ''}`;
   return JSON.stringify(d).slice(0, 100);
-}
-
-// Helper: build citations array from backend fields
-function _buildCitations(citationNote, unknownNote) {
-  const citations = [];
-  if (citationNote) {
-    citations.push({ source: citationNote, relevance: 'What this answer is based on' });
-  }
-  if (unknownNote) {
-    citations.push({ source: unknownNote, relevance: 'What is uncertain' });
-  }
-  return citations.length > 0 ? citations : [];
 }
