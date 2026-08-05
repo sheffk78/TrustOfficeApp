@@ -604,6 +604,1200 @@ ACTION_EXECUTION_MAP = {
 }
 
 
+async def _exec_distribution(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: distribution."""
+    # Route through the real distribution router to ensure validation,
+    # activity logging, onboarding updates, and email notifications.
+    from routers.distributions import create_distribution as _create_dist
+    from models import DistributionCreate, PurposeClassification
+    from fastapi import BackgroundTasks
+
+    purpose = mapped_data.pop("purpose_classification", "other")
+    try:
+        purpose_enum = PurposeClassification(purpose)
+    except ValueError:
+        purpose_enum = PurposeClassification.other
+
+    dist_create = DistributionCreate(
+        trust_id=trust_id,
+        beneficiary_name=mapped_data.get("beneficiary_name", "Unknown"),
+        amount=float(mapped_data.get("amount", 0)),
+        date=mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+        purpose_classification=purpose_enum,
+        notes=mapped_data.get("notes", ""),
+        is_benevolence=False,
+    )
+    # Fetch user dict for the router call
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    result = await _create_dist(
+        dist=dist_create,
+        background_tasks=BackgroundTasks(),
+        user=user_doc,
+    )
+    # Distribution is created in "review" status with solvency_confirmed=False.
+    # The chat must tell the user to confirm solvency on the Distributions page.
+    return {
+        "success": True,
+        "record_id": result.distribution_id,
+        "endpoint": "distributions",
+        "requires_solvency_confirmation": True,
+        "solvency_link": f"/distributions?approve={result.distribution_id}",
+    }
+
+    
+
+
+async def _exec_asset(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: asset."""
+    # Route through the real schedule_a router to ensure validation.
+    from routers.schedule_a import create_schedule_a_item as _create_asset
+    from models import ScheduleAItemCreate, AssetCategory
+    from fastapi import BackgroundTasks
+
+    category = mapped_data.pop("category", "other_property")
+    try:
+        category_enum = AssetCategory(category)
+    except ValueError:
+        category_enum = AssetCategory.other_property
+
+    asset_create = ScheduleAItemCreate(
+        trust_id=trust_id,
+        category=category_enum,
+        description=mapped_data.get("description", ""),
+        approximate_value=mapped_data.get("approximate_value"),
+        date_conveyed=mapped_data.get("date_conveyed", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+        notes=mapped_data.get("notes", ""),
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    result = await _create_asset(item=asset_create, user=user_doc)
+    # Update onboarding (schedule_a router doesn't call auto_update_onboarding)
+    try:
+        from dependencies import auto_update_onboarding
+        await auto_update_onboarding(user_id, trust_id)
+    except Exception:
+        pass
+    return {"success": True, "record_id": result.item_id, "endpoint": "schedule-a"}
+
+    
+
+
+async def _exec_asset_update(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: asset_update."""
+    # Route through the schedule_a router's update_schedule_a_item to
+    # enforce ownership verification and validation. Adds audit logging
+    # for the valuation update.
+    from routers.schedule_a import update_schedule_a_item as _update_asset
+    from models import ScheduleAItemUpdate
+
+    # Look up the existing asset by description (fuzzy match)
+    asset_desc = mapped_data.get("asset_description", "")
+    if not asset_desc:
+        return {"success": False, "error": "Asset description is required to identify which asset to update."}
+
+    # Try exact match first, then partial match
+    existing = await db.schedule_a_items.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active",
+        "description": {"$regex": re.escape(asset_desc), "$options": "i"}
+    })
+
+    if not existing:
+        # Try broader partial match
+        existing = await db.schedule_a_items.find_one({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "status": "active",
+            "description": {"$regex": re.escape(asset_desc.split()[0]), "$options": "i"}
+        })
+
+    if not existing:
+        return {"success": False, "error": f"Could not find an active asset matching '{asset_desc}'. Please check the description and try again."}
+
+    # Build the ScheduleAItemUpdate model with only provided fields
+    update_kwargs = {}
+    if mapped_data.get("new_value") is not None:
+        update_kwargs["approximate_value"] = float(mapped_data["new_value"])
+    if mapped_data.get("new_description"):
+        update_kwargs["description"] = mapped_data["new_description"]
+    if mapped_data.get("notes"):
+        update_kwargs["notes"] = mapped_data["notes"]
+
+    # Always record the valuation date via notes append
+    valuation_date = mapped_data.get("valuation_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if "notes" in update_kwargs:
+        update_kwargs["notes"] = f"{update_kwargs['notes']} | Valuation date: {valuation_date}"
+    else:
+        update_kwargs["notes"] = f"Valuation date: {valuation_date}"
+
+    if not update_kwargs:
+        return {"success": False, "error": "No update fields provided."}
+
+    asset_update = ScheduleAItemUpdate(**update_kwargs)
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        await _update_asset(
+            item_id=existing["item_id"],
+            update=asset_update,
+            user=user_doc,
+        )
+        # Audit log the asset valuation update
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="asset_updated",
+            entity_type="schedule_a_item",
+            entity_id=existing["item_id"],
+            details={
+                "trust_id": trust_id,
+                "description": existing.get("description", ""),
+                "fields_changed": list(update_kwargs.keys()),
+                "valuation_date": valuation_date,
+            },
+        )
+        return {"success": True, "record_id": existing["item_id"], "endpoint": "schedule-a"}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to update asset: {str(e)}"}
+
+    
+
+
+async def _exec_minutes(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: minutes."""
+    # Route through the real minutes router to ensure validation,
+    # onboarding updates, and email notifications.
+    # Fix 4b: chat minutes must be status="draft", not "finalized".
+    from routers.minutes import create_minutes as _create_minutes
+    from models import MinutesCreate, MinutesType
+    from fastapi import BackgroundTasks
+
+    minutes_type_val = mapped_data.pop("minutes_type", "general")
+    try:
+        minutes_type_enum = MinutesType(minutes_type_val)
+    except ValueError:
+        minutes_type_enum = MinutesType.general
+
+    participants_text = mapped_data.get("participants_text", "")
+    if isinstance(participants_text, list):
+        participants_text = ", ".join(participants_text)
+
+    decisions_text = mapped_data.get("decisions_text", "")
+    if isinstance(decisions_text, list):
+        decisions_text = "; ".join(decisions_text)
+
+    minutes_create = MinutesCreate(
+        trust_id=trust_id,
+        minutes_type=minutes_type_enum,
+        meeting_date=mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+        participants_text=participants_text,
+        decisions_text=decisions_text,
+        status="draft",  # Fix 4b: draft, not finalized
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    result = await _create_minutes(
+        minutes=minutes_create,
+        background_tasks=BackgroundTasks(),
+        user=user_doc,
+    )
+    # Onboarding update: minutes router only calls auto_update_onboarding
+    # for finalized minutes, but chat creates drafts. Update here so
+    # the onboarding checklist reflects that minutes were generated.
+    try:
+        from dependencies import auto_update_onboarding
+        await auto_update_onboarding(user_id, trust_id)
+    except Exception:
+        pass
+    return {
+        "success": True,
+        "record_id": result.minutes_id,
+        "endpoint": "minutes",
+        "status": "draft",
+        "review_link": f"/minutes/{result.minutes_id}/edit",
+    }
+
+    
+
+
+async def _exec_contribute_asset(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: contribute_asset."""
+    # Combined action: create a Schedule A item AND an acceptance-of-property
+    # minutes record in one transactional flow.
+    from routers.schedule_a import create_schedule_a_item as _create_asset
+    from routers.minutes import create_minutes as _create_minutes, generate_template_document
+    from models import ScheduleAItemCreate, AssetCategory, MinutesCreate, MinutesType
+    from fastapi import BackgroundTasks
+
+    # --- 0) Deduplication check — reject if an active asset with the same description already exists ---
+    property_description = mapped_data.get("description", "")
+    if property_description:
+        existing_asset = await db.schedule_a_items.find_one({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "status": "active",
+            "description": {"$regex": f"^{re.escape(property_description)}$", "$options": "i"},
+        })
+        if existing_asset:
+            return {
+                "success": False,
+                "error": f"An active asset with the description '{property_description}' already exists on Schedule A. "
+                         f"Use a different description or update the existing asset instead.",
+                "endpoint": "contribute_asset",
+            }
+
+    # --- 1) Create the Schedule A item (same pattern as the asset block) ---
+    category = mapped_data.pop("category", "other_property")
+    try:
+        category_enum = AssetCategory(category)
+    except ValueError:
+        category_enum = AssetCategory.other_property
+
+    # Build notes: include ownership_pct as a meaningful note if present
+    notes = mapped_data.get("notes", "")
+    ownership_pct = mapped_data.get("ownership_pct")
+    if ownership_pct is not None:
+        ownership_note = f"Ownership: {ownership_pct}%"
+        notes = f"{notes}\n{ownership_note}".strip() if notes else ownership_note
+
+    asset_create = ScheduleAItemCreate(
+        trust_id=trust_id,
+        category=category_enum,
+        description=property_description,
+        approximate_value=mapped_data.get("approximate_value"),
+        date_conveyed=mapped_data.get("date_conveyed", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+        notes=notes,
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    asset_result = await _create_asset(item=asset_create, user=user_doc)
+    asset_id = asset_result.item_id
+
+    # --- 2) Create the acceptance-of-property minutes record ---
+    participants_text = mapped_data.get("participants_text", "")
+    if isinstance(participants_text, list):
+        participants_text = ", ".join(participants_text)
+
+    meeting_date = mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    grantor_name = mapped_data.get("grantor_name", "")
+    property_value = mapped_data.get("approximate_value")
+    conveyance_date = mapped_data.get("date_conveyed", meeting_date)
+
+    # Dynamic decisions_text referencing the actual property being contributed
+    decisions_text = f"Acceptance of {property_description or 'property'} contributed to the trust" + (f" (value: ${property_value:,.2f})" if property_value else "")
+
+    # Clean template_data — remove dead fields that create_minutes does not process
+    template_data = {
+        "grantor_name": grantor_name,
+        "property_description": property_description,
+        "property_value": property_value,
+        "conveyance_date": conveyance_date,
+        "meeting_date": meeting_date,
+        "trustees_present": [p.strip() for p in participants_text.split(",") if p.strip()],
+    }
+
+    minutes_create = MinutesCreate(
+        trust_id=trust_id,
+        minutes_type=MinutesType.general,
+        meeting_date=meeting_date,
+        participants_text=participants_text,
+        decisions_text=decisions_text,
+        status="draft",
+        template_type="acceptance_of_property",
+        template_data=template_data,
+    )
+
+    # Fetch the trust document for generate_template_document
+    trust_doc = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+
+    try:
+        minutes_result = await _create_minutes(
+            minutes=minutes_create,
+            background_tasks=BackgroundTasks(),
+            user=user_doc,
+        )
+    except Exception as minutes_exc:
+        # FIX 2 — Partial failure rollback: if minutes creation fails after
+        # the Schedule A item was already created, delete the orphaned item
+        # so we don't leave a dangling asset with no acceptance minutes.
+        logger.error(f"contribute_asset: minutes creation failed, rolling back Schedule A item {asset_id}: {minutes_exc}")
+        try:
+            # Route through the schedule_a router's delete endpoint
+            # to enforce ownership verification and audit logging.
+            from routers.schedule_a import delete_schedule_a_item as _delete_asset
+            await _delete_asset(item_id=asset_id, user=user_doc)
+        except Exception as del_exc:
+            logger.error(f"contribute_asset: failed to delete orphaned Schedule A item {asset_id}: {del_exc}")
+        return {
+            "success": False,
+            "error": f"Failed to create acceptance minutes: {minutes_exc}. The Schedule A item was rolled back.",
+            "endpoint": "contribute_asset",
+        }
+
+    # FIX 1 — Generate WHEREAS/RESOLVED formatted text and update the minutes record
+    try:
+        if trust_doc:
+            generated_text = generate_template_document(trust_doc, "acceptance_of_property", template_data)
+            if generated_text:
+                # Route through the minutes router's update_minutes endpoint
+                # to enforce ownership verification and validation.
+                from routers.minutes import update_minutes as _update_minutes
+                mock_req = _MockRequest({"decisions_text": generated_text})
+                await _update_minutes(
+                    minutes_id=minutes_result.minutes_id,
+                    request=mock_req,
+                    user=user_doc,
+                )
+    except Exception as gen_exc:
+        logger.error(f"contribute_asset: failed to generate template document for minutes {minutes_result.minutes_id}: {gen_exc}")
+        # Non-fatal — the minutes record still has the dynamic decisions_text fallback
+
+    # FIX 3 — Set minutes_ref on the Schedule A item pointing to the minutes record
+    try:
+        # Route through the schedule_a router's update endpoint to
+        # enforce ownership verification and validation.
+        from routers.schedule_a import update_schedule_a_item as _update_asset
+        from models import ScheduleAItemUpdate as _SAItemUpdate
+        ref_update = _SAItemUpdate(minutes_ref=minutes_result.minutes_id)
+        await _update_asset(
+            item_id=asset_id,
+            update=ref_update,
+            user=user_doc,
+        )
+    except Exception as ref_exc:
+        logger.error(f"contribute_asset: failed to set minutes_ref on Schedule A item {asset_id}: {ref_exc}")
+        # Non-fatal — both records exist but the link is missing
+
+    # --- 3) Update onboarding after both records are created ---
+    try:
+        from dependencies import auto_update_onboarding
+        await auto_update_onboarding(user_id, trust_id)
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "schedule_a_id": asset_id,
+        "minutes_id": minutes_result.minutes_id,
+        "endpoint": "contribute_asset",
+        "status": "draft",
+        "review_link": f"/minutes/{minutes_result.minutes_id}/edit",
+    }
+
+    
+
+
+async def _exec_beneficiary(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: beneficiary."""
+    # Route through the real trust_units router to ensure validation
+    # (units overflow check, fractional validation, certificate numbering).
+    from routers.trust_units import create_unit_certificate as _create_cert
+    from models import TrustUnitCertificateCreate
+
+    # Get unit settings for the trust to convert percentage to units
+    settings = await db.trust_units_settings.find_one({"trust_id": trust_id})
+    total_authorized = settings.get("total_authorized_units", 0) if settings else 0
+
+    allocation_pct = mapped_data.get("units", 0)
+    if total_authorized > 0 and isinstance(allocation_pct, (int, float)) and allocation_pct < 100:
+        units = max(1, round(total_authorized * allocation_pct / 100))
+    elif isinstance(allocation_pct, (int, float)):
+        units = int(allocation_pct) if allocation_pct > 0 else 1
+    else:
+        units = 1
+
+    cert_create = TrustUnitCertificateCreate(
+        trust_id=trust_id,
+        holder_name=mapped_data.get("holder_name", "Unknown"),
+        holder_type=mapped_data.get("holder_type", "individual"),
+        units=float(units),
+        issue_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        email=mapped_data.get("email"),
+        phone=mapped_data.get("phone"),
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _create_cert(certificate=cert_create, user=user_doc)
+        # Update onboarding checklist
+        try:
+            from dependencies import auto_update_onboarding
+            await auto_update_onboarding(user_id, trust_id)
+        except Exception:
+            pass
+        return {"success": True, "record_id": result.certificate_id, "endpoint": "trust-units/certificates"}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create beneficiary: {str(e)}"}
+
+    
+
+
+async def _exec_beneficiary_update(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: beneficiary_update."""
+    # Route through the beneficiaries router's update_beneficiary to
+    # enforce ownership verification (certificate must be active and
+    # belong to the user). Adds audit logging for the change.
+    from routers.beneficiaries import update_beneficiary as _update_bene
+    from models import BeneficiaryUpdate
+
+    # Find the existing beneficiary certificate by holder_name (case-insensitive)
+    existing = await db.trust_unit_certificates.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
+        "status": "active",
+    })
+    if not existing:
+        return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found. Use 'Create Beneficiary' to add them first."}
+
+    # Build the BeneficiaryUpdate model with only provided fields
+    update_kwargs = {}
+    if mapped_data.get("email"):
+        update_kwargs["email"] = mapped_data["email"]
+    if mapped_data.get("phone"):
+        update_kwargs["phone"] = mapped_data["phone"]
+    if mapped_data.get("notes"):
+        update_kwargs["notes"] = mapped_data["notes"]
+
+    if not update_kwargs:
+        return {"success": False, "error": "No update fields provided."}
+
+    bene_update = BeneficiaryUpdate(**update_kwargs)
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        await _update_beneficiary(
+            beneficiary_id=existing["certificate_id"],
+            data=bene_update,
+            user=user_doc,
+        )
+        # Audit log the beneficiary update
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="beneficiary_updated",
+            entity_type="trust_unit_certificate",
+            entity_id=existing["certificate_id"],
+            details={
+                "trust_id": trust_id,
+                "holder_name": existing.get("holder_name", ""),
+                "fields_changed": list(update_kwargs.keys()),
+            },
+        )
+        return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "updated"}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to update beneficiary: {str(e)}"}
+
+    
+
+
+async def _exec_beneficiary_removal(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: beneficiary_removal."""
+    # Route through the beneficiaries router's delete_beneficiary to
+    # enforce ownership verification and preserve the audit trail
+    # (soft-delete: marks certificate inactive rather than deleting).
+    from routers.beneficiaries import delete_beneficiary as _delete_bene
+
+    existing = await db.trust_unit_certificates.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
+        "status": "active",
+    })
+    if not existing:
+        return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found."}
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        await _delete_beneficiary(
+            beneficiary_id=existing["certificate_id"],
+            user=user_doc,
+        )
+        # Audit log the beneficiary removal
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="beneficiary_removed",
+            entity_type="trust_unit_certificate",
+            entity_id=existing["certificate_id"],
+            details={
+                "trust_id": trust_id,
+                "holder_name": existing.get("holder_name", ""),
+                "reason": mapped_data.get("reason", ""),
+            },
+        )
+        return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "removed"}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to remove beneficiary: {str(e)}"}
+
+    
+
+
+async def _exec_send_certificate(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: send_certificate."""
+    # Route through the beneficiaries router's send_beneficiary_certificate
+    # to enforce trust ownership verification, certificate lookup, email
+    # validation, and communication logging. Adds audit logging.
+    from routers.beneficiaries import send_beneficiary_certificate as _send_cert
+    from models import SendCertificateRequest
+
+    holder_name = mapped_data.get("holder_name", "")
+    override_email = mapped_data.get("email", "")
+
+    cert_req = SendCertificateRequest(
+        trust_id=trust_id,
+        beneficiary_name=holder_name,
+        email=override_email if override_email else None,
+        notes=mapped_data.get("notes"),
+    )
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _send_cert(data=cert_req, user=user_doc)
+        # Audit log the certificate send
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="certificate_sent_via_chat",
+            entity_type="trust_unit_certificate",
+            entity_id=result.get("certificate_id", ""),
+            details={
+                "trust_id": trust_id,
+                "beneficiary_name": holder_name,
+                "email_sent_to": result.get("email_sent_to", ""),
+                "units": result.get("units", 0),
+                "percentage": result.get("percentage", 0),
+                "source": "chat_assistant",
+            },
+        )
+        return {
+            "success": True,
+            "record_id": result.get("certificate_id", ""),
+            "endpoint": "certificate_notice",
+            "action": "emailed",
+            "email_sent_to": result.get("email_sent_to", ""),
+            "units": result.get("units", 0),
+            "percentage": result.get("percentage", 0),
+        }
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to send certificate: {str(e)}"}
+
+    
+
+
+async def _exec_distribution_cancel(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: distribution_cancel."""
+    # Route through the distributions router's delete_distribution to
+    # enforce ownership verification and audit logging. The chat "cancel"
+    # action maps to the canonical delete endpoint, which logs to the
+    # audit trail via log_audit_event.
+    from routers.distributions import delete_distribution as _delete_dist
+
+    # Find matching distribution by beneficiary name + optional amount/date
+    query = {"trust_id": trust_id, "user_id": user_id}
+    if mapped_data.get("beneficiary_name"):
+        query["beneficiary_name"] = {"$regex": f"^{mapped_data['beneficiary_name']}$", "$options": "i"}
+    if mapped_data.get("amount"):
+        query["amount"] = float(mapped_data["amount"])
+
+    existing = await db.distribution_records.find_one(query, sort=[("created_at", -1)])
+    if not existing:
+        return {"success": False, "error": "Distribution not found matching those details."}
+
+    # Governance check: cannot cancel an already-approved distribution
+    # without first revoking approval (status flow validation)
+    if existing.get("approved_at") and existing.get("status") != "cancelled":
+        return {
+            "success": False,
+            "error": "This distribution has already been approved and may have been executed. "
+                     "Please revoke approval on the Distributions page before cancelling.",
+            "requires_action": "revoke_approval",
+            "solvency_link": f"/distributions?approve={existing['distribution_id']}",
+        }
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        await _delete_dist(distribution_id=existing["distribution_id"], user=user_doc)
+        return {"success": True, "record_id": existing["distribution_id"], "endpoint": "distributions", "action": "cancelled"}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to cancel distribution: {str(e)}"}
+
+    
+
+
+async def _exec_document_upload(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: document_upload."""
+    # Route through the real vault router to ensure validation
+    # and onboarding updates.
+    from routers.vault import add_document as _add_doc, DocumentCreate
+
+    # Validate category against vault's DOC_CATEGORIES
+    category = mapped_data.get("category", "other")
+    try:
+        doc_create = DocumentCreate(
+            title=mapped_data.get("title", "Untitled Document"),
+            category=category,
+            description=mapped_data.get("notes", ""),
+            storage_provider="local_server",
+        )
+    except Exception as ve:
+        return {"success": False, "error": f"Invalid document data: {str(ve)}"}
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _add_doc(trust_id=trust_id, doc=doc_create, user=user_doc)
+        return {
+            "success": True,
+            "record_id": result["doc_id"],
+            "endpoint": "vault/documents",
+            "action": "created",
+            "note": "Document record created. Upload the file in the Vault page to complete.",
+        }
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create document: {str(e)}"}
+
+    
+
+
+async def _exec_compensation_plan(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: compensation_plan."""
+    # Route through the real compensation router to ensure validation,
+    # primary-plan logic, and onboarding updates.
+    from routers.compensation import create_comp_plan as _create_plan
+    from models import CompensationPlanCreate
+
+    annual_amount = float(mapped_data.get("annual_amount", 0))
+    effective_date = mapped_data.get("effective_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+    plan_create = CompensationPlanCreate(
+        trust_id=trust_id,
+        trustee_name=mapped_data.get("trustee_name", ""),
+        role=mapped_data.get("role", ""),
+        annual_amount=annual_amount,
+        annual_approved_amount=annual_amount,
+        fee_type=mapped_data.get("fee_type", "fixed"),
+        effective_date=effective_date,
+        notes=mapped_data.get("notes", ""),
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _create_plan(plan=plan_create, user=user_doc)
+        return {
+            "success": True,
+            "record_id": result.plan_id,
+            "endpoint": "compensation-plans",
+            "action": "created",
+        }
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create compensation plan: {str(e)}"}
+
+    
+
+
+async def _exec_compensation_payment(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: compensation_payment."""
+    # Route through the real compensation router to ensure validation,
+    # exceeds-plan detection, and onboarding updates.
+    from routers.compensation import create_comp_payment as _create_payment
+    from models import CompensationPaymentCreate
+
+    payment_date = mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    payment_amount = float(mapped_data.get("amount", 0))
+
+    payment_create = CompensationPaymentCreate(
+        trust_id=trust_id,
+        amount=payment_amount,
+        date=payment_date,
+        classification_text=mapped_data.get("classification_text", ""),
+        trustee_name=mapped_data.get("trustee_name") or None,
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _create_payment(payment=payment_create, user=user_doc)
+        return {
+            "success": True,
+            "record_id": result.payment_id,
+            "endpoint": "compensation-payments",
+            "action": "created",
+        }
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create compensation payment: {str(e)}"}
+
+    
+
+
+async def _exec_investment(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: investment."""
+    # Route through the real investments router to ensure validation.
+    from routers.investments import create_investment as _create_inv
+
+    cost_basis = float(mapped_data.get("cost_basis", 0))
+    current_value = float(mapped_data.get("current_value", 0)) if mapped_data.get("current_value") else cost_basis
+    investment_dict = {
+        "asset_name": mapped_data.get("asset_name", ""),
+        "asset_type": mapped_data.get("asset_type", "other"),
+        "purchase_date": mapped_data.get("purchase_date"),
+        "cost_basis": cost_basis,
+        "current_value": current_value,
+        "quantity": float(mapped_data.get("quantity", 1)) if mapped_data.get("quantity") else 1,
+        "unit": mapped_data.get("unit", "shares"),
+        "custodian": mapped_data.get("custodian"),
+        "notes": mapped_data.get("notes"),
+    }
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _create_inv(trust_id=trust_id, investment=investment_dict, user=user_doc)
+        # Update onboarding checklist (investments router doesn't call auto_update_onboarding)
+        try:
+            from dependencies import auto_update_onboarding
+            await auto_update_onboarding(user_id, trust_id)
+        except Exception:
+            pass
+        return {
+            "success": True,
+            "record_id": result["investment_id"],
+            "endpoint": "investments",
+            "action": "created",
+        }
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create investment: {str(e)}"}
+
+    
+
+
+async def _exec_task(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: task."""
+    # Route through the real tasks router to ensure validation,
+    # checklist template population, and onboarding updates.
+    from routers.tasks import create_task as _create_task
+    from models import GovernanceTaskCreate, TaskType
+
+    task_type_val = mapped_data.get("task_type", "custom")
+    try:
+        task_type_enum = TaskType(task_type_val)
+    except ValueError:
+        task_type_enum = TaskType.custom
+
+    task_create = GovernanceTaskCreate(
+        trust_id=trust_id,
+        task_type=task_type_enum,
+        due_date=mapped_data.get("due_date", ""),
+        description=mapped_data.get("description", ""),
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _create_task(task=task_create, user=user_doc)
+        return {
+            "success": True,
+            "record_id": result.task_id,
+            "endpoint": "tasks",
+            "action": "created",
+        }
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create task: {str(e)}"}
+
+    
+
+
+async def _exec_transaction(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: transaction."""
+    # Route through the real transactions router to ensure validation,
+    # audit logging, and alert detection.
+    from routers.transactions import create_transaction as _create_txn
+    from models import TransactionCreate, TransactionDirection, GovernanceClassification
+
+    # The transactions router requires an entity_id — look up the
+    # first entity for this trust (typically the Trust entity itself).
+    entity = await db.entities.find_one(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0},
+        sort=[("created_at", 1)],
+    )
+    if not entity:
+        return {
+            "success": False,
+            "error": "No entity found for this trust. Please create an entity (Trust, Holding LLC, or Operating LLC) before recording transactions.",
+        }
+    entity_id = entity["entity_id"]
+
+    # Map chat's "transaction_type" to direction + governance_classification.
+    # Chat sends transaction_type as "expense"/"income"/etc.
+    raw_type = mapped_data.get("transaction_type", "expense")
+    if raw_type in ("income", "deposit", "inflow"):
+        direction_enum = TransactionDirection.inflow
+        classification_enum = GovernanceClassification.capital_contribution
+    else:
+        direction_enum = TransactionDirection.outflow
+        classification_enum = GovernanceClassification.operational_expense
+
+    # Map chat's "category" if it matches a known GovernanceClassification
+    raw_category = mapped_data.get("category", "")
+    if raw_category:
+        try:
+            classification_enum = GovernanceClassification(raw_category)
+        except ValueError:
+            pass  # keep the default
+
+    txn_create = TransactionCreate(
+        trust_id=trust_id,
+        entity_id=entity_id,
+        date=mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+        amount=float(mapped_data.get("amount", 0)),
+        direction=direction_enum,
+        governance_classification=classification_enum,
+        purpose_memo=mapped_data.get("description", ""),
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _create_txn(txn=txn_create, user=user_doc)
+        # Update onboarding checklist (transactions router doesn't call auto_update_onboarding)
+        try:
+            from dependencies import auto_update_onboarding
+            await auto_update_onboarding(user_id, trust_id)
+        except Exception:
+            pass
+        return {
+            "success": True,
+            "record_id": result.transaction_id,
+            "endpoint": "transactions",
+            "action": "created",
+        }
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create transaction: {str(e)}"}
+
+    
+
+
+async def _exec_entity(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: entity."""
+    # Route through the real entities router to ensure validation
+    # and onboarding updates.
+    from routers.entities import create_entity as _create_entity
+    from models import EntityCreate, EntityType
+
+    # Validate entity_type — must be one of the allowed values
+    raw_type = mapped_data.get("entity_type", "Trust")
+    entity_type_enum = None
+    for et in EntityType:
+        if raw_type and raw_type.lower() == et.value.lower():
+            entity_type_enum = et
+            break
+    if not entity_type_enum:
+        entity_type_enum = EntityType.trust  # default to Trust if unrecognized
+
+    name = mapped_data.get("name", "")
+    entity_create = EntityCreate(
+        trust_id=trust_id,
+        name=name,
+        entity_type=entity_type_enum,
+        legal_name=mapped_data.get("legal_name", name),
+        formation_date=mapped_data.get("formation_date"),
+        governing_law=mapped_data.get("governing_law", ""),
+        ein=mapped_data.get("ein"),
+        trustee_names=mapped_data.get("trustee_names", ""),
+        member_names=mapped_data.get("member_names", ""),
+        manager_names=mapped_data.get("manager_names", ""),
+    )
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _create_entity(entity=entity_create, user=user_doc)
+        return {
+            "success": True,
+            "record_id": result.entity_id,
+            "endpoint": "entities",
+            "action": "created",
+        }
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create entity: {str(e)}"}
+
+    
+
+
+async def _exec_settings_update(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: settings_update."""
+    # Route through the trusts router's update_trust to enforce
+    # ownership verification, field validation (EIN format, tax year
+    # end), jurisdiction/state_code auto-sync, and audit logging
+    # (update_trust calls log_audit_event internally).
+    from routers.trusts import update_trust as _update_trust
+    from models import TrustUpdate
+
+    field = mapped_data.get("field", "")
+    value = mapped_data.get("value", "")
+    field_mapping = {
+        "name": "name",
+        "trust_type": "trust_type",
+        "formation_date": "start_date",
+        "ein": "ein",
+        "jurisdiction": "jurisdiction",
+        "state_code": "state_code",
+    }
+    db_field = field_mapping.get(field.lower().replace(" ", "_"))
+    if not db_field:
+        return {"success": False, "error": f"Unknown field: {field}. Valid fields: name, trust_type, formation_date, ein, jurisdiction, state_code"}
+
+    # Build the TrustUpdate model with only the provided field
+    update_kwargs = {db_field: value}
+    try:
+        trust_update = TrustUpdate(**update_kwargs)
+    except Exception as ve:
+        return {"success": False, "error": f"Invalid value for field '{field}': {str(ve)}"}
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        await _update_trust(
+            trust_id=trust_id,
+            update=trust_update,
+            user=user_doc,
+        )
+        # update_trust already logs to audit trail via log_audit_event,
+        # but we add a chat-specific audit entry for traceability.
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="trust_settings_updated_via_chat",
+            entity_type="trust",
+            entity_id=trust_id,
+            details={
+                "field_changed": db_field,
+                "source": "chat_assistant",
+            },
+        )
+        return {"success": True, "record_id": trust_id, "endpoint": "trusts", "action": "updated", "field": db_field}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to update trust settings: {str(e)}"}
+
+    
+
+
+async def _exec_alert_dismiss(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: alert_dismiss."""
+    # Route through the governance router's dismiss_insight to enforce
+    # trust ownership verification. Adds audit logging for the dismissal.
+    from routers.governance import dismiss_insight as _dismiss_insight
+    from models import DismissedInsightCreate
+
+    criterion = mapped_data.get("criterion_name", "")
+    if not criterion:
+        return {"success": False, "error": "No criterion name provided to dismiss."}
+
+    dismiss_req = DismissedInsightCreate(trust_id=trust_id, criterion_name=criterion)
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        await _dismiss_insight(req=dismiss_req, user=user_doc)
+        # Audit log the alert dismissal
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="alert_dismissed_via_chat",
+            entity_type="governance_insight",
+            entity_id=criterion,
+            details={
+                "trust_id": trust_id,
+                "criterion_name": criterion,
+                "source": "chat_assistant",
+            },
+        )
+        return {"success": True, "endpoint": "insights", "action": "dismissed", "criterion": criterion}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to dismiss insight: {str(e)}"}
+
+    
+
+
+async def _exec_class_beneficiary(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: class_beneficiary."""
+    # Route through the beneficiaries router's create_class_beneficiary
+    # to enforce trust ownership verification and class_type validation
+    # via the ClassBeneficiaryType enum. Adds audit logging.
+    from routers.beneficiaries import create_class_beneficiary as _create_cb
+    from models import ClassBeneficiaryCreate, ClassBeneficiaryType
+
+    class_type_raw = mapped_data.get("class_type", "custom")
+    try:
+        class_type_enum = ClassBeneficiaryType(class_type_raw)
+    except ValueError:
+        class_type_enum = ClassBeneficiaryType.custom
+
+    cb_create = ClassBeneficiaryCreate(
+        trust_id=trust_id,
+        class_type=class_type_enum,
+        description=mapped_data.get("description", ""),
+        percentage=float(mapped_data.get("percentage", 0)),
+        notes=mapped_data.get("notes", ""),
+    )
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        result = await _create_cb(data=cb_create, user=user_doc)
+        cb_id = result.get("class_beneficiary_id", "")
+        # Audit log the class beneficiary creation
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="class_beneficiary_created_via_chat",
+            entity_type="class_beneficiary",
+            entity_id=cb_id,
+            details={
+                "trust_id": trust_id,
+                "class_type": class_type_enum.value,
+                "percentage": float(mapped_data.get("percentage", 0)),
+                "source": "chat_assistant",
+            },
+        )
+        # Update onboarding checklist
+        try:
+            from dependencies import auto_update_onboarding
+            await auto_update_onboarding(user_id, trust_id)
+        except Exception:
+            pass
+        return {"success": True, "record_id": cb_id, "endpoint": "class-beneficiaries", "action": "created"}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create class beneficiary: {str(e)}"}
+
+    
+
+
+async def _exec_class_beneficiary_removal(mapped_data: dict, trust_id: str, user_id: str) -> dict:
+    """Execute approved action: class_beneficiary_removal."""
+    # Route through the beneficiaries router's delete_class_beneficiary
+    # to enforce ownership verification (user_id match). Adds audit logging.
+    from routers.beneficiaries import delete_class_beneficiary as _delete_cb
+
+    class_type = mapped_data.get("class_type", "")
+    existing = await db.class_beneficiaries.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "class_type": class_type,
+    })
+    if not existing:
+        return {"success": False, "error": f"Class beneficiary '{class_type}' not found for this trust."}
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        user_doc = {"user_id": user_id, "email": "", "name": ""}
+    try:
+        await _delete_cb(
+            class_beneficiary_id=existing["class_beneficiary_id"],
+            user=user_doc,
+        )
+        # Audit log the class beneficiary removal
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="class_beneficiary_removed_via_chat",
+            entity_type="class_beneficiary",
+            entity_id=existing["class_beneficiary_id"],
+            details={
+                "trust_id": trust_id,
+                "class_type": class_type,
+                "reason": mapped_data.get("reason", ""),
+                "source": "chat_assistant",
+            },
+        )
+        return {"success": True, "record_id": existing["class_beneficiary_id"], "endpoint": "class-beneficiaries", "action": "removed"}
+    except HTTPException as e:
+        return {"success": False, "error": e.detail}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to remove class beneficiary: {str(e)}"}
+
+    
+
+
+ACTION_DISPATCH = {
+    "distribution": _exec_distribution,
+    "asset": _exec_asset,
+    "asset_update": _exec_asset_update,
+    "minutes": _exec_minutes,
+    "contribute_asset": _exec_contribute_asset,
+    "beneficiary": _exec_beneficiary,
+    "beneficiary_update": _exec_beneficiary_update,
+    "beneficiary_removal": _exec_beneficiary_removal,
+    "send_certificate": _exec_send_certificate,
+    "distribution_cancel": _exec_distribution_cancel,
+    "document_upload": _exec_document_upload,
+    "compensation_plan": _exec_compensation_plan,
+    "compensation_payment": _exec_compensation_payment,
+    "investment": _exec_investment,
+    "task": _exec_task,
+    "transaction": _exec_transaction,
+    "entity": _exec_entity,
+    "settings_update": _exec_settings_update,
+    "alert_dismiss": _exec_alert_dismiss,
+    "class_beneficiary": _exec_class_beneficiary,
+    "class_beneficiary_removal": _exec_class_beneficiary_removal,
+}
+
 async def _execute_approved_action(
     action_card: dict,
     user_id: str,
@@ -659,1092 +1853,9 @@ async def _execute_approved_action(
     mapped_data["trust_id"] = trust_id
 
     try:
-        if endpoint_type == "distribution":
-            # Route through the real distribution router to ensure validation,
-            # activity logging, onboarding updates, and email notifications.
-            from routers.distributions import create_distribution as _create_dist
-            from models import DistributionCreate, PurposeClassification
-            from fastapi import BackgroundTasks
-
-            purpose = mapped_data.pop("purpose_classification", "other")
-            try:
-                purpose_enum = PurposeClassification(purpose)
-            except ValueError:
-                purpose_enum = PurposeClassification.other
-
-            dist_create = DistributionCreate(
-                trust_id=trust_id,
-                beneficiary_name=mapped_data.get("beneficiary_name", "Unknown"),
-                amount=float(mapped_data.get("amount", 0)),
-                date=mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                purpose_classification=purpose_enum,
-                notes=mapped_data.get("notes", ""),
-                is_benevolence=False,
-            )
-            # Fetch user dict for the router call
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            result = await _create_dist(
-                dist=dist_create,
-                background_tasks=BackgroundTasks(),
-                user=user_doc,
-            )
-            # Distribution is created in "review" status with solvency_confirmed=False.
-            # The chat must tell the user to confirm solvency on the Distributions page.
-            return {
-                "success": True,
-                "record_id": result.distribution_id,
-                "endpoint": "distributions",
-                "requires_solvency_confirmation": True,
-                "solvency_link": f"/distributions?approve={result.distribution_id}",
-            }
-
-        elif endpoint_type == "asset":
-            # Route through the real schedule_a router to ensure validation.
-            from routers.schedule_a import create_schedule_a_item as _create_asset
-            from models import ScheduleAItemCreate, AssetCategory
-            from fastapi import BackgroundTasks
-
-            category = mapped_data.pop("category", "other_property")
-            try:
-                category_enum = AssetCategory(category)
-            except ValueError:
-                category_enum = AssetCategory.other_property
-
-            asset_create = ScheduleAItemCreate(
-                trust_id=trust_id,
-                category=category_enum,
-                description=mapped_data.get("description", ""),
-                approximate_value=mapped_data.get("approximate_value"),
-                date_conveyed=mapped_data.get("date_conveyed", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                notes=mapped_data.get("notes", ""),
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            result = await _create_asset(item=asset_create, user=user_doc)
-            # Update onboarding (schedule_a router doesn't call auto_update_onboarding)
-            try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-            return {"success": True, "record_id": result.item_id, "endpoint": "schedule-a"}
-
-        elif endpoint_type == "asset_update":
-            # Route through the schedule_a router's update_schedule_a_item to
-            # enforce ownership verification and validation. Adds audit logging
-            # for the valuation update.
-            from routers.schedule_a import update_schedule_a_item as _update_asset
-            from models import ScheduleAItemUpdate
-
-            # Look up the existing asset by description (fuzzy match)
-            asset_desc = mapped_data.get("asset_description", "")
-            if not asset_desc:
-                return {"success": False, "error": "Asset description is required to identify which asset to update."}
-
-            # Try exact match first, then partial match
-            existing = await db.schedule_a_items.find_one({
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "status": "active",
-                "description": {"$regex": re.escape(asset_desc), "$options": "i"}
-            })
-
-            if not existing:
-                # Try broader partial match
-                existing = await db.schedule_a_items.find_one({
-                    "trust_id": trust_id,
-                    "user_id": user_id,
-                    "status": "active",
-                    "description": {"$regex": re.escape(asset_desc.split()[0]), "$options": "i"}
-                })
-
-            if not existing:
-                return {"success": False, "error": f"Could not find an active asset matching '{asset_desc}'. Please check the description and try again."}
-
-            # Build the ScheduleAItemUpdate model with only provided fields
-            update_kwargs = {}
-            if mapped_data.get("new_value") is not None:
-                update_kwargs["approximate_value"] = float(mapped_data["new_value"])
-            if mapped_data.get("new_description"):
-                update_kwargs["description"] = mapped_data["new_description"]
-            if mapped_data.get("notes"):
-                update_kwargs["notes"] = mapped_data["notes"]
-
-            # Always record the valuation date via notes append
-            valuation_date = mapped_data.get("valuation_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            if "notes" in update_kwargs:
-                update_kwargs["notes"] = f"{update_kwargs['notes']} | Valuation date: {valuation_date}"
-            else:
-                update_kwargs["notes"] = f"Valuation date: {valuation_date}"
-
-            if not update_kwargs:
-                return {"success": False, "error": "No update fields provided."}
-
-            asset_update = ScheduleAItemUpdate(**update_kwargs)
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                await _update_asset(
-                    item_id=existing["item_id"],
-                    update=asset_update,
-                    user=user_doc,
-                )
-                # Audit log the asset valuation update
-                from utils.audit import log_audit_event
-                await log_audit_event(
-                    user_id=user_id,
-                    action="asset_updated",
-                    entity_type="schedule_a_item",
-                    entity_id=existing["item_id"],
-                    details={
-                        "trust_id": trust_id,
-                        "description": existing.get("description", ""),
-                        "fields_changed": list(update_kwargs.keys()),
-                        "valuation_date": valuation_date,
-                    },
-                )
-                return {"success": True, "record_id": existing["item_id"], "endpoint": "schedule-a"}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to update asset: {str(e)}"}
-
-        elif endpoint_type == "minutes":
-            # Route through the real minutes router to ensure validation,
-            # onboarding updates, and email notifications.
-            # Fix 4b: chat minutes must be status="draft", not "finalized".
-            from routers.minutes import create_minutes as _create_minutes
-            from models import MinutesCreate, MinutesType
-            from fastapi import BackgroundTasks
-
-            minutes_type_val = mapped_data.pop("minutes_type", "general")
-            try:
-                minutes_type_enum = MinutesType(minutes_type_val)
-            except ValueError:
-                minutes_type_enum = MinutesType.general
-
-            participants_text = mapped_data.get("participants_text", "")
-            if isinstance(participants_text, list):
-                participants_text = ", ".join(participants_text)
-
-            decisions_text = mapped_data.get("decisions_text", "")
-            if isinstance(decisions_text, list):
-                decisions_text = "; ".join(decisions_text)
-
-            minutes_create = MinutesCreate(
-                trust_id=trust_id,
-                minutes_type=minutes_type_enum,
-                meeting_date=mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                participants_text=participants_text,
-                decisions_text=decisions_text,
-                status="draft",  # Fix 4b: draft, not finalized
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            result = await _create_minutes(
-                minutes=minutes_create,
-                background_tasks=BackgroundTasks(),
-                user=user_doc,
-            )
-            # Onboarding update: minutes router only calls auto_update_onboarding
-            # for finalized minutes, but chat creates drafts. Update here so
-            # the onboarding checklist reflects that minutes were generated.
-            try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-            return {
-                "success": True,
-                "record_id": result.minutes_id,
-                "endpoint": "minutes",
-                "status": "draft",
-                "review_link": f"/minutes/{result.minutes_id}/edit",
-            }
-
-        elif endpoint_type == "contribute_asset":
-            # Combined action: create a Schedule A item AND an acceptance-of-property
-            # minutes record in one transactional flow.
-            from routers.schedule_a import create_schedule_a_item as _create_asset
-            from routers.minutes import create_minutes as _create_minutes, generate_template_document
-            from models import ScheduleAItemCreate, AssetCategory, MinutesCreate, MinutesType
-            from fastapi import BackgroundTasks
-
-            # --- 0) Deduplication check — reject if an active asset with the same description already exists ---
-            property_description = mapped_data.get("description", "")
-            if property_description:
-                existing_asset = await db.schedule_a_items.find_one({
-                    "trust_id": trust_id,
-                    "user_id": user_id,
-                    "status": "active",
-                    "description": {"$regex": f"^{re.escape(property_description)}$", "$options": "i"},
-                })
-                if existing_asset:
-                    return {
-                        "success": False,
-                        "error": f"An active asset with the description '{property_description}' already exists on Schedule A. "
-                                 f"Use a different description or update the existing asset instead.",
-                        "endpoint": "contribute_asset",
-                    }
-
-            # --- 1) Create the Schedule A item (same pattern as the asset block) ---
-            category = mapped_data.pop("category", "other_property")
-            try:
-                category_enum = AssetCategory(category)
-            except ValueError:
-                category_enum = AssetCategory.other_property
-
-            # Build notes: include ownership_pct as a meaningful note if present
-            notes = mapped_data.get("notes", "")
-            ownership_pct = mapped_data.get("ownership_pct")
-            if ownership_pct is not None:
-                ownership_note = f"Ownership: {ownership_pct}%"
-                notes = f"{notes}\n{ownership_note}".strip() if notes else ownership_note
-
-            asset_create = ScheduleAItemCreate(
-                trust_id=trust_id,
-                category=category_enum,
-                description=property_description,
-                approximate_value=mapped_data.get("approximate_value"),
-                date_conveyed=mapped_data.get("date_conveyed", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                notes=notes,
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            asset_result = await _create_asset(item=asset_create, user=user_doc)
-            asset_id = asset_result.item_id
-
-            # --- 2) Create the acceptance-of-property minutes record ---
-            participants_text = mapped_data.get("participants_text", "")
-            if isinstance(participants_text, list):
-                participants_text = ", ".join(participants_text)
-
-            meeting_date = mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-            grantor_name = mapped_data.get("grantor_name", "")
-            property_value = mapped_data.get("approximate_value")
-            conveyance_date = mapped_data.get("date_conveyed", meeting_date)
-
-            # Dynamic decisions_text referencing the actual property being contributed
-            decisions_text = f"Acceptance of {property_description or 'property'} contributed to the trust" + (f" (value: ${property_value:,.2f})" if property_value else "")
-
-            # Clean template_data — remove dead fields that create_minutes does not process
-            template_data = {
-                "grantor_name": grantor_name,
-                "property_description": property_description,
-                "property_value": property_value,
-                "conveyance_date": conveyance_date,
-                "meeting_date": meeting_date,
-                "trustees_present": [p.strip() for p in participants_text.split(",") if p.strip()],
-            }
-
-            minutes_create = MinutesCreate(
-                trust_id=trust_id,
-                minutes_type=MinutesType.general,
-                meeting_date=meeting_date,
-                participants_text=participants_text,
-                decisions_text=decisions_text,
-                status="draft",
-                template_type="acceptance_of_property",
-                template_data=template_data,
-            )
-
-            # Fetch the trust document for generate_template_document
-            trust_doc = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
-
-            try:
-                minutes_result = await _create_minutes(
-                    minutes=minutes_create,
-                    background_tasks=BackgroundTasks(),
-                    user=user_doc,
-                )
-            except Exception as minutes_exc:
-                # FIX 2 — Partial failure rollback: if minutes creation fails after
-                # the Schedule A item was already created, delete the orphaned item
-                # so we don't leave a dangling asset with no acceptance minutes.
-                logger.error(f"contribute_asset: minutes creation failed, rolling back Schedule A item {asset_id}: {minutes_exc}")
-                try:
-                    # Route through the schedule_a router's delete endpoint
-                    # to enforce ownership verification and audit logging.
-                    from routers.schedule_a import delete_schedule_a_item as _delete_asset
-                    await _delete_asset(item_id=asset_id, user=user_doc)
-                except Exception as del_exc:
-                    logger.error(f"contribute_asset: failed to delete orphaned Schedule A item {asset_id}: {del_exc}")
-                return {
-                    "success": False,
-                    "error": f"Failed to create acceptance minutes: {minutes_exc}. The Schedule A item was rolled back.",
-                    "endpoint": "contribute_asset",
-                }
-
-            # FIX 1 — Generate WHEREAS/RESOLVED formatted text and update the minutes record
-            try:
-                if trust_doc:
-                    generated_text = generate_template_document(trust_doc, "acceptance_of_property", template_data)
-                    if generated_text:
-                        # Route through the minutes router's update_minutes endpoint
-                        # to enforce ownership verification and validation.
-                        from routers.minutes import update_minutes as _update_minutes
-                        mock_req = _MockRequest({"decisions_text": generated_text})
-                        await _update_minutes(
-                            minutes_id=minutes_result.minutes_id,
-                            request=mock_req,
-                            user=user_doc,
-                        )
-            except Exception as gen_exc:
-                logger.error(f"contribute_asset: failed to generate template document for minutes {minutes_result.minutes_id}: {gen_exc}")
-                # Non-fatal — the minutes record still has the dynamic decisions_text fallback
-
-            # FIX 3 — Set minutes_ref on the Schedule A item pointing to the minutes record
-            try:
-                # Route through the schedule_a router's update endpoint to
-                # enforce ownership verification and validation.
-                from routers.schedule_a import update_schedule_a_item as _update_asset
-                from models import ScheduleAItemUpdate as _SAItemUpdate
-                ref_update = _SAItemUpdate(minutes_ref=minutes_result.minutes_id)
-                await _update_asset(
-                    item_id=asset_id,
-                    update=ref_update,
-                    user=user_doc,
-                )
-            except Exception as ref_exc:
-                logger.error(f"contribute_asset: failed to set minutes_ref on Schedule A item {asset_id}: {ref_exc}")
-                # Non-fatal — both records exist but the link is missing
-
-            # --- 3) Update onboarding after both records are created ---
-            try:
-                from dependencies import auto_update_onboarding
-                await auto_update_onboarding(user_id, trust_id)
-            except Exception:
-                pass
-
-            return {
-                "success": True,
-                "schedule_a_id": asset_id,
-                "minutes_id": minutes_result.minutes_id,
-                "endpoint": "contribute_asset",
-                "status": "draft",
-                "review_link": f"/minutes/{minutes_result.minutes_id}/edit",
-            }
-
-        elif endpoint_type == "beneficiary":
-            # Route through the real trust_units router to ensure validation
-            # (units overflow check, fractional validation, certificate numbering).
-            from routers.trust_units import create_unit_certificate as _create_cert
-            from models import TrustUnitCertificateCreate
-
-            # Get unit settings for the trust to convert percentage to units
-            settings = await db.trust_units_settings.find_one({"trust_id": trust_id})
-            total_authorized = settings.get("total_authorized_units", 0) if settings else 0
-
-            allocation_pct = mapped_data.get("units", 0)
-            if total_authorized > 0 and isinstance(allocation_pct, (int, float)) and allocation_pct < 100:
-                units = max(1, round(total_authorized * allocation_pct / 100))
-            elif isinstance(allocation_pct, (int, float)):
-                units = int(allocation_pct) if allocation_pct > 0 else 1
-            else:
-                units = 1
-
-            cert_create = TrustUnitCertificateCreate(
-                trust_id=trust_id,
-                holder_name=mapped_data.get("holder_name", "Unknown"),
-                holder_type=mapped_data.get("holder_type", "individual"),
-                units=float(units),
-                issue_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                email=mapped_data.get("email"),
-                phone=mapped_data.get("phone"),
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _create_cert(certificate=cert_create, user=user_doc)
-                # Update onboarding checklist
-                try:
-                    from dependencies import auto_update_onboarding
-                    await auto_update_onboarding(user_id, trust_id)
-                except Exception:
-                    pass
-                return {"success": True, "record_id": result.certificate_id, "endpoint": "trust-units/certificates"}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create beneficiary: {str(e)}"}
-
-        elif endpoint_type == "beneficiary_update":
-            # Route through the beneficiaries router's update_beneficiary to
-            # enforce ownership verification (certificate must be active and
-            # belong to the user). Adds audit logging for the change.
-            from routers.beneficiaries import update_beneficiary as _update_bene
-            from models import BeneficiaryUpdate
-
-            # Find the existing beneficiary certificate by holder_name (case-insensitive)
-            existing = await db.trust_unit_certificates.find_one({
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
-                "status": "active",
-            })
-            if not existing:
-                return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found. Use 'Create Beneficiary' to add them first."}
-
-            # Build the BeneficiaryUpdate model with only provided fields
-            update_kwargs = {}
-            if mapped_data.get("email"):
-                update_kwargs["email"] = mapped_data["email"]
-            if mapped_data.get("phone"):
-                update_kwargs["phone"] = mapped_data["phone"]
-            if mapped_data.get("notes"):
-                update_kwargs["notes"] = mapped_data["notes"]
-
-            if not update_kwargs:
-                return {"success": False, "error": "No update fields provided."}
-
-            bene_update = BeneficiaryUpdate(**update_kwargs)
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                await _update_beneficiary(
-                    beneficiary_id=existing["certificate_id"],
-                    data=bene_update,
-                    user=user_doc,
-                )
-                # Audit log the beneficiary update
-                from utils.audit import log_audit_event
-                await log_audit_event(
-                    user_id=user_id,
-                    action="beneficiary_updated",
-                    entity_type="trust_unit_certificate",
-                    entity_id=existing["certificate_id"],
-                    details={
-                        "trust_id": trust_id,
-                        "holder_name": existing.get("holder_name", ""),
-                        "fields_changed": list(update_kwargs.keys()),
-                    },
-                )
-                return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "updated"}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to update beneficiary: {str(e)}"}
-
-        elif endpoint_type == "beneficiary_removal":
-            # Route through the beneficiaries router's delete_beneficiary to
-            # enforce ownership verification and preserve the audit trail
-            # (soft-delete: marks certificate inactive rather than deleting).
-            from routers.beneficiaries import delete_beneficiary as _delete_bene
-
-            existing = await db.trust_unit_certificates.find_one({
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
-                "status": "active",
-            })
-            if not existing:
-                return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found."}
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                await _delete_beneficiary(
-                    beneficiary_id=existing["certificate_id"],
-                    user=user_doc,
-                )
-                # Audit log the beneficiary removal
-                from utils.audit import log_audit_event
-                await log_audit_event(
-                    user_id=user_id,
-                    action="beneficiary_removed",
-                    entity_type="trust_unit_certificate",
-                    entity_id=existing["certificate_id"],
-                    details={
-                        "trust_id": trust_id,
-                        "holder_name": existing.get("holder_name", ""),
-                        "reason": mapped_data.get("reason", ""),
-                    },
-                )
-                return {"success": True, "record_id": existing["certificate_id"], "endpoint": "beneficiaries", "action": "removed"}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to remove beneficiary: {str(e)}"}
-
-        elif endpoint_type == "send_certificate":
-            # Route through the beneficiaries router's send_beneficiary_certificate
-            # to enforce trust ownership verification, certificate lookup, email
-            # validation, and communication logging. Adds audit logging.
-            from routers.beneficiaries import send_beneficiary_certificate as _send_cert
-            from models import SendCertificateRequest
-
-            holder_name = mapped_data.get("holder_name", "")
-            override_email = mapped_data.get("email", "")
-
-            cert_req = SendCertificateRequest(
-                trust_id=trust_id,
-                beneficiary_name=holder_name,
-                email=override_email if override_email else None,
-                notes=mapped_data.get("notes"),
-            )
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _send_cert(data=cert_req, user=user_doc)
-                # Audit log the certificate send
-                from utils.audit import log_audit_event
-                await log_audit_event(
-                    user_id=user_id,
-                    action="certificate_sent_via_chat",
-                    entity_type="trust_unit_certificate",
-                    entity_id=result.get("certificate_id", ""),
-                    details={
-                        "trust_id": trust_id,
-                        "beneficiary_name": holder_name,
-                        "email_sent_to": result.get("email_sent_to", ""),
-                        "units": result.get("units", 0),
-                        "percentage": result.get("percentage", 0),
-                        "source": "chat_assistant",
-                    },
-                )
-                return {
-                    "success": True,
-                    "record_id": result.get("certificate_id", ""),
-                    "endpoint": "certificate_notice",
-                    "action": "emailed",
-                    "email_sent_to": result.get("email_sent_to", ""),
-                    "units": result.get("units", 0),
-                    "percentage": result.get("percentage", 0),
-                }
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to send certificate: {str(e)}"}
-
-        elif endpoint_type == "distribution_cancel":
-            # Route through the distributions router's delete_distribution to
-            # enforce ownership verification and audit logging. The chat "cancel"
-            # action maps to the canonical delete endpoint, which logs to the
-            # audit trail via log_audit_event.
-            from routers.distributions import delete_distribution as _delete_dist
-
-            # Find matching distribution by beneficiary name + optional amount/date
-            query = {"trust_id": trust_id, "user_id": user_id}
-            if mapped_data.get("beneficiary_name"):
-                query["beneficiary_name"] = {"$regex": f"^{mapped_data['beneficiary_name']}$", "$options": "i"}
-            if mapped_data.get("amount"):
-                query["amount"] = float(mapped_data["amount"])
-
-            existing = await db.distribution_records.find_one(query, sort=[("created_at", -1)])
-            if not existing:
-                return {"success": False, "error": "Distribution not found matching those details."}
-
-            # Governance check: cannot cancel an already-approved distribution
-            # without first revoking approval (status flow validation)
-            if existing.get("approved_at") and existing.get("status") != "cancelled":
-                return {
-                    "success": False,
-                    "error": "This distribution has already been approved and may have been executed. "
-                             "Please revoke approval on the Distributions page before cancelling.",
-                    "requires_action": "revoke_approval",
-                    "solvency_link": f"/distributions?approve={existing['distribution_id']}",
-                }
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                await _delete_dist(distribution_id=existing["distribution_id"], user=user_doc)
-                return {"success": True, "record_id": existing["distribution_id"], "endpoint": "distributions", "action": "cancelled"}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to cancel distribution: {str(e)}"}
-
-        elif endpoint_type == "document_upload":
-            # Route through the real vault router to ensure validation
-            # and onboarding updates.
-            from routers.vault import add_document as _add_doc, DocumentCreate
-
-            # Validate category against vault's DOC_CATEGORIES
-            category = mapped_data.get("category", "other")
-            try:
-                doc_create = DocumentCreate(
-                    title=mapped_data.get("title", "Untitled Document"),
-                    category=category,
-                    description=mapped_data.get("notes", ""),
-                    storage_provider="local_server",
-                )
-            except Exception as ve:
-                return {"success": False, "error": f"Invalid document data: {str(ve)}"}
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _add_doc(trust_id=trust_id, doc=doc_create, user=user_doc)
-                return {
-                    "success": True,
-                    "record_id": result["doc_id"],
-                    "endpoint": "vault/documents",
-                    "action": "created",
-                    "note": "Document record created. Upload the file in the Vault page to complete.",
-                }
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create document: {str(e)}"}
-
-        elif endpoint_type == "compensation_plan":
-            # Route through the real compensation router to ensure validation,
-            # primary-plan logic, and onboarding updates.
-            from routers.compensation import create_comp_plan as _create_plan
-            from models import CompensationPlanCreate
-
-            annual_amount = float(mapped_data.get("annual_amount", 0))
-            effective_date = mapped_data.get("effective_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-
-            plan_create = CompensationPlanCreate(
-                trust_id=trust_id,
-                trustee_name=mapped_data.get("trustee_name", ""),
-                role=mapped_data.get("role", ""),
-                annual_amount=annual_amount,
-                annual_approved_amount=annual_amount,
-                fee_type=mapped_data.get("fee_type", "fixed"),
-                effective_date=effective_date,
-                notes=mapped_data.get("notes", ""),
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _create_plan(plan=plan_create, user=user_doc)
-                return {
-                    "success": True,
-                    "record_id": result.plan_id,
-                    "endpoint": "compensation-plans",
-                    "action": "created",
-                }
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create compensation plan: {str(e)}"}
-
-        elif endpoint_type == "compensation_payment":
-            # Route through the real compensation router to ensure validation,
-            # exceeds-plan detection, and onboarding updates.
-            from routers.compensation import create_comp_payment as _create_payment
-            from models import CompensationPaymentCreate
-
-            payment_date = mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-            payment_amount = float(mapped_data.get("amount", 0))
-
-            payment_create = CompensationPaymentCreate(
-                trust_id=trust_id,
-                amount=payment_amount,
-                date=payment_date,
-                classification_text=mapped_data.get("classification_text", ""),
-                trustee_name=mapped_data.get("trustee_name") or None,
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _create_payment(payment=payment_create, user=user_doc)
-                return {
-                    "success": True,
-                    "record_id": result.payment_id,
-                    "endpoint": "compensation-payments",
-                    "action": "created",
-                }
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create compensation payment: {str(e)}"}
-
-        elif endpoint_type == "investment":
-            # Route through the real investments router to ensure validation.
-            from routers.investments import create_investment as _create_inv
-
-            cost_basis = float(mapped_data.get("cost_basis", 0))
-            current_value = float(mapped_data.get("current_value", 0)) if mapped_data.get("current_value") else cost_basis
-            investment_dict = {
-                "asset_name": mapped_data.get("asset_name", ""),
-                "asset_type": mapped_data.get("asset_type", "other"),
-                "purchase_date": mapped_data.get("purchase_date"),
-                "cost_basis": cost_basis,
-                "current_value": current_value,
-                "quantity": float(mapped_data.get("quantity", 1)) if mapped_data.get("quantity") else 1,
-                "unit": mapped_data.get("unit", "shares"),
-                "custodian": mapped_data.get("custodian"),
-                "notes": mapped_data.get("notes"),
-            }
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _create_inv(trust_id=trust_id, investment=investment_dict, user=user_doc)
-                # Update onboarding checklist (investments router doesn't call auto_update_onboarding)
-                try:
-                    from dependencies import auto_update_onboarding
-                    await auto_update_onboarding(user_id, trust_id)
-                except Exception:
-                    pass
-                return {
-                    "success": True,
-                    "record_id": result["investment_id"],
-                    "endpoint": "investments",
-                    "action": "created",
-                }
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create investment: {str(e)}"}
-
-        elif endpoint_type == "task":
-            # Route through the real tasks router to ensure validation,
-            # checklist template population, and onboarding updates.
-            from routers.tasks import create_task as _create_task
-            from models import GovernanceTaskCreate, TaskType
-
-            task_type_val = mapped_data.get("task_type", "custom")
-            try:
-                task_type_enum = TaskType(task_type_val)
-            except ValueError:
-                task_type_enum = TaskType.custom
-
-            task_create = GovernanceTaskCreate(
-                trust_id=trust_id,
-                task_type=task_type_enum,
-                due_date=mapped_data.get("due_date", ""),
-                description=mapped_data.get("description", ""),
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _create_task(task=task_create, user=user_doc)
-                return {
-                    "success": True,
-                    "record_id": result.task_id,
-                    "endpoint": "tasks",
-                    "action": "created",
-                }
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create task: {str(e)}"}
-
-        elif endpoint_type == "transaction":
-            # Route through the real transactions router to ensure validation,
-            # audit logging, and alert detection.
-            from routers.transactions import create_transaction as _create_txn
-            from models import TransactionCreate, TransactionDirection, GovernanceClassification
-
-            # The transactions router requires an entity_id — look up the
-            # first entity for this trust (typically the Trust entity itself).
-            entity = await db.entities.find_one(
-                {"trust_id": trust_id, "user_id": user_id},
-                {"_id": 0},
-                sort=[("created_at", 1)],
-            )
-            if not entity:
-                return {
-                    "success": False,
-                    "error": "No entity found for this trust. Please create an entity (Trust, Holding LLC, or Operating LLC) before recording transactions.",
-                }
-            entity_id = entity["entity_id"]
-
-            # Map chat's "transaction_type" to direction + governance_classification.
-            # Chat sends transaction_type as "expense"/"income"/etc.
-            raw_type = mapped_data.get("transaction_type", "expense")
-            if raw_type in ("income", "deposit", "inflow"):
-                direction_enum = TransactionDirection.inflow
-                classification_enum = GovernanceClassification.capital_contribution
-            else:
-                direction_enum = TransactionDirection.outflow
-                classification_enum = GovernanceClassification.operational_expense
-
-            # Map chat's "category" if it matches a known GovernanceClassification
-            raw_category = mapped_data.get("category", "")
-            if raw_category:
-                try:
-                    classification_enum = GovernanceClassification(raw_category)
-                except ValueError:
-                    pass  # keep the default
-
-            txn_create = TransactionCreate(
-                trust_id=trust_id,
-                entity_id=entity_id,
-                date=mapped_data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                amount=float(mapped_data.get("amount", 0)),
-                direction=direction_enum,
-                governance_classification=classification_enum,
-                purpose_memo=mapped_data.get("description", ""),
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _create_txn(txn=txn_create, user=user_doc)
-                # Update onboarding checklist (transactions router doesn't call auto_update_onboarding)
-                try:
-                    from dependencies import auto_update_onboarding
-                    await auto_update_onboarding(user_id, trust_id)
-                except Exception:
-                    pass
-                return {
-                    "success": True,
-                    "record_id": result.transaction_id,
-                    "endpoint": "transactions",
-                    "action": "created",
-                }
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create transaction: {str(e)}"}
-
-        elif endpoint_type == "entity":
-            # Route through the real entities router to ensure validation
-            # and onboarding updates.
-            from routers.entities import create_entity as _create_entity
-            from models import EntityCreate, EntityType
-
-            # Validate entity_type — must be one of the allowed values
-            raw_type = mapped_data.get("entity_type", "Trust")
-            entity_type_enum = None
-            for et in EntityType:
-                if raw_type and raw_type.lower() == et.value.lower():
-                    entity_type_enum = et
-                    break
-            if not entity_type_enum:
-                entity_type_enum = EntityType.trust  # default to Trust if unrecognized
-
-            name = mapped_data.get("name", "")
-            entity_create = EntityCreate(
-                trust_id=trust_id,
-                name=name,
-                entity_type=entity_type_enum,
-                legal_name=mapped_data.get("legal_name", name),
-                formation_date=mapped_data.get("formation_date"),
-                governing_law=mapped_data.get("governing_law", ""),
-                ein=mapped_data.get("ein"),
-                trustee_names=mapped_data.get("trustee_names", ""),
-                member_names=mapped_data.get("member_names", ""),
-                manager_names=mapped_data.get("manager_names", ""),
-            )
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _create_entity(entity=entity_create, user=user_doc)
-                return {
-                    "success": True,
-                    "record_id": result.entity_id,
-                    "endpoint": "entities",
-                    "action": "created",
-                }
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create entity: {str(e)}"}
-
-        elif endpoint_type == "settings_update":
-            # Route through the trusts router's update_trust to enforce
-            # ownership verification, field validation (EIN format, tax year
-            # end), jurisdiction/state_code auto-sync, and audit logging
-            # (update_trust calls log_audit_event internally).
-            from routers.trusts import update_trust as _update_trust
-            from models import TrustUpdate
-
-            field = mapped_data.get("field", "")
-            value = mapped_data.get("value", "")
-            field_mapping = {
-                "name": "name",
-                "trust_type": "trust_type",
-                "formation_date": "start_date",
-                "ein": "ein",
-                "jurisdiction": "jurisdiction",
-                "state_code": "state_code",
-            }
-            db_field = field_mapping.get(field.lower().replace(" ", "_"))
-            if not db_field:
-                return {"success": False, "error": f"Unknown field: {field}. Valid fields: name, trust_type, formation_date, ein, jurisdiction, state_code"}
-
-            # Build the TrustUpdate model with only the provided field
-            update_kwargs = {db_field: value}
-            try:
-                trust_update = TrustUpdate(**update_kwargs)
-            except Exception as ve:
-                return {"success": False, "error": f"Invalid value for field '{field}': {str(ve)}"}
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                await _update_trust(
-                    trust_id=trust_id,
-                    update=trust_update,
-                    user=user_doc,
-                )
-                # update_trust already logs to audit trail via log_audit_event,
-                # but we add a chat-specific audit entry for traceability.
-                from utils.audit import log_audit_event
-                await log_audit_event(
-                    user_id=user_id,
-                    action="trust_settings_updated_via_chat",
-                    entity_type="trust",
-                    entity_id=trust_id,
-                    details={
-                        "field_changed": db_field,
-                        "source": "chat_assistant",
-                    },
-                )
-                return {"success": True, "record_id": trust_id, "endpoint": "trusts", "action": "updated", "field": db_field}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to update trust settings: {str(e)}"}
-
-        elif endpoint_type == "alert_dismiss":
-            # Route through the governance router's dismiss_insight to enforce
-            # trust ownership verification. Adds audit logging for the dismissal.
-            from routers.governance import dismiss_insight as _dismiss_insight
-            from models import DismissedInsightCreate
-
-            criterion = mapped_data.get("criterion_name", "")
-            if not criterion:
-                return {"success": False, "error": "No criterion name provided to dismiss."}
-
-            dismiss_req = DismissedInsightCreate(trust_id=trust_id, criterion_name=criterion)
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                await _dismiss_insight(req=dismiss_req, user=user_doc)
-                # Audit log the alert dismissal
-                from utils.audit import log_audit_event
-                await log_audit_event(
-                    user_id=user_id,
-                    action="alert_dismissed_via_chat",
-                    entity_type="governance_insight",
-                    entity_id=criterion,
-                    details={
-                        "trust_id": trust_id,
-                        "criterion_name": criterion,
-                        "source": "chat_assistant",
-                    },
-                )
-                return {"success": True, "endpoint": "insights", "action": "dismissed", "criterion": criterion}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to dismiss insight: {str(e)}"}
-
-        elif endpoint_type == "class_beneficiary":
-            # Route through the beneficiaries router's create_class_beneficiary
-            # to enforce trust ownership verification and class_type validation
-            # via the ClassBeneficiaryType enum. Adds audit logging.
-            from routers.beneficiaries import create_class_beneficiary as _create_cb
-            from models import ClassBeneficiaryCreate, ClassBeneficiaryType
-
-            class_type_raw = mapped_data.get("class_type", "custom")
-            try:
-                class_type_enum = ClassBeneficiaryType(class_type_raw)
-            except ValueError:
-                class_type_enum = ClassBeneficiaryType.custom
-
-            cb_create = ClassBeneficiaryCreate(
-                trust_id=trust_id,
-                class_type=class_type_enum,
-                description=mapped_data.get("description", ""),
-                percentage=float(mapped_data.get("percentage", 0)),
-                notes=mapped_data.get("notes", ""),
-            )
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                result = await _create_cb(data=cb_create, user=user_doc)
-                cb_id = result.get("class_beneficiary_id", "")
-                # Audit log the class beneficiary creation
-                from utils.audit import log_audit_event
-                await log_audit_event(
-                    user_id=user_id,
-                    action="class_beneficiary_created_via_chat",
-                    entity_type="class_beneficiary",
-                    entity_id=cb_id,
-                    details={
-                        "trust_id": trust_id,
-                        "class_type": class_type_enum.value,
-                        "percentage": float(mapped_data.get("percentage", 0)),
-                        "source": "chat_assistant",
-                    },
-                )
-                # Update onboarding checklist
-                try:
-                    from dependencies import auto_update_onboarding
-                    await auto_update_onboarding(user_id, trust_id)
-                except Exception:
-                    pass
-                return {"success": True, "record_id": cb_id, "endpoint": "class-beneficiaries", "action": "created"}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to create class beneficiary: {str(e)}"}
-
-        elif endpoint_type == "class_beneficiary_removal":
-            # Route through the beneficiaries router's delete_class_beneficiary
-            # to enforce ownership verification (user_id match). Adds audit logging.
-            from routers.beneficiaries import delete_class_beneficiary as _delete_cb
-
-            class_type = mapped_data.get("class_type", "")
-            existing = await db.class_beneficiaries.find_one({
-                "trust_id": trust_id,
-                "user_id": user_id,
-                "class_type": class_type,
-            })
-            if not existing:
-                return {"success": False, "error": f"Class beneficiary '{class_type}' not found for this trust."}
-
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-            if not user_doc:
-                user_doc = {"user_id": user_id, "email": "", "name": ""}
-            try:
-                await _delete_cb(
-                    class_beneficiary_id=existing["class_beneficiary_id"],
-                    user=user_doc,
-                )
-                # Audit log the class beneficiary removal
-                from utils.audit import log_audit_event
-                await log_audit_event(
-                    user_id=user_id,
-                    action="class_beneficiary_removed_via_chat",
-                    entity_type="class_beneficiary",
-                    entity_id=existing["class_beneficiary_id"],
-                    details={
-                        "trust_id": trust_id,
-                        "class_type": class_type,
-                        "reason": mapped_data.get("reason", ""),
-                        "source": "chat_assistant",
-                    },
-                )
-                return {"success": True, "record_id": existing["class_beneficiary_id"], "endpoint": "class-beneficiaries", "action": "removed"}
-            except HTTPException as e:
-                return {"success": False, "error": e.detail}
-            except Exception as e:
-                return {"success": False, "error": f"Failed to remove class beneficiary: {str(e)}"}
-
+        handler = ACTION_DISPATCH.get(endpoint_type)
+        if handler:
+            return await handler(mapped_data, trust_id, user_id)
         return {"success": False, "error": f"Unhandled endpoint type: {endpoint_type}"}
 
     except Exception as e:
