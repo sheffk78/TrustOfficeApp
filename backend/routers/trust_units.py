@@ -30,6 +30,147 @@ router = APIRouter(tags=["trust-units"])
 
 # ==================== HELPER FUNCTIONS ====================
 
+def _calc_percentage(units: float, total_authorized: float) -> float:
+    """Calculate percentage of total authorized, handling zero division."""
+    return round((units / total_authorized * 100) if total_authorized > 0 else 0, 4)
+
+
+async def _find_trust_entities(trust_id: str, holder_trust_id: str, user_id: str):
+    """Find the trust's own entity and the holder trust's entity."""
+    trust_entity = await db.entities.find_one(
+        {"trust_id": trust_id, "entity_type": "Trust", "user_id": user_id},
+        {"_id": 0}
+    )
+    holder_entity = await db.entities.find_one(
+        {"trust_id": holder_trust_id, "entity_type": "Trust", "user_id": user_id},
+        {"_id": 0}
+    )
+    return trust_entity, holder_entity
+
+
+async def _create_auto_link_relationship(
+    trust_entity: dict, holder_entity: dict, user_id: str,
+    certificate_id: str, units: float, total_authorized: float
+):
+    """Create an auto-link entity relationship if one doesn't already exist."""
+    existing = await db.entity_relationships.find_one({
+        "parent_entity_id": holder_entity["entity_id"],
+        "child_entity_id": trust_entity["entity_id"],
+        "relationship_type": "receives_distributions_from",
+        "user_id": user_id
+    })
+    if existing:
+        return
+    ownership_pct = (units / total_authorized * 100) if total_authorized > 0 else 100
+    rel_doc = {
+        "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
+        "parent_entity_id": holder_entity["entity_id"],
+        "child_entity_id": trust_entity["entity_id"],
+        "relationship_type": "receives_distributions_from",
+        "ownership_percentage": ownership_pct,
+        "trust_id": holder_entity["trust_id"],
+        "user_id": user_id,
+        "source": "certificate_autolink",
+        "certificate_id": certificate_id,
+        "notes": "",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.entity_relationships.insert_one(rel_doc)
+
+
+async def _remove_auto_link_relationships(certificate_id: str, user_id: str):
+    """Remove auto-linked entity relationships for a certificate."""
+    await db.entity_relationships.delete_many({
+        "certificate_id": certificate_id,
+        "source": "certificate_autolink",
+        "user_id": user_id
+    })
+
+
+async def _try_auto_link_on_create(certificate: TrustUnitCertificateCreate, trust_id: str, user_id: str, certificate_id: str, units: float, total_authorized: float):
+    """Auto-link entity relationship when holder_type='trust' and holder_trust_id is set."""
+    if certificate.holder_type != "trust" or not certificate.holder_trust_id:
+        return
+    try:
+        trust_entity, holder_entity = await _find_trust_entities(trust_id, certificate.holder_trust_id, user_id)
+        if trust_entity and holder_entity:
+            await _create_auto_link_relationship(
+                trust_entity, holder_entity, user_id, certificate_id, units, total_authorized
+            )
+    except Exception:
+        pass  # Certificate is already created; skip auto-link on error
+
+
+async def _sync_auto_link_on_update(cert: dict, update_fields: dict, user_id: str, certificate_id: str, settings: dict, updated_cert: dict):
+    """Sync auto-link relationships when holder_type / holder_trust_id changes during update."""
+    try:
+        old_type = cert.get("holder_type")
+        new_type = update_fields.get("holder_type", old_type)
+
+        if new_type != "trust":
+            await _remove_auto_link_relationships(certificate_id, user_id)
+            return
+
+        old_holder_trust_id = cert.get("holder_trust_id")
+        new_holder_trust_id = update_fields.get("holder_trust_id", old_holder_trust_id)
+
+        if new_holder_trust_id == old_holder_trust_id:
+            return  # No change — keep existing auto-link
+
+        # Remove old auto-link, create new one if holder_trust_id is set
+        await _remove_auto_link_relationships(certificate_id, user_id)
+        if not new_holder_trust_id:
+            return
+
+        trust_entity, holder_entity = await _find_trust_entities(cert["trust_id"], new_holder_trust_id, user_id)
+        if trust_entity and holder_entity:
+            total_authorized = settings["total_authorized_units"]
+            await _create_auto_link_relationship(
+                trust_entity, holder_entity, user_id, certificate_id,
+                updated_cert["units"], total_authorized
+            )
+    except Exception:
+        pass  # Auto-link sync failure should not block the certificate update
+
+
+def _build_cert_doc(certificate_id: str, trust_id: str, user_id: str, certificate, units: float, certificate_number: str) -> dict:
+    """Build a certificate document for insertion."""
+    return {
+        "certificate_id": certificate_id,
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "holder_name": certificate.holder_name,
+        "holder_identifier": certificate.holder_identifier,
+        "holder_type": certificate.holder_type,
+        "holder_trust_id": certificate.holder_trust_id,
+        "email": certificate.email,
+        "phone": certificate.phone,
+        "units": units,
+        "issue_date": certificate.issue_date,
+        "certificate_number": certificate_number,
+        "status": "active",
+        "replaced_by_certificate_id": None,
+        "notes": certificate.notes,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None
+    }
+
+
+def _build_transfer_doc(trust_id: str, user_id: str, from_holder, to_holder, units: float, reason: str, minutes_record_id=None) -> dict:
+    """Build a transfer document for insertion."""
+    return {
+        "transfer_id": f"transfer_{uuid.uuid4().hex[:12]}",
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "from_holder": from_holder,
+        "to_holder": to_holder,
+        "units": units,
+        "reason": reason,
+        "minutes_record_id": minutes_record_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+
+
 async def get_or_create_units_settings(trust_id: str, user_id: str) -> dict:
     """Get or create default units settings for a trust"""
     settings = await db.trust_units_settings.find_one(
@@ -118,10 +259,10 @@ async def get_trust_units_summary(
     active_count = 0
     
     for cert in certificates_raw:
-        percentage = (cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+        percentage = _calc_percentage(cert["units"], total_authorized)
         cert_response = TrustUnitCertificateResponse(
             **cert,
-            percentage=round(percentage, 4)
+            percentage=percentage
         )
         certificates.append(cert_response)
         
@@ -215,86 +356,22 @@ async def create_unit_certificate(
     certificate_id = f"cert_{uuid.uuid4().hex[:12]}"
     certificate_number = await get_next_certificate_number(certificate.trust_id, user["user_id"])
     
-    cert_doc = {
-        "certificate_id": certificate_id,
-        "trust_id": certificate.trust_id,
-        "user_id": user["user_id"],
-        "holder_name": certificate.holder_name,
-        "holder_identifier": certificate.holder_identifier,
-        "holder_type": certificate.holder_type,
-        "holder_trust_id": certificate.holder_trust_id,
-        "email": certificate.email,
-        "phone": certificate.phone,
-        "units": units,
-        "issue_date": certificate.issue_date,
-        "certificate_number": certificate_number,
-        "status": "active",
-        "replaced_by_certificate_id": None,
-        "notes": certificate.notes,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": None
-    }
+    cert_doc = _build_cert_doc(certificate_id, certificate.trust_id, user["user_id"], certificate, units, certificate_number)
     
     await db.trust_unit_certificates.insert_one(cert_doc)
     
     # Auto-link entity relationship when holder_type="trust" and holder_trust_id is set
-    if certificate.holder_type == "trust" and certificate.holder_trust_id:
-        try:
-            # Get the trust's own entity (the trust this certificate belongs to)
-            trust_entity = await db.entities.find_one(
-                {"trust_id": certificate.trust_id, "entity_type": "Trust", "user_id": user["user_id"]},
-                {"_id": 0}
-            )
-            # Get the holder trust's entity
-            holder_entity = await db.entities.find_one(
-                {"trust_id": certificate.holder_trust_id, "entity_type": "Trust", "user_id": user["user_id"]},
-                {"_id": 0}
-            )
-            
-            if trust_entity and holder_entity:
-                # Check if relationship already exists (don't duplicate)
-                existing = await db.entity_relationships.find_one({
-                    "parent_entity_id": holder_entity["entity_id"],
-                    "child_entity_id": trust_entity["entity_id"],
-                    "relationship_type": "receives_distributions_from",
-                    "user_id": user["user_id"]
-                })
-                if not existing:
-                    rel_doc = {
-                        "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
-                        "parent_entity_id": holder_entity["entity_id"],
-                        "child_entity_id": trust_entity["entity_id"],
-                        "relationship_type": "receives_distributions_from",
-                        "ownership_percentage": (units / total_authorized * 100) if total_authorized > 0 else 100,
-                        "trust_id": holder_entity["trust_id"],
-                        "user_id": user["user_id"],
-                        "source": "certificate_autolink",
-                        "certificate_id": certificate_id,
-                        "notes": "",
-                        "created_at": datetime.now(timezone.utc).isoformat()
-                    }
-                    await db.entity_relationships.insert_one(rel_doc)
-        except Exception:
-            # Gracefully handle errors — certificate is already created, just skip auto-link
-            pass
+    await _try_auto_link_on_create(certificate, certificate.trust_id, user["user_id"], certificate_id, units, total_authorized)
     
     # Record the transfer (issuance)
-    transfer_doc = {
-        "transfer_id": f"transfer_{uuid.uuid4().hex[:12]}",
-        "trust_id": certificate.trust_id,
-        "user_id": user["user_id"],
-        "from_holder": None,
-        "to_holder": certificate.holder_name,
-        "units": units,
-        "reason": "Initial certificate issuance",
-        "minutes_record_id": None,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
+    transfer_doc = _build_transfer_doc(
+        certificate.trust_id, user["user_id"], None, certificate.holder_name, units, "Initial certificate issuance"
+    )
     await db.trust_unit_transfers.insert_one(transfer_doc)
     
-    percentage = (units / total_authorized * 100) if total_authorized > 0 else 0
+    percentage = _calc_percentage(units, total_authorized)
     
-    return TrustUnitCertificateResponse(**cert_doc, percentage=round(percentage, 4))
+    return TrustUnitCertificateResponse(**cert_doc, percentage=percentage)
 
 
 @router.patch("/trust-units/certificates/{certificate_id}", response_model=TrustUnitCertificateResponse)
@@ -367,71 +444,12 @@ async def update_unit_certificate(
     )
 
     # Auto-link sync: handle holder_type / holder_trust_id changes
-    try:
-        old_type = cert.get("holder_type")
-        new_type = update_fields.get("holder_type", old_type)
-
-        if new_type != "trust":
-            # Changed away from trust (or was never trust) — remove auto-link
-            await db.entity_relationships.delete_many({
-                "certificate_id": certificate_id,
-                "source": "certificate_autolink",
-                "user_id": user["user_id"]
-            })
-        elif new_type == "trust":
-            # Type is trust — check if holder_trust_id changed
-            old_holder_trust_id = cert.get("holder_trust_id")
-            new_holder_trust_id = update_fields.get("holder_trust_id", old_holder_trust_id)
-
-            if new_holder_trust_id != old_holder_trust_id:
-                # Remove old auto-link
-                await db.entity_relationships.delete_many({
-                    "certificate_id": certificate_id,
-                    "source": "certificate_autolink",
-                    "user_id": user["user_id"]
-                })
-                # Create new auto-link if holder_trust_id is set
-                if new_holder_trust_id:
-                    trust_entity = await db.entities.find_one(
-                        {"trust_id": cert["trust_id"], "entity_type": "Trust", "user_id": user["user_id"]},
-                        {"_id": 0}
-                    )
-                    holder_entity = await db.entities.find_one(
-                        {"trust_id": new_holder_trust_id, "entity_type": "Trust", "user_id": user["user_id"]},
-                        {"_id": 0}
-                    )
-                    if trust_entity and holder_entity:
-                        existing = await db.entity_relationships.find_one({
-                            "parent_entity_id": holder_entity["entity_id"],
-                            "child_entity_id": trust_entity["entity_id"],
-                            "relationship_type": "receives_distributions_from",
-                            "user_id": user["user_id"]
-                        })
-                        if not existing:
-                            total_authorized = settings["total_authorized_units"]
-                            ownership_pct = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 100
-                            rel_doc = {
-                                "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
-                                "parent_entity_id": holder_entity["entity_id"],
-                                "child_entity_id": trust_entity["entity_id"],
-                                "relationship_type": "receives_distributions_from",
-                                "ownership_percentage": ownership_pct,
-                                "trust_id": holder_entity["trust_id"],
-                                "user_id": user["user_id"],
-                                "source": "certificate_autolink",
-                                "certificate_id": certificate_id,
-                                "notes": "",
-                                "created_at": datetime.now(timezone.utc).isoformat()
-                            }
-                            await db.entity_relationships.insert_one(rel_doc)
-    except Exception:
-        # Auto-link sync failure should not block the certificate update
-        pass
+    await _sync_auto_link_on_update(cert, update_fields, user["user_id"], certificate_id, settings, updated_cert)
 
     total_authorized = settings["total_authorized_units"]
-    percentage = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+    percentage = _calc_percentage(updated_cert["units"], total_authorized)
 
-    return TrustUnitCertificateResponse(**updated_cert, percentage=round(percentage, 4))
+    return TrustUnitCertificateResponse(**updated_cert, percentage=percentage)
 
 
 @router.get("/trust-units/certificates", response_model=List[TrustUnitCertificateResponse])
@@ -460,8 +478,8 @@ async def list_unit_certificates(
     
     result = []
     for cert in certificates:
-        percentage = (cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
-        result.append(TrustUnitCertificateResponse(**cert, percentage=round(percentage, 4)))
+        percentage = _calc_percentage(cert["units"], total_authorized)
+        result.append(TrustUnitCertificateResponse(**cert, percentage=percentage))
     
     return result
 
@@ -518,11 +536,7 @@ async def revoke_unit_certificate(
     await db.trust_unit_transfers.insert_one(transfer_doc)
     
     # Remove auto-linked entity relationships when certificate is revoked
-    await db.entity_relationships.delete_many({
-        "certificate_id": certificate_id,
-        "source": "certificate_autolink",
-        "user_id": user["user_id"]
-    })
+    await _remove_auto_link_relationships(certificate_id, user["user_id"])
     
     updated_cert = await db.trust_unit_certificates.find_one(
         {"certificate_id": certificate_id},
@@ -531,9 +545,9 @@ async def revoke_unit_certificate(
     
     settings = await get_or_create_units_settings(revoke.trust_id, user["user_id"])
     total_authorized = settings["total_authorized_units"]
-    percentage = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+    percentage = _calc_percentage(updated_cert["units"], total_authorized)
     
-    return TrustUnitCertificateResponse(**updated_cert, percentage=round(percentage, 4))
+    return TrustUnitCertificateResponse(**updated_cert, percentage=percentage)
 
 
 # ==================== DELETE ====================
@@ -557,11 +571,7 @@ async def delete_unit_certificate(
     )
 
     # Remove auto-linked entity relationships for this certificate
-    await db.entity_relationships.delete_many({
-        "certificate_id": certificate_id,
-        "source": "certificate_autolink",
-        "user_id": user["user_id"]
-    })
+    await _remove_auto_link_relationships(certificate_id, user["user_id"])
 
     return {"message": "Certificate deleted"}
 
@@ -983,7 +993,7 @@ async def get_certificate_pdf(certificate_id: str, user: dict = Depends(get_curr
     settings = await get_or_create_units_settings(cert["trust_id"], user["user_id"])
     
     total_authorized = settings["total_authorized_units"]
-    cert["percentage"] = (cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
+    cert["percentage"] = _calc_percentage(cert["units"], total_authorized)
     
     show_watermark = await should_show_watermark(user["user_id"])
     
@@ -1273,10 +1283,10 @@ async def bootstrap_certificates_from_minutes(
         }
         await db.trust_unit_transfers.insert_one(transfer_doc)
         
-        percentage = (units / total_authorized * 100) if total_authorized > 0 else 0
+        percentage = _calc_percentage(units, total_authorized)
         created_certificates.append(TrustUnitCertificateResponse(
             **cert_doc,
-            percentage=round(percentage, 4)
+            percentage=percentage
         ))
     
     total_issued = sum(cert.units for cert in created_certificates)
