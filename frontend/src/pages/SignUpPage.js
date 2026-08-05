@@ -222,14 +222,38 @@ export default function SignUpPage() {
       if (couponCode) {
         sessionStorage.setItem('pending_coupon', couponCode);
       }
-      
+
+      // If this came from the WingPoint connect flow, carry params to pricing
+      // so we can redirect to the connect flow after checkout.
+      const connectAfter = searchParams.get('connect_after');
+      const connectWpRef = searchParams.get('wp_ref') || sessionStorage.getItem('wp_ref') || '';
+      const connectTrustName = searchParams.get('trust_name') || sessionStorage.getItem('wp_trust_name') || '';
+      const redirectUrl = searchParams.get('redirect_url') || '';
+
+      if (connectAfter === '1' || isWingPoint) {
+        // Build the connect flow URL to use after purchase
+        const connectParams = new URLSearchParams();
+        if (redirectUrl) connectParams.set('redirect_url', redirectUrl);
+        if (connectWpRef) connectParams.set('wp_ref', connectWpRef);
+        if (connectTrustName) connectParams.set('trust_name', connectTrustName);
+        sessionStorage.setItem('wp_connect_after', '1');
+        sessionStorage.setItem('wp_connect_params', connectParams.toString());
+      }
+
       toast.success('Account created successfully');
 
       // Track signup conversion for Google Ads + GA4
       trackSignupConversion();
 
       // New users must subscribe — route to pricing page
-      navigate('/pricing');
+      // If WingPoint flow, pass wp=1&plan=wingpoint to show exclusive plan
+      if (isWingPoint || connectAfter === '1') {
+        const pricingParams = new URLSearchParams({ wp: '1', plan: 'wingpoint' });
+        if (couponCode) pricingParams.set('coupon', couponCode);
+        navigate(`/pricing?${pricingParams.toString()}`);
+      } else {
+        navigate('/pricing');
+      }
     } catch (error) {
       console.error('Signup error:', error);
       const msg = error.message || 'Could not create your account. Please try again or contact support@trustoffice.app for help.';

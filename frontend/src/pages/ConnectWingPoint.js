@@ -400,7 +400,7 @@ export default function ConnectWingPoint() {
 
               <p className="text-center text-xs text-muted-foreground mt-6">
                 Need an account?{' '}
-                <Link to="/signup" className="text-navy hover:text-navy/70">
+                <Link to={`/signup?${searchParams.toString()}`} className="text-navy hover:text-navy/70">
                   Sign up
                 </Link>
               </p>

@@ -205,10 +205,19 @@ export default function PricingPage() {
       const token = localStorage.getItem('auth_token');
       const baseUrl = window.location.origin;
       
+            // If WingPoint connect flow, redirect to connect page after successful checkout
+      const wpConnectAfter = sessionStorage.getItem('wp_connect_after');
+      const wpConnectParams = sessionStorage.getItem('wp_connect_params');
+      let successUrl = `${baseUrl}/dashboard?welcome=true`;
+      if (wpConnectAfter === '1' && wpConnectParams) {
+        // After checkout, redirect to the WingPoint connect flow
+        successUrl = `${baseUrl}/connect/wingpoint?${wpConnectParams}&from_checkout=1`;
+      }
+
       const checkoutData = {
         plan_type: planType,
         billing_period: period,
-        success_url: `${baseUrl}/dashboard?welcome=true`,
+        success_url: successUrl,
         cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`
       };
       
