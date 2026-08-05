@@ -1116,6 +1116,87 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
 
 # ==================== MINUTES TEMPLATES ENDPOINTS ====================
 
+# Dispatch table: template_type -> content generator function.
+# Functions that take (trust, data) are wrapped to match the (data) signature.
+def _dispatch_template_content(template_type: str, trust: dict, template_data: dict) -> str:
+    """Dispatch to the template-specific content generator."""
+    _generators = {
+        "general_meeting": lambda d: generate_general_meeting_content(d),
+        "initial_trustee_meeting": lambda d: generate_initial_trustee_meeting_content(trust, d),
+        "distribution_to_beneficiaries": lambda d: generate_distribution_content(d),
+        "acceptance_of_property": lambda d: generate_property_acceptance_content(d),
+        "disposition_of_asset": lambda d: generate_disposition_content(d),
+        "appointment_additional_trustee": lambda d: generate_trustee_appointment_content(d, "additional"),
+        "appointment_successor_trustee": lambda d: generate_trustee_appointment_content(d, "successor"),
+        "designation_of_beneficiaries": lambda d: generate_beneficiary_designation_content(d),
+        "bank_account_authorization": lambda d: generate_bank_account_content(d),
+        "change_of_situs": lambda d: generate_change_of_situs_content(d),
+        "benevolence_approval": lambda d: generate_benevolence_approval_content(d),
+        "investment_policy": lambda d: generate_investment_policy_content(d),
+        "loan_authorization": lambda d: generate_loan_authorization_content(d),
+        "insurance_authorization": lambda d: generate_insurance_authorization_content(d),
+        "annual_review": lambda d: generate_annual_review_content(d),
+        "quarterly_review": lambda d: generate_quarterly_review_content(d),
+        "trustee_compensation": lambda d: generate_trustee_compensation_content(d),
+        "trustee_resignation": lambda d: generate_trustee_resignation_content(d),
+        "beneficiary_request_denial": lambda d: generate_beneficiary_denial_content(d),
+        "hems_distribution": lambda d: generate_hems_distribution_content(d),
+        "beneficiary_loan": lambda d: generate_beneficiary_loan_content(d),
+        "trust_amendment": lambda d: generate_trust_amendment_content(d),
+        "power_of_attorney": lambda d: generate_power_of_attorney_content(d),
+        "trust_termination": lambda d: generate_trust_termination_content(d),
+        "real_estate_purchase": lambda d: generate_real_estate_purchase_content(d),
+        "business_interest_acquisition": lambda d: generate_business_interest_content(d),
+        "real_estate_lease": lambda d: generate_real_estate_lease_content(d),
+        "fiscal_year_election": lambda d: generate_fiscal_year_content(d),
+        "tax_filing_authorization": lambda d: generate_tax_filing_content(d),
+        "emergency_ratification": lambda d: generate_emergency_ratification_content(d),
+        "conflict_of_interest": lambda d: generate_conflict_of_interest_content(d),
+        "bill_of_sale": lambda d: generate_bill_of_sale_content(d),
+        "assignment_of_personal_property": lambda d: generate_assignment_of_personal_property_content(d),
+        "general_assignment": lambda d: generate_general_assignment_content(d),
+    }
+    gen = _generators.get(template_type)
+    if gen is None:
+        return ""
+    return gen(template_data)
+
+
+def _fmt_iso_date(d: str) -> str:
+    """Format an ISO date (yyyy-MM-dd) to human-readable (Month DD, YYYY).
+
+    Returns the input unchanged if it's empty, a placeholder, or unparseable.
+    """
+    if not d or d.startswith("[") or d == "[Date of Trust Formation]":
+        return d
+    try:
+        from datetime import datetime as _dt
+        return _dt.strptime(d[:10], "%Y-%m-%d").strftime("%B %d, %Y")
+    except (ValueError, TypeError):
+        return d
+
+
+def _fmt_time_12h(t: str) -> str:
+    """Format a 24h time (HH:MM) to 12h with AM/PM.
+
+    Returns the input unchanged if it's empty, already formatted, or unparseable.
+    """
+    if not t:
+        return t
+    if isinstance(t, str) and ("AM" in t or "PM" in t):
+        return t
+    try:
+        h, m = t.split(":")
+        h = int(h)
+        suffix = "AM" if h < 12 else "PM"
+        h12 = h if h <= 12 else h - 12
+        if h12 == 0:
+            h12 = 12
+        return f"{h12}:{m} {suffix}"
+    except (ValueError, TypeError):
+        return t
+
+
 def generate_template_document(trust: dict, template_type: str, template_data: dict) -> str:
     """Generate the full text minutes document from template"""
     trust_name = trust.get("name", "[Trust Name]")
@@ -1132,37 +1213,10 @@ def generate_template_document(trust: dict, template_type: str, template_data: d
     trust_formation_date = template_data.get("trust_formation_date") or template_data.get("trust_indenture_date") or trust.get("start_date", "[Date of Trust Formation]")
     
     # Format ISO dates (yyyy-MM-dd) to human-readable for the document
-    def _fmt_date(d):
-        if not d or d == "[Date of Trust Formation]":
-            return d
-        try:
-            from datetime import datetime as _dt
-            return _dt.strptime(d[:10], "%Y-%m-%d").strftime("%B %d, %Y")
-        except (ValueError, TypeError):
-            return d
-    
-    meeting_date = _fmt_date(meeting_date)
-    trust_formation_date = _fmt_date(trust_formation_date)
-    
-    # Format time from 24h (HH:MM) to 12h with AM/PM
-    def _fmt_time(t):
-        if not t:
-            return t
-        # Already formatted (e.g. "10:00 AM") — return as-is
-        if isinstance(t, str) and ("AM" in t or "PM" in t):
-            return t
-        try:
-            h, m = t.split(":")
-            h = int(h)
-            suffix = "AM" if h < 12 else "PM"
-            h12 = h if h <= 12 else h - 12
-            if h12 == 0:
-                h12 = 12
-            return f"{h12}:{m} {suffix}"
-        except (ValueError, TypeError):
-            return t
-    
-    meeting_time = _fmt_time(meeting_time)
+    meeting_date = _fmt_iso_date(meeting_date)
+    trust_formation_date = _fmt_iso_date(trust_formation_date)
+
+    meeting_time = _fmt_time_12h(meeting_time)
     
     meeting_type_text = {
         "in_person": f"In person at {template_data.get('meeting_location', '[Location]')}",
@@ -1213,78 +1267,9 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
         template_data.setdefault("trustee_name", ", ".join(trustee_names))
         template_data.setdefault("ein", trust.get("ein", ""))
         template_data.setdefault("state_code", trust.get("jurisdiction", "") or trust.get("state_code", ""))
-    
-    # Generate template-specific content
-    if template_type == "general_meeting":
-        doc += generate_general_meeting_content(template_data)
-    elif template_type == "initial_trustee_meeting":
-        doc += generate_initial_trustee_meeting_content(trust, template_data)
-    elif template_type == "distribution_to_beneficiaries":
-        doc += generate_distribution_content(template_data)
-    elif template_type == "acceptance_of_property":
-        doc += generate_property_acceptance_content(template_data)
-    elif template_type == "disposition_of_asset":
-        doc += generate_disposition_content(template_data)
-    elif template_type == "appointment_additional_trustee":
-        doc += generate_trustee_appointment_content(template_data, "additional")
-    elif template_type == "appointment_successor_trustee":
-        doc += generate_trustee_appointment_content(template_data, "successor")
-    elif template_type == "designation_of_beneficiaries":
-        doc += generate_beneficiary_designation_content(template_data)
-    elif template_type == "bank_account_authorization":
-        doc += generate_bank_account_content(template_data)
-    elif template_type == "change_of_situs":
-        doc += generate_change_of_situs_content(template_data)
-    elif template_type == "benevolence_approval":
-        doc += generate_benevolence_approval_content(template_data)
-    # New templates
-    elif template_type == "investment_policy":
-        doc += generate_investment_policy_content(template_data)
-    elif template_type == "loan_authorization":
-        doc += generate_loan_authorization_content(template_data)
-    elif template_type == "insurance_authorization":
-        doc += generate_insurance_authorization_content(template_data)
-    elif template_type == "annual_review":
-        doc += generate_annual_review_content(template_data)
-    elif template_type == "quarterly_review":
-        doc += generate_quarterly_review_content(template_data)
-    elif template_type == "trustee_compensation":
-        doc += generate_trustee_compensation_content(template_data)
-    elif template_type == "trustee_resignation":
-        doc += generate_trustee_resignation_content(template_data)
-    elif template_type == "beneficiary_request_denial":
-        doc += generate_beneficiary_denial_content(template_data)
-    elif template_type == "hems_distribution":
-        doc += generate_hems_distribution_content(template_data)
-    elif template_type == "beneficiary_loan":
-        doc += generate_beneficiary_loan_content(template_data)
-    # Batch 2 templates
-    elif template_type == "trust_amendment":
-        doc += generate_trust_amendment_content(template_data)
-    elif template_type == "power_of_attorney":
-        doc += generate_power_of_attorney_content(template_data)
-    elif template_type == "trust_termination":
-        doc += generate_trust_termination_content(template_data)
-    elif template_type == "real_estate_purchase":
-        doc += generate_real_estate_purchase_content(template_data)
-    elif template_type == "business_interest_acquisition":
-        doc += generate_business_interest_content(template_data)
-    elif template_type == "real_estate_lease":
-        doc += generate_real_estate_lease_content(template_data)
-    elif template_type == "fiscal_year_election":
-        doc += generate_fiscal_year_content(template_data)
-    elif template_type == "tax_filing_authorization":
-        doc += generate_tax_filing_content(template_data)
-    elif template_type == "emergency_ratification":
-        doc += generate_emergency_ratification_content(template_data)
-    elif template_type == "conflict_of_interest":
-        doc += generate_conflict_of_interest_content(template_data)
-    elif template_type == "bill_of_sale":
-        doc += generate_bill_of_sale_content(template_data)
-    elif template_type == "assignment_of_personal_property":
-        doc += generate_assignment_of_personal_property_content(template_data)
-    elif template_type == "general_assignment":
-        doc += generate_general_assignment_content(template_data)
+
+    # Generate template-specific content via dispatch table
+    doc += _dispatch_template_content(template_type, trust, template_data)
     
     # Add adjournment and certification
     doc += f"""
@@ -1292,7 +1277,7 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
 
 ADJOURNMENT
 
-There being no further business to come before the Board of Trustees, the meeting was adjourned at {_fmt_time(template_data.get('adjournment_time', meeting_time))}.
+There being no further business to come before the Board of Trustees, the meeting was adjourned at {_fmt_time_12h(template_data.get('adjournment_time', meeting_time))}.
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1326,6 +1311,110 @@ END OF TRUST MINUTES
 """
     
     return doc
+
+def _initial_meeting_compensation_section(compensation_type: str, compensation_amount: str) -> str:
+    """Build Resolution 8 (Trustee Compensation) for the initial meeting."""
+    if compensation_type == "none":
+        return """WHEREAS, the Trust Instrument addresses the matter of Trustee compensation;
+
+BE IT RESOLVED, that the initial Trustee(s) shall serve without compensation at 
+this time, reserving the right to establish reasonable compensation in the 
+future as permitted by the Trust Instrument.
+
+VOTE: Unanimous approval.
+
+"""
+    elif compensation_type == "fixed":
+        return f"""WHEREAS, the Trust Instrument permits reasonable compensation for Trustee services;
+
+BE IT RESOLVED, that the initial Trustee(s) shall receive annual compensation 
+of {compensation_amount or "[Amount]"} for services rendered to the Trust, 
+payable in accordance with the terms of the Trust Instrument.
+
+VOTE: Unanimous approval.
+
+"""
+    elif compensation_type == "percentage":
+        return f"""WHEREAS, the Trust Instrument permits reasonable compensation for Trustee services;
+
+BE IT RESOLVED, that the initial Trustee(s) shall receive compensation equal to 
+{compensation_amount or "[Percentage]"}% of the trust corpus value, computed 
+annually in accordance with the terms of the Trust Instrument.
+
+VOTE: Unanimous approval.
+
+"""
+    return ""
+
+
+def _initial_meeting_bank_section(trust_name: str, bank_name: str, initial_deposit: str, trustee_names: list) -> str:
+    """Build Resolutions 4+5 (Bank Account + EIN) for the initial meeting."""
+    section = f"""BE IT RESOLVED, that the Trustees are hereby authorized to open and maintain 
+bank accounts, brokerage accounts, or other financial accounts in the name of 
+{trust_name}, and to execute all documents, agreements, and certifications 
+required by financial institutions for such purpose.
+
+BE IT FURTHER RESOLVED, that the Trustee(s) are authorized and directed to 
+open one or more bank accounts"""
+
+    if bank_name and bank_name != "[Bank Name]":
+        section += f" at {bank_name}"
+    else:
+        section += " at such financial institution(s) as the Trustee(s) may deem appropriate"
+
+    section += f" in the name of the {trust_name};\n\n"
+
+    if initial_deposit:
+        section += f"BE IT FURTHER RESOLVED, that the Trustee(s) shall deposit the initial trust corpus of {initial_deposit} into the trust bank account.\n\n"
+
+    section += f"""BE IT FURTHER RESOLVED, that {trustee_names[0]}, as Trustee, is authorized to sign 
+on behalf of the Trust, and to present this resolution, the Declaration of 
+Trust, a Certification of Trust, and the Trust's EIN documentation to any bank 
+or financial institution as proof of authority.
+
+BE IT FURTHER RESOLVED, that any Trustee acting alone is authorized to:
+  (a) Execute any and all documents necessary to open and maintain such accounts;
+  (b) Make deposits to and withdrawals from such accounts;
+  (c) Endorse checks and other negotiable instruments payable to the Trust;
+  (d) Apply for and obtain debit cards, checks, and other banking instruments.
+
+VOTE: Unanimous approval.
+
+"""
+    return section
+
+
+def _initial_meeting_ein_section(trust_name: str, ein: str) -> str:
+    """Build Resolution 5 (EIN) for the initial meeting."""
+    if ein:
+        return f"""WHEREAS, the Trustees have obtained an Employer Identification Number (EIN) 
+from the Internal Revenue Service for the purpose of opening bank accounts and 
+conducting Trust business;
+
+BE IT RESOLVED, that the Trustees accept and adopt the following EIN for 
+{trust_name}:
+
+  EIN: {ein}
+
+This EIN shall be used for all Trust banking, financial, and reporting purposes 
+as deemed necessary by the Trustees.
+
+VOTE: Unanimous approval.
+
+"""
+    return f"""WHEREAS, the Trust requires an Employer Identification Number (EIN) for 
+tax filing and banking purposes;
+
+BE IT RESOLVED, that the Trustee(s) are authorized and directed to apply for 
+and obtain an EIN from the Internal Revenue Service for the {trust_name};
+
+FURTHER RESOLVED, that once obtained, the EIN shall be used for all tax filing 
+and banking purposes related to the Trust.
+
+VOTE: Unanimous approval.
+
+"""
+
 
 def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     """Generate content for the initial organizational trustee meeting.
@@ -1372,36 +1461,8 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     meeting_date = data.get("meeting_date", "[Date]")
     
     # Format ISO dates to human-readable
-    def _fmt_date_iso(d):
-        if not d or d.startswith("["):
-            return d
-        try:
-            from datetime import datetime as _dt
-            return _dt.strptime(d[:10], "%Y-%m-%d").strftime("%B %d, %Y")
-        except (ValueError, TypeError):
-            return d
-    
-    start_date = _fmt_date_iso(start_date)
-    meeting_date = _fmt_date_iso(meeting_date)
-    
-    # Format time from 24h to 12h with AM/PM
-    def _fmt_time_12h(t):
-        if not t:
-            return t
-        # Already formatted (e.g. "10:00 AM") — return as-is
-        if isinstance(t, str) and ("AM" in t or "PM" in t):
-            return t
-        try:
-            h, m = t.split(":")
-            h = int(h)
-            suffix = "AM" if h < 12 else "PM"
-            h12 = h if h <= 12 else h - 12
-            if h12 == 0:
-                h12 = 12
-            return f"{h12}:{m} {suffix}"
-        except (ValueError, TypeError):
-            return t
-    
+    start_date = _fmt_iso_date(start_date)
+    meeting_date = _fmt_iso_date(meeting_date)
     meeting_time = _fmt_time_12h(meeting_time)
     
     content = f"""FIRST ORGANIZATIONAL MEETING MINUTES
@@ -1529,74 +1590,16 @@ RESOLUTION 4: AUTHORIZATION TO OPEN BANK ACCOUNTS
 WHEREAS, the Trustees determine that it is necessary and prudent to establish 
 one or more financial accounts in the name of the Trust for the proper 
 administration of Trust assets;
+"""
 
-BE IT RESOLVED, that the Trustees are hereby authorized to open and maintain 
-bank accounts, brokerage accounts, or other financial accounts in the name of 
-{trust_name}, and to execute all documents, agreements, and certifications 
-required by financial institutions for such purpose.
+    content += _initial_meeting_bank_section(trust_name, bank_name, initial_deposit, trustee_names)
 
-BE IT FURTHER RESOLVED, that the Trustee(s) are authorized and directed to 
-open one or more bank accounts"""
-
-    if bank_name and bank_name != "[Bank Name]":
-        content += f" at {bank_name}"
-    else:
-        content += " at such financial institution(s) as the Trustee(s) may deem appropriate"
-
-    content += f" in the name of the {trust_name};\n\n"
-
-    if initial_deposit:
-        content += f"BE IT FURTHER RESOLVED, that the Trustee(s) shall deposit the initial trust corpus of {initial_deposit} into the trust bank account.\n\n"
-    
-    content += f"""BE IT FURTHER RESOLVED, that {trustee_names[0]}, as Trustee, is authorized to sign 
-on behalf of the Trust, and to present this resolution, the Declaration of 
-Trust, a Certification of Trust, and the Trust's EIN documentation to any bank 
-or financial institution as proof of authority.
-
-BE IT FURTHER RESOLVED, that any Trustee acting alone is authorized to:
-  (a) Execute any and all documents necessary to open and maintain such accounts;
-  (b) Make deposits to and withdrawals from such accounts;
-  (c) Endorse checks and other negotiable instruments payable to the Trust;
-  (d) Apply for and obtain debit cards, checks, and other banking instruments.
-
-VOTE: Unanimous approval.
-
-═══════════════════════════════════════════════════════════════════════════════
+    content += f"""═══════════════════════════════════════════════════════════════════════════════
 
 RESOLUTION 5: EMPLOYER IDENTIFICATION NUMBER
 
 """
-    
-    if ein:
-        content += f"""WHEREAS, the Trustees have obtained an Employer Identification Number (EIN) 
-from the Internal Revenue Service for the purpose of opening bank accounts and 
-conducting Trust business;
-
-BE IT RESOLVED, that the Trustees accept and adopt the following EIN for 
-{trust_name}:
-
-  EIN: {ein}
-
-This EIN shall be used for all Trust banking, financial, and reporting purposes 
-as deemed necessary by the Trustees.
-
-VOTE: Unanimous approval.
-
-"""
-    else:
-        content += f"""WHEREAS, the Trust requires an Employer Identification Number (EIN) for 
-tax filing and banking purposes;
-
-BE IT RESOLVED, that the Trustee(s) are authorized and directed to apply for 
-and obtain an EIN from the Internal Revenue Service for the {trust_name};
-
-FURTHER RESOLVED, that once obtained, the EIN shall be used for all tax filing 
-and banking purposes related to the Trust.
-
-VOTE: Unanimous approval.
-
-"""
-
+    content += _initial_meeting_ein_section(trust_name, ein)
     # RESOLUTION 6: Acceptance of Initial Trust Property
     if accept_initial_property:
         content += f"""═══════════════════════════════════════════════════════════════════════════════
