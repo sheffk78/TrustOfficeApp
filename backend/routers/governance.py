@@ -152,20 +152,8 @@ async def ensure_transaction_review_task(trust_id: str, user_id: str):
             })
 
 
-async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = False) -> dict:
-    """Async: gather all raw DB data needed for health score. Returns dict of raw metrics.
-    If use_cache=True, tries to load risk findings from TTL cache (5 min) before gathering fresh.
-    """
-    now = datetime.now(timezone.utc)
-    quarter_start = get_quarter_start(now)
-    year_start = get_year_start(now)
-    one_year_ago = (now - timedelta(days=365))
-    twelve_months_ago = one_year_ago
-
-    # 1. Quarterly Minutes — count both minutes_records (direct-created) and
-    # finalized minutes_templates (created via template flow, e.g. Getting Started).
-    # Without this, users who complete initial minutes through onboarding still see
-    # "Missing Q Minutes" because their minutes are in minutes_templates, not minutes_records.
+async def _gather_minutes_data(trust_id: str, user_id: str, quarter_start: datetime) -> int:
+    """Count quarterly minutes from both minutes_records and minutes_templates."""
     quarterly_minutes_records = await db.minutes_records.count_documents({
         "trust_id": trust_id,
         "user_id": user_id,
@@ -177,27 +165,16 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "created_at": {"$gte": quarter_start.isoformat()},
         "status": {"$in": ["final", "finalized", "draft"]}
     })
-    quarterly_minutes = quarterly_minutes_records + quarterly_minutes_templates
+    return quarterly_minutes_records + quarterly_minutes_templates
 
-    # 2. Task Compliance
-    total_tasks = await db.governance_tasks.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id
-    })
-    overdue_tasks = await db.governance_tasks.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "completed_at": None,
-        "due_date": {"$lt": now.isoformat()}
-    })
 
-    # 3. Compensation Alignment
+async def _gather_compensation_data(trust_id: str, user_id: str, year_start: datetime) -> tuple:
+    """Return (comp_plan, ytd_total, approved_amount) for compensation alignment."""
     comp_plan = await db.compensation_plans.find_one(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0},
         sort=[("effective_date", -1)]
     )
-    ytd_payments = []
     ytd_total = 0
     approved_amount = 0
     if comp_plan:
@@ -207,61 +184,11 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         ).to_list(1000)
         ytd_total = sum(p.get("amount", 0) for p in ytd_payments)
         approved_amount = comp_plan.get("annual_approved_amount") or comp_plan.get("annual_fee") or comp_plan.get("annual_amount", 0)
+    return comp_plan, ytd_total, approved_amount
 
-    # 4. Distribution Documentation
-    dist_count = await db.distribution_records.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id
-    })
-    benevolence_dists = await db.distribution_records.find({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "is_benevolence": True
-    }, {"_id": 0}).to_list(1000)
 
-    # 5. Annual Review
-    annual_review = await db.governance_tasks.find_one({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "task_type": "annual_review",
-        "completed_at": {"$gte": one_year_ago.isoformat()}
-    }, {"_id": 0})
-
-    # 5b. Trust creation date (to suppress Annual Review insight for new trusts)
-    trust_doc = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "created_at": 1})
-    trust_created_at = trust_doc.get("created_at") if trust_doc else None
-
-    # 6. Asset Valuation Freshness
-    active_assets = await db.schedule_a_items.find({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "status": "active"
-    }, {"_id": 0, "description": 1, "last_valued_date": 1, "date_conveyed": 1}).to_list(1000)
-
-    # 7. Transaction Classification
-    total_txns = await db.transactions.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id
-    })
-    classified_txns = 0
-    if total_txns > 0:
-        classified_txns = await db.transactions.count_documents({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "classification": {"$exists": True, "$ne": None, "$ne": ""}
-        })
-
-    # 8. Separation Alert Health
-    active_alert_count = await db.separation_alerts.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "status": "active"
-    })
-
-    # 9. Risk findings (for penalty computation, excludes separation alerts)
-    trust_doc = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0}) or {}
-    today = now.date()
-
+async def _gather_risk_findings(trust_id: str, trust_doc: dict, now: datetime, today, use_cache: bool) -> list:
+    """Gather risk findings, using TTL cache (5 min) if use_cache=True."""
     risk_findings = None
     if use_cache:
         cached = await db.risk_findings_cache.find_one({
@@ -281,6 +208,80 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
                 {"$set": {"findings": risk_findings, "cached_at": now.isoformat()}},
                 upsert=True
             )
+    return risk_findings
+
+
+async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = False) -> dict:
+    """Async: gather all raw DB data needed for health score. Returns dict of raw metrics.
+    If use_cache=True, tries to load risk findings from TTL cache (5 min) before gathering fresh.
+    """
+    now = datetime.now(timezone.utc)
+    quarter_start = get_quarter_start(now)
+    year_start = get_year_start(now)
+    one_year_ago = (now - timedelta(days=365))
+
+    quarterly_minutes = await _gather_minutes_data(trust_id, user_id, quarter_start)
+
+    total_tasks = await db.governance_tasks.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    overdue_tasks = await db.governance_tasks.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "completed_at": None,
+        "due_date": {"$lt": now.isoformat()}
+    })
+
+    comp_plan, ytd_total, approved_amount = await _gather_compensation_data(trust_id, user_id, year_start)
+
+    dist_count = await db.distribution_records.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    benevolence_dists = await db.distribution_records.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "is_benevolence": True
+    }, {"_id": 0}).to_list(1000)
+
+    annual_review = await db.governance_tasks.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "task_type": "annual_review",
+        "completed_at": {"$gte": one_year_ago.isoformat()}
+    }, {"_id": 0})
+
+    trust_doc_for_created = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "created_at": 1})
+    trust_created_at = trust_doc_for_created.get("created_at") if trust_doc_for_created else None
+
+    active_assets = await db.schedule_a_items.find({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active"
+    }, {"_id": 0, "description": 1, "last_valued_date": 1, "date_conveyed": 1}).to_list(1000)
+
+    total_txns = await db.transactions.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id
+    })
+    classified_txns = 0
+    if total_txns > 0:
+        classified_txns = await db.transactions.count_documents({
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "classification": {"$exists": True, "$ne": None, "$ne": ""}
+        })
+
+    active_alert_count = await db.separation_alerts.count_documents({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "status": "active"
+    })
+
+    trust_doc = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0}) or {}
+    today = now.date()
+    risk_findings = await _gather_risk_findings(trust_id, trust_doc, now, today, use_cache)
 
     return {
         "now": now,
@@ -295,7 +296,7 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "annual_review": annual_review,
         "trust_created_at": trust_created_at,
         "active_assets": active_assets,
-        "twelve_months_ago": twelve_months_ago,
+        "twelve_months_ago": one_year_ago,
         "total_txns": total_txns,
         "classified_txns": classified_txns,
         "active_alert_count": active_alert_count,
@@ -599,6 +600,77 @@ def _compute_health_score(data: dict) -> dict:
     }
 
 
+async def _clear_achieved_dismissals(trust_id: str, user_id: str, criteria: list) -> None:
+    """Auto-clear dismissals for criteria that are now achieved."""
+    achieved_names = [c.name for c in criteria if c.achieved]
+    if not achieved_names:
+        return
+    await db.dismissed_insights.delete_many({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "criterion_name": {"$in": achieved_names}
+    })
+
+
+async def _maybe_notify_score_drop(
+    trust_id: str, user_id: str, total_score: int, risk_findings: list, now: datetime
+) -> None:
+    """Insert a notification when the score drops 5+ points due to new high/critical risks."""
+    prev = await db.health_score_snapshots.find_one(
+        {"trust_id": trust_id},
+        sort=[("calculated_at", -1)],
+        projection={"_id": 0, "score_value": 1}
+    )
+    if not prev or prev.get("score_value", 100) - total_score < 5:
+        return
+    new_findings = [r for r in risk_findings if r.get("severity") in ("critical", "high")]
+    if not new_findings:
+        return
+    await db.notifications.insert_one({
+        "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "type": "score_drop",
+        "title": "Your Trust Health Score changed",
+        "message": f"Your score is now {total_score}/{TOTAL_MAX_POINTS}. "
+                   f"{len(new_findings)} new risk{'s' if len(new_findings) > 1 else ''} "
+                   f"affecting your score. Review and resolve to recover points.",
+        "action_path": "/governance",
+        "created_at": now.isoformat(),
+        "read": False
+    })
+
+
+async def _save_health_snapshot(
+    trust_id: str, user_id: str, criteria: list, base_score: int,
+    risk_penalty: int, total_score: int, color: HealthColor,
+    risk_penalty_breakdown: dict, now: datetime
+) -> None:
+    """Persist a health-score snapshot (schema v2)."""
+    snapshot = {
+        "snapshot_id": f"health_{uuid.uuid4().hex[:12]}",
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "schema_version": 2,
+        "base_score": base_score,
+        "risk_penalty": risk_penalty,
+        "score_value": total_score,
+        "color": color.value,
+        "calculated_at": now.isoformat(),
+        "criteria_breakdown": [
+            {"name": c.name, "points": c.points, "max_points": c.max_points, "achieved": c.achieved}
+            for c in criteria
+        ],
+        "risk_findings_count": {
+            "critical": risk_penalty_breakdown["critical"]["count"],
+            "high": risk_penalty_breakdown["high"]["count"],
+            "medium": risk_penalty_breakdown["medium"]["count"],
+            "low": risk_penalty_breakdown["low"]["count"],
+        }
+    }
+    await db.health_score_snapshots.insert_one(snapshot)
+
+
 async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: bool = True) -> dict:
     """
     Calculate governance health score using 8 criteria + risk penalty.
@@ -623,62 +695,15 @@ async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: boo
     risk_penalty_breakdown = result["risk_penalty_breakdown"]
 
     # Auto-clear dismissals for criteria that are now achieved
-    achieved_names = [c.name for c in criteria if c.achieved]
-    if achieved_names:
-        await db.dismissed_insights.delete_many({
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "criterion_name": {"$in": achieved_names}
-        })
+    await _clear_achieved_dismissals(trust_id, user_id, criteria)
 
-    # Score-change notification: detect 5+ point drop from new risk findings
+    # Score-change notification + snapshot persistence (only when saving)
     if save_snapshot:
-        prev = await db.health_score_snapshots.find_one(
-            {"trust_id": trust_id},
-            sort=[("calculated_at", -1)],
-            projection={"_id": 0, "score_value": 1}
+        await _maybe_notify_score_drop(trust_id, user_id, total_score, risk_findings, now)
+        await _save_health_snapshot(
+            trust_id, user_id, criteria, base_score, risk_penalty,
+            total_score, color, risk_penalty_breakdown, now
         )
-        if prev and prev.get("score_value", 100) - total_score >= 5:
-            new_findings = [r for r in risk_findings if r.get("severity") in ("critical", "high")]
-            if new_findings:
-                await db.notifications.insert_one({
-                    "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
-                    "user_id": user_id,
-                    "trust_id": trust_id,
-                    "type": "score_drop",
-                    "title": "Your Trust Health Score changed",
-                    "message": f"Your score is now {total_score}/{TOTAL_MAX_POINTS}. "
-                               f"{len(new_findings)} new risk{'s' if len(new_findings) > 1 else ''} "
-                               f"affecting your score. Review and resolve to recover points.",
-                    "action_path": "/governance",
-                    "created_at": now.isoformat(),
-                    "read": False
-                })
-
-    # Save snapshot (schema v2)
-    if save_snapshot:
-        snapshot = {
-            "snapshot_id": f"health_{uuid.uuid4().hex[:12]}",
-            "trust_id": trust_id,
-            "user_id": user_id,
-            "schema_version": 2,
-            "base_score": base_score,
-            "risk_penalty": risk_penalty,
-            "score_value": total_score,
-            "color": color.value,
-            "calculated_at": now.isoformat(),
-            "criteria_breakdown": [
-                {"name": c.name, "points": c.points, "max_points": c.max_points, "achieved": c.achieved}
-                for c in criteria
-            ],
-            "risk_findings_count": {
-                "critical": risk_penalty_breakdown["critical"]["count"],
-                "high": risk_penalty_breakdown["high"]["count"],
-                "medium": risk_penalty_breakdown["medium"]["count"],
-                "low": risk_penalty_breakdown["low"]["count"],
-            }
-        }
-        await db.health_score_snapshots.insert_one(snapshot)
 
     return {
         "trust_id": trust_id,
@@ -695,46 +720,52 @@ async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: boo
     }
 
 
+_INSIGHT_USE_DESC_CRITERIA = {
+    "Asset Valuation Freshness",
+    "Transaction Classification",
+    "Separation Alert Health",
+}
+
+
+def _build_insight_description(c: dict, cfg: dict, max_points: int) -> str:
+    """Build the human-readable description for a governance insight."""
+    name = c["name"]
+    if name == "Distribution Documentation":
+        desc = c.get("description", "")
+        if "benevolence" in desc.lower():
+            return desc
+        return f"Log your first distribution to earn +{max_points} points"
+    if name in _INSIGHT_USE_DESC_CRITERIA:
+        return c.get("description", cfg["insight_desc"].format(max_points=max_points))
+    return cfg["insight_desc"].format(max_points=max_points)
+
+
 def generate_governance_insights(criteria: List[dict]) -> List[GovernanceInsight]:
     """Generate actionable insights from health score criteria."""
     insights = []
-    
+
     for c in criteria:
-        if not c["achieved"] and not c.get("no_data", False):
-            cfg = CRITERIA_CONFIG.get(c["name"])
-            if not cfg:
-                continue
-            max_points = cfg["max_points"]
-            recoverable = max_points - c.get("points", 0)
-            if recoverable <= 0:
-                continue
-            
-            # Special cases with custom descriptions
-            if c["name"] == "Distribution Documentation":
-                desc = c.get("description", "")
-                if "benevolence" in desc.lower():
-                    description = desc
-                else:
-                    description = f"Log your first distribution to earn +{max_points} points"
-            elif c["name"] == "Asset Valuation Freshness":
-                description = c.get("description", cfg["insight_desc"].format(max_points=max_points))
-            elif c["name"] == "Transaction Classification":
-                description = c.get("description", cfg["insight_desc"].format(max_points=max_points))
-            elif c["name"] == "Separation Alert Health":
-                description = c.get("description", cfg["insight_desc"].format(max_points=max_points))
-            else:
-                description = cfg["insight_desc"].format(max_points=max_points)
-            
-            insights.append(GovernanceInsight(
-                type=cfg["insight_type"],
-                criterion_name=c["name"],
-                title=cfg["insight_title"],
-                description=description,
-                action_path=cfg["action_path"],
-                action_label=cfg["action_label"],
-                points=recoverable
-            ))
-    
+        if c["achieved"] or c.get("no_data", False):
+            continue
+        cfg = CRITERIA_CONFIG.get(c["name"])
+        if not cfg:
+            continue
+        max_points = cfg["max_points"]
+        recoverable = max_points - c.get("points", 0)
+        if recoverable <= 0:
+            continue
+
+        description = _build_insight_description(c, cfg, max_points)
+        insights.append(GovernanceInsight(
+            type=cfg["insight_type"],
+            criterion_name=c["name"],
+            title=cfg["insight_title"],
+            description=description,
+            action_path=cfg["action_path"],
+            action_label=cfg["action_label"],
+            points=recoverable
+        ))
+
     return insights
 
 
@@ -1164,6 +1195,65 @@ async def get_activity(
 
 # ==================== DASHBOARD ENDPOINT ====================
 
+async def _get_pending_quarterly_draft(trust_id: str, user_id: str) -> Optional[dict]:
+    """Check for a pending auto-drafted quarterly review minutes draft."""
+    pending_draft = await db.minutes_records.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "minutes_type": "quarterly_review",
+        "status": "draft",
+        "template_data.auto_drafted": True,
+    })
+    if not pending_draft:
+        return None
+    quarter = pending_draft.get("template_data", {}).get("quarter", "")
+    return {
+        "minutes_id": pending_draft["minutes_id"],
+        "quarter": quarter,
+        "review_link": f"/minutes/{pending_draft['minutes_id']}/edit",
+    }
+
+
+async def _resolve_dashboard_trust(trust_id: Optional[str], user_id: str) -> dict:
+    """Resolve the trust for the dashboard — by id or the most recent one."""
+    if trust_id:
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"_id": 0}
+        )
+        if not trust:
+            raise HTTPException(
+                status_code=404,
+                detail="Trust not found or access denied."
+            )
+        return trust
+
+    trust = await db.trusts.find_one(
+        {"user_id": user_id},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    if not trust:
+        raise HTTPException(
+            status_code=404,
+            detail="No trust found. Please create a trust first."
+        )
+    return trust
+
+
+async def _get_active_insights(trust_id: str, user_id: str, criteria: list) -> list:
+    """Generate governance insights, filtering out dismissed ones and adding supplementary insights."""
+    dismissed = await db.dismissed_insights.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "criterion_name": 1}
+    ).to_list(1000)
+    dismissed_names = {d["criterion_name"] for d in dismissed}
+
+    governance_insights = generate_governance_insights(criteria)
+    governance_insights.extend(await generate_additional_governance_insights(trust_id, user_id))
+    return [i for i in governance_insights if i.criterion_name not in dismissed_names]
+
+
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(
     trust_id: Optional[str] = None,
@@ -1179,55 +1269,20 @@ async def get_dashboard(
     - Subscription state (for read-only mode awareness)
     """
     user_id = user["user_id"]
-    
-    if trust_id:
-        trust = await db.trusts.find_one(
-            {"trust_id": trust_id, "user_id": user_id},
-            {"_id": 0}
-        )
-        if not trust:
-            raise HTTPException(
-                status_code=404,
-                detail="Trust not found or access denied."
-            )
-    else:
-        trust = await db.trusts.find_one(
-            {"user_id": user_id},
-            {"_id": 0},
-            sort=[("created_at", -1)]
-        )
-        
-        if not trust:
-            raise HTTPException(
-                status_code=404, 
-                detail="No trust found. Please create a trust first."
-            )
-    
+
+    trust = await _resolve_dashboard_trust(trust_id, user_id)
     trust_id = trust["trust_id"]
     trust_name = trust.get("name", "Unnamed Trust")
-    
+
     health_data = await calculate_health_score(trust_id, user_id, save_snapshot=False)
     health_score = HealthScoreResponse(**health_data)
-    
+
     onboarding_state = await get_onboarding_state(user_id, trust_id)
-    
     recent_activity = await get_recent_activity(user_id, trust_id, limit=10)
-    
     stats = await get_dashboard_stats(trust_id, user_id)
-    
-    # Filter out dismissed insights for this trust
-    dismissed = await db.dismissed_insights.find(
-        {"trust_id": trust_id, "user_id": user_id},
-        {"_id": 0, "criterion_name": 1}
-    ).to_list(1000)
-    dismissed_names = {d["criterion_name"] for d in dismissed}
-    
-    governance_insights = generate_governance_insights(health_data["criteria"])
-    # Append supplementary insights that require direct DB queries
-    # (Undocumented Distributions, Overdue Tax Filings)
-    governance_insights.extend(await generate_additional_governance_insights(trust_id, user_id))
-    governance_insights = [i for i in governance_insights if i.criterion_name not in dismissed_names]
-    
+
+    governance_insights = await _get_active_insights(trust_id, user_id, health_data["criteria"])
+
     sub_state = await get_subscription_state(user_id)
     subscription = DashboardSubscriptionState(
         plan_type=sub_state.plan_type,
@@ -1239,21 +1294,7 @@ async def get_dashboard(
     )
 
     # Check for pending quarterly draft (Fix 3)
-    pending_quarterly_draft = None
-    pending_draft = await db.minutes_records.find_one({
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "minutes_type": "quarterly_review",
-        "status": "draft",
-        "template_data.auto_drafted": True,
-    })
-    if pending_draft:
-        quarter = pending_draft.get("template_data", {}).get("quarter", "")
-        pending_quarterly_draft = {
-            "minutes_id": pending_draft["minutes_id"],
-            "quarter": quarter,
-            "review_link": f"/minutes/{pending_draft['minutes_id']}/edit",
-        }
+    pending_quarterly_draft = await _get_pending_quarterly_draft(trust_id, user_id)
 
     return DashboardResponse(
         trust_id=trust_id,
