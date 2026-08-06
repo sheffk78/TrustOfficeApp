@@ -105,9 +105,65 @@ def _is_trustoffice_invoice(inv) -> bool:
             price_id = _get_price_id(line)
             if price_id and price_id in TRUSTOFFICE_PRICE_IDS:
                 return True
-    except Exception:
-        pass
+    except (AttributeError, TypeError) as e:
+        logger.debug(f"Could not inspect invoice lines: {e}")
     return False
+
+
+async def _init_user_onboarding(user_id: str, now: datetime) -> None:
+    """Initialize the user_onboarding record for a new user."""
+    await db.user_onboarding.insert_one({
+        "user_id": user_id,
+        "formation_date_added": False,
+        "ein_entered": False,
+        "trust_doc_uploaded": False,
+        "ein_doc_uploaded": False,
+        "beneficiaries_added": False,
+        "assets_added": False,
+        "minutes_generated": False,
+        "calendar_set": False,
+        "checklist_dismissed": False,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat()
+    })
+
+
+async def _cancel_paid_stripe_subscription(user_id: str) -> None:
+    """Cancel a user's paid Stripe subscription (if any) at period end."""
+    existing_sub = await db.subscriptions.find_one({"user_id": user_id})
+    stripe_sub_id = existing_sub.get("stripe_subscription_id") if existing_sub else None
+    if not stripe_sub_id:
+        return
+    try:
+        stripe.Subscription.modify(stripe_sub_id, cancel_at_period_end=True)
+        logger.info(f"Cancelled paid subscription {stripe_sub_id} for user {user_id}")
+    except stripe.StripeError as e:
+        logger.warning(f"Failed to cancel paid subscription for {user_id}: {e}")
+
+
+def _build_gift_subscription_doc(
+    user_id: str, plan_type: str, gift_type: str, duration_days: int,
+    admin_email: str, now: datetime,
+) -> dict:
+    """Build a subscription doc for a gifted plan with time-limited access."""
+    return {
+        "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+        "user_id": user_id,
+        "plan_type": plan_type,
+        "status": "active",
+        "gifted": True,
+        "gift_type": gift_type,
+        "gift_start_date": now.isoformat(),
+        "gift_end_date": (now + timedelta(days=duration_days)).isoformat(),
+        "gifted_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+        "notes": f"Gifted {plan_type} access granted by admin {admin_email}",
+    }
+
+
+def _format_cents(cents: int) -> str:
+    """Format an amount in cents as a USD string."""
+    return f"${cents / 100:,.2f}"
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -243,54 +299,59 @@ async def list_customers(
     """
     List all customers with filtering, search, and pagination.
     """
-    # Build filter query
+    query = _build_customer_query(search, is_admin_filter)
+
+    total = await db.users.count_documents(query)
+    logger.info(f"Admin list_customers: query={query}, total={total}")
+
+    sort_dir = -1 if sort_order == "desc" else 1
+    skip = (page - 1) * limit
+    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort(sort_by, sort_dir).skip(skip).limit(limit).to_list(limit)
+
+    logger.info(f"Admin list_customers: fetched {len(users)} users")
+
+    customers = await _enrich_customers(users, status)
+
+    return {
+        "customers": customers,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+
+def _build_customer_query(search: Optional[str], is_admin_filter: Optional[bool]) -> dict:
+    """Build the MongoDB query for list_customers based on search and admin filter."""
     query = {}
-    
     if search:
-        # Escape regex metacharacters to prevent NoSQL injection / ReDoS
         escaped_search = re.escape(search)
         query["$or"] = [
             {"email": {"$regex": escaped_search, "$options": "i"}},
             {"name": {"$regex": escaped_search, "$options": "i"}}
         ]
-    
     if is_admin_filter is not None:
         if is_admin_filter:
             query["is_admin"] = True
         else:
             query["is_admin"] = {"$ne": True}
-    
-    # Get total count
-    total = await db.users.count_documents(query)
-    logger.info(f"Admin list_customers: query={query}, total={total}")
-    
-    # Build sort - handle missing created_at field
-    sort_dir = -1 if sort_order == "desc" else 1
-    
-    # Get users
-    skip = (page - 1) * limit
-    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort(sort_by, sort_dir).skip(skip).limit(limit).to_list(limit)
-    
-    logger.info(f"Admin list_customers: fetched {len(users)} users")
-    
-    # Enrich with subscription data
+    return query
+
+
+async def _enrich_customers(users: list, status_filter: Optional[str]) -> list:
+    """Enrich a list of user docs with subscription and trust data, returning CustomerListItem dicts."""
     customers = []
     for user in users:
-        # Get subscription
         sub = await db.subscriptions.find_one({"user_id": user["user_id"]}, {"_id": 0})
-        
-        # Get trust count
         trust_count = await db.trusts.count_documents({"user_id": user["user_id"]})
-        
-        # Determine subscription status
+
         sub_status = sub.get("status", "none") if sub else "none"
         sub_plan = sub.get("plan_type", "none") if sub else "none"
         sub_billing_period = sub.get("billing_period") if sub else None
-        
-        # Filter by status if specified (do this filtering here)
-        if status and status != "all" and sub_status != status:
+
+        if status_filter and status_filter != "all" and sub_status != status_filter:
             continue
-        
+
         customers.append(CustomerListItem(
             user_id=user["user_id"],
             email=user["email"],
@@ -304,14 +365,7 @@ async def list_customers(
             trust_count=trust_count,
             last_login=user.get("last_login")
         ).model_dump())
-    
-    return {
-        "customers": customers,
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "pages": (total + limit - 1) // limit
-    }
+    return customers
 
 
 @router.get("/customers/{user_id}", response_model=CustomerDetail)
@@ -516,36 +570,19 @@ async def grant_access(
     - Fixing billing issues
     """
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="Customer not found")
-    
+
     now = datetime.now(timezone.utc)
-    
-    if request.plan_type in ("trial", "gifted_14day"):
-        # Gift or extend 14-day access
+    plan_type = request.plan_type
+
+    if plan_type in ("trial", "gifted_14day"):
         days = request.days or 14
-        gift_end = (now + timedelta(days=days)).isoformat()
-        
-        await db.subscriptions.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "plan_type": "free",
-                "status": "active",
-                "gifted": True,
-                "gift_type": "14day",
-                "gift_start_date": now.isoformat(),
-                "gift_end_date": gift_end,
-                "gifted_at": now.isoformat(),
-                "updated_at": now.isoformat(),
-                "notes": f"Gifted 14-day access granted by admin {admin['email']}"
-            }},
-            upsert=True
-        )
-        
+        await _await_gift_update(user_id, "free", "14day", days, admin["email"], now)
         return {"message": f"Gifted {days} days of access to {user['email']}"}
-    
-    elif request.plan_type == "forever_free":
+
+    if plan_type == "forever_free":
         await db.subscriptions.update_one(
             {"user_id": user_id},
             {"$set": {
@@ -556,83 +593,66 @@ async def grant_access(
             }},
             upsert=True
         )
-        
         return {"message": f"Forever free access granted to {user['email']}"}
-    
-    elif request.plan_type in ("gifted_monthly", "gifted_annual"):
-        # Gift monthly access
-        plan_type_map = {"gifted_monthly": "monthly", "gifted_annual": "annual"}
+
+    if plan_type in ("gifted_monthly", "gifted_annual"):
+        plan_map = {"gifted_monthly": "monthly", "gifted_annual": "annual"}
         duration_map = {"gifted_monthly": 30, "gifted_annual": 365}
-        plan = plan_type_map.get(request.plan_type, "monthly")
-        duration = duration_map.get(request.plan_type, 30)
-        gift_end = (now + timedelta(days=duration)).isoformat()
-        
-        await db.subscriptions.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "plan_type": plan,
-                "status": "active",
-                "gifted": True,
-                "gift_type": plan,
-                "gift_start_date": now.isoformat(),
-                "gift_end_date": gift_end,
-                "gifted_at": now.isoformat(),
-                "updated_at": now.isoformat(),
-                "notes": f"Gifted {plan} access granted by admin {admin['email']}"
-            }},
-            upsert=True
-        )
-        
+        plan = plan_map.get(plan_type, "monthly")
+        duration = duration_map.get(plan_type, 30)
+        await _await_gift_update(user_id, plan, plan, duration, admin["email"], now)
         return {"message": f"Gifted {plan} access to {user['email']}"}
-    
-    elif request.plan_type in ("gifted_trustee", "gifted_estate", "gifted_advisor"):
-        # Gift new tier access (trustee, estate, advisor)
+
+    if plan_type in ("gifted_trustee", "gifted_estate", "gifted_advisor"):
         tier_map = {"gifted_trustee": "trustee", "gifted_estate": "estate", "gifted_advisor": "advisor"}
-        plan = tier_map.get(request.plan_type, "trustee")
-        duration = 30
-        gift_end = (now + timedelta(days=duration)).isoformat()
-        
-        await db.subscriptions.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "plan_type": plan,
-                "status": "active",
-                "gifted": True,
-                "gift_type": request.plan_type,
-                "gift_start_date": now.isoformat(),
-                "gift_end_date": gift_end,
-                "gifted_at": now.isoformat(),
-                "updated_at": now.isoformat(),
-                "notes": f"Gifted {plan} access granted by admin {admin['email']}"
-            }},
-            upsert=True
-        )
-        
+        plan = tier_map.get(plan_type, "trustee")
+        await _await_gift_update(user_id, plan, plan_type, 30, admin["email"], now)
         return {"message": f"Gifted {plan} access to {user['email']}"}
-    
-    else:
-        # Grant paid plan access (direct, not gifted)
-        await db.subscriptions.update_one(
-            {"user_id": user_id},
-            {
-                "$set": {
-                    "plan_type": request.plan_type,
-                    "status": "active",
-                    "updated_at": now.isoformat(),
-                    "notes": f"Access granted by admin {admin['email']}"
-                },
-                "$unset": {
-                    "gifted": "",
-                    "gift_type": "",
-                    "gift_start_date": "",
-                    "gift_end_date": "",
-                    "gifted_at": ""
-                }
+
+    # Grant paid plan access (direct, not gifted)
+    await db.subscriptions.update_one(
+        {"user_id": user_id},
+        {
+            "$set": {
+                "plan_type": plan_type,
+                "status": "active",
+                "updated_at": now.isoformat(),
+                "notes": f"Access granted by admin {admin['email']}"
             },
-            upsert=True
-        )
-        
-        return {"message": f"{request.plan_type} access granted to {user['email']}"}
+            "$unset": {
+                "gifted": "",
+                "gift_type": "",
+                "gift_start_date": "",
+                "gift_end_date": "",
+                "gifted_at": ""
+            }
+        },
+        upsert=True
+    )
+    return {"message": f"{plan_type} access granted to {user['email']}"}
+
+
+async def _await_gift_update(
+    user_id: str, plan: str, gift_type: str, duration: int,
+    admin_email: str, now: datetime,
+) -> None:
+    """Update a user's subscription with a gifted plan and duration (days)."""
+    gift_end = (now + timedelta(days=duration)).isoformat()
+    await db.subscriptions.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "plan_type": plan,
+            "status": "active",
+            "gifted": True,
+            "gift_type": gift_type,
+            "gift_start_date": now.isoformat(),
+            "gift_end_date": gift_end,
+            "gifted_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+            "notes": f"Gifted {plan} access granted by admin {admin_email}"
+        }},
+        upsert=True
+    )
 
 
 COLLECTIONS_TO_CLEAN = [
@@ -1042,23 +1062,26 @@ def _fetch_stripe_all_time_revenue() -> tuple:
             limit=100,
             created={"gte": int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp())}
         )
-        for inv in all_invoices.auto_paging_iter():
-            try:
-                if not _is_trustoffice_invoice(inv):
-                    continue
-                amount = inv.amount_paid or inv.total or 0
-                total_revenue_cents += amount
-                total_transactions += 1
-                customer_id = getattr(inv, 'customer', None)
-                if customer_id:
-                    customer_ids.add(customer_id)
-            except Exception as inv_err:
-                logger.warning(f"Skipping invoice in stats: {inv_err}")
-                continue
     except stripe.StripeError as e:
         logger.error(f"Stripe API error in /admin/stats: {e}")
-    except Exception as e:
+        return 0, 0, set()
+    except (ValueError, TypeError) as e:
         logger.error(f"Error fetching Stripe data in /admin/stats: {e}")
+        return 0, 0, set()
+
+    for inv in all_invoices.auto_paging_iter():
+        try:
+            if not _is_trustoffice_invoice(inv):
+                continue
+            amount = inv.amount_paid or inv.total or 0
+            total_revenue_cents += amount
+            total_transactions += 1
+            customer_id = getattr(inv, 'customer', None)
+            if customer_id:
+                customer_ids.add(customer_id)
+        except (AttributeError, TypeError, ValueError) as inv_err:
+            logger.warning(f"Skipping invoice in stats: {inv_err}")
+            continue
 
     return total_revenue_cents, total_transactions, customer_ids
 
@@ -1175,8 +1198,8 @@ def _detect_plan_type(inv) -> str:
             price_id = _get_price_id(line)
             if price_id and price_id in PRICE_ID_TO_PLAN_LABEL:
                 return PRICE_ID_TO_PLAN_LABEL[price_id]
-    except Exception:
-        pass
+    except (AttributeError, TypeError) as e:
+        logger.debug(f"Could not detect plan type: {e}")
     return "unknown"
 
 
@@ -1187,7 +1210,9 @@ def _get_customer_email(inv, customer_id: str) -> str:
             customer = stripe.Customer.retrieve(customer_id)
             return customer.email or ""
         return getattr(inv, 'customer_email', '') or ""
-    except Exception:
+    except stripe.StripeError:
+        return getattr(inv, 'customer_email', '') or ""
+    except (AttributeError, TypeError):
         return getattr(inv, 'customer_email', '') or ""
 
 
@@ -1233,39 +1258,31 @@ async def _fetch_period_revenue(now: datetime) -> dict:
         "all_time": datetime(2020, 1, 1, tzinfo=timezone.utc),
     }
 
-    revenue = {k: 0 for k in periods}
+    revenue = {}
     for label, start_dt in periods.items():
-        try:
-            data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(start_dt.timestamp())})
-            for inv in data.auto_paging_iter():
-                if _is_trustoffice_invoice(inv):
-                    revenue[label] += inv.amount_paid or inv.total or 0
-        except stripe.StripeError as e:
-            logger.error(f"Stripe API error fetching {label} revenue: {e}")
+        revenue[label] = _fetch_period_revenue_single(label, start_dt)
     return revenue
 
 
-@router.get("/revenue")
-async def get_revenue_data(
-    preset: str = Query("last_30_days", description="Date range preset: today, this_week, this_month, last_30_days, last_90_days, all_time"),
-    start_date: Optional[str] = Query(None, description="Custom start date (ISO format). Overrides preset."),
-    end_date: Optional[str] = Query(None, description="Custom end date (ISO format). Overrides preset."),
-    admin: dict = Depends(require_admin)
-):
-    """
-    Get detailed revenue data from Stripe for the admin dashboard.
-    Includes customer-level transaction data (admin only).
-    """
-    now = datetime.now(timezone.utc)
-    start_dt, end_dt = _resolve_date_range(preset, start_date, end_date, now)
-    start_ts = int(start_dt.timestamp())
-    end_ts = int(end_dt.timestamp())
+def _fetch_period_revenue_single(label: str, start_dt: datetime) -> int:
+    """Fetch total paid-invoice revenue for a single period. Returns cents."""
+    try:
+        data = stripe.Invoice.list(status="paid", limit=100, created={"gte": int(start_dt.timestamp())})
+        period_total = 0
+        for inv in data.auto_paging_iter():
+            if _is_trustoffice_invoice(inv):
+                period_total += inv.amount_paid or inv.total or 0
+        return period_total
+    except stripe.StripeError as e:
+        logger.error(f"Stripe API error fetching {label} revenue: {e}")
+        return 0
 
+
+def _fetch_revenue_invoices(start_ts: int, end_ts: int, customer_ids: set,
+                           revenue_by_month: defaultdict, subscriptions_by_plan: dict) -> tuple:
+    """Paginate Stripe invoices and aggregate revenue. Returns (transactions, total_cents, error)."""
     total_revenue_cents = 0
     total_transactions = 0
-    customer_ids = set()
-    revenue_by_month = defaultdict(int)
-    subscriptions_by_plan = {"monthly": 0, "annual": 0}
     recent_transactions = []
     stripe_error = None
 
@@ -1306,9 +1323,36 @@ async def get_revenue_data(
     except stripe.StripeError as e:
         logger.error(f"Stripe API error in /admin/revenue: {e}")
         stripe_error = str(e)
-    except Exception as e:
+    except (ValueError, TypeError, KeyError) as e:
         logger.error(f"Error fetching revenue data: {e}")
         stripe_error = str(e)
+
+    return total_transactions, total_revenue_cents, recent_transactions, stripe_error
+
+
+@router.get("/revenue")
+async def get_revenue_data(
+    preset: str = Query("last_30_days", description="Date range preset: today, this_week, this_month, last_30_days, last_90_days, all_time"),
+    start_date: Optional[str] = Query(None, description="Custom start date (ISO format). Overrides preset."),
+    end_date: Optional[str] = Query(None, description="Custom end date (ISO format). Overrides preset."),
+    admin: dict = Depends(require_admin)
+):
+    """
+    Get detailed revenue data from Stripe for the admin dashboard.
+    Includes customer-level transaction data (admin only).
+    """
+    now = datetime.now(timezone.utc)
+    start_dt, end_dt = _resolve_date_range(preset, start_date, end_date, now)
+    start_ts = int(start_dt.timestamp())
+    end_ts = int(end_dt.timestamp())
+
+    customer_ids = set()
+    revenue_by_month = defaultdict(int)
+    subscriptions_by_plan = {"monthly": 0, "annual": 0}
+
+    total_transactions, total_revenue_cents, recent_transactions, stripe_error = _fetch_revenue_invoices(
+        start_ts, end_ts, customer_ids, revenue_by_month, subscriptions_by_plan
+    )
 
     # Sort recent transactions by date descending
     recent_transactions.sort(key=lambda t: t["date"], reverse=True)
@@ -1337,25 +1381,25 @@ async def get_revenue_data(
 
     return {
         "total_revenue_cents": total_revenue_cents,
-        "total_revenue_formatted": f"${total_revenue_cents / 100:,.2f}",
+        "total_revenue_formatted": _format_cents(total_revenue_cents),
         "mrr_cents": mrr_cents,
-        "mrr_formatted": f"${mrr_cents / 100:,.2f}",
+        "mrr_formatted": _format_cents(mrr_cents),
         "arr_cents": arr_cents,
-        "arr_formatted": f"${arr_cents / 100:,.2f}",
+        "arr_formatted": _format_cents(arr_cents),
         "total_transactions": total_transactions,
         "paid_customers": len(customer_ids),
         "avg_revenue_per_customer_cents": avg_revenue_per_customer_cents,
-        "avg_revenue_per_customer_formatted": f"${avg_revenue_per_customer_cents / 100:,.2f}",
+        "avg_revenue_per_customer_formatted": _format_cents(avg_revenue_per_customer_cents),
         "revenue_by_month": revenue_by_month_list,
         "subscriptions_by_plan": subscriptions_by_plan,
         "revenue_today_cents": period_revenue["today"],
-        "revenue_today_formatted": f"${period_revenue['today'] / 100:,.2f}",
+        "revenue_today_formatted": _format_cents(period_revenue["today"]),
         "revenue_this_week_cents": period_revenue["week"],
-        "revenue_this_week_formatted": f"${period_revenue['week'] / 100:,.2f}",
+        "revenue_this_week_formatted": _format_cents(period_revenue["week"]),
         "revenue_this_month_cents": period_revenue["month"],
-        "revenue_this_month_formatted": f"${period_revenue['month'] / 100:,.2f}",
+        "revenue_this_month_formatted": _format_cents(period_revenue["month"]),
         "revenue_all_time_cents": period_revenue["all_time"],
-        "revenue_all_time_formatted": f"${period_revenue['all_time'] / 100:,.2f}",
+        "revenue_all_time_formatted": _format_cents(period_revenue["all_time"]),
         "monthly_subs": monthly_active,
         "annual_subs": annual_active,
         "recent_transactions": recent_transactions,
@@ -1472,7 +1516,7 @@ async def debug_db_check(admin: dict = Depends(require_admin)):
             "sample_users": [u.get("email") for u in sample_users],
             "admin_requesting": admin.get("email")
         }
-    except Exception as e:
+    except (ConnectionError, OSError, RuntimeError) as e:
         logger.error(f"DB check failed: {e}")
         return {
             "status": "error",
@@ -1549,21 +1593,8 @@ async def create_admin_user(
     })
     
     # Initialize onboarding
-    await db.user_onboarding.insert_one({
-        "user_id": user_id,
-        "formation_date_added": False,
-        "ein_entered": False,
-        "trust_doc_uploaded": False,
-        "ein_doc_uploaded": False,
-        "beneficiaries_added": False,
-        "assets_added": False,
-        "minutes_generated": False,
-        "calendar_set": False,
-        "checklist_dismissed": False,
-        "created_at": now.isoformat(),
-        "updated_at": now.isoformat()
-    })
-    
+    await _init_user_onboarding(user_id, now)
+
     logger.info(f"Admin {admin['email']} created new admin user {email}")
     
     return {
@@ -1634,40 +1665,22 @@ async def create_user(
     else:
         # Gifted tier — create time-limited gift
         gift_duration_days = {"14day": 14, "monthly": 30, "annual": 365, "trustee": 30, "estate": 30, "advisor": 30}
-        duration = gift_duration_days[request.gifted_tier]
         plan_type_map = {"14day": "free", "monthly": "monthly", "annual": "annual", "trustee": "trustee", "estate": "estate", "advisor": "advisor"}
-        
-        gift_end = (now + timedelta(days=duration)).isoformat()
-        await db.subscriptions.insert_one({
-            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
-            "user_id": user_id,
-            "plan_type": plan_type_map[request.gifted_tier],
-            "status": "active",
-            "gifted": True,
-            "gift_type": request.gifted_tier,
-            "gift_start_date": now.isoformat(),
-            "gift_end_date": gift_end,
-            "gifted_at": now.isoformat(),
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
-        })
+
+        duration = gift_duration_days[request.gifted_tier]
+        plan_type = plan_type_map[request.gifted_tier]
+
+        gift_doc = _build_gift_subscription_doc(
+            user_id, plan_type, request.gifted_tier, duration, admin["email"], now,
+        )
+        # Override notes to match the create_user context (not "grant-access")
+        gift_doc["notes"] = f"Gifted {plan_type} access (admin create-user)"
+        gift_doc["created_at"] = now.isoformat()
+        await db.subscriptions.insert_one(gift_doc)
     
     # Initialize onboarding
-    await db.user_onboarding.insert_one({
-        "user_id": user_id,
-        "formation_date_added": False,
-        "ein_entered": False,
-        "trust_doc_uploaded": False,
-        "ein_doc_uploaded": False,
-        "beneficiaries_added": False,
-        "assets_added": False,
-        "minutes_generated": False,
-        "calendar_set": False,
-        "checklist_dismissed": False,
-        "created_at": now.isoformat(),
-        "updated_at": now.isoformat()
-    })
-    
+    await _init_user_onboarding(user_id, now)
+
     # Generate password set token (expires in 24 hours — longer than normal reset)
     set_password_token = secrets.token_urlsafe(32)
     expires_at = now + timedelta(hours=24)
