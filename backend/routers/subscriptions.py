@@ -86,6 +86,17 @@ from mailercloud_service import add_to_paid_list
 
 # ==================== HELPER FUNCTIONS ====================
 
+
+async def _try_send_email(send_func, label: str) -> None:
+    """Send an email if configured, logging errors without failing the request."""
+    if not email_service.is_configured:
+        return
+    try:
+        await send_func()
+    except (Exception,) as e:
+        logger.error(f"Failed to send {label}: {e}")
+
+
 async def get_or_create_subscription(user_id: str) -> dict:
     """Get or create subscription for a user (atomic upsert to avoid race conditions)"""
     now = datetime.now(timezone.utc).isoformat()
@@ -112,6 +123,21 @@ async def get_or_create_subscription(user_id: str) -> dict:
         projection={"_id": 0}
     )
     return sub
+
+
+def _calc_trial_status(sub: dict, result: dict, now: datetime) -> dict:
+    """Calculate trial status with days remaining."""
+    trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
+    if trial_end.tzinfo is None:
+        trial_end = trial_end.replace(tzinfo=timezone.utc)
+    days_remaining = (trial_end - now).days
+    is_expired = days_remaining < 0
+    return {
+        **result,
+        "is_active": not is_expired,
+        "days_remaining": max(0, days_remaining),
+        "status": "expired" if is_expired else "trialing"
+    }
 
 
 def calculate_subscription_status(sub: dict) -> dict:
@@ -163,19 +189,7 @@ def calculate_subscription_status(sub: dict) -> dict:
         }
     
     if sub["status"] == "trialing" and sub.get("trial_end_date"):
-        trial_end = datetime.fromisoformat(sub["trial_end_date"].replace('Z', '+00:00'))
-        if trial_end.tzinfo is None:
-            trial_end = trial_end.replace(tzinfo=timezone.utc)
-        
-        days_remaining = (trial_end - now).days
-        is_expired = days_remaining < 0
-        
-        return {
-            **result,
-            "is_active": not is_expired,
-            "days_remaining": max(0, days_remaining),
-            "status": "expired" if is_expired else "trialing"
-        }
+        return _calc_trial_status(sub, result, now)
     
     return {
         **result,
@@ -524,15 +538,14 @@ async def cancel_subscription(user: dict = Depends(get_current_user)):
         ).strftime('%B %d, %Y')
         
         # Send cancellation email
-        if email_service.is_configured:
-            try:
-                await email_service.send_subscription_canceled(
-                    to_email=user["email"],
-                    user_name=user.get("name", ""),
-                    access_until=cancel_date
-                )
-            except Exception as e:
-                logger.error(f"Failed to send cancellation email: {e}")
+        await _try_send_email(
+            lambda: email_service.send_subscription_canceled(
+                to_email=user["email"],
+                user_name=user.get("name", ""),
+                access_until=cancel_date
+            ),
+            "cancellation email"
+        )
         
         return {
             "status": "canceled",
@@ -619,16 +632,15 @@ async def upgrade_subscription(user: dict = Depends(get_current_user)):
         )
         
         # Send upgrade email
-        if email_service.is_configured:
-            try:
-                await email_service.send_subscription_upgraded(
-                    to_email=user["email"],
-                    user_name=user.get("name", ""),
-                    old_plan=f"{current_plan} ({current_billing})",
-                    new_plan=f"{target_tier} (annual)"
-                )
-            except Exception as e:
-                logger.error(f"Failed to send upgrade email: {e}")
+        await _try_send_email(
+            lambda: email_service.send_subscription_upgraded(
+                to_email=user["email"],
+                user_name=user.get("name", ""),
+                old_plan=f"{current_plan} ({current_billing})",
+                new_plan=f"{target_tier} (annual)"
+            ),
+            "upgrade email"
+        )
         
         return {
             "status": "upgraded",
@@ -701,16 +713,15 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
         )
         
         # Send upgrade/downgrade email
-        if email_service.is_configured:
-            try:
-                await email_service.send_subscription_upgraded(
-                    to_email=user["email"],
-                    user_name=user.get("name", ""),
-                    old_plan=old_plan_label,
-                    new_plan=new_plan_label
-                )
-            except Exception as e:
-                logger.error(f"Failed to send plan change email: {e}")
+        await _try_send_email(
+            lambda: email_service.send_subscription_upgraded(
+                to_email=user["email"],
+                user_name=user.get("name", ""),
+                old_plan=old_plan_label,
+                new_plan=new_plan_label
+            ),
+            "plan change email"
+        )
         
         return {
             "status": "changed",
@@ -728,116 +739,182 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
 
 # ==================== STRIPE WEBHOOK EVENT HANDLERS ====================
 
+async def _process_referral_conversion_safe(user_id: str) -> None:
+    """Process referral conversion — apply reward to referrer."""
+    try:
+        from routers.referrals import process_referral_conversion
+        referral_result = await process_referral_conversion(user_id)
+        if referral_result:
+            logger.info(f"Referral conversion processed for user {user_id}: {referral_result}")
+    except (ImportError, Exception) as e:
+        logger.error(f"Failed to process referral conversion: {e}")
+
+
+async def _send_activation_emails_safe(user: dict, plan_type: str, amount: str, session: dict) -> None:
+    """Send activation email and admin purchase notification."""
+    if not user or not email_service.is_configured:
+        return
+    try:
+        stripe_sub = stripe.Subscription.retrieve(session.get("subscription"))
+        next_billing = format_date(stripe_sub.current_period_end)
+        await email_service.send_subscription_activated(
+            to_email=user["email"],
+            user_name=user.get("name", ""),
+            plan_type=plan_type,
+            amount=amount,
+            next_billing_date=next_billing,
+            legacy_trust_limit=10 if plan_type in ("monthly", "annual") else None
+        )
+        await email_service.send_admin_new_purchase_notification(
+            customer_email=user["email"],
+            customer_name=user.get("name", ""),
+            plan_type=plan_type,
+            amount=amount
+        )
+    except (stripe.StripeError, Exception) as e:
+        logger.error(f"Failed to send activation email: {e}")
+
+
+async def _mark_lead_subscribed_safe(user: dict, user_id: str) -> None:
+    """Mark lead as subscribed in CRM."""
+    if not user:
+        return
+    try:
+        from routers.leads import mark_lead_as_subscribed
+        await mark_lead_as_subscribed(email=user["email"], user_id=user_id)
+    except (ImportError, Exception) as e:
+        logger.error(f"Failed to mark lead as subscribed: {e}")
+
+
+async def _add_to_mailercloud_safe(user: dict) -> None:
+    """Add user to Mailercloud paid members list."""
+    if not user:
+        return
+    try:
+        mailercloud_result = await add_to_paid_list(
+            email=user["email"],
+            name=user.get("name", "")
+        )
+        if mailercloud_result and mailercloud_result.get("success"):
+            logger.info(f"Added {user['email']} to Mailercloud paid list")
+        else:
+            logger.warning(f"Could not add {user['email']} to Mailercloud: {mailercloud_result}")
+    except (Exception,) as e:
+        logger.error(f"Failed to add to Mailercloud paid list: {e}")
+
+
 async def _webhook_checkout_session_completed(event) -> None:
     """Handle Stripe webhook event: checkout.session.completed."""
     session = event.data.object
     user_id = session.get("metadata", {}).get("user_id")
     plan_type = session.get("metadata", {}).get("plan_type", "monthly")
     billing_period = session.get("metadata", {}).get("billing_period")
-    
+
     # For legacy plans, billing_period wasn't in metadata — infer from plan_type
     if not billing_period and plan_type in ("monthly", "annual"):
         billing_period = plan_type
 
-    if user_id:
-        # Determine if this is a legacy plan that needs grandfathering
-        update_set = {
-            "plan_type": plan_type,
-            "billing_period": billing_period,
-            "status": "active",
-            "stripe_subscription_id": session.get("subscription"),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
-        # Grandfather legacy monthly/annual subscribers with 10-trust limit
-        if plan_type in ("monthly", "annual"):
-            update_set["legacy_trust_limit"] = 10
+    if not user_id:
+        return
 
-        # Update subscription status
-        await db.subscriptions.update_one(
-            {"user_id": user_id},
-            {
-                "$set": update_set,
-                "$unset": {
-                    "gifted": "",
-                    "gift_type": "",
-                    "gift_start_date": "",
-                    "gift_end_date": "",
-                    "gifted_at": ""
-                }
-            },
-            upsert=True
-        )
+    # Determine if this is a legacy plan that needs grandfathering
+    update_set = {
+        "plan_type": plan_type,
+        "billing_period": billing_period,
+        "status": "active",
+        "stripe_subscription_id": session.get("subscription"),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    if plan_type in ("monthly", "annual"):
+        update_set["legacy_trust_limit"] = 10
 
-        # Update payment transaction
-        await db.payment_transactions.update_one(
-            {"session_id": session["id"]},
-            {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
-        )
+    await db.subscriptions.update_one(
+        {"user_id": user_id},
+        {
+            "$set": update_set,
+            "$unset": {
+                "gifted": "",
+                "gift_type": "",
+                "gift_start_date": "",
+                "gift_end_date": "",
+                "gifted_at": ""
+            }
+        },
+        upsert=True
+    )
 
-        # Process referral conversion - apply reward to referrer
-        try:
-            from routers.referrals import process_referral_conversion
-            referral_result = await process_referral_conversion(user_id)
-            if referral_result:
-                logger.info(f"Referral conversion processed for user {user_id}: {referral_result}")
-        except Exception as e:
-            logger.error(f"Failed to process referral conversion: {e}")
+    await db.payment_transactions.update_one(
+        {"session_id": session["id"]},
+        {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
 
-        # Send activation email
-        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-        amount = str(int(PLAN_AMOUNTS.get((plan_type, billing_period), 79.00)))
-        if user and email_service.is_configured:
-            try:
-                # Get subscription details from Stripe
-                stripe_sub = stripe.Subscription.retrieve(session.get("subscription"))
-                next_billing = format_date(stripe_sub.current_period_end)
+    await _process_referral_conversion_safe(user_id)
 
-                await email_service.send_subscription_activated(
-                    to_email=user["email"],
-                    user_name=user.get("name", ""),
-                    plan_type=plan_type,
-                    amount=amount,
-                    next_billing_date=next_billing,
-                    legacy_trust_limit=10 if plan_type in ("monthly", "annual") else None
-                )
-
-                # Send admin notification about new purchase
-                await email_service.send_admin_new_purchase_notification(
-                    customer_email=user["email"],
-                    customer_name=user.get("name", ""),
-                    plan_type=plan_type,
-                    amount=amount
-                )
-            except Exception as e:
-                logger.error(f"Failed to send activation email: {e}")
-
-        # Mark lead as subscribed in CRM (if they were captured as a lead first)
-        if user:
-            try:
-                from routers.leads import mark_lead_as_subscribed
-                await mark_lead_as_subscribed(
-                    email=user["email"],
-                    user_id=user_id,
-                )
-            except Exception as e:
-                logger.error(f"Failed to mark lead as subscribed: {e}")
-
-        # Add to Mailercloud paid members list
-        if user:
-            try:
-                mailercloud_result = await add_to_paid_list(
-                    email=user["email"],
-                    name=user.get("name", "")
-                )
-                if mailercloud_result and mailercloud_result.get("success"):
-                    logger.info(f"Added {user['email']} to Mailercloud paid list")
-                else:
-                    logger.warning(f"Could not add {user['email']} to Mailercloud: {mailercloud_result}")
-            except Exception as e:
-                logger.error(f"Failed to add to Mailercloud paid list: {e}")
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    amount = str(int(PLAN_AMOUNTS.get((plan_type, billing_period), 79.00)))
+    await _send_activation_emails_safe(user, plan_type, amount, session)
+    await _mark_lead_subscribed_safe(user, user_id)
+    await _add_to_mailercloud_safe(user)
 
     # ========== SUBSCRIPTION UPDATED ==========
     
+
+
+def _resolve_plan_from_price(price_id: str) -> tuple:
+    """Resolve (plan_type, billing_period) from a Stripe price_id, checking legacy map."""
+    plan_info = PRICE_ID_TO_PLAN.get(price_id)
+    if plan_info:
+        return plan_info
+    legacy = LEGACY_PRICE_MAP.get(price_id)
+    if legacy:
+        return (legacy[0], legacy[1])
+    return ("monthly", None)
+
+
+async def _handle_subscription_plan_change(user: dict, sub: dict, old_price: str, new_price: str) -> None:
+    """Handle a plan change in customer.subscription.updated webhook."""
+    old_plan_info = _resolve_plan_from_price(old_price)
+    new_plan_info = _resolve_plan_from_price(new_price)
+
+    old_plan = old_plan_info[0]
+    new_plan = new_plan_info[0]
+    new_billing_period = new_plan_info[1]
+
+    update_set = {
+        "plan_type": new_plan,
+        "billing_period": new_billing_period,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    if old_price in LEGACY_PRICE_MAP and new_price in LEGACY_PRICE_MAP:
+        update_set["legacy_trust_limit"] = 10
+
+    await db.subscriptions.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": update_set}
+    )
+
+    await _try_send_email(
+        lambda: email_service.send_subscription_upgraded(
+            to_email=user["email"],
+            user_name=user.get("name", ""),
+            old_plan=old_plan,
+            new_plan=new_plan
+        ),
+        "upgrade email"
+    )
+
+
+async def _handle_subscription_cancel_scheduled(user: dict, subscription: dict) -> None:
+    """Handle cancel_at_period_end change in customer.subscription.updated webhook."""
+    access_until = format_date(subscription.get("current_period_end"))
+    await _try_send_email(
+        lambda: email_service.send_subscription_canceled(
+            to_email=user["email"],
+            user_name=user.get("name", ""),
+            access_until=access_until
+        ),
+        "cancellation email"
+    )
 
 
 async def _webhook_customer_subscription_updated(event) -> None:
@@ -854,67 +931,13 @@ async def _webhook_customer_subscription_updated(event) -> None:
     if "items" in previous_attributes:
         old_price = previous_attributes.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
         new_price = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
-
         if old_price and new_price and old_price != new_price:
-            # Determine plan types using new + legacy lookup
-            old_plan_info = PRICE_ID_TO_PLAN.get(old_price)
-            if not old_plan_info:
-                legacy = LEGACY_PRICE_MAP.get(old_price)
-                old_plan_info = (legacy[0], legacy[1]) if legacy else ("monthly", None)
-            new_plan_info = PRICE_ID_TO_PLAN.get(new_price)
-            if not new_plan_info:
-                legacy = LEGACY_PRICE_MAP.get(new_price)
-                new_plan_info = (legacy[0], legacy[1]) if legacy else ("monthly", None)
-            
-            old_plan = old_plan_info[0]
-            new_plan = new_plan_info[0]
-            new_billing_period = new_plan_info[1]
-
-            # Build update set
-            update_set = {
-                "plan_type": new_plan,
-                "billing_period": new_billing_period,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }
-            # If migrating from a legacy plan, preserve the 10-trust grandfathering
-            old_price_in_legacy = old_price in LEGACY_PRICE_MAP
-            new_price_in_legacy = new_price in LEGACY_PRICE_MAP
-            if old_price_in_legacy and new_price_in_legacy:
-                update_set["legacy_trust_limit"] = 10
-
-            # Update database
-            await db.subscriptions.update_one(
-                {"user_id": user["user_id"]},
-                {"$set": update_set}
-            )
-
-            # Send upgrade email
-            if email_service.is_configured:
-                try:
-                    await email_service.send_subscription_upgraded(
-                        to_email=user["email"],
-                        user_name=user.get("name", ""),
-                        old_plan=old_plan,
-                        new_plan=new_plan
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to send upgrade email: {e}")
+            await _handle_subscription_plan_change(user, sub, old_price, new_price)
 
     # Check if cancel_at_period_end changed (cancellation scheduled)
     if "cancel_at_period_end" in previous_attributes:
         if subscription.get("cancel_at_period_end") and not previous_attributes.get("cancel_at_period_end"):
-            # Subscription scheduled for cancellation
-            access_until = format_date(subscription.get("current_period_end"))
-
-            if email_service.is_configured:
-                try:
-                    await email_service.send_subscription_canceled(
-                        to_email=user["email"],
-                        user_name=user.get("name", ""),
-                        access_until=access_until
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to send cancellation email: {e}")
+            await _handle_subscription_cancel_scheduled(user, subscription)
 
     # ========== SUBSCRIPTION DELETED (fully canceled) ==========
     
