@@ -1,607 +1,82 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { fetchWithAuth } from '@/utils/api';
-import { toast } from 'sonner';
-import { showError } from '../utils/errors';
-import PDFPreviewModal from '@/components/PDFPreviewModal';
 import PageHelpButton from '@/components/PageHelpButton';
-import { format, parseISO } from 'date-fns';
-import { 
-  Users,
-  PieChart,
-  Award,
-  Plus,
-  MoreVertical,
-  FileText,
-  ArrowRightLeft,
-  Pencil,
-  XCircle,
-  AlertCircle,
-  TrendingUp,
-  FileCheck,
-  ChevronDown,
-  ChevronUp,
-  Settings,
-  History,
-  Info,
-  UsersRound,
-  Trash2,
-  Bot
+import {
+  Users, PieChart, Award, Settings, ArrowRightLeft, UsersRound,
 } from 'lucide-react';
 
-// ========== PIE CHART COMPONENT ==========
-const OwnershipPieChart = ({ beneficiaries, totalAuthorized }) => {
-  const colors = [
-    '#010079', '#D5AD36', '#2563eb', '#16a34a', '#dc2626',
-    '#9333ea', '#ea580c', '#0891b2', '#4f46e5', '#be185d',
-  ];
-  
-  let gradientStops = [];
-  let currentAngle = 0;
-  
-  beneficiaries.forEach((ben, index) => {
-    const angle = (ben.percentage / 100) * 360;
-    const color = colors[index % colors.length];
-    gradientStops.push(`${color} ${currentAngle}deg ${currentAngle + angle}deg`);
-    currentAngle += angle;
-  });
-  
-  const totalIssued = beneficiaries.reduce((sum, b) => sum + b.percentage, 0);
-  if (totalIssued < 100) {
-    gradientStops.push(`#e5e7eb ${currentAngle}deg 360deg`);
-  }
-  
-  const gradient = `conic-gradient(${gradientStops.join(', ')})`;
-  
-  return (
-    <div className="flex flex-col items-center">
-      <div className="w-48 h-48 rounded-full shadow-inner" style={{ background: gradient }} />
-      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-        {beneficiaries.slice(0, 6).map((ben, index) => (
-          <div key={ben.holder_name} className="flex items-center gap-2">
-            <div className="w-3 h-3 flex-shrink-0" style={{ backgroundColor: colors[index % colors.length] }} />
-            <span className="truncate max-w-[120px]" title={ben.holder_name}>{ben.holder_name}</span>
-            <span className="font-mono text-xs text-muted-foreground">{ben.percentage.toFixed(1)}%</span>
-          </div>
-        ))}
-        {beneficiaries.length > 6 && (
-          <div className="col-span-2 text-muted-foreground text-xs mt-1">+{beneficiaries.length - 6} more holders</div>
-        )}
-        {totalIssued < 100 && (
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 flex-shrink-0 bg-muted" />
-            <span>Unissued</span>
-            <span className="font-mono text-xs text-muted-foreground">{(100 - totalIssued).toFixed(1)}%</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+import { formatDate, filterCertificatesByStatus } from './beneficiaries/constants';
+import {
+  useBeneficiariesData,
+  useCertificateForm,
+  useTransferForm,
+  useRevoke,
+  useSettings,
+  usePdfPreview,
+  useClassBeneficiary,
+  usePersonForm,
+} from './beneficiaries/hooks';
+import PeopleTab from './beneficiaries/PeopleTab';
+import OverviewTab from './beneficiaries/OverviewTab';
+import CertificatesTab from './beneficiaries/CertificatesTab';
+import TransfersTab from './beneficiaries/TransfersTab';
+import ClassBeneficiariesTab from './beneficiaries/ClassBeneficiariesTab';
+import { BeneficiariesModals } from './beneficiaries/Modals';
 
 // ========== MAIN PAGE COMPONENT ==========
 export default function BeneficiariesPage() {
   const { selectedTrust, isReadOnly, trusts } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
   const [activeTab, setActiveTab] = useState('beneficiaries');
-  
-  // Overview data
-  const [overviewData, setOverviewData] = useState(null);
   const [expandedHolder, setExpandedHolder] = useState(null);
-  
-  // Certificates data
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [showCertificateModal, setShowCertificateModal] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [editingCertificate, setEditingCertificate] = useState(null);
-  const [showRevokeModal, setShowRevokeModal] = useState(null);
-  const [revokeReason, setRevokeReason] = useState('');
-  const [certificateForm, setCertificateForm] = useState({
-    holder_name: '',
-    holder_identifier: '',
-    holder_type: 'individual',
-    holder_trust_id: '',
-    email: '',
-    phone: '',
-    units: '',
-    issue_date: format(new Date(), 'yyyy-MM-dd'),
-    notes: ''
-  });
-  const [transferForm, setTransferForm] = useState({
-    from_certificate_id: '',
-    to_certificate_id: '',
-    to_holder_name: '',
-    to_holder_identifier: '',
-    units: '',
-    reason: ''
-  });
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [settingsForm, setSettingsForm] = useState({
-    total_authorized_units: 100,
-    unit_label: 'Unit',
-    allow_fractional: false
-  });
-  
-  // PDF Preview
-  const [pdfPreview, setPdfPreview] = useState({ show: false, loading: false, data: null, filename: '' });
-  
-  // Filter state
   const [statusFilter, setStatusFilter] = useState('active');
-  
-  // Class beneficiary state
-  const [showClassBeneficiaryModal, setShowClassBeneficiaryModal] = useState(false);
-  const [classBeneficiaryForm, setClassBeneficiaryForm] = useState({
-    class_type: 'children',
-    description: '',
-    percentage: '',
-    notes: ''
-  });
-  const [deleteConfirmClass, setDeleteConfirmClass] = useState(null);
 
-  // Person-centric "People" tab state
-  const [showPersonModal, setShowPersonModal] = useState(false);
-  const [personForm, setPersonForm] = useState({
-    name: '',
-    relationship: '',
-    sharePercentage: '',
-  });
+  // Refs to hold the latest data-reload callbacks for the settings hook
+  const loadCertificatesDataRef = useRef(null);
+  const loadOverviewDataRef = useRef(null);
 
-  // ========== DATA LOADING ==========
-  const loadOverviewData = useCallback(async () => {
-    if (!selectedTrust) return;
-    try {
-      const response = await fetchWithAuth(`/beneficiaries/dashboard?trust_id=${selectedTrust.trust_id}`);
-      if (response.ok) {
-        setOverviewData(await response.json());
-      }
-    } catch (error) {
-      console.error('Failed to load overview:', error);
-    }
-  }, [selectedTrust]);
+  // Settings hook (uses refs so it can call reload without circular dependency)
+  const settings = useSettings(selectedTrust, isReadOnly, showUpgradeModal, loadCertificatesDataRef, loadOverviewDataRef);
 
-  const loadCertificatesData = useCallback(async () => {
-    if (!selectedTrust) return;
-    setLoading(true);
-    try {
-      const response = await fetchWithAuth(`/trust-units/summary?trust_id=${selectedTrust.trust_id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSummary(data);
-        if (data.settings) {
-          setSettingsForm({
-            total_authorized_units: data.settings.total_authorized_units || 100,
-            unit_label: data.settings.unit_label || 'Unit',
-            allow_fractional: data.settings.allow_fractional || false
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load certificates:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedTrust]);
+  // Data loading — sync settings form when summary loads
+  const {
+    overviewData,
+    summary,
+    loading,
+    loadOverviewData,
+    loadCertificatesData,
+  } = useBeneficiariesData(selectedTrust, settings.syncSettingsFromSummary);
 
-  useEffect(() => {
-    if (selectedTrust) {
-      loadOverviewData();
-      loadCertificatesData();
-    }
-  }, [selectedTrust, loadOverviewData, loadCertificatesData]);
+  // Keep refs updated with the latest reload functions
+  loadCertificatesDataRef.current = loadCertificatesData;
+  loadOverviewDataRef.current = loadOverviewData;
 
-  // ========== HANDLERS ==========
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    try {
-      return format(parseISO(dateStr), 'MMM d, yyyy');
-    } catch {
-      return dateStr;
-    }
-  };
+  // Certificate form hook
+  const certForm = useCertificateForm(selectedTrust, isReadOnly, showUpgradeModal, summary, loadCertificatesData, loadOverviewData);
 
-  // Read-only guards for write actions
-  const handleOpenCertificateModal = (editing = null) => {
-    if (isReadOnly) {
-      showUpgradeModal('issue certificates', 'button_click', 'beneficiaries_page');
-      return;
-    }
-    if (editing) {
-      setEditingCertificate(editing);
-      setCertificateForm({
-        holder_name: editing.holder_name,
-        holder_identifier: editing.holder_identifier || '',
-        holder_type: editing.holder_type || 'individual',
-        holder_trust_id: editing.holder_trust_id || '',
-        email: editing.email || '',
-        phone: editing.phone || '',
-        units: editing.units.toString(),
-        issue_date: editing.issue_date?.split('T')[0] || format(new Date(), 'yyyy-MM-dd'),
-        notes: editing.notes || ''
-      });
-    }
-    setShowCertificateModal(true);
-  };
+  // Transfer form hook
+  const transfer = useTransferForm(selectedTrust, isReadOnly, showUpgradeModal, summary, loadCertificatesData, loadOverviewData);
 
-  const handleOpenTransferModal = (fromCert) => {
-    if (isReadOnly) {
-      showUpgradeModal('transfer certificates', 'button_click', 'beneficiaries_page');
-      return;
-    }
-    setTransferForm({
-      from_certificate_id: fromCert.certificate_id,
-      to_certificate_id: '',
-      to_holder_name: '',
-      to_holder_identifier: '',
-      units: '',
-      reason: ''
-    });
-    setShowTransferModal(true);
-  };
+  // Revoke hook
+  const revoke = useRevoke(selectedTrust, loadCertificatesData, loadOverviewData);
 
-  const handleOpenSettingsModal = () => {
-    if (isReadOnly) {
-      showUpgradeModal('modify trust settings', 'button_click', 'beneficiaries_page');
-      return;
-    }
-    setShowSettingsModal(true);
-  };
+  // PDF preview hook
+  const pdfPreview = usePdfPreview();
 
-  const handleSaveSettings = async () => {
-    try {
-      const response = await fetchWithAuth('/trust-units/settings', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          ...settingsForm
-        })
-      });
-      if (response.ok) {
-        toast.success('Settings updated');
-        setShowSettingsModal(false);
-        loadCertificatesData();
-        loadOverviewData();
-      } else {
-        const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to save settings (${response.status})`), { operation: 'save', page: 'Beneficiaries' });
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'save', page: 'Beneficiaries' });
-    }
-  };
-  const sanitizeOptional = (val) => {
-        return val === null || val === undefined || val.trim() === '' ? null : val;
-      };
+  // Class beneficiary hook
+  const classBeneficiary = useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal, loadOverviewData);
 
-      // Handle issue/update certificate
-      const handleIssueCertificate = async () => {
-    if (!certificateForm.holder_name || !certificateForm.units) {
-      toast.error('Holder name and units are required');
-      return;
-    }
-    if (certificateForm.holder_type === 'trust' && !certificateForm.holder_trust_id) {
-      toast.error('Please select a trust from the dropdown');
-      return;
-    }
-    
-    const units = parseFloat(certificateForm.units);
-    if (!editingCertificate && summary && units > summary.remaining_units) {
-      toast.error(`Cannot issue ${units} units. Only ${summary.remaining_units} units remaining.`);
-      return;
-    }
-    
-    try {
-      const url = editingCertificate 
-        ? `/trust-units/certificates/${editingCertificate.certificate_id}`
-        : '/trust-units/certificates';
-      const method = editingCertificate ? 'PATCH' : 'POST';
-      
-      const response = await fetchWithAuth(url, {
-        method,
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          ...certificateForm,
-          holder_identifier: sanitizeOptional(certificateForm.holder_identifier),
-          holder_trust_id: sanitizeOptional(certificateForm.holder_trust_id),
-          email: sanitizeOptional(certificateForm.email),
-          phone: sanitizeOptional(certificateForm.phone),
-          notes: sanitizeOptional(certificateForm.notes),
-          units: parseFloat(certificateForm.units)
-        })
-      });
-      
-      if (response.ok) {
-        toast.success(editingCertificate ? 'Certificate updated' : 'Certificate issued');
-        setShowCertificateModal(false);
-        resetCertificateForm();
-        loadCertificatesData();
-        loadOverviewData();
-      } else {
-        const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to save certificate (${response.status})`), { operation: 'save', page: 'Beneficiaries' });
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'save', page: 'Beneficiaries' });
-    }
-  };
-
-  const handleTransfer = async () => {
-    if (!transferForm.from_certificate_id || !transferForm.to_certificate_id || !transferForm.units) {
-      toast.error('All fields are required');
-      return;
-    }
-    try {
-      // Get the "from" holder name from the selected certificate
-      const fromCert = summary?.certificates?.find(c => c.certificate_id === transferForm.from_certificate_id);
-      if (!fromCert) {
-        toast.error('Invalid source certificate');
-        return;
-      }
-
-      // Get the "to" holder name from the selected certificate ID
-      const toCert = summary?.certificates?.find(c => c.certificate_id === transferForm.to_certificate_id);
-      if (!toCert) {
-        toast.error('Invalid destination certificate');
-        return;
-      }
-
-      const response = await fetchWithAuth('/trust-units/transfers', {
-        method: 'POST',
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          from_holder: fromCert.holder_name,
-          to_holder: toCert.holder_name,
-          units: parseFloat(transferForm.units),
-          reason: transferForm.reason || 'Transfer'
-        })
-      });
-      if (response.ok) {
-        toast.success('Transfer completed');
-        setShowTransferModal(false);
-        setTransferForm({ from_certificate_id: '', to_certificate_id: '', to_holder_name: '', to_holder_identifier: '', units: '', reason: '' });
-        loadCertificatesData();
-        loadOverviewData();
-      } else {
-        const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Transfer failed (${response.status})`), { operation: 'transfer_certificate', page: 'Beneficiaries' });
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'transfer_certificate', page: 'Beneficiaries' });
-    }
-  };
-
-  const handleRevoke = async (certificate) => {
-    try {
-      const response = await fetchWithAuth(`/trust-units/certificates/${certificate.certificate_id}/revoke`, {
-        method: 'POST',
-        body: JSON.stringify({ trust_id: selectedTrust.trust_id, reason: revokeReason || '' })
-      });
-      if (response.ok) {
-        toast.success('Certificate revoked');
-        setShowRevokeModal(null);
-        setRevokeReason('');
-        loadCertificatesData();
-        loadOverviewData();
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'revoke', page: 'Beneficiaries' });
-    }
-  };
-
-  const handleViewPDF = async (certificate) => {
-    setPdfPreview({ show: true, loading: true, data: null, filename: '' });
-    try {
-      const response = await fetchWithAuth(`/trust-units/certificates/${certificate.certificate_id}/pdf`);
-      if (response.ok) {
-        const data = await response.json();
-        setPdfPreview({ show: true, loading: false, data: data.pdf_base64, filename: data.filename });
-      } else {
-        const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to load PDF (${response.status})`), { operation: 'load', page: 'Beneficiaries' });
-        setPdfPreview({ show: false, loading: false, data: null, filename: '' });
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
-      setPdfPreview({ show: false, loading: false, data: null, filename: '' });
-    }
-  };
-
-  // ========== CLASS BENEFICIARY HANDLERS ==========
-  const handleAddClassBeneficiary = async () => {
-    if (!classBeneficiaryForm.class_type) {
-      toast.error('Class type is required');
-      return;
-    }
-    try {
-      const response = await fetchWithAuth('/beneficiaries/class-beneficiaries', {
-        method: 'POST',
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          class_type: classBeneficiaryForm.class_type,
-          description: classBeneficiaryForm.description,
-          percentage: parseFloat(classBeneficiaryForm.percentage) || 0,
-          notes: classBeneficiaryForm.notes
-        })
-      });
-      if (response.ok) {
-        toast.success('Class Beneficiary added');
-        setShowClassBeneficiaryModal(false);
-        setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' });
-        loadOverviewData();
-      } else {
-        const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to add Class Beneficiary (${response.status})`), { operation: 'add', page: 'Beneficiaries' });
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'add', page: 'Beneficiaries' });
-    }
-  };
-
-  const handleDeleteClassBeneficiary = async (classBeneficiaryId) => {
-    try {
-      const response = await fetchWithAuth(`/beneficiaries/class-beneficiaries/${classBeneficiaryId}`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        toast.success('Class Beneficiary removed');
-        loadOverviewData();
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'remove', page: 'Beneficiaries' });
-    }
-  };
-
-  const CLASS_BENEFICIARY_OPTIONS = [
-    { value: 'children', label: 'Children (including after-born)' },
-    { value: 'descendants', label: 'Descendants' },
-    { value: 'issue', label: 'Issue (lineal descendants)' },
-    { value: 'heirs', label: 'Heirs' },
-    { value: 'heirs_at_law', label: 'Heirs at Law' },
-    { value: 'blood_relatives', label: 'Blood Relatives' },
-    { value: 'per_stirpes', label: 'Per Stirpes (by branch)' },
-    { value: 'per_capita', label: 'Per Capita (by head)' },
-    { value: 'custom', label: 'Custom Class' },
-  ];
-
-  // ========== PERSON-CENTRIC ADD BENEFICIARY (People tab) ==========
-  const RELATIONSHIP_OPTIONS = [
-    { value: 'Spouse', label: 'Spouse' },
-    { value: 'Child', label: 'Child' },
-    { value: 'Daughter', label: 'Daughter' },
-    { value: 'Son', label: 'Son' },
-    { value: 'Parent', label: 'Parent' },
-    { value: 'Sibling', label: 'Sibling' },
-    { value: 'Grandchild', label: 'Grandchild' },
-    { value: 'Other relative', label: 'Other relative' },
-    { value: 'Friend', label: 'Friend' },
-    { value: 'Charity', label: 'Charity / Organization' },
-    { value: 'Other', label: 'Other' },
-  ];
-
-  const handleAddPerson = async () => {
-    if (!personForm.name || !personForm.sharePercentage) {
-      toast.error('Name and share percentage are required');
-      return;
-    }
-    const pct = parseFloat(personForm.sharePercentage);
-    if (!pct || pct <= 0 || pct > 100) {
-      toast.error('Share percentage must be between 0 and 100');
-      return;
-    }
-    if (isReadOnly) {
-      showUpgradeModal('add beneficiaries', 'button_click', 'beneficiaries_page');
-      return;
-    }
-
-    // Compute units from share percentage using total authorized units
-    const totalAuthorized = summary?.settings?.total_authorized_units || 100;
-    const units = (pct / 100) * totalAuthorized;
-
-    // Check availability
-    if (summary && units > summary.remaining_units) {
-      toast.error(`Cannot allocate ${pct}%. Only ${summary.remaining_units} units available (${((summary.remaining_units / totalAuthorized) * 100).toFixed(1)}%).`);
-      return;
-    }
-
-    try {
-      const relationship = personForm.relationship || '';
-      const isCharity = relationship === 'Charity';
-      const notesText = relationship ? `Relationship to grantor: ${relationship}` : '';
-      const response = await fetchWithAuth('/trust-units/certificates', {
-        method: 'POST',
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          holder_name: personForm.name,
-          holder_identifier: null,
-          holder_type: isCharity ? 'charity' : 'individual',
-          email: null,
-          phone: null,
-          units: units,
-          issue_date: format(new Date(), 'yyyy-MM-dd'),
-          notes: notesText || null,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success(`${personForm.name} added as a beneficiary (${pct}%)`);
-        setShowPersonModal(false);
-        setPersonForm({ name: '', relationship: '', sharePercentage: '' });
-        loadCertificatesData();
-        loadOverviewData();
-      } else {
-        const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to add beneficiary (${response.status})`), { operation: 'add', page: 'Beneficiaries' });
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'add', page: 'Beneficiaries' });
-    }
-  };
-
-  const resetPersonForm = () => {
-    setPersonForm({ name: '', relationship: '', sharePercentage: '' });
-  };
-
-  const handleOpenPersonModal = () => {
-    if (isReadOnly) {
-      showUpgradeModal('add beneficiaries', 'button_click', 'beneficiaries_page');
-      return;
-    }
-    setShowPersonModal(true);
-  };
-
-  const resetCertificateForm = () => {
-    setCertificateForm({
-      holder_name: '',
-      holder_identifier: '',
-      holder_type: 'individual',
-      holder_trust_id: '',
-      email: '',
-      phone: '',
-      units: '',
-      issue_date: format(new Date(), 'yyyy-MM-dd'),
-      notes: ''
-    });
-    setEditingCertificate(null);
-  };
-
-  const openEditModal = (certificate) => {
-    if (isReadOnly) {
-      showUpgradeModal('edit certificates', 'button_click', 'beneficiaries_page');
-      return;
-    }
-    setEditingCertificate(certificate);
-    setCertificateForm({
-      holder_name: certificate.holder_name,
-      holder_identifier: certificate.holder_identifier || '',
-      holder_type: certificate.holder_type || 'individual',
-      holder_trust_id: certificate.holder_trust_id || '',
-      email: certificate.email || '',
-      phone: certificate.phone || '',
-      units: certificate.units.toString(),
-      issue_date: certificate.issue_date,
-      notes: certificate.notes || ''
-    });
-    setShowCertificateModal(true);
-  };
+  // Person form hook
+  const personForm = usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summary, loadCertificatesData, loadOverviewData);
 
   // Filter certificates
-  const filteredCertificates = summary?.certificates?.filter(cert => {
-    if (statusFilter === 'all') return true;
-    return cert.status === statusFilter;
-  }) || [];
+  const filteredCertificates = filterCertificatesByStatus(summary?.certificates, statusFilter);
 
   if (!selectedTrust) {
     return (
@@ -641,7 +116,7 @@ export default function BeneficiariesPage() {
                 ]}
                 taPrompt="Help me understand the Beneficiaries page and how to add a beneficiary"
               />
-              <Button variant="outline" onClick={handleOpenSettingsModal} data-testid="settings-btn">
+              <Button variant="outline" onClick={settings.handleOpenSettingsModal} data-testid="settings-btn">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </Button>
@@ -673,539 +148,62 @@ export default function BeneficiariesPage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* ========== PEOPLE TAB (person-centric, first) ========== */}
+            {/* ========== PEOPLE TAB ========== */}
             <TabsContent value="beneficiaries">
-              {/* Primary CTA */}
-              <div className="card-trust p-4 mb-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div>
-                    <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                      Add the people you want to benefit from this trust
-                    </p>
-                  </div>
-                  <Button className="btn-primary" onClick={handleOpenPersonModal} data-testid="add-beneficiary-btn">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Beneficiary
-                  </Button>
-                </div>
-              </div>
-
-              {/* People List */}
-              <div className="card-trust overflow-hidden">
-                <div className="p-4 border-b border-border flex items-center gap-2">
-                  <Users className="w-4 h-4 text-navy dark:text-gold" />
-                  <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Beneficiaries</h2>
-                  <span className="ml-auto text-xs text-muted-foreground">{overviewData?.beneficiaries?.length || 0} people</span>
-                </div>
-
-                {loading ? (
-                  <div className="p-8 text-center">
-                    <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin mx-auto mb-4"></div>
-                    <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading...</p>
-                  </div>
-                ) : !overviewData?.beneficiaries?.length ? (
-                  <div className="p-8 text-center">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                    <p className="text-muted-foreground mb-2">No beneficiaries yet</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Add a person — like a spouse, child, or charity — and choose what share of the trust they receive.
-                    </p>
-                    <Button className="btn-primary" onClick={handleOpenPersonModal} data-testid="empty-add-beneficiary-btn">
-                      <Plus className="w-4 h-4 mr-2" /> Add Your First Beneficiary
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {overviewData.beneficiaries.map((ben, index) => {
-                      // Try to surface the relationship stored in certificate notes
-                      const relationshipNote = ben.certificates?.find(c => c.notes?.startsWith('Relationship to grantor:'))?.notes;
-                      const relationship = relationshipNote ? relationshipNote.replace('Relationship to grantor: ', '') : null;
-                      return (
-                        <div key={`${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}`} className="p-4 flex items-center justify-between hover:bg-muted/20 transition-colors" data-testid={`person-row-${index}`}>
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-navy/10 dark:bg-gold/10 flex items-center justify-center">
-                              <Users className="w-6 h-6 text-navy dark:text-gold" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-navy dark:text-foreground">{ben.holder_name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {relationship ? (
-                                  <span>{relationship} to grantor</span>
-                                ) : (
-                                  <span>{ben.holder_type || 'Individual'}</span>
-                                )}
-                              </p>
-                              {ben.email && (
-                                <p className="text-xs text-muted-foreground">{ben.email}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
-                            <p className="text-xs text-muted-foreground">share</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <PeopleTab
+                overviewData={overviewData}
+                loading={loading}
+                handleOpenPersonModal={personForm.handleOpenPersonModal}
+              />
             </TabsContent>
 
             {/* ========== OVERVIEW TAB ========== */}
             <TabsContent value="overview">
-              {loading ? (
-                <div className="card-trust p-8 text-center">
-                  <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin mx-auto mb-4"></div>
-                  <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading...</p>
-                </div>
-              ) : !overviewData ? (
-                <div className="card-trust p-8 text-center">
-                  <p className="text-muted-foreground">No data available</p>
-                </div>
-              ) : (
-                <>
-                  {/* Summary Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div className="card-trust p-4" data-testid="total-authorized-card">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-navy/10 dark:bg-gold/10 flex items-center justify-center">
-                          <Award className="w-5 h-5 text-navy dark:text-gold" />
-                        </div>
-                        <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Total Available</p>
-                          <p className="font-serif text-2xl text-navy dark:text-foreground">{overviewData.total_authorized_units}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="card-trust p-4" data-testid="issued-units-card">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-success/10 dark:bg-success/20 flex items-center justify-center">
-                          <FileCheck className="w-5 h-5 text-success dark:text-success" />
-                        </div>
-                        <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Issued</p>
-                          <p className="font-serif text-2xl text-navy dark:text-foreground">{overviewData.total_issued_units}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="card-trust p-4" data-testid="remaining-units-card">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
-                          <PieChart className="w-5 h-5 text-gold" />
-                        </div>
-                        <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Remaining</p>
-                          <p className="font-serif text-2xl text-navy dark:text-foreground">{overviewData.remaining_units}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="card-trust p-4" data-testid="beneficiaries-count-card">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-warning/10 dark:bg-warning/20 flex items-center justify-center">
-                          <Users className="w-5 h-5 text-warning dark:text-warning" />
-                        </div>
-                        <div>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Beneficiaries</p>
-                          <p className="font-serif text-2xl text-navy dark:text-foreground">{overviewData.beneficiaries.length}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pie Chart & Holder List */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="card-trust p-6" data-testid="ownership-chart">
-                      <div className="flex items-center gap-2 mb-6">
-                        <PieChart className="w-4 h-4 text-navy dark:text-gold" />
-                        <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Ownership Distribution</h2>
-                      </div>
-                      {overviewData.beneficiaries.length > 0 ? (
-                        <OwnershipPieChart beneficiaries={overviewData.beneficiaries} totalAuthorized={overviewData.total_authorized_units} />
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                          <p>No certificates issued yet</p>
-                          <Button className="btn-primary mt-4" onClick={() => { setActiveTab('certificates'); handleOpenCertificateModal(); }}>
-                            <Plus className="w-4 h-4 mr-2" /> Add First Ownership Share
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="lg:col-span-2 card-trust overflow-hidden">
-                      <div className="p-4 border-b border-border flex items-center gap-2">
-                        <Users className="w-4 h-4 text-navy dark:text-gold" />
-                        <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Share Holders</h2>
-                      </div>
-                      
-                      {overviewData.beneficiaries.length === 0 ? (
-                        <div className="p-8 text-center">
-                          <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                          <p className="text-muted-foreground">No beneficiaries yet</p>
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
-                          {overviewData.beneficiaries.map((ben, index) => (
-                            <div key={`${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}`} data-testid={`beneficiary-row-${index}`}>
-                              <button
-                                onClick={() => setExpandedHolder(expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}` ? null : `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}`)}
-                                className="w-full p-4 flex items-center justify-between hover:bg-muted/20 transition-colors"
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 bg-navy/10 dark:bg-gold/10 flex items-center justify-center font-serif text-navy dark:text-gold">
-                                    {index + 1}
-                                  </div>
-                                  <div className="text-left">
-                                    <div className="flex items-center gap-2">
-                                      <p className="font-medium text-navy dark:text-foreground">{ben.holder_name}</p>
-                                      {ben.holder_type && ben.holder_type !== 'individual' && (
-                                        <span className="px-2 py-0.5 text-xs font-mono bg-navy/10 dark:bg-gold/10 text-navy dark:text-gold rounded">
-                                          {ben.holder_type}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {ben.holder_identifier && (
-                                      <p className="text-xs text-muted-foreground font-mono">{ben.holder_identifier}</p>
-                                    )}
-                                    {ben.email && (
-                                      <p className="text-xs text-muted-foreground">{ben.email}</p>
-                                    )}
-                                    {ben.phone && (
-                                      <p className="text-xs text-muted-foreground">{ben.phone}</p>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-6">
-                                  <div className="text-right">
-                                    <p className="font-mono text-lg text-navy dark:text-foreground">{ben.total_units}</p>
-                                    <p className="text-xs text-muted-foreground">{overviewData.unit_label}s</p>
-                                  </div>
-                                  <div className="text-right min-w-[80px]">
-                                    <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
-                                    <p className="text-xs text-muted-foreground">ownership</p>
-                                  </div>
-                                  {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}` ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                </div>
-                              </button>
-                              
-                              {expandedHolder === `${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}` && (
-                                <div className="bg-muted/30 p-4 border-t border-border">
-                                  <div className="flex items-center justify-between mb-3">
-                                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                                      {ben.certificate_count} Certificate{ben.certificate_count !== 1 ? 's' : ''}
-                                    </p>
-                                    <Link
-                                      to={`/trust-assistant?prompt=${encodeURIComponent(`Draft meeting minutes to add ${ben.holder_name} as a beneficiary.`)}`}
-                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gold hover:bg-gold/10 transition-colors"
-                                      title="Ask Trust Assistant to draft minutes"
-                                      data-testid={`ta-add-beneficiary-${index}`}
-                                    >
-                                      <Bot className="w-3.5 h-3.5" />
-                                      Draft Minutes
-                                    </Link>
-                                  </div>
-                                  <div className="space-y-2">
-                                    {ben.certificates.map((cert) => (
-                                      <div key={cert.certificate_id} className="flex items-center justify-between p-3 bg-background border border-border">
-                                        <div className="flex items-center gap-3">
-                                          <span className="font-mono text-sm text-navy dark:text-gold">{cert.certificate_number}</span>
-                                          <span className="text-sm text-muted-foreground">{cert.units} units</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                          <Button variant="ghost" size="sm" onClick={() => openEditModal(cert)} data-testid={`edit-cert-${cert.certificate_id}`}>
-                                            <Pencil className="w-3.5 h-3.5" />
-                                            <span className="ml-1 text-xs">Edit</span>
-                                          </Button>
-                                          <span className="text-xs text-muted-foreground font-mono">Issued {formatDate(cert.issue_date)}</span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
+              <OverviewTab
+                overviewData={overviewData}
+                loading={loading}
+                expandedHolder={expandedHolder}
+                setExpandedHolder={setExpandedHolder}
+                openEditModal={certForm.openEditModal}
+                setActiveTab={setActiveTab}
+                handleOpenCertificateModal={certForm.handleOpenCertificateModal}
+                formatDateFn={formatDate}
+              />
             </TabsContent>
 
             {/* ========== CERTIFICATES TAB ========== */}
             <TabsContent value="certificates">
-              {/* Actions Bar */}
-              <div className="card-trust p-4 mb-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-[150px]" data-testid="status-filter">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active Only</SelectItem>
-                        <SelectItem value="all">All Certificates</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                        <SelectItem value="replaced">Replaced</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    {summary && (
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Available: </span>
-                        <span className="font-mono font-medium text-navy dark:text-gold">{summary.remaining_units} units</span>
-                        <span className="text-muted-foreground"> of {summary.settings?.total_authorized_units}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => handleOpenTransferModal(summary?.certificates?.find(c => c.status === 'active'))} disabled={!summary?.certificates?.filter(c => c.status === 'active').length} data-testid="transfer-btn">
-                      <ArrowRightLeft className="w-4 h-4 mr-2" />
-                      Transfer
-                    </Button>
-                    <Button className="btn-primary" onClick={() => { resetCertificateForm(); handleOpenCertificateModal(); }} data-testid="issue-units-btn">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Shares
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Fully Allocated Warning */}
-              {summary && summary.remaining_units === 0 && (
-                <div className="mb-4 p-4 border-2 border-gold/40 bg-gold/5 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-mono text-xs font-medium text-navy mb-1">All {summary.settings?.total_authorized_units || 100} units are allocated</p>
-                    <p className="text-sm text-muted-foreground mb-2">To add another beneficiary, increase the authorized units or cancel an existing certificate.</p>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setShowSettingsModal(true)} className="font-mono text-xs">
-                        <Settings className="w-3.5 h-3.5 mr-1" /> Increase Authorized Units
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Certificates List */}
-              <div className="card-trust overflow-hidden">
-                <div className="p-4 border-b border-border flex items-center gap-2">
-                  <Award className="w-4 h-4 text-navy dark:text-gold" />
-                  <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Ownership Shares</h2>
-                  <span className="ml-auto text-xs text-muted-foreground">{filteredCertificates.length} records</span>
-                </div>
-                
-                {loading ? (
-                  <div className="p-8 text-center">
-                    <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin mx-auto mb-4"></div>
-                    <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading...</p>
-                  </div>
-                ) : filteredCertificates.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <Award className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                    <p className="text-muted-foreground mb-4">No certificates found</p>
-                    <Button className="btn-primary" onClick={() => { resetCertificateForm(); handleOpenCertificateModal(); }}>
-                      <Plus className="w-4 h-4 mr-2" /> Add First Ownership Share
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {filteredCertificates.map((cert) => (
-                      <div key={cert.certificate_id} className={`p-4 flex items-center justify-between ${cert.status !== 'active' ? 'opacity-60 bg-muted/30' : ''}`} data-testid={`cert-${cert.certificate_id}`}>
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-navy/10 dark:bg-gold/10 flex items-center justify-center">
-                            <Award className={`w-6 h-6 ${cert.status === 'active' ? 'text-navy dark:text-gold' : 'text-muted-foreground'}`} />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-navy dark:text-foreground">{cert.holder_name}</p>
-                              {cert.holder_type && cert.holder_type !== 'individual' && (
-                                <span className="px-2 py-0.5 text-xs font-mono bg-navy/10 dark:bg-gold/10 text-navy dark:text-gold rounded">
-                                  {cert.holder_type}
-                                </span>
-                              )}
-                              <span className={`px-2 py-0.5 text-xs font-mono ${
-                                cert.status === 'active' ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success' :
-                                cert.status === 'cancelled' ? 'bg-error/10 text-error dark:bg-error/20 dark:text-error' :
-                                'bg-muted text-muted-foreground'
-                              }`}>
-                                {cert.status}
-                              </span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {cert.certificate_number} • {cert.units} {summary?.settings?.unit_label || 'Unit'}s ({cert.percentage.toFixed(2)}%)
-                            </p>
-                            <p className="text-xs text-muted-foreground font-mono">Issued {formatDate(cert.issue_date)}</p>
-                            {cert.email && (
-                              <p className="text-xs text-muted-foreground">{cert.email}</p>
-                            )}
-                            {cert.phone && (
-                              <p className="text-xs text-muted-foreground">{cert.phone}</p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" data-testid={`cert-menu-${cert.certificate_id}`}>
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewPDF(cert)}>
-                              <FileText className="w-4 h-4 mr-2" />
-                              View Certificate PDF
-                            </DropdownMenuItem>
-                            {cert.status === 'active' && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => openEditModal(cert)}>
-                                  <Pencil className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setTransferForm({ ...transferForm, from_certificate_id: cert.certificate_id, to_certificate_id: '', to_holder_name: '', to_holder_identifier: '' }); setShowTransferModal(true); }}>
-                                  <ArrowRightLeft className="w-4 h-4 mr-2" />
-                                  Transfer Units
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setShowRevokeModal(cert)} className="text-error">
-                                  <XCircle className="w-4 h-4 mr-2" />
-                                  Revoke
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <CertificatesTab
+                summary={summary}
+                loading={loading}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                filteredCertificates={filteredCertificates}
+                handleOpenTransferModal={transfer.handleOpenTransferModal}
+                resetCertificateForm={certForm.resetCertificateForm}
+                handleOpenCertificateModal={certForm.handleOpenCertificateModal}
+                handleViewPDF={pdfPreview.handleViewPDF}
+                openEditModal={certForm.openEditModal}
+                setTransferForm={transfer.setTransferForm}
+                setShowTransferModal={transfer.setShowTransferModal}
+                setShowRevokeModal={revoke.setShowRevokeModal}
+                transferForm={transfer.transferForm}
+                setShowSettingsModal={settings.setShowSettingsModal}
+              />
             </TabsContent>
 
             {/* ========== TRANSFERS TAB ========== */}
             <TabsContent value="transfers">
-              <div className="card-trust overflow-hidden">
-                <div className="p-4 border-b border-border flex items-center gap-2">
-                  <History className="w-4 h-4 text-navy dark:text-gold" />
-                  <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Transfer History</h2>
-                </div>
-                
-                {!overviewData?.recent_transfers?.length ? (
-                  <div className="p-8 text-center">
-                    <ArrowRightLeft className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                    <p className="text-muted-foreground">No transfers recorded yet</p>
-                    <p className="text-sm text-muted-foreground mt-2">Transfers will appear here when units are moved between holders</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {overviewData.recent_transfers.map((transfer) => (
-                      <div key={transfer.transfer_id} className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
-                            <TrendingUp className="w-5 h-5 text-gold" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-navy dark:text-foreground">
-                              {transfer.from_holder ? (
-                                <>{transfer.from_holder} → {transfer.to_holder}</>
-                              ) : (
-                                <>New issuance to {transfer.to_holder}</>
-                              )}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{transfer.reason || 'No reason specified'}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-mono text-navy dark:text-foreground">{transfer.units} units</p>
-                          <p className="text-xs text-muted-foreground font-mono">{formatDate(transfer.created_at)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <TransfersTab overviewData={overviewData} />
             </TabsContent>
 
             {/* ========== CLASS BENEFICIARIES TAB ========== */}
             <TabsContent value="class">
-              <div className="card-trust p-4 mb-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div>
-                    <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                      Class Beneficiaries are groups defined by relationship rather than named individuals
-                    </p>
-                  </div>
-                  <Button className="btn-primary" onClick={() => setShowClassBeneficiaryModal(true)} data-testid="add-class-beneficiary-btn">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Class
-                  </Button>
-                </div>
-              </div>
-
-              <div className="card-trust overflow-hidden">
-                <div className="p-4 border-b border-border flex items-center gap-2">
-                  <UsersRound className="w-4 h-4 text-navy dark:text-gold" />
-                  <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Class Beneficiaries</h2>
-                  <span className="ml-auto text-xs text-muted-foreground">{overviewData?.class_beneficiaries?.length || 0} classes</span>
-                </div>
-                
-                {!overviewData?.class_beneficiaries?.length ? (
-                  <div className="p-8 text-center">
-                    <UsersRound className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                    <p className="text-muted-foreground mb-2">No Class Beneficiaries defined</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Add a class like "Children" or "Descendants" to designate beneficiaries by relationship
-                    </p>
-                    <Button className="btn-primary" onClick={() => setShowClassBeneficiaryModal(true)}>
-                      <Plus className="w-4 h-4 mr-2" /> Add Class Beneficiary
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {overviewData.class_beneficiaries.map((cb) => (
-                      <div key={cb.class_beneficiary_id} className="p-4 flex items-center justify-between hover:bg-muted/20 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-navy/10 dark:bg-gold/10 flex items-center justify-center">
-                            <UsersRound className="w-6 h-6 text-navy dark:text-gold" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-navy dark:text-foreground">{cb.class_type_label}</p>
-                              {cb.percentage > 0 && (
-                                <span className="px-2 py-0.5 text-xs font-mono bg-gold/10 text-gold">
-                                  {cb.percentage}%
-                                </span>
-                              )}
-                            </div>
-                            {cb.description && (
-                              <p className="text-sm text-muted-foreground">{cb.description}</p>
-                            )}
-                            {cb.notes && (
-                              <p className="text-xs text-muted-foreground mt-1">{cb.notes}</p>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-error hover:text-error hover:bg-error/10 dark:hover:bg-error/20"
-                          onClick={() => setDeleteConfirmClass(cb)}
-                          data-testid={`delete-class-${cb.class_beneficiary_id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ClassBeneficiariesTab
+                overviewData={overviewData}
+                setShowClassBeneficiaryModal={classBeneficiary.setShowClassBeneficiaryModal}
+                setDeleteConfirmClass={classBeneficiary.setDeleteConfirmClass}
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -1213,521 +211,48 @@ export default function BeneficiariesPage() {
       <MobileBottomNav />
 
       {/* ========== MODALS ========== */}
-      
-      {/* Issue/Edit Certificate Modal */}
-      <Dialog open={showCertificateModal} onOpenChange={(open) => { if (!open) resetCertificateForm(); setShowCertificateModal(open); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingCertificate ? 'Edit Certificate' : 'Issue New Certificate'}</DialogTitle>
-            <DialogDescription>
-              {editingCertificate ? 'Update certificate details' : `Issue beneficial interest units. ${summary?.remaining_units || 0} units available.`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Holder Name / Trust Picker (conditional on holder_type) */}
-            {certificateForm.holder_type === 'trust' && trusts && trusts.length > 0 ? (
-              <div>
-                <Label className="label-trust">Select Trust *</Label>
-                <Select
-                  value={certificateForm.holder_trust_id}
-                  onValueChange={(v) => {
-                    const trust = trusts.find(t => t.trust_id === v);
-                    const trustName = trust ? (trust.trust_name || trust.name || 'Unknown Trust') : '';
-                    setCertificateForm({ ...certificateForm, holder_trust_id: v, holder_name: trustName });
-                  }}
-                >
-                  <SelectTrigger className="mt-1" data-testid="holder-trust-select">
-                    <SelectValue placeholder="Choose a trust..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {trusts.filter(t => t.trust_id !== selectedTrust?.trust_id).map(t => (
-                      <SelectItem key={t.trust_id} value={t.trust_id}>
-                        {t.trust_name || t.name || 'Unknown Trust'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1.5">
-                  <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Selecting a trust will automatically create a beneficiary relationship in the Structures hierarchy. The trust's name auto-fills the holder name for display.</span>
-                </p>
-              </div>
-            ) : (
-              <div>
-                <Label className="label-trust">Holder Name *</Label>
-                <Input
-                  value={certificateForm.holder_name}
-                  onChange={(e) => setCertificateForm({ ...certificateForm, holder_name: e.target.value })}
-                  placeholder="John Smith or Smith Family Trust"
-                  className="mt-1"
-                  data-testid="holder-name-input"
-                />
-              </div>
-            )}
-            <div>
-              <Label className="label-trust">Holder Type</Label>
-              <Select
-                value={certificateForm.holder_type}
-                onValueChange={(v) => {
-                  const updates = { holder_type: v };
-                  // Switching to "trust" — auto-select if user has exactly one other trust
-                  if (v === 'trust' && trusts && trusts.length === 1 && trusts[0].trust_id === selectedTrust?.trust_id) {
-                    // Only trust is the current one; no cross-trust option available
-                    updates.holder_trust_id = '';
-                    updates.holder_name = '';
-                  } else if (v === 'trust' && trusts && trusts.length === 2) {
-                    // Two trusts total: one is the current (issuer), auto-select the other
-                    const otherTrust = trusts.find(t => t.trust_id !== selectedTrust?.trust_id);
-                    if (otherTrust) {
-                      updates.holder_trust_id = otherTrust.trust_id;
-                      updates.holder_name = otherTrust.trust_name || otherTrust.name || 'Unknown Trust';
-                    }
-                  }
-                  setCertificateForm({ ...certificateForm, ...updates });
-                }}
-              >
-                <SelectTrigger className="mt-1" data-testid="holder-type-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="individual">Individual</SelectItem>
-                  <SelectItem value="trust">Trust</SelectItem>
-                  <SelectItem value="llc">LLC</SelectItem>
-                  <SelectItem value="corporation">Corporation</SelectItem>
-                  <SelectItem value="charity">Charity / Nonprofit</SelectItem>
-                  <SelectItem value="estate">Estate</SelectItem>
-                  <SelectItem value="other">Other Entity</SelectItem>
-                </SelectContent>
-              </Select>
-              {certificateForm.holder_type === 'trust' && trusts && trusts.length <= 1 && (
-                <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1.5">
-                  <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>You need at least two trusts to make one a beneficiary of another. Create another trust first, or use "Other Entity" with a free-text name.</span>
-                </p>
-              )}
-            </div>
-            <div>
-              <Label className="label-trust">Holder Identifier (Optional)</Label>
-              <Input
-                value={certificateForm.holder_identifier}
-                onChange={(e) => setCertificateForm({ ...certificateForm, holder_identifier: e.target.value })}
-                placeholder="SSN last 4, EIN, etc."
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="label-trust">Email</Label>
-              <Input
-                type="email"
-                value={certificateForm.email}
-                onChange={(e) => setCertificateForm({ ...certificateForm, email: e.target.value })}
-                placeholder="beneficiary@email.com"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="label-trust">Phone</Label>
-              <Input
-                type="tel"
-                value={certificateForm.phone}
-                onChange={(e) => setCertificateForm({ ...certificateForm, phone: e.target.value })}
-                placeholder="(555) 123-4567"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="label-trust">Units *</Label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={certificateForm.units}
-                onChange={(e) => setCertificateForm({ ...certificateForm, units: e.target.value })}
-                placeholder="25"
-                required
-                className="mt-1"
-                data-testid="units-input"
-              />
-              {summary && (
-                <div className="mt-2 space-y-1">
-                  {certificateForm.units && parseFloat(certificateForm.units) > 0 && (
-                    <p className="text-xs text-muted-foreground font-mono">
-                      = {((parseFloat(certificateForm.units) / summary.settings.total_authorized_units) * 100).toFixed(2)}% ownership
-                    </p>
-                  )}
-                  {certificateForm.units && parseFloat(certificateForm.units) > summary.remaining_units && !editingCertificate && (
-                    <p className="text-xs text-error dark:text-error font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      Exceeds available units ({summary.remaining_units} remaining)
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            <div>
-              <Label className="label-trust">Issue Date</Label>
-              <Input
-                type="date"
-                value={certificateForm.issue_date}
-                onChange={(e) => setCertificateForm({ ...certificateForm, issue_date: e.target.value })}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="label-trust">Notes (Optional)</Label>
-              <Textarea
-                value={certificateForm.notes}
-                onChange={(e) => setCertificateForm({ ...certificateForm, notes: e.target.value })}
-                placeholder="Additional notes..."
-                className="mt-1"
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCertificateModal(false); resetCertificateForm(); }}>Cancel</Button>
-            <Button className="btn-primary" onClick={handleIssueCertificate} data-testid="save-certificate-btn">
-              {editingCertificate ? 'Update' : 'Issue Certificate'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Transfer Modal */}
-      <Dialog open={showTransferModal} onOpenChange={setShowTransferModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Transfer Units</DialogTitle>
-            <DialogDescription>Transfer units from one certificate holder to another</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label className="label-trust">From Certificate *</Label>
-              <Select 
-                value={transferForm.from_certificate_id} 
-                onValueChange={(v) => {
-                  // When changing "from", check if current "to" certificate is the same as new "from"
-                  const shouldClearTo = transferForm.to_certificate_id === v;
-                  
-                  setTransferForm({ 
-                    ...transferForm, 
-                    from_certificate_id: v,
-                    // Clear "to" selection if it's now the same as "from"
-                    to_certificate_id: shouldClearTo ? '' : transferForm.to_certificate_id,
-                    to_holder_name: shouldClearTo ? '' : transferForm.to_holder_name,
-                    to_holder_identifier: shouldClearTo ? '' : transferForm.to_holder_identifier
-                  });
-                }}
-              >
-                <SelectTrigger className="mt-1" data-testid="from-cert-select">
-                  <SelectValue placeholder="Select source certificate" />
-                </SelectTrigger>
-                <SelectContent>
-                  {summary?.certificates?.filter(c => c.status === 'active').map((cert) => (
-                    <SelectItem key={cert.certificate_id} value={cert.certificate_id}>
-                      {cert.holder_name} - {cert.units} units ({cert.certificate_number})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="label-trust">To Beneficiary *</Label>
-              <Select 
-                value={transferForm.to_certificate_id} 
-                onValueChange={(v) => {
-                  // Find the selected certificate to get the holder name and identifier
-                  const selectedCert = summary?.certificates?.find(c => c.certificate_id === v);
-                  setTransferForm({ 
-                    ...transferForm, 
-                    to_certificate_id: v,
-                    to_holder_name: selectedCert?.holder_name || '',
-                    to_holder_identifier: selectedCert?.holder_identifier || ''
-                  });
-                }}
-              >
-                <SelectTrigger className="mt-1" data-testid="to-holder-select">
-                  <SelectValue placeholder="Select destination beneficiary" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(() => {
-                    // Exclude the "from" certificate from the destination list
-                    return summary?.certificates?.filter(c => c.status === 'active' && c.certificate_id !== transferForm.from_certificate_id).map((cert) => (
-                      <SelectItem key={cert.certificate_id} value={cert.certificate_id}>
-                        {cert.holder_name} - {cert.units} units ({cert.certificate_number})
-                      </SelectItem>
-                    ));
-                  })()}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="label-trust">Units to Transfer *</Label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={transferForm.units}
-                onChange={(e) => setTransferForm({ ...transferForm, units: e.target.value })}
-                required
-                className="mt-1"
-                data-testid="transfer-units-input"
-              />
-            </div>
-            <div>
-              <Label className="label-trust">Reason (Optional)</Label>
-              <Input
-                value={transferForm.reason}
-                onChange={(e) => setTransferForm({ ...transferForm, reason: e.target.value })}
-                placeholder="Gift, sale, etc."
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTransferModal(false)}>Cancel</Button>
-            <Button className="btn-primary" onClick={handleTransfer} data-testid="confirm-transfer-btn">Complete Transfer</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Revoke Confirmation Modal */}
-      <Dialog open={!!showRevokeModal} onOpenChange={() => setShowRevokeModal(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-error">Revoke Certificate</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to revoke certificate {showRevokeModal?.certificate_number}? 
-              This will return {showRevokeModal?.units} units to the available pool.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Label className="label-trust">Reason (Optional)</Label>
-            <Input
-              value={revokeReason}
-              onChange={(e) => setRevokeReason(e.target.value)}
-              placeholder="e.g., Beneficiary removed by trustee resolution"
-              className="mt-1"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowRevokeModal(null); setRevokeReason(''); }}>Cancel</Button>
-            <Button variant="destructive" onClick={() => handleRevoke(showRevokeModal)} data-testid="confirm-revoke-btn">Revoke Certificate</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Settings Modal */}
-      <Dialog open={showSettingsModal} onOpenChange={setShowSettingsModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Unit Settings</DialogTitle>
-            <DialogDescription>Configure trust unit parameters</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label className="label-trust">Total Authorized Units</Label>
-              <Input
-                type="number"
-                value={settingsForm.total_authorized_units}
-                onChange={(e) => setSettingsForm({ ...settingsForm, total_authorized_units: parseInt(e.target.value) || 0 })}
-                className="mt-1"
-                data-testid="total-units-input"
-              />
-              <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
-                <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                This is the maximum number of units that can be issued. Cannot be less than currently issued units ({summary?.total_issued_units || 0} currently issued).
-              </p>
-            </div>
-            <div>
-              <Label className="label-trust">Unit Label</Label>
-              <Input
-                value={settingsForm.unit_label}
-                onChange={(e) => setSettingsForm({ ...settingsForm, unit_label: e.target.value })}
-                placeholder="Unit, Share, Interest"
-                className="mt-1"
-              />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-muted/30 border border-border">
-              <div>
-                <Label className="label-trust">Allow Fractional Units</Label>
-                <p className="text-xs text-muted-foreground">Enable decimals (e.g., 12.5 units)</p>
-              </div>
-              <Switch
-                checked={settingsForm.allow_fractional}
-                onCheckedChange={(checked) => setSettingsForm({ ...settingsForm, allow_fractional: checked })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSettingsModal(false)}>Cancel</Button>
-            <Button className="btn-primary" onClick={handleSaveSettings} data-testid="save-settings-btn">Save Settings</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Class Beneficiary Confirmation */}
-      <Dialog open={!!deleteConfirmClass} onOpenChange={() => setDeleteConfirmClass(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-error">Remove Class Beneficiary</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to remove "{deleteConfirmClass?.class_type_label}"? 
-              This will remove the class designation from this trust.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmClass(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => { handleDeleteClassBeneficiary(deleteConfirmClass?.class_beneficiary_id); setDeleteConfirmClass(null); }} data-testid="confirm-delete-class-btn">
-              Remove Class
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Class Beneficiary Modal */}
-      <Dialog open={showClassBeneficiaryModal} onOpenChange={(open) => { if (!open) setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' }); setShowClassBeneficiaryModal(open); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add Class Beneficiary</DialogTitle>
-            <DialogDescription>
-              Designate a class of beneficiaries defined by relationship rather than naming individuals
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label className="label-trust">Class Type *</Label>
-              <Select
-                value={classBeneficiaryForm.class_type}
-                onValueChange={(v) => setClassBeneficiaryForm({ ...classBeneficiaryForm, class_type: v })}
-              >
-                <SelectTrigger className="mt-1" data-testid="class-type-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CLASS_BENEFICIARY_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="label-trust">Description (Optional)</Label>
-              <Input
-                value={classBeneficiaryForm.description}
-                onChange={(e) => setClassBeneficiaryForm({ ...classBeneficiaryForm, description: e.target.value })}
-                placeholder="e.g., All children of the grantor, including after-born"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="label-trust">Allocation Percentage (Optional)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                value={classBeneficiaryForm.percentage}
-                onChange={(e) => setClassBeneficiaryForm({ ...classBeneficiaryForm, percentage: e.target.value })}
-                placeholder="e.g., 50"
-                className="mt-1"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Percentage of trust allocated to this class (if applicable)</p>
-            </div>
-            <div>
-              <Label className="label-trust">Notes (Optional)</Label>
-              <Textarea
-                value={classBeneficiaryForm.notes}
-                onChange={(e) => setClassBeneficiaryForm({ ...classBeneficiaryForm, notes: e.target.value })}
-                placeholder="Additional context about this class designation..."
-                className="mt-1"
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowClassBeneficiaryModal(false); setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' }); }}>Cancel</Button>
-            <Button className="btn-primary" onClick={handleAddClassBeneficiary} data-testid="save-class-beneficiary-btn">Add Class</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Beneficiary Modal (People tab — simplified person-centric form) */}
-      <Dialog open={showPersonModal} onOpenChange={(open) => { if (!open) resetPersonForm(); setShowPersonModal(open); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add Beneficiary</DialogTitle>
-            <DialogDescription>
-              Add a person to benefit from this trust and choose their share.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label className="label-trust">Name *</Label>
-              <Input
-                value={personForm.name}
-                onChange={(e) => setPersonForm({ ...personForm, name: e.target.value })}
-                placeholder="e.g., Jane Smith"
-                className="mt-1"
-                data-testid="person-name-input"
-              />
-            </div>
-            <div>
-              <Label className="label-trust">Relationship to Grantor</Label>
-              <Select
-                value={personForm.relationship}
-                onValueChange={(v) => setPersonForm({ ...personForm, relationship: v })}
-              >
-                <SelectTrigger className="mt-1" data-testid="person-relationship-select">
-                  <SelectValue placeholder="Select relationship (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {RELATIONSHIP_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="label-trust">Share Percentage *</Label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                max="100"
-                value={personForm.sharePercentage}
-                onChange={(e) => setPersonForm({ ...personForm, sharePercentage: e.target.value })}
-                placeholder="e.g., 50"
-                className="mt-1"
-                data-testid="person-share-input"
-              />
-              <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
-                <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                The percentage of the trust this person will receive. This automatically creates an ownership share record.
-                {summary && (
-                  <span className="ml-1 font-mono">
-                    {((summary.remaining_units / (summary.settings?.total_authorized_units || 100)) * 100).toFixed(1)}% available.
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowPersonModal(false); resetPersonForm(); }}>Cancel</Button>
-            <Button className="btn-primary" onClick={handleAddPerson} data-testid="save-beneficiary-btn">
-              Add Beneficiary
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* PDF Preview Modal */}
-      <PDFPreviewModal
-        open={pdfPreview.show}
-        onOpenChange={(isOpen) => !isOpen && setPdfPreview({ show: false, loading: false, data: null, filename: '' })}
-        pdfBase64={pdfPreview.data}
-        filename={pdfPreview.filename}
-        title="Unit Certificate"
+      <BeneficiariesModals
+        showCertificateModal={certForm.showCertificateModal}
+        setShowCertificateModal={certForm.setShowCertificateModal}
+        editingCertificate={certForm.editingCertificate}
+        certificateForm={certForm.certificateForm}
+        setCertificateForm={certForm.setCertificateForm}
+        resetCertificateForm={certForm.resetCertificateForm}
+        handleIssueCertificate={certForm.handleIssueCertificate}
+        summary={summary}
+        trusts={trusts}
+        selectedTrust={selectedTrust}
+        showTransferModal={transfer.showTransferModal}
+        setShowTransferModal={transfer.setShowTransferModal}
+        transferForm={transfer.transferForm}
+        setTransferForm={transfer.setTransferForm}
+        handleTransfer={transfer.handleTransfer}
+        showRevokeModal={revoke.showRevokeModal}
+        setShowRevokeModal={revoke.setShowRevokeModal}
+        revokeReason={revoke.revokeReason}
+        setRevokeReason={revoke.setRevokeReason}
+        handleRevoke={revoke.handleRevoke}
+        showSettingsModal={settings.showSettingsModal}
+        setShowSettingsModal={settings.setShowSettingsModal}
+        settingsForm={settings.settingsForm}
+        setSettingsForm={settings.setSettingsForm}
+        handleSaveSettings={settings.handleSaveSettings}
+        deleteConfirmClass={classBeneficiary.deleteConfirmClass}
+        setDeleteConfirmClass={classBeneficiary.setDeleteConfirmClass}
+        handleDeleteClassBeneficiary={classBeneficiary.handleDeleteClassBeneficiary}
+        showClassBeneficiaryModal={classBeneficiary.showClassBeneficiaryModal}
+        setShowClassBeneficiaryModal={classBeneficiary.setShowClassBeneficiaryModal}
+        classBeneficiaryForm={classBeneficiary.classBeneficiaryForm}
+        setClassBeneficiaryForm={classBeneficiary.setClassBeneficiaryForm}
+        handleAddClassBeneficiary={classBeneficiary.handleAddClassBeneficiary}
+        showPersonModal={personForm.showPersonModal}
+        setShowPersonModal={personForm.setShowPersonModal}
+        personForm={personForm.personForm}
+        setPersonForm={personForm.setPersonForm}
+        resetPersonForm={personForm.resetPersonForm}
+        handleAddPerson={personForm.handleAddPerson}
+        pdfPreview={pdfPreview.pdfPreview}
+        setPdfPreview={pdfPreview.setPdfPreview}
       />
     </div>
   );
