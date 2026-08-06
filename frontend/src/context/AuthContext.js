@@ -216,22 +216,11 @@ const useAuthActions = ({
   return { login, register, logout, exchangeAuthCode, seedDemoData };
 };
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  // Start loading as true ONLY if we have a token to validate
-  // If no token, we know immediately user is not authenticated
-  const [loading, setLoading] = useState(hasStoredToken());
-  const [trusts, setTrusts] = useState([]);
-  const [trustsLoading, setTrustsLoading] = useState(true);
-  const [selectedTrust, setSelectedTrust] = useState(null);
-  const [subscription, setSubscription] = useState(null);
-  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
-  const [isReadOnly, setIsReadOnly] = useState(false);
-  const authCheckComplete = useRef(false);
+// ─── useSubscriptionState: extracted from AuthProvider ──────────────
+// Encapsulates subscription state loading + admin override logic.
 
-  // Load the normalized subscription state from the new endpoint
+const useSubscriptionState = ({ setSubscription, setSubscriptionExpired, setIsReadOnly }) => {
   const loadSubscriptionState = useCallback(async (userEmail = null) => {
-
     // ADMIN OVERRIDE: If user is primary admin, always grant full access
     if (isPrimaryAdmin(userEmail)) {
       const adminState = buildAdminSubscriptionState();
@@ -255,25 +244,74 @@ export const AuthProvider = ({ children }) => {
         return state;
       } else {
         console.error('[AuthContext] Subscription API returned:', response.status);
-        // Set default state on error so the app doesn't hang
         applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
       }
     } catch (error) {
       console.error('[AuthContext] Failed to load subscription state:', error);
-      // Set default state on error so the app doesn't hang
       applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
     }
     return null;
-  }, []);
+  }, [setSubscription, setSubscriptionExpired, setIsReadOnly]);
 
-  // Legacy method for backward compatibility
-  const loadSubscription = useCallback(async () => {
-    return loadSubscriptionState();
-  }, [loadSubscriptionState]);
+  return { loadSubscriptionState };
+};
 
+// ─── useTrustsLoader: extracted from AuthProvider ───────────────────
+// Encapsulates trust loading + selection persistence.
+
+const useTrustsLoader = ({ setTrusts, setTrustsLoading, setSelectedTrust, selectedTrust }) => {
+  const loadTrustsInternal = useCallback(async (forceSelectNew = false) => {
+    setTrustsLoading(true);
+    try {
+      const response = await fetch(`${API}/trusts`, {
+        credentials: 'include',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTrusts(data);
+
+        // Select first trust if none selected, or if forced
+        if (data.length > 0 && (!selectedTrust || forceSelectNew)) {
+          const storedTrustId = localStorage.getItem('selected_trust_id');
+          const storedTrust = data.find(t => t.trust_id === storedTrustId);
+          if (!selectedTrust) {
+            setSelectedTrust(storedTrust || data[0]);
+          }
+        }
+      } else {
+        console.error('[AuthContext] Trusts API returned:', response.status);
+      }
+    } catch (error) {
+      console.error('[AuthContext] Failed to load trusts:', error);
+    } finally {
+      setTrustsLoading(false);
+    }
+  }, [setTrusts, setTrustsLoading, setSelectedTrust, selectedTrust]);
+
+  const loadTrusts = useCallback(async () => {
+    await loadTrustsInternal();
+  }, [loadTrustsInternal]);
+
+  return { loadTrustsInternal, loadTrusts };
+};
+
+// ─── useAuthCheck: extracted from AuthProvider ───────────────────────
+// Encapsulates the initial auth-check flow (skip on callback routes, validate
+// token, load trusts + subscription after success).
+
+const useAuthCheck = ({
+  user,
+  setUser,
+  setLoading,
+  setTrustsLoading,
+  authCheckComplete,
+  loadTrustsInternal,
+  loadSubscriptionState,
+}) => {
   const checkAuth = useCallback(async () => {
     // CRITICAL: If returning from OAuth callback path, skip the /me check.
-    // AuthCallback will handle the token and establish the session.
     if (isOAuthCallbackRoute()) {
       setLoading(false);
       setTrustsLoading(false);
@@ -317,43 +355,40 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       authCheckComplete.current = true;
     }
-  }, [loadSubscriptionState, user]);
+  }, [user, setUser, setLoading, setTrustsLoading, authCheckComplete, loadTrustsInternal, loadSubscriptionState]);
 
-  // Internal function that doesn't depend on state
-  const loadTrustsInternal = async (forceSelectNew = false) => {
-    setTrustsLoading(true);
-    try {
-      const response = await fetch(`${API}/trusts`, {
-        credentials: 'include',
-        headers: getAuthHeaders()
-      });
+  return { checkAuth };
+};
 
-      if (response.ok) {
-        const data = await response.json();
-        setTrusts(data);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  // Start loading as true ONLY if we have a token to validate
+  const [loading, setLoading] = useState(hasStoredToken());
+  const [trusts, setTrusts] = useState([]);
+  const [trustsLoading, setTrustsLoading] = useState(true);
+  const [selectedTrust, setSelectedTrust] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  const authCheckComplete = useRef(false);
 
-        // Select first trust if none selected, or if forced
-        if (data.length > 0 && (!selectedTrust || forceSelectNew)) {
-          const storedTrustId = localStorage.getItem('selected_trust_id');
-          const storedTrust = data.find(t => t.trust_id === storedTrustId);
-          if (!selectedTrust) {
-            setSelectedTrust(storedTrust || data[0]);
-          }
-        }
-      } else {
-        console.error('[AuthContext] Trusts API returned:', response.status);
-      }
-    } catch (error) {
-      console.error('[AuthContext] Failed to load trusts:', error);
-    } finally {
-      setTrustsLoading(false);
-    }
-  };
+  // Subscription state loader
+  const { loadSubscriptionState } = useSubscriptionState({
+    setSubscription, setSubscriptionExpired, setIsReadOnly,
+  });
 
-  const loadTrusts = useCallback(async () => {
-    await loadTrustsInternal();
-  }, []);
+  // Trusts loader (depends on selectedTrust)
+  const { loadTrustsInternal, loadTrusts } = useTrustsLoader({
+    setTrusts, setTrustsLoading, setSelectedTrust, selectedTrust,
+  });
 
+  // Auth check (depends on user + loaders)
+  const { checkAuth } = useAuthCheck({
+    user, setUser, setLoading, setTrustsLoading, authCheckComplete,
+    loadTrustsInternal, loadSubscriptionState,
+  });
+
+  // Auth actions (login/register/logout/etc.)
   const { login, register, logout, exchangeAuthCode, seedDemoData } = useAuthActions({
     setUser,
     setTrusts,
@@ -361,6 +396,12 @@ export const AuthProvider = ({ children }) => {
     loadTrustsInternal,
   });
 
+  // Legacy method for backward compatibility
+  const loadSubscription = useCallback(async () => {
+    return loadSubscriptionState();
+  }, [loadSubscriptionState]);
+
+  // Initial auth check on mount
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
@@ -368,7 +409,6 @@ export const AuthProvider = ({ children }) => {
   // Listen for subscription expired events from API calls
   useEffect(() => {
     const handleSubscriptionExpired = () => {
-      // Don't mark admin as expired
       if (isPrimaryAdmin(user?.email)) return;
       setSubscriptionExpired(true);
       setIsReadOnly(true);
@@ -376,10 +416,8 @@ export const AuthProvider = ({ children }) => {
     };
 
     const handleSubscriptionReadOnly = () => {
-      // Don't mark admin as read-only
       if (isPrimaryAdmin(user?.email)) return;
       setIsReadOnly(true);
-      // Optionally refresh subscription state
       loadSubscriptionState(user?.email);
     };
 
