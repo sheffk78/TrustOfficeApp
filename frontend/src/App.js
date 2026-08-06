@@ -110,20 +110,20 @@ const ProtectedRoute = ({ children }) => {
 
   // Check if user is admin - admins skip onboarding
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
-  
+
   // Check for stored token
   const hasToken = localStorage.getItem('auth_token') !== null;
 
+  const isOnboarding = location.pathname.includes('/onboarding');
+  const skipOnboarding = localStorage.getItem('skip_onboarding') === 'true';
+
   // IMMEDIATE redirect: no token, no user, not loading — go to login
-  if (!hasToken && !user && !loading) {
+  if (shouldRedirectToLogin({ hasToken, user, loading })) {
     return <Navigate to="/" replace />;
   }
 
   // Show loading spinner while auth is being verified (but not for trusts on onboarding)
-  const isOnboarding = location.pathname.includes('/onboarding');
-  const shouldShowLoading = (loading || (!isOnboarding && trustsLoading)) && !loadingTimeout;
-  
-  if (shouldShowLoading) {
+  if (shouldShowLoadingSpinner({ loading, isOnboarding, trustsLoading, loadingTimeout })) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
@@ -136,7 +136,7 @@ const ProtectedRoute = ({ children }) => {
 
   // After loading timeout, if we still have a token, don't redirect - let user see the page
   // Only redirect to login if there's genuinely no token
-  if (!hasToken && !user && !hasUserFromState && !isCallback) {
+  if (shouldRedirectToLoginPostTimeout({ hasToken, user, hasUserFromState, isCallback })) {
     return <Navigate to="/" replace />;
   }
 
@@ -146,13 +146,32 @@ const ProtectedRoute = ({ children }) => {
   // - Still loading trusts
   // - User has explicit "skip onboarding" in localStorage (set when clicking read-only mode)
   // - User has a token but user data hasn't loaded yet (loading timeout scenario)
-  const skipOnboarding = localStorage.getItem('skip_onboarding') === 'true';
-  if (user && !trustsLoading && trusts && trusts.length === 0 && !isOnboarding && !isAdmin && !skipOnboarding) {
+  if (shouldRedirectToOnboarding({ user, trustsLoading, trusts, isOnboarding, isAdmin, skipOnboarding })) {
     return <Navigate to="/onboarding" replace />;
   }
 
   return children;
 };
+
+// Guard: immediate redirect when there's no token, no user, and auth isn't loading.
+const shouldRedirectToLogin = ({ hasToken, user, loading }) =>
+  !hasToken && !user && !loading;
+
+// Guard: show the loading spinner while auth/trusts are being verified
+// (unless the loading timeout has fired, or we're on onboarding which
+// doesn't need trusts loaded).
+const shouldShowLoadingSpinner = ({ loading, isOnboarding, trustsLoading, loadingTimeout }) =>
+  (loading || (!isOnboarding && trustsLoading)) && !loadingTimeout;
+
+// Guard: post-timeout redirect to login only if there's genuinely no token,
+// no user, no user-from-navigation-state, and not a callback route.
+const shouldRedirectToLoginPostTimeout = ({ hasToken, user, hasUserFromState, isCallback }) =>
+  !hasToken && !user && !hasUserFromState && !isCallback;
+
+// Guard: redirect users with no trusts to onboarding, unless they're already
+// there, are admins, are still loading trusts, or have opted out via localStorage.
+const shouldRedirectToOnboarding = ({ user, trustsLoading, trusts, isOnboarding, isAdmin, skipOnboarding }) =>
+  user && !trustsLoading && trusts && trusts.length === 0 && !isOnboarding && !isAdmin && !skipOnboarding;
 
 // Protected Route with Subscription Gate (for routes that require active subscription)
 const SubscriptionProtectedRoute = ({ children }) => {
