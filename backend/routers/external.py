@@ -777,7 +777,8 @@ async def _resolve_user_id(
 
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     try:
-        await _create_new_user(request, user_id, email, None, now)
+        display_name = _derive_display_name(request)
+        await _create_new_user(request, user_id, email, display_name, now)
         logger.info(f"Provision: Created new user {user_id} ({email}) via WingPoint")
         return user_id, True, None
     except Exception as e:
@@ -884,17 +885,6 @@ async def _generate_set_password_token(user_id: str, now: datetime) -> tuple[str
     return set_password_token, expires_at
 
 
-def _build_set_password_url(
-    request: WingPointProvisionRequest, frontend_url: str,
-    set_password_token: str,
-) -> str:
-    """Build the WingPoint set-password URL with coupon + plan params."""
-    coupon_param = f"&coupon={quote(request.coupon_code, safe='')}" if request.coupon_code else ""
-    _prelim_plan = PACKAGE_TO_PLAN.get(request.source_package or "", "trustee")
-    action_plan_param = f"&plan={_prelim_plan}"
-    return f"{frontend_url}/wingpoint?action=set_password&token={set_password_token}{coupon_param}{action_plan_param}"
-
-
 def _build_entity_doc(
     trust_id: str, user_id: str, trust_name: str,
     trust_formation_date: Optional[str], jurisdiction: str,
@@ -930,11 +920,15 @@ async def _ensure_entity_record(
     trust_formation_date: Optional[str], jurisdiction: str,
     ein: Optional[str], trustee_str: str, now: datetime,
     log_prefix: str = "Provision",
-) -> None:
-    """Create an entity record for a trust if one doesn't already exist."""
+) -> bool:
+    """Create an entity record for a trust if one doesn't already exist.
+
+    Returns True if an entity record exists (pre-existing or successfully
+    created), False if creation was attempted but failed.
+    """
     _existing_entity = await db.entities.find_one({"trust_id": trust_id}, {"_id": 1})
     if _existing_entity:
-        return
+        return True
     entity_doc = _build_entity_doc(
         trust_id, user_id, trust_name, trust_formation_date,
         jurisdiction, ein, trustee_str, now,
@@ -942,8 +936,10 @@ async def _ensure_entity_record(
     try:
         await db.entities.insert_one(entity_doc)
         logger.info(f"{log_prefix}: Created entity {entity_doc['entity_id']} for trust {trust_id}")
+        return True
     except Exception as e:
-        logger.warning(f"{log_prefix}: Failed to create entity for trust {trust_id}: {e}")
+        logger.error(f"{log_prefix}: Failed to create entity for trust {trust_id}: {e}", exc_info=True)
+        return False
 
 
 async def _resolve_provision_plan(
@@ -1054,7 +1050,7 @@ async def _build_race_complete_response(existing: dict) -> dict:
 
 async def _send_provision_email(
     request: WingPointProvisionRequest, recommended: dict,
-    email: str, display_name: str, set_password_url: str,
+    email: str, set_password_url: str,
 ) -> tuple[dict, str]:
     """Send the appropriate provision email (set-password or skip).
 
@@ -1087,7 +1083,7 @@ def _build_provision_response(
     is_new_user: bool, user_id: str, trust_id: str,
     set_password_url: str, expires_at: datetime, email: str,
     request: WingPointProvisionRequest, email_status: str,
-    recommended: dict, display_name: str, email_result: dict,
+    recommended: dict, email_result: dict,
 ) -> dict:
     """Build the final provision response with a context-appropriate message."""
     response = {
@@ -1173,7 +1169,6 @@ async def provision_trustoffice(
 
     # ---- MAP WINGPOINT DATA TO TRUSTOFFICE ----
     to_trust_type = WINGPOINT_TRUST_TYPE_MAP.get(request.trust_type, "family")
-    display_name = _derive_display_name(request)
     trustee_str = _derive_trustee_str(request)
     email = request.email.lower().strip()
     now = datetime.now(timezone.utc)
@@ -1189,7 +1184,7 @@ async def provision_trustoffice(
     # ---- AUTO-CREATE ENTITY RECORD (matches in-app trust creation) ----
     # The in-app path calls _create_trust_entity which inserts into db.entities.
     # WingPoint provision must do the same so the trust appears in Structures.
-    await _ensure_entity_record(
+    entity_created = await _ensure_entity_record(
         trust_id, user_id, request.trust_name, request.trust_formation_date,
         request.jurisdiction, request.ein, trustee_str, now,
     )
@@ -1235,7 +1230,7 @@ async def provision_trustoffice(
 
     # ---- SEND EMAIL ----
     email_result, email_status = await _send_provision_email(
-        request, recommended, email, display_name, set_password_url,
+        request, recommended, email, set_password_url,
     )
 
     if email_status == "failed":
@@ -1249,6 +1244,7 @@ async def provision_trustoffice(
         {"$set": {
             "status": "complete",
             "email_status": email_status,
+            "entity_created": entity_created,
             "completed_at": datetime.now(timezone.utc).isoformat()
         }}
     )
@@ -1273,7 +1269,7 @@ async def provision_trustoffice(
     # ---- BUILD RESPONSE ----
     return _build_provision_response(
         is_new_user, user_id, trust_id, set_password_url, expires_at,
-        email, request, email_status, recommended, display_name, email_result,
+        email, request, email_status, recommended, email_result,
     )
 
 

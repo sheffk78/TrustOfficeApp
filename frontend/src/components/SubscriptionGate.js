@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,27 @@ import {
 export const SubscriptionGate = ({ children }) => {
   const { user, subscription, subscriptionExpired, isReadOnly, loading } = useAuth();
 
+  // Fallback for when /subscription/state never resolves (network hang, etc.).
+  // After 10s we stop showing the spinner and render the content with the
+  // ReadOnlyBanner — mirroring the DEFAULT_ERROR_SUBSCRIPTION pattern from
+  // AuthContext (expired / read-only). If the real subscription state arrives
+  // later (loading flips false / subscription becomes non-null), the normal
+  // render branches below take over and this flag is cleared.
+  const [subscriptionLoadTimedOut, setSubscriptionLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!loading && subscription) {
+      setSubscriptionLoadTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      // Only trip the fallback if we're STILL waiting on subscription state.
+      if (!subscription) {
+        setSubscriptionLoadTimedOut(true);
+      }
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [loading, subscription]);
+
   // Don't block while loading - show loading spinner instead
   if (loading) {
     return (
@@ -39,11 +61,24 @@ export const SubscriptionGate = ({ children }) => {
     return children;
   }
 
-  // Wait for subscription to load before deciding — prevents flash of wrong state
-  if (!subscription) {
+  // Wait for subscription to load before deciding — prevents flash of wrong state.
+  // If the load timed out, fall through to the read-only render below instead of
+  // spinning forever.
+  if (!subscription && !subscriptionLoadTimedOut) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto"></div>
+      </div>
+    );
+  }
+
+  // Timed out and still no subscription state — render content with ReadOnlyBanner
+  // (read-only / expired fallback) rather than hanging on the spinner forever.
+  if (!subscription && subscriptionLoadTimedOut) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <ReadOnlyBanner />
+        {children}
       </div>
     );
   }

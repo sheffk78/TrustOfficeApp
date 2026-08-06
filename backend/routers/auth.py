@@ -341,11 +341,14 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
     # Store reset token
     await db.password_resets.update_one(
         {"user_id": user["user_id"]},
-        {"$set": {
-            "token": reset_token,
-            "expires_at": expires_at.isoformat(),
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }},
+        {
+            "$set": {
+                "token": reset_token,
+                "expires_at": expires_at.isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+            "$setOnInsert": {"purpose": "reset"},
+        },
         upsert=True
     )
     
@@ -391,6 +394,14 @@ async def reset_password(request: PasswordResetConfirm, background_tasks: Backgr
     
     # Update password
     new_hash = hash_password(request.new_password)
+    # Fetch the user BEFORE updating to check whether this is a first-time
+    # password set (no existing hash) or a reset of an existing password.
+    # The "password_set" activation webhook should only fire the first time.
+    _user_before = await db.users.find_one(
+        {"user_id": reset_record["user_id"]},
+        {"password_hash": 1, "_id": 0},
+    )
+    _had_password = bool(_user_before and _user_before.get("password_hash"))
     await db.users.update_one(
         {"user_id": reset_record["user_id"]},
         {"$set": {"password_hash": new_hash}}
@@ -413,12 +424,17 @@ async def reset_password(request: PasswordResetConfirm, background_tasks: Backgr
         "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()  # Auto-cleanup after max token lifetime
     })
     
-    # Fire activation webhook for WingPoint-provisioned users (fire-and-forget)
-    try:
-        from routers.external import fire_activation_webhook
-        background_tasks.add_task(fire_activation_webhook, reset_record["user_id"], "password_set")
-    except Exception as e:
-        logger.warning(f"Failed to queue password_set webhook for {reset_record['user_id']}: {e}")
+    # Fire activation webhook for WingPoint-provisioned users (fire-and-forget).
+    # Only fire on the FIRST password set — a reset of an existing password is
+    # not an activation event and must not retrigger the WingPoint webhook.
+    if not _had_password:
+        try:
+            from routers.external import fire_activation_webhook
+            background_tasks.add_task(fire_activation_webhook, reset_record["user_id"], "password_set")
+        except Exception as e:
+            logger.warning(f"Failed to queue password_set webhook for {reset_record['user_id']}: {e}")
+    else:
+        logger.info(f"Skipping password_set webhook for {reset_record['user_id']} (password reset, not first set)")
     
     return {"message": "Password has been reset successfully. Please log in with your new password."}
 

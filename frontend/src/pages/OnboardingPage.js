@@ -54,7 +54,11 @@ export default function OnboardingPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!checkingTrusts && trusts && trusts.length > 0 && !isSubscriptionExpired) {
+    // Redirect to dashboard when the user already has at least one trust,
+    // regardless of subscription state. WingPoint users may have a trust but
+    // no active subscription — the SubscriptionGate on the dashboard handles
+    // the read-only / paywall logic, so we must not block them here.
+    if (!checkingTrusts && trusts && trusts.length > 0) {
       if (!initialTrustCheckDone.current) {
         wizard.navigate('/dashboard', { replace: true });
       }
@@ -62,7 +66,7 @@ export default function OnboardingPage() {
     if (!checkingTrusts) {
       initialTrustCheckDone.current = true;
     }
-  }, [checkingTrusts, trusts, isSubscriptionExpired]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [checkingTrusts, trusts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-fill first trustee name with the signed-up user's name
   useEffect(() => {

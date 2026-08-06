@@ -174,9 +174,29 @@ export default function ConnectWingPoint() {
         getAuthHeaders(),
       );
 
+      // "already_exists" means the trust is already linked to this WingPoint
+      // account — treat it as SUCCESS, not an error. Proceed with the redirect
+      // exactly as if the confirm succeeded. The redirect still needs the
+      // user id (and connect token, if the API provides one on re-link).
+      if (data?.status === 'already_exists') {
+        // Non-fatal informational log; flow continues below unchanged.
+        console.info('WingPoint trust already linked — proceeding with redirect.');
+      }
+
+      // Refresh the trust list so it's current when the user returns to TrustOffice
+      // (fire-and-forget; don't block the redirect on it)
+      try {
+        await loadTrusts();
+      } catch (e) {
+        // Non-fatal — the redirect should still proceed.
+        console.warn('loadTrusts failed after WingPoint confirm:', e);
+      }
+
       // Build the redirect URL with user_id + connect_token
       const callback = new URL(redirectUrl);
-      callback.searchParams.set('trustoffice_user_id', data.trustoffice_user_id);
+      if (data.trustoffice_user_id) {
+        callback.searchParams.set('trustoffice_user_id', data.trustoffice_user_id);
+      }
       if (data.connect_token) {
         callback.searchParams.set('connect_token', data.connect_token);
       }

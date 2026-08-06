@@ -18,7 +18,7 @@ const WINGPOINT_PLAN = {
   features: [
     'AI-powered guided minutes',
     '31 professional templates',
-    'Minutes Ã¢ Money integration',
+    'Minutes & Money integration',
     'Multi-trust dashboard',
     'Recurring task automation',
     'Governance calendar with reminders',
@@ -46,11 +46,11 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Can I cancel anytime?',
-    a: 'Yes. Your TrustOffice subscription renews annually. If you cancel, you won\'t be able to get this special pricing again Ã¢ÂÂ you would need to subscribe at regular TrustOffice rates.',
+    a: 'Yes. Your TrustOffice subscription renews annually. If you cancel, you won\'t be able to get this special pricing again — you would need to subscribe at regular TrustOffice rates.',
   },
   {
     q: 'What happens if I cancel?',
-    a: 'This exclusive WingPoint rate is available to WingPoint customers only. If you cancel, you won\'t be able to get this pricing again Ã¢ÂÂ you would need to subscribe at regular TrustOffice rates.',
+    a: 'This exclusive WingPoint rate is available to WingPoint customers only. If you cancel, you won\'t be able to get this pricing again — you would need to subscribe at regular TrustOffice rates.',
   },
   {
     q: 'Why is this plan annual only?',
@@ -73,6 +73,8 @@ export default function WingPointWelcomePage() {
 
   const action = searchParams.get('action');
   const token = searchParams.get('token');
+  const coupon = searchParams.get('coupon');
+  const plan = searchParams.get('plan');
 
   // Set password form state
   const [password, setPassword] = useState('');
@@ -94,15 +96,30 @@ export default function WingPointWelcomePage() {
   // Verify set-password token if present
   useEffect(() => {
     if (action === 'set_password' && token) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       const verifyToken = async () => {
         try {
-          const response = await fetch(`${API}/api/auth/verify-reset-token?token=${token}`);
+          const response = await fetch(
+            `${API}/api/auth/verify-reset-token?token=${token}`,
+            { signal: controller.signal }
+          );
+          clearTimeout(timeoutId);
           setTokenValid(response.ok);
         } catch (e) {
-          setTokenValid(false);
+          clearTimeout(timeoutId);
+          if (e.name === 'AbortError') {
+            setTokenValid(false);
+          } else {
+            setTokenValid(false);
+          }
         }
       };
       verifyToken();
+      return () => {
+        clearTimeout(timeoutId);
+        controller.abort();
+      };
     }
   }, [action, token]);
 
@@ -136,10 +153,16 @@ export default function WingPointWelcomePage() {
         throw new Error(data.detail || 'Failed to set password');
       }
       setPasswordSet(true);
-      toast.success('Password set successfully. You can now log in.');
-      // Clear the set_password params from URL
+      toast.success('Password set successfully. Taking you to choose your plan...');
+      // Redirect to pricing, preserving coupon/plan/wp params
       setTimeout(() => {
-        navigate('/wingpoint', { replace: true });
+        const params = new URLSearchParams();
+        params.set('wp', '1');
+        params.set('action', 'subscribe');
+        if (coupon) params.set('coupon', coupon);
+        if (plan) params.set('plan', plan);
+        params.set('billing', 'annual');
+        navigate(`/pricing?${params.toString()}`, { replace: true });
       }, 2000);
     } catch (error) {
       toast.error(error.message);
@@ -502,10 +525,9 @@ function NotLoggedInAction({
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-red-900">This link has expired or is invalid.</p>
+                <p className="text-sm font-medium text-red-900">Your link has expired.</p>
                 <p className="text-sm text-red-700 mt-1">
-                  Please check your email for a fresh setup link, or{' '}
-                  <Link to="/forgot-password" className="underline font-medium">request a new one</Link>.
+                  Please request a new connection link from WingPoint.
                 </p>
               </div>
             </div>
@@ -558,8 +580,8 @@ function NotLoggedInAction({
             <div className="flex items-start gap-2">
               <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-green-900">Password set successfully!</p>
-                <p className="text-sm text-green-700 mt-1">You can now log in to your TrustOffice account.</p>
+                <p className="text-sm font-medium text-green-900">Password set!</p>
+                <p className="text-sm text-green-700 mt-1">Taking you to choose your plan...</p>
               </div>
             </div>
           </div>

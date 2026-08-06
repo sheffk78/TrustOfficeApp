@@ -58,11 +58,11 @@ export default function SignUpPage() {
   const [referralCode, setReferralCode] = useState('');
   const [referralInfo, setReferralInfo] = useState(null);
   
-  // Coupon code from URL params (e.g., /signup?coupon=WINGPOINT50)
+  // Coupon code from URL params (e.g., /signup?coupon=WINGPOINT3M)
   const [couponCode, setCouponCode] = useState('');
   const [couponInfo, setCouponInfo] = useState(null);
   
-  // WingPoint partnership params (e.g., /signup?ref=wp&wp_ref=WP-123&trust_name=Smith+Family+Trust&coupon=WINGPOINT50)
+  // WingPoint partnership params (e.g., /signup?ref=wp&wp_ref=WP-123&trust_name=Smith+Family+Trust&coupon=WINGPOINT3M)
   const [isWingPoint, setIsWingPoint] = useState(false);
   const [wingPointTrustName, setWingPointTrustName] = useState('');
   const [wingPointRef, setWingPointRef] = useState('');
@@ -76,7 +76,7 @@ export default function SignUpPage() {
       setIsWingPoint(true);
       const trustName = searchParams.get('trust_name') || '';
       const wpRef = searchParams.get('wp_ref') || '';
-      const coupon = searchParams.get('coupon') || 'WINGPOINT50';
+      const coupon = searchParams.get('coupon') || 'WINGPOINT3M';
       
       setWingPointTrustName(decodeURIComponent(trustName));
       setWingPointRef(wpRef);
@@ -84,12 +84,12 @@ export default function SignUpPage() {
       // Auto-apply WingPoint coupon
       const couponUpper = coupon.toUpperCase();
       setCouponCode(couponUpper);
-      if (couponUpper === 'WINGPOINT50') {
+      if (couponUpper === 'WINGPOINT3M') {
         setCouponInfo({
-          code: 'WINGPOINT50',
-          description: '$50 off your first payment',
+          code: 'WINGPOINT3M',
+          description: '3 months free',
           regularPrice: '$79/month or $790/year',
-          savings: 'Save $50 on your first billing cycle'
+          savings: 'Save $237 — 3 months free'
         });
       }
       
@@ -119,12 +119,12 @@ export default function SignUpPage() {
           regularPrice: '$79/month',
           savings: '$30 off per month'
         });
-      } else if (couponUpper === 'WINGPOINT50') {
+      } else if (couponUpper === 'WINGPOINT3M') {
         setCouponInfo({
-          code: 'WINGPOINT50',
-          description: '$50 off your first payment',
+          code: 'WINGPOINT3M',
+          description: '3 months free',
           regularPrice: '$79/month or $790/year',
-          savings: 'Save $50 on your first billing cycle'
+          savings: 'Save $237 — 3 months free'
         });
       }
     }
