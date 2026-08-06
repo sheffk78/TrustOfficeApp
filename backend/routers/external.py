@@ -163,6 +163,105 @@ PLAN_DISPLAY_NAMES = {
 }
 
 
+def _resolve_suggested_plan(
+    source_package: Optional[str], trust_count: int,
+    plan_type: str, sub_state,
+) -> str:
+    """Determine the recommended TrustOffice plan based on package, trust count, and current plan."""
+    suggested_plan = PACKAGE_TO_PLAN.get(source_package)
+    if not suggested_plan:
+        suggested_plan = _fallback_plan_by_trust_count(trust_count)
+    else:
+        suggested_plan = _adjust_plan_for_trust_count(suggested_plan, trust_count)
+
+    # Prevent recommending a downgrade for legacy plan users (legacy limit = 10)
+    current_limit = get_trust_limit(plan_type, sub_state.legacy_trust_limit)
+    suggested_limit = PLAN_TRUST_LIMITS.get(suggested_plan, 1)
+    if _is_downgrade(current_limit, suggested_limit):
+        suggested_plan = _prevent_downgrade(current_limit, trust_count)
+    return suggested_plan
+
+
+def _fallback_plan_by_trust_count(trust_count: int) -> str:
+    """Pick a plan based on trust count when no package maps."""
+    if trust_count <= 1:
+        return "trustee"
+    if trust_count <= 5:
+        return "estate"
+    return "advisor"
+
+
+def _adjust_plan_for_trust_count(suggested_plan: str, trust_count: int) -> str:
+    """Validate package-based plan against actual trust count."""
+    plan_limit = PLAN_TRUST_LIMITS.get(suggested_plan, 1)
+    if plan_limit == float('inf') or trust_count <= plan_limit:
+        return suggested_plan
+    if trust_count <= 5:
+        return "estate"
+    return "advisor"
+
+
+def _is_downgrade(current_limit: float, suggested_limit: float) -> bool:
+    """True if suggested plan has fewer trusts than current plan."""
+    if current_limit == float('inf') or suggested_limit == float('inf'):
+        return False
+    return suggested_limit < current_limit
+
+
+def _prevent_downgrade(current_limit: float, trust_count: int) -> str:
+    """Return a plan that is not a downgrade from the current one."""
+    if current_limit >= 10:
+        return "advisor"  # Only Advisor exceeds legacy 10
+    if trust_count <= 5:
+        return "estate"
+    return "advisor"
+
+
+def _resolve_action_and_redirect(
+    is_new_user: bool, has_password: bool, is_past_due: bool,
+    is_free_or_trial: bool, needs_upgrade: bool, cancel_pending: bool,
+    coupon_code: Optional[str], suggested_plan: str, frontend_url: str,
+) -> tuple[str, Optional[str]]:
+    """Determine the action and redirect URL for a provisioned user."""
+    if is_new_user or not has_password:
+        return "set_password", None
+    if is_past_due:
+        return "login_and_update_payment", f"{frontend_url}/login?wp=1&action=update_payment"
+    if is_free_or_trial:
+        return "login_and_subscribe", _build_subscribe_url(frontend_url, coupon_code, suggested_plan)
+    if needs_upgrade:
+        return "login_and_upgrade", f"{frontend_url}/login?wp=1&action=upgrade&plan={suggested_plan}"
+    if cancel_pending:
+        return "login_and_resubscribe", f"{frontend_url}/login?wp=1&action=resubscribe"
+    return "login", f"{frontend_url}/login?wp=1&action=welcome"
+
+
+def _build_subscribe_url(frontend_url: str, coupon_code: Optional[str], suggested_plan: str) -> str:
+    """Build the login-and-subscribe redirect URL with optional coupon and plan params."""
+    params = "?wp=1&action=subscribe"
+    if coupon_code:
+        params += f"&coupon={quote(coupon_code, safe='')}"
+    if suggested_plan:
+        params += f"&plan={suggested_plan}"
+    return f"{frontend_url}/login{params}"
+
+
+def _action_message(action: str, suggested_plan: str) -> str:
+    """Build a human-readable message for the given action."""
+    plan_name = PLAN_DISPLAY_NAMES.get(suggested_plan, suggested_plan)
+    if action == "set_password":
+        return "Check your email to set your password and activate your account."
+    if action == "login_and_subscribe":
+        return f"Your trust has been added. Log in to choose your TrustOffice plan ({plan_name})."
+    if action == "login_and_upgrade":
+        return f"Your trust has been added. Log in to upgrade to the {plan_name} plan to manage all your trusts."
+    if action == "login_and_resubscribe":
+        return "Your trust has been added. Log in to reactivate your subscription."
+    if action == "login_and_update_payment":
+        return "Your trust has been added. Log in to update your payment method."
+    return "Your trust has been added to your account. Log in to get started."
+
+
 async def _determine_recommended_action(
     user_id: str,
     is_new_user: bool,
@@ -182,109 +281,31 @@ async def _determine_recommended_action(
     - needs_upgrade: bool
     - requires_payment: bool
     """
-    # Count trusts for this user
     trust_count = await db.trusts.count_documents({"user_id": user_id})
-
-    # Get subscription state
     sub_state = await get_subscription_state(user_id)
     plan_type = sub_state.plan_type
     is_active = sub_state.is_active
     cancel_pending = sub_state.cancel_at_period_end
 
-    # Check if user has a password (existing users who set one already)
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 1})
     has_password = bool(user is not None and user.get("password_hash") is not None)
 
-    # Determine recommended plan based on package or trust count
-    suggested_plan = PACKAGE_TO_PLAN.get(source_package, None)
-    if not suggested_plan:
-        # Fallback: recommend based on trust count
-        if trust_count <= 1:
-            suggested_plan = "trustee"
-        elif trust_count <= 5:
-            suggested_plan = "estate"
-        else:
-            suggested_plan = "advisor"
-    else:
-        # Validate package-based plan against actual trust count
-        # (e.g., user bought multiple Single Trust packages → Trustee won't cover them)
-        plan_limit = PLAN_TRUST_LIMITS.get(suggested_plan, 1)
-        if plan_limit != float('inf') and trust_count > plan_limit:
-            if trust_count <= 5:
-                suggested_plan = "estate"
-            else:
-                suggested_plan = "advisor"
+    suggested_plan = _resolve_suggested_plan(source_package, trust_count, plan_type, sub_state)
 
-    # Prevent recommending a downgrade for legacy plan users (legacy limit = 10)
     current_limit = get_trust_limit(plan_type, sub_state.legacy_trust_limit)
-    suggested_limit = PLAN_TRUST_LIMITS.get(suggested_plan, 1)
-    if current_limit != float('inf') and suggested_limit != float('inf') and suggested_limit < current_limit:
-        # Don't recommend a plan with fewer trusts than they already have
-        if current_limit >= 10:
-            suggested_plan = "advisor"  # Only Advisor exceeds legacy 10
-        elif trust_count <= 5:
-            suggested_plan = "estate"
-        else:
-            suggested_plan = "advisor"
-
     needs_upgrade = trust_count > current_limit if current_limit != float('inf') else False
 
-    # Check for past_due status BEFORE is_free_or_trial (past_due has is_active=False but
-    # the user needs to update payment, not re-subscribe from scratch)
     sub_status = getattr(sub_state, 'status', None)
     is_past_due = sub_status == 'past_due'
-
-    # Determine if user needs to pay (free/trial/canceled → yes; active paid → no unless upgrade needed)
     is_free_or_trial = plan_type in ("free", "forever_free", "trial") or not is_active
     requires_payment = (is_free_or_trial and not is_past_due) or needs_upgrade or is_past_due
 
-    # Build redirect URL and action
-    if is_new_user or not has_password:
-        # New user or existing user without password → set password first
-        action = "set_password"
-        # Set-password URL is built by the caller; we just flag the action
-        redirect_url = None  # Caller provides set_password_url
-    elif is_past_due:
-        # Payment failed but access still active (grace period) → update payment method
-        action = "login_and_update_payment"
-        redirect_url = f"{frontend_url}/login?wp=1&action=update_payment"
-    elif is_free_or_trial:
-        # Existing user with password, on free/trial → login then subscribe
-        action = "login_and_subscribe"
-        params = "?wp=1&action=subscribe"
-        if coupon_code:
-            params += f"&coupon={quote(coupon_code, safe='')}"
-        if suggested_plan:
-            params += f"&plan={suggested_plan}"
-        redirect_url = f"{frontend_url}/login{params}"
-    elif needs_upgrade:
-        # Existing paid user whose plan can't handle the trust count → upgrade
-        action = "login_and_upgrade"
-        redirect_url = f"{frontend_url}/login?wp=1&action=upgrade&plan={suggested_plan}"
-    elif cancel_pending:
-        # Active subscription but cancellation pending → resubscribe
-        action = "login_and_resubscribe"
-        redirect_url = f"{frontend_url}/login?wp=1&action=resubscribe"
-    else:
-        # Existing paid user, plan covers trusts → just log in
-        action = "login"
-        redirect_url = f"{frontend_url}/login?wp=1&action=welcome"
+    action, redirect_url = _resolve_action_and_redirect(
+        is_new_user, has_password, is_past_due, is_free_or_trial,
+        needs_upgrade, cancel_pending, coupon_code, suggested_plan, frontend_url,
+    )
+    message = _action_message(action, suggested_plan)
 
-    # Build human-readable message
-    if action == "set_password":
-        message = "Check your email to set your password and activate your account."
-    elif action == "login_and_subscribe":
-        message = f"Your trust has been added. Log in to choose your TrustOffice plan ({PLAN_DISPLAY_NAMES.get(suggested_plan, suggested_plan)})."
-    elif action == "login_and_upgrade":
-        message = f"Your trust has been added. Log in to upgrade to the {PLAN_DISPLAY_NAMES.get(suggested_plan, suggested_plan)} plan to manage all your trusts."
-    elif action == "login_and_resubscribe":
-        message = "Your trust has been added. Log in to reactivate your subscription."
-    elif action == "login_and_update_payment":
-        message = "Your trust has been added. Log in to update your payment method."
-    else:
-        message = "Your trust has been added to your account. Log in to get started."
-
-    # Return only what WingPoint needs for routing — no internal user state
     return {
         "action": action,
         "redirect_url": redirect_url,
@@ -760,13 +781,18 @@ async def _resolve_user_id(
         logger.info(f"Provision: Created new user {user_id} ({email}) via WingPoint")
         return user_id, True, None
     except Exception as e:
-        if "duplicate key" in str(e).lower() or "E11000" in str(e):
-            existing_user = await db.users.find_one({"email": email}, {"_id": 0})
-            if existing_user:
-                logger.info(f"Provision: Race condition resolved — user {existing_user['user_id']} ({email}) already exists")
-                return existing_user["user_id"], False, existing_user
-            raise HTTPException(status_code=500, detail="Failed to create user due to concurrent request. Please retry.")
+        return await _resolve_user_creation_race(e, email)
+
+
+async def _resolve_user_creation_race(error: Exception, email: str) -> tuple[str, bool, dict | None]:
+    """Handle a race condition during user creation (duplicate key)."""
+    if "duplicate key" not in str(error).lower() and "E11000" not in str(error):
         raise
+    existing_user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not existing_user:
+        raise HTTPException(status_code=500, detail="Failed to create user due to concurrent request. Please retry.")
+    logger.info(f"Provision: Race condition resolved — user {existing_user['user_id']} ({email}) already exists")
+    return existing_user["user_id"], False, existing_user
 
 
 def _build_trust_doc(
@@ -869,6 +895,80 @@ def _build_set_password_url(
     return f"{frontend_url}/wingpoint?action=set_password&token={set_password_token}{coupon_param}{action_plan_param}"
 
 
+def _build_entity_doc(
+    trust_id: str, user_id: str, trust_name: str,
+    trust_formation_date: Optional[str], jurisdiction: str,
+    ein: Optional[str], trustee_str: str, now: datetime,
+) -> dict:
+    """Build the entity document for a trust (shared by provision and link_trust)."""
+    return {
+        "entity_id": f"entity_{uuid.uuid4().hex[:12]}",
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "name": trust_name,
+        "entity_type": "Trust",
+        "legal_name": trust_name,
+        "formation_date": trust_formation_date,
+        "governing_law": jurisdiction or "",
+        "ein": ein,
+        "trustee_names": trustee_str,
+        "beneficiary_standard": "",
+        "article_ref_distribution": "",
+        "article_ref_compensation": "",
+        "article_ref_amendment": "",
+        "oversight_required": False,
+        "member_names": "",
+        "manager_names": "",
+        "article_ref_authority": "",
+        "article_ref_profit_distribution": "",
+        "created_at": now.isoformat(),
+    }
+
+
+async def _ensure_entity_record(
+    trust_id: str, user_id: str, trust_name: str,
+    trust_formation_date: Optional[str], jurisdiction: str,
+    ein: Optional[str], trustee_str: str, now: datetime,
+    log_prefix: str = "Provision",
+) -> None:
+    """Create an entity record for a trust if one doesn't already exist."""
+    _existing_entity = await db.entities.find_one({"trust_id": trust_id}, {"_id": 1})
+    if _existing_entity:
+        return
+    entity_doc = _build_entity_doc(
+        trust_id, user_id, trust_name, trust_formation_date,
+        jurisdiction, ein, trustee_str, now,
+    )
+    try:
+        await db.entities.insert_one(entity_doc)
+        logger.info(f"{log_prefix}: Created entity {entity_doc['entity_id']} for trust {trust_id}")
+    except Exception as e:
+        logger.warning(f"{log_prefix}: Failed to create entity for trust {trust_id}: {e}")
+
+
+async def _resolve_provision_plan(
+    source_package: Optional[str], user_id: str,
+) -> str:
+    """Determine the preliminary plan for the set-password URL, adjusting for trust count."""
+    _prelim_plan = PACKAGE_TO_PLAN.get(source_package or "", "trustee")
+    _prelim_limit = PLAN_TRUST_LIMITS.get(_prelim_plan, 1)
+    if _prelim_limit != float('inf'):
+        _current_trust_count = await db.trusts.count_documents({"user_id": user_id})
+        if _current_trust_count > _prelim_limit:
+            _prelim_plan = "estate" if _current_trust_count <= 8 else "advisor"
+    return _prelim_plan
+
+
+def _build_provision_set_password_url(
+    frontend_url: str, set_password_token: str,
+    coupon_code: Optional[str], prelim_plan: str,
+) -> str:
+    """Build the WingPoint set-password URL with coupon + plan params."""
+    coupon_param = f"&coupon={quote(coupon_code, safe='')}" if coupon_code else ""
+    action_plan_param = f"&plan={prelim_plan}"
+    return f"{frontend_url}/wingpoint?action=set_password&token={set_password_token}{coupon_param}{action_plan_param}"
+
+
 async def _build_provision_record(
     request: WingPointProvisionRequest, idem_key: str, partner_id: str,
     user_id: str, trust_id: str, email: str, is_new_user: bool,
@@ -909,35 +1009,47 @@ async def _insert_provision_record(
         await db.external_provisions.insert_one(provision_record)
         return None
     except Exception as e:
-        if "duplicate key" not in str(e).lower() and "E11000" not in str(e):
-            raise
-        existing = await db.external_provisions.find_one({"idem_key": idem_key}, {"_id": 0})
-        if not existing:
-            raise
-        logger.info(f"Provision: Duplicate key on provision insert for wingpoint_ref={request.wingpoint_ref} idem_key={idem_key} (race resolved, existing status={existing.get('status')})")
-        if existing.get("status") == "complete":
-            _race_frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
-            try:
-                race_recommended = await _determine_recommended_action(
-                    user_id=existing.get("user_id", ""),
-                    is_new_user=False,
-                    source_package=existing.get("request_payload", {}).get("source_package"),
-                    coupon_code=existing.get("request_payload", {}).get("coupon_code"),
-                    frontend_url=_race_frontend_url,
-                )
-            except Exception:
-                race_recommended = _safe_recommended_action(_race_frontend_url)
-            return {
-                "status": "already_exists",
-                "provision": existing,
-                "recommended_action": race_recommended,
-                "message": "Trust already provisioned"
-            }
-        return {
-            "status": "in_progress",
-            "provision": existing,
-            "message": "Trust provisioning already in progress"
-        }
+        return await _handle_provision_duplicate_key(e, idem_key, request)
+
+
+async def _handle_provision_duplicate_key(
+    error: Exception, idem_key: str, request: WingPointProvisionRequest,
+) -> dict | None:
+    """Handle a duplicate-key error during provision record insertion."""
+    if "duplicate key" not in str(error).lower() and "E11000" not in str(error):
+        raise
+    existing = await db.external_provisions.find_one({"idem_key": idem_key}, {"_id": 0})
+    if not existing:
+        raise
+    logger.info(f"Provision: Duplicate key on provision insert for wingpoint_ref={request.wingpoint_ref} idem_key={idem_key} (race resolved, existing status={existing.get('status')})")
+    if existing.get("status") == "complete":
+        return await _build_race_complete_response(existing)
+    return {
+        "status": "in_progress",
+        "provision": existing,
+        "message": "Trust provisioning already in progress"
+    }
+
+
+async def _build_race_complete_response(existing: dict) -> dict:
+    """Build a response for a race-condition resolved to an already-complete provision."""
+    _race_frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
+    try:
+        race_recommended = await _determine_recommended_action(
+            user_id=existing.get("user_id", ""),
+            is_new_user=False,
+            source_package=existing.get("request_payload", {}).get("source_package"),
+            coupon_code=existing.get("request_payload", {}).get("coupon_code"),
+            frontend_url=_race_frontend_url,
+        )
+    except Exception:
+        race_recommended = _safe_recommended_action(_race_frontend_url)
+    return {
+        "status": "already_exists",
+        "provision": existing,
+        "recommended_action": race_recommended,
+        "message": "Trust already provisioned"
+    }
 
 
 async def _send_provision_email(
@@ -1077,52 +1189,19 @@ async def provision_trustoffice(
     # ---- AUTO-CREATE ENTITY RECORD (matches in-app trust creation) ----
     # The in-app path calls _create_trust_entity which inserts into db.entities.
     # WingPoint provision must do the same so the trust appears in Structures.
-    entity_id = f"entity_{uuid.uuid4().hex[:12]}"
-    entity_doc = {
-        "entity_id": entity_id,
-        "user_id": user_id,
-        "trust_id": trust_id,
-        "name": request.trust_name,
-        "entity_type": "Trust",
-        "legal_name": request.trust_name,
-        "formation_date": request.trust_formation_date,
-        "governing_law": request.jurisdiction or "",
-        "ein": request.ein,
-        "trustee_names": trustee_str,
-        "beneficiary_standard": "",
-        "article_ref_distribution": "",
-        "article_ref_compensation": "",
-        "article_ref_amendment": "",
-        "oversight_required": False,
-        "member_names": "",
-        "manager_names": "",
-        "article_ref_authority": "",
-        "article_ref_profit_distribution": "",
-        "created_at": now.isoformat(),
-    }
-    # Avoid duplicate entity for same trust
-    _existing_entity = await db.entities.find_one({"trust_id": trust_id}, {"_id": 1})
-    if not _existing_entity:
-        try:
-            await db.entities.insert_one(entity_doc)
-            logger.info(f"Provision: Created entity {entity_id} for trust {trust_id}")
-        except Exception as e:
-            logger.warning(f"Provision: Failed to create entity for trust {trust_id}: {e}")
+    await _ensure_entity_record(
+        trust_id, user_id, request.trust_name, request.trust_formation_date,
+        request.jurisdiction, request.ein, trustee_str, now,
+    )
 
     # ---- GENERATE SET-PASSWORD TOKEN (7-day expiry) ----
     set_password_token, expires_at = await _generate_set_password_token(user_id, now)
 
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
-    # Plan derived from source package; override if trust count exceeds plan limit
-    _prelim_plan = PACKAGE_TO_PLAN.get(request.source_package or "", "trustee")
-    _prelim_limit = PLAN_TRUST_LIMITS.get(_prelim_plan, 1)
-    if _prelim_limit != float('inf'):
-        _current_trust_count = await db.trusts.count_documents({"user_id": user_id})
-        if _current_trust_count > _prelim_limit:
-            _prelim_plan = "estate" if _current_trust_count <= 8 else "advisor"
-    coupon_param = f"&coupon={quote(request.coupon_code, safe='')}" if request.coupon_code else ""
-    action_plan_param = f"&plan={_prelim_plan}"
-    set_password_url = f"{frontend_url}/wingpoint?action=set_password&token={set_password_token}{coupon_param}{action_plan_param}"
+    _prelim_plan = await _resolve_provision_plan(request.source_package, user_id)
+    set_password_url = _build_provision_set_password_url(
+        frontend_url, set_password_token, request.coupon_code, _prelim_plan,
+    )
 
     # ---- INSERT PROVISION RECORD EARLY (pending status) ----
     provision_record = await _build_provision_record(
@@ -1539,43 +1618,43 @@ async def _send_webhook_with_retry(
     for attempt in range(3):
         try:
             resp = await client.post(webhook_url, content=payload_json, headers=headers)
-
-            if 200 <= resp.status_code < 300:
-                logger.info(
-                    f"Webhook {event_type} delivered for user {user_id}: "
-                    f"HTTP {resp.status_code} (attempt {attempt + 1})"
-                )
-                await _record_webhook_audit(
-                    partner_id, user_id, provision, webhook_url,
-                    f"webhook_{event_type}", now, response_status=resp.status_code,
-                )
-                return
-
-            logger.warning(
-                f"Webhook {event_type} got HTTP {resp.status_code} for user {user_id}: "
-                f"not delivered (attempt {attempt + 1})"
-            )
+        except httpx.RequestError as e:
+            logger.warning(f"Webhook {event_type} delivery failed (attempt {attempt + 1}): {e}")
             if attempt < 2:
                 await asyncio.sleep(1 * (attempt + 1))
                 continue
+            break  # all retries exhausted
+
+        if _is_webhook_success(resp):
             await _record_webhook_audit(
                 partner_id, user_id, provision, webhook_url,
-                f"webhook_{event_type}_failed", now, response_status=resp.status_code,
+                f"webhook_{event_type}", now, response_status=resp.status_code,
             )
             return
 
-        except httpx.RequestError as e:
-            logger.warning(
-                f"Webhook {event_type} delivery failed (attempt {attempt + 1}): {e}"
-            )
-            if attempt < 2:
-                await asyncio.sleep(1 * (attempt + 1))
-                continue
+        if attempt < 2:
+            await asyncio.sleep(1 * (attempt + 1))
+            continue
+
+        await _record_webhook_audit(
+            partner_id, user_id, provision, webhook_url,
+            f"webhook_{event_type}_failed", now, response_status=resp.status_code,
+        )
+        return
+
     # All retries exhausted via RequestError path
     await _record_webhook_audit(
         partner_id, user_id, provision, webhook_url,
         f"webhook_{event_type}_failed", now, error="max retries exceeded (network errors)",
     )
+
+
+def _is_webhook_success(resp) -> bool:
+    """True if the webhook response is a success status (2xx)."""
+    if 200 <= resp.status_code < 300:
+        logger.info(f"Webhook delivered: HTTP {resp.status_code}")
+        return True
+    return False
 
 
 async def fire_activation_webhook(user_id: str, event_type: str):
@@ -1644,6 +1723,78 @@ async def fire_activation_webhook(user_id: str, event_type: str):
 
 # ==================== LINK TRUST (Authenticate-First Flow) ====================
 
+def _build_link_trust_doc(
+    request: LinkTrustRequest, user_id: str, to_trust_type: str,
+    trustee_str: str, trust_id: str, now: datetime,
+) -> dict:
+    """Build the trust document for link_trust (same fields as provision path)."""
+    return {
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "wingpoint_ref": request.wingpoint_ref,
+        "name": request.trust_name,
+        "trust_type": to_trust_type,
+        "entity_type": request.entity_type,
+        "jurisdiction": request.jurisdiction,
+        "role": request.role_for_trust,
+        "start_date": request.trust_formation_date,
+        "trustees": trustee_str,
+        "ein": request.ein,
+        "state_code": request.jurisdiction,
+        "source": "wingpoint",
+        "use_wingpoint_trustee": request.use_wingpoint_trustee,
+        "trustee_first_name": request.trustee_first_name,
+        "trustee_middle_name": request.trustee_middle_name,
+        "trustee_last_name": request.trustee_last_name,
+        "trustee_suffix": request.trustee_suffix,
+        "trustee_full_name": request.trustee_full_name,
+        "mailing_address_line1": request.mailing_address_line1,
+        "mailing_address_line2": request.mailing_address_line2,
+        "mailing_city": request.mailing_city,
+        "mailing_state": request.mailing_state,
+        "mailing_zip": request.mailing_zip,
+        "mailing_county": request.mailing_county,
+        "bank_name": request.bank_name,
+        "has_irs_confirmation": request.has_irs_confirmation,
+        "has_declaration": request.has_declaration,
+        "has_certification": request.has_certification,
+        "has_binder_kit": request.has_binder_kit,
+        "source_package": request.source_package,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+    }
+
+
+async def _resolve_or_create_trust(
+    request, trust_doc: dict, trust_id: str, user_id: str,
+    now: datetime, log_prefix: str,
+) -> tuple[str, bool]:
+    """Check if trust exists for wingpoint_ref; re-link or create as needed.
+
+    Returns (trust_id, re_linked) — the final trust_id and whether it was re-linked.
+    """
+    existing_trust = await db.trusts.find_one(
+        {"wingpoint_ref": request.wingpoint_ref},
+        {"trust_id": 1, "user_id": 1, "_id": 0}
+    )
+    if not existing_trust:
+        await db.trusts.insert_one(trust_doc)
+        logger.info(f"{log_prefix}: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
+        return trust_id, False
+
+    existing_trust_id = existing_trust["trust_id"]
+    if existing_trust.get("user_id") != user_id:
+        await db.trusts.update_one(
+            {"trust_id": existing_trust_id},
+            {"$set": {"user_id": user_id, "updated_at": now.isoformat()}},
+        )
+        logger.info(f"{log_prefix}: Re-linked trust {existing_trust_id} from user {existing_trust.get('user_id')} to {user_id}")
+        return existing_trust_id, True
+
+    logger.info(f"{log_prefix}: Trust {existing_trust_id} already linked to user {user_id}")
+    return existing_trust_id, False
+
+
 @router.post("/link-trust")
 async def link_trust(
     request: LinkTrustRequest,
@@ -1684,94 +1835,16 @@ async def link_trust(
     
     # Build trust doc
     trust_id = f"trust_{uuid.uuid4().hex[:12]}"
-    trust_doc = {
-        "trust_id": trust_id,
-        "user_id": user_id,
-        "wingpoint_ref": request.wingpoint_ref,
-        "name": request.trust_name,
-        "trust_type": to_trust_type,
-        "entity_type": request.entity_type,
-        "jurisdiction": request.jurisdiction,
-        "role": request.role_for_trust,
-        "start_date": request.trust_formation_date,
-        "trustees": trustee_str,
-        "ein": request.ein,
-        "state_code": request.jurisdiction,
-        "source": "wingpoint",
-        "use_wingpoint_trustee": request.use_wingpoint_trustee,
-        "trustee_first_name": request.trustee_first_name,
-        "trustee_middle_name": request.trustee_middle_name,
-        "trustee_last_name": request.trustee_last_name,
-        "trustee_suffix": request.trustee_suffix,
-        "trustee_full_name": request.trustee_full_name,
-        "mailing_address_line1": request.mailing_address_line1,
-        "mailing_address_line2": request.mailing_address_line2,
-        "mailing_city": request.mailing_city,
-        "mailing_state": request.mailing_state,
-        "mailing_zip": request.mailing_zip,
-        "mailing_county": request.mailing_county,
-        "bank_name": request.bank_name,
-        "has_irs_confirmation": request.has_irs_confirmation,
-        "has_declaration": request.has_declaration,
-        "has_certification": request.has_certification,
-        "has_binder_kit": request.has_binder_kit,
-        "source_package": request.source_package,
-        "created_at": now.isoformat(),
-        "updated_at": now.isoformat(),
-    }
+    trust_doc = _build_link_trust_doc(request, user_id, to_trust_type, trustee_str, trust_id, now)
     
     # Check if trust already exists for this wingpoint_ref — re-link if so
-    existing_trust = await db.trusts.find_one(
-        {"wingpoint_ref": request.wingpoint_ref},
-        {"trust_id": 1, "user_id": 1, "_id": 0}
-    )
-    if existing_trust:
-        existing_trust_id = existing_trust["trust_id"]
-        if existing_trust.get("user_id") != user_id:
-            # Re-link to the authenticated user
-            await db.trusts.update_one(
-                {"trust_id": existing_trust_id},
-                {"$set": {"user_id": user_id, "updated_at": now.isoformat()}},
-            )
-            logger.info(f"LinkTrust: Re-linked trust {existing_trust_id} from user {existing_trust.get('user_id')} to {user_id}")
-        else:
-            logger.info(f"LinkTrust: Trust {existing_trust_id} already linked to user {user_id}")
-        trust_id = existing_trust_id
-    else:
-        await db.trusts.insert_one(trust_doc)
-        logger.info(f"LinkTrust: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
+    trust_id, re_linked = await _resolve_or_create_trust(request, trust_doc, trust_id, user_id, now, "LinkTrust")
     
     # Create entity record (same as provision path)
-    entity_id = f"entity_{uuid.uuid4().hex[:12]}"
-    entity_doc = {
-        "entity_id": entity_id,
-        "user_id": user_id,
-        "trust_id": trust_id,
-        "name": request.trust_name,
-        "entity_type": "Trust",
-        "legal_name": request.trust_name,
-        "formation_date": request.trust_formation_date,
-        "governing_law": request.jurisdiction or "",
-        "ein": request.ein,
-        "trustee_names": trustee_str,
-        "beneficiary_standard": "",
-        "article_ref_distribution": "",
-        "article_ref_compensation": "",
-        "article_ref_amendment": "",
-        "oversight_required": False,
-        "member_names": "",
-        "manager_names": "",
-        "article_ref_authority": "",
-        "article_ref_profit_distribution": "",
-        "created_at": now.isoformat(),
-    }
-    _existing_entity = await db.entities.find_one({"trust_id": trust_id}, {"_id": 1})
-    if not _existing_entity:
-        try:
-            await db.entities.insert_one(entity_doc)
-            logger.info(f"LinkTrust: Created entity {entity_id} for trust {trust_id}")
-        except Exception as e:
-            logger.warning(f"LinkTrust: Failed to create entity for trust {trust_id}: {e}")
+    await _ensure_entity_record(
+        trust_id, user_id, request.trust_name, request.trust_formation_date,
+        request.jurisdiction, request.ein, trustee_str, now, log_prefix="LinkTrust",
+    )
     
     # Audit log
     await log_audit(
@@ -1782,7 +1855,7 @@ async def link_trust(
             "user_id": user_id,
             "trust_id": trust_id,
             "trust_name": request.trust_name,
-            "re_linked": existing_trust is not None,
+            "re_linked": re_linked,
         },
         status="success",
     )
@@ -1794,5 +1867,5 @@ async def link_trust(
         "user_id": user_id,
         "trust_id": trust_id,
         "trust_name": request.trust_name,
-        "re_linked": existing_trust is not None,
+        "re_linked": re_linked,
     }
