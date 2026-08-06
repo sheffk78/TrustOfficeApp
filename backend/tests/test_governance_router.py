@@ -18,7 +18,7 @@ import requests
 import os
 from datetime import datetime
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
+BASE_URL = (os.environ.get('REACT_APP_BACKEND_URL') or '').rstrip('/')
 DEMO_USER = "demo@trustoffice.com"
 DEMO_PASSWORD = "demopassword"
 TRUST_ID = "trust_b753cb8fe07f"
