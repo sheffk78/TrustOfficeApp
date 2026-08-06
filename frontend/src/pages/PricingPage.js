@@ -338,9 +338,9 @@ export default function PricingPage() {
         // WingPoint exclusive plan (not in TIERS — annual only, $99/mo, unlimited trusts)
         if (wingPointPlan === 'wingpoint') {
           return (
-            <section className="pb-8 px-8" data-testid="wp-preselected-card">
+            <section className="pb-8 px-8 pt-6" data-testid="wp-preselected-card">
               <div className="max-w-3xl mx-auto">
-                <div className="card-trust corner-mark p-8 border-2 border-gold relative">
+                <div className="card-trust corner-mark p-8 border-2 border-gold relative overflow-visible">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
                     WingPoint Exclusive
                   </div>
@@ -354,6 +354,23 @@ export default function PricingPage() {
                       <span className="text-muted-foreground">/mo</span>
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">billed annually ($1,188/year)</p>
+
+                    {/* Savings callout — makes it clear this is the best deal */}
+                    <div className="bg-navy/5 border border-navy/10 rounded-lg p-4 mb-6 text-left">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Public Advisor plan (annual)</span>
+                        <span className="text-sm font-mono text-muted-foreground line-through">$3,990/yr</span>
+                      </div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-navy">Your WingPoint rate</span>
+                        <span className="text-sm font-mono font-bold text-navy">$1,188/yr</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-navy/10">
+                        <span className="text-sm font-bold text-gold">You save</span>
+                        <span className="text-lg font-mono font-bold text-gold">$2,802/year</span>
+                      </div>
+                    </div>
+
                     <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium mb-6">
                       Unlimited trusts. Annual commitment required.
                     </div>
