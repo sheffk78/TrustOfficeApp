@@ -195,21 +195,105 @@ async def get_minutes(
 # ==================== STATIC-PATH MINUTES ENDPOINTS (must be before /minutes/{minutes_id}) ====================
 
 @router.post("/minutes/draft", response_model=MinutesDraftResponse)
+def _resolve_participants(request, trust: dict) -> list:
+    """Resolve participants list from request, falling back to trust trustees / role."""
+    return (request.participants
+            or parse_trustees(trust.get("trustees") or "")
+            or [trust.get("role", "Trustee")])
+
+
+def _build_template_mode_context(request, trust_name: str, jurisdiction: str,
+                                 participants_str: str, beneficiary_standard) -> dict:
+    """Build the AI context dict for template-mode draft generation."""
+    ai_context = {
+        "trust_name": trust_name,
+        "meeting_date": request.meeting_date,
+        "participants": participants_str,
+        "jurisdiction": jurisdiction,
+        "beneficiary_standard": beneficiary_standard or "Not specified",
+        "additional_context": request.additional_context or "",
+    }
+    if request.template_data:
+        ai_context.update(request.template_data)
+        if ai_context.get("additional_context") is None:
+            ai_context["additional_context"] = ""
+    if request.agenda_items:
+        ai_context["agenda_items"] = "; ".join(request.agenda_items)
+    if request.key_decisions:
+        ai_context["key_decisions"] = "; ".join(request.key_decisions)
+    if request.other_attendees:
+        ai_context.setdefault("additional_context", "")
+        ai_context["additional_context"] += f"\nOther attendees: {', '.join(request.other_attendees)}"
+    if request.is_retroactive:
+        retro_note = f"\nRETROACTIVE: These minutes document a past event. Reason: {request.retroactive_reason or 'Not specified'}"
+        ai_context["additional_context"] += retro_note
+    if request.section_context:
+        ai_context["additional_context"] += f"\n{request.section_context}"
+    return ai_context
+
+
+def _build_quick_mode_outline(request) -> list:
+    """Build the decisions_outline list for quick/bullet-point mode."""
+    decisions_outline = []
+    if request.agenda_items:
+        decisions_outline.append("AGENDA ITEMS DISCUSSED:")
+        decisions_outline.extend([f"  - {item}" for item in request.agenda_items])
+    if request.key_decisions:
+        decisions_outline.append("KEY DECISIONS MADE:")
+        decisions_outline.extend([f"  - {decision}" for decision in request.key_decisions])
+    return decisions_outline
+
+
+def _build_quick_mode_context(request) -> list:
+    """Build the additional_context parts list for quick/bullet-point mode."""
+    parts = []
+    if request.additional_context:
+        parts.append(f"Additional notes: {request.additional_context}")
+    if request.other_attendees:
+        parts.append(f"Other attendees present (not trustees): {', '.join(request.other_attendees)}")
+    if request.is_retroactive:
+        parts.append(
+            f"RETROACTIVE: These minutes document a past event. Reason: {request.retroactive_reason or 'Not specified'}"
+        )
+    if request.section_context:
+        parts.append(request.section_context)
+    parts.append(
+        "WIZARD INPUT: This is from a guided wizard where the user provided brief bullet points. "
+        "Please expand these into proper formal minutes language with WHEREAS clauses for context "
+        "and RESOLVED clauses for each decision. Make the document complete and professional."
+    )
+    return parts
+
+
+async def _call_ai_draft(ai_request) -> object:
+    """Call the AI draft service, translating HTTPException re-raises and logging others as 500."""
+    try:
+        return await draft_minutes_from_structured_input(ai_request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating minutes draft: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate minutes draft. Please try again. If this continues, contact support@trustoffice.app.",
+        )
+
+
 async def create_minutes_draft(
     request: MinutesDraftRequest,
     user: dict = Depends(require_write_access)
 ):
     """
     Unified AI draft generation for minutes.
-    
+
     Supports two modes:
     1. Quick minutes (bullet-point input): agenda_items + key_decisions
     2. Template mode (structured fields): template_type + template_data
-    
+
     Both modes include trust context (jurisdiction, trustee names, trust name).
     """
     user_id = user["user_id"]
-    
+
     # Get trust context for AI
     trust = await db.trusts.find_one(
         {"trust_id": request.trust_id, "user_id": user_id},
@@ -217,146 +301,59 @@ async def create_minutes_draft(
     )
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
-    
+
     # Get entity-level details for beneficiary standard
     entity = await db.entities.find_one(
         {"trust_id": request.trust_id, "entity_type": "Trust", "user_id": user_id},
         {"_id": 0}
     )
     beneficiary_standard = entity.get("beneficiary_standard") if entity else None
-    
+
     trust_name = trust.get("name", "")
     jurisdiction = trust.get("jurisdiction", "")
     participants_str = ", ".join(request.participants) if request.participants else ""
-    
-    # Determine minutes_type for backward compat
     minutes_type = request.minutes_type or "general"
-    
-    # Build AI prompt based on mode
+
     if request.template_type:
-        # ── Template mode: use template-specific prompt ──
-        template_def = get_template_definition(request.template_type)
-        if not template_def:
-            raise HTTPException(status_code=400, detail=f"Unknown template type '{request.template_type}'. Please select a valid template from the minutes wizard.")
-        ai_context = {
-            "trust_name": trust_name,
-            "meeting_date": request.meeting_date,
-            "participants": participants_str,
-            "jurisdiction": jurisdiction,
-            "beneficiary_standard": beneficiary_standard or "Not specified",
-            "additional_context": request.additional_context or "",
-        }
-        
-        # Add template_data fields to the context
-        if request.template_data:
-            ai_context.update(request.template_data)
-            # Ensure additional_context remains a string after template_data update
-            # (template_data may contain None values that would crash += operations)
-            if ai_context.get("additional_context") is None:
-                ai_context["additional_context"] = ""
-        
-        # Add bullet-point context if also provided
-        if request.agenda_items:
-            ai_context["agenda_items"] = "; ".join(request.agenda_items)
-        if request.key_decisions:
-            ai_context["key_decisions"] = "; ".join(request.key_decisions)
-        
-        # Add other attendees
-        if request.other_attendees:
-            ai_context.setdefault("additional_context", "")
-            ai_context["additional_context"] += f"\nOther attendees: {', '.join(request.other_attendees)}"
-        
-        # Add retroactive context
-        if request.is_retroactive:
-            retro_note = f"\nRETROACTIVE: These minutes document a past event. Reason: {request.retroactive_reason or 'Not specified'}"
-            ai_context["additional_context"] += retro_note
-        
-        # Add section context
-        if request.section_context:
-            ai_context["additional_context"] += f"\n{request.section_context}"
-        
-        ai_prompt_text = build_ai_prompt(request.template_type, ai_context)
-        
-        # Use the AI service with the constructed prompt
-        try:
-            ai_request = AiMinutesDraftRequest(
-                minutes_type=minutes_type,
-                meeting_date=request.meeting_date,
-                participants=request.participants or parse_trustees(trust.get("trustees") or "") or [trust.get("role", "Trustee")],
-                decisions_outline=[ai_prompt_text],
-                trust_name=trust_name,
-                jurisdiction=jurisdiction,
-                beneficiary_standard=beneficiary_standard,
-                additional_context=ai_context.get("additional_context", "")
+        # ── Template mode ──
+        if not get_template_definition(request.template_type):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown template type '{request.template_type}'. Please select a valid template from the minutes wizard.",
             )
-            ai_response = await draft_minutes_from_structured_input(ai_request)
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error generating template minutes draft: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again. If this continues, contact support@trustoffice.app.")
+        ai_context = _build_template_mode_context(
+            request, trust_name, jurisdiction, participants_str, beneficiary_standard
+        )
+        ai_prompt_text = build_ai_prompt(request.template_type, ai_context)
+        ai_request = AiMinutesDraftRequest(
+            minutes_type=minutes_type,
+            meeting_date=request.meeting_date,
+            participants=_resolve_participants(request, trust),
+            decisions_outline=[ai_prompt_text],
+            trust_name=trust_name,
+            jurisdiction=jurisdiction,
+            beneficiary_standard=beneficiary_standard,
+            additional_context=ai_context.get("additional_context", ""),
+        )
+        ai_response = await _call_ai_draft(ai_request)
     else:
         # ── Quick minutes / bullet-point mode ──
-        decisions_outline = []
-        
-        if request.agenda_items:
-            decisions_outline.append("AGENDA ITEMS DISCUSSED:")
-            decisions_outline.extend([f"  - {item}" for item in request.agenda_items])
-        
-        if request.key_decisions:
-            decisions_outline.append("KEY DECISIONS MADE:")
-            decisions_outline.extend([f"  - {decision}" for decision in request.key_decisions])
-        
-        # Build additional context
-        additional_context_parts = []
-        if request.additional_context:
-            additional_context_parts.append(f"Additional notes: {request.additional_context}")
-        
-        if request.other_attendees:
-            additional_context_parts.append(
-                f"Other attendees present (not trustees): {', '.join(request.other_attendees)}"
-            )
-        
-        if request.is_retroactive:
-            additional_context_parts.append(
-                f"RETROACTIVE: These minutes document a past event. Reason: {request.retroactive_reason or 'Not specified'}"
-            )
-        
-        if request.section_context:
-            additional_context_parts.append(request.section_context)
-        
-        additional_context_parts.append(
-            "WIZARD INPUT: This is from a guided wizard where the user provided brief bullet points. "
-            "Please expand these into proper formal minutes language with WHEREAS clauses for context "
-            "and RESOLVED clauses for each decision. Make the document complete and professional."
-        )
-        
-        # Map minutes_type for AI service
-        minutes_type_map = {
-            "annual": "annual",
-            "quarterly": "quarterly",
-            "general": "quarterly"
-        }
+        decisions_outline = _build_quick_mode_outline(request)
+        additional_context_parts = _build_quick_mode_context(request)
+        minutes_type_map = {"annual": "annual", "quarterly": "quarterly", "general": "quarterly"}
         ai_minutes_type = minutes_type_map.get(minutes_type, "quarterly")
-        
-        try:
-            ai_request = AiMinutesDraftRequest(
-                minutes_type=ai_minutes_type,
-                meeting_date=request.meeting_date,
-                participants=request.participants or parse_trustees(trust.get("trustees") or "") or [trust.get("role", "Trustee")],
-                decisions_outline=decisions_outline if decisions_outline else ["No specific decisions recorded"],
-                trust_name=trust_name,
-                jurisdiction=jurisdiction,
-                beneficiary_standard=beneficiary_standard,
-                additional_context="\n".join(additional_context_parts)
-            )
-            ai_response = await draft_minutes_from_structured_input(ai_request)
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error generating minutes draft: {e}")
-            raise HTTPException(status_code=500, detail="Failed to generate minutes draft. Please try again. If this continues, contact support@trustoffice.app.")
-    
+        ai_request = AiMinutesDraftRequest(
+            minutes_type=ai_minutes_type,
+            meeting_date=request.meeting_date,
+            participants=_resolve_participants(request, trust),
+            decisions_outline=decisions_outline if decisions_outline else ["No specific decisions recorded"],
+            trust_name=trust_name,
+            jurisdiction=jurisdiction,
+            beneficiary_standard=beneficiary_standard,
+            additional_context="\n".join(additional_context_parts),
+        )
+        ai_response = await _call_ai_draft(ai_request)
+
     return MinutesDraftResponse(
         suggested_title=ai_response.suggested_title,
         draft_body=ai_response.draft_body,
@@ -701,156 +698,84 @@ async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_acc
     # Not found in either collection
     raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
 
-def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = False) -> bytes:
-    """Generate a professional legal-style PDF for minutes record with proper formatting"""
-    import re
-    
-    doc, buffer = create_doc_template(margins={
-        'topMargin': 0.75 * inch,
-        'bottomMargin': 0.75 * inch,
-        'leftMargin': 1 * inch,
-        'rightMargin': 1 * inch,
-    })
-    
-    # Custom styles for legal document appearance
+def _pdf_styles():
+    """Build the ParagraphStyle objects used by the minutes PDF."""
     styles = getSampleStyleSheet()
-    
-    # Document title - trust name
+
     title_style = ParagraphStyle(
-        'TrustTitle',
-        parent=styles['Heading1'],
-        fontName='Times-Bold',
-        fontSize=16,
-        alignment=1,  # Center
-        spaceAfter=4,
-        textColor=NAVY
+        'TrustTitle', parent=styles['Heading1'], fontName='Times-Bold',
+        fontSize=16, alignment=1, spaceAfter=4, textColor=NAVY,
     )
-    
-    # Document subtitle
     subtitle_style = ParagraphStyle(
-        'Subtitle',
-        parent=styles['Normal'],
-        fontName='Times-Roman',
-        fontSize=12,
-        alignment=1,  # Center
-        spaceAfter=20,
-        textColor=colors.HexColor('#333333')
+        'Subtitle', parent=styles['Normal'], fontName='Times-Roman',
+        fontSize=12, alignment=1, spaceAfter=20, textColor=colors.HexColor('#333333'),
     )
-    
-    # Section headers (WHEREAS, RESOLVED, etc.)
     section_header_style = ParagraphStyle(
-        'SectionHeader',
-        parent=styles['Heading2'],
-        fontName='Times-Bold',
-        fontSize=11,
-        spaceBefore=16,
-        spaceAfter=8,
-        textColor=NAVY,
-        borderWidth=0,
-        borderPadding=0,
-        borderColor=NAVY,
+        'SectionHeader', parent=styles['Heading2'], fontName='Times-Bold',
+        fontSize=11, spaceBefore=16, spaceAfter=8, textColor=NAVY,
+        borderWidth=0, borderPadding=0, borderColor=NAVY,
     )
-    
-    # WHEREAS clause style - indented, formal
     whereas_style = ParagraphStyle(
-        'Whereas',
-        parent=styles['Normal'],
-        fontName='Times-Roman',
-        fontSize=11,
-        leading=15,
-        leftIndent=0.25*inch,
-        spaceBefore=6,
-        spaceAfter=6,
-        firstLineIndent=0,
+        'Whereas', parent=styles['Normal'], fontName='Times-Roman',
+        fontSize=11, leading=15, leftIndent=0.25*inch,
+        spaceBefore=6, spaceAfter=6, firstLineIndent=0,
     )
-    
-    # RESOLVED clause style - bold lead-in
     resolved_style = ParagraphStyle(
-        'Resolved',
-        parent=styles['Normal'],
-        fontName='Times-Roman',
-        fontSize=11,
-        leading=15,
-        leftIndent=0.25*inch,
-        spaceBefore=8,
-        spaceAfter=8,
-        firstLineIndent=0,
+        'Resolved', parent=styles['Normal'], fontName='Times-Roman',
+        fontSize=11, leading=15, leftIndent=0.25*inch,
+        spaceBefore=8, spaceAfter=8, firstLineIndent=0,
     )
-    
-    # Regular body text
     body_style = ParagraphStyle(
-        'TrustBody',
-        parent=styles['Normal'],
-        fontName='Times-Roman',
-        fontSize=11,
-        leading=15,
-        spaceAfter=8,
-        alignment=4,  # Justify
+        'TrustBody', parent=styles['Normal'], fontName='Times-Roman',
+        fontSize=11, leading=15, spaceAfter=8, alignment=4,
     )
-    
-    # Bullet point style
     bullet_style = ParagraphStyle(
-        'Bullet',
-        parent=styles['Normal'],
-        fontName='Times-Roman',
-        fontSize=11,
-        leading=15,
-        leftIndent=0.5*inch,
-        spaceBefore=4,
-        spaceAfter=4,
-        bulletIndent=0.25*inch,
+        'Bullet', parent=styles['Normal'], fontName='Times-Roman',
+        fontSize=11, leading=15, leftIndent=0.5*inch,
+        spaceBefore=4, spaceAfter=4, bulletIndent=0.25*inch,
     )
-    
-    # Label style (for signature lines)
     label_style = ParagraphStyle(
-        'TrustLabel',
-        parent=styles['Normal'],
-        fontName='Times-Italic',
-        fontSize=10,
-        textColor=GRAY
+        'TrustLabel', parent=styles['Normal'], fontName='Times-Italic',
+        fontSize=10, textColor=GRAY,
     )
-    
-    # Divider line style
     divider_style = ParagraphStyle(
-        'Divider',
-        parent=styles['Normal'],
-        fontName='Times-Roman',
-        fontSize=8,
-        alignment=1,  # Center
-        spaceBefore=12,
-        spaceAfter=12,
-        textColor=colors.HexColor('#999999')
+        'Divider', parent=styles['Normal'], fontName='Times-Roman',
+        fontSize=8, alignment=1, spaceBefore=12, spaceAfter=12,
+        textColor=colors.HexColor('#999999'),
     )
-    
+    return {
+        'styles': styles, 'title_style': title_style, 'subtitle_style': subtitle_style,
+        'section_header_style': section_header_style, 'whereas_style': whereas_style,
+        'resolved_style': resolved_style, 'body_style': body_style,
+        'bullet_style': bullet_style, 'label_style': label_style,
+        'divider_style': divider_style,
+    }
+
+
+def _pdf_header(minutes: dict, trust: dict, title_style, subtitle_style, divider_style) -> list:
+    """Build the decorative top border, trust-name title, and meeting-type subtitle."""
     story = []
-    
-    # ==== DOCUMENT HEADER ====
-    # Decorative top border
     story.append(Paragraph("═" * 60, divider_style))
-    
-    # Trust name as main title
     trust_name = trust.get('name', 'Trust')
     story.append(Paragraph(trust_name.upper(), title_style))
-    
-    # Meeting type as subtitle
     minutes_type = minutes.get('minutes_type', 'General').replace('_', ' ').title()
     story.append(Paragraph(f"MINUTES OF {minutes_type.upper()} MEETING", subtitle_style))
-    
     story.append(Paragraph("═" * 60, divider_style))
     story.append(Spacer(1, 12))
-    
-    # ==== MEETING DETAILS TABLE ====
+    return story
+
+
+def _pdf_details_table(minutes: dict, trust: dict, minutes_type: str) -> list:
+    """Build the meeting-details table (date, type, trust, jurisdiction)."""
     meeting_date = minutes.get('meeting_date', 'N/A')
     if 'T' in meeting_date:
         meeting_date = meeting_date.split('T')[0]
-    
     details_data = [
         ['Date of Meeting:', meeting_date],
         ['Type:', minutes_type],
         ['Trust:', trust.get('name', 'N/A')],
-        ['Jurisdiction:', trust.get('jurisdiction', 'N/A')]
+        ['Jurisdiction:', trust.get('jurisdiction', 'N/A')],
     ]
-    
     details_table = Table(details_data, colWidths=[1.5*inch, 4.5*inch])
     details_table.setStyle(TableStyle([
         ('FONTNAME', (0, 0), (0, -1), 'Times-Bold'),
@@ -861,41 +786,43 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
-    story.append(details_table)
-    story.append(Spacer(1, 16))
-    
-    # ==== RETROACTIVE HEADER (only when is_retroactive is true) ====
-    if minutes.get('is_retroactive'):
-        retroactive_data = [
-            ['RETROACTIVE MINUTES', ''],
-            ['Date of Original Event:', minutes.get('meeting_date', 'N/A')],
-            ['Reason for Retroactive Documentation:', minutes.get('retroactive_reason', 'Not specified')],
-            ['Retroactive Type:', minutes.get('retroactive_type', 'Not specified')],
-            ['Trustees Aware at Time:', 'Yes' if minutes.get('retroactive_trustees_aware') else 'No'],
-        ]
-        retroactive_table = Table(retroactive_data, colWidths=[2.5 * inch, 3.5 * inch])
-        retroactive_table.setStyle(TableStyle([
-            ('SPAN', (0, 0), (1, 0)),  # Merge top row for label
-            ('FONTNAME', (0, 0), (1, 0), 'Times-Bold'),
-            ('FONTSIZE', (0, 0), (1, 0), 13),
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.HexColor('#990000')),
-            ('ALIGN', (0, 0), (1, 0), 'CENTER'),
-            ('FONTNAME', (0, 1), (0, -1), 'Times-Bold'),
-            ('FONTNAME', (1, 1), (1, -1), 'Times-Bold'),
-            ('FONTSIZE', (0, 1), (-1, -1), 11),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#333333')),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fff3e0')),
-            ('BOX', (0, 0), (-1, -1), 1.5, colors.HexColor('#990000')),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cc9966')),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        story.append(retroactive_table)
-        story.append(Spacer(1, 16))
-    
-    # ==== TRUSTEES PRESENT ====
+    return [details_table, Spacer(1, 16)]
+
+
+def _pdf_retroactive_block(minutes: dict) -> list:
+    """Build the retroactive-minutes callout table (only when is_retroactive is true)."""
+    retroactive_data = [
+        ['RETROACTIVE MINUTES', ''],
+        ['Date of Original Event:', minutes.get('meeting_date', 'N/A')],
+        ['Reason for Retroactive Documentation:', minutes.get('retroactive_reason', 'Not specified')],
+        ['Retroactive Type:', minutes.get('retroactive_type', 'Not specified')],
+        ['Trustees Aware at Time:', 'Yes' if minutes.get('retroactive_trustees_aware') else 'No'],
+    ]
+    retroactive_table = Table(retroactive_data, colWidths=[2.5 * inch, 3.5 * inch])
+    retroactive_table.setStyle(TableStyle([
+        ('SPAN', (0, 0), (1, 0)),
+        ('FONTNAME', (0, 0), (1, 0), 'Times-Bold'),
+        ('FONTSIZE', (0, 0), (1, 0), 13),
+        ('TEXTCOLOR', (0, 0), (1, 0), colors.HexColor('#990000')),
+        ('ALIGN', (0, 0), (1, 0), 'CENTER'),
+        ('FONTNAME', (0, 1), (0, -1), 'Times-Bold'),
+        ('FONTNAME', (1, 1), (1, -1), 'Times-Bold'),
+        ('FONTSIZE', (0, 1), (-1, -1), 11),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#333333')),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fff3e0')),
+        ('BOX', (0, 0), (-1, -1), 1.5, colors.HexColor('#990000')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cc9966')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    return [retroactive_table, Spacer(1, 16)]
+
+
+def _pdf_attendees(minutes: dict, section_header_style, bullet_style) -> list:
+    """Build the TRUSTEES PRESENT and ALSO PRESENT sections."""
+    story = []
     if minutes.get('participants_text'):
         story.append(Paragraph("TRUSTEES PRESENT", section_header_style))
         participants = minutes.get('participants_text', '').split(',')
@@ -903,8 +830,6 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
             if p.strip():
                 story.append(Paragraph(f"• {p.strip()}, Trustee", bullet_style))
         story.append(Spacer(1, 12))
-    
-    # ==== OTHER ATTENDEES (if present) ====
     if minutes.get('other_attendees_text'):
         story.append(Paragraph("ALSO PRESENT", section_header_style))
         other_attendees = minutes.get('other_attendees_text', '').split(',')
@@ -912,51 +837,90 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
             if a.strip():
                 story.append(Paragraph(f"• {a.strip()}", bullet_style))
         story.append(Spacer(1, 12))
-    
-    # ==== MINUTES BODY - WITH FORMATTING PRESERVATION ====
+    return story
+
+
+def _pdf_body(minutes: dict, s, divider_style, section_header_style) -> list:
+    """Build the matters-considered / resolutions body using the legal-text parser."""
     decisions_text = minutes.get('decisions_text', '')
-    if decisions_text:
-        story.append(Paragraph("─" * 50, divider_style))
-        story.append(Paragraph("MATTERS CONSIDERED AND RESOLUTIONS ADOPTED", section_header_style))
-        story.append(Spacer(1, 8))
-        
-        # Process the text to preserve formatting
-        story.extend(_parse_legal_document_text(decisions_text, styles, whereas_style, resolved_style, body_style, bullet_style, section_header_style))
-    
-    # ==== SIGNATURE BLOCK ====
-    story.append(Spacer(1, 30))
-    story.append(Paragraph("─" * 50, divider_style))
-    story.append(Paragraph("CERTIFICATION", section_header_style))
-    story.append(Paragraph(
-        "The undersigned Trustee(s) hereby certify that the foregoing Minutes constitute a true, "
-        "accurate, and complete record of the meeting and that all decisions recorded herein were "
-        "made in good faith and in accordance with the Trust Indenture.",
-        body_style
+    if not decisions_text:
+        return []
+    story = [
+        Paragraph("─" * 50, divider_style),
+        Paragraph("MATTERS CONSIDERED AND RESOLUTIONS ADOPTED", section_header_style),
+        Spacer(1, 8),
+    ]
+    story.extend(_parse_legal_document_text(
+        decisions_text, s['styles'], s['whereas_style'], s['resolved_style'],
+        s['body_style'], s['bullet_style'], s['section_header_style'],
     ))
-    story.append(Spacer(1, 24))
-    
-    # Signature lines
+    return story
+
+
+def _pdf_signature_block(minutes: dict, s, divider_style, section_header_style) -> list:
+    """Build the certification paragraph and signature lines (max 2)."""
+    story = [
+        Spacer(1, 30),
+        Paragraph("─" * 50, divider_style),
+        Paragraph("CERTIFICATION", section_header_style),
+        Paragraph(
+            "The undersigned Trustee(s) hereby certify that the foregoing Minutes constitute a true, "
+            "accurate, and complete record of the meeting and that all decisions recorded herein were "
+            "made in good faith and in accordance with the Trust Indenture.",
+            s['body_style'],
+        ),
+        Spacer(1, 24),
+    ]
     participants = minutes.get('participants_text', '').split(',') if minutes.get('participants_text') else ['Trustee']
-    for p in participants[:2]:  # Max 2 signature lines
+    for p in participants[:2]:
         if p.strip():
             story.append(Spacer(1, 16))
-            story.append(Paragraph('_' * 40, body_style))
-            story.append(Paragraph(f'{p.strip()}, Trustee', label_style))
-            story.append(Paragraph('Date: _________________', label_style))
-    
-    # ==== FOOTER ====
-    story.append(Spacer(1, 30))
-    story.append(Paragraph("═" * 60, divider_style))
+            story.append(Paragraph('_' * 40, s['body_style']))
+            story.append(Paragraph(f'{p.strip()}, Trustee', s['label_style']))
+            story.append(Paragraph('Date: _________________', s['label_style']))
+    return story
+
+
+def _pdf_footer(minutes: dict, trust: dict, hide_watermark: bool, styles, divider_style, trust_name: str) -> list:
+    """Build the PDF footer (watermark + confidential note)."""
+    story = [Spacer(1, 30), Paragraph("═" * 60, divider_style)]
     if not hide_watermark:
         story.append(Paragraph(
             "Generated by TrustOffice",
-            ParagraphStyle('Footer', parent=styles['Normal'], fontName='Times-Italic', fontSize=8, alignment=1, textColor=colors.HexColor('#999999'))
+            ParagraphStyle('Footer', parent=styles['Normal'], fontName='Times-Italic',
+                           fontSize=8, alignment=1, textColor=colors.HexColor('#999999')),
         ))
     story.append(Paragraph(
         f"{trust_name} – Private Trust Minutes – Confidential",
-        ParagraphStyle('FooterNote', parent=styles['Normal'], fontName='Times-Italic', fontSize=8, alignment=1, textColor=GRAY)
+        ParagraphStyle('FooterNote', parent=styles['Normal'], fontName='Times-Italic',
+                       fontSize=8, alignment=1, textColor=GRAY),
     ))
-    
+    return story
+
+
+def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = False) -> bytes:
+    """Generate a professional legal-style PDF for minutes record with proper formatting."""
+    doc, buffer = create_doc_template(margins={
+        'topMargin': 0.75 * inch,
+        'bottomMargin': 0.75 * inch,
+        'leftMargin': 1 * inch,
+        'rightMargin': 1 * inch,
+    })
+
+    s = _pdf_styles()
+    trust_name = trust.get('name', 'Trust')
+    minutes_type = minutes.get('minutes_type', 'General').replace('_', ' ').title()
+
+    story = []
+    story.extend(_pdf_header(minutes, trust, s['title_style'], s['subtitle_style'], s['divider_style']))
+    story.extend(_pdf_details_table(minutes, trust, minutes_type))
+    if minutes.get('is_retroactive'):
+        story.extend(_pdf_retroactive_block(minutes))
+    story.extend(_pdf_attendees(minutes, s['section_header_style'], s['bullet_style']))
+    story.extend(_pdf_body(minutes, s, s['divider_style'], s['section_header_style']))
+    story.extend(_pdf_signature_block(minutes, s, s['divider_style'], s['section_header_style']))
+    story.extend(_pdf_footer(minutes, trust, hide_watermark, s['styles'], s['divider_style'], trust_name))
+
     doc.build(story)
     return buffer.getvalue()
 
@@ -1416,6 +1380,367 @@ VOTE: Unanimous approval.
 """
 
 
+def _initial_meeting_header(trust_name: str, start_date: str, meeting_date: str,
+                            meeting_time: str, meeting_location: str,
+                            trustee_names: list) -> str:
+    """Build the opening header (title + trustees present + call to order + quorum)."""
+    content = f"""FIRST ORGANIZATIONAL MEETING MINUTES
+{trust_name}
+
+Trust Formation Date: {start_date}
+Date: {meeting_date}"""
+    if meeting_time:
+        content += f"\nTime: {meeting_time}"
+    content += f"\nLocation: {meeting_location}"
+
+    content += f"""
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TRUSTEES PRESENT
+
+"""
+    for trustee in trustee_names:
+        content += f"{trustee}, Trustee\n"
+
+    content += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+CALL TO ORDER
+
+{trustee_names[0]}, acting as presiding Trustee, called the organizational 
+meeting of {trust_name} to order.
+
+The presiding Trustee confirmed that this meeting constitutes the first formal 
+meeting of the Board of Trustees following the execution of the Declaration of 
+Trust on {start_date}.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+QUORUM
+
+The presiding Trustee confirmed that all appointed Trustees are present, and a 
+quorum exists for the transaction of business.
+
+"""
+    return content
+
+
+def _initial_meeting_resolution_1(trust_name: str, start_date: str,
+                                  trustee_names: list) -> str:
+    """Build Resolution 1: Adoption of Declaration of Trust and Acceptance of Trusteeship."""
+    content = f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 1: ADOPTION OF DECLARATION OF TRUST AND ACCEPTANCE OF TRUSTEESHIP
+
+WHEREAS, the Declaration of Trust for {trust_name} was duly executed on 
+{start_date} by {"; ".join(trustee_names)} as Trustee(s);
+
+BE IT RESOLVED, that the Trustees hereby acknowledge receipt of the Declaration 
+of Trust, accept their appointment as Trustees, and agree to hold and administer 
+the Trust estate in accordance with the terms, conditions, and fiduciary duties 
+set forth in said Declaration.
+
+"""
+    for trustee in trustee_names:
+        content += f"BE IT FURTHER RESOLVED, that {trustee} hereby accepts the appointment as Trustee of the {trust_name} and agrees to serve in such capacity subject to the terms and conditions set forth in the Trust Instrument.\n\n"
+    content += "VOTE: Unanimous approval.\n\n"
+    return content
+
+
+def _initial_meeting_resolution_2() -> str:
+    """Build Resolution 2: Acknowledgment of Fiduciary Duties."""
+    return """═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 2: ACKNOWLEDGMENT OF FIDUCIARY DUTIES
+
+WHEREAS, the Trustees understand that they hold the Trust property in a 
+fiduciary capacity and not in any personal capacity;
+
+BE IT RESOLVED, that the Trustees acknowledge and accept the following fiduciary 
+duties as binding upon them:
+
+  Duty of Loyalty — To act solely in the interest of the Trust and its 
+  Beneficiaries, avoiding all conflicts of interest and self-dealing.
+
+  Duty of Prudence — To manage Trust assets with the care, skill, and caution 
+  that a reasonable person would exercise, seeking professional guidance when 
+  necessary.
+
+  Duty of Impartiality — To balance the interests of all Beneficiaries fairly 
+  and in accordance with the Trust instrument.
+
+  Duty of Obedience — To follow the written terms of the Declaration of Trust 
+  and act only within the powers granted therein.
+
+  Duty of Recordkeeping — To maintain complete, accurate, and organized records 
+  of all Trust meetings, decisions, transactions, and assets.
+
+  Duty of Confidentiality — To preserve the privacy of all Trust records, 
+  minutes, and internal deliberations, disclosing information only when required 
+  by law or authorized by the Board.
+
+VOTE: Unanimous acknowledgment.
+
+"""
+
+
+def _initial_meeting_resolution_3(trust_name: str, principal_place: str,
+                                  trust_address: str) -> str:
+    """Build Resolution 3: Principal Place of Administration."""
+    content = f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 3: ESTABLISHMENT OF PRINCIPAL PLACE OF ADMINISTRATION
+
+WHEREAS, the Declaration of Trust designates the principal place of 
+administration and elected situs of this Trust;
+
+BE IT RESOLVED, that the Trustees confirm the principal place of administration 
+of {trust_name} to be:
+{principal_place}"""
+    if trust_address:
+        content += f"\n{trust_address}"
+    content += f"""
+
+All official Trust records, minutes, resolutions, and correspondence shall be 
+maintained at this location or in such secure location as the Trustees may 
+designate by subsequent resolution.
+
+VOTE: Unanimous approval.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 4: AUTHORIZATION TO OPEN BANK ACCOUNTS
+
+WHEREAS, the Trustees determine that it is necessary and prudent to establish 
+one or more financial accounts in the name of the Trust for the proper 
+administration of Trust assets;
+"""
+    return content
+
+
+def _initial_meeting_resolution_6(trust_name: str) -> str:
+    """Build Resolution 6: Acceptance of Initial Trust Property."""
+    return f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 6: ACCEPTANCE OF INITIAL TRUST PROPERTY
+
+WHEREAS, the Settlor has conveyed or will convey property to the Trustee(s) as 
+the initial trust corpus; and
+
+WHEREAS, the Trustee(s) are willing to accept such property in accordance with 
+the terms of the Trust Instrument;
+
+BE IT RESOLVED, that the Trustees acknowledge their authority to accept real 
+property, personal property, financial assets, business interests, and any other 
+lawful property conveyed to the Trust by the Settlor, provided such acceptance 
+is consistent with the Trust's stated purpose and in the best interest of the 
+Beneficiaries.
+
+BE IT FURTHER RESOLVED, that any property accepted into the Trust shall be 
+recorded on Schedule A or in a separate Trust ledger, and acceptance shall be 
+memorialized by resolution at the time of conveyance.
+
+VOTE: Unanimous approval.
+
+"""
+
+
+def _initial_meeting_resolution_7(trust_name: str, fiscal_year_end: str) -> str:
+    """Build Resolution 7: Establishment of Fiscal Year."""
+    content = f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 7: ESTABLISHMENT OF FISCAL YEAR
+
+WHEREAS, the Trustees desire to establish a fiscal year for accounting and 
+record-keeping purposes;
+
+BE IT RESOLVED, that the fiscal year of {trust_name} shall """
+    if fiscal_year_end == "December 31":
+        content += "be the calendar year, beginning January 1 and ending December 31."
+    else:
+        content += f"end on {fiscal_year_end}."
+    content += f"""
+
+The Trustees may, by subsequent resolution, change the fiscal year if deemed 
+prudent for tax or administrative purposes.
+
+VOTE: Unanimous approval.
+
+"""
+    return content
+
+
+def _initial_meeting_resolution_9() -> str:
+    """Build Resolution 9: Adoption of Governance Standards."""
+    return """═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 9: ADOPTION OF GOVERNANCE STANDARDS
+
+WHEREAS, the Trustees desire to establish clear governance standards and 
+practices for the ongoing administration of the Trust;
+
+BE IT RESOLVED, that the Trustees adopt the following governance practices:
+
+  Regular Meetings — The Trustees shall meet not less than two (2) times per 
+  year, and preferably quarterly, to review Trust finances, approve expenditures, 
+  accept new assets, and address Trust business.
+
+  Meeting Minutes — All meetings of the Trustees shall be memorialized in 
+  written minutes, which shall include the date, location, Trustees present, 
+  agenda items, resolutions passed, and votes recorded. Minutes shall be signed 
+  by all Trustees present.
+
+  Resolutions — All significant decisions, including the acceptance of property, 
+  approval of expenditures, authorization of contracts, and appointment of 
+  agents, shall be documented by formal written resolution and filed in the 
+  Trust's compliance records.
+
+  Annual Review — The Trustees shall conduct an annual review of Trust 
+  operations, compliance with fiduciary duties, financial condition, and any 
+  required tax or regulatory filings.
+
+VOTE: Unanimous approval.
+
+"""
+
+
+def _initial_meeting_resolution_10(trust_name: str) -> str:
+    """Build Resolution 10: Authorization of Insurance."""
+    return f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 10: AUTHORIZATION OF INSURANCE
+
+WHEREAS, it is prudent and in the best interest of the Trust to maintain 
+appropriate insurance coverage;
+
+BE IT RESOLVED, that the Trustee(s) are authorized to obtain and maintain the 
+following insurance on behalf of {trust_name}:
+  (a) Trustee liability (errors and omissions) insurance;
+  (b) Property insurance for trust real and personal property; and
+  (c) Such other insurance as the Trustee(s) may deem appropriate.
+
+VOTE: Unanimous approval.
+
+"""
+
+
+def _initial_meeting_resolution_11() -> str:
+    """Build Resolution 11: Authorization for Legal and Professional Services."""
+    return """═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 11: AUTHORIZATION FOR LEGAL AND PROFESSIONAL SERVICES
+
+WHEREAS, the Trustees may from time to time require the assistance of attorneys, 
+accountants, tax advisors, or other professional service providers for the proper 
+administration of the Trust;
+
+BE IT RESOLVED, that the Trustees are authorized to retain and compensate 
+qualified professionals as deemed necessary for the protection, administration, 
+and tax compliance of the Trust, and to execute engagement agreements and pay 
+reasonable fees for such services from Trust assets.
+
+All professional fees shall be reviewed and approved by the Trustees and 
+recorded in the Trust's financial ledgers.
+
+VOTE: Unanimous approval.
+
+"""
+
+
+def _initial_meeting_resolution_12(trust_name: str, trustee_names: list) -> str:
+    """Build Resolution 12: Designation of Record Keeper."""
+    record_keeper = trustee_names[0] if trustee_names else "[Trustee Name]"
+    return f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 12: DESIGNATION OF RECORD KEEPER
+
+WHEREAS, the Trust Instrument requires that adequate records be kept of all 
+trust proceedings;
+
+BE IT RESOLVED, that {record_keeper} 
+is hereby designated as the Record Keeper of {trust_name}, responsible for 
+maintaining all trust records, minutes, and documents at the principal place of 
+administration.
+
+FURTHER RESOLVED, that all trust records shall be kept in a secure and accessible 
+manner, and shall be available for review by any Trustee or beneficiary as 
+required by law.
+
+VOTE: Unanimous approval.
+
+"""
+
+
+def _initial_meeting_resolution_13() -> str:
+    """Build Resolution 13: Execution of Certifications and Trust Documents."""
+    return """═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 13: EXECUTION OF CERTIFICATIONS AND TRUST DOCUMENTS
+
+WHEREAS, banks, financial institutions, title companies, and government agencies 
+may require evidence of the Trust's existence and the Trustees' authority to act 
+on behalf of the Trust;
+
+BE IT RESOLVED, that the Trustees are authorized to execute, deliver, and present 
+Certifications of Trust, affidavits, and other summary documents evidencing the 
+Trust's existence, the identity of the Trustees, and the authority of the 
+Trustees to transact business, open accounts, hold title to property, and 
+otherwise administer the Trust.
+
+The Trustees may execute such certifications in the name of the Trust without 
+disclosing the full text of the Declaration of Trust, in order to preserve the 
+privacy of the Trust's internal provisions.
+
+VOTE: Unanimous approval.
+
+"""
+
+
+def _initial_meeting_resolution_14(trust_name: str) -> str:
+    """Build Resolution 14: Ratification of Prior Actions."""
+    return f"""═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION 14: RATIFICATION OF PRIOR ACTIONS
+
+BE IT RESOLVED, that all actions taken by the Settlor and the Trustees in 
+connection with the formation, execution, and initial administration of 
+{trust_name} are hereby ratified, confirmed, and approved as valid and binding 
+acts of the Trust.
+
+VOTE: Unanimous approval.
+
+"""
+
+
+def _initial_meeting_adjournment(trust_name: str, meeting_date: str,
+                                 trustee_names: list) -> str:
+    """Build the adjournment + attestation signature block."""
+    content = f"""═══════════════════════════════════════════════════════════════════════════════
+
+ADJOURNMENT
+
+There being no further business to come before the meeting, the presiding 
+Trustee declared the meeting adjourned.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ATTESTATION
+
+The undersigned Trustees certify that the foregoing minutes constitute a true 
+and accurate record of the organizational meeting of {trust_name} held on 
+{meeting_date}.
+
+"""
+    for trustee in trustee_names:
+        content += f"""
+________________________________________
+{trustee}, Trustee
+Date: {meeting_date}"""
+    content += "\n"
+    return content
+
+
 def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     """Generate content for the initial organizational trustee meeting.
     
@@ -1465,389 +1790,70 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     meeting_date = _fmt_iso_date(meeting_date)
     meeting_time = _fmt_time_12h(meeting_time)
     
-    content = f"""FIRST ORGANIZATIONAL MEETING MINUTES
-{trust_name}
-
-Trust Formation Date: {start_date}
-Date: {meeting_date}"""
-    if meeting_time:
-        content += f"\nTime: {meeting_time}"
-    content += f"\nLocation: {meeting_location}"
-
-    content += f"""
-
-═══════════════════════════════════════════════════════════════════════════════
-
-TRUSTEES PRESENT
-
-"""
-    for trustee in trustee_names:
-        content += f"{trustee}, Trustee\n"
-
-    content += f"""
-═══════════════════════════════════════════════════════════════════════════════
-
-CALL TO ORDER
-
-{trustee_names[0]}, acting as presiding Trustee, called the organizational 
-meeting of {trust_name} to order.
-
-The presiding Trustee confirmed that this meeting constitutes the first formal 
-meeting of the Board of Trustees following the execution of the Declaration of 
-Trust on {start_date}.
-
-═══════════════════════════════════════════════════════════════════════════════
-
-QUORUM
-
-The presiding Trustee confirmed that all appointed Trustees are present, and a 
-quorum exists for the transaction of business.
-
-"""
+    content = _initial_meeting_header(
+        trust_name, start_date, meeting_date, meeting_time, meeting_location, trustee_names
+    )
 
     # RESOLUTION 1: Acceptance of Trusteeship + Adoption of Declaration
     if accept_trusteeship:
-        content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 1: ADOPTION OF DECLARATION OF TRUST AND ACCEPTANCE OF TRUSTEESHIP
-
-WHEREAS, the Declaration of Trust for {trust_name} was duly executed on 
-{start_date} by {"; ".join(trustee_names)} as Trustee(s);
-
-BE IT RESOLVED, that the Trustees hereby acknowledge receipt of the Declaration 
-of Trust, accept their appointment as Trustees, and agree to hold and administer 
-the Trust estate in accordance with the terms, conditions, and fiduciary duties 
-set forth in said Declaration.
-
-"""
-        for trustee in trustee_names:
-            content += f"BE IT FURTHER RESOLVED, that {trustee} hereby accepts the appointment as Trustee of the {trust_name} and agrees to serve in such capacity subject to the terms and conditions set forth in the Trust Instrument.\n\n"
-        content += "VOTE: Unanimous approval.\n\n"
+        content += _initial_meeting_resolution_1(trust_name, start_date, trustee_names)
 
     # RESOLUTION 2: Fiduciary Duties Acknowledgment
     if acknowledge_fiduciary_duties:
-        content += f"""═══════════════════════════════════════════════════════════════════════════════
+        content += _initial_meeting_resolution_2()
 
-RESOLUTION 2: ACKNOWLEDGMENT OF FIDUCIARY DUTIES
-
-WHEREAS, the Trustees understand that they hold the Trust property in a 
-fiduciary capacity and not in any personal capacity;
-
-BE IT RESOLVED, that the Trustees acknowledge and accept the following fiduciary 
-duties as binding upon them:
-
-  Duty of Loyalty — To act solely in the interest of the Trust and its 
-  Beneficiaries, avoiding all conflicts of interest and self-dealing.
-
-  Duty of Prudence — To manage Trust assets with the care, skill, and caution 
-  that a reasonable person would exercise, seeking professional guidance when 
-  necessary.
-
-  Duty of Impartiality — To balance the interests of all Beneficiaries fairly 
-  and in accordance with the Trust instrument.
-
-  Duty of Obedience — To follow the written terms of the Declaration of Trust 
-  and act only within the powers granted therein.
-
-  Duty of Recordkeeping — To maintain complete, accurate, and organized records 
-  of all Trust meetings, decisions, transactions, and assets.
-
-  Duty of Confidentiality — To preserve the privacy of all Trust records, 
-  minutes, and internal deliberations, disclosing information only when required 
-  by law or authorized by the Board.
-
-VOTE: Unanimous acknowledgment.
-
-"""
-
-    # RESOLUTION 3: Principal Place of Administration
-    content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 3: ESTABLISHMENT OF PRINCIPAL PLACE OF ADMINISTRATION
-
-WHEREAS, the Declaration of Trust designates the principal place of 
-administration and elected situs of this Trust;
-
-BE IT RESOLVED, that the Trustees confirm the principal place of administration 
-of {trust_name} to be:
-{principal_place}"""
-
-    if trust_address:
-        content += f"\n{trust_address}"
-
-    content += f"""
-
-All official Trust records, minutes, resolutions, and correspondence shall be 
-maintained at this location or in such secure location as the Trustees may 
-designate by subsequent resolution.
-
-VOTE: Unanimous approval.
-
-═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 4: AUTHORIZATION TO OPEN BANK ACCOUNTS
-
-WHEREAS, the Trustees determine that it is necessary and prudent to establish 
-one or more financial accounts in the name of the Trust for the proper 
-administration of Trust assets;
-"""
+    # RESOLUTION 3: Principal Place of Administration (includes Resolution 4 header)
+    content += _initial_meeting_resolution_3(trust_name, principal_place, trust_address)
 
     content += _initial_meeting_bank_section(trust_name, bank_name, initial_deposit, trustee_names)
 
-    content += f"""═══════════════════════════════════════════════════════════════════════════════
+    content += """═══════════════════════════════════════════════════════════════════════════════
 
 RESOLUTION 5: EMPLOYER IDENTIFICATION NUMBER
 
 """
     content += _initial_meeting_ein_section(trust_name, ein)
+
     # RESOLUTION 6: Acceptance of Initial Trust Property
     if accept_initial_property:
-        content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 6: ACCEPTANCE OF INITIAL TRUST PROPERTY
-
-WHEREAS, the Settlor has conveyed or will convey property to the Trustee(s) as 
-the initial trust corpus; and
-
-WHEREAS, the Trustee(s) are willing to accept such property in accordance with 
-the terms of the Trust Instrument;
-
-BE IT RESOLVED, that the Trustees acknowledge their authority to accept real 
-property, personal property, financial assets, business interests, and any other 
-lawful property conveyed to the Trust by the Settlor, provided such acceptance 
-is consistent with the Trust's stated purpose and in the best interest of the 
-Beneficiaries.
-
-BE IT FURTHER RESOLVED, that any property accepted into the Trust shall be 
-recorded on Schedule A or in a separate Trust ledger, and acceptance shall be 
-memorialized by resolution at the time of conveyance.
-
-VOTE: Unanimous approval.
-
-"""
+        content += _initial_meeting_resolution_6(trust_name)
 
     # RESOLUTION 7: Fiscal Year
-    content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 7: ESTABLISHMENT OF FISCAL YEAR
-
-WHEREAS, the Trustees desire to establish a fiscal year for accounting and 
-record-keeping purposes;
-
-BE IT RESOLVED, that the fiscal year of {trust_name} shall """
-
-    if fiscal_year_end == "December 31":
-        content += f"be the calendar year, beginning January 1 and ending December 31."
-    else:
-        content += f"end on {fiscal_year_end}."
-
-    content += f"""
-
-The Trustees may, by subsequent resolution, change the fiscal year if deemed 
-prudent for tax or administrative purposes.
-
-VOTE: Unanimous approval.
-
-"""
+    content += _initial_meeting_resolution_7(trust_name, fiscal_year_end)
 
     # RESOLUTION 8: Trustee Compensation
-    content += f"""═══════════════════════════════════════════════════════════════════════════════
+    content += """═══════════════════════════════════════════════════════════════════════════════
 
 RESOLUTION 8: TRUSTEE COMPENSATION
 
 """
-    
-    if compensation_type == "none":
-        content += f"""WHEREAS, the Trust Instrument addresses the matter of Trustee compensation;
-
-BE IT RESOLVED, that the initial Trustee(s) shall serve without compensation at 
-this time, reserving the right to establish reasonable compensation in the 
-future as permitted by the Trust Instrument.
-
-VOTE: Unanimous approval.
-
-"""
-    elif compensation_type == "fixed":
-        content += f"""WHEREAS, the Trust Instrument permits reasonable compensation for Trustee services;
-
-BE IT RESOLVED, that the initial Trustee(s) shall receive annual compensation 
-of {compensation_amount or "[Amount]"} for services rendered to the Trust, 
-payable in accordance with the terms of the Trust Instrument.
-
-VOTE: Unanimous approval.
-
-"""
-    elif compensation_type == "percentage":
-        content += f"""WHEREAS, the Trust Instrument permits reasonable compensation for Trustee services;
-
-BE IT RESOLVED, that the initial Trustee(s) shall receive compensation equal to 
-{compensation_amount or "[Percentage]"}% of the trust corpus value, computed 
-annually in accordance with the terms of the Trust Instrument.
-
-VOTE: Unanimous approval.
-
-"""
+    content += _initial_meeting_compensation_section(compensation_type, compensation_amount)
 
     # RESOLUTION 9: Governance Standards
     if adopt_governance_standards:
-        content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 9: ADOPTION OF GOVERNANCE STANDARDS
-
-WHEREAS, the Trustees desire to establish clear governance standards and 
-practices for the ongoing administration of the Trust;
-
-BE IT RESOLVED, that the Trustees adopt the following governance practices:
-
-  Regular Meetings — The Trustees shall meet not less than two (2) times per 
-  year, and preferably quarterly, to review Trust finances, approve expenditures, 
-  accept new assets, and address Trust business.
-
-  Meeting Minutes — All meetings of the Trustees shall be memorialized in 
-  written minutes, which shall include the date, location, Trustees present, 
-  agenda items, resolutions passed, and votes recorded. Minutes shall be signed 
-  by all Trustees present.
-
-  Resolutions — All significant decisions, including the acceptance of property, 
-  approval of expenditures, authorization of contracts, and appointment of 
-  agents, shall be documented by formal written resolution and filed in the 
-  Trust's compliance records.
-
-  Annual Review — The Trustees shall conduct an annual review of Trust 
-  operations, compliance with fiduciary duties, financial condition, and any 
-  required tax or regulatory filings.
-
-VOTE: Unanimous approval.
-
-"""
+        content += _initial_meeting_resolution_9()
 
     # RESOLUTION 10: Insurance
     if authorize_insurance:
-        content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 10: AUTHORIZATION OF INSURANCE
-
-WHEREAS, it is prudent and in the best interest of the Trust to maintain 
-appropriate insurance coverage;
-
-BE IT RESOLVED, that the Trustee(s) are authorized to obtain and maintain the 
-following insurance on behalf of {trust_name}:
-  (a) Trustee liability (errors and omissions) insurance;
-  (b) Property insurance for trust real and personal property; and
-  (c) Such other insurance as the Trustee(s) may deem appropriate.
-
-VOTE: Unanimous approval.
-
-"""
+        content += _initial_meeting_resolution_10(trust_name)
 
     # RESOLUTION 11: Professional Services
     if authorize_professional_services:
-        content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 11: AUTHORIZATION FOR LEGAL AND PROFESSIONAL SERVICES
-
-WHEREAS, the Trustees may from time to time require the assistance of attorneys, 
-accountants, tax advisors, or other professional service providers for the proper 
-administration of the Trust;
-
-BE IT RESOLVED, that the Trustees are authorized to retain and compensate 
-qualified professionals as deemed necessary for the protection, administration, 
-and tax compliance of the Trust, and to execute engagement agreements and pay 
-reasonable fees for such services from Trust assets.
-
-All professional fees shall be reviewed and approved by the Trustees and 
-recorded in the Trust's financial ledgers.
-
-VOTE: Unanimous approval.
-
-"""
+        content += _initial_meeting_resolution_11()
 
     # RESOLUTION 12: Designation of Record Keeper
     if designate_record_keeper:
-        content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 12: DESIGNATION OF RECORD KEEPER
-
-WHEREAS, the Trust Instrument requires that adequate records be kept of all 
-trust proceedings;
-
-BE IT RESOLVED, that {trustee_names[0] if trustee_names else "[Trustee Name]"} 
-is hereby designated as the Record Keeper of {trust_name}, responsible for 
-maintaining all trust records, minutes, and documents at the principal place of 
-administration.
-
-FURTHER RESOLVED, that all trust records shall be kept in a secure and accessible 
-manner, and shall be available for review by any Trustee or beneficiary as 
-required by law.
-
-VOTE: Unanimous approval.
-
-"""
+        content += _initial_meeting_resolution_12(trust_name, trustee_names)
 
     # RESOLUTION 13: Certification of Trust Authority
-    content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 13: EXECUTION OF CERTIFICATIONS AND TRUST DOCUMENTS
-
-WHEREAS, banks, financial institutions, title companies, and government agencies 
-may require evidence of the Trust's existence and the Trustees' authority to act 
-on behalf of the Trust;
-
-BE IT RESOLVED, that the Trustees are authorized to execute, deliver, and present 
-Certifications of Trust, affidavits, and other summary documents evidencing the 
-Trust's existence, the identity of the Trustees, and the authority of the 
-Trustees to transact business, open accounts, hold title to property, and 
-otherwise administer the Trust.
-
-The Trustees may execute such certifications in the name of the Trust without 
-disclosing the full text of the Declaration of Trust, in order to preserve the 
-privacy of the Trust's internal provisions.
-
-VOTE: Unanimous approval.
-
-"""
+    content += _initial_meeting_resolution_13()
 
     # RESOLUTION 14: Ratification
     if ratify_prior_actions:
-        content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-RESOLUTION 14: RATIFICATION OF PRIOR ACTIONS
-
-BE IT RESOLVED, that all actions taken by the Settlor and the Trustees in 
-connection with the formation, execution, and initial administration of 
-{trust_name} are hereby ratified, confirmed, and approved as valid and binding 
-acts of the Trust.
-
-VOTE: Unanimous approval.
-
-"""
+        content += _initial_meeting_resolution_14(trust_name)
 
     # ADJOURNMENT AND ATTESTATION
-    content += f"""═══════════════════════════════════════════════════════════════════════════════
-
-ADJOURNMENT
-
-There being no further business to come before the meeting, the presiding 
-Trustee declared the meeting adjourned.
-
-═══════════════════════════════════════════════════════════════════════════════
-
-ATTESTATION
-
-The undersigned Trustees certify that the foregoing minutes constitute a true 
-and accurate record of the organizational meeting of {trust_name} held on 
-{meeting_date}.
-
-"""
-
-    for trustee in trustee_names:
-        content += f"""
-________________________________________
-{trustee}, Trustee
-Date: {meeting_date}"""
-
-    content += "\n"
-    return content
+    content += _initial_meeting_adjournment(trust_name, meeting_date, trustee_names)
 
 def generate_general_meeting_content(data: dict) -> str:
     """Generate content for general meeting with multiple resolutions"""
