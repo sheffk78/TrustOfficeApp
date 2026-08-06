@@ -5,10 +5,17 @@
 import pytest
 import requests
 import os
+import sys
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 DEMO_EMAIL = "demo@trustoffice.com"
 DEMO_PASSWORD = "demopassword"
+
+# database.py hard-reads MONGO_URL/DB_NAME at import time; set dummies so the
+# module-import test (and any router import) succeeds without a live Mongo.
+os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
+os.environ.setdefault("DB_NAME", "trustoffice_test")
+os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-smoke-tests")
 
 
 @pytest.fixture(scope="module")
@@ -36,6 +43,9 @@ def session(auth_token):
 
 def test_module_imports():
     """Module health: chat router imports successfully."""
+    bd = os.path.join(os.path.dirname(__file__), "..")
+    if bd not in sys.path:
+        sys.path.insert(0, os.path.abspath(bd))
     import routers.chat  # noqa: F401
 
 
