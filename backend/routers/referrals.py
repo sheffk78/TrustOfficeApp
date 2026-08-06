@@ -52,7 +52,7 @@ async def get_or_create_stripe_coupon() -> str:
                 id=coupon_id,
                 percent_off=REFERRAL_DISCOUNT_PERCENT,
                 duration="once",
-                name="Referral Discount - 50% Off First Payment"
+                name="Referral 50% Off First Payment"
             )
             logger.info(f"Created Stripe coupon: {coupon_id}")
             return coupon.id
