@@ -98,8 +98,8 @@ def _get_price_id(line):
 def _is_trustoffice_invoice(inv) -> bool:
     """Check if an invoice has a line item matching a TrustOffice Price ID."""
     if not any(TRUSTOFFICE_PRICE_IDS):
-        logger.warning("No TrustOffice price IDs configured — including all invoices in revenue")
-        return True
+        logger.warning("No TrustOffice price IDs configured — excluding all invoices from revenue")
+        return False
     try:
         for line in inv.lines.data:
             price_id = _get_price_id(line)
