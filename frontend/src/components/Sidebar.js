@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect } from 'react';
+import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -301,24 +301,63 @@ const UserSection = ({ user, onLogout }) => (
   </div>
 );
 
-// ─── Main component ────────────────────────────────────────────────
+// ─── Custom hooks (extracted from Sidebar to reduce brain_method) ───
 
-export const Sidebar = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user, trusts, selectedTrust, setSelectedTrust, logout } = useAuth();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const navRef = useRef(null);
+/**
+ * Persist sidebar scroll position to sessionStorage (restore on remount).
+ */
+const useSidebarScroll = (navRef) => {
   const scrollTimer = useRef(null);
 
-  // Determine which group should be expanded based on current route
-  const activeGroup = NAV_GROUPS.find(g =>
-    g.items.some(item =>
-      isPathActive(item.path, location.pathname)
-    )
-  )?.key || null;
+  // Restore scroll position before paint to avoid visible jump
+  useLayoutEffect(() => {
+    if (!navRef.current) return;
+    try {
+      const saved = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+      if (saved != null) {
+        navRef.current.scrollTop = parseInt(saved, 10) || 0;
+      }
+    } catch (e) { /* ignore */ }
+  }, []);
 
-  // Initialize expandedGroups from sessionStorage (survives remount) or fall back to active group
+  // Throttled scroll handler — save scroll position to sessionStorage
+  const handleNavScroll = useCallback(() => {
+    if (scrollTimer.current) return;
+    scrollTimer.current = setTimeout(() => {
+      if (navRef.current) {
+        try {
+          sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
+        } catch (e) { /* ignore */ }
+      }
+      scrollTimer.current = null;
+    }, 150);
+  }, [navRef]);
+
+  const saveScrollPosition = useCallback(() => {
+    if (navRef.current) {
+      try {
+        sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
+      } catch (e) { /* ignore */ }
+      }
+  }, [navRef]);
+
+  // Clean up any pending scroll timer on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimer.current) {
+        clearTimeout(scrollTimer.current);
+        scrollTimer.current = null;
+      }
+    };
+  }, []);
+
+  return { handleNavScroll, saveScrollPosition };
+};
+
+/**
+ * Track which nav groups are expanded, persisted to sessionStorage.
+ */
+const useExpandedGroups = (activeGroup) => {
   const [expandedGroups, setExpandedGroups] = useState(() => {
     try {
       const saved = sessionStorage.getItem(SIDEBAR_GROUPS_KEY);
@@ -336,52 +375,100 @@ export const Sidebar = () => {
     } catch (e) { /* ignore */ }
   }, [expandedGroups]);
 
-  // Restore scroll position before paint to avoid visible jump
-  useLayoutEffect(() => {
-    if (!navRef.current) return;
-    try {
-      const saved = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
-      if (saved != null) {
-        navRef.current.scrollTop = parseInt(saved, 10) || 0;
-      }
-    } catch (e) { /* ignore */ }
-  }, []);
-
-  // Throttled scroll handler — save scroll position to sessionStorage
-  const handleNavScroll = () => {
-    if (scrollTimer.current) return;
-    scrollTimer.current = setTimeout(() => {
-      if (navRef.current) {
-        try {
-          sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
-        } catch (e) { /* ignore */ }
-      }
-      scrollTimer.current = null;
-    }, 150);
-  };
-
-  // Clean up any pending scroll timer on unmount
-  useEffect(() => {
-    return () => {
-      if (scrollTimer.current) {
-        clearTimeout(scrollTimer.current);
-        scrollTimer.current = null;
-      }
-    };
-  }, []);
-
-  const toggleGroup = (key) => {
+  const toggleGroup = useCallback((key) => {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  }, []);
 
-  // Save scroll position immediately (used on link clicks before navigation)
-  const saveScrollPosition = () => {
-    if (navRef.current) {
-      try {
-        sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
-      } catch (e) { /* ignore */ }
-    }
-  };
+  return { expandedGroups, toggleGroup };
+};
+
+// ─── NavList: renders all nav groups (extracted from Sidebar body) ───
+
+const NavList = ({
+  pathname,
+  selectedTrust,
+  expandedGroups,
+  toggleGroup,
+  onLinkClick,
+  isAdmin,
+  user,
+}) => (
+  <>
+    {NAV_GROUPS.map((group) => {
+      const isExpanded = expandedGroups[group.key];
+
+      // Single-item groups render directly
+      if (group.items.length === 0) {
+        return (
+          <StandaloneNavItem
+            key={group.key}
+            group={group}
+            pathname={pathname}
+            onClick={onLinkClick}
+          />
+        );
+      }
+
+      // Grouped items with accordion
+      return (
+        <NavGroupItem
+          key={group.key}
+          group={group}
+          pathname={pathname}
+          selectedTrust={selectedTrust}
+          isExpanded={isExpanded}
+          onToggle={toggleGroup}
+          onLinkClick={onLinkClick}
+        />
+      );
+    })}
+
+    {/* Admin link - only visible to admins */}
+    {isAdmin && (
+      <StaffLink
+        to="/admin"
+        label="Admin"
+        badge="staff"
+        icon={Crown}
+        pathname={pathname}
+        onClick={onLinkClick}
+        testId="nav-admin"
+      />
+    )}
+
+    {/* Stats link - visible to stats users. Appears next to Admin */}
+    {user?.is_stats_user && (
+      <StaffLink
+        to="/stats"
+        label="Stats"
+        badge="view"
+        icon={BarChart3}
+        pathname={pathname}
+        onClick={onLinkClick}
+        testId="nav-stats"
+      />
+    )}
+  </>
+);
+
+// ─── Main component ────────────────────────────────────────────────
+
+export const Sidebar = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, trusts, selectedTrust, setSelectedTrust, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navRef = useRef(null);
+
+  // Determine which group should be expanded based on current route
+  const activeGroup = NAV_GROUPS.find(g =>
+    g.items.some(item =>
+      isPathActive(item.path, location.pathname)
+    )
+  )?.key || null;
+
+  const { expandedGroups, toggleGroup } = useExpandedGroups(activeGroup);
+  const { handleNavScroll, saveScrollPosition } = useSidebarScroll(navRef);
 
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
 
@@ -445,60 +532,15 @@ export const Sidebar = () => {
 
         {/* Navigation */}
         <nav ref={navRef} onScroll={handleNavScroll} className="flex-1 py-4 overflow-y-auto">
-          {NAV_GROUPS.map((group) => {
-            const isExpanded = expandedGroups[group.key];
-
-            // Single-item groups render directly
-            if (group.items.length === 0) {
-              return (
-                <StandaloneNavItem
-                  key={group.key}
-                  group={group}
-                  pathname={location.pathname}
-                  onClick={handleLinkClick}
-                />
-              );
-            }
-
-            // Grouped items with accordion
-            return (
-              <NavGroupItem
-                key={group.key}
-                group={group}
-                pathname={location.pathname}
-                selectedTrust={selectedTrust}
-                isExpanded={isExpanded}
-                onToggle={toggleGroup}
-                onLinkClick={handleLinkClick}
-              />
-            );
-          })}
-
-          {/* Admin link - only visible to admins */}
-          {isAdmin && (
-            <StaffLink
-              to="/admin"
-              label="Admin"
-              badge="staff"
-              icon={Crown}
-              pathname={location.pathname}
-              onClick={handleLinkClick}
-              testId="nav-admin"
-            />
-          )}
-
-          {/* Stats link - visible to stats users. Appears next to Admin */}
-          {user?.is_stats_user && (
-            <StaffLink
-              to="/stats"
-              label="Stats"
-              badge="view"
-              icon={BarChart3}
-              pathname={location.pathname}
-              onClick={handleLinkClick}
-              testId="nav-stats"
-            />
-          )}
+          <NavList
+            pathname={location.pathname}
+            selectedTrust={selectedTrust}
+            expandedGroups={expandedGroups}
+            toggleGroup={toggleGroup}
+            onLinkClick={handleLinkClick}
+            isAdmin={isAdmin}
+            user={user}
+          />
         </nav>
 
         <UserSection user={user} onLogout={handleLogout} />

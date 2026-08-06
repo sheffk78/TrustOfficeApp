@@ -34,7 +34,7 @@ export { fetchWithAuth, API } from '@/utils/api';
 // Layout components
 export { Sidebar } from '@/components/Sidebar';
 export { MobileBottomNav } from '@/components/MobileBottomNav';
-export { PageHelpButton } from '@/components/PageHelpButton';
+export { default as PageHelpButton } from '@/components/PageHelpButton';
 
 // UI primitives
 export { Button } from '@/components/ui/button';
