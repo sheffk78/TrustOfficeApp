@@ -333,30 +333,64 @@ export default function PricingPage() {
         </section>
       )}
 
-      {/* WingPoint Pre-Selected Plan Card (only when ?wp=1 AND ?plan=XX) */}
-      {wingPointPlan && (() => {
-        // WingPoint exclusive plan (not in TIERS — annual only, $99/mo, unlimited trusts)
-        if (wingPointPlan === 'wingpoint') {
-          return (
-            <section className="pb-8 px-8 pt-6" data-testid="wp-preselected-card">
-              <div className="max-w-3xl mx-auto">
-                <div className="card-trust corner-mark p-8 border-2 border-gold relative overflow-visible">
+      {/* WingPoint Two-Card Choice: Trustee vs WingPoint Annual
+          (shown whenever ?wp=1 is present, regardless of ?plan=) */}
+      {isWingPointFlow && (() => {
+        const trusteeTier = TIERS.find((t) => t.id === 'trustee');
+        return (
+          <section className="pb-8 px-8 pt-6" data-testid="wp-preselected-card">
+            <div className="max-w-4xl mx-auto">
+              <div className="grid md:grid-cols-2 gap-8 items-stretch">
+                {/* Card 1: Trustee Plan — $79/month (1 trust) */}
+                <div className="card-trust corner-mark p-8 border border-border relative overflow-visible flex flex-col">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-white px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
+                    1 Trust
+                  </div>
+                  <div className="text-center mt-4 flex-1 flex flex-col">
+                    <h2 className="font-serif text-3xl text-navy mb-2">Trustee Plan</h2>
+                    <p className="text-base text-muted-foreground mb-4 max-w-xs mx-auto">
+                      {WP_PLAN_DESCRIPTIONS['trustee']}
+                    </p>
+                    <div className="flex items-baseline justify-center gap-1 mb-1">
+                      <span className="font-serif text-5xl text-navy">$79</span>
+                      <span className="text-muted-foreground">/mo</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {billingPeriod === 'annual' ? 'billed annually ($790/year)' : 'billed monthly'}
+                    </p>
+                    <div className="inline-block bg-subtle-bg border border-border text-navy px-4 py-2 rounded-full text-sm font-medium mb-6 self-center">
+                      1 trust &middot; all governance tools
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleCheckout('trustee')}
+                    disabled={loading !== null}
+                    className="w-full btn-primary text-lg py-6"
+                    data-testid="wp-confirm-plan-btn"
+                  >
+                    {loading === 'trustee' ? 'Loading...' : 'Choose Trustee'}
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </div>
+
+                {/* Card 2: WingPoint Annual — $99/month (unlimited trusts) */}
+                <div className="card-trust corner-mark p-8 border-2 border-gold relative overflow-visible flex flex-col">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
                     WingPoint Exclusive
                   </div>
-                  <div className="text-center mt-4">
+                  <div className="text-center mt-4 flex-1 flex flex-col">
                     <h2 className="font-serif text-3xl text-navy mb-2">WingPoint Annual</h2>
-                    <p className="text-base text-muted-foreground mb-4 max-w-xl mx-auto">
+                    <p className="text-base text-muted-foreground mb-4 max-w-xs mx-auto">
                       {WP_PLAN_DESCRIPTIONS['wingpoint']}
                     </p>
-                    <div className="flex items-baseline justify-center gap-1 mb-2">
+                    <div className="flex items-baseline justify-center gap-1 mb-1">
                       <span className="font-serif text-5xl text-navy">$99</span>
                       <span className="text-muted-foreground">/mo</span>
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">billed annually ($1,188/year)</p>
 
                     {/* Savings callout — makes it clear this is the best deal */}
-                    <div className="bg-navy/5 border border-navy/10 rounded-lg p-4 mb-6 text-left">
+                    <div className="bg-navy/5 border border-navy/10 rounded-lg p-4 mb-4 text-left">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-muted-foreground">Public Advisor plan (annual)</span>
                         <span className="text-sm font-mono text-muted-foreground line-through">$3,990/yr</span>
@@ -371,88 +405,44 @@ export default function PricingPage() {
                       </div>
                     </div>
 
-                    <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium mb-6">
-                      Unlimited trusts. Annual commitment required.
+                    <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium mb-6 self-center">
+                      Unlimited trusts &middot; annual commitment
                     </div>
                   </div>
                   <Button
                     onClick={() => handleCheckout('wingpoint', 'annual')}
                     disabled={loading !== null}
                     className="w-full btn-primary text-lg py-6"
-                    data-testid="wp-confirm-plan-btn"
+                    data-testid="wp-confirm-wingpoint-btn"
                   >
                     {loading === 'wingpoint' ? 'Loading...' : 'Start Your WingPoint Plan'}
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
-                  <div className="text-center mt-4">
-                    <p className="text-xs text-muted-foreground mb-2">
-                      This exclusive rate renews annually. If you cancel, you won't be able to get this pricing again.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (pricingTiersRef.current) {
-                          pricingTiersRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }
-                      }}
-                      className="text-sm text-navy hover:underline font-medium"
-                      data-testid="wp-see-other-plans-link"
-                    >
-                      See public plans
-                    </button>
-                  </div>
                 </div>
               </div>
-            </section>
-          );
-        }
-        // Standard tier plan (trustee/estate/advisor)
-        const wpTier = TIERS.find((t) => t.id === wingPointPlan);
-        if (!wpTier) return null;
-        const wpPrice = formatPrice(wpTier);
-        return (
-          <section className="pb-8 px-8" data-testid="wp-preselected-card">
-            <div className="max-w-3xl mx-auto">
-              <div className="card-trust corner-mark p-8 border-2 border-gold relative">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
-                  Recommended for You
-                </div>
-                <div className="text-center mt-4">
-                  <h2 className="font-serif text-3xl text-navy mb-2">{wpTier.name} Plan</h2>
-                  <p className="text-base text-muted-foreground mb-4 max-w-xl mx-auto">
-                    {WP_PLAN_DESCRIPTIONS[wpTier.id]}
-                  </p>
-                  <div className="flex items-baseline justify-center gap-1 mb-4">
-                    <span className="font-serif text-5xl text-navy">${wpPrice.amount}</span>
-                    <span className="text-muted-foreground">{wpPrice.unit}</span>
-                  </div>
-                  <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium mb-6">
-                    $50 off your first month, courtesy of WingPoint, already applied at checkout.
-                  </div>
-                </div>
-                <Button
-                  onClick={() => handleCheckout(wpTier.id)}
-                  disabled={loading !== null}
-                  className="w-full btn-primary text-lg py-6"
-                  data-testid="wp-confirm-plan-btn"
+
+              {/* Comparison line between the two options */}
+              <div className="text-center mt-4">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-navy">1 trust</span> vs{' '}
+                  <span className="font-medium text-navy">Unlimited trusts</span> &mdash; choose the plan that fits you.
+                </p>
+              </div>
+
+              {/* "See other plans" link so users can still scroll to Estate/Advisor */}
+              <div className="text-center mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (pricingTiersRef.current) {
+                      pricingTiersRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                  className="text-sm text-navy hover:underline font-medium"
+                  data-testid="wp-see-other-plans-link"
                 >
-                  {loading === wpTier.id ? 'Loading...' : 'Confirm and Continue'}
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-                <div className="text-center mt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (pricingTiersRef.current) {
-                        pricingTiersRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }
-                    }}
-                    className="text-sm text-navy hover:underline font-medium"
-                    data-testid="wp-see-other-plans-link"
-                  >
-                    See other plans
-                  </button>
-                </div>
+                  See other plans
+                </button>
               </div>
             </div>
           </section>
