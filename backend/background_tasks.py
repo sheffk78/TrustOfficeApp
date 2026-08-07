@@ -205,25 +205,32 @@ class BackgroundTaskRunner:
                 except:
                     next_action = "Prepare for upcoming discovery call"
                 lead_id = f"lead_{uuid.uuid4().hex[:12]}"
-                await self.db.leads.insert_one({
-                    "lead_id": lead_id,
-                    "email": email,
-                    "name": name,
-                    "source": "booked-call",
-                    "lead_type": "email_capture",
-                    "stage": "new",
-                    "manual_stage_override": False,
-                    "booked_call": True,
-                    "booked_call_at": starts_at,
-                    "lessons_watched": 0,
-                    "subscription_status": None,
-                    "last_login": None,
-                    "notes": "",
-                    "next_action": next_action,
-                    "score": 70,
-                    "created_at": now,
-                    "updated_at": now,
-                })
+                try:
+                    await self.db.leads.insert_one({
+                        "lead_id": lead_id,
+                        "email": email,
+                        "name": name,
+                        "source": "booked-call",
+                        "lead_type": "email_capture",
+                        "stage": "new",
+                        "manual_stage_override": False,
+                        "booked_call": True,
+                        "booked_call_at": starts_at,
+                        "lessons_watched": 0,
+                        "subscription_status": None,
+                        "last_login": None,
+                        "notes": "",
+                        "next_action": next_action,
+                        "score": 70,
+                        "created_at": now,
+                        "updated_at": now,
+                    })
+                except Exception as insert_err:
+                    # DuplicateKeyError — another instance already created this lead
+                    if "duplicate key" in str(insert_err).lower() or "11000" in str(insert_err):
+                        logger.info(f"TidyCal sync: lead {email} already created by another instance — skipping")
+                        continue
+                    raise
                 await self.db.lead_activities.insert_one({
                     "activity_id": f"act_{uuid.uuid4().hex[:12]}",
                     "lead_id": lead_id,

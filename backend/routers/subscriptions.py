@@ -1070,12 +1070,20 @@ async def stripe_webhook(request: Request):
             # If "processing" or "failed", allow reprocessing
             logger.info(f"Webhook event {event_id} found in status '{existing.get('status')}' — reprocessing")
         # Record the event as processing
-        await db.webhook_events.insert_one({
-            "event_id": event_id,
-            "type": event.type,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "status": "processing"
-        })
+        # Use try/except to handle race condition when two backends process the same webhook
+        try:
+            await db.webhook_events.insert_one({
+                "event_id": event_id,
+                "type": event.type,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "status": "processing"
+            })
+        except Exception as insert_err:
+            # DuplicateKeyError — another instance already inserted this event
+            if "duplicate key" in str(insert_err).lower() or "11000" in str(insert_err):
+                logger.info(f"Webhook event {event_id} already inserted by another instance — skipping")
+                return JSONResponse(content={"status": "already_processed"})
+            raise
 
     event_type = event.type
     logger.info(f"Stripe webhook received: {event_type}")
