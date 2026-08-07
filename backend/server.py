@@ -96,6 +96,7 @@ from routers.external import router as external_router
 from routers.external_trust_docs import router as external_trust_docs_router
 from routers.courses import router as courses_router
 from routers.leads import router as leads_router
+from routers.client_notes import router as client_notes_router
 from routers.notifications import router as notifications_router
 from routers.assessments import router as assessments_router
 from routers.chat import router as chat_router  # Trust Assistant
@@ -406,6 +407,8 @@ app.include_router(external_trust_docs_router)
 app.include_router(courses_router, prefix="/api")
 # Lead management (admin)
 app.include_router(leads_router, prefix="/api")
+# Client conversation history & CRM notes (Kit / admin access)
+app.include_router(client_notes_router, prefix="/api")
 # Admin notifications + triage + email templates
 app.include_router(notifications_router, prefix="/api")
 # Fiduciary assessment (public)
@@ -611,6 +614,18 @@ async def startup_event():
         
         # Lead email template indexes
         await db.lead_email_templates.create_index("template_id", unique=True)
+        
+        # Client notes indexes (conversation history & CRM)
+        await db.client_notes.create_index("note_id", unique=True)
+        await db.client_notes.create_index("client_email")
+        await db.client_notes.create_index("client_user_id", sparse=True)
+        await db.client_notes.create_index([("client_email", 1), ("created_at", -1)])
+        await db.client_notes.create_index([("resolution_status", 1), ("created_at", -1)])
+        await db.client_notes.create_index([("note_type", 1), ("created_at", -1)])
+        await db.client_notes.create_index([("severity", 1), ("created_at", -1)])
+        await db.client_notes.create_index("email_thread_id", sparse=True)
+        await db.client_notes.create_index("agent")
+        await db.client_notes.create_index("tags")
         
         # Class beneficiary indexes
         await db.class_beneficiaries.create_index([("trust_id", 1), ("user_id", 1)])
