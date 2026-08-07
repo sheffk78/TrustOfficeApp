@@ -739,6 +739,15 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
 
 # ==================== STRIPE WEBHOOK EVENT HANDLERS ====================
 
+def _stripe_get(obj, key, default=None):
+    """Safely get a field from a Stripe StripeObject (which lacks .get())."""
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
 async def _process_referral_conversion_safe(user_id: str) -> None:
     """Process referral conversion — apply reward to referrer."""
     try:
@@ -755,7 +764,7 @@ async def _send_activation_emails_safe(user: dict, plan_type: str, amount: str, 
     if not user or not email_service.is_configured:
         return
     try:
-        stripe_sub = stripe.Subscription.retrieve(session.get("subscription"))
+        stripe_sub = stripe.Subscription.retrieve(getattr(session, "subscription", None))
         next_billing = format_date(stripe_sub.current_period_end)
         await email_service.send_subscription_activated(
             to_email=user["email"],
@@ -806,9 +815,13 @@ async def _add_to_mailercloud_safe(user: dict) -> None:
 async def _webhook_checkout_session_completed(event) -> None:
     """Handle Stripe webhook event: checkout.session.completed."""
     session = event.data.object
-    user_id = session.get("metadata", {}).get("user_id")
-    plan_type = session.get("metadata", {}).get("plan_type", "monthly")
-    billing_period = session.get("metadata", {}).get("billing_period")
+    # Stripe's StripeObject doesn't have .get() — use getattr with fallback to dict-like access
+    metadata = getattr(session, "metadata", None) or {}
+    if not isinstance(metadata, dict):
+        metadata = dict(metadata) if hasattr(metadata, "items") else {}
+    user_id = metadata.get("user_id")
+    plan_type = metadata.get("plan_type", "monthly")
+    billing_period = metadata.get("billing_period")
 
     # For legacy plans, billing_period wasn't in metadata — infer from plan_type
     if not billing_period and plan_type in ("monthly", "annual"):
@@ -822,7 +835,7 @@ async def _webhook_checkout_session_completed(event) -> None:
         "plan_type": plan_type,
         "billing_period": billing_period,
         "status": "active",
-        "stripe_subscription_id": session.get("subscription"),
+        "stripe_subscription_id": getattr(session, "subscription", None),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     if plan_type in ("monthly", "annual"):
@@ -844,7 +857,7 @@ async def _webhook_checkout_session_completed(event) -> None:
     )
 
     await db.payment_transactions.update_one(
-        {"session_id": session["id"]},
+        {"session_id": getattr(session, "id", None) or str(session)},
         {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
 
@@ -906,7 +919,7 @@ async def _handle_subscription_plan_change(user: dict, sub: dict, old_price: str
 
 async def _handle_subscription_cancel_scheduled(user: dict, subscription: dict) -> None:
     """Handle cancel_at_period_end change in customer.subscription.updated webhook."""
-    access_until = format_date(subscription.get("current_period_end"))
+    access_until = format_date(_stripe_get(subscription, "current_period_end"))
     await _try_send_email(
         lambda: email_service.send_subscription_canceled(
             to_email=user["email"],
@@ -921,7 +934,7 @@ async def _webhook_customer_subscription_updated(event) -> None:
     """Handle Stripe webhook event: customer.subscription.updated."""
     subscription = event.data.object
     previous_attributes = getattr(event.data, "previous_attributes", {}) or {}
-    customer_id = subscription.get("customer")
+    customer_id = _stripe_get(subscription, "customer")
 
     user, sub = await get_user_by_customer_id(customer_id)
     if not user:
@@ -930,13 +943,13 @@ async def _webhook_customer_subscription_updated(event) -> None:
     # Check if plan changed (upgrade)
     if "items" in previous_attributes:
         old_price = previous_attributes.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
-        new_price = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
+        new_price = _stripe_get(_stripe_get(_stripe_get(_stripe_get(subscription, "items"), "data"), 0), "price")
         if old_price and new_price and old_price != new_price:
             await _handle_subscription_plan_change(user, sub, old_price, new_price)
 
     # Check if cancel_at_period_end changed (cancellation scheduled)
     if "cancel_at_period_end" in previous_attributes:
-        if subscription.get("cancel_at_period_end") and not previous_attributes.get("cancel_at_period_end"):
+        if _stripe_get(subscription, "cancel_at_period_end") and not _stripe_get(previous_attributes, "cancel_at_period_end"):
             await _handle_subscription_cancel_scheduled(user, subscription)
 
     # ========== SUBSCRIPTION DELETED (fully canceled) ==========
@@ -947,7 +960,7 @@ async def _webhook_customer_subscription_deleted(event) -> None:
     """Handle Stripe webhook event: customer.subscription.deleted."""
     subscription = event.data.object
     await db.subscriptions.update_one(
-        {"stripe_subscription_id": subscription["id"]},
+        {"stripe_subscription_id": _stripe_get(subscription, "id")},
         {"$set": {
             "status": "canceled",
             "stripe_subscription_id": None,
@@ -962,10 +975,10 @@ async def _webhook_customer_subscription_deleted(event) -> None:
 async def _webhook_invoice_paid(event) -> None:
     """Handle Stripe webhook event: invoice.paid."""
     invoice = event.data.object
-    customer_id = invoice.get("customer")
+    customer_id = _stripe_get(invoice, "customer")
 
     # Skip if this is the first invoice (handled by checkout.session.completed)
-    if invoice.get("billing_reason") == "subscription_create":
+    if _stripe_get(invoice, "billing_reason") == "subscription_create":
         return {"status": "ok", "message": "Initial invoice, skipping"}
 
     user, sub = await get_user_by_customer_id(customer_id)
@@ -982,12 +995,12 @@ async def _webhook_invoice_paid(event) -> None:
     )
 
     # Send renewal email
-    if email_service.is_configured and invoice.get("billing_reason") == "subscription_cycle":
+    if email_service.is_configured and _stripe_get(invoice, "billing_reason") == "subscription_cycle":
         try:
             # Get next billing date from subscription
-            stripe_sub = stripe.Subscription.retrieve(invoice.get("subscription"))
+            stripe_sub = stripe.Subscription.retrieve(_stripe_get(invoice, "subscription"))
             next_billing = format_date(stripe_sub.current_period_end)
-            amount = format_amount(invoice.get("amount_paid", 0))
+            amount = format_amount(_stripe_get(invoice, "amount_paid", 0))
             plan_type = sub.get("plan_type", "monthly")
 
             await email_service.send_subscription_renewed(
@@ -1007,7 +1020,7 @@ async def _webhook_invoice_paid(event) -> None:
 async def _webhook_invoice_payment_failed(event) -> None:
     """Handle Stripe webhook event: invoice.payment_failed."""
     invoice = event.data.object
-    customer_id = invoice.get("customer")
+    customer_id = _stripe_get(invoice, "customer")
 
     user, sub = await get_user_by_customer_id(customer_id)
     if user:
@@ -1023,8 +1036,8 @@ async def _webhook_invoice_payment_failed(event) -> None:
         # Send payment failed email
         if email_service.is_configured:
             try:
-                amount = format_amount(invoice.get("amount_due", 0))
-                next_attempt = invoice.get("next_payment_attempt")
+                amount = format_amount(_stripe_get(invoice, "amount_due", 0))
+                next_attempt = _stripe_get(invoice, "next_payment_attempt")
                 retry_date = format_date(next_attempt) if next_attempt else None
 
                 await email_service.send_payment_failed(
