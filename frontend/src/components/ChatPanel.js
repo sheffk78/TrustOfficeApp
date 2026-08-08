@@ -26,7 +26,7 @@ const GREETING_MESSAGE = {
 };
 
 const ChatPanel = ({
-  messages,
+  messages = [],
   loading,
   error,
   isStreaming,

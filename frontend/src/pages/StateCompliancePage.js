@@ -177,7 +177,7 @@ export default function StateCompliancePage() {
             <div className="space-y-3">
               {[1,2,3].map(i => <div key={i} className="h-24 card-trust border border-border rounded animate-pulse"/>)}
             </div>
-          ) : stateData?.state_code === null ? (
+          ) : !stateData?.state_code ? (
             <Card className="border border-border">
               <CardContent className="p-12 flex flex-col items-center text-center">
                 <MapPin className="w-12 h-12 text-muted-foreground/50 mb-3"/>
@@ -200,7 +200,7 @@ export default function StateCompliancePage() {
                       <MapPin className="w-5 h-5 text-navy"/>
                       <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">State</p>
                     </div>
-                    <p className="text-xl font-bold text-navy">{profile?.state_name || stateData.state_code}</p>
+                    <p className="text-xl font-bold text-navy">{profile?.state_name || stateData?.state_code}</p>
                   </CardContent>
                 </Card>
 
