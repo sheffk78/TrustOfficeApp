@@ -65,6 +65,15 @@
     "build": "craco build",
     "test": "craco test"
   },
+  "jest": {
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1",
+      "^react-router-dom$": "<rootDir>/test-utils/react-router-dom-stub.js"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(reactflow|react-markdown|remark-gfm|recharts)/)"
+    ]
+  },
   "browserslist": {
     "production": [
       ">0.2%",
@@ -81,6 +90,10 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@craco/craco": "^7.1.0",
     "@eslint/js": "9.23.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.3",
     "autoprefixer": "^10.4.20",
     "eslint": "9.23.0",
     "eslint-plugin-import": "2.31.0",
