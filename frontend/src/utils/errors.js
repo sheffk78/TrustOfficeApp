@@ -259,6 +259,49 @@ function _isThirdPartyScriptError(event) {
 }
 
 /**
+ * Detect noise from a rejected promise that is NOT our code and should not page
+ * Discord. Sources: browser extensions (Chrome/Firefox/Safari), ad-blockers,
+ * password managers, and headless crawlers (Googlebot, scanners). These fire
+ * real unhandledRejection events in the page but carry no actionable in-app
+ * signal — paging the team on them is a false alarm every time.
+ *
+ * Distinct from _isThirdPartyScriptError (cross-origin "Script error."); this
+ * covers unhandled promise rejections, which surface different messages and
+ * never throw a cross-origin "Script error.".
+ */
+function _isNoiseRejection(reason) {
+  const msg =
+    (reason && reason.message) ||
+    (typeof reason === 'string' && reason) ||
+    String(reason || '');
+
+  // Browser-extension runtime / messaging artifacts (chrome.runtime, etc.)
+  if (/runtime\.sendMessage|not a registered extension|Extension context invalidated/i.test(msg)) {
+    return true;
+  }
+
+  // "Error: loading script" — headless browsers / crawlers / extension content
+  // scripts (Googlebot and scanner UAs produce exactly this). No in-app meaning.
+  if (/^error:\s*loading script$/i.test(msg.trim())) {
+    return true;
+  }
+
+  // Generic content-script / ad-blocker injection noise
+  if (/content script|adblock|webRequest|loading script/i.test(msg)) {
+    return true;
+  }
+
+  // Crawlers and automated scanners produce these with no user context — treat
+  // bot-user-agent rejections as noise regardless of the message.
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  if (/Googlebot|bingbot|Slurp|DuckDuckBot|bot\/|crawler|spider/i.test(ua)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Install global uncaught error and unhandled rejection handlers.
  * Call once at app startup (e.g., in App.js or index.js).
  * These report to the backend but don't show toasts (to avoid spamming the user
@@ -301,11 +344,18 @@ export function installGlobalErrorHandlers() {
     const message = (reason && reason.message) || String(reason) || 'Unhandled promise rejection';
     const stack = (reason && reason.stack) || null;
 
-    // Report to /api/report-error (Discord alert pipeline)
-    reportErrorToBackend(reason, {
-      operation: 'unhandled_promise_rejection',
-      page: window.location.pathname,
-    });
+    // Browser-extension / crawler artifacts ("Error: loading script",
+    // chrome.runtime, Googlebot, scanners) are NOT our bugs. Log them to
+    // MongoDB for the audit trail but DO NOT fire the Discord alert pipeline.
+    const isNoise = _isNoiseRejection(reason);
+
+    if (!isNoise) {
+      // Report to /api/report-error (Discord alert pipeline)
+      reportErrorToBackend(reason, {
+        operation: 'unhandled_promise_rejection',
+        page: window.location.pathname,
+      });
+    }
 
     // Report to /api/error-log (MongoDB log, queryable via admin API)
     reportToErrorLog({
@@ -314,7 +364,7 @@ export function installGlobalErrorHandlers() {
       stack: stack,
       url: window.location.href,
       user_agent: navigator.userAgent,
-      metadata: {},
+      metadata: { is_noise },
     }, 'unhandled_promise_rejection');
   });
 }

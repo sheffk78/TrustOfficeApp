@@ -147,6 +147,26 @@ async def report_error(
         configured; ``duplicate`` is True when deduped.
     """
     # --- Build the fingerprint for dedupe ---
+    # Suppress Discord paging for known browser-extension / crawler noise that
+    # ships up from the frontend (unhandled promise rejections from content
+    # scripts, ad-blockers, Googlebot/scanners). Defensive net behind the
+    # frontend filter in errors.js — still logged (server log below), but never
+    # a real-time page. Only applies to frontend reports; server errors always
+    # alert.
+    _NOISE_PATTERNS = (
+        "loading script",
+        "runtime.sendMessage",
+        "Extension context invalidated",
+        "not a registered extension",
+        "Script error.",
+        "content script",
+        "adblock",
+        "webRequest",
+    )
+    if source == "frontend" and error_message:
+        msg_lower = error_message.lower()
+        if any(p.lower() in msg_lower for p in _NOISE_PATTERNS):
+            alert = False
     tb_first_line = ""
     if traceback_str:
         # First non-empty line of the traceback is the most identifying piece
