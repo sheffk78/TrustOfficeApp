@@ -422,7 +422,7 @@ export default function BenevolenceLogPage() {
               </div>
 
               {/* Monthly Breakdown */}
-              {data.monthly_aggregates.length > 0 && (
+              {data.monthly_aggregates?.length > 0 && (
                 <div className="mt-8 card-trust overflow-hidden">
                   <div className="p-4 border-b border-border flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-navy dark:text-gold" />
