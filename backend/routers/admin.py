@@ -932,6 +932,36 @@ async def get_impersonation_audit_log(
     }
 
 
+# ==================== CONVERSATIONS ====================
+
+@router.get("/conversations")
+async def list_conversations(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    search: Optional[str] = Query(None, description="Search by name or email"),
+    status: Optional[str] = Query(None, description="Filter by last interaction status (open/pending/resolved)"),
+    sentiment: Optional[str] = Query(None, description="Filter by last interaction sentiment (positive/neutral/negative)"),
+    admin: dict = Depends(require_admin),
+):
+    """Admin view: who is talking to TrustOffice, about what, and where they came from.
+
+    Returns contacts that have support_interactions, enriched with their
+    AI-maintained profile summary, interaction count, most recent interaction,
+    and marketing source (linked from a converted lead).
+    """
+    from services.contact_memory_service import list_conversations as _list_conversations
+
+    skip = (page - 1) * limit
+    result = await _list_conversations(
+        limit=limit,
+        skip=skip,
+        status_filter=status,
+        sentiment_filter=sentiment,
+        search=search,
+    )
+    return result
+
+
 # ==================== REFERRAL MANAGEMENT ====================
 
 @router.get("/referrals")

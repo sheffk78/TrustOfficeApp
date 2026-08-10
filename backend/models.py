@@ -187,6 +187,10 @@ class UserCreate(BaseModel):
     referral_code: Optional[str] = None  # Optional referral code from friend
     wp_ref: Optional[str] = None  # WingPoint reference ID for attribution
     wp_trust_name: Optional[str] = None  # WingPoint trust name (pre-fill)
+    utm_source: Optional[str] = None  # Marketing attribution (ad campaign, etc.)
+    utm_campaign: Optional[str] = None
+    utm_medium: Optional[str] = None
+    referrer: Optional[str] = None  # document.referrer from the browser
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -1197,6 +1201,10 @@ class CheckoutRequest(BaseModel):
     promotion_code: Optional[str] = None
     coupon: Optional[str] = None  # Direct Stripe coupon ID (e.g., TRUST49)
     referral_id: Optional[str] = None  # Rewardful affiliate referral ID
+    utm_source: Optional[str] = None  # Marketing attribution carried to Stripe metadata
+    utm_campaign: Optional[str] = None
+    utm_medium: Optional[str] = None
+    referrer: Optional[str] = None
 
 
 class ChangePlanRequest(BaseModel):
@@ -2035,3 +2043,116 @@ class ClientDeadlineSummary(BaseModel):
     critical_count: int = 0
     next_deadline: Optional[DeadlineResponse] = None
     calculated_at: str
+
+
+# ==================== CUSTOMER MEMORY MODELS ====================
+
+class ContactRole(str, Enum):
+    """Role of a contact within the TrustOffice ecosystem"""
+    trustee = "trustee"
+    advisor = "advisor"
+    beneficiary = "beneficiary"
+    prospect = "prospect"
+
+class ContactStatus(str, Enum):
+    """Lifecycle status of a contact"""
+    prospect = "prospect"
+    active_client = "active_client"
+    former = "former"
+
+class ContactCreate(BaseModel):
+    """Create a contact record (customer memory)"""
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    organization: Optional[str] = None
+    role: ContactRole = ContactRole.prospect
+    status: ContactStatus = ContactStatus.prospect
+    plan: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class ContactResponse(BaseModel):
+    """Contact record response"""
+    contact_id: str
+    name: str
+    email: str
+    phone: Optional[str] = None
+    organization: Optional[str] = None
+    role: str
+    status: str
+    plan: Optional[str] = None
+    tags: List[str] = []
+    created_at: str
+    updated_at: Optional[str] = None
+
+class SupportInteractionChannel(str, Enum):
+    """Channel through which a support interaction occurred"""
+    email = "email"
+    chat = "chat"
+    call_summary = "call_summary"
+    in_app = "in_app"
+
+class SupportInteractionSentiment(str, Enum):
+    """Sentiment classification of a support interaction"""
+    positive = "positive"
+    neutral = "neutral"
+    negative = "negative"
+
+class SupportInteractionStatus(str, Enum):
+    """Resolution status of a support interaction"""
+    open = "open"
+    pending = "pending"
+    resolved = "resolved"
+
+class SupportInteractionCreate(BaseModel):
+    """Create a support interaction record linked to a contact"""
+    contact_id: str
+    channel: SupportInteractionChannel = SupportInteractionChannel.email
+    raw_content: str
+    generated_reply: Optional[str] = None
+    summary: str
+    topics: List[str] = []
+    sentiment: SupportInteractionSentiment = SupportInteractionSentiment.neutral
+    urgency: int = Field(3, ge=1, le=5)
+    status: SupportInteractionStatus = SupportInteractionStatus.open
+
+class SupportInteractionResponse(BaseModel):
+    """Support interaction response"""
+    interaction_id: str
+    contact_id: str
+    channel: str
+    raw_content: str
+    generated_reply: Optional[str] = None
+    summary: str
+    topics: List[str] = []
+    sentiment: str
+    urgency: int
+    status: str
+    created_at: str
+    resolved_at: Optional[str] = None
+
+class ContactPhase(str, Enum):
+    """Lifecycle phase of a contact used in the profile summary"""
+    onboarding = "onboarding"
+    implementation = "implementation"
+    renewal = "renewal"
+    at_risk = "at_risk"
+    active = "active"
+
+class ContactProfileSummary(BaseModel):
+    """Structured, updatable profile summary maintained for a contact"""
+    contact_id: str
+    current_phase: ContactPhase = ContactPhase.active
+    key_preferences: List[str] = []
+    constraints: List[str] = []
+    last_major_issue: Optional[str] = None
+    last_major_issue_outcome: Optional[str] = None
+    recommended_next_actions: List[str] = []
+    follow_up_notes: Optional[str] = None
+    updated_at: Optional[str] = None
+
+class ContactContextResponse(BaseModel):
+    """Aggregated context bundle for a contact: contact + profile summary + recent interactions"""
+    contact: ContactResponse
+    profile_summary: Optional[ContactProfileSummary] = None
+    recent_interactions: List[SupportInteractionResponse] = []

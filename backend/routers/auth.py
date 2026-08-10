@@ -28,6 +28,16 @@ from dependencies import (
 from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, ProfileUpdate
 from email_service import email_service
 from security import InputSanitizer
+
+
+def _clean_utm(value: Optional[str], max_len: int = 200) -> Optional[str]:
+    """Sanitize a UTM/attribution value to a safe length, or None if empty."""
+    if not value:
+        return None
+    value = value.strip()
+    if not value or len(value) > max_len:
+        return value[:max_len] if value else None
+    return value
 from mailercloud_service import add_to_trial_list
 from utils.audit import log_audit_event
 
@@ -158,6 +168,12 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
         "created_at": datetime.now(timezone.utc).isoformat(),
         "wp_ref": user.wp_ref or None,
         "wp_trust_name": user.wp_trust_name or None,
+        # Marketing attribution — captured from the signup form / URL params so
+        # direct-to-checkout conversions can be attributed to ad campaigns.
+        "utm_source": _clean_utm(user.utm_source),
+        "utm_campaign": _clean_utm(user.utm_campaign),
+        "utm_medium": _clean_utm(user.utm_medium),
+        "referrer": _clean_utm(user.referrer, max_len=500),
     }
     
     await db.users.insert_one(user_doc)

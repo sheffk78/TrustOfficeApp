@@ -14,7 +14,7 @@ import LeadFollowUpModal from '@/components/LeadFollowUpModal';
 import {
   Users, Shield, Crown, Link2, Target,
   TrendingUp, Gift, DollarSign, CheckCircle,
-  RefreshCw, BarChart3,
+  RefreshCw, BarChart3, MessageSquare,
 } from 'lucide-react';
 
 import { RevenueTab } from './admin/RevenueTab';
@@ -23,6 +23,7 @@ import { AdminsTab } from './admin/AdminsTab';
 import { ReferralsTab } from './admin/ReferralsTab';
 import { LeadsTab } from './admin/LeadsTab';
 import { LeadAnalyticsTab } from './admin/LeadAnalyticsTab';
+import { ConversationsTab } from './admin/ConversationsTab';
 import {
   LeadDetailDialog, BulkLeadStageDialog, CustomerDetailDialog,
   GrantAccessDialog, DeleteDialog, CreateAdminDialog,
@@ -40,6 +41,7 @@ const STATS_CARDS = [
 
 const TAB_CONFIG = [
   { value: 'customers', icon: Users, label: 'Customers' },
+  { value: 'conversations', icon: MessageSquare, label: 'Conversations' },
   { value: 'revenue', icon: BarChart3, label: 'Revenue' },
   { value: 'admins', icon: Crown, label: 'Admins' },
   { value: 'referrals', icon: Link2, label: 'Referrals' },
@@ -130,6 +132,16 @@ export default function AdminPage() {
   // Follow-up email modal state
   const [followUpLead, setFollowUpLead] = useState(null);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+
+  // Conversations state
+  const [conversations, setConversations] = useState([]);
+  const [conversationsTotal, setConversationsTotal] = useState(0);
+  const [conversationsPage, setConversationsPage] = useState(1);
+  const [conversationsLimit, setConversationsLimit] = useState(50);
+  const [conversationsStatus, setConversationsStatus] = useState('all');
+  const [conversationsSentiment, setConversationsSentiment] = useState('all');
+  const [conversationsSearch, setConversationsSearch] = useState('');
+  const [conversationsLoading, setConversationsLoading] = useState(false);
 
   // Check if user is admin - first check from user object, then verify with API
   const [isAdmin, setIsAdmin] = useState(false);
@@ -260,6 +272,27 @@ export default function AdminPage() {
     }
     setLeadsLoading(false);
   };
+
+  // ─── Fetch conversations ─────────────────────────────────────────
+  const fetchConversations = useCallback(async () => {
+    setConversationsLoading(true);
+    try {
+      let url = `/admin/conversations?page=${conversationsPage}&limit=${conversationsLimit}`;
+      if (conversationsStatus !== 'all') url += `&status=${conversationsStatus}`;
+      if (conversationsSentiment !== 'all') url += `&sentiment=${conversationsSentiment}`;
+      if (conversationsSearch) url += `&search=${encodeURIComponent(conversationsSearch)}`;
+
+      const response = await fetchWithAuth(url);
+      if (response.ok) {
+        const data = await response.json();
+        setConversations(data.conversations || []);
+        setConversationsTotal(data.total || 0);
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversations:', error);
+    }
+    setConversationsLoading(false);
+  }, [conversationsPage, conversationsLimit, conversationsStatus, conversationsSentiment, conversationsSearch]);
 
   // ─── Fetch lead analytics ─────────────────────────────────────────
   const fetchLeadAnalytics = async () => {
@@ -522,7 +555,8 @@ export default function AdminPage() {
     if (activeTab === 'lead-analytics') fetchLeadAnalytics();
     if (activeTab === 'admins') { fetchAdmins(); fetchStatsUsers(); }
     if (activeTab === 'revenue') fetchRevenueData();
-  }, [isAdmin, activeTab, revenuePreset, fetchRevenueData]);
+    if (activeTab === 'conversations') fetchConversations();
+  }, [isAdmin, activeTab, revenuePreset, fetchRevenueData, fetchConversations]);
 
   // ─── Actions ──────────────────────────────────────────────────────
   const handleMakeAdmin = async (userId) => {
@@ -967,6 +1001,26 @@ export default function AdminPage() {
                 onGrantAccess={handleGrantAccessFromCustomer}
                 onPrevPage={() => setCustomerPage(p => Math.max(1, p - 1))}
                 onNextPage={() => setCustomerPage(p => p + 1)}
+              />
+            </TabsContent>
+
+            {/* Conversations Tab */}
+            <TabsContent value="conversations">
+              <ConversationsTab
+                conversations={conversations}
+                loading={conversationsLoading}
+                total={conversationsTotal}
+                page={conversationsPage}
+                limit={conversationsLimit}
+                statusFilter={conversationsStatus}
+                sentimentFilter={conversationsSentiment}
+                search={conversationsSearch}
+                onStatusFilterChange={setConversationsStatus}
+                onSentimentFilterChange={setConversationsSentiment}
+                onSearchChange={setConversationsSearch}
+                onRefresh={fetchConversations}
+                onPrevPage={() => setConversationsPage(p => Math.max(1, p - 1))}
+                onNextPage={() => setConversationsPage(p => p + 1)}
               />
             </TabsContent>
 

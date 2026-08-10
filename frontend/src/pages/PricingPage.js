@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { getUtmParams } from '@/utils/utm';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Check, ArrowRight } from 'lucide-react';
@@ -220,6 +221,14 @@ export default function PricingPage() {
         success_url: successUrl,
         cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`
       };
+
+      // Add marketing attribution (UTM) so direct-to-checkout conversions can
+      // be attributed to ad campaigns.
+      const utm = getUtmParams();
+      if (utm.utm_source) checkoutData.utm_source = utm.utm_source;
+      if (utm.utm_campaign) checkoutData.utm_campaign = utm.utm_campaign;
+      if (utm.utm_medium) checkoutData.utm_medium = utm.utm_medium;
+      if (utm.referrer) checkoutData.referrer = utm.referrer;
       
       // Add coupon if present
       if (couponCode) {

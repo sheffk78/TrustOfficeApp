@@ -1429,6 +1429,22 @@ async def mark_lead_as_subscribed(email: str, user_id: str):
             lead_name=lead.get("name", ""),
         )
 
+    # Bridge the converted lead into the customer-memory layer so the admin
+    # Conversations view can show who converted and where they came from.
+    try:
+        from services.contact_memory_service import upsert_contact_from_lead
+        await upsert_contact_from_lead(
+            email=email,
+            name=lead.get("name"),
+            lead=lead,
+            user_id=user_id,
+        )
+        logger.info(f"Lead {lead['lead_id']} linked to a contact record ({email})")
+    except Exception as e:
+        logger.warning(
+            f"Failed to link lead {lead['lead_id']} to a contact record: {e}"
+        )
+
     logger.info(f"Lead {lead['lead_id']} marked as subscribed — {email}")
 
 

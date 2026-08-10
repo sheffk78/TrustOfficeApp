@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { getUtmParams } from '@/utils/utm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -195,13 +196,18 @@ export default function SignUpPage() {
       // Step 1: Register using XMLHttpRequest (include referral code, WingPoint ref, and trust name if present)
       const wpRef = sessionStorage.getItem('wp_ref') || null;
       const wpTrustName = sessionStorage.getItem('wp_trust_name') || null;
+      const utm = getUtmParams();
       await xhrPost(`${API_URL}/api/auth/register`, {
         email: trimmedEmail,
         password: password,
         name: trimmedName,
         referral_code: referralCode || null,
         wp_ref: wpRef,
-        wp_trust_name: wpTrustName
+        wp_trust_name: wpTrustName,
+        utm_source: utm.utm_source || null,
+        utm_campaign: utm.utm_campaign || null,
+        utm_medium: utm.utm_medium || null,
+        referrer: utm.referrer || null
       });
       
       // Step 2: Login using XMLHttpRequest

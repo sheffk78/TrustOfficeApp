@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-route
 import { Toaster } from "@/components/ui/sonner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { GiftedBanner } from "@/components/GiftedBanner";
+import { captureUtmParams } from "@/utils/utm";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
@@ -45,6 +46,7 @@ import DeadlineDashboard from "@/pages/DeadlineDashboard";
 import InvestmentsPage from "@/pages/InvestmentsPage";
 import CommunicationsPage from "@/pages/CommunicationsPage";
 import VaultPage from "@/pages/VaultPage";
+import MessagingPage from "@/pages/MessagingPage";
 import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import PrintableBinderPage from "@/pages/PrintableBinderPage";
 import SuccessorPacketPage from "@/pages/SuccessorPacketPage";
@@ -55,6 +57,9 @@ import WingPointWelcomePage from "@/pages/WingPointWelcomePage";
 import WingPointRedirect from "@/pages/WingPointRedirect";
 import ConnectWingPoint from "@/pages/ConnectWingPoint";
 import NotFoundPage from "@/pages/NotFoundPage";
+import KnowledgeBasePage from "@/pages/KnowledgeBasePage";
+import KnowledgeArticleDetail from "@/pages/KnowledgeArticleDetail";
+import KnowledgeAdmin from "@/pages/KnowledgeAdmin";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -65,6 +70,7 @@ import CoursePage from "@/pages/CoursePage";
 import TrustAdminKitsPage from "@/pages/TrustAdminKitsPage";
 import TransactionLedgerPage from "@/pages/TransactionLedgerPage";
 import BenevolenceLogPage from "@/pages/BenevolenceLogPage";
+import PerformanceDashboard from "@/pages/PerformanceDashboard";
 
 // Install global uncaught error handlers once at app load
 // Reports to /api/report-error -> Discord alert (see utils/errors.js)
@@ -190,6 +196,12 @@ const AppRouter = () => {
   
   // Track page views in GA4 on route changes
   useGA4PageTracking();
+
+  // Capture UTM/attribution params from the URL into sessionStorage so they
+  // survive navigation to signup/checkout (ad campaign attribution).
+  useEffect(() => {
+    captureUtmParams();
+  }, [location]);
 
   // CRITICAL: Check URL fragment synchronously for session_id (OAuth callback)
   // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
@@ -401,6 +413,11 @@ const AppRouter = () => {
           <CommunicationsPage />
         </SubscriptionProtectedRoute>
       } />
+      <Route path="/messaging" element={
+        <SubscriptionProtectedRoute>
+          <MessagingPage />
+        </SubscriptionProtectedRoute>
+      } />
       <Route path="/vault" element={
         <SubscriptionProtectedRoute>
           <VaultPage />
@@ -433,6 +450,22 @@ const AppRouter = () => {
           <TrustAdminKitsPage />
         </SubscriptionProtectedRoute>
       } />
+      {/* Knowledge Base / Resource Hub */}
+      <Route path="/knowledge" element={
+        <SubscriptionProtectedRoute>
+          <KnowledgeBasePage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/knowledge/:id" element={
+        <SubscriptionProtectedRoute>
+          <KnowledgeArticleDetail />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/knowledge/admin" element={
+        <ProtectedRoute>
+          <KnowledgeAdmin />
+        </ProtectedRoute>
+      } />
       {/* Settings and Billing are accessible without active subscription */}
       <Route path="/settings" element={
         <ProtectedRoute>
@@ -458,6 +491,11 @@ const AppRouter = () => {
       } />
 
       {/* Catch-all 404 route - must be last */}
+      <Route path="/performance" element={
+        <SubscriptionProtectedRoute>
+          <PerformanceDashboard />
+        </SubscriptionProtectedRoute>
+      } />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

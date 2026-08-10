@@ -366,6 +366,13 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
             "metadata": {"user_id": user["user_id"], "plan_type": checkout.plan_type, "billing_period": billing_period},
             "allow_promotion_codes": True  # Always allow entering promo codes
         }
+
+        # Carry marketing attribution into Stripe metadata so direct-to-checkout
+        # conversions can be attributed to ad campaigns (Google/Meta/etc.).
+        for _k, _v in (("utm_source", checkout.utm_source), ("utm_campaign", checkout.utm_campaign),
+                       ("utm_medium", checkout.utm_medium), ("referrer", checkout.referrer)):
+            if _v:
+                checkout_params["metadata"][_k] = str(_v)[:200]
         
         # Pass Rewardful referral ID as client_reference_id for affiliate tracking
         if checkout.referral_id:
@@ -785,7 +792,7 @@ async def _send_activation_emails_safe(user: dict, plan_type: str, amount: str, 
 
 
 async def _mark_lead_subscribed_safe(user: dict, user_id: str) -> None:
-    """Mark lead as subscribed in CRM."""
+    """Mark lead as subscribed in CRM and ensure a contact record exists."""
     if not user:
         return
     try:
@@ -793,6 +800,16 @@ async def _mark_lead_subscribed_safe(user: dict, user_id: str) -> None:
         await mark_lead_as_subscribed(email=user["email"], user_id=user_id)
     except (ImportError, Exception) as e:
         logger.error(f"Failed to mark lead as subscribed: {e}")
+
+    # Ensure a contact record exists for the converted customer (covers
+    # direct-to-checkout conversions with no lead) and carry UTM attribution
+    # so the admin Conversations view can attribute the sale to an ad campaign.
+    try:
+        from services.contact_memory_service import upsert_contact_from_user
+        await upsert_contact_from_user(user=user, user_id=user_id)
+        logger.info(f"Contact ensured for converted user {user_id} ({user['email']})")
+    except Exception as e:
+        logger.warning(f"Failed to ensure contact for converted user {user_id}: {e}")
 
 
 async def _add_to_mailercloud_safe(user: dict) -> None:

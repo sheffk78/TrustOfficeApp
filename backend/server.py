@@ -97,12 +97,19 @@ from routers.external_trust_docs import router as external_trust_docs_router
 from routers.courses import router as courses_router
 from routers.leads import router as leads_router
 from routers.client_notes import router as client_notes_router
+from routers.knowledge import router as knowledge_router
+from routers.messaging import router as messaging_router
 from routers.notifications import router as notifications_router
 from routers.assessments import router as assessments_router
 from routers.chat import router as chat_router  # Trust Assistant
+from routers.performance import router as performance_router
 from routers.trust_doc_analysis import router as trust_doc_analysis_router
 from routers.trust_admin_kits import router as trust_admin_kits_router
 from routers.page_agent import router as page_agent_router  # Page Agent LLM proxy
+# Contact Memory — customer memory system + inbound email flow
+from routers.contact_memory import router as contact_memory_router
+# Knowledge Base Retrieval — read-only search source for support agents
+from routers.knowledge_retrieval import router as knowledge_retrieval_router
 
 # Error alerting: global exception handler + frontend error reporting endpoint
 from error_alerting import ErrorReporter
@@ -234,6 +241,9 @@ WRITE_EXEMPT_PATHS = {
     "/api/auth/profile",  # Allow profile updates
     "/api/trusts",  # Allow trust creation — first trust is needed for onboarding; multiple-trust gate is enforced in the route handler
     "/api/demo/seed",  # Allow demo data seeding — onboarding feature for new users
+    # Contact Memory — inbound email flow + interaction logging are write operations
+    "/api/contact-memory/email-flow",
+    "/api/contact-memory/interactions",
 }
 
 
@@ -409,7 +419,10 @@ app.include_router(courses_router, prefix="/api")
 app.include_router(leads_router, prefix="/api")
 # Client conversation history & CRM notes (Kit / admin access)
 app.include_router(client_notes_router, prefix="/api")
+# Knowledge Base / Resource Hub
+app.include_router(knowledge_router, prefix="/api")
 # Admin notifications + triage + email templates
+app.include_router(messaging_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 # Fiduciary assessment (public)
 app.include_router(assessments_router, prefix="/api")
@@ -417,6 +430,8 @@ app.include_router(assessments_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 # Trust Document Intelligence — AI extraction from trust documents
 app.include_router(trust_doc_analysis_router, prefix="/api")
+# Performance Dashboard — contractor/lead performance metrics
+app.include_router(performance_router, prefix="/api")
 # Trust Administration Kits — auto-gathered paperwork packets (vehicle retitle, bank, real estate, etc.)
 app.include_router(trust_admin_kits_router, prefix="/api")
 # Page Agent — authenticated LLM proxy for the onboarding Page Agent pilot
@@ -426,6 +441,10 @@ app.include_router(error_reports_router, prefix="/api")
 # In-app error logging (POST /api/error-log + GET /api/admin-api/error-log)
 app.include_router(error_log_router, prefix="/api")
 app.include_router(error_log_admin_router, prefix="/api")
+# Contact Memory — customer memory system + inbound email flow
+app.include_router(contact_memory_router, prefix="/api")
+# Knowledge Base Retrieval — read-only search source for support agents
+app.include_router(knowledge_retrieval_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -667,6 +686,13 @@ async def startup_event():
         await db.bank_statements.create_index([("trust_id", 1), ("user_id", 1)])
         await db.bank_statements.create_index([("account_id", 1), ("statement_period_end", -1)])
         await db.bank_statements.create_index("vault_document_id")
+
+        # Messaging indexes
+        await db.conversations.create_index([("participants", 1), ("updated_at", -1)])
+        await db.conversations.create_index("conversation_id", unique=True)
+        await db.messages.create_index([("conversation_id", 1), ("created_at", -1)])
+        await db.messages.create_index("message_id", unique=True)
+        await db.messages.create_index([("conversation_id", 1), ("read_by", 1)])
 
         # Error logs indexes (in-app error reporting)
         await db.error_logs.create_index("error_id", unique=True)
