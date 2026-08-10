@@ -570,6 +570,31 @@ Amount: ${amount}
             metadata={"email_type": "lead_reengagement"}
         )
 
+    async def send_booking_confirmation(
+        self,
+        to_email: str,
+        name: str,
+        call_date: str,
+        call_time: str,
+        timezone: str,
+        meeting_url: str,
+    ) -> Dict[str, Any]:
+        """Send same-day booking confirmation with Google Meet link, signed as Jeff Kohler."""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="booking_confirmation",
+            template_data={
+                "name": name or "there",
+                "call_date": call_date,
+                "call_time": call_time,
+                "timezone": timezone,
+                "meeting_url": meeting_url,
+            },
+            to_name=name,
+            tag="booking_confirmation",
+            metadata={"email_type": "booking_confirmation"},
+        )
+
     # ==================== NURTURE SEQUENCE METHODS ====================
 
     NURTURE_TEMPLATES = {

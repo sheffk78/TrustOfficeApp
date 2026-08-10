@@ -1010,6 +1010,66 @@ The TrustOffice Team
         """
     },
 
+    # Booking Confirmation (same-day, pre-call reminder with Google Meet link)
+    "booking_confirmation": {
+        "subject": lambda data: f"Your TrustOffice call today — {data.get('call_time', 'see you soon')}",
+        "html": lambda data: _base_template(f"""
+            <h2>Your call with TrustOffice is today</h2>
+            <p>Hi {data.get('name', 'there')},</p>
+            <p>Just a quick heads-up that your 15-minute discovery call with <strong>Jeff Kohler, founder of TrustOffice</strong>, is scheduled for today.</p>
+
+            <div class="task-card">
+              <p class="label">Date</p>
+              <p class="value">{data.get('call_date', '')}</p>
+              <p class="label">Time</p>
+              <p class="value">{data.get('call_time', '')}</p>
+              <p class="label">Time zone</p>
+              <p class="value">{data.get('timezone', '')}</p>
+            </div>
+
+            <p><strong>Meeting link (Google Meet):</strong></p>
+            <p style="text-align: center; margin: 20px 0;">
+              <a href="{data.get('meeting_url', '#')}" class="button">Join Your Call</a>
+            </p>
+            <p style="font-size: 12px; color: #666;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <span style="word-break: break-all;">{data.get('meeting_url', '#')}</span>
+            </p>
+
+            <p><strong>What to expect:</strong> No pitch, no pressure. We'll talk about what's going on with your trust right now, whether TrustOffice is a good fit, and if it makes sense I'll walk you through the annual plan. You'll walk away with a clearer picture of what you should be doing as trustee — whether or not you sign up.</p>
+            <p><strong>No prep needed.</strong> Just show up and tell me about your situation.</p>
+
+            <p>Need to reschedule or cancel? You can do that right from your original booking confirmation email, or reply to this one.</p>
+
+            <p>Looking forward to it,</p>
+            <p><strong>Jeff Kohler</strong><br>Founder, TrustOffice</p>
+        """),
+        "text": lambda data: f"""
+Your call with TrustOffice is today
+
+Hi {data.get('name', 'there')},
+
+Just a quick heads-up that your 15-minute discovery call with Jeff Kohler, founder of TrustOffice, is scheduled for today.
+
+Date: {data.get('call_date', '')}
+Time: {data.get('call_time', '')}
+Time zone: {data.get('timezone', '')}
+
+Meeting link (Google Meet): {data.get('meeting_url', '#')}
+
+What to expect: No pitch, no pressure. We'll talk about what's going on with your trust right now, whether TrustOffice is a good fit, and if it makes sense I'll walk you through the annual plan. You'll walk away with a clearer picture of what you should be doing as trustee - whether or not you sign up.
+
+No prep needed. Just show up and tell me about your situation.
+
+Need to reschedule or cancel? You can do that right from your original booking confirmation email, or reply to this one.
+
+Looking forward to it,
+
+Jeff Kohler
+Founder, TrustOffice
+        """
+    },
+
     # Distribution Notice to Beneficiary
     "distribution_notice": {
         "subject": lambda data: f"Distribution Notice — {data.get('trust_name', 'Your Trust')}",

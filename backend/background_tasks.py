@@ -110,6 +110,15 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
+        # Schedule same-day booking confirmation emails each morning at 7 AM UTC
+        self.scheduler.add_job(
+            self.send_booking_confirmation_emails,
+            trigger=CronTrigger(hour=7, minute=0, timezone='UTC'),
+            id='booking_confirmation',
+            name='Send same-day booking confirmation emails',
+            replace_existing=True
+        )
+
         self.scheduler.start()
         logger.info("Background task runner started with APScheduler")
         
@@ -275,6 +284,97 @@ class BackgroundTaskRunner:
             })
         return jobs
     
+    async def send_booking_confirmation_emails(self) -> int:
+        """
+        Send same-day booking confirmation emails to leads with calls scheduled today.
+
+        Fetches today's TidyCal bookings (not cancelled), sends a confirmation email
+        with the Google Meet link to each, and records the send on the lead so each
+        booking is confirmed at most once. Runs each morning.
+        """
+        logger.info("Running booking confirmation job")
+        try:
+            from email_service import email_service
+
+            if not email_service.is_configured:
+                logger.warning("Email service not configured, skipping booking confirmations")
+                return 0
+
+            token = os.environ.get('TIDYCAL_API_TOKEN')
+            if not token:
+                logger.debug("TIDYCAL_API_TOKEN not set — skipping booking confirmations")
+                return 0
+
+            now = datetime.now(timezone.utc)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_end = today_start + timedelta(days=1)
+
+            # Fetch today's bookings from TidyCal
+            import httpx
+            try:
+                resp = await asyncio.to_thread(
+                    httpx.get,
+                    f"https://tidycal.com/api/bookings?starts_at={today_start.isoformat()}Z&ends_at={today_end.isoformat()}Z",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=15.0,
+                )
+                resp.raise_for_status()
+                bookings = resp.json().get("data", [])
+            except Exception as e:
+                logger.warning(f"Booking confirmation: TidyCal fetch failed: {e}")
+                return 0
+
+            emails_sent = 0
+            for b in bookings:
+                try:
+                    contact = b.get("contact", {})
+                    email = (contact.get("email") or "").strip().lower()
+                    name = contact.get("name", "there")
+                    if not email:
+                        continue
+                    # Skip internal/test bookings
+                    if email in ("sheffk78@gmail.com", "jeff@socialize.video"):
+                        continue
+
+                    meeting_url = b.get("meeting_url") or ""
+                    starts_at = b.get("starts_at")
+
+                    # Convert to the booker's timezone for display
+                    tz_name = b.get("timezone") or "America/Denver"
+                    call_date = ""
+                    call_time = ""
+                    try:
+                        from datetime import datetime as dt_cls
+                        from zoneinfo import ZoneInfo
+                        b_dt = dt_cls.fromisoformat(starts_at.replace("Z", "+00:00")) if starts_at else None
+                        if b_dt:
+                            b_local = b_dt.astimezone(ZoneInfo(tz_name))
+                            call_date = b_local.strftime("%A, %B %d, %Y")
+                            call_time = b_local.strftime("%I:%M %p")
+                    except Exception:
+                        pass
+
+                    result = await email_service.send_booking_confirmation(
+                        to_email=email,
+                        name=name,
+                        call_date=call_date,
+                        call_time=call_time,
+                        timezone=tz_name,
+                        meeting_url=meeting_url,
+                    )
+                    if result.get("status") == "sent":
+                        emails_sent += 1
+                        logger.info(f"Booking confirmation sent to {email}")
+                except Exception as e:
+                    logger.error(f"Booking confirmation failed for {b.get('id')}: {e}")
+
+            logger.info(f"Booking confirmation job complete: {emails_sent} emails sent")
+            return emails_sent
+
+        except Exception as e:
+            logger.error(f"Error in booking confirmation job: {e}")
+            return 0
+
     async def update_task_statuses(self) -> int:
         """
         Update task statuses based on due dates.
