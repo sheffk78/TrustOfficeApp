@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FilePen, Settings, HeartPulse, Coins, Wallet, TrendingUp, MessageSquare, Bot, FolderOpen, HeartHandshake, ArrowUpDown, Network, Building2, Users, FileText } from 'lucide-react';
+import { LayoutDashboard, FilePen, Settings, HeartPulse, Coins, Wallet, TrendingUp, MessageSquare, Bot, FolderOpen, HeartHandshake, ArrowUpDown, Network, Building2, Users, FileText, BarChart3 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 const mainNav = [
