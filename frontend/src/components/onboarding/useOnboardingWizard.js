@@ -185,6 +185,7 @@ export function useOnboardingWizard() {
         tax_year_end_day: day,
         is_fiscal_year: computedFiscalYear,
         grantor_name: trustData.grantor_name || '',
+        successor_trustee_name: trustData.successor_trustee_name || '',
         trustees: filteredTrusteeNames,
       };
 

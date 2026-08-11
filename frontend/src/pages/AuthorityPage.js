@@ -101,7 +101,11 @@ export default function AuthorityPage() {
           role: 'Successor Trustee',
           source: 'Trust',
           authority: 'contingent',
-          authorityClause: trustData.successor_trustee_notes || ''
+          // Note: successor_trustee_notes intentionally NOT surfaced here as an
+          // authority clause — the successor note/guidance lives only in
+          // Settings > Successor Trustee and the Successor Trustee Packet, so
+          // there is a single canonical surface for it.
+          authorityClause: null
         });
       }
     }

@@ -28,6 +28,12 @@ export default function WelcomeStep({ createdTrustName }) {
           </Link>
         </div>
 
+        <div className="bg-cyan-50 border border-cyan-200 p-4 mb-6 text-left">
+          <p className="text-sm text-cyan-900">
+            <strong>Next up:</strong> Name a <strong>successor trustee</strong> — the person who steps in to manage your trust if you can't. You can add their contact details and a letter of guidance in <strong>Settings → Successor Trustee</strong>.
+          </p>
+        </div>
+
         <div className="bg-navy/5 border border-navy/10 p-4 mb-6">
           <p className="text-sm text-navy text-left">
             <strong>Tip:</strong> You can also explore the app with demo data to see all features in action. Demo data is separate from your real trust and can be deleted anytime in Settings.

@@ -32,6 +32,7 @@ export const INITIAL_TRUST_DATA = {
   tax_year_end_month: '12',
   tax_year_end_day: '31',
   is_fiscal_year: false,
+  successor_trustee_name: '',
 };
 
 /** Allowed MIME types and file extensions for trust document upload. */
