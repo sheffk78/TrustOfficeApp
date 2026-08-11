@@ -12,17 +12,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code. Keep the knowledge router as an explicit source path:
-# Railway has previously produced an image from a stale/incomplete COPY layer
-# even though this file was present in the Git tree. An explicit COPY makes the
-# file part of the layer checksum and the assertion below turns this into a
-# build-time failure instead of a runtime crash.
+# Copy application code. The explicit per-file COPY lines below ensure each
+# router file is part of the Docker layer checksum, preventing stale build
+# cache from producing an image missing files that are present in the git tree.
 COPY . /app/
-COPY routers/knowledge.py /app/routers/knowledge.py
 
-# Fail the build if the runtime image does not contain the imported router.
-RUN test -f /app/routers/knowledge.py \
-    && python -m py_compile /app/routers/knowledge.py
+# Explicitly copy all router files to bust stale cache layers
+COPY routers/ /app/routers/
+
+# Fail the build if any imported router is missing from the runtime image.
+# Also verify the knowledge router specifically (previously lost to stale cache).
+RUN ls /app/routers/knowledge.py /app/routers/messaging.py /app/routers/performance.py \
+    && python -m py_compile /app/routers/knowledge.py \
+    && python -m py_compile /app/routers/messaging.py \
+    && python -m py_compile /app/routers/performance.py
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser && \
