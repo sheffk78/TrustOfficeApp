@@ -8,6 +8,7 @@ import { Calendar } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
+import { fetchWithAuth } from '../utils/api';
 
 // Extracted config + helpers + sub-components (frontend/src/pages/trust-calendar/)
 import { initialTypeFilter, defaultNewTask } from './trust-calendar/calendarConfig';

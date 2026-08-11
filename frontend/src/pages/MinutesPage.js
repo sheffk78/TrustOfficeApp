@@ -147,7 +147,7 @@ export default function MinutesPage() {
       const response = await fetchWithAuth(`/minutes/${minutesId}`, { method: 'DELETE' });
       if (response.ok) {
         toast.success('Minutes deleted.');
-        loadMinutes(searchQuery);
+        loadMinutes(debouncedSearch);
       } else {
         const errBody = await response.json().catch(() => ({}));
         toast.error(errBody.detail || 'Failed to delete minutes.');

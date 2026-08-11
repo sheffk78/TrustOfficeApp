@@ -364,7 +364,7 @@ export function installGlobalErrorHandlers() {
       stack: stack,
       url: window.location.href,
       user_agent: navigator.userAgent,
-      metadata: { is_noise },
+      metadata: { is_noise: isNoise },
     }, 'unhandled_promise_rejection');
   });
 }
