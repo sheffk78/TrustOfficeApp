@@ -24,6 +24,7 @@ from routers.admin import require_admin
 from discord_service import notify_new_lead, notify_lead_stage_change
 from email_service import email_service
 from routers.notifications import create_notification
+from routers.analytics import record_lead_capture
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -392,6 +393,20 @@ async def capture_lead(lead: LeadCapture):
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }}
         )
+        # Record returning lead capture analytics event
+        try:
+            await record_lead_capture(
+                lead_id=existing["lead_id"],
+                source=source,
+                utm_source=lead.utm_source,
+                utm_campaign=lead.utm_campaign,
+                utm_medium=lead.utm_medium,
+                referrer=lead.referrer,
+                is_returning=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to record lead capture analytics for {existing['lead_id']}: {e}")
+
         return {
             "success": True,
             "lead_id": existing["lead_id"],
@@ -461,6 +476,20 @@ async def capture_lead(lead: LeadCapture):
         lead_email=email,
         lead_name=name,
     )
+
+    # Record lead capture analytics event with UTM attribution
+    try:
+        await record_lead_capture(
+            lead_id=lead_id,
+            source=source,
+            utm_source=lead.utm_source,
+            utm_campaign=lead.utm_campaign,
+            utm_medium=lead.utm_medium,
+            referrer=lead.referrer,
+            is_returning=False,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to record lead capture analytics for {lead_id}: {e}")
 
     return {
         "success": True,

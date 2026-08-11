@@ -246,6 +246,29 @@ class EmailService:
             to_name=user_name,
             metadata={"email_type": "task_reminder", "task_type": task_type}
         )
+
+    async def send_successor_packet_email(
+        self,
+        to_email: str,
+        successor_name: str,
+        trust_name: str,
+        trustee_name: str,
+        packet_url: str
+    ) -> Dict[str, Any]:
+        """Send the successor trustee a secure packet access link."""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="successor_packet",
+            template_data={
+                "successor_name": successor_name,
+                "trust_name": trust_name,
+                "trustee_name": trustee_name,
+                "packet_url": packet_url,
+            },
+            to_name=successor_name,
+            tag="successor_packet",
+            metadata={"email_type": "successor_packet"}
+        )
     
     async def send_task_overdue(
         self,

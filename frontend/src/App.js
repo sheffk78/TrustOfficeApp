@@ -50,6 +50,7 @@ import MessagingPage from "@/pages/MessagingPage";
 import RiskDashboardPage from "@/pages/RiskDashboardPage";
 import PrintableBinderPage from "@/pages/PrintableBinderPage";
 import SuccessorPacketPage from "@/pages/SuccessorPacketPage";
+import SuccessorAccessPage from "@/pages/SuccessorAccessPage";
 import TrustAssistantPage from "@/pages/TrustAssistantPage";
 import BeneficiaryReportPage from "@/pages/BeneficiaryReportPage";
 import ExportDashboard from "@/pages/ExportDashboard";
@@ -224,6 +225,8 @@ const AppRouter = () => {
       <Route path="/about" element={<Navigate to="/" replace />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      {/* Public successor trustee access link — intentionally outside all auth gates */}
+      <Route path="/successor-access/:token" element={<SuccessorAccessPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/auth/google/callback" element={<AuthCallback />} />
       <Route path="/onboarding" element={

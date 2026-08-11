@@ -65,6 +65,7 @@ from routers.expenses import router as expenses_router
 from routers.calendar import router as calendar_router
 from routers.trust_units import router as trust_units_router
 from routers.trusts import router as trusts_router
+from routers.successor import router as successor_router
 from routers.entities import router as entities_router
 from routers.tasks import router as tasks_router
 from routers.auth import router as auth_router
@@ -106,6 +107,7 @@ from routers.performance import router as performance_router
 from routers.trust_doc_analysis import router as trust_doc_analysis_router
 from routers.trust_admin_kits import router as trust_admin_kits_router
 from routers.page_agent import router as page_agent_router  # Page Agent LLM proxy
+from routers.analytics import router as analytics_router  # Analytics events + funnel
 # Contact Memory — customer memory system + inbound email flow
 from routers.contact_memory import router as contact_memory_router
 # Knowledge Base Retrieval — read-only search source for support agents
@@ -365,6 +367,7 @@ app.add_middleware(
 # Register all routers
 app.include_router(auth_router, prefix="/api")
 app.include_router(trusts_router, prefix="/api")
+app.include_router(successor_router, prefix="/api")
 app.include_router(entities_router, prefix="/api")
 app.include_router(tasks_router, prefix="/api")
 app.include_router(trust_units_router, prefix="/api")
@@ -445,6 +448,8 @@ app.include_router(error_log_admin_router, prefix="/api")
 app.include_router(contact_memory_router, prefix="/api")
 # Knowledge Base Retrieval — read-only search source for support agents
 app.include_router(knowledge_retrieval_router, prefix="/api")
+# Analytics — durable funnel event recording (purchase, activation, lead capture)
+app.include_router(analytics_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -542,6 +547,10 @@ async def startup_event():
         # Audit logs
         await db.audit_logs.create_index([("user_id", 1), ("timestamp", -1)])
         await db.audit_logs.create_index("audit_id", unique=True)
+
+        # One-time successor access links (MongoDB removes them after expiry)
+        await db.successor_access.create_index("token_hash", unique=True)
+        await db.successor_access.create_index("expires_at", expireAfterSeconds=0)
         
         # Referral indexes
         await db.referral_codes.create_index("user_id", unique=True)

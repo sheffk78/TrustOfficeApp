@@ -1,10 +1,10 @@
 /**
  * GA4 Analytics Utility for TrustOffice
  * Measurement ID: G-MT6FBPRE60
- * 
+ *
  * This utility provides helper functions for sending events to Google Analytics 4.
  * The base GA4 script is loaded in public/index.html.
- * 
+ *
  * Usage:
  *   import { trackEvent, trackSubscriptionEvent } from '@/utils/analytics';
  *   trackEvent('button_click', { button_name: 'save_minutes' });
@@ -300,6 +300,77 @@ export const trackUpgradeModalClicked = (params = {}) => {
   });
 };
 
+/**
+ * Track when a user activates their subscription (first dashboard visit after purchase)
+ * Idempotent — uses localStorage keyed by userId to ensure it fires only once per user.
+ *
+ * @param {Object} params - Event parameters
+ * @param {string} params.user_id - Unique user identifier
+ * @param {string} params.plan_type - 'trustee' | 'estate' | 'advisor' | 'wingpoint'
+ * @param {string} params.billing_period - 'monthly' | 'annual'
+ * @param {string} [params.source] - Where activation originated (e.g. 'direct', 'stripe_webhook')
+ */
+export const trackActivationComplete = (params = {}) => {
+  const userId = params.user_id;
+  if (!userId) {
+    console.warn('[Analytics] trackActivationComplete requires a user_id');
+    return;
+  }
+
+  // Idempotency guard: only fire once per user (keyed by userId + plan_type)
+  const activationKey = `activation_complete_${userId}_${params.plan_type || 'unknown'}`;
+  if (typeof window !== 'undefined' && localStorage.getItem(activationKey)) {
+    return;
+  }
+
+  trackEvent('activation_complete', {
+    event_category: 'subscription',
+    plan_type: params.plan_type || 'unknown',
+    billing_period: params.billing_period || 'unknown',
+    source: params.source || undefined,
+    transaction_id: params.transaction_id || null,
+    value: getTierPrice(params.plan_type, params.billing_period),
+    currency: 'USD',
+    ...params
+  });
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(activationKey, 'true');
+  }
+};
+
+/**
+ * Track a successfully persisted lead capture with attribution metadata.
+ * Fires GA4 custom event and Meta Pixel Lead standard event.
+ *
+ * @param {Object} params - Event parameters
+ * @param {string} params.source - Lead source (e.g. 'trustee-101-landing-page', 'facebook-lead-ad')
+ * @param {string} [params.plan_type] - Plan type if known (e.g. 'trustee', 'estate', 'advisor')
+ * @param {string} [params.utm_source] - UTM source parameter
+ * @param {string} [params.utm_campaign] - UTM campaign parameter
+ * @param {string} [params.utm_medium] - UTM medium parameter
+ * @param {string} [params.referrer] - Document referrer
+ */
+export const trackLeadCapture = (params = {}) => {
+  trackEvent('lead_captured', {
+    event_category: 'lead',
+    source: params.source || 'unknown',
+    plan_type: params.plan_type || null,
+    utm_source: params.utm_source || null,
+    utm_medium: params.utm_medium || null,
+    utm_campaign: params.utm_campaign || null,
+    referrer: params.referrer || null,
+    ...params,
+  });
+
+  // Meta Pixel — Lead standard event
+  if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+    window.fbq('track', 'Lead', {
+      content_name: params.source || 'unknown',
+    });
+  }
+};
+
 // Legacy subscription event tracker (backward compatible)
 export const trackSubscriptionEvent = (eventType, params = {}) => {
   const validEvents = [
@@ -434,8 +505,10 @@ export default {
   trackTrialBannerClicked,
   trackUpgradeModalShown,
   trackUpgradeModalClicked,
+  trackActivationComplete,
   trackGoogleAdsConversion,
   trackSignupConversion,
   trackPurchaseConversion,
+  trackLeadCapture,
   isGtagAvailable
 };

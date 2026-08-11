@@ -5,6 +5,12 @@ Centralized email templates for easy editing
 
 from typing import Dict, Any
 from datetime import datetime
+import html
+
+
+def _h(value: Any) -> str:
+    """Escape a value for safe interpolation into HTML email content."""
+    return html.escape(str(value or ""), quote=True)
 
 
 def _booking_cta_html(booking_url: str, phone_request: bool = True) -> str:
@@ -1109,6 +1115,67 @@ This notice was sent by the trustee of the trust. If you have questions about th
 
 Best regards,
 The TrustOffice Team
+        """
+    },
+
+    # Successor Trustee Packet — sent to the named successor with a secure access link
+    "successor_packet": {
+        "subject": lambda data: f"Important information about the {data.get('trust_name', 'Trust')} Trust",
+        "html": lambda data: _base_template(f"""
+            <h2>You've been named as a successor trustee</h2>
+            <p>Hi {_h(data.get('successor_name', 'there'))},</p>
+            <p>You've been named as the successor trustee for the <strong>{_h(data.get('trust_name', 'Trust'))}</strong>. This email is to make sure you have what you need, when you need it.</p>
+
+            <div class="success">
+              <strong>You don't need to do anything right now.</strong> This is for your records.
+            </div>
+
+            <p>If the current trustee is ever unable to serve, here's what to do first:</p>
+            <ol>
+              <li>Open the secure packet at the button below — it has the trust details, accounts, contacts, and guidance.</li>
+              <li>Contact the trust attorney listed in the packet.</li>
+              <li>Review the "First 30 Days" section — it walks you through the steps.</li>
+            </ol>
+
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="{_h(data.get('packet_url', '#'))}" class="button">Open the Secure Packet</a>
+            </p>
+
+            <div class="alert">
+              <strong>This link is valid for 30 days and can be used once.</strong> If it expires, ask the current trustee to send you a new one.
+            </div>
+
+            <p style="font-size: 12px; color: #666;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <span style="word-break: break-all;">{_h(data.get('packet_url', '#'))}</span>
+            </p>
+
+            <p>This is operational information to help you step in, not legal advice. For questions about your authority as successor trustee, please consult the trust attorney.</p>
+
+            <p>Best regards,<br>{_h(data.get('trustee_name', 'The TrustOffice Team'))}</p>
+        """),
+        "text": lambda data: f"""
+You've been named as a successor trustee
+
+Hi {data.get('successor_name', 'there')},
+
+You've been named as the successor trustee for the {data.get('trust_name', 'Trust')}. This email is to make sure you have what you need, when you need it.
+
+You don't need to do anything right now. This is for your records.
+
+If the current trustee is ever unable to serve, here's what to do first:
+1. Open the secure packet at the link below — it has the trust details, accounts, contacts, and guidance.
+2. Contact the trust attorney listed in the packet.
+3. Review the "First 30 Days" section — it walks you through the steps.
+
+Open the secure packet here: {data.get('packet_url', '#')}
+
+This link is valid for 30 days and can be used once. If it expires, ask the current trustee to send you a new one.
+
+This is operational information to help you step in, not legal advice. For questions about your authority as successor trustee, please consult the trust attorney.
+
+Best regards,
+{data.get('trustee_name', 'The TrustOffice Team')}
         """
     }
 }

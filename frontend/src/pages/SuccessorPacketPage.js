@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
+import { showError } from '@/utils/errors';
+import { toast } from 'sonner';
 import PageHelpButton from '@/components/PageHelpButton';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -96,6 +98,7 @@ const SuccessorPacketPage = () => {
   const [taxCalendar, setTaxCalendar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!selectedTrust?.trust_id) return;
@@ -111,7 +114,7 @@ const SuccessorPacketPage = () => {
           fetchWithAuth(`/trusts/${tid}/bank-accounts`).catch(() => null),
           fetchWithAuth(`/vault?trust_id=${tid}`).catch(() => null),
           fetchWithAuth(`/governance/tasks?trust_id=${tid}`).catch(() => null),
-          fetchWithAuth(`/tax-calendar?trust_id=${tid}`).catch(() => null),
+          fetchWithAuth(`/trusts/${tid}/tax-calendar`).catch(() => null),
         ]);
 
         if (cancelled) return;
@@ -174,6 +177,30 @@ const SuccessorPacketPage = () => {
     setTimeout(() => window.print(), 100);
   };
 
+  const handleSend = async () => {
+    if (!selectedTrust?.trust_id) return;
+    const tid = selectedTrust.trust_id;
+    setSending(true);
+    try {
+      const res = await fetchWithAuth(`/trusts/${tid}/successor/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to send');
+      if (data.status === 'sent') {
+        toast.success(`Packet sent to ${data.to_email}. They'll get a secure link valid for 30 days.`);
+      } else if (data.status === 'not_sent') {
+        toast.warning(data.message || 'Email service is not configured. The secure link was created but not sent.');
+      }
+    } catch (e) {
+      showError(toast, e, { operation: 'send_successor_packet', page: 'SuccessorPacket' });
+    } finally {
+      setSending(false);
+    }
+  };
+
   const trustName = trustData?.name || selectedTrust?.name || 'Your Trust';
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -195,9 +222,17 @@ const SuccessorPacketPage = () => {
                     { text: 'This packet compiles everything a successor trustee needs if the current trustee dies or becomes incapacitated' },
                     { text: 'Fill in successor trustee info and key contacts in Settings first for a complete packet' },
                     { text: 'Print on standard letter-size paper. Uses your browser print dialog.' },
+                    { text: 'You can also email a secure link to your successor trustee that is valid for 30 days.' },
                   ]}
                   taPrompt="What should I include in my successor trustee packet?"
                 />
+                <button
+                  onClick={handleSend}
+                  disabled={loading || sending}
+                  className="flex items-center gap-2 px-4 py-2 bg-navy hover:bg-navy/90 text-white font-medium shadow-sm transition-colors disabled:opacity-50"
+                >
+                  <Mail className="w-4 h-4" /> {sending ? 'Sending...' : 'Send Packet to Successor'}
+                </button>
                 <button
                   onClick={handlePrint}
                   disabled={loading}
@@ -225,6 +260,11 @@ const SuccessorPacketPage = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Click "Print Full Packet" to generate a printable document with all sections below. The packet includes trust identification, trustee transition info, beneficiaries, assets, bank accounts, professional contacts, governance rules, upcoming deadlines, and your letter of guidance.
                 </p>
+                {trustData?.successor_trustee_email && (
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Successor Trustee: {trustData.successor_trustee_name || trustData.successor_trustee_email} — a secure link will be emailed valid for 30 days.
+                  </p>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                   {[
