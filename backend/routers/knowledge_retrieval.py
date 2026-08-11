@@ -23,9 +23,10 @@ from services import trust_knowledge
 router = APIRouter(prefix="/knowledge-retrieval", tags=["knowledge_retrieval"])
 
 # Canonical registry + knowledge source (single source of truth).
-# File: .../TrustOffice/projects/TrustOfficeApp/backend/routers/knowledge_retrieval.py
-# parents[0]=routers [1]=backend [2]=TrustOfficeApp [3]=projects [4]=TrustOffice (brand root)
-BRAND_ROOT = Path(__file__).resolve().parents[4]
+# In Railway this file lives at /app/routers/knowledge_retrieval.py, so
+# parents[0]=routers [1]=app. The repository root is not a brand monorepo
+# checkout in the deployed image; keep the path calculation within the app.
+BRAND_ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = os.environ.get(
     "TRUST_KNOWLEDGE_REGISTRY",
     str(BRAND_ROOT / "KNOWLEDGE" / "trustoffice-registry.yaml"),
