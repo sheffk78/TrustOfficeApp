@@ -57,7 +57,9 @@ async def get_successor_packet(token: str):
     # The used_at predicate makes the one-time credential atomic under concurrent opens.
     used_at = now.isoformat()
     claimed = await db.successor_access.find_one_and_update(
-        {"token_hash": token_hash, "used_at": None},
+        # Re-check expiry in the atomic claim so a request racing the TTL/check
+        # boundary can never consume an already-expired credential.
+        {"token_hash": token_hash, "used_at": None, "expires_at": {"$gt": now}},
         {"$set": {"used_at": used_at}},
         projection={"_id": 0},
         return_document=ReturnDocument.AFTER,
