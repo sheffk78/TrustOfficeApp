@@ -14,7 +14,7 @@ Jeff wants TrustOffice to help customers move assets (vehicles, artwork, antique
 
 **Jeff's directive:** "We want to consolidate as much as we can and not just add more features and make trustoffice so confusing."
 
-**Important note on the review agents:** The agents searched a different path (`Kit/life/brands/TrustOffice/projects/TrustOfficeApp/`) and did NOT find the Trust Admin Kit generator. The kit generator DOES exist — it was built this session, is committed to git (commit `06fe980`), and is deployed at `api.trustoffice.app`. The files are at `~/Projects/TrustOfficeApp/backend/routers/trust_admin_kits.py` and `~/Projects/TrustOfficeApp/frontend/src/pages/TrustAdminKitsPage.js`. The agents' core recommendation (extend Minutes, don't add a new page) is still correct, but their claim that the kit generator doesn't exist is wrong — they just searched the wrong path.
+**Important note on the review agents:** The agents searched a different path (`Kit/life/brands/TrustOffice/projects/TrustOfficeApp/`) and did NOT find the Trust Admin Kit generator. The kit generator DOES exist — it was built this session, is committed to git (commit `06fe980`), and is deployed at `api.trustoffice.app`. The files are at `~/.openclaw/workspace/Kit/life/brands/TrustOffice/projects/TrustOfficeApp/backend/routers/trust_admin_kits.py` and `~/.openclaw/workspace/Kit/life/brands/TrustOffice/projects/TrustOfficeApp/frontend/src/pages/TrustAdminKitsPage.js`. The agents' core recommendation (extend Minutes, don't add a new page) is still correct, but their claim that the kit generator doesn't exist is wrong — they just searched the wrong path.
 
 ---
 

@@ -19,8 +19,10 @@ const mainNav = [
     { path: '/communications', icon: MessageSquare, label: 'Communications' },
   ]},
   { path: '/trust-assistant', icon: Bot, label: 'Assistant' },
+  { path: '/messaging', icon: MessageSquare, label: 'Messages' },
   { path: '/vault', icon: FolderOpen, label: 'Vault' },
   { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
+  { path: '/performance', icon: BarChart3, label: 'Performance' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

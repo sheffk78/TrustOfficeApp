@@ -1,3 +1,6 @@
+# ARCHIVED - AgentMail removed
+# Historical/stale script; do not execute. Use mail_client.py or google-workspace/google_api.py as applicable.
+
 """
 Client Notes Router — Persistent Client Conversation History & CRM Notes
 

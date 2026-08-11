@@ -58,6 +58,10 @@ const NAV_GROUPS = [
 
   // ═══ LEARNING ═══
   { key: 'course', icon: GraduationCap, label: 'Trustee 101', items: [], standout: true },
+  { key: 'knowledge', icon: BookOpen, label: 'Knowledge Base', items: [
+    { path: '/knowledge', icon: BookOpen, label: 'Browse Articles' },
+    { path: '/knowledge/admin', icon: FilePen, label: 'Manage Articles', adminOnly: true },
+  ], badge: 'NEW' },
 
   // ═══ CORE SECTIONS ═══
   { key: 'governance', icon: BookOpen, label: 'Governance', items: [
@@ -78,6 +82,7 @@ const NAV_GROUPS = [
     { path: '/schedule-a', icon: Package, label: 'Trust Assets' },
     { path: '/beneficiaries', icon: Users, label: 'Beneficiaries' },
     { path: '/communications', icon: MessageSquare, label: 'Communications' },
+    { path: '/messaging', icon: MessageSquare, label: 'Messages', badge: 'NEW' },
     { path: '/vault', icon: FolderOpen, label: 'Vault' },
     { path: '/admin-kits', icon: Briefcase, label: 'Admin Templates', badge: 'NEW' },
   ]},
@@ -89,6 +94,7 @@ const NAV_GROUPS = [
     { path: '/binder', icon: NotebookTabs, label: 'Record Book' },
     { path: '/successor-packet', icon: UserCheck, label: 'Successor Packet' },
   ]},
+  { key: 'performance', icon: BarChart3, label: 'Performance', items: [] },
   { key: 'score', icon: HeartPulse, label: 'Trust Health', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
@@ -100,7 +106,7 @@ const SIDEBAR_SCROLL_KEY = 'sidebar-scroll';
 const SIDEBAR_GROUPS_KEY = 'sidebar-expanded-groups';
 
 // Paths that match by prefix (not just exact equality)
-const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities']);
+const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities', '/knowledge']);
 
 /**
  * Check whether a nav item path matches the current pathname.
@@ -121,8 +127,9 @@ const isPathActive = (itemPath, pathname) => {
 /**
  * Check whether an item is visible given the current trust's benevolence flag.
  */
-const isItemVisible = (item, selectedTrust) => {
+const isItemVisible = (item, selectedTrust, isAdmin) => {
   if (item.requiresBenevolence && !selectedTrust?.benevolence_enabled) return false;
+  if (item.adminOnly && !isAdmin) return false;
   return true;
 };
 
@@ -133,8 +140,10 @@ const resolveSingleGroupPath = (groupKey) => {
   switch (groupKey) {
     case 'dashboard': return '/dashboard';
     case 'score': return '/governance';
+    case 'performance': return '/performance';
     case 'trust-assistant': return '/trust-assistant';
     case 'course': return '/course';
+    case 'knowledge': return '/knowledge';
     default: return '/settings';
   }
 };
@@ -174,9 +183,9 @@ const StandaloneNavItem = ({ group, pathname, onClick }) => {
   );
 };
 
-const NavGroupItem = ({ group, pathname, selectedTrust, isExpanded, onToggle, onLinkClick }) => {
+const NavGroupItem = ({ group, pathname, selectedTrust, isAdmin, isExpanded, onToggle, onLinkClick }) => {
   const GroupIcon = group.icon;
-  const visibleItems = group.items.filter(item => isItemVisible(item, selectedTrust));
+  const visibleItems = group.items.filter(item => isItemVisible(item, selectedTrust, isAdmin));
   const hasActiveChild = visibleItems.some(item => isPathActive(item.path, pathname));
 
   return (
@@ -416,6 +425,7 @@ const NavList = ({
           group={group}
           pathname={pathname}
           selectedTrust={selectedTrust}
+          isAdmin={isAdmin}
           isExpanded={isExpanded}
           onToggle={toggleGroup}
           onLinkClick={onLinkClick}

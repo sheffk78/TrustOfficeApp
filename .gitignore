@@ -190,3 +190,4 @@ credentials.json
 .credentials
 .railway/
 test_reports/
+backend/trust_knowledge.db

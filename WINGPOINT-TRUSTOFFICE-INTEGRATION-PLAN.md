@@ -2,7 +2,7 @@
 
 **Date:** July 10, 2026
 **Status:** Backend changes implemented (5 of 7). Frontend changes pending.
-**Codebase:** `/Users/socializerender/Projects/TrustOfficeApp`
+**Codebase:** `/Users/socializerender/.openclaw/workspace/Kit/life/brands/TrustOffice/projects/TrustOfficeApp`
 
 ---
 

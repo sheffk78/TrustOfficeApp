@@ -4,7 +4,7 @@
       "command": "repowise",
       "args": [
         "mcp",
-        "/Users/socializerender/Projects/TrustOfficeApp",
+        "/Users/socializerender/.openclaw/workspace/Kit/life/brands/TrustOffice/projects/TrustOfficeApp",
         "--transport",
         "stdio"
       ],

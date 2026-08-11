@@ -1,77 +1,85 @@
 """
-Knowledge Base Retrieval router — read-only search of the GLOBAL knowledge base
-for support agents grounding their replies. This is the retrieval source agents
-call to fetch relevant published articles from the knowledge_articles
-collection (product docs, FAQs, policy). It does NOT surface per-contact data.
+Knowledge Base Retrieval router — compatibility wrapper.
 
-Pair with the customer-memory layer (contacts, support_interactions,
-contact_profile_summary) for the full agent context pipeline.
+Preserves the original public API of this endpoint (GET /knowledge-retrieval/search
+with q, limit, category params and the get_current_user auth dependency) and its
+response shape (query, count, results with id/title/category/summary/content_snippet),
+but now answers from the consolidated SQLite FTS5 index (services/trust_knowledge.py)
+instead of doing a Mongo regex scan.
+
+Build-on-first-use: if the index database does not exist, it is built from the
+canonical registry + knowledge markdown before the first query.
 """
+import os
+from pathlib import Path
 from typing import List, Optional
-import re
 
 from fastapi import APIRouter, Depends, Query
 
-from database import db
 from dependencies import get_current_user
+
+from services import trust_knowledge
 
 router = APIRouter(prefix="/knowledge-retrieval", tags=["knowledge_retrieval"])
 
-# Maximum content snippet length returned in compact search results.
+# Canonical registry + knowledge source (single source of truth).
+# File: .../TrustOffice/projects/TrustOfficeApp/backend/routers/knowledge_retrieval.py
+# parents[0]=routers [1]=backend [2]=TrustOfficeApp [3]=projects [4]=TrustOffice (brand root)
+BRAND_ROOT = Path(__file__).resolve().parents[4]
+REGISTRY_PATH = os.environ.get(
+    "TRUST_KNOWLEDGE_REGISTRY",
+    str(BRAND_ROOT / "KNOWLEDGE" / "trustoffice-registry.yaml"),
+)
+KNOWLEDGE_DIR = os.environ.get(
+    "TRUST_KNOWLEDGE_DIR",
+    str(Path(__file__).resolve().parent.parent / "knowledge"),
+)
+DB_PATH = os.environ.get(
+    "TRUST_KNOWLEDGE_DB",
+    str(Path(__file__).resolve().parent.parent / "data" / "trust_knowledge.db"),
+)
+
+# Content snippet length (kept for compatibility with the original response shape).
 CONTENT_SNIPPET_LENGTH = 500
+
+
+def _ensure_index() -> str:
+    """Return the index db path, building it if it does not yet exist."""
+    if not Path(DB_PATH).exists():
+        trust_knowledge.build_index(REGISTRY_PATH, KNOWLEDGE_DIR, DB_PATH)
+    return DB_PATH
 
 
 @router.get("/search")
 async def search_knowledge(
-    q: str = Query(..., min_length=1, description="Free-text query matched against title, summary, tags, and content (case-insensitive)."),
+    q: str = Query(..., min_length=1, description="Free-text query."),
     limit: int = Query(5, ge=1, le=10, description="Maximum number of articles to return (default 5, max 10)."),
-    category: Optional[str] = Query(None, description="Optional category filter (e.g. compliance, tax)."),
+    category: Optional[str] = Query(None, description="Optional category filter."),
     user: dict = Depends(get_current_user),
 ):
     """
     Search the GLOBAL knowledge base for published articles matching `q`.
 
-    Returns a compact list of {id, title, category, summary, content_snippet}
-    where content_snippet is the first ~500 characters of the article content.
-    Only published articles are returned. This endpoint is read-only and does
-    not increment view counts — it is optimized for retrieval, not browsing.
+    Compatibility wrapper: preserves the original endpoint signature and response
+    shape, but answers from the consolidated SQLite FTS5 index. Only live, public
+    records are surfaced to this public endpoint (private partner offers such as
+    WingPoint Annual are never returned).
     """
-    # Escape user input for safe regex matching (case-insensitive).
-    pattern = re.escape(q)
+    db_path = _ensure_index()
+    retrieved = trust_knowledge.retrieve(
+        q,
+        {"db_path": db_path, "limit": limit, "status": "live", "visibility": "public"},
+    )
 
-    match_clauses = [
-        {"title": {"$regex": pattern, "$options": "i"}},
-        {"summary": {"$regex": pattern, "$options": "i"}},
-        {"content": {"$regex": pattern, "$options": "i"}},
-        {"tags": {"$regex": pattern, "$options": "i"}},
-    ]
-
-    query = {
-        "published": True,
-        "$or": match_clauses,
-    }
-    if category:
-        query["category"] = category
-
-    cursor = db.knowledge_articles.find(query, {
-        "id": 1,
-        "title": 1,
-        "category": 1,
-        "summary": 1,
-        "content": 1,
-        "_id": 0,
-    }).limit(limit)
-
-    results: List[dict] = []
-    async for article in cursor:
-        content = article.get("content", "") or ""
-        summary = article.get("summary", "") or ""
+    results = []
+    for item in retrieved.get("results", [])[:limit]:
+        # Map the new index envelope into the legacy response shape.
         results.append({
-            "id": article.get("id", ""),
-            "title": article.get("title", ""),
-            "category": article.get("category", ""),
-            "summary": summary,
-            "content_snippet": content[:CONTENT_SNIPPET_LENGTH],
+            "id": item.get("item_id", ""),
+            "title": item.get("title", ""),
+            "category": item.get("kind", item.get("category", "")),
+            "summary": (item.get("snippet") or "")[:CONTENT_SNIPPET_LENGTH],
+            "content_snippet": (item.get("snippet") or "")[:CONTENT_SNIPPET_LENGTH],
         })
 
     return {"query": q, "count": len(results), "results": results}
