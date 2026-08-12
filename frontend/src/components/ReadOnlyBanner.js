@@ -49,7 +49,11 @@ export const ReadOnlyBanner = () => {
                   : 'Access inactive'}
             </p>
             <p className="text-xs text-warning dark:text-warning">
-              You can view all your data, but creating or editing is disabled until you subscribe.
+              {trialExpired
+                ? 'Purchase a plan to make changes again. You can view all your data, but creating or editing is disabled until you subscribe.'
+                : subCanceled
+                  ? 'Purchase a plan to make changes again. You can view all your data, but creating or editing is disabled until you resubscribe.'
+                  : 'Purchase a plan to make changes. You can view all your data, but creating or editing is disabled until you subscribe.'}
             </p>
           </div>
         </div>

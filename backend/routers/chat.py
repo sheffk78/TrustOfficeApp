@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from dependencies import get_current_user, get_subscription_state
+from dependencies import get_current_user, require_write_access, get_subscription_state
 from database import db
 from chat_service import (
     classify_intent,
@@ -196,7 +196,7 @@ async def _get_active_trust(user_id: str, trust_id: Optional[str] = None) -> tup
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """
     Chat with the Trust Assistant.
@@ -1868,7 +1868,7 @@ async def confirm_action(
     conversation_id: str,
     message_index: int,
     request: ConfirmActionRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """
     Confirm, reject, or request edits for an action card.
@@ -1965,7 +1965,7 @@ async def confirm_action(
 async def rename_conversation(
     conversation_id: str,
     title: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """Rename a conversation."""
     if not title or len(title.strip()) == 0 or len(title) > 100:
@@ -2229,7 +2229,7 @@ async def get_latest_assistant_message(
 @router.post("/chat/stream")
 async def chat_stream(
     request: ChatRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """
     Streaming chat endpoint using Server-Sent Events (SSE).

@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from database import db
 from dependencies import (
     get_current_user, require_write_access, should_show_watermark,
-    require_premium_feature, Feature
 )
 from models import (
     TrustUnitsSettingsUpdate, TrustUnitsSettingsResponse,
@@ -278,14 +277,13 @@ def validate_units(units: float, allow_fractional: bool) -> float:
 @router.get("/trust-units/summary", response_model=TrustUnitsSummaryResponse)
 async def get_trust_units_summary(
     trust_id: str, 
-    user: dict = Depends(require_premium_feature(Feature.TRUST_UNITS))
+    user: dict = Depends(get_current_user)
 ):
     """
     Get complete units summary for a trust including settings, certificates, and aggregates.
-    
-    Feature Gate: TRUST_UNITS
-    - Trial users cannot access trust unit management
-    - Paid users can manage unit certificates and transfers
+
+    READ endpoint — available to all authenticated users (free, expired, past-due).
+    Only write operations (create/update/revoke/transfer) are gated to active subscribers.
     """
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
@@ -487,12 +485,12 @@ async def update_unit_certificate(
 async def list_unit_certificates(
     trust_id: str,
     status: Optional[str] = None,
-    user: dict = Depends(require_premium_feature(Feature.TRUST_UNITS))
+    user: dict = Depends(get_current_user)
 ):
     """
     List all certificates for a trust, optionally filtered by status.
-    
-    Feature Gate: TRUST_UNITS
+
+    READ endpoint — available to all authenticated users.
     """
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from database import db
-from dependencies import get_current_user, require_premium_feature, Feature, get_task_status
+from dependencies import get_current_user, get_task_status
 
 router = APIRouter(tags=["exports"])
 
@@ -14,7 +14,7 @@ router = APIRouter(tags=["exports"])
 @router.get("/export/minutes")
 async def export_minutes_csv(
     trust_id: Optional[str] = None, 
-    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+    user: dict = Depends(get_current_user)
 ):
     """Export minutes records as CSV (Premium feature)"""
     query = {"user_id": user["user_id"]}
@@ -52,7 +52,7 @@ async def export_minutes_csv(
 @router.get("/export/distributions")
 async def export_distributions_csv(
     trust_id: Optional[str] = None, 
-    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+    user: dict = Depends(get_current_user)
 ):
     """Export distribution records as CSV (Premium feature)"""
     query = {"user_id": user["user_id"]}
@@ -94,7 +94,7 @@ async def export_distributions_csv(
 @router.get("/export/compensation")
 async def export_compensation_csv(
     trust_id: Optional[str] = None, 
-    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+    user: dict = Depends(get_current_user)
 ):
     """Export compensation payments as CSV (Premium feature)"""
     query = {"user_id": user["user_id"]}
@@ -132,7 +132,7 @@ async def export_compensation_csv(
 @router.get("/export/tasks")
 async def export_tasks_csv(
     trust_id: Optional[str] = None, 
-    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+    user: dict = Depends(get_current_user)
 ):
     """Export governance tasks as CSV (Premium feature)"""
     query = {"user_id": user["user_id"]}
@@ -170,7 +170,7 @@ async def export_tasks_csv(
 @router.get("/export/expenses")
 async def export_expenses_csv(
     trust_id: Optional[str] = None, 
-    user: dict = Depends(require_premium_feature(Feature.CSV_EXPORT))
+    user: dict = Depends(get_current_user)
 ):
     """Export expense records as CSV (Premium feature)"""
     query = {"user_id": user["user_id"]}

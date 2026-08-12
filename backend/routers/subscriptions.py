@@ -6,6 +6,7 @@ from typing import Optional
 import uuid
 import logging
 import os
+import traceback
 
 import stripe
 from pymongo import ReturnDocument
@@ -755,6 +756,64 @@ def _stripe_get(obj, key, default=None):
     return getattr(obj, key, default)
 
 
+def _stripe_to_dict(obj) -> dict:
+    """Convert a Stripe StripeObject to a plain dict, recursively.
+
+    StripeObject does NOT have .get(), .items(), or .keys(), so calling
+    dict() on it fails with KeyError (it iterates integer indices).
+    StripeObject.to_dict() returns a proper nested dict.  Falls back to
+    {} for None/empty.
+    """
+    if obj is None:
+        return {}
+    if isinstance(obj, dict):
+        return obj
+    # StripeObject has a .to_dict() method that returns a plain dict
+    if hasattr(obj, "to_dict") and callable(obj.to_dict):
+        return obj.to_dict()
+    # Last resort — try dict() for ordinary Mapping types
+    try:
+        return dict(obj)
+    except Exception:
+        return {}
+
+
+def format_date(timestamp) -> Optional[str]:
+    """Format a Unix timestamp (or None) as an ISO date string.
+
+    Used by webhook email handlers to render billing/period dates.
+    Returns None when timestamp is falsy (None/0).
+    """
+    if not timestamp:
+        return None
+    try:
+        return datetime.fromtimestamp(int(timestamp), tz=timezone.utc).strftime("%Y-%m-%d")
+    except (ValueError, TypeError, OSError):
+        return None
+
+
+def format_amount(cents) -> str:
+    """Format an integer amount in cents as a dollar string (e.g. '79.00')."""
+    try:
+        return f"{int(cents) / 100:.2f}"
+    except (ValueError, TypeError):
+        return "0.00"
+
+
+async def get_user_by_customer_id(customer_id: str):
+    """Look up a user and their subscription by Stripe customer ID.
+
+    Returns (user_dict, subscription_dict) or (None, None) if not found.
+    """
+    if not customer_id:
+        return None, None
+    user = await db.users.find_one({"stripe_customer_id": customer_id}, {"_id": 0})
+    if not user:
+        return None, None
+    sub = await db.subscriptions.find_one({"user_id": user.get("user_id")}, {"_id": 0})
+    return user, sub or {}
+
+
 async def _process_referral_conversion_safe(user_id: str) -> None:
     """Process referral conversion — apply reward to referrer."""
     try:
@@ -832,10 +891,9 @@ async def _add_to_mailercloud_safe(user: dict) -> None:
 async def _webhook_checkout_session_completed(event) -> None:
     """Handle Stripe webhook event: checkout.session.completed."""
     session = event.data.object
-    # Stripe's StripeObject doesn't have .get() — use getattr with fallback to dict-like access
-    metadata = getattr(session, "metadata", None) or {}
-    if not isinstance(metadata, dict):
-        metadata = dict(metadata) if hasattr(metadata, "items") else {}
+    # Stripe's StripeObject doesn't have .get() — convert metadata to a plain dict
+    raw_metadata = getattr(session, "metadata", None)
+    metadata = _stripe_to_dict(raw_metadata)
     user_id = metadata.get("user_id")
     plan_type = metadata.get("plan_type", "monthly")
     billing_period = metadata.get("billing_period")
@@ -950,7 +1008,8 @@ async def _handle_subscription_cancel_scheduled(user: dict, subscription: dict) 
 async def _webhook_customer_subscription_updated(event) -> None:
     """Handle Stripe webhook event: customer.subscription.updated."""
     subscription = event.data.object
-    previous_attributes = getattr(event.data, "previous_attributes", {}) or {}
+    # previous_attributes is a StripeObject (no .get()/.items()); convert to dict.
+    previous_attributes = _stripe_to_dict(getattr(event.data, "previous_attributes", None))
     customer_id = _stripe_get(subscription, "customer")
 
     user, sub = await get_user_by_customer_id(customer_id)
@@ -958,11 +1017,13 @@ async def _webhook_customer_subscription_updated(event) -> None:
         return {"status": "ok", "message": "User not found"}
 
     # Check if plan changed (upgrade)
-    if "items" in previous_attributes:
-        old_price = previous_attributes.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
-        new_price = _stripe_get(_stripe_get(_stripe_get(_stripe_get(subscription, "items"), "data"), 0), "price")
-        if old_price and new_price and old_price != new_price:
-            await _handle_subscription_plan_change(user, sub, old_price, new_price)
+    prev_items = (previous_attributes.get("items") or {}).get("data") or [{}]
+    old_price = prev_items[0].get("price") or {}
+    if isinstance(old_price, dict):
+        old_price = old_price.get("id")
+    new_price = _stripe_get(_stripe_get(_stripe_get(_stripe_get(subscription, "items"), "data"), 0), "price")
+    if old_price and new_price and old_price != new_price:
+        await _handle_subscription_plan_change(user, sub, old_price, new_price)
 
     # Check if cancel_at_period_end changed (cancellation scheduled)
     if "cancel_at_period_end" in previous_attributes:
@@ -1126,9 +1187,10 @@ async def stripe_webhook(request: Request):
 
     except Exception as e:
         if event_id:
+            error_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
             await db.webhook_events.update_one(
                 {"event_id": event_id},
-                {"$set": {"status": "failed", "error": str(e)[:500]}}
+                {"$set": {"status": "failed", "error": error_msg[:2000]}}
             )
         raise
 

@@ -337,29 +337,33 @@ export default function BillingPage() {
               </div>
             </div>
             {/* Pricing Plans for no-subscription state */}
-            <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
-            <BillingPeriodToggle value={pickerBillingPeriod} onChange={setPickerBillingPeriod} />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {TIERS.map(tier => (
-                <PlanCard
-                  key={tier.id}
-                  tier={tier}
-                  billingPeriod={pickerBillingPeriod}
-                  onSubscribe={handleSubscribe}
-                  processing={processing}
-                  isTargetPlan={targetPlan === tier.id}
-                  cardRef={tierCardRef(tier.id)}
-                />
-              ))}
-            </div>
-            {/* WingPoint-exclusive plan card — only for WingPoint customers */}
-            {user?.is_wingpoint && (
+            {user?.is_wingpoint ? (
+              /* WingPoint customers: two-option purchase section ($79 Trustee + $99 WingPoint) */
               <WingPointPlanCard
                 onSubscribe={handleSubscribe}
                 processing={processing}
-                isTargetPlan={targetPlan === WINGPOINT_TIER.id}
-                cardRef={tierCardRef(WINGPOINT_TIER.id)}
+                isTargetPlan={targetPlan}
+                registerCardRef={registerCardRef}
               />
+            ) : (
+              /* Non-WingPoint: standard 3-tier picker */
+              <>
+                <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
+                <BillingPeriodToggle value={pickerBillingPeriod} onChange={setPickerBillingPeriod} />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  {TIERS.map(tier => (
+                    <PlanCard
+                      key={tier.id}
+                      tier={tier}
+                      billingPeriod={pickerBillingPeriod}
+                      onSubscribe={handleSubscribe}
+                      processing={processing}
+                      isTargetPlan={targetPlan === tier.id}
+                      cardRef={tierCardRef(tier.id)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
             </>
           ) : (
@@ -398,31 +402,33 @@ export default function BillingPage() {
 
               {/* Pricing Plans — Show for free plan, expired, or non-active subscriptions */}
               {(isFreePlan || !isActivePaidSubscription) && (
-                <>
-                  <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
-                  <BillingPeriodToggle value={pickerBillingPeriod} onChange={setPickerBillingPeriod} />
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    {TIERS.map(tier => (
-                      <PlanCard
-                        key={tier.id}
-                        tier={tier}
-                        billingPeriod={pickerBillingPeriod}
-                        onSubscribe={handleSubscribe}
-                        processing={processing}
-                        cardRef={tierCardRef(tier.id)}
-                      />
-                    ))}
-                  </div>
-                  {/* WingPoint-exclusive plan card — only for WingPoint customers */}
-                  {user?.is_wingpoint && (
-                    <WingPointPlanCard
-                      onSubscribe={handleSubscribe}
-                      processing={processing}
-                      isTargetPlan={targetPlan === WINGPOINT_TIER.id}
-                      cardRef={tierCardRef(WINGPOINT_TIER.id)}
-                    />
-                  )}
-                </>
+                user?.is_wingpoint ? (
+                  /* WingPoint customers: two-option purchase section ($79 Trustee + $99 WingPoint) */
+                  <WingPointPlanCard
+                    onSubscribe={handleSubscribe}
+                    processing={processing}
+                    isTargetPlan={targetPlan}
+                    registerCardRef={registerCardRef}
+                  />
+                ) : (
+                  /* Non-WingPoint: standard 3-tier picker */
+                  <>
+                    <h3 className="font-serif text-xl text-navy mb-4">Choose a Plan</h3>
+                    <BillingPeriodToggle value={pickerBillingPeriod} onChange={setPickerBillingPeriod} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                      {TIERS.map(tier => (
+                        <PlanCard
+                          key={tier.id}
+                          tier={tier}
+                          billingPeriod={pickerBillingPeriod}
+                          onSubscribe={handleSubscribe}
+                          processing={processing}
+                          cardRef={tierCardRef(tier.id)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )
               )}
 
               <BillingFAQ />

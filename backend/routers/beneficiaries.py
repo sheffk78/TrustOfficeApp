@@ -8,7 +8,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 
-from dependencies import require_premium_feature, require_write_access, Feature, auto_update_onboarding
+from dependencies import get_current_user, require_write_access, auto_update_onboarding
 from database import db
 from models import (
     BeneficiaryDashboardResponse, BeneficiaryAllocation,
@@ -40,7 +40,7 @@ CLASS_BENEFICIARY_LABELS = {
 @router.post("/class-beneficiaries", response_model=ClassBeneficiaryResponse)
 async def create_class_beneficiary(
     data: ClassBeneficiaryCreate,
-    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+    user: dict = Depends(require_write_access)
 ):
     """Add a class beneficiary designation to a trust"""
     user_id = user["user_id"]
@@ -75,9 +75,9 @@ async def list_class_beneficiaries(
     trust_id: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+    user: dict = Depends(get_current_user)
 ):
-    """List all class beneficiaries for a trust (paginated)"""
+    """List all class beneficiaries for a trust (paginated). READ endpoint — available to all authenticated users."""
     user_id = user["user_id"]
     
     query = {"user_id": user_id}
@@ -100,7 +100,7 @@ async def list_class_beneficiaries(
 @router.delete("/class-beneficiaries/{class_beneficiary_id}")
 async def delete_class_beneficiary(
     class_beneficiary_id: str,
-    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+    user: dict = Depends(require_write_access)
 ):
     """Remove a class beneficiary designation"""
     user_id = user["user_id"]
@@ -121,11 +121,14 @@ async def delete_class_beneficiary(
 @router.get("/dashboard", response_model=BeneficiaryDashboardResponse)
 async def get_beneficiary_dashboard(
     trust_id: Optional[str] = None,
-    user: dict = Depends(require_premium_feature(Feature.BENEFICIARY_DASHBOARD))
+    user: dict = Depends(get_current_user)
 ):
     """
     Beneficiary Dashboard showing current unit allocations per certificate holder.
     Also includes class beneficiary designations.
+
+    READ endpoint — available to all authenticated users (free, expired, past-due).
+    Users can view their beneficiary data regardless of subscription status.
     """
     user_id = user["user_id"]
     
