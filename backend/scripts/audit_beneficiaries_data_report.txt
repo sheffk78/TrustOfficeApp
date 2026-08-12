@@ -1,0 +1,173 @@
+======================================================================
+  BENEFICIARIES BUG — DATA/ACCOUNT AUDIT REPORT
+  Database: trustoffice_local_test
+  Timestamp: 2026-08-12T00:04:44.008592+00:00
+======================================================================
+
+📊 COLLECTION COUNTS
+--------------------------------------------------
+  trusts                                            2 docs
+  trust_unit_certificates                           4 docs
+  trust_units_settings (plural)                     2 docs
+  trust_unit_settings (singular)                    2 docs
+  class_beneficiaries                               3 docs
+  distribution_records                             10 docs
+  benevolence_records                              12 docs
+  users                                             9 docs
+
+
+📋 ALL TRUSTS & UNITS STATE
+----------------------------------------------------------------------
+
+  ┌─ Trust: trust_3a3d11395029
+  │  name:           Smith Family Trust
+  │  user_id:        user_8c2b44d97637  [DEMO]
+  │  trust_type:     family
+  │  jurisdiction:   Delaware
+  │  Settings (plural):    YES
+  │  Settings (singular):  YES
+  │  total_authorized_units: 100
+  │  total_issued_units:     100  (from 4 active cert(s))
+  │  remaining_units:        0  🚨 FULLY ALLOCATED
+  │  Certificates (4):
+  │    CERT-001  Emily Smith  units=25  status=active
+  │    CERT-002  Michael Smith  units=30  status=active
+  │    CERT-003  James Smith Jr.  units=15  status=active
+  │    CERT-004  Sarah Smith  units=30  status=active
+  └─
+
+  ┌─ Trust: trust_18eebacb8ea4
+  │  name:           Johnson Education Trust
+  │  user_id:        user_8c2b44d97637  [DEMO]
+  │  trust_type:     family
+  │  jurisdiction:   California
+  │  Settings (plural):    ❌ MISSING
+  │  Settings (singular):  no
+  │  total_authorized_units: UNKNOWN (no plural settings)
+  │  Certificates: none
+  └─
+
+
+🚨 FLAGGED TRUSTS (remaining_units <= 0)
+----------------------------------------------------------------------
+  trust_3a3d11395029  Smith Family Trust
+    auth=100  issued=100  remaining=0  certs=4  [DEMO]
+    → Demo trust. The collection-mismatch bug originally caused the demo seeder
+      data to be invisible to the app (read from PLURAL, data in SINGULAR).
+      After migration, remaining=0 is CORRECT — 4 certificates use all 100 units.
+
+
+🔍 OTHER DATA ANOMALIES
+----------------------------------------------------------------------
+
+  ⚠️  Settings docs with no matching trust in 'trusts' collection: 1
+      trust_id=trust_4148a2427ed9  user_id=user_d25c18916ca8  [plural]
+
+  ⚠️  Trusts with NO settings doc in either collection: 1
+      trust_id=trust_18eebacb8ea4  (Johnson Education Trust)  user_id=user_8c2b44d97637
+      → App will auto-create default settings on first access (100 units)
+  ✅ No duplicate trust_units_settings
+  ✅ No duplicate trust_unit_settings (singular)
+
+  ⚠️  Orphaned docs in trust_unit_settings (singular): 2
+      6a5dc6452042ffd0a598b56d  trust_id=trust_3a3d11395029  user_id=user_8c2b44d97637 → already migrated to plural
+      6a7a85ba3496624c52359d25  trust_id=trust_4148a2427ed9  user_id=user_d25c18916ca8 → trust missing from trusts collection; already migrated to plural
+  ✅ No certificates with units <= 0
+  ✅ All certificates have matching settings
+
+  ℹ️  class_beneficiaries: 3 records
+      trust=trust_3a3d11395029  class=None  share=?%
+        beneficiaries: 0
+      trust=trust_3a3d11395029  class=None  share=?%
+        beneficiaries: 0
+      trust=trust_18eebacb8ea4  class=None  share=?%
+        beneficiaries: 0
+  ✅ All distribution_records have positive amounts
+
+  ℹ️  benevolence_records: 12
+
+
+🔧 MIGRATION SCRIPT SAFETY (re-run check)
+----------------------------------------------------------------------
+  Singular docs:           2
+  Plural docs:             2
+  Would be moved if re-run: 0
+  ✅ Migration is IDEMPOTENT. Re-running is SAFE (no new docs to move).
+
+
+🧹 SINGULAR COLLECTION (trust_unit_settings) CLEANUP RECOMMENDATION
+----------------------------------------------------------------------
+  ⚠️  All singular docs are in plural, but some have no matching trust:
+      trust_id=trust_4148a2427ed9
+     Recommendation: These are orphaned. Safe to DROP singular collection
+     after confirming these trust_ids belong to intentionally deleted trusts.
+
+
+📊 SUMMARY COUNTS
+----------------------------------------------------------------------
+  Total users:                       9
+  Total trusts:                      2
+  Total certificates:                4
+  Trust settings (plural):           2
+  Trust settings (singular):         2
+  Class beneficiaries:               3
+  Distribution records:              10
+
+  Users (total):                     9
+    Likely demo/test users:           9
+      user_083a0cf83086 (pagetest@testexample.com)
+      user_0c7d7ef8ec2b (test_auth_router_212674f4@example.com)
+      user_6f0799eff3dd (test_register_e718b92d@example.com)
+      user_7a1444638652 (test_auth_router_de60fa18@example.com)
+      user_7da31a5e4f42 (test_auth_router_bc17e3e6@example.com)
+      user_8c2b44d97637 (pageagent@testexample.com)
+      user_97d20257238a (test_register_d0fb4a2e@example.com)
+      user_aa693003a2e8 (test_register_8185d37f@example.com)
+      user_dddb3bd4a254 (test_email_6aba0ab3@example.com)
+    Likely production users:          0
+  Trusts (total):                    2
+    Demo trusts:                      2
+    Production trusts:                0
+
+  User ↔ Trust mapping:
+    user_083a0cf83086 [DEMO] → (no trusts)
+    user_0c7d7ef8ec2b [DEMO] → (no trusts)
+    user_6f0799eff3dd [DEMO] → (no trusts)
+    user_7a1444638652 [DEMO] → (no trusts)
+    user_7da31a5e4f42 [DEMO] → (no trusts)
+    user_8c2b44d97637 [DEMO] → trust_3a3d11395029
+    user_8c2b44d97637 [DEMO] → trust_18eebacb8ea4
+    user_97d20257238a [DEMO] → (no trusts)
+    user_aa693003a2e8 [DEMO] → (no trusts)
+    user_dddb3bd4a254 [DEMO] → (no trusts)
+
+
+======================================================================
+  BUG IMPACT VERDICT
+======================================================================
+
+  Trusts fully allocated (remaining=0): 1
+    Demo trusts:  1
+    Real trusts:  0
+
+  Result: Only demo trusts are fully allocated.
+  The collection-mismatch bug originally caused the demo data to be invisible
+  to the app (read from PLURAL, data in SINGULAR). After the migration, the data
+  is now correctly in trust_units_settings (plural).
+  remaining=0 is CORRECT for trust_3a3d11395029 — 4 certificates use all 100 units.
+  A user hitting 'cannot add beneficiary' is not a bug — the trust is genuinely full.
+  To add more beneficiaries, increase authorized_units.
+
+  Affected accounts (by trust_id):
+    trust_3a3d11395029  user=user_8c2b44d97637  auth=100  used=100  remaining=0  [DEMO data (bug-exposed)]
+
+  Could OTHER accounts be affected?
+  → No production users exist in this database.
+
+  → The collection-mismatch bug ONLY affects trusts seeded via the demo seeder.
+    No production trusts exist in the current database.
+    The fix + migration fully resolves the issue for all affected accounts.
+
+======================================================================
+  AUDIT COMPLETE
+======================================================================

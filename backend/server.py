@@ -500,6 +500,12 @@ async def startup_event():
         # Trust indexes
         await db.trusts.create_index("user_id")
         await db.trusts.create_index("trust_id", unique=True)
+        await db.trust_unit_certificates.create_index(
+            [("trust_id", 1), ("user_id", 1), ("certificate_number", 1)], unique=True
+        )
+        await db.trust_unit_counters.create_index(
+            [("trust_id", 1), ("user_id", 1)], unique=True
+        )
         # Partial unique index on wingpoint_ref — only string values participate
         # so older trusts without a wingpoint_ref don't collide on null.
         await db.trusts.create_index(

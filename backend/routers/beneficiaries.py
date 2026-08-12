@@ -154,42 +154,51 @@ async def get_beneficiary_dashboard(
     total_authorized = settings["total_authorized_units"]
     unit_label = settings.get("unit_label", "Certificate Unit")
     
-    # Get all active certificates
-    certificates = await db.trust_unit_certificates.find(
-        {"trust_id": trust_id, "user_id": user_id, "status": "active"},
-        {"_id": 0}
-    ).to_list(1000)
-    
-    # Aggregate by holder (use composite key to avoid merging different entities with same name)
-    holder_map = {}
-    for cert in certificates:
-        holder_key = (cert["holder_name"], cert.get("holder_identifier") or "", cert.get("holder_type") or "individual")
-        holder = cert["holder_name"]
-        if holder_key not in holder_map:
-            holder_map[holder_key] = {
-                "holder_name": holder,
-                "holder_identifier": cert.get("holder_identifier"),
-                "holder_type": cert.get("holder_type", "individual"),
-                "email": cert.get("email"),
-                "phone": cert.get("phone"),
-                "total_units": 0,
-                "certificates": []
+    # Aggregate certificates directly in MongoDB for correctness at any scale
+    pipeline = [
+        {"$match": {"trust_id": trust_id, "user_id": user_id, "status": "active"}},
+        {
+            "$group": {
+                "_id": {
+                    "holder_name": "$holder_name",
+                    "holder_identifier": {"$ifNull": ["$holder_identifier", ""]},
+                    "holder_type": {"$ifNull": ["$holder_type", "individual"]},
+                },
+                "holder_identifier": {"$first": "$holder_identifier"},
+                "holder_type": {"$first": {"$ifNull": ["$holder_type", "individual"]}},
+                "email": {"$first": "$email"},
+                "phone": {"$first": "$phone"},
+                "total_units": {"$sum": "$units"},
+                "certificates": {
+                    "$push": {
+                        "certificate_id": "$certificate_id",
+                        "certificate_number": "$certificate_number",
+                        "units": "$units",
+                        "issue_date": "$issue_date",
+                        "notes": {"$ifNull": ["$notes", ""]},
+                        "email": {"$ifNull": ["$email", ""]},
+                        "phone": {"$ifNull": ["$phone", ""]},
+                    }
+                },
             }
-        holder_map[holder_key]["total_units"] += cert["units"]
-        holder_map[holder_key]["certificates"].append({
-            "certificate_id": cert["certificate_id"],
-            "certificate_number": cert["certificate_number"],
-            "units": cert["units"],
-            "issue_date": cert["issue_date"],
-            "notes": cert.get("notes", ""),
-            "email": cert.get("email", ""),
-            "phone": cert.get("phone", ""),
-        })
-    
+        },
+        {"$sort": {"total_units": -1}},
+    ]
+    agg_results = await db.trust_unit_certificates.aggregate(pipeline).to_list(None)
+
     # Build beneficiary allocations with percentages
     beneficiaries = []
     total_issued = 0
-    for holder_data in holder_map.values():
+    for row in agg_results:
+        holder_data = {
+            "holder_name": row["_id"]["holder_name"],
+            "holder_identifier": row["holder_identifier"],
+            "holder_type": row["holder_type"],
+            "email": row["email"],
+            "phone": row["phone"],
+            "total_units": row["total_units"],
+            "certificates": row["certificates"],
+        }
         percentage = (holder_data["total_units"] / total_authorized * 100) if total_authorized > 0 else 0
         total_issued += holder_data["total_units"]
         beneficiaries.append(BeneficiaryAllocation(
@@ -204,9 +213,6 @@ async def get_beneficiary_dashboard(
             certificates=holder_data["certificates"]
         ))
     
-    # Sort by total_units descending
-    beneficiaries.sort(key=lambda x: x.total_units, reverse=True)
-    
     # Get class beneficiaries
     class_beneficiaries = await db.class_beneficiaries.find(
         {"trust_id": trust_id, "user_id": user_id},
@@ -218,7 +224,12 @@ async def get_beneficiary_dashboard(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0}
     ).sort("created_at", -1).limit(10).to_list(10)
-    
+
+    # Total active certificate count for metadata
+    active_cert_count = await db.trust_unit_certificates.count_documents(
+        {"trust_id": trust_id, "user_id": user_id, "status": "active"}
+    )
+
     return BeneficiaryDashboardResponse(
         trust_id=trust_id,
         trust_name=trust_name,
@@ -226,7 +237,7 @@ async def get_beneficiary_dashboard(
         total_issued_units=total_issued,
         remaining_units=total_authorized - total_issued,
         unit_label=unit_label,
-        active_certificate_count=len(certificates),
+        active_certificate_count=active_cert_count,
         beneficiaries=beneficiaries,
         class_beneficiaries=class_beneficiaries,
         recent_transfers=transfers
@@ -263,14 +274,46 @@ async def create_beneficiary(
     # Get unit settings to convert allocation_pct to units
     settings = await get_or_create_units_settings(data.trust_id, user_id)
     total_authorized = settings.get("total_authorized_units", 0)
+    allow_fractional = settings.get("allow_fractional", False)
+
+    if total_authorized <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Trust has no authorized units. Configure unit settings first."
+        )
 
     allocation_pct = data.allocation_pct
-    if total_authorized > 0 and isinstance(allocation_pct, (int, float)) and allocation_pct < 100:
-        units = max(1, round(total_authorized * allocation_pct / 100))
-    elif isinstance(allocation_pct, (int, float)):
-        units = int(allocation_pct) if allocation_pct > 0 else 1
+    if allocation_pct is None:
+        raise HTTPException(
+            status_code=400,
+            detail="allocation_pct is required (percentage > 0)"
+        )
+    if not isinstance(allocation_pct, (int, float)) or allocation_pct <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="allocation_pct must be a positive number greater than 0"
+        )
+
+    # Convert percentage to units
+    raw_units = total_authorized * allocation_pct / 100.0
+
+    if allow_fractional:
+        units = round(raw_units, 4)
     else:
-        units = 1
+        units = round(raw_units)
+
+    if units <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"allocation_pct of {allocation_pct}% resolves to zero units "
+                f"(raw={raw_units}, allow_fractional={allow_fractional}). "
+                f"Increase the percentage or enable fractional units."
+            )
+        )
+
+    # Effective percentage back-calculated from final units for the response
+    effective_pct = round(units / total_authorized * 100, 4)
 
     cert_create = TrustUnitCertificateCreate(
         trust_id=data.trust_id,
@@ -295,7 +338,12 @@ async def create_beneficiary(
             await auto_update_onboarding(user_id, data.trust_id)
         except Exception:
             pass
-        return result
+        # Enrich response with the effective values derived from allocation_pct
+        response = dict(result) if hasattr(result, "__dict__") else dict(result)
+        response["requested_allocation_pct"] = allocation_pct
+        response["effective_pct"] = effective_pct
+        response["effective_units"] = units
+        return response
     except HTTPException as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
     except Exception as e:
@@ -420,7 +468,7 @@ async def send_beneficiary_certificate(
             "status": "active",
         },
         {"_id": 0}
-    ).to_list(100)
+    ).to_list(5000)
 
     if not certs:
         raise HTTPException(

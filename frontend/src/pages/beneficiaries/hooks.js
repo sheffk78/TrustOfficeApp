@@ -18,13 +18,19 @@ export function useBeneficiariesData(selectedTrust, onSummaryLoaded) {
 
   const loadOverviewData = useCallback(async () => {
     if (!selectedTrust) return;
+    setLoading(true);
     try {
       const response = await fetchWithAuth(`/beneficiaries/dashboard?trust_id=${selectedTrust.trust_id}`);
       if (response.ok) {
         setOverviewData(await response.json());
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to load overview (${response.status})`), { operation: 'load', page: 'Beneficiaries' });
       }
     } catch (error) {
-      console.error('Failed to load overview:', error);
+      showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
+    } finally {
+      setLoading(false);
     }
   }, [selectedTrust]);
 
@@ -38,9 +44,12 @@ export function useBeneficiariesData(selectedTrust, onSummaryLoaded) {
         setSummary(data);
         if (onSummaryLoaded) onSummaryLoaded(data);
         return data;
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to load certificates (${response.status})`), { operation: 'load', page: 'Beneficiaries' });
       }
     } catch (error) {
-      console.error('Failed to load certificates:', error);
+      showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
     } finally {
       setLoading(false);
     }
@@ -129,8 +138,20 @@ export function useCertificateForm(selectedTrust, isReadOnly, showUpgradeModal, 
     }
 
     const units = parseFloat(certificateForm.units);
+    if (isNaN(units) || units <= 0) {
+      toast.error('Units must be a positive number');
+      return;
+    }
+    if (summary?.settings?.allow_fractional === false && !Number.isInteger(units)) {
+      toast.error('Fractional units are not allowed. Please enter a whole number.');
+      return;
+    }
     if (!editingCertificate && summary && units > summary.remaining_units) {
       toast.error(`Cannot issue ${units} units. Only ${summary.remaining_units} units remaining.`);
+      return;
+    }
+    if (!editingCertificate && !summary) {
+      toast.error('Trust data is still loading. Please try again in a moment.');
       return;
     }
 
@@ -211,6 +232,10 @@ export function useTransferForm(selectedTrust, isReadOnly, showUpgradeModal, sum
       toast.error('All fields are required');
       return;
     }
+    if (transferForm.from_certificate_id === transferForm.to_certificate_id) {
+      toast.error('Cannot transfer units to the same certificate. Please select a different destination.');
+      return;
+    }
     try {
       const fromCert = summary?.certificates?.find(c => c.certificate_id === transferForm.from_certificate_id);
       if (!fromCert) {
@@ -222,14 +247,25 @@ export function useTransferForm(selectedTrust, isReadOnly, showUpgradeModal, sum
         toast.error('Invalid destination certificate');
         return;
       }
+      const units = parseFloat(transferForm.units);
+      if (isNaN(units) || units <= 0) {
+        toast.error('Units must be a positive number');
+        return;
+      }
+      if (fromCert.units < units) {
+        toast.error(`Cannot transfer ${units} units. ${fromCert.holder_name} only has ${fromCert.units} units.`);
+        return;
+      }
 
       const response = await fetchWithAuth('/trust-units/transfers', {
         method: 'POST',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
+          from_certificate_id: fromCert.certificate_id,
+          to_certificate_id: toCert.certificate_id,
           from_holder: fromCert.holder_name,
           to_holder: toCert.holder_name,
-          units: parseFloat(transferForm.units),
+          units: units,
           reason: transferForm.reason || 'Transfer'
         })
       });
@@ -275,6 +311,9 @@ export function useRevoke(selectedTrust, loadCertificatesData, loadOverviewData)
         setRevokeReason('');
         loadCertificatesData();
         loadOverviewData();
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Revoke failed (${response.status})`), { operation: 'revoke', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'revoke', page: 'Beneficiaries' });
@@ -315,12 +354,18 @@ export function useSettings(selectedTrust, isReadOnly, showUpgradeModal, loadCer
   }, [isReadOnly, showUpgradeModal]);
 
   const handleSaveSettings = useCallback(async () => {
+    const totalAuthorized = parseFloat(settingsForm.total_authorized_units);
+    if (isNaN(totalAuthorized) || totalAuthorized <= 0) {
+      toast.error('Total authorized units must be a positive number');
+      return;
+    }
     try {
       const response = await fetchWithAuth('/trust-units/settings', {
         method: 'PATCH',
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
-          ...settingsForm
+          ...settingsForm,
+          total_authorized_units: totalAuthorized
         })
       });
       if (response.ok) {
@@ -393,6 +438,11 @@ export function useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal,
       toast.error('Class type is required');
       return;
     }
+    const percentage = parseFloat(classBeneficiaryForm.percentage);
+    if (classBeneficiaryForm.percentage !== '' && (isNaN(percentage) || percentage <= 0 || percentage > 100)) {
+      toast.error('Percentage must be between 0 and 100');
+      return;
+    }
     try {
       const response = await fetchWithAuth('/beneficiaries/class-beneficiaries', {
         method: 'POST',
@@ -426,6 +476,9 @@ export function useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal,
       if (response.ok) {
         toast.success('Class Beneficiary removed');
         loadOverviewData();
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, new Error(errBody.detail || `Failed to remove Class Beneficiary (${response.status})`), { operation: 'remove', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'remove', page: 'Beneficiaries' });
@@ -477,7 +530,15 @@ export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summa
     }
 
     const totalAuthorized = summary?.settings?.total_authorized_units || 100;
-    const units = (pct / 100) * totalAuthorized;
+    let units = (pct / 100) * totalAuthorized;
+    if (summary?.settings?.allow_fractional !== true) {
+      units = Math.round(units);
+    }
+
+    if (units <= 0) {
+      toast.error('Share is too small to allocate a unit.');
+      return;
+    }
 
     if (summary && units > summary.remaining_units) {
       toast.error(`Cannot allocate ${pct}%. Only ${summary.remaining_units} units available (${((summary.remaining_units / totalAuthorized) * 100).toFixed(1)}%).`);

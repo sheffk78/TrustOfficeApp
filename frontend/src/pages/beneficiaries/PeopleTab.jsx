@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Users, Plus, Bot } from 'lucide-react';
+import { Users, Plus, Bot, AlertCircle, Settings } from 'lucide-react';
 import { extractRelationship } from './constants';
 
 // ========== PEOPLE TAB ==========
@@ -8,9 +8,27 @@ export function PeopleTab({
   overviewData,
   loading,
   handleOpenPersonModal,
+  summary,
+  setShowSettingsModal,
 }) {
   return (
     <>
+      {/* Fully Allocated Warning */}
+      {summary && summary.remaining_units === 0 && (
+        <div className="mb-6 p-4 border-2 border-gold/40 bg-gold/5 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-mono text-xs font-medium text-navy mb-1">All {(summary.settings?.total_authorized_units || 100)} {(summary.settings?.unit_label || 'Unit')}s are allocated</p>
+            <p className="text-sm text-muted-foreground mb-2">To add another beneficiary, increase the authorized units or cancel an existing certificate.</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowSettingsModal?.(true)} className="font-mono text-xs">
+                <Settings className="w-3.5 h-3.5 mr-1" /> Increase Authorized Units
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Primary CTA */}
       <div className="card-trust p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -19,7 +37,7 @@ export function PeopleTab({
               Add the people you want to benefit from this trust
             </p>
           </div>
-          <Button className="btn-primary" onClick={handleOpenPersonModal} data-testid="add-beneficiary-btn">
+          <Button className="btn-primary" onClick={handleOpenPersonModal} disabled={summary && summary.remaining_units === 0} data-testid="add-beneficiary-btn">
             <Plus className="w-4 h-4 mr-2" />
             Add Beneficiary
           </Button>
@@ -46,7 +64,7 @@ export function PeopleTab({
             <p className="text-sm text-muted-foreground mb-4">
               Add a person — like a spouse, child, or charity — and choose what share of the trust they receive.
             </p>
-            <Button className="btn-primary" onClick={handleOpenPersonModal} data-testid="empty-add-beneficiary-btn">
+            <Button className="btn-primary" onClick={handleOpenPersonModal} disabled={summary && summary.remaining_units === 0} data-testid="empty-add-beneficiary-btn">
               <Plus className="w-4 h-4 mr-2" /> Add Your First Beneficiary
             </Button>
           </div>

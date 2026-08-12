@@ -137,7 +137,7 @@ export const hasMultipleTrustsAvailable = (trusts, selectedTrust) =>
   Boolean(trusts && trusts.length > 1 && selectedTrust);
 
 export const canSelectTrustHolder = (trusts, selectedTrust) =>
-  isTrustHolder && trusts && trusts.length > 0 && Boolean(selectedTrust);
+  isTrustHolder({ holder_type: 'trust' }) && trusts && trusts.length > 0 && Boolean(selectedTrust);
 
 export const isFullyAllocated = (summary) =>
   Boolean(summary && summary.remaining_units === 0);

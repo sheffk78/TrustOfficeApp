@@ -26,8 +26,8 @@ router = APIRouter(tags=["trusts"])
 
 # Collections to clean up when deleting demo data
 _DEMO_CLEANUP_COLLECTIONS = [
-    "trust_unit_certificates", "trust_unit_transfers", "trust_units_settings",
-    "vault_documents", "governance_tasks", "tax_calendar", "minutes_records",
+    "trust_unit_certificates", "trust_unit_transfers", "trust_unit_counters", "trust_units_settings",
+    "trust_unit_settings", "vault_documents", "governance_tasks", "tax_calendar", "minutes_records",
     "minutes_templates", "entities", "benevolence_logs", "compensation_payments",
     "bank_accounts", "bank_statements", "distributions", "investments",
 ]
@@ -40,7 +40,7 @@ _TRUST_CASCADE_COLLECTIONS = [
     "trust_state_compliance", "investments", "transactions", "communications",
     "vault_documents", "separation_alerts", "beneficiaries", "schedule_a",
     "chat_conversations", "trust_document_analysis", "trust_unit_certificates",
-    "trust_unit_transfers", "trust_unit_settings", "schedule_a_items",
+    "trust_unit_transfers", "trust_unit_counters", "trust_unit_settings", "schedule_a_items",
     "dismissed_insights", "class_beneficiaries", "expenses", "bank_accounts",
     "bank_statements", "trust_admin_kits", "ai_suggestion_cache",
     "trust_units_settings", "benevolence_records", "risk_findings_cache",

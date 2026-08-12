@@ -700,7 +700,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     ])
     
     # ==================== TRUST UNIT CERTIFICATES (Trust 1) ====================
-    await db.trust_unit_settings.insert_one({
+    await db.trust_units_settings.insert_one({
         "trust_id": trust1_id,
         "user_id": user["user_id"],
         "total_authorized_units": 100,
@@ -1250,7 +1250,7 @@ async def delete_demo_data(user: dict = Depends(require_write_access)):
         ("class_beneficiaries", "class_beneficiaries"),
         ("trust_unit_certificates", "trust_unit_certificates"),
         ("trust_unit_transfers", "trust_unit_transfers"),
-        ("trust_unit_settings", "trust_unit_settings"),
+        ("trust_units_settings", "trust_units_settings"),
         ("compensation_payments", "compensation_payments"),
         ("compensation_plans", "compensation_plans"),
         ("benevolence_records", "benevolence_records"),
@@ -1310,7 +1310,7 @@ async def get_demo_status(user: dict = Depends(get_current_user)):
         "chat_conversations": await db.chat_conversations.count_documents({"user_id": user_id}),
         "trust_document_analysis": await db.trust_document_analysis.count_documents({"user_id": user_id}),
         "entity_relationships": await db.entity_relationships.count_documents({"user_id": user_id}),
-        "trust_unit_settings": await db.trust_unit_settings.count_documents({"user_id": user_id}),
+        "trust_units_settings": await db.trust_units_settings.count_documents({"user_id": user_id}),
         "trust_unit_transfers": await db.trust_unit_transfers.count_documents({"user_id": user_id}),
     }
     
@@ -1334,7 +1334,7 @@ async def get_demo_status(user: dict = Depends(get_current_user)):
         "chat_conversations": await db.chat_conversations.count_documents({"user_id": user_id, "is_demo": True}),
         "trust_document_analysis": await db.trust_document_analysis.count_documents({"user_id": user_id, "is_demo": True}),
         "entity_relationships": await db.entity_relationships.count_documents({"user_id": user_id, "is_demo": True}),
-        "trust_unit_settings": await db.trust_unit_settings.count_documents({"user_id": user_id, "is_demo": True}),
+        "trust_units_settings": await db.trust_units_settings.count_documents({"user_id": user_id, "is_demo": True}),
         "trust_unit_transfers": await db.trust_unit_transfers.count_documents({"user_id": user_id, "is_demo": True}),
     }
     

@@ -530,7 +530,9 @@ class TrustUnitCertificateResponse(BaseModel):
 class TrustUnitTransferCreate(BaseModel):
     trust_id: str
     from_holder: Optional[str] = None
+    from_certificate_id: Optional[str] = None
     to_holder: str
+    to_certificate_id: Optional[str] = None
     units: float
     reason: str
     minutes_record_id: Optional[str] = None

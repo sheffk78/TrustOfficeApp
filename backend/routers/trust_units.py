@@ -5,6 +5,9 @@ from typing import List, Optional
 import uuid
 import io
 import base64
+import math
+
+from pymongo import ReturnDocument
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -202,21 +205,64 @@ async def get_total_active_units(trust_id: str, user_id: str, exclude_certificat
     if exclude_certificate_id:
         query["certificate_id"] = {"$ne": exclude_certificate_id}
     
-    certificates = await db.trust_unit_certificates.find(query, {"_id": 0, "units": 1}).to_list(1000)
-    return sum(cert.get("units", 0) for cert in certificates)
+    pipeline = [{"$match": query}, {"$group": {"_id": None, "total": {"$sum": "$units"}}}]
+    rows = await db.trust_unit_certificates.aggregate(pipeline).to_list(None)
+    return rows[0].get("total", 0) if rows else 0
+
+
+async def _initialize_unit_counter(trust_id: str, user_id: str):
+    """Initialize the counter from existing data, without overwriting a live counter."""
+    active = await get_total_active_units(trust_id, user_id)
+    latest = await db.trust_unit_certificates.find(
+        {"trust_id": trust_id, "user_id": user_id}, {"certificate_number": 1}
+    ).sort("certificate_number", -1).limit(1).to_list(1)
+    next_number = 1
+    if latest:
+        try:
+            next_number = int(str(latest[0].get("certificate_number", "")).split("-")[-1]) + 1
+        except (ValueError, TypeError):
+            next_number = await db.trust_unit_certificates.count_documents({"trust_id": trust_id, "user_id": user_id}) + 1
+    await db.trust_unit_counters.update_one(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"$setOnInsert": {"trust_id": trust_id, "user_id": user_id,
+                           "next_cert_number": next_number, "reserved_units": active}},
+        upsert=True,
+    )
 
 
 async def get_next_certificate_number(trust_id: str, user_id: str) -> str:
-    """Get the next sequential certificate number for a trust"""
-    count = await db.trust_unit_certificates.count_documents({
-        "trust_id": trust_id,
-        "user_id": user_id
-    })
-    return f"CU-{str(count + 1).zfill(3)}"
+    """Atomically allocate the next certificate number for a trust."""
+    await _initialize_unit_counter(trust_id, user_id)
+    counter = await db.trust_unit_counters.find_one_and_update(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"$inc": {"next_cert_number": 1}},
+        projection={"next_cert_number": 1}, return_document=ReturnDocument.BEFORE,
+    )
+    return f"CU-{str(counter['next_cert_number']).zfill(3)}"
+
+
+async def reserve_units(trust_id: str, user_id: str, units: float, authorized: float) -> str:
+    """Atomically reserve capacity and allocate a certificate number."""
+    await _initialize_unit_counter(trust_id, user_id)
+    counter = await db.trust_unit_counters.find_one_and_update(
+        {"trust_id": trust_id, "user_id": user_id,
+         "reserved_units": {"$lte": authorized - units}},
+        {"$inc": {"reserved_units": units, "next_cert_number": 1}},
+        projection={"next_cert_number": 1}, return_document=ReturnDocument.BEFORE,
+    )
+    if not counter:
+        current = await get_total_active_units(trust_id, user_id)
+        raise HTTPException(status_code=400, detail=f"Cannot issue {units} units. Only {authorized - current} units remaining.")
+    return f"CU-{str(counter['next_cert_number']).zfill(3)}"
 
 
 def validate_units(units: float, allow_fractional: bool) -> float:
-    """Validate and normalize unit value"""
+    """Validate and normalize unit value, rejecting NaN and infinity."""
+    try:
+        if not math.isfinite(float(units)):
+            raise ValueError
+    except (TypeError, ValueError, OverflowError):
+        raise HTTPException(status_code=400, detail="Units must be a finite number")
     if not allow_fractional:
         if units != int(units):
             raise HTTPException(
@@ -250,7 +296,7 @@ async def get_trust_units_summary(
     certificates_raw = await db.trust_unit_certificates.find(
         {"trust_id": trust_id, "user_id": user["user_id"]},
         {"_id": 0}
-    ).sort("certificate_number", 1).to_list(1000)
+    ).sort("certificate_number", 1).to_list(None)
     
     total_authorized = settings["total_authorized_units"]
     
@@ -343,18 +389,9 @@ async def create_unit_certificate(
     if units <= 0:
         raise HTTPException(status_code=400, detail="Units must be greater than 0")
     
-    current_active = await get_total_active_units(certificate.trust_id, user["user_id"])
     total_authorized = settings["total_authorized_units"]
-    
-    if current_active + units > total_authorized:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot issue {units} units. Only {total_authorized - current_active} units remaining. "
-                   f"(Active: {current_active}, Authorized: {total_authorized})"
-        )
-    
     certificate_id = f"cert_{uuid.uuid4().hex[:12]}"
-    certificate_number = await get_next_certificate_number(certificate.trust_id, user["user_id"])
+    certificate_number = await reserve_units(certificate.trust_id, user["user_id"], units, total_authorized)
     
     cert_doc = _build_cert_doc(certificate_id, certificate.trust_id, user["user_id"], certificate, units, certificate_number)
     
@@ -407,6 +444,8 @@ async def update_unit_certificate(
     if update.phone is not None:
         update_fields["phone"] = update.phone
     if update.status is not None:
+        if update.status.value != cert["status"]:
+            raise HTTPException(status_code=400, detail="Status changes must use the dedicated revoke or transfer endpoint")
         update_fields["status"] = update.status.value
     
     if update.units is not None:
@@ -415,24 +454,16 @@ async def update_unit_certificate(
         if units <= 0:
             raise HTTPException(status_code=400, detail="Units must be greater than 0")
         
-        current_active_excluding_this = await get_total_active_units(
-            cert["trust_id"], 
-            user["user_id"], 
-            exclude_certificate_id=certificate_id
-        )
-        
-        new_status = update.status.value if update.status else cert["status"]
-        if new_status == "active":
-            total_authorized = settings["total_authorized_units"]
-            if current_active_excluding_this + units > total_authorized:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot update to {units} units. Would exceed authorized total. "
-                           f"(Other active: {current_active_excluding_this}, Authorized: {total_authorized})"
-                )
-        
+        delta = units - cert["units"]
+        if cert["status"] == "active" and delta > 0:
+            await reserve_units(cert["trust_id"], user["user_id"], delta, settings["total_authorized_units"])
+        elif cert["status"] == "active" and delta < 0:
+            await db.trust_unit_counters.update_one(
+                {"trust_id": cert["trust_id"], "user_id": user["user_id"]},
+                {"$inc": {"reserved_units": delta}}
+            )
         update_fields["units"] = units
-    
+
     await db.trust_unit_certificates.update_one(
         {"certificate_id": certificate_id},
         {"$set": update_fields}
@@ -474,7 +505,7 @@ async def list_unit_certificates(
     if status:
         query["status"] = status
     
-    certificates = await db.trust_unit_certificates.find(query, {"_id": 0}).sort("certificate_number", 1).to_list(1000)
+    certificates = await db.trust_unit_certificates.find(query, {"_id": 0}).sort("certificate_number", 1).to_list(None)
     
     result = []
     for cert in certificates:
@@ -507,6 +538,8 @@ async def revoke_unit_certificate(
     
     if cert["status"] != "active":
         raise HTTPException(status_code=400, detail=f"Cannot revoke certificate with status '{cert['status']}'. Only active certificates can be revoked.")
+    if revoke.trust_id != cert["trust_id"]:
+        raise HTTPException(status_code=400, detail="trust_id does not match the certificate's trust")
     
     now = datetime.now(timezone.utc).isoformat()
     
@@ -524,7 +557,7 @@ async def revoke_unit_certificate(
     # Record a transfer entry for audit trail
     transfer_doc = {
         "transfer_id": f"transfer_{uuid.uuid4().hex[:12]}",
-        "trust_id": revoke.trust_id,
+        "trust_id": cert["trust_id"],
         "user_id": user["user_id"],
         "from_holder": cert["holder_name"],
         "to_holder": None,
@@ -543,7 +576,11 @@ async def revoke_unit_certificate(
         {"_id": 0}
     )
     
-    settings = await get_or_create_units_settings(revoke.trust_id, user["user_id"])
+    await db.trust_unit_counters.update_one(
+        {"trust_id": cert["trust_id"], "user_id": user["user_id"]},
+        {"$inc": {"reserved_units": -cert["units"]}}
+    )
+    settings = await get_or_create_units_settings(cert["trust_id"], user["user_id"])
     total_authorized = settings["total_authorized_units"]
     percentage = _calc_percentage(updated_cert["units"], total_authorized)
     
@@ -595,13 +632,17 @@ async def create_unit_transfer(
     if units <= 0:
         raise HTTPException(status_code=400, detail="Transfer units must be greater than 0")
     
-    if transfer.from_holder:
-        from_cert = await db.trust_unit_certificates.find_one({
+    if transfer.from_holder or transfer.from_certificate_id:
+        source_query = {
             "trust_id": transfer.trust_id,
             "user_id": user["user_id"],
-            "holder_name": transfer.from_holder,
             "status": "active"
-        }, {"_id": 0})
+        }
+        if transfer.from_certificate_id:
+            source_query["certificate_id"] = transfer.from_certificate_id
+        else:
+            source_query["holder_name"] = transfer.from_holder
+        from_cert = await db.trust_unit_certificates.find_one(source_query, {"_id": 0})
         
         if not from_cert:
             raise HTTPException(
@@ -648,13 +689,20 @@ async def create_unit_transfer(
                 "updated_at": None
             }
             await db.trust_unit_certificates.insert_one(remainder_cert)
+    else:
+        # No source means new issuance; reserve capacity atomically.
+        await reserve_units(transfer.trust_id, user["user_id"], units, settings["total_authorized_units"])
     
-    existing_to_cert = await db.trust_unit_certificates.find_one({
+    destination_query = {
         "trust_id": transfer.trust_id,
         "user_id": user["user_id"],
-        "holder_name": transfer.to_holder,
         "status": "active"
-    }, {"_id": 0})
+    }
+    if transfer.to_certificate_id:
+        destination_query["certificate_id"] = transfer.to_certificate_id
+    else:
+        destination_query["holder_name"] = transfer.to_holder
+    existing_to_cert = await db.trust_unit_certificates.find_one(destination_query, {"_id": 0})
     
     if existing_to_cert:
         combined_units = existing_to_cert["units"] + units
@@ -742,7 +790,7 @@ async def list_unit_transfers(
     transfers = await db.trust_unit_transfers.find(
         {"trust_id": trust_id, "user_id": user["user_id"]},
         {"_id": 0}
-    ).sort("created_at", -1).to_list(1000)
+    ).sort("created_at", -1).to_list(None)
     
     return [TrustUnitTransferResponse(**t) for t in transfers]
 

@@ -1,7 +1,8 @@
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   PieChart, Award, FileCheck, Users, Plus,
-  ChevronDown, ChevronUp, Bot, Pencil,
+  ChevronDown, ChevronUp, Bot, Pencil, AlertCircle, Settings,
 } from 'lucide-react';
 import { OwnershipPieChart } from './OwnershipPieChart';
 import { beneficiaryKey, formatDate } from './constants';
@@ -61,7 +62,7 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
         <div className="flex items-center gap-6">
           <div className="text-right">
             <p className="font-mono text-lg text-navy dark:text-foreground">{ben.total_units}</p>
-            <p className="text-xs text-muted-foreground">{overviewData.unit_label}s</p>
+            <p className="text-xs text-muted-foreground">{(overviewData.unit_label || 'Unit') + 's'}</p>
           </div>
           <div className="text-right min-w-[80px]">
             <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
@@ -170,6 +171,22 @@ export function OverviewTab({
           value={overviewData.beneficiaries.length}
         />
       </div>
+
+      {/* Fully Allocated Warning */}
+      {overviewData.remaining_units === 0 && (
+        <div className="mb-6 p-4 border-2 border-gold/40 bg-gold/5 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-mono text-xs font-medium text-navy mb-1">All {overviewData.total_authorized_units || 100} {overviewData.unit_label || 'Unit'}s are allocated</p>
+            <p className="text-sm text-muted-foreground mb-2">To add another beneficiary, increase the authorized units or cancel an existing certificate.</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setActiveTab('certificates')} className="font-mono text-xs">
+                <Settings className="w-3.5 h-3.5 mr-1" /> Go to Shares
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pie Chart & Holder List */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

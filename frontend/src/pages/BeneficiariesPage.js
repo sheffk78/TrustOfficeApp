@@ -154,6 +154,8 @@ export default function BeneficiariesPage() {
                 overviewData={overviewData}
                 loading={loading}
                 handleOpenPersonModal={personForm.handleOpenPersonModal}
+                summary={summary}
+                setShowSettingsModal={settings.setShowSettingsModal}
               />
             </TabsContent>
 
@@ -162,6 +164,7 @@ export default function BeneficiariesPage() {
               <OverviewTab
                 overviewData={overviewData}
                 loading={loading}
+                summary={summary}
                 expandedHolder={expandedHolder}
                 setExpandedHolder={setExpandedHolder}
                 openEditModal={certForm.openEditModal}
