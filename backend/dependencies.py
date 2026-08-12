@@ -150,7 +150,12 @@ def _build_forever_free_state(user_id: str, sub: dict) -> SubscriptionState:
 
 
 def _apply_gift_fields_to_free_state(state: SubscriptionState, sub: dict, now: datetime):
-    """Apply gifted fields and expiration checks to a free-plan state (in-place)."""
+    """Apply gifted fields and expiration checks to a free-plan state (in-place).
+
+    A gifted free user (sub['gifted'] truthy) has FULL write access while the
+    gift is active, and drops to read-only once it expires. Non-gifted free
+    users stay read-only (set by _build_free_state).
+    """
     if not sub.get("gifted"):
         return
 
@@ -163,18 +168,39 @@ def _apply_gift_fields_to_free_state(state: SubscriptionState, sub: dict, now: d
         if end:
             state.gift_days_remaining = max(0, (end - now).days)
             if end < now:
+                # Gift expired -> read-only
                 state.status = "expired"
                 state.is_active = False
                 state.is_read_only = True
+                state.is_trial = False
+            else:
+                # Active gift -> full write access
+                state.is_active = True
+                state.is_read_only = False
                 state.is_trial = False
     elif sub.get("trial_end_date"):
         end = _parse_iso_datetime(sub["trial_end_date"])
         if end:
             state.gift_days_remaining = max(0, (end - now).days)
+            if end >= now:
+                # Active gift (trial-based) -> full write access
+                state.is_active = True
+                state.is_read_only = False
+                state.is_trial = False
+            else:
+                state.status = "expired"
+                state.is_active = False
+                state.is_read_only = True
+                state.is_trial = False
 
 
 def _build_free_state(user_id: str, sub: dict, now: datetime) -> SubscriptionState:
-    """Build SubscriptionState for a free-plan user, including gift handling."""
+    """Build SubscriptionState for a free-plan user, including gift handling.
+
+    FREE users (non-gifted) are READ-ONLY: they can view their own data but
+    cannot do write work. Gifted users get full write access while their gift
+    is active (handled in _apply_gift_fields_to_free_state).
+    """
     state = SubscriptionState(
         user_id=user_id,
         subscription_id=sub.get("subscription_id"),
@@ -185,7 +211,7 @@ def _build_free_state(user_id: str, sub: dict, now: datetime) -> SubscriptionSta
         trial_days_remaining=None,
         is_trial=True,
         is_active=True,
-        is_read_only=False,
+        is_read_only=True,
         stripe_customer_id=sub.get("stripe_customer_id"),
         stripe_subscription_id=sub.get("stripe_subscription_id"),
         current_period_end=sub.get("current_period_end"),

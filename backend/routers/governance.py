@@ -6,7 +6,7 @@ import uuid
 
 from database import db
 from dependencies import (
-    get_current_user, get_subscription_state, 
+    get_current_user, get_subscription_state, require_write_access,
     check_feature_access, Feature,
     PREMIUM_FEATURE_ERROR_MESSAGE, PREMIUM_FEATURE_ERROR_CODE
 )
@@ -1118,7 +1118,7 @@ async def get_onboarding(user: dict = Depends(get_current_user)):
 
 
 @router.patch("/onboarding")
-async def update_onboarding(updates: dict, user: dict = Depends(get_current_user)):
+async def update_onboarding(updates: dict, user: dict = Depends(require_write_access)):
     """Update onboarding state — records manual overrides for toggled fields."""
     allowed_fields = ["formation_date_added", "ein_entered", "trust_doc_uploaded", "ein_doc_uploaded", "beneficiaries_added", "assets_added", "minutes_generated", "calendar_set", "checklist_dismissed", "successor_trustee_added"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
@@ -1142,7 +1142,7 @@ async def update_onboarding(updates: dict, user: dict = Depends(get_current_user
 
 
 @router.post("/onboarding/dismiss")
-async def dismiss_onboarding(user: dict = Depends(get_current_user)):
+async def dismiss_onboarding(user: dict = Depends(require_write_access)):
     """Dismiss onboarding checklist"""
     await db.user_onboarding.update_one(
         {"user_id": user["user_id"]},
@@ -1157,7 +1157,7 @@ async def dismiss_onboarding(user: dict = Depends(get_current_user)):
 
 
 @router.delete("/onboarding/dismiss")
-async def undismiss_onboarding(user: dict = Depends(get_current_user)):
+async def undismiss_onboarding(user: dict = Depends(require_write_access)):
     """Re-show onboarding checklist (undo dismiss)"""
     await db.user_onboarding.update_one(
         {"user_id": user["user_id"]},
@@ -1314,7 +1314,7 @@ async def get_dashboard(
 @router.post("/insights/dismiss")
 async def dismiss_insight(
     req: DismissedInsightCreate,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """Dismiss a governance insight so it no longer appears on the dashboard"""
     trust_id = req.trust_id
@@ -1385,7 +1385,7 @@ async def get_dismissed_insights(
 @router.post("/insights/restore")
 async def restore_insight(
     req: DismissedInsightCreate,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """Restore a previously dismissed governance insight"""
     trust_id = req.trust_id

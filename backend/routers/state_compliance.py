@@ -5,7 +5,7 @@ from typing import List
 import uuid
 
 from database import db
-from dependencies import get_current_user
+from dependencies import get_current_user, require_write_access
 
 router = APIRouter(tags=["state_compliance"])
 
@@ -110,7 +110,7 @@ async def get_trust_state_compliance(trust_id: str, user: dict = Depends(get_cur
 
 @router.patch("/trusts/{trust_id}/state-compliance")
 async def update_trust_state_compliance(
-    trust_id: str, update: dict, user: dict = Depends(get_current_user)
+    trust_id: str, update: dict, user: dict = Depends(require_write_access)
 ):
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:

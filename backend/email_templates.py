@@ -787,6 +787,57 @@ The TrustOffice Team
         """
     },
 
+    # Subscription Canceled Due to Failed Payment (Stripe-initiated deletion)
+    "subscription_canceled_payment_failed": {
+        "subject": "Your TrustOffice Subscription Was Canceled Due to a Failed Payment",
+        "html": lambda data: _base_template(f"""
+            <h2>Subscription Canceled</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>We were unable to process your payment, and after several retries your TrustOffice subscription has been canceled.</p>
+
+            <div class="alert">
+              <strong>Your data is safe.</strong><br>
+              All of your trust records, documents, and data remain securely stored and fully viewable in your account.
+            </div>
+
+            <h3>What happens next:</h3>
+            <ul>
+              <li>Your data will be safely retained for 90 days</li>
+              <li>You can resubscribe at any time to regain full access and continue making changes</li>
+              <li>Your existing data will be there when you return</li>
+            </ul>
+
+            <p style="text-align: center;">
+              <a href="{data.get('app_url', '#')}/settings/billing" class="button">Resubscribe Now</a>
+            </p>
+
+            <p>If you believe this was a mistake, please update your payment method and resubscribe, or contact our support team.</p>
+
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Subscription Canceled
+
+Hi {data.get('user_name', 'there')},
+
+We were unable to process your payment, and after several retries your TrustOffice subscription has been canceled.
+
+Your data is safe. All of your trust records, documents, and data remain securely stored and fully viewable in your account.
+
+What happens next:
+- Your data will be safely retained for 90 days
+- You can resubscribe at any time to regain full access and continue making changes
+- Your existing data will be there when you return
+
+Resubscribe Now: {data.get('app_url', '#')}/settings/billing
+
+If you believe this was a mistake, please update your payment method and resubscribe, or contact our support team.
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
     # Subscription Renewed
     "subscription_renewed": {
         "subject": "Your TrustOffice Subscription Has Been Renewed",

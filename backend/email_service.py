@@ -377,6 +377,23 @@ class EmailService:
     
     # ==================== SUBSCRIPTION EMAIL METHODS ====================
     
+    async def send_subscription_canceled_payment_failed(
+        self,
+        to_email: str,
+        user_name: str,
+    ) -> Dict[str, Any]:
+        """Send notification when Stripe cancels a subscription due to failed payment."""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="subscription_canceled_payment_failed",
+            template_data={
+                "user_name": user_name,
+            },
+            to_name=user_name,
+            tag="subscription",
+            metadata={"email_type": "subscription_canceled_payment_failed"}
+        )
+    
     async def send_subscription_activated(
         self,
         to_email: str,

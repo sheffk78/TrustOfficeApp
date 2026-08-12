@@ -40,7 +40,10 @@ export default function BillingPage() {
   const targetPlan = searchParams.get('plan');
   const actionParam = searchParams.get('action');
   const wpParam = searchParams.get('wp');
-  const isWp = wpParam === '1';
+  // WingPoint contextual banners should show for WingPoint customers regardless
+  // of how they arrive. The ?wp=1 URL param is used by WingPoint provisioning
+  // flows, but the account flag (user.is_wingpoint) is the reliable signal.
+  const isWp = wpParam === '1' || user?.is_wingpoint === true;
   const planCardRefs = useRef({});
 
   const registerCardRef = (tierId) => (el) => { planCardRefs.current[tierId] = el; };

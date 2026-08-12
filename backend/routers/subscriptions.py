@@ -1037,6 +1037,7 @@ async def _webhook_customer_subscription_updated(event) -> None:
 async def _webhook_customer_subscription_deleted(event) -> None:
     """Handle Stripe webhook event: customer.subscription.deleted."""
     subscription = event.data.object
+    customer_id = _stripe_get(subscription, "customer")
     await db.subscriptions.update_one(
         {"stripe_subscription_id": _stripe_get(subscription, "id")},
         {"$set": {
@@ -1045,6 +1046,19 @@ async def _webhook_customer_subscription_deleted(event) -> None:
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+
+    # Notify the user that their subscription was canceled due to failed payment.
+    # This is a Stripe-initiated deletion (after dunning), distinct from a
+    # user-initiated cancellation — reassure them their data is safe.
+    user, _ = await get_user_by_customer_id(customer_id)
+    if user and email_service.is_configured:
+        try:
+            await email_service.send_subscription_canceled_payment_failed(
+                to_email=user["email"],
+                user_name=user.get("name", ""),
+            )
+        except Exception as e:
+            logger.error(f"Failed to send payment-failed cancellation email: {e}")
 
     # ========== INVOICE PAID (renewal) ==========
     

@@ -380,7 +380,7 @@ async def get_conversation(
 @router.delete("/chat/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """Delete a conversation."""
     result = await db.chat_conversations.delete_one({

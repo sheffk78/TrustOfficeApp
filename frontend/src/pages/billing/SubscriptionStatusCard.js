@@ -136,6 +136,36 @@ export default function SubscriptionStatusCard({
         </div>
       )}
 
+      {/* Past-Due Payment Warning */}
+      {subscription?.status === 'past_due' && (
+        <div className="p-4 bg-warning/10 border border-warning/20 mb-6">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-warning">Your payment was declined — subscription paused</p>
+              <p className="text-sm text-warning/80 mt-1">
+                Your data is safe and fully accessible. Update your payment method to restore your subscription and continue making changes.
+              </p>
+              <Button
+                onClick={onManageBilling}
+                variant="outline"
+                size="sm"
+                className="mt-3 border-warning text-warning hover:bg-warning/10"
+                disabled={actionLoading === 'portal'}
+                data-testid="manage-billing-btn"
+              >
+                {actionLoading === 'portal' ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                )}
+                Update Payment Method
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cancellation Notice */}
       {isCanceling && (
         <div className="p-4 bg-warning/10 border border-warning/20 mb-6">

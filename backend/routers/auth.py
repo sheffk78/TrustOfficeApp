@@ -228,7 +228,11 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
         picture=None,
         created_at=user_doc["created_at"],
         wp_ref=user_doc.get("wp_ref"),
-        is_wingpoint=bool(user_doc.get("wp_ref")),
+        is_wingpoint=bool(
+            user_doc.get("wp_ref")
+            or user_doc.get("source") == "wingpoint"
+            or user_doc.get("created_via") == "wingpoint_provision"
+        ),
     )
 
 

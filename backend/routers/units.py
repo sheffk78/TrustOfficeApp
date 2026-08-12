@@ -6,7 +6,7 @@ from typing import List, Optional
 import uuid
 
 from database import db
-from dependencies import get_current_user, should_show_watermark
+from dependencies import get_current_user, require_write_access, should_show_watermark
 from models import (
     TrustUnitsSettingsUpdate, TrustUnitsSettingsResponse,
     TrustUnitCertificateCreate, TrustUnitCertificateUpdate, TrustUnitCertificateResponse,
@@ -273,7 +273,7 @@ async def get_trust_units_summary(trust_id: str, user: dict = Depends(get_curren
 async def update_trust_units_settings(
     trust_id: str, 
     update: TrustUnitsSettingsUpdate, 
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """Update units settings for a trust"""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
@@ -315,7 +315,7 @@ async def update_trust_units_settings(
 @router.post("/certificates", response_model=TrustUnitCertificateResponse)
 async def create_unit_certificate(
     certificate: TrustUnitCertificateCreate, 
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """Issue a new unit certificate"""
     trust = await db.trusts.find_one({"trust_id": certificate.trust_id, "user_id": user["user_id"]}, {"_id": 0})
@@ -382,7 +382,7 @@ async def create_unit_certificate(
 async def update_unit_certificate(
     certificate_id: str,
     update: TrustUnitCertificateUpdate,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """Update a unit certificate"""
     cert = await db.trust_unit_certificates.find_one(
@@ -476,7 +476,7 @@ async def list_unit_certificates(
 @router.post("/transfers", response_model=TrustUnitTransferResponse)
 async def create_unit_transfer(
     transfer: TrustUnitTransferCreate,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """Record a unit transfer between holders"""
     trust = await db.trusts.find_one({"trust_id": transfer.trust_id, "user_id": user["user_id"]}, {"_id": 0})

@@ -5,13 +5,13 @@ from typing import List, Optional
 import uuid
 
 from database import db
-from dependencies import get_current_user
+from dependencies import get_current_user, require_write_access
 
 router = APIRouter(tags=["investments"])
 
 
 @router.post("/trusts/{trust_id}/investments")
-async def create_investment(trust_id: str, investment: dict, user: dict = Depends(get_current_user)):
+async def create_investment(trust_id: str, investment: dict, user: dict = Depends(require_write_access)):
     """Record a new investment holding for this trust."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
@@ -70,7 +70,7 @@ async def list_investments(trust_id: str, user: dict = Depends(get_current_user)
 
 
 @router.patch("/investments/{investment_id}")
-async def update_investment(investment_id: str, update: dict, user: dict = Depends(get_current_user)):
+async def update_investment(investment_id: str, update: dict, user: dict = Depends(require_write_access)):
     """Update an investment (new valuation, notes, mark inactive)."""
     inv = await db.investments.find_one({"investment_id": investment_id}, {"_id": 0})
     if not inv:

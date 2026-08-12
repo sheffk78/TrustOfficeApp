@@ -5,7 +5,7 @@ from typing import Optional
 import uuid
 
 from database import db
-from dependencies import get_current_user
+from dependencies import get_current_user, require_write_access
 from models import (
     TaxCalendarEntryCreate, TaxCalendarEntryUpdate, TaxCalendarEntryResponse,
     TaxCalendarSummaryResponse, TrustTaxProfile
@@ -25,7 +25,7 @@ router = APIRouter(tags=["tax_calendar"])
 # ==================== API ENDPOINTS ====================
 
 @router.post("/trusts/{trust_id}/tax-calendar/generate")
-async def generate_tax_calendar(trust_id: str, request: dict, user: dict = Depends(get_current_user)):
+async def generate_tax_calendar(trust_id: str, request: dict, user: dict = Depends(require_write_access)):
     tax_year = request.get("tax_year")
     if not tax_year:
         raise HTTPException(status_code=400, detail="tax_year is required")
@@ -105,7 +105,7 @@ async def get_upcoming_deadlines(trust_id: str, days: int = 90, user: dict = Dep
 
 
 @router.patch("/tax-calendar/{entry_id}")
-async def update_tax_entry(entry_id: str, update: TaxCalendarEntryUpdate, user: dict = Depends(get_current_user)):
+async def update_tax_entry(entry_id: str, update: TaxCalendarEntryUpdate, user: dict = Depends(require_write_access)):
     entry = await db.tax_calendar.find_one({"entry_id": entry_id}, {"_id": 0})
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")

@@ -13,7 +13,7 @@ from urllib.parse import quote
 from pydantic import BaseModel, field_validator
 
 from database import db
-from dependencies import get_current_user
+from dependencies import get_current_user, require_write_access
 from routers.compensation import auto_update_onboarding
 from utils.audit import log_audit_event
 
@@ -147,7 +147,7 @@ class DocumentUpdate(BaseModel):
 
 
 @router.post("/trusts/{trust_id}/vault/documents")
-async def add_document(trust_id: str, doc: DocumentCreate, user: dict = Depends(get_current_user)):
+async def add_document(trust_id: str, doc: DocumentCreate, user: dict = Depends(require_write_access)):
     """Add a document reference to the vault."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
     if not trust:
@@ -193,7 +193,7 @@ async def upload_document(
     tags: Optional[str] = Form(""),
     expiration_date: Optional[str] = Form(None),
     needs_renewal: Optional[str] = Form("false"),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """Upload a file to the vault. Stores file content as BSON binary."""
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
@@ -436,7 +436,7 @@ async def list_documents(
 
 
 @router.patch("/vault/documents/{doc_id}")
-async def update_document(doc_id: str, update: DocumentUpdate, user: dict = Depends(get_current_user)):
+async def update_document(doc_id: str, update: DocumentUpdate, user: dict = Depends(require_write_access)):
     """Update a vault document record."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
@@ -454,7 +454,7 @@ async def update_document(doc_id: str, update: DocumentUpdate, user: dict = Depe
 
 
 @router.delete("/vault/documents/{doc_id}")
-async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
+async def delete_document(doc_id: str, user: dict = Depends(require_write_access)):
     """Remove a document from vault (and its file content)."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:

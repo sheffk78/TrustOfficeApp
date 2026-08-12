@@ -796,7 +796,7 @@ async def get_weekly_briefing(
 async def auto_draft_quarterly_minutes(
     trust_id: Optional[str] = None,
     quarter: Optional[str] = None,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """
     Auto-generate a draft minutes record from the quarter's activity.

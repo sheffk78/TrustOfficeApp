@@ -29,7 +29,8 @@ export const ReadOnlyBanner = () => {
   
   const trialExpired = subscription?.status === 'expired';
   const subCanceled = subscription?.status === 'canceled';
-  
+  const subPastDue = subscription?.status === 'past_due';
+
   return (
     <div 
       className="bg-warning/5 dark:bg-warning/10 border-b border-warning/20 dark:border-warning/30 px-4 py-3 lg:ml-64"
@@ -42,28 +43,32 @@ export const ReadOnlyBanner = () => {
           </div>
           <div>
             <p className="text-sm font-medium text-warning dark:text-warning">
-              {trialExpired 
-                ? 'Your free access has ended' 
-                : subCanceled 
-                  ? 'Your subscription has been canceled'
-                  : 'Access inactive'}
+              {subPastDue
+                ? 'Your payment was declined — your subscription is paused'
+                : trialExpired 
+                  ? 'Your free access has ended' 
+                  : subCanceled 
+                    ? 'Your subscription has been canceled'
+                    : 'Access inactive'}
             </p>
             <p className="text-xs text-warning dark:text-warning">
-              {trialExpired
-                ? 'Purchase a plan to make changes again. You can view all your data, but creating or editing is disabled until you subscribe.'
-                : subCanceled
-                  ? 'Purchase a plan to make changes again. You can view all your data, but creating or editing is disabled until you resubscribe.'
-                  : 'Purchase a plan to make changes. You can view all your data, but creating or editing is disabled until you subscribe.'}
+              {subPastDue
+                ? 'Your data is still fully accessible. Update your payment method to restore your subscription.'
+                : trialExpired
+                  ? 'Purchase a plan to make changes again. You can view all your data, but creating or editing is disabled until you subscribe.'
+                  : subCanceled
+                    ? 'Purchase a plan to make changes again. You can view all your data, but creating or editing is disabled until you resubscribe.'
+                    : 'Purchase a plan to make changes. You can view all your data, but creating or editing is disabled until you subscribe.'}
             </p>
           </div>
         </div>
-        <Link to="/settings/billing">
+        <Link to={subPastDue ? "/settings/billing?action=update_payment" : "/settings/billing"}>
           <Button 
             size="sm" 
             className="bg-warning hover:bg-warning text-white"
             data-testid="subscribe-now-btn"
           >
-            Subscribe Now
+            {subPastDue ? 'Update Payment Method' : 'Subscribe Now'}
           </Button>
         </Link>
       </div>

@@ -9,7 +9,7 @@ from typing import Optional
 import asyncio
 
 from database import db
-from dependencies import get_current_user
+from dependencies import get_current_user, require_write_access
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["trust_doc_analysis"])
@@ -155,7 +155,7 @@ async def get_vault_analysis_status(trust_id: str, user: dict = Depends(get_curr
 
 
 @router.post("/trusts/{trust_id}/document-analysis/reanalyze")
-async def reanalyze(trust_id: str, user: dict = Depends(get_current_user)):
+async def reanalyze(trust_id: str, user: dict = Depends(require_write_access)):
     """
     Re-trigger analysis from the existing trust instrument in the vault.
     Used by the "Re-analyze" button in the UI, or by users who want to

@@ -48,10 +48,10 @@ export const TrialBanner = ({ location = 'dashboard' }) => {
           </div>
           <div>
             <p className="text-sm font-medium text-navy">
-              Free Plan — Purchase to Make Changes
+              Free Plan — You can view your data, but cannot make changes
             </p>
             <p className="text-xs text-muted-foreground">
-              Purchase a plan to unlock PDF exports, multiple trusts, advanced templates, and the ability to make changes
+              Your data is safe and fully viewable. Purchase a plan to unlock PDF exports, multiple trusts, advanced templates, and the ability to make changes
             </p>
           </div>
         </div>
