@@ -20,6 +20,24 @@ router = APIRouter(tags=["successor"])
 # One-time packet access link validity (30 days)
 SUCCESSOR_LINK_TTL_DAYS = 30
 
+# Map stored trust protector power keys to human-readable labels for the appointment email.
+TRUST_PROTECTOR_POWER_LABELS = {
+    "remove_or_replace_trustee": "Remove or replace a trustee",
+    "amend_for_tax": "Amend the trust for tax efficiency",
+    "veto_distributions": "Veto a proposed distribution",
+    "add_or_remove_beneficiaries": "Add or remove beneficiaries",
+    "resolve_disputes": "Resolve disputes between trustees or beneficiaries",
+    "change_situs": "Change the trust's jurisdiction or situs",
+    "terminate_trust": "Terminate the trust",
+}
+
+def _power_labels(powers) -> list:
+    """Convert stored power keys to human-readable labels; pass through unknowns."""
+    if not isinstance(powers, list):
+        return []
+    return [TRUST_PROTECTOR_POWER_LABELS.get(p, p) for p in powers]
+
+
 
 
 def _public_doc(doc: dict, *, exclude_file_content: bool = False) -> dict:
@@ -216,7 +234,7 @@ async def send_trust_protector_appointment(trust_id: str, user: dict = Depends(r
         )
 
     protector_name = (trust.get("trust_protector_name") or "").strip() or protector_email
-    powers = trust.get("trust_protector_powers") or []
+    powers = _power_labels(trust.get("trust_protector_powers") or [])
 
     if not email_service.is_configured:
         await log_audit_event(

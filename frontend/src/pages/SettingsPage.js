@@ -274,6 +274,12 @@ export default function SettingsPage() {
         successor_trustee_phone: selectedTrust.successor_trustee_phone || '',
         successor_trustee_relationship: selectedTrust.successor_trustee_relationship || '',
         successor_trustee_notes: selectedTrust.successor_trustee_notes || '',
+        trust_protector_name: selectedTrust.trust_protector_name || '',
+        trust_protector_email: selectedTrust.trust_protector_email || '',
+        trust_protector_phone: selectedTrust.trust_protector_phone || '',
+        trust_protector_relationship: selectedTrust.trust_protector_relationship || '',
+        trust_protector_powers: selectedTrust.trust_protector_powers || [],
+        trust_protector_status: selectedTrust.trust_protector_status || '',
         grantor_name: selectedTrust.grantor_name || '',
         attorney_name: selectedTrust.attorney_name || '',
         attorney_phone: selectedTrust.attorney_phone || '',
@@ -1136,30 +1142,24 @@ export default function SettingsPage() {
                             ? 'You\'ve chosen to defer for now'
                             : trustData.trust_protector_name
                               ? 'Trust protector set'
-                              : 'Add a trust protector or defer'}
+                              : 'Set up a trust protector'}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           You can always come back and add or change a trust protector later. Deferring is a valid choice.
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-xs text-muted-foreground">Defer for now</span>
+                        <span className="text-xs text-muted-foreground">Set up a trust protector</span>
                         <Switch
+                          aria-label="Set up a trust protector"
                           checked={trustData.trust_protector_status !== 'none'}
                           onCheckedChange={(checked) => {
                             if (!checked) {
-                              // Defer: clear the protector, mark decision made
-                              setTrustData({
-                                ...trustData,
-                                trust_protector_name: '',
-                                trust_protector_email: '',
-                                trust_protector_phone: '',
-                                trust_protector_relationship: '',
-                                trust_protector_powers: [],
-                                trust_protector_status: 'none',
-                              });
+                              // Defer: mark the decision made but keep any entered details so
+                              // the user can reopen without losing their work.
+                              setTrustData({ ...trustData, trust_protector_status: 'none' });
                             } else {
-                              // Re-enabling from defer (or first decision) — reopen the setup
+                              // Reopen setup (from defer or first decision)
                               setTrustData({
                                 ...trustData,
                                 trust_protector_status: trustData.trust_protector_status === 'none' ? 'pending' : trustData.trust_protector_status,
@@ -1236,13 +1236,14 @@ export default function SettingsPage() {
                                   <input
                                     type="checkbox"
                                     checked={active}
+                                    aria-label={power.label}
                                     onChange={() => {
                                       const powers = active
                                         ? trustData.trust_protector_powers.filter((p) => p !== power.value)
                                         : [...trustData.trust_protector_powers, power.value];
                                       setTrustData({ ...trustData, trust_protector_powers: powers });
                                     }}
-                                    className="mt-0.5 h-4 w-4 accent-[#d5ad36]"
+                                    className="mt-0.5 h-5 w-5 accent-[#d5ad36]"
                                   />
                                   <div>
                                     <p className="text-xs font-medium text-navy">{power.label}</p>
@@ -1265,7 +1266,7 @@ export default function SettingsPage() {
                           </div>
                           <Button
                             type="button"
-                            variant="outline"
+                            className="btn-primary"
                             onClick={handleSendTrustProtectorNotice}
                             disabled={loading}
                           >
