@@ -1,0 +1,40 @@
+{
+  "_comment": "CANONICAL SOURCE OF TRUTH for trust protector powers. Edit ONLY this file. Run backend/scripts/generate_trust_protector_powers.py to regenerate the frontend constant, and backend/scripts/check_trust_protector_drift.py to verify no drift. value is the stored key; label and description are user-facing.",
+  "powers": [
+    {
+      "value": "remove_or_replace_trustee",
+      "label": "Remove or replace a trustee",
+      "description": "Step in to change who manages the trust if the current trustee is not performing properly."
+    },
+    {
+      "value": "amend_for_tax",
+      "label": "Amend the trust for tax efficiency",
+      "description": "Update the trust to take advantage of favorable tax law or fix tax issues."
+    },
+    {
+      "value": "veto_distributions",
+      "label": "Veto a proposed distribution",
+      "description": "Block a distribution the trustee wants to make if it conflicts with the grantor intent."
+    },
+    {
+      "value": "add_or_remove_beneficiaries",
+      "label": "Add or remove beneficiaries",
+      "description": "Change who benefits from the trust, within the grantor's intent."
+    },
+    {
+      "value": "resolve_disputes",
+      "label": "Resolve disputes between trustees or beneficiaries",
+      "description": "Act as a tie-breaker to settle disagreements and keep the trust moving."
+    },
+    {
+      "value": "change_situs",
+      "label": "Change the trust's jurisdiction or situs",
+      "description": "Move the trust to a different state or location where it is administered."
+    },
+    {
+      "value": "terminate_trust",
+      "label": "Terminate the trust",
+      "description": "Wind down and distribute the trust if it no longer serves its purpose."
+    }
+  ]
+}

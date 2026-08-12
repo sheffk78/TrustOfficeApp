@@ -20,8 +20,31 @@ router = APIRouter(tags=["successor"])
 # One-time packet access link validity (30 days)
 SUCCESSOR_LINK_TTL_DAYS = 30
 
-# Map stored trust protector power keys to human-readable labels for the appointment email.
-TRUST_PROTECTOR_POWER_LABELS = {
+
+def _power_labels(powers) -> list:
+    """Map stored trust protector power keys to human-readable labels for the appointment email.
+
+    Single source of truth for label text: backend/data/trust_protector_powers.json.
+    """
+    labels = _trust_protector_label_map()
+    return [labels.get(p, p) for p in powers] if isinstance(powers, list) else []
+
+
+def _trust_protector_label_map() -> dict:
+    """Load the {key: label} map from the canonical JSON (backend/data/trust_protector_powers.json)."""
+    import json
+    here = __file__
+    data_path = __import__("pathlib").Path(here).resolve().parent.parent / "data" / "trust_protector_powers.json"
+    try:
+        data = json.loads(data_path.read_text())
+        return {p["value"]: p["label"] for p in data.get("powers", [])}
+    except Exception as exc:  # pragma: no cover - defensive; JSON is versioned
+        logger.warning(f"Could not load trust_protector_powers.json ({exc}); falling back to inline map")
+        return _TRUST_PROTECTOR_POWER_LABELS_FALLBACK
+
+
+# Fallback inline map — only used if the JSON file is missing/unreadable at runtime.
+_TRUST_PROTECTOR_POWER_LABELS_FALLBACK = {
     "remove_or_replace_trustee": "Remove or replace a trustee",
     "amend_for_tax": "Amend the trust for tax efficiency",
     "veto_distributions": "Veto a proposed distribution",
@@ -30,12 +53,6 @@ TRUST_PROTECTOR_POWER_LABELS = {
     "change_situs": "Change the trust's jurisdiction or situs",
     "terminate_trust": "Terminate the trust",
 }
-
-def _power_labels(powers) -> list:
-    """Convert stored power keys to human-readable labels; pass through unknowns."""
-    if not isinstance(powers, list):
-        return []
-    return [TRUST_PROTECTOR_POWER_LABELS.get(p, p) for p in powers]
 
 
 
