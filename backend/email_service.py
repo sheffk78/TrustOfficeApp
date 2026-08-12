@@ -270,6 +270,29 @@ class EmailService:
             metadata={"email_type": "successor_packet"}
         )
     
+    async def send_trust_protector_appointment_email(
+        self,
+        to_email: str,
+        protector_name: str,
+        trust_name: str,
+        trustee_name: str,
+        powers_list: list
+    ) -> Dict[str, Any]:
+        """Send the trust protector an appointment notice outlining their role and requested powers."""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="trust_protector_appointment",
+            template_data={
+                "protector_name": protector_name,
+                "trust_name": trust_name,
+                "trustee_name": trustee_name,
+                "powers_list": powers_list,
+            },
+            to_name=protector_name,
+            tag="trust_protector_appointment",
+            metadata={"email_type": "trust_protector_appointment"}
+        )
+
     async def send_task_overdue(
         self,
         to_email: str,

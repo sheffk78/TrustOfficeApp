@@ -107,18 +107,19 @@ export function getStatusBadgeClass(status) {
 // Build onboarding steps config from onboarding state + selectedTrust.
 // Field names must match backend OnboardingState model (backend/models.py L1045).
 export function getOnboardingProgress(onboarding, selectedTrust) {
-  if (!onboarding) return { nextStep: null, completed: 0, total: 9, allSteps: [] };
+  if (!onboarding) return { nextStep: null, completed: 0, total: 10, allSteps: [] };
 
   const steps = [
     { id: 'trust_doc', label: 'Add your trust document', done: onboarding.trust_doc_uploaded, action: '/vault', priority: 1, field: 'trust_doc_uploaded' },
     { id: 'beneficiaries', label: 'Add beneficiaries', done: onboarding.beneficiaries_added, action: '/beneficiaries', priority: 2, field: 'beneficiaries_added' },
     { id: 'successor_trustee', label: 'Name a successor trustee', done: onboarding.successor_trustee_added, action: '/settings#successor-trustee', priority: 3, field: 'successor_trustee_added' },
-    { id: 'assets', label: 'Add your trust assets', done: onboarding.assets_added, action: '/schedule-a', priority: 4, field: 'assets_added' },
-    { id: 'minutes', label: 'Hold your first trustee meeting', done: onboarding.minutes_generated, action: '/minutes/create?type=initial_trustee_meeting', priority: 5, field: 'minutes_generated' },
-    { id: 'ein_doc', label: 'Add EIN letter to vault', done: onboarding.ein_doc_uploaded, action: '/vault', priority: 6, field: 'ein_doc_uploaded' },
-    { id: 'formation_date', label: 'Add formation date', done: onboarding.formation_date_added, action: '/settings#formation-date', priority: 7, field: 'formation_date_added' },
-    { id: 'ein', label: 'Enter your EIN', done: onboarding.ein_entered, action: '/settings#ein', priority: 8, field: 'ein_entered' },
-    { id: 'calendar', label: 'Review your tax calendar', done: onboarding.calendar_set || selectedTrust?.benevolence_enabled, action: '/calendar', priority: 9, field: 'calendar_set' },
+    { id: 'trust_protector', label: 'Choose a trust protector (or defer)', done: onboarding.trust_protector_added, action: '/settings#trust-protector', priority: 4, field: 'trust_protector_added' },
+    { id: 'assets', label: 'Add your trust assets', done: onboarding.assets_added, action: '/schedule-a', priority: 5, field: 'assets_added' },
+    { id: 'minutes', label: 'Hold your first trustee meeting', done: onboarding.minutes_generated, action: '/minutes/create?type=initial_trustee_meeting', priority: 6, field: 'minutes_generated' },
+    { id: 'ein_doc', label: 'Add EIN letter to vault', done: onboarding.ein_doc_uploaded, action: '/vault', priority: 7, field: 'ein_doc_uploaded' },
+    { id: 'formation_date', label: 'Add formation date', done: onboarding.formation_date_added, action: '/settings#formation-date', priority: 8, field: 'formation_date_added' },
+    { id: 'ein', label: 'Enter your EIN', done: onboarding.ein_entered, action: '/settings#ein', priority: 9, field: 'ein_entered' },
+    { id: 'calendar', label: 'Review your tax calendar', done: onboarding.calendar_set || selectedTrust?.benevolence_enabled, action: '/calendar', priority: 10, field: 'calendar_set' },
   ];
 
   const completed = steps.filter(s => s.done).length;

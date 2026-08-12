@@ -49,6 +49,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
+// Selectable powers for a trust protector. These shape the appointment notice sent to the protector.
+const TRUST_PROTECTOR_POWERS = [
+  { value: 'remove_or_replace_trustee', label: 'Remove or replace a trustee', description: 'Step in to change who manages the trust if the current trustee is not performing properly.' },
+  { value: 'amend_for_tax', label: 'Amend the trust for tax efficiency', description: 'Update the trust to take advantage of favorable tax law or fix tax issues.' },
+  { value: 'veto_distributions', label: 'Veto a proposed distribution', description: 'Block a distribution the trustee wants to make if it conflicts with the grantor intent.' },
+  { value: 'add_or_remove_beneficiaries', label: 'Add or remove beneficiaries', description: 'Change who benefits from the trust, within the grantor\'s intent.' },
+  { value: 'resolve_disputes', label: 'Resolve disputes between trustees or beneficiaries', description: 'Act as a tie-breaker to settle disagreements and keep the trust moving.' },
+  { value: 'change_situs', label: 'Change the trust\'s jurisdiction or situs', description: 'Move the trust to a different state or location where it is administered.' },
+  { value: 'terminate_trust', label: 'Terminate the trust', description: 'Wind down and distribute the trust if it no longer serves its purpose.' },
+];
+
 export default function SettingsPage() {
   // EIN formatting: auto-inserts dash so user sees XX-XXXXXXX as they type
   const formatEIN = (value) => {
@@ -126,6 +137,12 @@ export default function SettingsPage() {
     successor_trustee_phone: selectedTrust?.successor_trustee_phone || '',
     successor_trustee_relationship: selectedTrust?.successor_trustee_relationship || '',
     successor_trustee_notes: selectedTrust?.successor_trustee_notes || '',
+    trust_protector_name: selectedTrust?.trust_protector_name || '',
+    trust_protector_email: selectedTrust?.trust_protector_email || '',
+    trust_protector_phone: selectedTrust?.trust_protector_phone || '',
+    trust_protector_relationship: selectedTrust?.trust_protector_relationship || '',
+    trust_protector_powers: selectedTrust?.trust_protector_powers || [],
+    trust_protector_status: selectedTrust?.trust_protector_status || '',
     grantor_name: selectedTrust?.grantor_name || '',
     attorney_name: selectedTrust?.attorney_name || '',
     attorney_phone: selectedTrust?.attorney_phone || '',
@@ -147,6 +164,7 @@ export default function SettingsPage() {
   const hashToTab = {
     'formation-date': 'profile', 'ein': 'profile', 'grantor': 'profile',
     'successor-trustee': 'people', 'key-contacts': 'people', 'successor-instructions': 'people',
+    'trust-protector': 'people',
     'governance': 'compliance',
     'notifications': 'account', 'billing': 'account',
   };
@@ -591,6 +609,33 @@ export default function SettingsPage() {
       toast.success('Trust updated');
     } catch (error) {
       showError(toast, error, { operation: 'update_trust', page: 'Settings' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendTrustProtectorNotice = async () => {
+    if (!selectedTrust) return;
+    if (!trustData.trust_protector_email) {
+      toast.error('Add a trust protector email first');
+      return;
+    }
+    if (trustData.trust_protector_powers.length === 0) {
+      toast.error('Select at least one trust protector power');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/trust-protector/send`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to send appointment notice');
+      }
+      toast.success('Appointment notice sent to the trust protector');
+    } catch (error) {
+      showError(toast, error, { operation: 'send_trust_protector_notice', page: 'Settings' });
     } finally {
       setLoading(false);
     }
@@ -1068,6 +1113,168 @@ export default function SettingsPage() {
                         placeholder="Any special instructions about the successor trustee"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Trust Protector */}
+                <div className="card-trust mb-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Shield className="w-5 h-5 text-gold" />
+                    <h2 className="font-serif text-xl text-navy">Trust Protector</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    A trust protector is an independent person you ask to help keep your trust on track — they do not manage
+                    day-to-day assets, but they hold specific powers to act if something goes wrong or needs to change.
+                  </p>
+
+                  <div data-section="trust-protector" className="space-y-6">
+                    {/* Defer / Add decision */}
+                    <div className="flex items-center justify-between p-4 border border-navy/15 bg-navy/[0.02]">
+                      <div className="flex-1 mr-4">
+                        <p className="font-mono text-xs font-medium text-navy">
+                          {trustData.trust_protector_status === 'none'
+                            ? 'You\'ve chosen to defer for now'
+                            : trustData.trust_protector_name
+                              ? 'Trust protector set'
+                              : 'Add a trust protector or defer'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          You can always come back and add or change a trust protector later. Deferring is a valid choice.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-muted-foreground">Defer for now</span>
+                        <Switch
+                          checked={trustData.trust_protector_status !== 'none'}
+                          onCheckedChange={(checked) => {
+                            if (!checked) {
+                              // Defer: clear the protector, mark decision made
+                              setTrustData({
+                                ...trustData,
+                                trust_protector_name: '',
+                                trust_protector_email: '',
+                                trust_protector_phone: '',
+                                trust_protector_relationship: '',
+                                trust_protector_powers: [],
+                                trust_protector_status: 'none',
+                              });
+                            } else {
+                              // Re-enabling from defer (or first decision) — reopen the setup
+                              setTrustData({
+                                ...trustData,
+                                trust_protector_status: trustData.trust_protector_status === 'none' ? 'pending' : trustData.trust_protector_status,
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Protector details — only shown when not deferred */}
+                    {trustData.trust_protector_status !== 'none' && (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="label-trust">Trust Protector Name</Label>
+                            <Input
+                              type="text"
+                              value={trustData.trust_protector_name}
+                              onChange={(e) => setTrustData({ ...trustData, trust_protector_name: e.target.value })}
+                              className="mt-1 input-trust"
+                              placeholder="Who will help oversee the trust?"
+                            />
+                          </div>
+                          <div>
+                            <Label className="label-trust">Trust Protector Email</Label>
+                            <Input
+                              type="email"
+                              value={trustData.trust_protector_email}
+                              onChange={(e) => setTrustData({ ...trustData, trust_protector_email: e.target.value })}
+                              className="mt-1 input-trust"
+                              placeholder="email@example.com"
+                            />
+                          </div>
+                          <div>
+                            <Label className="label-trust">Trust Protector Phone</Label>
+                            <Input
+                              type="tel"
+                              value={trustData.trust_protector_phone}
+                              onChange={(e) => setTrustData({ ...trustData, trust_protector_phone: e.target.value })}
+                              className="mt-1 input-trust"
+                              placeholder="(555) 123-4567"
+                            />
+                          </div>
+                          <div>
+                            <Label className="label-trust">Relationship to Grantor</Label>
+                            <Input
+                              type="text"
+                              value={trustData.trust_protector_relationship}
+                              onChange={(e) => setTrustData({ ...trustData, trust_protector_relationship: e.target.value })}
+                              className="mt-1 input-trust"
+                              placeholder="Trusted friend, advisor, attorney, etc."
+                            />
+                          </div>
+                        </div>
+
+                        {/* Powers checklist */}
+                        <div>
+                          <Label className="label-trust">Powers to Grant (select all that apply)</Label>
+                          <p className="text-xs text-muted-foreground mt-1 mb-3">
+                            Check the specific things you want your trust protector to be able to do. Leave unchecked anything
+                            you don't want them to handle. These powers shape the notice we send them.
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {TRUST_PROTECTOR_POWERS.map((power) => {
+                              const active = trustData.trust_protector_powers.includes(power.value);
+                              return (
+                                <label
+                                  key={power.value}
+                                  className={`flex items-start gap-3 p-3 border cursor-pointer transition-colors ${
+                                    active ? 'border-gold bg-gold/5' : 'border-navy/15 hover:border-navy/30'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={active}
+                                    onChange={() => {
+                                      const powers = active
+                                        ? trustData.trust_protector_powers.filter((p) => p !== power.value)
+                                        : [...trustData.trust_protector_powers, power.value];
+                                      setTrustData({ ...trustData, trust_protector_powers: powers });
+                                    }}
+                                    className="mt-0.5 h-4 w-4 accent-[#d5ad36]"
+                                  />
+                                  <div>
+                                    <p className="text-xs font-medium text-navy">{power.label}</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">{power.description}</p>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Send appointment notice */}
+                        <div className="flex items-center justify-between p-4 border border-navy/10 bg-navy/[0.02]">
+                          <div className="flex-1 mr-4">
+                            <p className="text-xs font-medium text-navy">Notify your trust protector</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Sends them an email outlining their role, the powers you selected, and a request to confirm.
+                              Save your changes first so the details are up to date.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleSendTrustProtectorNotice}
+                            disabled={loading}
+                          >
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                            Send Notice
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 

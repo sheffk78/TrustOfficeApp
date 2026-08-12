@@ -13,6 +13,20 @@ def _h(value: Any) -> str:
     return html.escape(str(value or ""), quote=True)
 
 
+def _safe_list(values: Any) -> str:
+    """Render a list of strings as HTML <li> items. Falls back to a single item."""
+    if isinstance(values, list) and values:
+        return "".join(f"<li>{_h(v)}</li>" for v in values)
+    return f"<li>{_h(values)}</li>"
+
+
+def _safe_list_plain(values: Any) -> str:
+    """Render a list of strings as plain-text bullets. Falls back to a single item."""
+    if isinstance(values, list) and values:
+        return "\n".join(f"- {v}" for v in values)
+    return f"- {values}"
+
+
 def _booking_cta_html(booking_url: str, phone_request: bool = True) -> str:
     """Render a 'Book a Call' CTA section if booking_url is provided."""
     if not booking_url:
@@ -1170,6 +1184,49 @@ The TrustOffice Team
     },
 
     # Successor Trustee Packet — sent to the named successor with a secure access link
+    "trust_protector_appointment": {
+        "subject": lambda data: f"You've been asked to serve as trust protector for the {data.get('trust_name', 'Trust')} Trust",
+        "html": lambda data: _base_template(f"""
+            <h2>You've been named a trust protector</h2>
+            <p>Hi {_h(data.get('protector_name', 'there'))},</p>
+            <p><strong>{_h(data.get('trustee_name', 'A trustee'))}</strong> has asked you to serve as the <strong>trust protector</strong> for the <strong>{_h(data.get('trust_name', 'Trust'))}</strong>.</p>
+
+            <p>A trust protector is an independent person the trustee asks to help oversee the trust. You are <strong>not</strong> a trustee and you do not manage day-to-day assets or distributions. Your role is to step in for specific, limited purposes to help keep the trust on track and aligned with the grantor's intent.</p>
+
+            <div class="success">
+              <strong>Here is what is being asked of you:</strong>
+            </div>
+            <p>The trustee has asked you to hold the following powers:</p>
+            <ul>
+              {_safe_list(data.get('powers_list', []))}
+            </ul>
+
+            <p>Your formal acceptance is not required to be on record with TrustOffice, but please reply to this email to confirm you're willing to serve, so the trustee has it in writing. If you have questions about what any of these powers mean or your responsibilities, consult a licensed attorney.</p>
+
+            <p>This is an informational notice describing what the trustee has asked of you — it is not legal advice.</p>
+
+            <p>Best regards,<br>{_h(data.get('trustee_name', 'The TrustOffice Team'))}</p>
+        """),
+        "text": lambda data: f"""
+You've been named a trust protector
+
+Hi {data.get('protector_name', 'there')},
+
+{data.get('trustee_name', 'A trustee')} has asked you to serve as the trust protector for the {data.get('trust_name', 'Trust')}.
+
+A trust protector is an independent person the trustee asks to help oversee the trust. You are NOT a trustee and you do not manage day-to-day assets or distributions. Your role is to step in for specific, limited purposes to help keep the trust on track and aligned with the grantor's intent.
+
+Here is what is being asked of you — the trustee has asked you to hold the following powers:
+{_safe_list_plain(data.get('powers_list', []))}
+
+Your formal acceptance is not required to be on record with TrustOffice, but please reply to this email to confirm you're willing to serve, so the trustee has it in writing. If you have questions about what any of these powers mean or your responsibilities, consult a licensed attorney.
+
+This is an informational notice describing what the trustee has asked of you — it is not legal advice.
+
+Best regards,
+{data.get('trustee_name', 'The TrustOffice Team')}
+        """
+    },
     "successor_packet": {
         "subject": lambda data: f"Important information about the {data.get('trust_name', 'Trust')} Trust",
         "html": lambda data: _base_template(f"""

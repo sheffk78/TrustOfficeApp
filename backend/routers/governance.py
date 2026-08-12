@@ -893,7 +893,8 @@ _ONBOARDING_DEFAULTS = {
     "minutes_generated": False,
     "calendar_set": False,
     "checklist_dismissed": False,
-    "successor_trustee_added": False
+    "successor_trustee_added": False,
+    "trust_protector_added": False
 }
 
 _AUTO_SEEDED_TASK_TYPES = {"annual_review", "quarterly_review", "compensation_review", "asset_revaluation"}
@@ -916,6 +917,9 @@ async def _detect_onboarding_updates(user_id: str, trust_id: str, existing: dict
             ("formation_date_added", bool(trust.get("start_date"))),
             ("ein_entered", bool(trust.get("ein"))),
             ("successor_trustee_added", bool(trust.get("successor_trustee_name"))),
+            # Trust protector is "done" once the trustee has made a decision —
+            # either deferring (status = "none") or naming a protector.
+            ("trust_protector_added", trust.get("trust_protector_status") in ("none", "pending", "appointed")),
         ]
         for key, detected in checks:
             if _should_update(existing.get(key), detected, manual_overrides, key):
@@ -1120,7 +1124,7 @@ async def get_onboarding(user: dict = Depends(get_current_user)):
 @router.patch("/onboarding")
 async def update_onboarding(updates: dict, user: dict = Depends(require_write_access)):
     """Update onboarding state — records manual overrides for toggled fields."""
-    allowed_fields = ["formation_date_added", "ein_entered", "trust_doc_uploaded", "ein_doc_uploaded", "beneficiaries_added", "assets_added", "minutes_generated", "calendar_set", "checklist_dismissed", "successor_trustee_added"]
+    allowed_fields = ["formation_date_added", "ein_entered", "trust_doc_uploaded", "ein_doc_uploaded", "beneficiaries_added", "assets_added", "minutes_generated", "calendar_set", "checklist_dismissed", "successor_trustee_added", "trust_protector_added"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     

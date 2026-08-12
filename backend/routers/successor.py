@@ -195,6 +195,67 @@ async def send_successor_packet(trust_id: str, user: dict = Depends(require_writ
     }
 
 
+@router.post("/trusts/{trust_id}/trust-protector/send")
+async def send_trust_protector_appointment(trust_id: str, user: dict = Depends(require_write_access)):
+    """Notify the designated trust protector of their appointment, outlining their role and requested powers.
+
+    Mirrors the successor trustee send flow but sends a plain appointment notice (no packet access link).
+    """
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0},
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    protector_email = (trust.get("trust_protector_email") or "").strip()
+    if not protector_email:
+        raise HTTPException(
+            status_code=400,
+            detail="No trust protector email set. Add one in Settings > People > Trust Protector before sending.",
+        )
+
+    protector_name = (trust.get("trust_protector_name") or "").strip() or protector_email
+    powers = trust.get("trust_protector_powers") or []
+
+    if not email_service.is_configured:
+        await log_audit_event(
+            user["user_id"], "trust_protector_notice_created", "trust", trust_id,
+            {"to_email": protector_email, "sent": False, "reason": "email_not_configured"},
+        )
+        return {
+            "status": "not_sent",
+            "message": "Email service is not configured. The notice was not sent.",
+        }
+
+    result = await email_service.send_trust_protector_appointment_email(
+        to_email=protector_email,
+        protector_name=protector_name,
+        trust_name=trust.get("name") or "Trust",
+        trustee_name=(trust.get("trustee_names") or user.get("name") or "The trustee"),
+        powers_list=powers,
+    )
+
+    sent = result.get("status") == "sent"
+    await log_audit_event(
+        user["user_id"], "trust_protector_notice_sent", "trust", trust_id,
+        {"to_email": protector_email, "sent": sent, "powers": powers},
+    )
+
+    if not sent:
+        logger.error(f"Failed to send trust protector appointment email for trust {trust_id}: {result}")
+        raise HTTPException(
+            status_code=502,
+            detail="The email could not be sent. Please try again, and contact support if the problem persists.",
+        )
+
+    return {
+        "status": "sent",
+        "message": f"Appointment notice sent to {protector_email}",
+        "to_email": protector_email,
+    }
+
+
 def _hash_token(raw_token: str) -> str:
     """Hash a raw access token for storage. Only the hash is persisted."""
     import hashlib

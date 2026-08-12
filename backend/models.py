@@ -262,6 +262,12 @@ class TrustCreate(BaseModel):
     successor_trustee_phone: Optional[str] = None
     successor_trustee_relationship: Optional[str] = None
     successor_trustee_notes: Optional[str] = None
+    trust_protector_name: Optional[str] = None
+    trust_protector_email: Optional[str] = None
+    trust_protector_phone: Optional[str] = None
+    trust_protector_relationship: Optional[str] = None
+    trust_protector_powers: List[str] = []
+    trust_protector_status: Optional[str] = None
     grantor_name: Optional[str] = None
     attorney_name: Optional[str] = None
     attorney_phone: Optional[str] = None
@@ -320,6 +326,12 @@ class TrustUpdate(BaseModel):
     successor_trustee_phone: Optional[str] = None
     successor_trustee_relationship: Optional[str] = None
     successor_trustee_notes: Optional[str] = None
+    trust_protector_name: Optional[str] = None
+    trust_protector_email: Optional[str] = None
+    trust_protector_phone: Optional[str] = None
+    trust_protector_relationship: Optional[str] = None
+    trust_protector_powers: Optional[List[str]] = None
+    trust_protector_status: Optional[str] = None
     grantor_name: Optional[str] = None
     attorney_name: Optional[str] = None
     attorney_phone: Optional[str] = None
@@ -378,6 +390,12 @@ class TrustResponse(BaseModel):
     successor_trustee_phone: Optional[str] = None
     successor_trustee_relationship: Optional[str] = None
     successor_trustee_notes: Optional[str] = None
+    trust_protector_name: Optional[str] = None
+    trust_protector_email: Optional[str] = None
+    trust_protector_phone: Optional[str] = None
+    trust_protector_relationship: Optional[str] = None
+    trust_protector_powers: Optional[List[str]] = None
+    trust_protector_status: Optional[str] = None
     grantor_name: Optional[str] = None
     attorney_name: Optional[str] = None
     attorney_phone: Optional[str] = None
@@ -1078,6 +1096,7 @@ class OnboardingState(BaseModel):
     calendar_set: bool = False
     checklist_dismissed: bool = False
     successor_trustee_added: bool = False
+    trust_protector_added: bool = False
     # Manual overrides — tracks which steps the user manually toggled.
     # Auto-detection skips these fields, preserving the user's choice.
     manual_overrides: dict = {}
