@@ -101,6 +101,20 @@ class KnowledgeArticleResponse(BaseModel):
     updated_at: str
 
 
+class PaginationMeta(BaseModel):
+    page: int
+    limit: int
+    total: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
+class KnowledgeArticleListResponse(BaseModel):
+    articles: List[KnowledgeArticleResponse]
+    pagination: PaginationMeta
+
+
 # ==================== HELPERS ====================
 
 async def _require_admin(user: dict) -> dict:
@@ -148,7 +162,7 @@ async def list_categories():
     }
 
 
-@router.get("", response_model=List[KnowledgeArticleResponse])
+@router.get("", response_model=KnowledgeArticleListResponse)
 async def list_articles(
     category: Optional[str] = Query(None, description="Filter by category"),
     search: Optional[str] = Query(None, description="Search title/summary/tags"),
