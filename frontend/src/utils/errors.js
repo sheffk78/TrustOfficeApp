@@ -323,20 +323,9 @@ export function installGlobalErrorHandlers() {
       });
     }
 
-    // Report to /api/error-log (MongoDB log, queryable via admin API)
-    reportToErrorLog({
-      error_type: 'uncaught_exception',
-      error_message: event.message || (event.error && event.error.message) || 'Uncaught error',
-      stack: (event.error && event.error.stack) || null,
-      url: window.location.href,
-      user_agent: navigator.userAgent,
-      metadata: {
-        filename: event.filename || null,
-        lineno: event.lineno || null,
-        colno: event.colno || null,
-        third_party_script_error: isThirdParty,
-      },
-    }, 'uncaught_exception');
+    // MongoDB storage is handled by the backend (/api/report-error → error_logs).
+    // The reportErrorToBackend call above sends to the Discord webhook pipeline,
+    // which now also writes to MongoDB — one call, one pipeline.
   });
 
   window.addEventListener('unhandledrejection', (event) => {
@@ -357,14 +346,7 @@ export function installGlobalErrorHandlers() {
       });
     }
 
-    // Report to /api/error-log (MongoDB log, queryable via admin API)
-    reportToErrorLog({
-      error_type: 'unhandled_promise_rejection',
-      error_message: message,
-      stack: stack,
-      url: window.location.href,
-      user_agent: navigator.userAgent,
-      metadata: { is_noise: isNoise },
-    }, 'unhandled_promise_rejection');
+    // MongoDB storage is handled by the backend — reportErrorToBackend above
+    // now writes to error_logs as well as sending the Discord alert.
   });
 }

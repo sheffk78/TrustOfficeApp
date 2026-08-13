@@ -1,5 +1,5 @@
 import React from 'react';
-import { reportToErrorLog } from '@/utils/errors';
+import { reportErrorToBackend } from '@/utils/errors';
 
 /**
  * Error Boundary component — catches unhandled JS errors in child components
@@ -23,21 +23,15 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary] Caught error:', error, errorInfo);
 
-    // Report to /api/error-log (MongoDB-backed, queryable via admin API)
+    // Report via /api/report-error (writes to MongoDB error_logs + Discord alert)
     // Includes componentStack and boundary: true to distinguish React render
     // errors from window.onerror uncaught exceptions.
-    reportToErrorLog(
+    reportErrorToBackend(
+      error,
       {
-        error_type: 'react_render_error',
-        error_message: error?.message || String(error) || 'Unknown render error',
-        stack: error?.stack || null,
-        url: window.location.href,
-        user_agent: navigator.userAgent,
-        component_stack: errorInfo?.componentStack || null,
-        boundary: true,
-        metadata: {},
-      },
-      'react_render_error'
+        operation: 'react_render_error',
+        page: window.location.pathname,
+      }
     );
   }
 

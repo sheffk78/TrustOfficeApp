@@ -29,9 +29,12 @@ import hashlib
 import logging
 import time
 import traceback
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from discord_service import notify_alert
+from database import db
 
 if TYPE_CHECKING:
     # Import only for type-checking to avoid pulling FastAPI/Starlette into
@@ -196,6 +199,36 @@ async def report_error(
 
     full_log = "\n".join(log_lines)
     logger.error(full_log)
+
+    # --- Store in MongoDB error_logs (single source of truth) ---
+    # Every report_error() call writes to error_logs so the orchestrator can
+    # poll it.  Deduped errors still get stored (with resolved=False) so the
+    # loop sees them; the dedupe below only gates the Discord alert.
+    _ctx = extra_context or {}
+    error_doc = {
+        "error_id": f"err_{uuid.uuid4().hex[:12]}",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": user_id,
+        "error_type": (error_type or "unknown")[:200],
+        "error_message": (error_message or "")[:4000],
+        "stack_trace": (traceback_str or "")[:8000] if traceback_str else None,
+        "url": (_ctx.get("location") or request_path or "")[:1000] or None,
+        "user_agent": (_ctx.get("user_agent") or "")[:500] or None,
+        "component_stack": None,
+        "boundary": False,
+        "metadata": {
+            "source": source,
+            "fingerprint": fp,
+            "operation": _ctx.get("operation"),
+            **{k: v for k, v in _ctx.items() if k not in ("location", "user_agent", "operation")},
+        },
+        "resolved": False,
+        "ip_address": None,
+    }
+    try:
+        await db.error_logs.insert_one(error_doc)
+    except Exception as store_exc:
+        logger.warning(f"Failed to store error in MongoDB: {store_exc}")
 
     # --- Dedupe check ---
     if _is_duplicate(fp):
