@@ -19,6 +19,8 @@ import { DashboardTaxCalendar } from './dashboard/DashboardTaxCalendar';
 import { DashboardHealthScoreCard } from './dashboard/DashboardHealthScoreCard';
 import { DashboardQuickActionsCard, DashboardMoneySection } from './dashboard/DashboardQuickActionsCard';
 import { DashboardRecentActivity } from './dashboard/DashboardRecentActivity';
+import { ReviewPromptModal } from '@/components/ReviewPromptModal';
+import { FeedbackPromptModal } from '@/components/FeedbackPromptModal';
 import { getOnboardingProgress, computeNextAction } from './dashboard/constants';
 
 export default function DashboardPage() {
@@ -57,6 +59,16 @@ export default function DashboardPage() {
   const stats = dashboard?.stats;
   const activities = dashboard?.recent_activity || [];
   const nextAction = computeNextAction(taxDeadlines, onboardingProgress, insights);
+
+  // Review prompt: show when all onboarding steps are complete OR checklist is dismissed
+  const showReviewPrompt = !loading && onboarding && (
+    onboardingProgress.completed >= onboardingProgress.total ||
+    onboarding.checklist_dismissed === true
+  );
+
+  // Feedback prompt: show after user has created 3+ minutes entries
+  // total_decisions = minutes_records + minutes_templates counts from backend
+  const showFeedbackPrompt = !loading && stats && (stats.total_decisions >= 3);
 
   // Determine if this is a new trust (less than 14 days old)
   const trustCreatedAt = selectedTrust?.created_at;
@@ -227,6 +239,12 @@ export default function DashboardPage() {
         </div>
       </main>
       <MobileBottomNav />
+
+      {/* Review prompt — triggers when onboarding is complete or dismissed */}
+      <ReviewPromptModal show={showReviewPrompt} />
+
+      {/* Feedback prompt — triggers after 3rd minutes entry created */}
+      <FeedbackPromptModal show={showFeedbackPrompt} />
     </div>
   );
 }
