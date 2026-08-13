@@ -20,12 +20,16 @@ COPY . /app/
 # Explicitly copy all router files to bust stale cache layers
 COPY routers/ /app/routers/
 
-# Fail the build if any imported router is missing from the runtime image.
+# Fail the build if any imported module is missing from the runtime image.
 # Also verify the knowledge router specifically (previously lost to stale cache).
+# Also verify services/ directory (knowledge_retrieval imports from services).
 RUN ls /app/routers/knowledge.py /app/routers/messaging.py /app/routers/performance.py \
+    && ls /app/services/__init__.py /app/services/trust_knowledge.py \
     && python -m py_compile /app/routers/knowledge.py \
     && python -m py_compile /app/routers/messaging.py \
-    && python -m py_compile /app/routers/performance.py
+    && python -m py_compile /app/routers/performance.py \
+    && python -m py_compile /app/routers/knowledge_retrieval.py \
+    && python -m py_compile /app/services/trust_knowledge.py
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser && \
