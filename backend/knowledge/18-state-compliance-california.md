@@ -10,7 +10,7 @@ Estimated tax payments are required if the trust expects to owe $1,000 or more i
 
 ## Filing Requirements
 
-California fiduciary income tax is filed using Form 541, the Fiduciary Income Tax Return. The filing deadline is April 15 for calendar-year trusts, or the 15th day of the fourth month after the close of the fiscal year. Form 541 is due annually. If the trust is a simple trust that distributes all income, it may still need to file if it has California-source income or is a resident trust. An extension can be filed using Form 3540, which provides an automatic six-month extension to file (but not to pay).
+California fiduciary income tax is filed using Form 541, the Fiduciary Income Tax Return. The filing deadline is April 15 for calendar-year trusts, or the 15th day of the fourth month after the close of the fiscal year. Form 541 is due annually. If the trust is a simple trust that distributes all income, it may still need to file if it has California-source income or is a resident trust. An extension can be filed using FTB 3537, which provides an automatic six-month extension to file (but not to pay).
 
 ## Beneficiary Notice Requirements
 

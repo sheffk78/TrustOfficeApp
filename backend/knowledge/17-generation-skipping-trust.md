@@ -8,7 +8,7 @@ A Generation-Skipping Transfer trust, or GST trust, is a trust designed to trans
 
 - **GST exemption must be allocated to the trust.** The grantor can allocate the GST exemption either affirmatively on a timely filed gift tax return (Form 709) or rely on automatic allocation rules for certain direct skips and indirect skips. The trustee and grantor must understand which allocation method applies, because an unallocated exemption means the transfer is subject to the full GST tax.
 
-- **Form 709 reporting for lifetime transfers.** Transfers to a GST trust during the grantor's lifetime must be reported on Form 709, and the GST exemption allocation is made on that return. Late allocations are permitted but generally result in a less favorable effective tax rate.
+- **Form 709 reporting for lifetime transfers.** Transfers to a GST trust during the grantor's lifetime must be reported on Form 709, and the GST exemption allocation is made on that return. Late allocations are permitted under the automatic allocation rules and relief provisions, but may result in different tax consequences depending on timing.
 
 - **Understanding GST tax tiers.** The GST tax applies to three types of transfers: direct skips (a transfer to a skip-generation beneficiary outright or in trust), taxable distributions (distributions from a trust to a skip-generation beneficiary), and taxable terminations (a trust termination that causes a skip-generation beneficiary's interest to become possessory). The trustee must know which tier a given distribution triggers, because each has different reporting and tax implications.
 

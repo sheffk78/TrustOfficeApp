@@ -31,7 +31,7 @@ For testamentary trusts (created by will), the trust may fall under the jurisdic
 - **Flat Income Tax Rate:** Illinois applies a flat 4.95% income tax to trust income, simplifying rate calculations but still representing a meaningful cost.
 - **Exempt Resident Trust Rule:** Resident trusts with no Illinois-source income and no Illinois trustee may be exempt from Illinois income tax.
 - **Illinois Trust Code:** Illinois modernized its trust laws in 2020, providing clearer rules on trustee duties, beneficiary rights, and trust administration.
-- **No Estate Tax:** Illinois does not currently impose a state estate tax, though it does have an inheritance tax in limited circumstances for certain beneficiaries.
+- **Illinois Estate Tax:** Illinois imposes a separate state estate tax with an exemption amount that differs from the federal exemption (currently $4 million). Trustees and executors must evaluate Illinois estate tax filing requirements independently from federal estate tax.
 
 ## How TrustOffice Helps
 

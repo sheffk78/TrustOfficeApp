@@ -8,7 +8,7 @@ The first 90 days after a trust becomes active — whether through a life event,
 
 **Complete these tasks in the first 90 days:**
 
-1. **Obtain an Employer Identification Number (EIN)** from the IRS. A trust is a separate taxpayer and needs its own EIN, even if it is a revocable trust that will use the grantor's Social Security number during life. Apply online at IRS.gov — it takes minutes and is free. Do not use your personal SSN for trust tax filings.
+1. **Obtain an Employer Identification Number (EIN)** from the IRS if the trust is irrevocable or has become irrevocable (e.g., at the grantor's death). A revocable living trust during the grantor's lifetime typically uses the grantor's Social Security number and does not need its own EIN. Apply online at IRS.gov — it takes minutes and is free. Do not use your personal SSN for an irrevocable trust's tax filings.
 
 2. **Open a trust bank account.** Use the EIN, not your personal SSN. All trust income and expenses must flow through this account. Never commingle trust funds with personal funds — commingling is one of the most common and damaging breaches of fiduciary duty.
 
