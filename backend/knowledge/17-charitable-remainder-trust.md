@@ -1,0 +1,32 @@
+# Charitable Remainder Trust (CRT)
+
+## What It Is
+A charitable remainder trust (CRT) is an irrevocable trust that provides income to one or more non-charitable beneficiaries (typically the grantor and/or family members) for a term of years or for life, with the remainder passing to one or more qualified charities. It is used by individuals who want to support a charity, receive a current income tax deduction, diversify a concentrated holding, and generate income — all in one structure. The trust is irrevocable from the moment it is signed. There are two primary structures: the charitable remainder annuity trust (CRAT), which pays a fixed dollar amount annually, and the charitable remainder unitrust (CRUT), which pays a fixed percentage of the trust's value (revalued annually). A third variation, the net income with makeup unitrust (NIMCRUT), pays the lesser of the trust's actual income or the stated percentage.
+
+## Key Governance Requirements
+- **Minimum 5% annual payout.** By law, the CRT must distribute at least 5% of its net fair market value annually to the non-charitable beneficiaries. The payout percentage is set in the trust agreement and cannot be less than 5% or more than 50% (CRUT) or more than 50% for CRATs. Failure to meet the minimum payout can trigger trust termination or excise taxes.
+- **File Form 5227 annually.** The CRT files Form 5227 (Charitable Remainder Trust Information Return) every year — not Form 1041. This form reports the trust's income, distributions, and charitable remainder value. The trustee must also issue Schedule K-1 (Form 5227) to each income beneficiary.
+- **At least 10% remainder interest.** The trust must be structured so that the present value of the charitable remainder is at least 10% of the initial fair market value of the trust assets. If the payout is too high or the beneficiary's life expectancy is too long, the trust may fail this test and lose its tax-exempt status.
+- **Irrevocable — no amendments.** Once established, the CRT cannot be revoked or modified (except in limited circumstances via judicial or non-judicial modification statutes). The trustee must understand that the structure is fixed.
+- **Self-dealing prohibitions apply.** IRC Section 4947 imposes excise taxes on self-dealing between the CRT and disqualified persons (the grantor, family members, and related entities). The trustee cannot sell trust assets to the grantor, loan money to disqualified persons, or use trust property for the grantor's personal benefit.
+
+## Distribution Rules
+- **CRAT pays a fixed dollar amount.** The annuity amount is set at funding and does not change, regardless of trust performance. If the trust earns less than the annuity, principal is invaded.
+- **CRUT pays a fixed percentage of annual value.** The percentage (minimum 5%) is applied to the trust's value as revalued each year. This means payouts rise and fall with trust performance.
+- **Distributions to non-charitable beneficiaries first.** During the income term, all distributions go to the named income beneficiaries (grantor, spouse, children). At the end of the term (death of the last income beneficiary or the stated term of years), the remaining principal goes to the named charity or charities.
+- **Remainder must go to qualified charities.** The remainder beneficiaries must be organizations described in IRC Section 170(c). The trustee must verify the charity's qualified status and obtain acknowledgment letters for any gifts received.
+
+## How TrustOffice Helps
+- **Tax Calendar** tracks Form 5227 filing deadlines, minimum distribution requirements, and estimated payment dates so the trustee never misses the mandatory 5% payout or the annual return.
+- **Distributions** module documents each payment to income beneficiaries and tracks whether the trust has met its minimum 5% annual payout requirement, flagging shortfalls before they become compliance failures.
+- **Vault** stores the trust agreement, IRS determination letter for the CRT, qualified charity acknowledgment letters, and the actuarial calculations showing the 10% remainder test was satisfied at funding.
+- **Governance Calendar** tracks the income beneficiary's life expectancy milestones, the term-of-years countdown, and the eventual charitable remainder distribution date.
+- **Trust Assistant** explains payout calculations, the difference between CRAT and CRUT, self-dealing restrictions, and the Form 5227 filing requirements in plain language.
+- **Defensibility Score** flags missed minimum distributions, late Form 5227 filings, unverified charity status, or self-dealing transactions that could trigger excise taxes.
+
+## Common Pitfalls
+- **Missing the minimum 5% distribution.** The trustee must distribute at least 5% of the trust's net value annually. Accumulating income to grow the trust — even with good intentions — violates the trust's terms and can trigger excise taxes or trust termination.
+- **Filing Form 1041 instead of Form 5227.** A CRT files Form 5227, not Form 1041. Filing the wrong form can result in penalties and confusion about the trust's tax-exempt status. This is a common error for trustees unfamiliar with CRTs.
+- **Self-dealing violations.** The trustee cannot transact with the grantor or related parties. Common violations include the grantor buying assets from the trust, the trust leasing property to the grantor, or the trust compensating a family member for services. Each triggers a 10% excise tax on the disqualified person and a 5% tax on the trustee.
+- **Failing the 10% remainder test at funding.** If the trust's assets decline significantly after the initial valuation but before actual funding, or if the actuarial calculation used incorrect life expectancy tables, the trust may fail the 10% test and lose its exemption. The trustee must verify the calculation and asset values at the funding date.
+- **Not verifying charity status.** The remainder beneficiary must be a qualified charity at the time the remainder is distributed. Charities can lose their status. The trustee should verify status via IRS Exempt Organizations Select Check before making the final distribution.

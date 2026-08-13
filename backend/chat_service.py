@@ -42,7 +42,17 @@ KNOWLEDGE_DIR = os.path.join(os.path.dirname(__file__), "knowledge")
 with open(os.path.join(PROMPTS_DIR, "intent_classifier.md"), "r") as f:
     INTENT_CLASSIFIER_PROMPT = f.read()
 
-# System prompt (Agent Constitution)
+# System prompt — split into core (always), actions (action intents), escalation (fiduciary)
+with open(os.path.join(PROMPTS_DIR, "chat_system_core.md"), "r") as f:
+    CHAT_SYSTEM_CORE = f.read()
+
+with open(os.path.join(PROMPTS_DIR, "chat_system_actions.md"), "r") as f:
+    CHAT_SYSTEM_ACTIONS = f.read()
+
+with open(os.path.join(PROMPTS_DIR, "chat_system_escalation.md"), "r") as f:
+    CHAT_SYSTEM_ESCALATION = f.read()
+
+# Legacy full prompt kept for backward compatibility (unused in split mode)
 with open(os.path.join(PROMPTS_DIR, "chat_system.md"), "r") as f:
     CHAT_SYSTEM_PROMPT = f.read()
 
@@ -79,21 +89,45 @@ def get_knowledge_base() -> Dict[str, str]:
     return _KNOWLEDGE_BASE_CACHE
 
 
+# Unified intent classification sets — derived once, used by both
+# _format_knowledge_context() and _build_system_prompt(). (MEDIUM-2 fix)
+ACTION_INTENTS = {
+    "add_asset", "contribute_asset", "update_asset", "log_minutes",
+    "create_distribution", "evaluate_distribution", "create_beneficiary",
+    "create_class_beneficiary", "remove_class_beneficiary", "update_beneficiary",
+    "remove_beneficiary", "send_certificate", "cancel_distribution",
+    "upload_document", "setup_compensation", "record_compensation_payment",
+    "add_investment", "schedule_task", "add_transaction", "change_settings",
+    "create_entity", "review_document", "dismiss_alert", "recommend_action",
+    "check_deadlines", "health_check",
+}
+ESCALATION_INTENTS = ACTION_INTENTS | {"ask_knowledge", "emergency"}
+
+
 def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
     """Format relevant knowledge base entries into a single context string.
 
     The Trust Assistant's product/workflow files are long. If we blindly append
     every file and then truncate the combined context, the newer workflow guide
     can be pushed out of the prompt by unrelated foundational files. Keep the
-    feature and workflow guides pinned, then add the most relevant topical files.
+    feature and workflow guides pinned (for action intents), then add the most
+    relevant topical files. For knowledge/chat intents, skip product files to
+    save tokens and avoid drowning out trust-type knowledge.
     """
     kb = get_knowledge_base()
     if not kb:
         return "No curated knowledge base entries available."
 
     query = f"{intent} {user_message}".lower()
-    # Put high-level training first so "how do I" and scenario guidance survives final prompt truncation.
-    pinned_topics = ["15-trustoffice-scenarios", "14-trustoffice-page-playbooks", "13-trustoffice-workflows", "12-trustoffice-features"]
+
+    # Product files are only pinned for action-oriented intents. For knowledge
+    # questions and casual chat, they waste ~9K chars of context and crowd out
+    # the trust-type knowledge the user actually needs.
+    # Uses the module-level ACTION_INTENTS set (unified with _build_system_prompt).
+    if intent in ACTION_INTENTS:
+        pinned_topics = ["15-trustoffice-scenarios", "14-trustoffice-page-playbooks", "13-trustoffice-workflows", "12-trustoffice-features"]
+    else:
+        pinned_topics = []
 
     topic_keywords = {
         "16-minutes-types-and-templates": ["minutes", "meeting", "create minutes", "draft minutes", "initial minutes", "first meeting", "trustee meeting", "document a", "resolution", "annual review", "quarterly", "template"],
@@ -108,6 +142,44 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
         "11-video-library": ["video", "lesson", "course", "trustee 101"],
         "03-trustee-duties": ["duty", "fiduciary", "trustee", "responsibility"],
         "01-hems-standard": ["hems", "health", "education", "maintenance", "support"],
+        # --- Trust type knowledge (17-* series) ---
+        "17-revocable-living-trust": ["revocable", "living trust", "revocable living", "probate", "inter vivos", "grantor trust", "revocable trust"],
+        "17-irrevocable-life-insurance-trust": ["ilit", "life insurance trust", "irrevocable life insurance", "crummey", "insurance trust", "policy proceeds", "gift tax annual exclusion", "notice of withdrawal"],
+        "17-dynasty-trust": ["dynasty", "perpetuity", "generation-skipping", "gst exemption", "dynasty trust", "multi-generational", "perpetual trust"],
+        "17-charitable-remainder-trust": ["charitable remainder", "crt", "charitable trust", "remainder beneficiary", "5% payout", "annuity trust", "unitrust", "charitable remainder annuity", "charitable remainder unitrust"],
+        "17-charitable-lead-trust": ["charitable lead", "clt", "charitable lead annuity", "charitable lead unitrust", "income to charity", "remainder to family"],
+        "17-special-needs-trust": ["special needs", "supplemental needs", "ssi", "medicaid", "disability trust", "third-party special needs", "first-party special needs", "payback", "able account", "d4a", "sole benefit"],
+        "17-spendthrift-trust": ["spendthrift", "creditor protection", "spendthrift clause", "alienation", "voluntary alienation", "involuntary alienation"],
+        "17-asset-protection-trust": ["asset protection", "dapt", "fapt", "domestic asset protection", "foreign asset protection", "self-settled spendthrift", "alaska trust", "nevada trust", "south dakota trust", "fraudulent transfer"],
+        "17-blind-trust": ["blind trust", "conflict of interest", "blind trust", "independent trustee", "political trust", "ethics trust"],
+        "17-land-trust": ["land trust", "illinois land trust", "florida land trust", "property anonymity", "beneficial interest", "title by trustee"],
+        "17-qtip-trust": ["qtip", "qualified terminal interest", "marital deduction", "surviving spouse income", "terminal interest", "qtip election", "estate tax return", "form 706"],
+        "17-generation-skipping-trust": ["generation-skipping", "gst", "skip-generation", "gst tax", "gst exemption", "form 709", "grandchildren trust", "generation skipping transfer"],
+        "17-bypass-trust": ["bypass trust", "credit shelter", "a-b trust", "exemption trust", "family trust", "portability", "applicable exemption amount", "bypass", "credit shelter trust"],
+        "17-grat": ["grat", "grantor retained annuity", "annuity trust", "zeroed-out grat", "estate freeze", "irc 2701", "grantor retained annuity trust"],
+        "17-qualified-personal-residence-trust": ["qprt", "qualified personal residence", "personal residence trust", "retained right to occupy", "home to trust", "residence trust", "irc 2702"],
+        "17-testamentary-trust": ["testamentary", "will trust", "death trust", "probate trust", "testamentary trust"],
+        "17-totten-trust": ["totten", "bank account trust", "payable on death", "pod account", "totten trust"],
+        "17-marital-deduction-trust": ["marital deduction", "marital trust", "marital share", "spousal trust", "marital deduction trust", "unlimited marital deduction"],
+        "17-minors-trust": ["minor's trust", "2503(c)", "minors trust", "gift to minor", "custodial trust", "child trust"],
+        "17-irrevocable-trust-general": ["irrevocable", "irrevocable trust", "irrevocable general", "non-grantor trust", "irrevocable structure"],
+        # --- State-specific compliance (18-* series) ---
+        "18-state-compliance-california": ["california", "ca compliance", "ca tax", "ca probate", "ca trust", "probate code 16061"],
+        "18-state-compliance-texas": ["texas", "tx compliance", "tx trust", "texas trust", "franchise tax"],
+        "18-state-compliance-florida": ["florida", "fl compliance", "fl trust", "florida trust code", "florida trust"],
+        "18-state-compliance-new-york": ["new york", "ny compliance", "ny trust", "ny tax", "it-205", "ny estate tax"],
+        "18-state-compliance-illinois": ["illinois", "il compliance", "il trust", "il-1041", "illinois probate"],
+        "18-state-compliance-nevada": ["nevada", "nv compliance", "nv trust", "nevada trust", "nv perpetuity"],
+        "18-state-compliance-south-dakota": ["south dakota", "sd compliance", "sd trust", "south dakota trust", "sd perpetuity"],
+        "18-state-compliance-delaware": ["delaware", "de compliance", "de trust", "delaware trust", "chancery", "de perpetuity"],
+        "18-state-compliance-arizona": ["arizona", "az compliance", "az trust", "arizona trust"],
+        "18-state-compliance-washington": ["washington", "wa compliance", "wa trust", "washington trust", "wa estate tax"],
+        # --- Communication templates (19-*) ---
+        "19-beneficiary-communication-templates": ["beneficiary communication", "distribution letter", "approval letter", "denial letter", "annual accounting", "resignation notice", "beneficiary notice", "trustee communication", "communication template", "write to beneficiary", "notify beneficiary"],
+        # --- Trust lifecycle stages (20-*) ---
+        "20-trust-lifecycle-stages": ["lifecycle", "initial setup", "first 90 days", "ongoing administration", "trust termination", "wind down", "trust modification", "amendment", "decanting", "final return", "trust stages", "lifecycle stage"],
+        # --- Crisis escalation (21-*) ---
+        "21-crisis-escalation": ["fraud", "theft", "stolen", "unauthorized", "lawsuit", "litigation", "subpoena", "court order", "audit", "creditor claim", "incapacity", "trustee death", "missing beneficiary", "exploitation", "foreclosure", "emergency", "crisis", "urgent", "police", "law enforcement", "adult protective", "dispute", "threatened"],
     }
 
     selected = []
@@ -121,7 +193,10 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
 
     # De-duplicate while preserving order, then add one fallback conceptual file.
     selected = list(dict.fromkeys(selected))
-    if len(selected) == len([t for t in pinned_topics if t in kb]) and "03-trustee-duties" in kb:
+    if not pinned_topics and "03-trustee-duties" in kb and not selected:
+        # For knowledge/chat intents with no topic match, add trustee duties as a baseline.
+        selected.append("03-trustee-duties")
+    elif len(selected) == len([t for t in pinned_topics if t in kb]) and "03-trustee-duties" in kb:
         selected.append("03-trustee-duties")
 
     def relevant_excerpt(topic: str, content: str) -> str:
@@ -215,6 +290,45 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
     for topic in selected[:5]:
         content = kb[topic]
         sections.append(f"### {topic}\n{relevant_excerpt(topic, content)}")
+
+    # --- FTS5 fallback: if keyword matching found fewer than 3 files, use the
+    # SQLite FTS5 index for semantic search. This catches cases where the
+    # user's phrasing doesn't match our hand-coded keyword mappings.
+    if len(sections) < 3:
+        try:
+            from services import trust_knowledge
+            # Resolve paths the same way knowledge_retrieval.py does:
+            # parents[0]=chat_service.py dir (backend), parents[1]=app root.
+            # In Railway: /app/KNOWLEDGE/, locally: TrustOfficeApp/KNOWLEDGE/
+            brand_root = os.path.dirname(os.path.dirname(__file__))
+            registry_path = os.environ.get(
+                "TRUST_KNOWLEDGE_REGISTRY",
+                os.path.join(brand_root, "KNOWLEDGE", "trustoffice-registry.yaml"),
+            )
+            db_path = os.environ.get(
+                "TRUST_KNOWLEDGE_DB",
+                os.path.join(brand_root, "data", "trust_knowledge.db"),
+            )
+            # Skip FTS if the registry doesn't exist (don't try to build index)
+            if os.path.isfile(registry_path):
+                if not os.path.isfile(db_path):
+                    trust_knowledge.build_index(registry_path, KNOWLEDGE_DIR, db_path)
+                fts_result = trust_knowledge.retrieve(
+                    user_message,
+                    {"db_path": db_path, "limit": 3, "status": "live"},
+                )
+                existing = "\n".join(sections)
+                for item in fts_result.get("results", [])[:2]:
+                    item_title = item.get("title", "")
+                    item_snippet = item.get("snippet", "")
+                    if item_snippet and item_title not in existing:
+                        sections.append(f"### FTS: {item_title}\n{item_snippet[:600]}")
+            elif logger:
+                logger.debug("FTS5 fallback skipped: registry YAML not found at %s", registry_path)
+        except Exception as fts_err:
+            if logger:
+                logger.warning("FTS5 knowledge retrieval failed: %s", fts_err)
+
     return "\n\n".join(sections)
 
 
@@ -291,14 +405,23 @@ Respond with JSON only — no other text."""
     return {"action_type": intent, "extracted": {}, "missing_required": [], "suggested_clarification": None}
 
 
-async def build_trust_context(user_id: str, trust_id: str) -> dict:
+async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> dict:
     """
     Assemble the trust context for the AI: trust profile, deadlines,
     recent activity, beneficiaries, pending reviews.
+
+    When intent is provided and is a lightweight knowledge/chat intent,
+    skip the expensive MongoDB queries (beneficiaries, money summary,
+    structure summary, vault, recent activity) that aren't needed for
+    general questions. This saves 8+ DB round-trips per message.
     """
+    # Intents that need full context — action-oriented or health-checking.
+    LIGHTWEIGHT_INTENTS = {"ask_knowledge", "general_chat", "emergency"}
+    lightweight = intent in LIGHTWEIGHT_INTENTS
+
     context = {}
 
-    # 1. Trust profile
+    # 1. Trust profile (always needed — minimal cost)
     trust = await db.trusts.find_one(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0}
@@ -317,7 +440,7 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
     else:
         context["trust"] = {"name": "Unknown Trust"}
 
-    # 2. Defensibility Score
+    # 2. Defensibility Score (always included — one query, cheap)
     health = await db.health_score_snapshots.find_one(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0, "score_value": 1, "color": 1, "base_score": 1, "risk_penalty": 1},
@@ -333,8 +456,49 @@ async def build_trust_context(user_id: str, trust_id: str) -> dict:
     else:
         context["health_score"] = {"total": 0, "color": "red", "base_score": 0, "risk_penalty": 0}
 
-    # 3. Upcoming deadlines (next 14 days)
+    # For lightweight intents (ask_knowledge, general_chat, emergency), skip
+    # the expensive sections 3-11 below. The AI only needs trust profile +
+    # health score for general knowledge questions. This saves 8+ DB queries.
     now = datetime.now(timezone.utc)
+
+    if lightweight:
+        context["upcoming_deadlines"] = []
+        context["pending_items"] = []
+        context["recent_activity"] = []
+        context["beneficiaries"] = []
+        context["class_beneficiaries"] = []
+        context["entities"] = []
+        context["tax_deadlines"] = []
+        context["vault_documents"] = []
+        context["money_summary"] = {}
+        context["structure_summary"] = {}
+
+        # Fetch trust document analysis — it's a single find_one query and is
+        # essential for knowledge questions about the trust's own provisions.
+        # Without this, the AI would say "I don't have your trust instrument"
+        # even when it's fully analyzed in the DB. (CRITICAL-2 fix)
+        analysis = await db.trust_document_analysis.find_one(
+            {"trust_id": trust_id, "user_id": user_id, "status": "complete"},
+            {"_id": 0, "extracted_fields": 1},
+            sort=[("created_at", -1)]
+        )
+        if analysis:
+            fields = analysis.get("extracted_fields", {})
+            dist_std = fields.get("distribution_standard", {})
+            context["trust_document"] = {
+                "grantor": fields.get("grantor_name", ""),
+                "trust_type": fields.get("trust_type", ""),
+                "distribution_standard": dist_std.get("exact_language", ""),
+                "distribution_standard_type": dist_std.get("type", ""),
+                "distribution_article": dist_std.get("article_reference", ""),
+                "beneficiary_names": fields.get("beneficiary_names", []),
+            }
+        else:
+            context["trust_document"] = {}
+
+        return context
+
+    # 3. Upcoming deadlines (next 14 days)
     two_weeks = (now + timedelta(days=14)).isoformat()
     deadlines = await db.governance_tasks.find(
         {
@@ -1004,6 +1168,110 @@ def _build_vault_section(ctx: dict, intent: str, user_message: str) -> str:
     return vault_section
 
 
+# --- Trust-type-aware guidance (#1) ---
+# Maps the trust profile's trust_type field to the corresponding knowledge file,
+# then extracts the "Key Governance Requirements" and "Distribution Rules" sections
+# as a brief preamble so the AI proactively applies type-specific guidance.
+
+_TRUST_TYPE_FILE_MAP = {
+    "revocable": "17-revocable-living-trust",
+    "revocable living": "17-revocable-living-trust",
+    "living": "17-revocable-living-trust",
+    "revocable living trust": "17-revocable-living-trust",
+    "irrevocable": "17-irrevocable-trust-general",
+    "irrevocable trust": "17-irrevocable-trust-general",
+    "ilit": "17-irrevocable-life-insurance-trust",
+    "life insurance": "17-irrevocable-life-insurance-trust",
+    "insurance trust": "17-irrevocable-life-insurance-trust",
+    "dynasty": "17-dynasty-trust",
+    "crt": "17-charitable-remainder-trust",
+    "charitable remainder": "17-charitable-remainder-trust",
+    "clt": "17-charitable-lead-trust",
+    "charitable lead": "17-charitable-lead-trust",
+    "special needs": "17-special-needs-trust",
+    "supplemental needs": "17-special-needs-trust",
+    "snt": "17-special-needs-trust",
+    "spendthrift": "17-spendthrift-trust",
+    "asset protection": "17-asset-protection-trust",
+    "dapt": "17-asset-protection-trust",
+    "blind": "17-blind-trust",
+    "land trust": "17-land-trust",
+    "qtip": "17-qtip-trust",
+    "generation skipping": "17-generation-skipping-trust",
+    "gst": "17-generation-skipping-trust",
+    "bypass": "17-bypass-trust",
+    "credit shelter": "17-bypass-trust",
+    "a-b": "17-bypass-trust",
+    "grat": "17-grat",
+    "grantor retained annuity": "17-grat",
+    "qprt": "17-qualified-personal-residence-trust",
+    "personal residence": "17-qualified-personal-residence-trust",
+    "testamentary": "17-testamentary-trust",
+    "totten": "17-totten-trust",
+    "marital": "17-marital-deduction-trust",
+    "marital deduction": "17-marital-deduction-trust",
+    "minor": "17-minors-trust",
+    "2503(c)": "17-minors-trust",
+    "minors trust": "17-minors-trust",
+}
+
+
+def _build_trust_type_guidance(trust_type: str) -> str:
+    """Extract a brief trust-type-specific guidance section from the knowledge base.
+
+    Looks up the trust's type in the knowledge file map, then pulls the
+    'Key Governance Requirements' and 'Distribution Rules' sections as a
+    concise preamble (max 1500 chars). This lets the AI proactively apply
+    type-specific guidance without the user asking about it.
+    """
+    if not trust_type:
+        return ""
+
+    type_lower = trust_type.lower().strip()
+    kb = get_knowledge_base()
+
+    # Try exact match, then partial match (keyword must be at least 4 chars
+    # and only match keyword-in-type_lower, not the reverse, to avoid
+    # "blind" matching "blindly" or "test" matching "testamentary" incorrectly)
+    file_key = _TRUST_TYPE_FILE_MAP.get(type_lower)
+    if not file_key:
+        for keyword, key in _TRUST_TYPE_FILE_MAP.items():
+            if len(keyword) >= 4 and keyword in type_lower:
+                file_key = key
+                break
+    if not file_key or file_key not in kb:
+        return ""
+
+    content = kb[file_key]
+    lines = content.split("\n")
+    preamble_lines = [f"## Trust Type Guidance ({trust_type})"]
+    in_section = False
+    char_count = 0
+    for line in lines:
+        if line.startswith("## Key Governance Requirements"):
+            in_section = True
+            preamble_lines.append(line)
+            char_count += len(line)
+            continue
+        elif line.startswith("## Distribution Rules"):
+            in_section = True
+            preamble_lines.append(line)
+            char_count += len(line)
+            continue
+        elif line.startswith("## ") and in_section:
+            # Hit the next section after Distribution Rules — stop
+            break
+        if in_section:
+            preamble_lines.append(line)
+            char_count += len(line)
+            if char_count > 1200:
+                preamble_lines.append("  (truncated)")
+                break
+
+    result = "\n".join(preamble_lines)
+    return result[:1500]
+
+
 def _build_system_prompt(
     intent: str,
     user_message: str,
@@ -1031,10 +1299,39 @@ def _build_system_prompt(
 
     knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
     vault_section = _build_vault_section(ctx, intent, user_message)
+    trust_type_guidance = _build_trust_type_guidance(trust_info.get("type", ""))
 
     health = ctx.get("health_score", {})
 
-    shared_header = f"""{CHAT_SYSTEM_PROMPT}
+    # --- Assemble system prompt from split constitution ---
+    # Core is always loaded (~3K chars).
+    # Actions section loaded for action intents (~5K chars).
+    # Escalation section loaded for any intent touching fiduciary decisions (~2K chars).
+    # Uses module-level ACTION_INTENTS and ESCALATION_INTENTS (unified). (MEDIUM-2 fix)
+
+    system_prompt_base = CHAT_SYSTEM_CORE
+    if intent in ACTION_INTENTS:
+        system_prompt_base += "\n\n" + CHAT_SYSTEM_ACTIONS
+    if intent in ESCALATION_INTENTS:
+        system_prompt_base += "\n\n" + CHAT_SYSTEM_ESCALATION
+
+    # Distribution evaluation guidance (only for distribution intents)
+    if intent in ("create_distribution", "evaluate_distribution"):
+        system_prompt_base += """
+
+## Distribution Evaluation Protocol
+When a user asks about evaluating a distribution request, help them evaluate it systematically:
+1. Reference the trust's distribution standard (HEMS, sole discretion, etc.) from the trust document analysis
+2. Check whether the request falls within the trust's permitted distribution categories
+3. Reference past distribution patterns to ensure equitable treatment
+4. Note any quantitative parameters mentioned in the trust document (e.g., tuition coverage limits, reasonable amounts)
+5. Provide a clear recommendation: approved, denied, or needs further review
+6. Draft a beneficiary notification if the distribution is approved
+
+When evaluating, always cite the specific trust document language and article references you're basing the recommendation on.
+"""
+
+    shared_header = f"""{system_prompt_base}
 
 ## Current Trust Context
 Trust: {trust_info.get('name', 'Unknown')}
@@ -1047,6 +1344,8 @@ Trustees: {trust_info.get('trustees', 'Not specified')}
 Defensibility Score: {health.get('total', 0)}/{health.get('max_score', 115)} ({health.get('color', 'red')})
 
 {vault_section}
+
+{trust_type_guidance}
 
 ## Upcoming Deadlines (next 14 days)
 {_fmt_deadlines(ctx.get('upcoming_deadlines', []))}
@@ -1350,7 +1649,7 @@ def _structure_unknowns(struct: dict) -> list:
     return out
 
 
-def build_citation_notes(trust_context: dict, intent: str) -> tuple:
+def build_citation_notes(trust_context: dict, intent: str, user_message: str = "") -> tuple:
     """
     Build citation_note and unknown_note from the trust context.
     Returns (citation_note, unknown_note).
@@ -1385,7 +1684,7 @@ def build_citation_notes(trust_context: dict, intent: str) -> tuple:
     citations.extend(_trust_doc_citations(trust_doc))
 
     citations.extend(_vault_citations(
-        ctx.get("vault_documents", []), intent, ctx.get("_user_message", "")
+        ctx.get("vault_documents", []), intent, user_message
     ))
 
     # Unknowns

@@ -229,8 +229,8 @@ async def chat(
     intent = intent_result.get("intent", "general_chat")
     entities = intent_result.get("entities", {})
 
-    # 5. Build trust context
-    trust_context = await build_trust_context(user_id, trust_id)
+    # 5. Build trust context (intent-aware: lightweight intents skip heavy DB queries)
+    trust_context = await build_trust_context(user_id, trust_id, intent=intent)
 
     # 6. Generate response
     ai_response = await generate_response(
@@ -315,6 +315,36 @@ async def chat(
         f"intent={intent} | response_time={response_time:.2f}s | "
         f"has_action={'yes' if action_card else 'no'}"
     )
+
+    # --- Measurement framework telemetry (#7) ---
+    # Lightweight structured event for behavioral analytics. Queries are
+    # kept minimal (count_documents only) to avoid adding latency.
+    try:
+        # Count messages in this conversation to determine if this is the first
+        # message (activation tracking) vs. a follow-up (engagement)
+        msg_count = conversation.get("message_count", 0) if conversation else 0
+        is_first_message = msg_count == 0
+
+        # Health score for score-delta tracking
+        health_total = ctx.get("health_score", {}).get("total", 0)
+
+        await db.chat_telemetry.insert_one({
+            "timestamp": now,
+            "user_id": user_id,
+            "trust_id": trust_id,
+            "conversation_id": conv_id,
+            "intent": intent,
+            "response_time_s": round(response_time, 2),
+            "has_action_card": action_card is not None,
+            "action_card_type": action_card.type if action_card else None,
+            "is_first_message": is_first_message,
+            "health_score": health_total,
+            "message_length": len(request.message),
+            # For fallback-rate tracking: we log whether the user subsequently
+            # visits a Dashboard page after this chat message (joined at query time)
+        })
+    except Exception as e:
+        logger.debug(f"Telemetry write failed (non-critical): {e}")
 
     return ChatResponse(
         message=assistant_msg_doc,
@@ -2043,13 +2073,16 @@ async def _chat_stream_generator(
         # 4b. Send status event so frontend knows we're processing
         yield await _sse_event("status", {"phase": "thinking"})
 
-        # 5. Classify intent AND build trust context in parallel
-        intent_task = asyncio.create_task(classify_intent(message, None))
-        trust_context = await build_trust_context(user_id, trust_id_resolved)
-        intent_result = await intent_task
-
+        # 5. Classify intent first, then build trust context (intent-aware)
+        # Previously these ran in parallel, but build_trust_context now accepts
+        # intent to skip heavy DB queries for lightweight intents (ask_knowledge,
+        # general_chat, emergency). Awaiting intent first adds ~1s but saves
+        # 8+ DB queries for knowledge questions. (CRITICAL-3 fix)
+        intent_result = await classify_intent(message, None)
         intent = intent_result.get("intent", "general_chat")
         entities = intent_result.get("entities", {})
+
+        trust_context = await build_trust_context(user_id, trust_id_resolved, intent=intent)
 
         # 6. Stream the response tokens
         full_response_text = ""
@@ -2096,7 +2129,7 @@ async def _chat_stream_generator(
             raise
 
         # 7. Build citations
-        citation_note, unknown_note = build_citation_notes(trust_context, intent)
+        citation_note, unknown_note = build_citation_notes(trust_context, intent, user_message=message)
 
         # 8. Determine caveat
         caveat = None

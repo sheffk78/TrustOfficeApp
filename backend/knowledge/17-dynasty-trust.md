@@ -1,0 +1,33 @@
+# Dynasty Trust
+
+## What It Is
+A dynasty trust is a long-term irrevocable trust designed to hold wealth across multiple generations — potentially in perpetuity — while minimizing or eliminating transfer taxes (estate, gift, and generation-skipping transfer (GST) tax) at each generational level. It is used by high-net-worth families who want to preserve wealth for children, grandchildren, and great-grandchildren without the wealth being taxed at each generation's death. The trust leverages the grantor's GST exemption (currently $13.99 million per individual in 2025) to shield assets from GST tax permanently. Dynasty trusts are typically established in jurisdictions that have abolished or extended the rule against perpetuities, allowing the trust to last for hundreds of years or indefinitely.
+
+## Key Governance Requirements
+- **GST exemption allocation is critical.** The grantor must allocate their GST exemption to the dynasty trust, typically by filing Form 709 (gift tax return) and checking the automatic allocation box or making a timely allocation. Without proper allocation, distributions to skip persons (grandchildren and below) will be subject to the 40% GST tax.
+- **Jurisdiction selection matters enormously.** The trust should be established in a state that has repealed or significantly extended the rule against perpetuities. The most common jurisdictions are South Dakota (SD), Nevada (NV), and Delaware (DE). Each offers perpetual or near-perpetual trust duration, favorable trust laws, no state income tax (SD, NV), and sophisticated trust courts.
+- **File Form 709 for GST allocation.** Even if no gift tax is due, the grantor must file Form 709 to report and allocate GST exemption. The trustee should retain copies of all filed Forms 709 showing the allocation.
+- **Form 1041 filing required.** The dynasty trust is a separate taxpayer. The trustee must file Form 1041 annually and, where applicable, Schedule G (decedent's trusts) or Schedule D. If the trust is a grantor trust, income flows to the grantor's return, but the filing mechanics must still be tracked.
+- **Perpetuity period tracking.** The trustee must understand the trust's applicable perpetuity period under the governing state law. Some states allow 360 years (SD), 365 years (NV), or perpetuity (DE for personal property trusts). The trust instrument should specify the governing period.
+- **Ongoing fiduciary duties across generations.** The trustee owes duties to current and future (vested or contingent) beneficiaries. This includes the duty of impartiality between income beneficiaries and remainder beneficiaries, which becomes complex over generations.
+
+## Distribution Rules
+- **Distributions are typically discretionary.** The trustee usually has broad discretion to distribute income and principal to descendants for HEMS (health, education, maintenance, support) or in broader sole discretion. Ascertainable standards (HEMS) provide safe-harbor guidance.
+- **No distributions to the grantor or grantor's spouse.** To maintain the GST-exempt status and estate tax exclusion, the grantor and their spouse generally cannot be beneficiaries. Distributions are to descendants — children, grandchildren, and beyond.
+- **Beneficiary classes can be broad.** The trust may permit distributions to any lineal descendant, including future-born beneficiaries. The trustee must administer the trust with awareness of yet-unidentified future beneficiaries.
+- **Distribution standards must respect GST tax rules.** Distributions to non-skip persons (children) are not subject to GST tax. Distributions to skip persons (grandchildren and below) are subject to GST tax unless covered by the grantor's allocated exemption. The trustee must understand which category each beneficiary falls into.
+
+## How TrustOffice Helps
+- **Tax Calendar** tracks Form 709 filing deadlines, Form 1041 deadlines, and GST exemption allocation windows, preventing missed filings that could subject the trust to GST tax.
+- **Beneficiaries** module tracks the multi-generational beneficiary tree — current beneficiaries, contingent beneficiaries, and skip-person vs. non-skip-person classification — so the trustee understands the GST implications of each distribution.
+- **Governance Calendar** tracks perpetuity-related milestones, jurisdiction-specific reporting requirements, and trustee succession planning across what may be a centuries-long trust.
+- **Minutes** documents every distribution decision, GST classification analysis, and investment decision — critical when the trust's administration may be reviewed by future generations or future trustees.
+- **Trust Assistant** explains GST classification, jurisdiction rules, and distribution standards in plain language: "Is this beneficiary a skip person?" "What is the GST tax implication of this distribution?"
+- **Defensibility Score** flags unfiled Forms 709, missing GST allocation records, or distributions made without documented GST analysis.
+
+## Common Pitfalls
+- **Failing to allocate GST exemption.** This is the most consequential error. If the grantor does not allocate their GST exemption to the dynasty trust (or allocates it improperly), distributions to grandchildren and later generations will be subject to the 40% GST tax. The allocation must be made on a timely filed Form 709.
+- **Choosing the wrong jurisdiction.** Establishing the trust in a state with a traditional rule against perpetuities (typically 90–110 years) defeats the dynasty purpose. The trustee and advisor must confirm the trust is governed by SD, NV, DE, or another perpetuity-friendly state.
+- **Confusing income and principal beneficiaries.** Over generations, the trust may have income beneficiaries and remainder beneficiaries with competing interests. The trustee must balance distributions carefully, documenting the rationale for each decision.
+- **Ignoring state income tax.** Even if the trust is governed by SD, NV, or DE, if it has nexus to another state (e.g., the trustee or beneficiaries are located there), that state may tax the trust's income. The trustee must understand which states can tax the trust and plan accordingly.
+- **No trustee succession plan.** A trust designed to last for centuries needs a mechanism for appointing successor trustees. Relying on a single individual or institution without a succession plan can lead to court intervention or trust termination if the trustee becomes unable or unwilling to serve.
