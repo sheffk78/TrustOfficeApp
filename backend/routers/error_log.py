@@ -66,6 +66,13 @@ _RATE_LIMIT_WINDOW = 60  # 1 minute
 _RATE_LIMIT_MAX = 10
 _ip_buckets: Dict[str, deque] = defaultdict(deque)
 
+# Global cap: regardless of source IP, no more than this many error-log
+# inserts per minute total. Second layer of defense against a rate-limit
+# bypass flooding the collection (and thus the agent context / Discord).
+_GLOBAL_LIMIT_WINDOW = 60
+_GLOBAL_LIMIT_MAX = 60
+_global_bucket: deque = deque()
+
 
 def _is_rate_limited(ip: str) -> bool:
     """Return True if the IP has exceeded the per-IP rate limit."""
@@ -80,11 +87,28 @@ def _is_rate_limited(ip: str) -> bool:
     return False
 
 
+def _is_globally_rate_limited() -> bool:
+    """Return True if the global per-minute insert cap is exceeded."""
+    now = time.time()
+    cutoff = now - _GLOBAL_LIMIT_WINDOW
+    while _global_bucket and _global_bucket[0] < cutoff:
+        _global_bucket.popleft()
+    if len(_global_bucket) >= _GLOBAL_LIMIT_MAX:
+        return True
+    _global_bucket.append(now)
+    return False
+
+
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP, honouring X-Forwarded-For (rightmost = closest proxy)."""
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[-1].strip()
+    """Return the client IP to use as a rate-limit key.
+
+    Uses request.client.host (the TCP peer address). On Railway the app runs
+    behind a terminating proxy, so this is the edge IP — not the end-user IP,
+    but it is UNSPOOFABLE (the client cannot set its TCP peer address). We do
+    NOT trust the client-supplied X-Forwarded-For header, because a caller can
+    set any value there and rotate it to bypass a per-IP limit. The global cap
+    (_is_globally_rate_limited) provides the second, proxy-independent layer.
+    """
     return request.client.host if request.client else "unknown"
 
 
@@ -121,8 +145,12 @@ async def log_frontend_error(payload: ErrorLogPayload, request: Request):
     """
     client_ip = _get_client_ip(request)
 
-    # Per-IP rate limit
+    # Per-IP rate limit (unspoofable TCP peer IP)
     if _is_rate_limited(client_ip):
+        return {"status": "rate_limited"}
+
+    # Global rate limit (second layer, proxy-independent)
+    if _is_globally_rate_limited():
         return {"status": "rate_limited"}
 
     # Best-effort user_id extraction from JWT (no DB hit)
