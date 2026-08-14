@@ -167,6 +167,7 @@ export async function reportErrorToBackend(error, context = {}) {
         userId,
         email,
       },
+      severity: context.severity || 'minor',
     };
 
     // Fire-and-forget — use sendBeacon if available for reliability on unloads

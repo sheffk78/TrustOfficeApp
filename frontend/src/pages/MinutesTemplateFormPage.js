@@ -632,7 +632,7 @@ export default function MinutesTemplateFormPage() {
         const fromOnboarding = searchParams.get('source') === 'onboarding';
         navigate(fromOnboarding ? '/dashboard' : '/minutes');
       } else {
-        toast.error('Failed to save minutes. Please try again. If the problem continues, contact support@trustoffice.app.');
+        showError(toast, new Error('Failed to save minutes. Please try again. If the problem continues, contact support@trustoffice.app.'), { operation: 'save', page: 'MinutesTemplateForm' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'MinutesTemplateForm' });

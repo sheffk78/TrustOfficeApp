@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import PageHelpButton from '@/components/PageHelpButton';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import {
   Shield, AlertTriangle, AlertOctagon, AlertCircle,
   CheckCircle2, ArrowUpRight, Activity,
@@ -69,7 +70,7 @@ export default function RiskDashboardPage() {
 
       setStructureData({ entityCount, entityTypes, beneficiaryCount, scheduleATotal, scheduleAItems });
     } catch (e) {
-      toast.error(e.message);
+      showError(toast, e, { operation: 'load_risk', page: 'RiskDashboard' });
     } finally {
       setLoading(false);
     }

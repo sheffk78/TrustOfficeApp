@@ -1,8 +1,10 @@
 import { Component } from 'react';
+import { reportErrorToBackend } from '@/utils/errors';
 
 /**
- * PageAgentErrorBoundary — renders null on error so the host page
- * isn't blocked if the Page Agent integration crashes during render.
+ * PageAgentErrorBoundary — renders a small fallback message on error so
+ * the host page isn't blocked if the Page Agent integration crashes
+ * during render. Reports the crash to the backend.
  *
  * Shared between OnboardingConfirmStep and DistributionsPage.
  */
@@ -16,9 +18,16 @@ export default class PageAgentErrorBoundary extends Component {
   }
   componentDidCatch(error) {
     console.error('[PageAgentErrorBoundary] render crashed:', error);
+    reportErrorToBackend(error, { operation: 'page_agent_render', page: window.location.pathname, severity: 'major' });
   }
   render() {
-    if (this.state.hasError) return null;
+    if (this.state.hasError) {
+      return (
+        <div className="text-sm text-muted-foreground p-2">
+          This section failed to load.
+        </div>
+      );
+    }
     return this.props.children;
   }
 }

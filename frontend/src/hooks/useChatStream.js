@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { fetchWithAuth, getErrorMessage } from '@/utils/api';
+import { reportErrorToBackend } from '@/utils/errors';
 
 /**
  * Parse SSE events from a ReadableStream reader.
@@ -292,6 +293,7 @@ function handleStreamError({ err, assistantId, setMessages, setError }) {
     return;
   }
   console.error('[useChatStream] Error:', err);
+  reportErrorToBackend(err, { operation: 'chat_stream', page: window.location.pathname, severity: 'major' });
   setError(err.message || 'Failed to send message');
   setMessages(prev => prev.map(msg => {
     if (msg.id !== assistantId) return msg;

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 import { Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertTriangle, CreditCard, LayoutDashboard, BookOpen, Coins, Network, Scale, HeartPulse, Mail, LogIn, ChevronDown, ChevronUp } from 'lucide-react';
 
 const API = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -165,7 +166,7 @@ export default function WingPointWelcomePage() {
         navigate(`/pricing?${params.toString()}`, { replace: true });
       }, 2000);
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'set_password', page: 'WingPointWelcome' });
     } finally {
       setSettingPassword(false);
     }
@@ -190,7 +191,7 @@ export default function WingPointWelcomePage() {
       // Reload the page so AuthContext picks up the new session
       window.location.reload();
     } catch (error) {
-      toast.error(error.message);
+      showError(toast, error, { operation: 'wingpoint_login', page: 'WingPointWelcome' });
     } finally {
       setLoginLoading(false);
     }

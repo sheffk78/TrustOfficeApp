@@ -7,6 +7,7 @@ import { RefreshCw, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
+import { showError } from '../utils/errors';
 
 import { PAGE_SIZE } from './audit-trail/constants';
 import { useAuditTrail } from './audit-trail/useAuditTrail';
@@ -41,7 +42,7 @@ export default function AuditTrailPage() {
       URL.revokeObjectURL(url);
       toast.success('Audit Defense Report downloaded');
     } catch (e) {
-      toast.error(e.message || 'Failed to generate report');
+      showError(toast, e, { operation: 'audit_report', page: 'AuditTrail' });
     } finally {
       setDownloading(false);
     }

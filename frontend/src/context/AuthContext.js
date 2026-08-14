@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { reportErrorToBackend } from '@/utils/errors';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 const API = `${BACKEND_URL}/api`;
@@ -101,28 +102,33 @@ const useAuthActions = ({
     const url = `${API}/auth/login`;
     const body = JSON.stringify({ email, password });
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      credentials: 'include',
-      body: body
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: body
+      });
 
-    const data = await parseJsonResponse(response);
+      const data = await parseJsonResponse(response);
 
-    if (!response.ok) {
-      throw new Error(data.detail || 'Login failed');
+      if (!response.ok) {
+        throw new Error(data.detail || 'Login failed');
+      }
+
+      // Store token in localStorage
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      setUser(data.user);
+      return data;
+    } catch (error) {
+      reportErrorToBackend(error, { operation: 'auth_login', page: window.location.pathname, severity: 'major' });
+      throw error;
     }
-
-    // Store token in localStorage
-    if (data.token) {
-      localStorage.setItem('auth_token', data.token);
-    }
-    setUser(data.user);
-    return data;
   }, [setUser]);
 
   const register = useCallback(async (email, password, name) => {
@@ -247,6 +253,7 @@ const useSubscriptionState = ({ setSubscription, setSubscriptionExpired, setIsRe
         applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
       }
     } catch (error) {
+      reportErrorToBackend(error, { operation: 'load_subscription', page: window.location.pathname, severity: 'major' });
       console.error('[AuthContext] Failed to load subscription state:', error);
       applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
     }
@@ -284,6 +291,7 @@ const useTrustsLoader = ({ setTrusts, setTrustsLoading, setSelectedTrust, select
         console.error('[AuthContext] Trusts API returned:', response.status);
       }
     } catch (error) {
+      reportErrorToBackend(error, { operation: 'load_trusts', page: window.location.pathname, severity: 'major' });
       console.error('[AuthContext] Failed to load trusts:', error);
     } finally {
       setTrustsLoading(false);
@@ -348,6 +356,7 @@ const useAuthCheck = ({
       await loadTrustsInternal();
       await loadSubscriptionState(userData.email);
     } catch (error) {
+      reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'major' });
       console.error('[AuthContext] Auth check failed:', error);
       setUser(null);
       localStorage.removeItem('auth_token');
