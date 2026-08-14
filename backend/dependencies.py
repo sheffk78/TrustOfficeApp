@@ -8,8 +8,11 @@ import jwt
 import bcrypt
 import os
 import uuid
+import logging
 
 from database import db
+
+logger = logging.getLogger(__name__)
 
 # JWT Config
 JWT_SECRET = os.environ.get('JWT_SECRET')
@@ -109,7 +112,11 @@ def _resolve_effective_plan_type(sub: dict, is_forever_free: bool) -> str:
 
 
 async def _ensure_subscription_exists(user_id: str, now: datetime) -> dict:
-    """Fetch subscription for user, creating a 'none' placeholder if missing."""
+    """Fetch subscription for user, creating a 'none' placeholder if missing.
+    
+    Race-safe: if two concurrent requests both see no subscription and both
+    try to insert, catch the E11000 duplicate key error and re-fetch.
+    """
     sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
     if not sub:
         sub = {
@@ -125,7 +132,17 @@ async def _ensure_subscription_exists(user_id: str, now: datetime) -> dict:
             "updated_at": now.isoformat(),
             "notes": "No free plan — user must subscribe for access"
         }
-        await db.subscriptions.insert_one(sub)
+        try:
+            await db.subscriptions.insert_one(sub)
+        except Exception as e:
+            # E11000 duplicate key — another concurrent request already inserted.
+            # Re-fetch the existing doc instead of crashing.
+            logger.warning("Subscription insert race for user=%s: %s — re-fetching", user_id, e)
+            sub = await db.subscriptions.find_one({"user_id": user_id}, {"_id": 0})
+            if not sub:
+                # Should never happen, but don't crash
+                logger.error("Subscription re-fetch returned None for user=%s after duplicate key", user_id)
+                sub = {"user_id": user_id, "plan_type": "none", "status": "expired"}
     return sub
 
 

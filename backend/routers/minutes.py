@@ -1123,7 +1123,8 @@ def _dispatch_template_content(template_type: str, trust: dict, template_data: d
     gen = _generators.get(template_type)
     if gen is None:
         return ""
-    return gen(template_data)
+    result = gen(template_data)
+    return result if isinstance(result, str) else ""
 
 
 def _fmt_iso_date(d: str) -> str:
