@@ -70,7 +70,7 @@ const MONEY_LINKS = [
   { to: '/distributions', Icon: DollarSign, color: 'bg-success/10 text-success', title: 'Distributions', subtitle: 'Beneficiary payments' },
   { to: '/compensation', Icon: Wallet, color: 'bg-navy/10 text-navy', title: 'Compensation', subtitle: 'Trustee payments' },
   { to: '/investments', Icon: TrendingUp, color: 'bg-gold/10 text-gold', title: 'Investments', subtitle: 'Holdings & returns' },
-  { to: '/benevolence-log', Icon: HeartHandshake, color: 'bg-success/10 text-success', title: 'Benevolence', subtitle: 'Charitable giving log' },
+  { to: '/benevolence', Icon: HeartHandshake, color: 'bg-success/10 text-success', title: 'Benevolence', subtitle: 'Charitable giving log' },
 ];
 
 /**

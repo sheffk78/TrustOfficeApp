@@ -151,13 +151,18 @@ export default function DashboardPage() {
           )}
 
           {loading ? (
-            <div className="card-grid">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="card-trust">
-                  <div className="skeleton h-6 w-32 mb-4"></div>
-                  <div className="skeleton h-20 w-full"></div>
-                </div>
-              ))}
+            <div>
+              <p className="text-sm text-muted-foreground mb-6" data-testid="dashboard-loading-text">
+                Loading your trust dashboard…
+              </p>
+              <div className="card-grid">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="card-trust">
+                    <div className="skeleton h-6 w-32 mb-4"></div>
+                    <div className="skeleton h-20 w-full"></div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <>

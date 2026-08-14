@@ -107,6 +107,7 @@ export default function DistributionsPage() {
     benevolence_need_description: '',
     benevolence_notes: ''
   });
+  const [formErrors, setFormErrors] = useState({});
   const [beneficiaryVerified, setBeneficiaryVerified] = useState(null); // null = not checked, true = verified, false = not found
   const debouncedBeneficiary = useDebounce(formData.beneficiary, 500);
 
@@ -345,22 +346,29 @@ the user that they must review and submit the form themselves.
       return;
     }
 
-    if (!formData.amount || !formData.beneficiary || !formData.category) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+    // Inline validation — build errors object for field-level display
+    const errors = {};
+    if (!formData.amount) errors.amount = 'Amount is required';
+    if (!formData.beneficiary?.trim()) errors.beneficiary = 'Beneficiary is required';
+    if (!formData.category) errors.category = 'Category is required';
 
     // Validate benevolence fields if is_benevolence is true
     if (formData.is_benevolence) {
       if (!formData.benevolence_recipient_name?.trim()) {
-        toast.error('Benevolence recipient name is required');
-        return;
+        errors.benevolence_recipient_name = 'Recipient name is required';
       }
       if (!formData.benevolence_need_description?.trim()) {
-        toast.error('Benevolence need description is required');
-        return;
+        errors.benevolence_need_description = 'Need description is required';
       }
     }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    // Clear errors on valid submit
+    setFormErrors({});
 
     setFormLoading(true);
     try {
@@ -390,6 +398,7 @@ the user that they must review and submit the form themselves.
 
       toast.success(formData.is_benevolence ? 'Benevolence distribution created' : 'Distribution created');
       setDialogOpen(false);
+      setFormErrors({});
       setFormData({
         date: new Date(),
         amount: '',
@@ -671,12 +680,13 @@ the user that they must review and submit the form themselves.
                           type="number"
                           step="0.01"
                           value={formData.amount}
-                          onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                          className="pl-10 input-trust"
+                          onChange={(e) => { setFormData({ ...formData, amount: e.target.value }); if (formErrors.amount) setFormErrors({ ...formErrors, amount: undefined }); }}
+                          className={`pl-10 input-trust ${formErrors.amount ? 'border-red-500' : ''}`}
                           placeholder="0.00"
                           data-testid="dist-amount-input"
                         />
                       </div>
+                      {formErrors.amount && <p className="text-xs text-red-500 mt-1">{formErrors.amount}</p>}
                     </div>
                   </div>
 
@@ -684,8 +694,8 @@ the user that they must review and submit the form themselves.
                     <Label className="label-trust">Beneficiary *</Label>
                     <Input
                       value={formData.beneficiary}
-                      onChange={(e) => setFormData({ ...formData, beneficiary: e.target.value })}
-                      className="mt-1 input-trust"
+                      onChange={(e) => { setFormData({ ...formData, beneficiary: e.target.value }); if (formErrors.beneficiary) setFormErrors({ ...formErrors, beneficiary: undefined }); }}
+                      className={`mt-1 input-trust ${formErrors.beneficiary ? 'border-red-500' : ''}`}
                       placeholder="Beneficiary name"
                       data-testid="dist-beneficiary-input"
                     />
@@ -699,6 +709,7 @@ the user that they must review and submit the form themselves.
                         <span>✓</span> Verified beneficiary
                       </p>
                     )}
+                    {formErrors.beneficiary && <p className="text-xs text-red-500 mt-1">{formErrors.beneficiary}</p>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -722,9 +733,9 @@ the user that they must review and submit the form themselves.
                       <Label className="label-trust">Category *</Label>
                       <Select 
                         value={formData.category} 
-                        onValueChange={(value) => setFormData({ ...formData, category: value })}
+                        onValueChange={(value) => { setFormData({ ...formData, category: value }); if (formErrors.category) setFormErrors({ ...formErrors, category: undefined }); }}
                       >
-                        <SelectTrigger className="mt-1 input-trust" data-testid="dist-category-select">
+                        <SelectTrigger className={`mt-1 input-trust ${formErrors.category ? 'border-red-500' : ''}`} data-testid="dist-category-select">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
@@ -826,22 +837,24 @@ the user that they must review and submit the form themselves.
                           <Label className="label-trust">Recipient Name *</Label>
                           <Input
                             value={formData.benevolence_recipient_name}
-                            onChange={(e) => setFormData({ ...formData, benevolence_recipient_name: e.target.value })}
-                            className="mt-1 input-trust"
+                            onChange={(e) => { setFormData({ ...formData, benevolence_recipient_name: e.target.value }); if (formErrors.benevolence_recipient_name) setFormErrors({ ...formErrors, benevolence_recipient_name: undefined }); }}
+                            className={`mt-1 input-trust ${formErrors.benevolence_recipient_name ? 'border-red-500' : ''}`}
                             placeholder="Organization or individual receiving benevolence"
                             data-testid="benevolence-recipient-input"
                           />
+                          {formErrors.benevolence_recipient_name && <p className="text-xs text-red-500 mt-1">{formErrors.benevolence_recipient_name}</p>}
                         </div>
                         <div>
                           <Label className="label-trust">Need Description *</Label>
                           <Textarea
                             value={formData.benevolence_need_description}
-                            onChange={(e) => setFormData({ ...formData, benevolence_need_description: e.target.value })}
-                            className="mt-1 input-trust"
+                            onChange={(e) => { setFormData({ ...formData, benevolence_need_description: e.target.value }); if (formErrors.benevolence_need_description) setFormErrors({ ...formErrors, benevolence_need_description: undefined }); }}
+                            className={`mt-1 input-trust ${formErrors.benevolence_need_description ? 'border-red-500' : ''}`}
                             placeholder="Describe the charitable purpose or need being addressed..."
                             rows={2}
                             data-testid="benevolence-need-input"
                           />
+                          {formErrors.benevolence_need_description && <p className="text-xs text-red-500 mt-1">{formErrors.benevolence_need_description}</p>}
                         </div>
                         <div>
                           <Label className="label-trust">Benevolence Notes (Optional)</Label>

@@ -320,6 +320,9 @@ export default function MessagingPage() {
                       <p className="text-sm text-muted-foreground">
                         No conversations yet
                       </p>
+                      <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">
+                        Message trustees, beneficiaries, and advisors connected to your trust
+                      </p>
                       <Button
                         variant="ghost"
                         size="sm"

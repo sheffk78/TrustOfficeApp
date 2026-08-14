@@ -346,7 +346,17 @@ const useAuthCheck = ({
       });
 
       if (!response.ok) {
-        throw new Error('Not authenticated');
+        // Only clear the token on 401 (unauthorized) — the token is truly invalid.
+        // On 5xx or other errors, keep the token and let the user stay logged in
+        // (transient backend failures should NOT wipe the session).
+        if (response.status === 401) {
+          throw new Error('Not authenticated');
+        }
+        // Server error (5xx) — don't wipe the session, just log and stop loading
+        console.error('[AuthContext] Auth check returned status:', response.status, '— keeping session');
+        setLoading(false);
+        authCheckComplete.current = true;
+        return;
       }
 
       const userData = await response.json();
@@ -356,10 +366,17 @@ const useAuthCheck = ({
       await loadTrustsInternal();
       await loadSubscriptionState(userData.email);
     } catch (error) {
-      reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'major' });
-      console.error('[AuthContext] Auth check failed:', error);
-      setUser(null);
-      localStorage.removeItem('auth_token');
+      // Network errors (fetch throws) should NOT wipe the token — the backend may
+      // be temporarily unreachable. Only wipe on explicit 401 (caught above).
+      if (error.message === 'Not authenticated') {
+        reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'major' });
+        console.error('[AuthContext] Auth check failed: token invalid');
+        setUser(null);
+        localStorage.removeItem('auth_token');
+      } else {
+        // Network error — keep token, user stays logged in with cached data
+        console.error('[AuthContext] Auth check network error (keeping session):', error.message);
+      }
     } finally {
       setLoading(false);
       authCheckComplete.current = true;
