@@ -97,7 +97,7 @@ async def get_active_policy_version(trust_id: str, user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="No version is currently active.")
 
     version = await db.benevolence_policy_versions.find_one(
-        {"policy_version_id": policy["current_version_id"], "user_id": user["user_id"]},
+        {"policy_version_id": policy["current_version_id"], "user_id": user["user_id"], "status": "published"},
         {"_id": 0}
     )
     if not version:
@@ -239,7 +239,7 @@ async def publish_policy_version(
 @router.post("/benevolence/policies/{trust_id}/amend", response_model=BenevolencePolicyVersionResponse)
 async def amend_policy(
     trust_id: str,
-    policy: BenevolencePolicyCreate,
+    policy: BenevolencePolicyUpdate,
     user: dict = Depends(require_write_access)
 ):
     """Create a new draft version copying from the current published version."""
@@ -276,7 +276,7 @@ async def amend_policy(
     new_version["published_at"] = None
 
     # Override fields from the request
-    update_data = {k: v for k, v in policy.dict().items() if v is not None and k not in ("trust_id",)}
+    update_data = {k: v for k, v in policy.dict().items() if v is not None}
     for key, value in update_data.items():
         if isinstance(value, list) and value:
             new_version[key] = value

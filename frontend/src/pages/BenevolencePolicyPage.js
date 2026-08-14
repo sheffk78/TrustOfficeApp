@@ -113,6 +113,26 @@ export default function BenevolencePolicyPage() {
     }
   };
 
+  const handleAmend = async () => {
+    try {
+      const res = await fetchWithAuth(`/benevolence/policies/${trustId}/amend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version_label: '', notes: '' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.detail || 'Failed to create amendment');
+        return;
+      }
+      toast.success('Draft amendment created');
+      await loadData();
+      setActiveTab('edit');
+    } catch (err) {
+      showError(err);
+    }
+  };
+
   const handlePublish = async (versionId) => {
     try {
       const res = await fetchWithAuth(`/benevolence/policies/versions/${versionId}/publish`, {
@@ -153,7 +173,7 @@ export default function BenevolencePolicyPage() {
         </div>
         <div className="flex gap-2">
           {activeTab === 'view' && policy && (
-            <Button onClick={() => setActiveTab('edit')} variant="outline">
+            <Button onClick={handleAmend} variant="outline">
               <Plus className="h-4 w-4 mr-2" /> Amend Policy
             </Button>
           )}
