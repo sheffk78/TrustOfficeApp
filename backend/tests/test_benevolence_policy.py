@@ -30,7 +30,7 @@ TEST_EMAIL = os.environ.get("TEST_EMAIL", "test@trustoffice.com")
 TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "testpassword123")
 
 # Trust that has benevolence_enabled = true
-TRUST_BENEVOLENCE = "trust_f8896488ce03"
+TRUST_BENEVOLENCE = os.environ.get("TRUST_BENEVOLENCE", "trust_3c4557e9d412")
 # A second trust used for negative / permission tests
 TRUST_OTHER = "trust_7c1a0f5b2e9d"
 
@@ -83,7 +83,7 @@ def policy_payload():
                 "per_recipient_period": "year",
             },
             {
-                "purpose": "business",
+                "purpose": "other",
                 "label": "Business Start-up",
                 "is_allowed": False,
             },
