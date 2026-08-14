@@ -61,7 +61,17 @@ export default function MinutesTemplateFormPage() {
   const navigate = useNavigate();
   const { templateType } = useParams();
   const [searchParams] = useSearchParams();
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
+
+  // ----- Read-only guard -----
+  // Redirect read-only (inactive subscription) users to the minutes list
+  // instead of letting them hit the generate form and get a 403 error.
+  useEffect(() => {
+    if (isReadOnly) {
+      toast.error('Your subscription is inactive. Subscribe to generate minutes.');
+      navigate('/minutes', { replace: true });
+    }
+  }, [isReadOnly, navigate]);
 
   const [loading, setLoading] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);

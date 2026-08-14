@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -22,8 +22,19 @@ const KIT_ICONS = {
 };
 
 export default function TrustAdminKitsPage() {
-  const { user, trusts, selectedTrust } = useAuth();
+  const { user, trusts, selectedTrust, isReadOnly } = useAuth();
+  const navigate = useNavigate();
   const trustId = selectedTrust?.trust_id;
+
+  // ----- Read-only guard -----
+  // Redirect read-only (inactive subscription) users instead of letting them
+  // hit the generate endpoint and get a 403 error.
+  useEffect(() => {
+    if (isReadOnly) {
+      toast.error('Your subscription is inactive. Subscribe to generate admin kits.');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isReadOnly, navigate]);
 
   // View state: 'select' | 'preview' | 'detail'
   const [view, setView] = useState('select');
