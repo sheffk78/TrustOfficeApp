@@ -60,6 +60,7 @@ from routers.schedule_a import router as schedule_a_router
 from routers.compensation import router as compensation_router
 from routers.subscriptions import router as subscriptions_router
 from routers.benevolence import router as benevolence_router
+from routers.benevolence_policy import router as benevolence_policy_router
 from routers.exports import router as exports_router
 from routers.expenses import router as expenses_router
 from routers.calendar import router as calendar_router
@@ -376,6 +377,7 @@ app.include_router(minutes_router, prefix="/api")
 app.include_router(schedule_a_router, prefix="/api")
 app.include_router(distributions_router, prefix="/api")
 app.include_router(benevolence_router, prefix="/api")
+app.include_router(benevolence_policy_router, prefix="/api")
 app.include_router(compensation_router, prefix="/api")
 app.include_router(governance_router, prefix="/api")
 app.include_router(meetings_router, prefix="/api")

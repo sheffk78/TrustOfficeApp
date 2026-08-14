@@ -11,7 +11,7 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 from database import db
-from dependencies import get_current_user, require_write_access, should_show_watermark
+from dependencies import get_current_user, require_write_access, should_show_watermark, check_feature_access, Feature, PREMIUM_FEATURE_ERROR_CODE, PREMIUM_FEATURE_ERROR_MESSAGE
 from models import (
     BenevolenceRecordCreate, BenevolenceRecordUpdate, BenevolenceRecordResponse
 )
@@ -31,8 +31,23 @@ async def create_benevolence_record(record: BenevolenceRecordCreate, user: dict 
     
     if not trust.get("benevolence_enabled"):
         raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust. Enable it in the trust settings or upgrade your plan at trustoffice.app/settings/billing.")
-    
+    if not await check_feature_access(user["user_id"], Feature.BENEVOLENCE_MODE):
+        raise HTTPException(status_code=PREMIUM_FEATURE_ERROR_CODE, detail=f"{PREMIUM_FEATURE_ERROR_MESSAGE} Feature: {Feature.BENEVOLENCE_MODE}")
+
     record_id = f"ben_{uuid.uuid4().hex[:12]}"
+
+    # Auto-attach active policy version if not explicitly provided
+    policy_version_id = None
+    if not record.policy_version_id:
+        active_policy = await db.benevolence_policies.find_one(
+            {"trust_id": record.trust_id, "user_id": user["user_id"]},
+            {"_id": 0}
+        )
+        if active_policy and active_policy.get("current_version_status") == "published":
+            policy_version_id = active_policy["current_version_id"]
+    else:
+        policy_version_id = record.policy_version_id
+
     record_doc = {
         "record_id": record_id,
         "trust_id": record.trust_id,
@@ -48,6 +63,7 @@ async def create_benevolence_record(record: BenevolenceRecordCreate, user: dict 
         "minutes_id": record.minutes_id,
         "notes": record.notes,
         "status": record.status,
+        "policy_version_id": policy_version_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": None
     }
@@ -115,11 +131,13 @@ async def update_benevolence_record(record_id: str, update: BenevolenceRecordUpd
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     await db.benevolence_records.update_one(
-        {"record_id": record_id},
+        {"record_id": record_id, "user_id": user["user_id"]},
         {"$set": update_data}
     )
     
-    updated = await db.benevolence_records.find_one({"record_id": record_id}, {"_id": 0})
+    updated = await db.benevolence_records.find_one(
+        {"record_id": record_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
     return BenevolenceRecordResponse(**updated)
 
 
@@ -156,14 +174,16 @@ async def attach_minutes_to_benevolence(
         raise HTTPException(status_code=404, detail="Minutes record not found. It may have been deleted. Please refresh the page and try again.")
     
     await db.benevolence_records.update_one(
-        {"record_id": record_id},
+        {"record_id": record_id, "user_id": user["user_id"]},
         {"$set": {
             "minutes_id": minutes_record_id,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
     
-    updated = await db.benevolence_records.find_one({"record_id": record_id}, {"_id": 0})
+    updated = await db.benevolence_records.find_one(
+        {"record_id": record_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
     return BenevolenceRecordResponse(**updated)
 
 
@@ -244,12 +264,33 @@ async def get_benevolence_summary(trust_id: str, user: dict = Depends(get_curren
         except (ValueError, AttributeError):
             pass
     
+    # Get active policy version info
+    active_policy_version = None
+    policy = await db.benevolence_policies.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if policy and policy.get("current_version_status") == "published":
+        version = await db.benevolence_policy_versions.find_one(
+            {"policy_version_id": policy["current_version_id"], "user_id": user["user_id"]},
+            {"_id": 0}
+        )
+        if version:
+            active_policy_version = {
+                "policy_version_id": version["policy_version_id"],
+                "version_label": version["version_label"],
+                "status": version["status"],
+                "charitable_class": version.get("charitable_class", ""),
+                "per_recipient_annual_limit": version.get("per_recipient_annual_limit"),
+                "effective_date": version.get("effective_date", ""),
+            }
+
     # Get list of unique approvers
     all_approvers = set()
     for r in records:
         for approver in r.get("approved_by", []):
             all_approvers.add(approver)
-    
+
     return {
         "trust_id": trust_id,
         "trust_name": trust.get("name", ""),
@@ -259,7 +300,8 @@ async def get_benevolence_summary(trust_id: str, user: dict = Depends(get_curren
         "by_month": dict(sorted(by_month.items(), reverse=True)),
         "by_quarter": dict(sorted(by_quarter.items(), reverse=True)),
         "by_year": dict(sorted(by_year.items(), reverse=True)),
-        "approvers": list(all_approvers)
+        "approvers": list(all_approvers),
+        "active_policy_version": active_policy_version,
     }
 
 
@@ -387,6 +429,19 @@ async def export_benevolence_pdf(
         ["Tax Status:", tax_label],
         ["Period:", f"January 1 - December 31, {year}" if year else "All Records"],
     ]
+
+    # Include mission statement if present (wrap in Paragraph for long text)
+    mission = trust.get("benevolence_mission")
+    if mission:
+        mission_style = ParagraphStyle(
+            'MissionText',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=GRAY,
+            fontName='Helvetica',
+            leading=12,
+        )
+        info_data.append(["Mission:", Paragraph(mission, mission_style)])
     
     info_table = Table(info_data, colWidths=[1.5*inch, 4.5*inch])
     info_table.setStyle(TableStyle([
@@ -429,7 +484,46 @@ async def export_benevolence_pdf(
     ]))
     story.append(summary_table)
     story.append(Spacer(1, 16))
-    
+
+    # Policy Reference section
+    policy_info = await db.benevolence_policies.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if policy_info and policy_info.get("current_version_status") == "published":
+        policy_version = await db.benevolence_policy_versions.find_one(
+            {"policy_version_id": policy_info["current_version_id"]},
+            {"_id": 0}
+        )
+        if policy_version:
+            story.append(Paragraph("POLICY REFERENCE", category_style))
+            policy_data = [
+                ["Version:", policy_version.get("version_label", "")],
+                ["Status:", policy_version.get("status", "")],
+                ["Charitable Class:", policy_version.get("charitable_class", "")],
+                ["Effective Date:", policy_version.get("effective_date", "")],
+            ]
+            if policy_version.get("per_recipient_annual_limit"):
+                policy_data.append(["Per-Recipient Annual Limit:", f"${policy_version['per_recipient_annual_limit']:,.2f}"])
+            if policy_version.get("approval_process"):
+                policy_data.append(["Approval Process:", policy_version["approval_process"]])
+            if policy_version.get("designated_gift_prohibition"):
+                policy_data.append(["Designated Gift Prohibition:", policy_version["designated_gift_prohibition"][:80]])
+
+            policy_table = Table(policy_data, colWidths=[2*inch, 4*inch])
+            policy_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('TEXTCOLOR', (0, 0), (0, -1), NAVY),
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ]))
+            story.append(policy_table)
+            story.append(Spacer(1, 16))
+
     # Breakdown by Purpose
     story.append(Paragraph("GRANTS BY PURPOSE CATEGORY", category_style))
     

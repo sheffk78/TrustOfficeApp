@@ -439,7 +439,7 @@ async def save_guided_minutes_with_records(
                     "user_id": user_id,
                     "beneficiary_name": record.recipient,
                     "beneficiary_type": "individual",
-                    "purpose": "assistance",
+                    "purpose": "other",
                     "purpose_description": record.benevolence_need or record.description or "",
                     "amount": record.amount,
                     "date": record.date,

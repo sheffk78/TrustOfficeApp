@@ -287,6 +287,8 @@ class TrustCreate(BaseModel):
     is_fiscal_year: Optional[bool] = None
     description: Optional[str] = None
     review_cadence: Optional[str] = "quarterly"
+    benevolence_mission: Optional[str] = None
+    determination_letter_date: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_tax_fields(self):
@@ -351,6 +353,8 @@ class TrustUpdate(BaseModel):
     is_fiscal_year: Optional[bool] = None
     description: Optional[str] = None
     review_cadence: Optional[str] = None
+    benevolence_mission: Optional[str] = None
+    determination_letter_date: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_tax_fields(self):
@@ -417,6 +421,8 @@ class TrustResponse(BaseModel):
     is_fiscal_year: Optional[bool] = None
     description: Optional[str] = None
     review_cadence: Optional[str] = "quarterly"
+    benevolence_mission: Optional[str] = None
+    determination_letter_date: Optional[str] = None
 
 
 # ==================== ENTITY MODELS ====================
@@ -845,6 +851,7 @@ class DistributionCreate(BaseModel):
     benevolence_recipient_name: Optional[str] = None
     benevolence_need_description: Optional[str] = None
     benevolence_notes: Optional[str] = None
+    policy_version_id: Optional[str] = None
 
 class DistributionApprove(BaseModel):
     solvency_confirmed: bool
@@ -872,6 +879,9 @@ class DistributionResponse(BaseModel):
     benevolence_notes: Optional[str] = None
     distribution_standard: Optional[str] = None
     beneficiary_not_verified: bool = False
+    policy_version_id: Optional[str] = None
+    policy_limit_warning: Optional[str] = None
+
 
 class DistributionUpdate(BaseModel):
     beneficiary_name: Optional[str] = None
@@ -909,8 +919,117 @@ class BenevolenceLogResponse(BaseModel):
     incomplete_documentation_count: int
 
 
-# ==================== BENEVOLENCE MODELS ====================
+# ==================== BENEVOLENCE POLICY MODELS ====================
 
+class AssistanceTypeConfig(BaseModel):
+    """One allowable type of assistance within a policy"""
+    purpose: BenevolencePurpose          # reuses existing enum
+    label: str                            # display name, e.g. "Medical Expenses"
+    is_allowed: bool = True               # True = covered, False = explicitly excluded
+    per_recipient_limit: Optional[float] = None   # e.g. 500.00 (None = no limit)
+    per_recipient_period: Optional[str] = None     # "annual" | "lifetime" | "per_request"
+    notes: str = ""
+
+
+class CommitteeMember(BaseModel):
+    name: str
+    role: str = "member"                   # "chair" | "secretary" | "member"
+    email: Optional[str] = None
+
+
+class EligibilityCriterion(BaseModel):
+    criterion: str                         # e.g. "Must reside within 50 miles"
+    is_required: bool = True               # hard requirement vs. preference
+
+
+class DocumentationRequirement(BaseModel):
+    item: str                              # e.g. "Receipt for medical bill"
+    is_required: bool = True
+
+
+class BenevolencePolicyCreate(BaseModel):
+    trust_id: str
+    version_label: str = "1.0"             # user-facing version, e.g. "1.0", "1.1", "2.0"
+    charitable_class: str                  # IRS-required: who can receive
+    charitable_class_description: str = "" # broader description
+    eligibility_criteria: List[EligibilityCriterion] = []
+    assistance_types: List[AssistanceTypeConfig] = []
+    per_recipient_annual_limit: Optional[float] = None  # global cap across all types
+    approval_process: str = ""             # free-text description of approval workflow
+    approval_threshold: Optional[float] = None  # amounts below this = single approver; above = committee
+    committee_members: List[CommitteeMember] = []
+    documentation_requirements: List[DocumentationRequirement] = []
+    designated_gift_prohibition: str = "No earmarked contributions for specific individuals will be accepted."
+    employee_benevolence_note: str = ""    # IRC §102 / §139 taxability note
+    board_approval_date: Optional[str] = None     # ISO date string
+    board_approval_reference: Optional[str] = None  # minutes_id link to approving minutes
+    effective_date: str                    # ISO date — when this version takes effect
+    supersedes_version_id: Optional[str] = None   # policy_version_id of prior version
+    notes: str = ""
+
+
+class BenevolencePolicyUpdate(BaseModel):
+    """Used for editing a DRAFT version only — published versions are immutable"""
+    version_label: Optional[str] = None
+    charitable_class: Optional[str] = None
+    charitable_class_description: Optional[str] = None
+    eligibility_criteria: Optional[List[EligibilityCriterion]] = None
+    assistance_types: Optional[List[AssistanceTypeConfig]] = None
+    per_recipient_annual_limit: Optional[float] = None
+    approval_process: Optional[str] = None
+    approval_threshold: Optional[float] = None
+    committee_members: Optional[List[CommitteeMember]] = None
+    documentation_requirements: Optional[List[DocumentationRequirement]] = None
+    designated_gift_prohibition: Optional[str] = None
+    employee_benevolence_note: Optional[str] = None
+    board_approval_date: Optional[str] = None
+    board_approval_reference: Optional[str] = None
+    effective_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class BenevolencePolicyResponse(BaseModel):
+    policy_id: str                         # unique ID for the policy (one per trust)
+    trust_id: str
+    user_id: str
+    current_version_id: str                # policy_version_id of the active version
+    current_version_label: str
+    current_version_status: str            # "draft" | "published" | "superseded"
+    created_at: str
+    updated_at: Optional[str] = None
+
+
+class BenevolencePolicyVersionResponse(BaseModel):
+    policy_version_id: str
+    policy_id: str
+    trust_id: str
+    user_id: str
+    version_label: str
+    version_number: int                    # auto-incremented (1, 2, 3...)
+    status: str                            # "draft" | "published" | "superseded"
+    charitable_class: str
+    charitable_class_description: str
+    eligibility_criteria: List[dict]       # stored as list of dicts
+    assistance_types: List[dict]           # stored as list of dicts
+    per_recipient_annual_limit: Optional[float]
+    approval_process: str
+    approval_threshold: Optional[float]
+    committee_members: List[dict]
+    documentation_requirements: List[dict]
+    designated_gift_prohibition: str
+    employee_benevolence_note: str
+    board_approval_date: Optional[str]
+    board_approval_reference: Optional[str]
+    effective_date: str
+    supersedes_version_id: Optional[str]
+    notes: str
+    published_at: Optional[str] = None     # timestamp when status → "published"
+    created_at: str
+    updated_at: Optional[str] = None
+    created_by: str                        # user_id of creator
+
+
+# Patch BenevolenceRecord models to link to policy version
 class BenevolenceRecordCreate(BaseModel):
     trust_id: str
     beneficiary_name: str
@@ -924,6 +1043,8 @@ class BenevolenceRecordCreate(BaseModel):
     minutes_id: Optional[str] = None
     notes: str = ""
     status: str = "approved"
+    policy_version_id: Optional[str] = None    # links to active policy at time of creation
+
 
 class BenevolenceRecordUpdate(BaseModel):
     beneficiary_name: Optional[str] = None
@@ -936,6 +1057,8 @@ class BenevolenceRecordUpdate(BaseModel):
     approval_method: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    policy_version_id: Optional[str] = None
+
 
 class BenevolenceRecordResponse(BaseModel):
     record_id: str
@@ -953,6 +1076,7 @@ class BenevolenceRecordResponse(BaseModel):
     status: str
     created_at: str
     updated_at: Optional[str] = None
+    policy_version_id: Optional[str] = None
 
 
 # ==================== COMPENSATION MODELS ====================

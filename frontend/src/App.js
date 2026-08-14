@@ -27,6 +27,7 @@ import CompensationPage from "@/pages/CompensationPage";
 import BillingPage from "@/pages/BillingPage";
 import ScheduleAPage from "@/pages/ScheduleAPage";
 import BenevolencePage from "@/pages/BenevolencePage";
+import BenevolencePolicyPage from "@/pages/BenevolencePolicyPage";
 import PricingPage from "@/pages/PricingPage";
 import AuthorityPage from "@/pages/AuthorityPage";
 import AuditTrailPage from "@/pages/AuditTrailPage";
@@ -289,6 +290,11 @@ const AppRouter = () => {
       <Route path="/benevolence" element={
         <SubscriptionProtectedRoute>
           <BenevolencePage />
+        </SubscriptionProtectedRoute>
+      } />
+      <Route path="/benevolence/policy" element={
+        <SubscriptionProtectedRoute>
+          <BenevolencePolicyPage />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/benevolence-log" element={ <Navigate to="/benevolence" replace /> } />

@@ -497,6 +497,13 @@ export default function BenevolencePage() {
                 ]}
                 taPrompt="Walk me through the Benevolence page and how to approve a request"
               />
+              <Button
+                variant="outline"
+                onClick={() => navigate('/benevolence/policy')}
+                className="btn-secondary"
+              >
+                <FileText className="w-4 h-4 mr-2" /> Policy
+              </Button>
               <Dialog open={dialogOpen} onOpenChange={(open) => {
                 if (open && isReadOnly) {
                   showUpgradeModal('create a benevolence record', 'button_click', 'benevolence_page');

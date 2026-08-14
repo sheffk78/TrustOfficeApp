@@ -6,7 +6,7 @@ import uuid
 import re
 
 from database import db
-from dependencies import get_current_user, require_write_access, auto_update_onboarding
+from dependencies import get_current_user, require_write_access, auto_update_onboarding, check_feature_access, Feature, PREMIUM_FEATURE_ERROR_CODE, PREMIUM_FEATURE_ERROR_MESSAGE
 from trustee_utils import parse_trustees
 from models import (
     DistributionCreate, DistributionUpdate, DistributionResponse,
@@ -137,13 +137,70 @@ async def create_distribution(
     # Beneficiaries are stored in trust_unit_certificates, not db.beneficiaries
     beneficiary_not_verified = False
     if _is_non_empty_str(dist.beneficiary_name):
-        beneficiary = await _find_beneficiary_certificate(dist.trust_id, None, dist.beneficiary_name)
+        beneficiary = await _find_beneficiary_certificate(dist.trust_id, user["user_id"], dist.beneficiary_name)
         if not beneficiary:
             beneficiary_not_verified = True
 
     # Validate benevolence fields if is_benevolence is true
     if dist.is_benevolence:
+        if not trust.get("benevolence_enabled"):
+            raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust.")
+        if not await check_feature_access(user["user_id"], Feature.BENEVOLENCE_MODE):
+            raise HTTPException(status_code=PREMIUM_FEATURE_ERROR_CODE, detail=f"{PREMIUM_FEATURE_ERROR_MESSAGE} Feature: {Feature.BENEVOLENCE_MODE}")
         _validate_benevolence_fields(dist.benevolence_recipient_name, dist.benevolence_need_description)
+
+    # Policy limit validation — check against active policy if one exists
+    policy_limit_warning = None
+    active_policy = await db.benevolence_policies.find_one(
+        {"trust_id": dist.trust_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if active_policy and active_policy.get("current_version_status") == "published":
+        version = await db.benevolence_policy_versions.find_one(
+            {"policy_version_id": active_policy["current_version_id"]},
+            {"_id": 0}
+        )
+        if version:
+            # Check per-recipient annual limit
+            annual_limit = version.get("per_recipient_annual_limit")
+            if annual_limit:
+                ytd_query = {
+                    "trust_id": dist.trust_id,
+                    "user_id": user["user_id"],
+                    "is_benevolence": True,
+                    "benevolence_recipient_name": dist.benevolence_recipient_name,
+                }
+                # Parse date range for YTD if date is provided
+                if dist.date:
+                    try:
+                        year = dist.date.split("-")[0]
+                        ytd_query["date"] = {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"}
+                    except Exception:
+                        pass
+                ytd_total = 0.0
+                ytd_records = await db.distribution_records.find(
+                    ytd_query, {"_id": 0, "amount": 1}
+                ).to_list(length=None)
+                for d in ytd_records:
+                    ytd_total += float(d.get("amount", 0) or 0)
+                if ytd_total + dist.amount > annual_limit:
+                    policy_limit_warning = (
+                        f"Benevolence distribution of ${dist.amount:,.2f} would exceed "
+                        f"the per-recipient annual limit of ${annual_limit:,.2f} "
+                        f"(YTD total: ${ytd_total:,.2f})."
+                    )
+
+            # Check assistance type exclusion
+            purpose_str = dist.purpose_classification.value if hasattr(dist.purpose_classification, "value") else str(dist.purpose_classification)
+            at_list = version.get("assistance_types", [])
+            matching_at = [at for at in at_list if at.get("purpose") == purpose_str]
+            if matching_at and any(not at.get("is_allowed", True) for at in matching_at):
+                policy_limit_warning = (
+                    f"Warning: '{purpose_str}' is marked as excluded in the benevolence policy."
+                )
+
+            # Attach policy version if available
+            dist = dist.copy(update={"policy_version_id": version.get("policy_version_id")})
 
     dist_id = f"dist_{uuid.uuid4().hex[:12]}"
     # Auto-populate trustee_name from trust if not provided
@@ -177,7 +234,9 @@ async def create_distribution(
         # Fix 8: distribution standard from entity
         "distribution_standard": distribution_standard if distribution_standard else None,
         # Fix 9: beneficiary validation flag
-        "beneficiary_not_verified": beneficiary_not_verified
+        "beneficiary_not_verified": beneficiary_not_verified,
+        "policy_version_id": dist.policy_version_id,
+        "policy_limit_warning": policy_limit_warning,
     }
 
     await db.distribution_records.insert_one(dist_doc)
@@ -572,7 +631,7 @@ def _parse_year_month(date_str):
 @router.get("/benevolence-log", response_model=BenevolenceLogResponse)
 async def get_benevolence_log(
     trust_id: Optional[str] = None,
-    user: dict = Depends(require_write_access)
+    user: dict = Depends(get_current_user)
 ):
     """
     Get all benevolence distributions for a trust with aggregated totals.

@@ -10,6 +10,7 @@ const mainNav = [
     { path: '/compensation', icon: Wallet, label: 'Compensation' },
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
     { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence' },
+    { path: '/benevolence/policy', icon: FileText, label: 'Policy' },
     { path: '/transactions', icon: ArrowUpDown, label: 'Transactions' },
   ]},
   { path: '/structures', icon: Network, label: 'Structure', subMenu: [
