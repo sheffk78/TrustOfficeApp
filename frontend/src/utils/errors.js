@@ -108,14 +108,16 @@ export function extractErrorMessage(error) {
     return 'The server returned an error. Please try again.';
   }
 
-  // If it has a .message (standard Error)
-  if (error.message) {
-    // Check for common network errors
-    const msg = error.message;
-    if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-      return 'Network error — please check your internet connection and try again.';
+  // If it has a .message (standard Error) — ensure it's a string
+  if (error.message != null) {
+    const msg = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
+    if (msg) {
+      // Check for common network errors
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        return 'Network error — please check your internet connection and try again.';
+      }
+      return msg;
     }
-    return msg;
   }
 
   // If it's a string
@@ -124,8 +126,14 @@ export function extractErrorMessage(error) {
   // If it has a detail property (some API error wrappers)
   if (error.detail) {
     if (typeof error.detail === 'string') return error.detail;
-    if (error.detail?.message) return error.detail.message;
-    if (error.detail?.msg) return error.detail.msg;
+    if (error.detail?.message) return String(error.detail.message);
+    if (error.detail?.msg) return String(error.detail.msg);
+    try { return JSON.stringify(error.detail); } catch { /* fall through */ }
+  }
+
+  // Last resort: try to stringify, but never return [object Object]
+  if (typeof error === 'object') {
+    try { return JSON.stringify(error); } catch { /* fall through */ }
   }
 
   return 'An unexpected error occurred.';

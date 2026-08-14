@@ -65,7 +65,7 @@ export default function AuthorityPage() {
   };
 
   const parseNames = (namesStr) => {
-    if (!namesStr) return [];
+    if (typeof namesStr !== 'string' || !namesStr) return [];
     return namesStr.split(',').map(n => n.trim()).filter(Boolean);
   };
 
