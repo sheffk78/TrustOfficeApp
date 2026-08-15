@@ -146,6 +146,8 @@ export default function PricingPage() {
   const [billingPeriod, setBillingPeriod] = useState('monthly');
   // WingPoint card has its own billing period toggle (defaults to annual for best value)
   const [wingPointPeriod, setWingPointPeriod] = useState('annual');
+  // Trustee card in the WingPoint section has its own toggle (defaults to monthly)
+  const [trusteePeriod, setTrusteePeriod] = useState('monthly');
   
   // Get coupon from URL if present
   const couponCode = searchParams.get('coupon') || searchParams.get('promo');
@@ -327,17 +329,17 @@ export default function PricingPage() {
       {/* WingPoint Welcome Banner (only when ?wp=1) */}
       {isWingPointFlow && (
         <section className="pb-6 px-8" data-testid="wp-welcome-banner">
-          <div className="max-w-3xl mx-auto bg-navy text-white rounded-lg p-8 text-center">
-            <h2 className="font-serif text-3xl mb-4" data-testid="wp-banner-headline">
+          <div className="max-w-3xl mx-auto bg-subtle-bg border border-border rounded-lg p-8 text-center">
+            <h2 className="font-serif text-3xl text-navy mb-4" data-testid="wp-banner-headline">
               Your trust is ready. Activate it with your exclusive WingPoint plan.
             </h2>
-            <p className="text-base text-white/80 max-w-2xl mx-auto mb-6 leading-relaxed">
+            <p className="text-base text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed">
               You purchased your trust through WingPoint. TrustOffice is where that trust lives, managed, updated, and accessible whenever you need it. As a WingPoint customer, you get unlimited trusts at a special rate not available to the public.
             </p>
-            <div className="inline-block bg-gold/20 text-white px-5 py-3 rounded-full text-sm font-medium mb-3">
+            <div className="inline-block bg-gold/10 text-navy px-5 py-3 rounded-full text-sm font-medium mb-3">
               Unlimited trusts from $99/mo (annual) or $119/mo (monthly). WingPoint exclusive.
             </div>
-            <p className="text-sm text-white/60 mt-2">
+            <p className="text-sm text-success mt-2 font-medium">
               Save $240/year with annual billing. Monthly available for flexibility.
             </p>
           </div>
@@ -352,7 +354,7 @@ export default function PricingPage() {
           <section className="pb-8 px-8 pt-6" data-testid="wp-preselected-card">
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8 items-stretch">
-                {/* Card 1: Trustee Plan — $79/month (1 trust) */}
+                {/* Card 1: Trustee Plan — $79/mo or $66/mo (1 trust) */}
                 <div className="card-trust corner-mark p-8 border border-border relative overflow-visible flex flex-col">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-white px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
                     1 Trust
@@ -362,24 +364,58 @@ export default function PricingPage() {
                     <p className="text-base text-muted-foreground mb-4 max-w-xs mx-auto">
                       {WP_PLAN_DESCRIPTIONS['trustee']}
                     </p>
-                    <div className="flex items-baseline justify-center gap-1 mb-1">
-                      <span className="font-serif text-5xl text-navy">$79</span>
-                      <span className="text-muted-foreground">/mo</span>
+
+                    {/* Monthly/Annual toggle */}
+                    <div className="flex justify-center mb-4">
+                      <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
+                        <button
+                          type="button"
+                          onClick={() => setTrusteePeriod('monthly')}
+                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${trusteePeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+                        >
+                          Monthly
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTrusteePeriod('annual')}
+                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${trusteePeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+                        >
+                          Annual <span className="ml-1 text-success">2 months free</span>
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {billingPeriod === 'annual' ? 'billed annually ($790/year)' : 'billed monthly'}
-                    </p>
+
+                    {/* Price display */}
+                    {trusteePeriod === 'monthly' ? (
+                      <>
+                        <div className="flex items-baseline justify-center gap-1 mb-1">
+                          <span className="font-serif text-5xl text-navy">$79</span>
+                          <span className="text-muted-foreground">/mo</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-4">billed monthly · cancel anytime</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-baseline justify-center gap-1 mb-1">
+                          <span className="font-serif text-5xl text-navy">$66</span>
+                          <span className="text-muted-foreground">/mo</span>
+                        </div>
+                        <p className="text-sm text-success font-medium mb-1">Save $158/yr (2 months free)</p>
+                        <p className="text-sm text-muted-foreground mb-4">billed annually ($790/year)</p>
+                      </>
+                    )}
+
                     <div className="inline-block bg-subtle-bg border border-border text-navy px-4 py-2 rounded-full text-sm font-medium mb-6 self-center">
                       1 trust &middot; all governance tools
                     </div>
                   </div>
                   <Button
-                    onClick={() => handleCheckout('trustee')}
+                    onClick={() => handleCheckout('trustee', trusteePeriod)}
                     disabled={loading !== null}
                     className="w-full btn-primary text-lg py-6"
                     data-testid="wp-confirm-plan-btn"
                   >
-                    {loading === 'trustee' ? 'Loading...' : 'Choose Trustee'}
+                    {loading === 'trustee' ? 'Loading...' : `Choose Trustee (${trusteePeriod === 'annual' ? 'Annual' : 'Monthly'})`}
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </div>
@@ -529,7 +565,7 @@ export default function PricingPage() {
               <div
                 key={tier.id}
                 ref={(el) => { planCardRefs.current[tier.id] = el; }}
-                className={`card-trust corner-mark p-8 relative ${isPopular ? 'border-2 border-gold mt-4' : ''} ${targetPlan === tier.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
+                className={`card-trust corner-mark p-8 relative overflow-visible ${isPopular ? 'border-2 border-gold mt-4' : ''} ${targetPlan === tier.id ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
                 data-testid={`tier-card-${tier.id}`}
               >
                 {isPopular && (
