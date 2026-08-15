@@ -58,19 +58,16 @@ export const TIERS = [
 //
 // Jeff's requirement: WingPoint customers must be given TWO options:
 //   (a) $79/month  → maps to the existing 'trustee' tier (monthly 79, annual 790)
-//   (b) $99/month  → the WingPoint plan (annual $1,188 = $99 × 12)
+//   (b) WingPoint plan → unlimited trusts at a discounted rate
+//       Monthly: $119/mo   (new — price-conscious customers)
+//       Annual:  $1,188/yr ($99/mo equivalent — best value, annual commitment)
 //
-// The WingPoint plan is annual-only on the backend/Stripe — there is no
-// ("wingpoint","monthly") price ID and the checkout route returns 400 if
-// billing_period != "annual". So the $99/mo figure is the monthly-equivalent
-// (1188/12 = 99) displayed for price comparison; the card always subscribes
-// with billing_period="annual". The monthly/annual toggle on the WingPoint
-// card is therefore a presentation toggle, not a different backend call.
+// Both monthly and annual are real purchasable plans with Stripe price IDs.
 export const WINGPOINT_TIER = {
   id: 'wingpoint',
   name: 'WingPoint Plan',
-  monthly: 99,        // display-only: 1188/12 — not purchasable monthly
-  annual: 1188,       // backend + Stripe price (price_1U1JcFJE7N1BszdfbSjSSa7c)
+  monthly: 119,        // $119/mo — real Stripe price (price_1U4mSwJE7N1Bszdf9GHSbm89)
+  annual: 1188,       // $1,188/yr — real Stripe price (price_1U1JcFJE7N1BszdfbSjSSa7c)
   maxTrusts: Infinity,
   trustLimit: 'Unlimited trusts',
   features: [

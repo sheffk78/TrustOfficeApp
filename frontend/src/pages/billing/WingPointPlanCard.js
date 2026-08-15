@@ -128,12 +128,11 @@ function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef, use
   );
 }
 
-// ── WingPoint $99 option card ──────────────────────────────────
+// ── WingPoint $119/mo or $99/mo option card ───────────────────
 function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef }) {
-  const [period, setPeriod] = useState('monthly');
-  // WingPoint is annual-only on the backend. $99/mo is the monthly-equivalent
-  // (1188/12). Both toggle selections purchase the annual plan; the toggle is
-  // purely a presentation aid for price comparison.
+  const [period, setPeriod] = useState('annual');
+  // Both monthly and annual are now real purchasable plans.
+  // Monthly: $119/mo   Annual: $1,188/yr ($99/mo equivalent)
   const displayPrice = period === 'annual' ? WINGPOINT_TIER.annual : WINGPOINT_TIER.monthly;
 
   return (
@@ -148,7 +147,7 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
       <h3 className="font-serif text-xl text-navy mb-2">WingPoint Plan</h3>
       <p className="text-xs text-muted-foreground mb-3">{WINGPOINT_TIER.trustLimit}</p>
 
-      {/* Monthly/Annual toggle (presentation only — both purchase annual) */}
+      {/* Monthly/Annual toggle */}
       <div className="flex justify-center mb-4">
         <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
           <button
@@ -163,13 +162,12 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
             onClick={() => setPeriod('annual')}
             className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'annual' ? 'bg-gold text-white' : 'text-muted-foreground hover:text-navy'}`}
           >
-            Annual <span className="ml-1 text-success">save vs public</span>
+            Annual <span className="ml-1 text-success">save $240/yr</span>
           </button>
         </div>
       </div>
 
-      {/* Discount comparison: show the normal Estate price struck through
-          alongside the WingPoint price, plus a gold savings badge. */}
+      {/* Price display */}
       {period === 'monthly' ? (
         <>
           <div className="flex items-baseline gap-2 mb-1">
@@ -179,10 +177,10 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
             <span className="text-xs text-muted-foreground">/mo</span>
           </div>
           <div className="inline-block bg-gold/10 text-gold px-2 py-1 rounded font-mono text-xs font-semibold mb-2">
-            Save $50/mo vs Estate $149/mo
+            Save $30/mo vs Estate $149/mo
           </div>
-          <p className="text-xs text-success mb-3 font-medium">
-            $99/month · billed annually at $1,188/year
+          <p className="text-xs text-muted-foreground mb-3 font-medium">
+            Billed monthly · cancel anytime
           </p>
         </>
       ) : (
@@ -197,7 +195,7 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
             Save $302/yr vs Estate $1,490/yr
           </div>
           <p className="text-xs text-success mb-3 font-medium">
-            $1,188/year · billed annually
+            $99/month · billed annually · save $240/yr vs monthly
           </p>
         </>
       )}
@@ -211,7 +209,7 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
         ))}
       </ul>
       <Button
-        onClick={() => onSubscribe('wingpoint', 'annual')}
+        onClick={() => onSubscribe('wingpoint', period)}
         className="w-full btn-primary"
         disabled={processing}
         data-testid="subscribe-wingpoint-btn"
@@ -224,7 +222,7 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
         ) : (
           <>
             <CreditCard className="w-4 h-4 mr-2" />
-            Subscribe to WingPoint Annual
+            Subscribe to WingPoint {period === 'annual' ? 'Annual' : 'Monthly'}
           </>
         )}
       </Button>

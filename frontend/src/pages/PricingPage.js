@@ -133,7 +133,7 @@ const WP_PLAN_DESCRIPTIONS = {
   trustee: 'Perfect for your single WingPoint trust. Manage one trust with full access to documents and amendments.',
   estate: 'Ideal if you have WingPoints Estate Bundle. Manage up to 8 trusts for family, properties, or business entities.',
   advisor: 'For WingPoint Builder Bundle customers managing multiple trusts. Unlimited trusts, priority support.',
-  wingpoint: 'Your exclusive WingPoint plan: unlimited trusts at a special annual rate not available on our public pricing page.'
+  wingpoint: 'Your exclusive WingPoint plan: unlimited trusts at a special rate not available on our public pricing page. Choose monthly for flexibility or annual for the best value.'
 };
 
 export default function PricingPage() {
@@ -144,6 +144,8 @@ export default function PricingPage() {
   const [couponApplied, setCouponApplied] = useState(false);
   // Monthly / annual billing toggle (Phase 3)
   const [billingPeriod, setBillingPeriod] = useState('monthly');
+  // WingPoint card has its own billing period toggle (defaults to annual for best value)
+  const [wingPointPeriod, setWingPointPeriod] = useState('annual');
   
   // Get coupon from URL if present
   const couponCode = searchParams.get('coupon') || searchParams.get('promo');
@@ -330,13 +332,13 @@ export default function PricingPage() {
               Your trust is ready. Activate it with your exclusive WingPoint plan.
             </h2>
             <p className="text-base text-white/80 max-w-2xl mx-auto mb-6 leading-relaxed">
-              You purchased your trust through WingPoint. TrustOffice is where that trust lives, managed, updated, and accessible whenever you need it. As a WingPoint customer, you get unlimited trusts at a special annual rate not available to the public.
+              You purchased your trust through WingPoint. TrustOffice is where that trust lives, managed, updated, and accessible whenever you need it. As a WingPoint customer, you get unlimited trusts at a special rate not available to the public.
             </p>
             <div className="inline-block bg-gold/20 text-white px-5 py-3 rounded-full text-sm font-medium mb-3">
-              Unlimited trusts for $99/mo, billed annually. WingPoint exclusive.
+              Unlimited trusts from $99/mo (annual) or $119/mo (monthly). WingPoint exclusive.
             </div>
             <p className="text-sm text-white/60 mt-2">
-              This special rate is available to WingPoint customers only. Annual commitment required.
+              Save $240/year with annual billing. Monthly available for flexibility.
             </p>
           </div>
         </section>
@@ -382,49 +384,83 @@ export default function PricingPage() {
                   </Button>
                 </div>
 
-                {/* Card 2: WingPoint Annual — $99/month (unlimited trusts) */}
+                {/* Card 2: WingPoint — $119/mo or $99/mo (unlimited trusts) */}
                 <div className="card-trust corner-mark p-8 border-2 border-gold relative overflow-visible flex flex-col">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
                     WingPoint Exclusive
                   </div>
                   <div className="text-center mt-4 flex-1 flex flex-col">
-                    <h2 className="font-serif text-3xl text-navy mb-2">WingPoint Annual</h2>
+                    <h2 className="font-serif text-3xl text-navy mb-2">WingPoint Plan</h2>
                     <p className="text-base text-muted-foreground mb-4 max-w-xs mx-auto">
                       {WP_PLAN_DESCRIPTIONS['wingpoint']}
                     </p>
-                    <div className="flex items-baseline justify-center gap-1 mb-1">
-                      <span className="font-serif text-5xl text-navy">$99</span>
-                      <span className="text-muted-foreground">/mo</span>
+
+                    {/* Monthly/Annual toggle */}
+                    <div className="flex justify-center mb-4">
+                      <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
+                        <button
+                          type="button"
+                          onClick={() => setWingPointPeriod('monthly')}
+                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${wingPointPeriod === 'monthly' ? 'bg-gold text-white' : 'text-muted-foreground hover:text-navy'}`}
+                        >
+                          Monthly
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setWingPointPeriod('annual')}
+                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${wingPointPeriod === 'annual' ? 'bg-gold text-white' : 'text-muted-foreground hover:text-navy'}`}
+                        >
+                          Annual <span className="ml-1 text-success">save $240/yr</span>
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-4">billed annually ($1,188/year)</p>
+
+                    {/* Price display */}
+                    {wingPointPeriod === 'monthly' ? (
+                      <>
+                        <div className="flex items-baseline justify-center gap-1 mb-1">
+                          <span className="font-serif text-5xl text-navy">$119</span>
+                          <span className="text-muted-foreground">/mo</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-4">billed monthly · cancel anytime</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-baseline justify-center gap-1 mb-1">
+                          <span className="font-serif text-5xl text-navy">$99</span>
+                          <span className="text-muted-foreground">/mo</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-4">billed annually ($1,188/year)</p>
+                      </>
+                    )}
 
                     {/* Savings callout — makes it clear this is the best deal */}
                     <div className="bg-navy/5 border border-navy/10 rounded-lg p-4 mb-4 text-left">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Public Advisor plan (annual)</span>
-                        <span className="text-sm font-mono text-muted-foreground line-through">$3,990/yr</span>
+                        <span className="text-sm text-muted-foreground">Public Advisor plan</span>
+                        <span className="text-sm font-mono text-muted-foreground line-through">${wingPointPeriod === 'monthly' ? '399/mo' : '3,990/yr'}</span>
                       </div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-navy">Your WingPoint rate</span>
-                        <span className="text-sm font-mono font-bold text-navy">$1,188/yr</span>
+                        <span className="text-sm font-mono font-bold text-navy">${wingPointPeriod === 'monthly' ? '119/mo' : '1,188/yr'}</span>
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-navy/10">
                         <span className="text-sm font-bold text-gold">You save</span>
-                        <span className="text-lg font-mono font-bold text-gold">$2,802/year</span>
+                        <span className="text-lg font-mono font-bold text-gold">${wingPointPeriod === 'monthly' ? '280/mo' : '2,802/year'}</span>
                       </div>
                     </div>
 
                     <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium mb-6 self-center">
-                      Unlimited trusts &middot; annual commitment
+                      Unlimited trusts &middot; {wingPointPeriod === 'annual' ? 'annual' : 'monthly'}
                     </div>
                   </div>
                   <Button
-                    onClick={() => handleCheckout('wingpoint', 'annual')}
+                    onClick={() => handleCheckout('wingpoint', wingPointPeriod)}
                     disabled={loading !== null}
                     className="w-full btn-primary text-lg py-6"
                     data-testid="wp-confirm-wingpoint-btn"
                   >
-                    {loading === 'wingpoint' ? 'Loading...' : 'Start Your WingPoint Plan'}
+                    {loading === 'wingpoint' ? 'Loading...' : `Start Your WingPoint Plan (${wingPointPeriod === 'annual' ? 'Annual' : 'Monthly'})`}
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </div>

@@ -42,6 +42,7 @@ STRIPE_ESTATE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ESTATE_ANNUAL_PRICE_ID')
 STRIPE_ADVISOR_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ADVISOR_MONTHLY_PRICE_ID')
 STRIPE_ADVISOR_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ADVISOR_ANNUAL_PRICE_ID')
 STRIPE_WINGPOINT_ANNUAL_PRICE_ID = os.environ.get('STRIPE_WINGPOINT_ANNUAL_PRICE_ID')
+STRIPE_WINGPOINT_MONTHLY_PRICE_ID = os.environ.get('STRIPE_WINGPOINT_MONTHLY_PRICE_ID')
 
 # Price ID lookup: (plan_type, billing_period) -> stripe_price_id
 PRICE_IDS = {
@@ -51,6 +52,7 @@ PRICE_IDS = {
     ("estate", "annual"): STRIPE_ESTATE_ANNUAL_PRICE_ID,
     ("advisor", "monthly"): STRIPE_ADVISOR_MONTHLY_PRICE_ID,
     ("advisor", "annual"): STRIPE_ADVISOR_ANNUAL_PRICE_ID,
+    ("wingpoint", "monthly"): STRIPE_WINGPOINT_MONTHLY_PRICE_ID,
     ("wingpoint", "annual"): STRIPE_WINGPOINT_ANNUAL_PRICE_ID,
 }
 
@@ -60,6 +62,7 @@ PLAN_AMOUNTS = {
     ("trustee", "annual"): 790.00,
     ("estate", "monthly"): 149.00,
     ("estate", "annual"): 1490.00,
+    ("wingpoint", "monthly"): 119.00,
     ("wingpoint", "annual"): 1188.00,
     ("advisor", "monthly"): 399.00,
     ("advisor", "annual"): 3990.00,
@@ -293,10 +296,6 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
             raise HTTPException(status_code=400, detail="Invalid billing period. Choose 'monthly' or 'annual'.")
     else:
         raise HTTPException(status_code=400, detail="Invalid plan type. Choose 'trustee', 'estate', 'advisor', or 'wingpoint'.")
-
-    # WingPoint plan is annual-only
-    if checkout.plan_type == "wingpoint" and billing_period != "annual":
-        raise HTTPException(status_code=400, detail="WingPoint plan is annual-only.")
 
     # WingPoint eligibility guard — only WingPoint customers can purchase
     # the wingpoint plan. Checks wp_ref, source, or created_via on the
