@@ -59,6 +59,7 @@ PLAN_AMOUNTS = {
     ("trustee", "monthly"): 79.00,
     ("trustee", "annual"): 790.00,
     ("estate", "monthly"): 149.00,
+    ("estate", "annual"): 1490.00,
     ("wingpoint", "annual"): 1188.00,
     ("advisor", "monthly"): 399.00,
     ("advisor", "annual"): 3990.00,
@@ -1086,8 +1087,36 @@ async def _webhook_invoice_paid(event) -> None:
         }}
     )
 
+    # Record renewal payment transaction (BUG FIX: renewals were never logged, causing revenue undercount)
+    billing_reason = _stripe_get(invoice, "billing_reason")
+    if billing_reason == "subscription_cycle":
+        amount_paid = _stripe_get(invoice, "amount_paid", 0)
+        # Stripe stores amounts in cents; payment_transactions stores dollars
+        renewal_amount = amount_paid / 100 if amount_paid else 0
+        invoice_id = _stripe_get(invoice, "id", None) or str(invoice)
+        plan_type = (sub or {}).get("plan_type", "monthly")
+        billing_period = (sub or {}).get("billing_period", "monthly")
+
+        # Idempotency: upsert by invoice_id so duplicate webhook deliveries don't double-count
+        await db.payment_transactions.update_one(
+            {"session_id": invoice_id},
+            {"$set": {
+                "transaction_id": f"renewal_{invoice_id}",
+                "user_id": user["user_id"],
+                "session_id": invoice_id,
+                "amount": renewal_amount,
+                "currency": "usd",
+                "plan_type": plan_type,
+                "billing_period": billing_period,
+                "payment_status": "paid",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+
     # Send renewal email
-    if email_service.is_configured and _stripe_get(invoice, "billing_reason") == "subscription_cycle":
+    if email_service.is_configured and billing_reason == "subscription_cycle":
         try:
             # Get next billing date from subscription
             stripe_sub = stripe.Subscription.retrieve(_stripe_get(invoice, "subscription"))

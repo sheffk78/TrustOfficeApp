@@ -316,21 +316,26 @@ async def get_summary_stats(
     # Amount field stores dollars, convert to cents for consistent formatting
     total_revenue = int(raw_total * 100) if raw_total else 0
     
-    # Also calculate MRR from active subscriptions (for gifted/manual subs without payment_transactions)
+    # Also calculate MRR from active subscriptions (excluding gifted — they don't generate revenue)
     # Check both plan_type and plan fields since schema may vary
     sub_pipeline = [
-        {"$match": {"status": "active"}},
+        {"$match": {"$and": [
+            {"status": "active"},
+            {"gifted": {"$ne": True}}
+        ]}},
         {"$group": {"_id": {"$ifNull": ["$plan_type", {"$ifNull": ["$plan", "monthly"]}]}, "count": {"$sum": 1}}}
     ]
     sub_result = await db.subscriptions.aggregate(sub_pipeline).to_list(length=None)
     # Monthly: $79/mo = 7900 cents; Annual: $790/yr ≈ 6583 cents/mo
     # Trustee: $79/mo = 7900 cents; Estate: $149/mo = 14900 cents; Advisor: $399/mo = 39900 cents
+    # WingPoint: $1,188/yr ≈ 9900 cents/mo
     monthly_mrr = (
         sum(s["count"] * 7900 for s in sub_result if s["_id"] == "monthly")
         + sum(s["count"] * 6583 for s in sub_result if s["_id"] == "annual")
         + sum(s["count"] * 7900 for s in sub_result if s["_id"] == "trustee")
         + sum(s["count"] * 14900 for s in sub_result if s["_id"] == "estate")
         + sum(s["count"] * 39900 for s in sub_result if s["_id"] == "advisor")
+        + sum(s["count"] * 9900 for s in sub_result if s["_id"] == "wingpoint")
     )
     
     await log_api_action(
@@ -1314,7 +1319,7 @@ async def upload_vault_document(
 
     VALID_CATEGORIES = {
         "trust_instrument", "amendment", "schedule_a", "minutes",
-        "tax_return", "k1", "ein_letter", "financial_statement",
+        "tax_return", "k1", "ein_letter", "irs_determination", "financial_statement",
         "appraisal", "notice", "insurance", "deed", "bank_statement",
         "legal_opinion", "court_order", "other",
     }
