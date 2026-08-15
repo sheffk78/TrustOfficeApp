@@ -240,7 +240,13 @@ export default function BenevolencePolicyPage() {
                   {activeTab === 'edit' ? 'View' : 'Edit Draft'}
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => {}}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!activeVersion}
+                onClick={() => activeVersion && window.open(`/api/benevolence/policies/${trustId}/export/pdf?version_id=${activeVersion.policy_version_id}`, '_blank')}
+                title="Download PDF"
+              >
                 <Download className="h-4 w-4" />
               </Button>
             </div>

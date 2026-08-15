@@ -984,9 +984,24 @@ async def enrich_lead(
     body: dict,
     request: Request,
     api_key: str = Depends(verify_api_key),
+    user_id: Optional[str] = None,
 ):
-    """Enrich a lead with course progress, booked_call, stage, etc."""
-    lead = await db.leads.find_one({"lead_id": lead_id})
+    """Enrich a lead with course progress, booked_call, stage, etc.
+
+    Security note: verify_api_key authenticates against a single global
+    ADMIN_API_KEY (not a per-account key), so admin API callers have
+    intentionally global access. The optional ?user_id= query param provides
+    defence-in-depth: when supplied, the lead lookup is scoped to that
+    account so a caller cannot mutate a lead outside the intended tenant.
+    Leads that pre-date subscription (no user_id yet) remain reachable
+    only when user_id is omitted.
+    """
+    # Build filter with optional account scoping to prevent IDOR
+    lead_filter = {"lead_id": lead_id}
+    if user_id is not None:
+        lead_filter["user_id"] = user_id
+
+    lead = await db.leads.find_one(lead_filter)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
