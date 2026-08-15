@@ -41,9 +41,11 @@ export default function BillingPage() {
   const actionParam = searchParams.get('action');
   const wpParam = searchParams.get('wp');
   // WingPoint contextual banners should show for WingPoint customers regardless
-  // of how they arrive. The ?wp=1 URL param is used by WingPoint provisioning
-  // flows, but the account flag (user.is_wingpoint) is the reliable signal.
-  const isWp = wpParam === '1' || user?.is_wingpoint === true;
+  // of how they arrive. Only the account flag (user.is_wingpoint) drives this —
+  // the ?wp=1 URL param is NOT trusted so non-WingPoint users cannot craft the
+  // URL to trigger WingPoint banners. The wpParam variable is retained for
+  // other/provisioning uses but does not affect isWp.
+  const isWp = user?.is_wingpoint === true;
   const planCardRefs = useRef({});
 
   const registerCardRef = (tierId) => (el) => { planCardRefs.current[tierId] = el; };

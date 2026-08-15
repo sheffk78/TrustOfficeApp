@@ -141,15 +141,39 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
         </div>
       </div>
 
-      <div className="flex items-baseline gap-1 mb-2">
-        <span className="font-mono text-4xl text-navy">${displayPrice}</span>
-        <span className="text-muted-foreground">/{period === 'annual' ? 'year' : 'month'}</span>
-      </div>
-      <p className="text-xs text-success mb-3 font-medium">
-        {period === 'annual'
-          ? '$1,188/year · billed annually'
-          : '$99/month · billed annually at $1,188/year'}
-      </p>
+      {/* Discount comparison: show the normal Estate price struck through
+          alongside the WingPoint price, plus a gold savings badge. */}
+      {period === 'monthly' ? (
+        <>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="font-mono text-4xl text-navy">${displayPrice}</span>
+            <span className="text-muted-foreground">/month</span>
+            <span className="font-mono text-lg text-muted-foreground line-through ml-2">$149</span>
+            <span className="text-xs text-muted-foreground">/mo</span>
+          </div>
+          <div className="inline-block bg-gold/10 text-gold px-2 py-1 rounded font-mono text-xs font-semibold mb-2">
+            Save $50/mo vs Estate $149/mo
+          </div>
+          <p className="text-xs text-success mb-3 font-medium">
+            $99/month · billed annually at $1,188/year
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="font-mono text-4xl text-navy">${displayPrice}</span>
+            <span className="text-muted-foreground">/year</span>
+            <span className="font-mono text-lg text-muted-foreground line-through ml-2">$1,490</span>
+            <span className="text-xs text-muted-foreground">/yr</span>
+          </div>
+          <div className="inline-block bg-gold/10 text-gold px-2 py-1 rounded font-mono text-xs font-semibold mb-2">
+            Save $302/yr vs Estate $1,490/yr
+          </div>
+          <p className="text-xs text-success mb-3 font-medium">
+            $1,188/year · billed annually
+          </p>
+        </>
+      )}
 
       <ul className="space-y-3 mb-6">
         {WINGPOINT_TIER.features.map((feature, i) => (
