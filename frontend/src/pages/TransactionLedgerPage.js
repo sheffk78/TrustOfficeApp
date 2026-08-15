@@ -230,7 +230,7 @@ export default function TransactionLedgerPage() {
       setImportStep(1);
       loadData();
     } catch (e) {
-      showError(toast, e, { operation: 'import_csv', page: 'TransactionLedger' });
+      showError(toast, e, { operation: 'import_csv', page: 'TransactionLedger', silent: true });
     } finally {
       setImporting(false);
     }

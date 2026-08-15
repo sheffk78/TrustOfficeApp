@@ -369,7 +369,14 @@ const useAuthCheck = ({
       // Network errors (fetch throws) should NOT wipe the token — the backend may
       // be temporarily unreachable. Only wipe on explicit 401 (caught above).
       if (error.message === 'Not authenticated') {
-        reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'major' });
+        // Don't report auth_check as 'major' on public pages — a 401 is
+        // expected when visiting /pricing, /login, /signup, etc. without a
+        // token. Only report as 'major' on authenticated pages.
+        const publicPages = ['/pricing', '/login', '/signup', '/forgot-password', '/trust-governance-offer'];
+        const isPublicPage = publicPages.some(p => window.location.pathname.startsWith(p));
+        if (!isPublicPage) {
+          reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'major' });
+        }
         console.error('[AuthContext] Auth check failed: token invalid');
         setUser(null);
         localStorage.removeItem('auth_token');
