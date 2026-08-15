@@ -623,6 +623,7 @@ export const useChatStream = () => {
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
+  const clearAutoThreadFlag = useCallback(() => setWasAutoThreaded(false), []);
 
   return {
     messages,
