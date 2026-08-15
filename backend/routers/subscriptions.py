@@ -315,6 +315,19 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
                 detail="The WingPoint plan is only available to WingPoint customers."
             )
     
+    # Trust count validation — prevent checkout for plans that can't support
+    # the user's existing number of trusts. This check happens BEFORE any
+    # Stripe API call so users never reach checkout for an ineligible plan.
+    trust_count = await db.trusts.count_documents({"user_id": user["user_id"]})
+    trust_limit = get_trust_limit(checkout.plan_type, None)
+    if trust_limit != float('inf') and trust_count >= trust_limit:
+        _plan_display_names = {"trustee": "Trustee", "estate": "Estate", "advisor": "Advisor", "wingpoint": "WingPoint", "monthly": "Trustee", "annual": "Trustee"}
+        plan_display_name = _plan_display_names.get(checkout.plan_type, checkout.plan_type.title())
+        raise HTTPException(
+            status_code=400,
+            detail=f"Your account has {trust_count} trusts. The {plan_display_name} plan supports up to {int(trust_limit)}. Please select a higher tier."
+        )
+
     # Get price_id from lookup
     if checkout.plan_type in valid_new_plans:
         price_id = PRICE_IDS.get((checkout.plan_type, billing_period))
@@ -693,6 +706,19 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
     if current_plan == request.plan_type and current_billing == request.billing_period:
         raise HTTPException(status_code=400, detail=f"You are already on the {request.plan_type} {request.billing_period} plan.")
     
+    # Trust count validation — prevent downgrade to a plan that can't support
+    # the user's existing number of trusts. This check happens BEFORE the
+    # Stripe Subscription.modify call so the plan change never goes through.
+    trust_count = await db.trusts.count_documents({"user_id": user["user_id"]})
+    trust_limit = get_trust_limit(request.plan_type, None)
+    if trust_limit != float('inf') and trust_count >= trust_limit:
+        _plan_display_names = {"trustee": "Trustee", "estate": "Estate", "advisor": "Advisor", "wingpoint": "WingPoint"}
+        plan_display_name = _plan_display_names.get(request.plan_type, request.plan_type.title())
+        raise HTTPException(
+            status_code=400,
+            detail=f"Your account has {trust_count} trusts. The {plan_display_name} plan supports up to {int(trust_limit)}. Please select a higher tier."
+        )
+
     try:
         stripe_sub = stripe.Subscription.retrieve(sub["stripe_subscription_id"])
         old_plan_label = f"{current_plan} ({current_billing})" if current_billing else current_plan

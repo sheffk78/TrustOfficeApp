@@ -529,8 +529,8 @@ PLAN_FEATURES = {
 
 PLAN_TRUST_LIMITS = {
     "none": 0,
-    "free": 10,
-    "forever_free": 10,
+    "free": 1,
+    "forever_free": 1,
     "trustee": 1,
     "estate": 8,
     "advisor": float('inf'),  # unlimited
