@@ -60,7 +60,7 @@ from routers.schedule_a import router as schedule_a_router
 from routers.compensation import router as compensation_router
 from routers.subscriptions import router as subscriptions_router
 from routers.benevolence import router as benevolence_router
-from routers.benevolence_policy import router as benevolence_policy_router
+from routers.benevolence_policy import router as benevolence_policy_router, ensure_indexes as ensure_benevolence_policy_indexes
 from routers.exports import router as exports_router
 from routers.expenses import router as expenses_router
 from routers.calendar import router as calendar_router
@@ -719,6 +719,9 @@ async def startup_event():
         await db.error_logs.create_index("resolved")
         await db.error_logs.create_index("user_id", sparse=True)
         await db.error_logs.create_index([("error_type", 1), ("timestamp", -1)])
+        
+        # Benevolence policy indexes (policy container + versioning)
+        await ensure_benevolence_policy_indexes()
         
         logger.info("Database indexes created/verified successfully")
         
