@@ -250,6 +250,10 @@ export default function BillingPage() {
   const isActivePaidSubscription = subscription?.status === 'active' && !isFreePlan;
   const isCanceling = subscription?.cancel_at_period_end;
 
+  // Trust count used for plan eligibility graying.
+  // Prefer subscription.trust_count (synced with the plan), fall back to user.trust_count.
+  const userTrustCount = subscription?.trust_count ?? user?.trust_count ?? 0;
+
   // Phase 3: tier-aware upgrade logic.
   // The backend now returns plan_type as trustee/estate/advisor, with
   // billing_period as monthly/annual. Legacy monthly/annual subscribers are
@@ -349,6 +353,7 @@ export default function BillingPage() {
                 processing={processing}
                 isTargetPlan={targetPlan}
                 registerCardRef={registerCardRef}
+                userTrustCount={userTrustCount}
               />
             ) : (
               /* Non-WingPoint: standard 3-tier picker */
@@ -365,6 +370,7 @@ export default function BillingPage() {
                       processing={processing}
                       isTargetPlan={targetPlan === tier.id}
                       cardRef={tierCardRef(tier.id)}
+                      userTrustCount={userTrustCount}
                     />
                   ))}
                 </div>
@@ -402,6 +408,7 @@ export default function BillingPage() {
                   onChangePlan={handleChangePlan}
                   actionLoading={actionLoading}
                   cardRef={tierCardRef}
+                  userTrustCount={userTrustCount}
                 />
               )}
 
@@ -414,6 +421,7 @@ export default function BillingPage() {
                     processing={processing}
                     isTargetPlan={targetPlan}
                     registerCardRef={registerCardRef}
+                    userTrustCount={userTrustCount}
                   />
                 ) : (
                   /* Non-WingPoint: standard 3-tier picker */
@@ -429,6 +437,7 @@ export default function BillingPage() {
                           onSubscribe={handleSubscribe}
                           processing={processing}
                           cardRef={tierCardRef(tier.id)}
+                          userTrustCount={userTrustCount}
                         />
                       ))}
                     </div>

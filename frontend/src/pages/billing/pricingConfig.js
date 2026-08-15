@@ -7,6 +7,7 @@ export const TIERS = [
     name: 'Trustee Plan',
     monthly: 79,
     annual: 790,
+    maxTrusts: 1,
     trustLimit: '1 trust',
     features: [
       '1 trust record',
@@ -22,6 +23,7 @@ export const TIERS = [
     name: 'Estate Plan',
     monthly: 149,
     annual: 1490,
+    maxTrusts: 8,
     trustLimit: 'Up to 8 trusts',
     popular: true,
     features: [
@@ -38,6 +40,7 @@ export const TIERS = [
     name: 'Advisor Plan',
     monthly: 399,
     annual: 3990,
+    maxTrusts: Infinity,
     trustLimit: 'Unlimited trusts',
     features: [
       'Everything in Estate',
@@ -68,6 +71,7 @@ export const WINGPOINT_TIER = {
   name: 'WingPoint Plan',
   monthly: 99,        // display-only: 1188/12 — not purchasable monthly
   annual: 1188,       // backend + Stripe price (price_1U1JcFJE7N1BszdfbSjSSa7c)
+  maxTrusts: Infinity,
   trustLimit: 'Unlimited trusts',
   features: [
     'Unlimited trusts & entities',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, CreditCard, Loader2 } from 'lucide-react';
+import { Check, CreditCard, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WINGPOINT_TIER, TRUSTEE_TIER } from './pricingConfig';
 
@@ -9,7 +9,7 @@ import { WINGPOINT_TIER, TRUSTEE_TIER } from './pricingConfig';
 //   (b) WingPoint — $99/mo  (annual $1,188/yr)
 //
 // Each card carries its own Monthly/Annual toggle. Because the backend only
-// supports the wingpoint plan as annual (PRICE_IDS has ("wingpoint","annual")
+// supports the wingpoint plan as annual (PRICE_IDS has (\"wingpoint\",\"annual\")
 // only; checkout returns 400 for wingpoint + non-annual), the WingPoint card
 // always calls onSubscribe('wingpoint','annual') — the toggle is purely a
 // presentation aid so the user can compare the monthly-equivalent ($99/mo)
@@ -23,23 +23,45 @@ import { WINGPOINT_TIER, TRUSTEE_TIER } from './pricingConfig';
 //                     string, matches the tier id)
 //   registerCardRef – (tierId) => ref callback (optional; registers both the
 //                     trustee and wingpoint cards for auto-scroll)
+//   userTrustCount  – number | undefined  (optional) count of trusts the
+//                     user currently holds. If it exceeds tier.maxTrusts
+//                     the card is grayed out and the button is disabled.
 
 // ── Trustee $79 option card ─────────────────────────────────────
-function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef }) {
+function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef, userTrustCount }) {
   const [period, setPeriod] = useState('monthly');
   const price = period === 'annual' ? TRUSTEE_TIER.annual : TRUSTEE_TIER.monthly;
+
+  const isIneligible =
+    userTrustCount != null &&
+    TRUSTEE_TIER.maxTrusts !== Infinity &&
+    userTrustCount > TRUSTEE_TIER.maxTrusts;
 
   return (
     <div
       ref={cardRef}
-      className={`card-trust relative border-border bg-card ${isTargetPlan ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
+      className={`card-trust relative border-border bg-card ${isIneligible ? 'opacity-50 pointer-events-none' : ''} ${isTargetPlan && !isIneligible ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
       data-testid="plan-card-trustee"
     >
-      <div className="absolute top-0 right-0 bg-navy text-white px-3 py-1 font-mono text-xs uppercase">
-        1 Trust
-      </div>
+      {isIneligible ? (
+        <div className="absolute top-0 right-0 bg-muted text-muted-foreground px-3 py-1 font-mono text-xs uppercase flex items-center gap-1">
+          <Lock className="w-3 h-3" />
+          Not Enough Trusts
+        </div>
+      ) : (
+        <div className="absolute top-0 right-0 bg-navy text-white px-3 py-1 font-mono text-xs uppercase">
+          1 Trust
+        </div>
+      )}
       <h3 className="font-serif text-xl text-navy mb-2">Trustee Plan</h3>
       <p className="text-xs text-muted-foreground mb-3">{TRUSTEE_TIER.trustLimit}</p>
+      {isIneligible && (
+        <p className="text-xs text-warning mb-3 font-medium">
+          Your account has {userTrustCount} trust
+          {userTrustCount !== 1 ? 's' : ''}. This plan supports up to{' '}
+          {TRUSTEE_TIER.maxTrusts === Infinity ? 'unlimited' : TRUSTEE_TIER.maxTrusts}.
+        </p>
+      )}
 
       {/* Monthly/Annual toggle */}
       <div className="flex justify-center mb-4">
@@ -82,13 +104,18 @@ function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef }) {
       <Button
         onClick={() => onSubscribe('trustee', period)}
         className="w-full btn-secondary"
-        disabled={processing}
+        disabled={processing || isIneligible}
         data-testid="subscribe-trustee-btn"
       >
         {processing ? (
           <>
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             Processing...
+          </>
+        ) : isIneligible ? (
+          <>
+            <Lock className="w-4 h-4 mr-2" />
+            Not Enough Trusts
           </>
         ) : (
           <>
@@ -214,6 +241,7 @@ export default function WingPointPlanCard({
   processing,
   isTargetPlan,
   registerCardRef,
+  userTrustCount,
 }) {
   return (
     <div className="mb-8" data-testid="wingpoint-purchase-section">
@@ -229,6 +257,7 @@ export default function WingPointPlanCard({
           processing={processing}
           isTargetPlan={isTargetPlan === true || isTargetPlan === 'trustee'}
           cardRef={registerCardRef ? registerCardRef('trustee') : undefined}
+          userTrustCount={userTrustCount}
         />
         <WingPointOptionCard
           onSubscribe={onSubscribe}
