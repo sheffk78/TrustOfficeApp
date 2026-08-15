@@ -41,6 +41,8 @@ const TrustAssistantPage = () => {
     trustContext,
     isStreaming,
     streamPhase,
+    wasAutoThreaded,
+    clearAutoThreadFlag,
     sendMessage,
     stopStreaming,
     loadConversation,
@@ -89,6 +91,14 @@ const TrustAssistantPage = () => {
       fetchConversations();
     });
   }, [sendMessage, conversationId, messages, fetchConversations]);
+
+  // Show toast when the backend auto-threads into a new conversation
+  useEffect(() => {
+    if (wasAutoThreaded) {
+      toast.info('New conversation started — your previous chat was saved to history');
+      clearAutoThreadFlag();
+    }
+  }, [wasAutoThreaded, clearAutoThreadFlag]);
 
   // Handle selecting a conversation from history
   const handleConversationSelect = useCallback(async (conv) => {

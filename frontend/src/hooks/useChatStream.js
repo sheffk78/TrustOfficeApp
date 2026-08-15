@@ -352,6 +352,7 @@ export const useChatStream = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamPhase, setStreamPhase] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [wasAutoThreaded, setWasAutoThreaded] = useState(false);
   const abortRef = useRef(null);
   const onDoneCallbackRef = useRef(null);
 
@@ -360,6 +361,7 @@ export const useChatStream = () => {
   const lastUserMessageRef = useRef(null);
   const retryCountRef = useRef(0);
   const lastAssistantMessageIdRef = useRef(null);
+  const sentConversationIdRef = useRef(null);
 
   // Keep isStreamingRef in sync with isStreaming state
   useEffect(() => {
@@ -398,7 +400,13 @@ export const useChatStream = () => {
   }) => {
     if (!text.trim()) return null;
 
+    // Reset auto-thread flag for this new send
+    setWasAutoThreaded(false);
     onDoneCallbackRef.current = onDone;
+
+    // Track the conversation ID being sent so we can detect auto-threading
+    const sentConvId = currentConversationId || conversationId || null;
+    sentConversationIdRef.current = sentConvId;
 
     const userMessage = {
       id: `user-${Date.now()}`,
@@ -481,7 +489,14 @@ export const useChatStream = () => {
       const wrappedOnEvent = (eventType, data) => {
         if (eventType === 'meta') {
           newConvId = data.conversation_id;
-          if (newConvId) setConversationId(newConvId);
+          if (newConvId) {
+            setConversationId(newConvId);
+            // Detect auto-threading: backend returned a different conversation_id
+            const sentId = sentConversationIdRef.current;
+            if (sentId && newConvId !== sentId) {
+              setWasAutoThreaded(true);
+            }
+          }
           return;
         }
         eventHandler.onEvent(eventType, data);
@@ -604,6 +619,7 @@ export const useChatStream = () => {
     setTrustContext(null);
     setError(null);
     setStreamPhase(null);
+    setWasAutoThreaded(false);
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
@@ -622,6 +638,7 @@ export const useChatStream = () => {
     loadConversation,
     resetConversation,
     clearError,
+    clearAutoThreadFlag,
     setMessages,
   };
 };

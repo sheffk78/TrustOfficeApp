@@ -48,7 +48,7 @@ const CRITERION_SUGGESTIONS = {
   },
 };
 
-const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversations, conversationsLoading, onConversationDelete, onSendSuggestion }) => {
+const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversations, conversationsLoading, onConversationDelete, onSendSuggestion, conversationId, onNewChat }) => {
   const { selectedTrust } = useAuth();
   const [healthData, setHealthData] = useState(null);
   const [healthLoading, setHealthLoading] = useState(true);

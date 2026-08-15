@@ -300,16 +300,15 @@ const ChatPanel = ({
       {/* Input bar — always visible */}
       <div className="chat-input-bar border-t border-navy/10 bg-background">
         <div className="chat-input-wrapper max-w-3xl mx-auto w-full flex items-end gap-3">
-          {/* New chat button — only show when there's an active conversation */}
-          {hasUserMessages && !loading && onNewChat && (
-            <button
-              onClick={onNewChat}
-              className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors flex-shrink-0 mb-1"
-              title="Start new chat"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          )}
+          {/* New chat button — always visible */}
+          <button
+            onClick={onNewChat}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono font-medium text-navy/70 hover:text-navy hover:bg-navy/5 active:bg-navy/10 transition-colors border border-navy/10 hover:border-navy/20 rounded"
+            title="Start new conversation"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Conversation</span>
+          </button>
 
           {/* Paperclip — opens file upload card */}
           <button
