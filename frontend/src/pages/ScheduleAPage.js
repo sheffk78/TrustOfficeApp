@@ -193,7 +193,7 @@ export default function ScheduleAPage() {
         }
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to save asset (${response.status})`), { operation: 'save', page: 'ScheduleA' });
+        showError(toast, errBody || { detail: `Failed to save asset (${response.status})` }, { operation: 'save', page: 'ScheduleA' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'ScheduleA' });
@@ -215,7 +215,7 @@ export default function ScheduleAPage() {
         loadSummary();
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || 'Failed to delete asset'), { operation: 'delete', page: 'ScheduleA' });
+        showError(toast, errBody || { detail: 'Failed to delete asset' }, { operation: 'delete', page: 'ScheduleA' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'delete', page: 'ScheduleA' });
@@ -296,7 +296,7 @@ export default function ScheduleAPage() {
           loadSummary();
         } else {
           const errBody = await response.json().catch(() => ({}));
-          showError(toast, new Error(errBody.detail || 'Failed to dispose asset'), { operation: 'dispose', page: 'ScheduleA' });
+          showError(toast, errBody || { detail: 'Failed to dispose asset' }, { operation: 'dispose', page: 'ScheduleA' });
         }
       } catch (error) {
         showError(toast, error, { operation: 'dispose', page: 'ScheduleA' });

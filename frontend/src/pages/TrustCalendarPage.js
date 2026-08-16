@@ -173,7 +173,7 @@ export default function TrustCalendarPage() {
         loadEvents();
       } else {
         const errBody = await res.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || 'Failed to complete task'), { operation: 'complete', page: 'TrustCalendar' });
+        showError(toast, errBody || { detail: 'Failed to complete task' }, { operation: 'complete', page: 'TrustCalendar' });
       }
     } catch (e) {
       showError(toast, e, { operation: 'complete', page: 'TrustCalendar' });
@@ -188,7 +188,7 @@ export default function TrustCalendarPage() {
         loadEvents();
       } else {
         const errBody = await res.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || 'Failed to update task'), { operation: 'update', page: 'TrustCalendar' });
+        showError(toast, errBody || { detail: 'Failed to update task' }, { operation: 'update', page: 'TrustCalendar' });
       }
     } catch (e) {
       showError(toast, e, { operation: 'update', page: 'TrustCalendar' });
@@ -204,7 +204,7 @@ export default function TrustCalendarPage() {
         loadEvents();
       } else {
         const errBody = await res.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || 'Failed to delete task'), { operation: 'delete', page: 'TrustCalendar' });
+        showError(toast, errBody || { detail: 'Failed to delete task' }, { operation: 'delete', page: 'TrustCalendar' });
       }
     } catch (e) {
       showError(toast, e, { operation: 'delete', page: 'TrustCalendar' });
@@ -224,7 +224,7 @@ export default function TrustCalendarPage() {
         loadEvents();
       } else {
         const errBody = await res.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || 'Failed to update checklist'), { operation: 'update', page: 'TrustCalendar' });
+        showError(toast, errBody || { detail: 'Failed to update checklist' }, { operation: 'update', page: 'TrustCalendar' });
       }
     } catch (e) {
       showError(toast, e, { operation: 'update', page: 'TrustCalendar' });

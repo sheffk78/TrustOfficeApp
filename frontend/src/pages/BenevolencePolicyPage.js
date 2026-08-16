@@ -102,7 +102,7 @@ export default function BenevolencePolicyPage() {
         }),
       });
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Failed to create policy');
         return;
       }
@@ -122,7 +122,7 @@ export default function BenevolencePolicyPage() {
         body: JSON.stringify({ version_label: '', notes: '' }),
       });
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Failed to create amendment');
         return;
       }
@@ -142,7 +142,7 @@ export default function BenevolencePolicyPage() {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Failed to publish');
         return;
       }

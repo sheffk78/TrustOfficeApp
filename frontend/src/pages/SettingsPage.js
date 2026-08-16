@@ -459,7 +459,7 @@ export default function SettingsPage() {
         toast.success(checked ? 'Watermark hidden' : 'Watermark enabled');
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Update failed (${response.status})`), { operation: 'update', page: 'Settings' });
+        showError(toast, errBody || { detail: `Update failed (${response.status})` }, { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'update', page: 'Settings' });
@@ -483,7 +483,7 @@ export default function SettingsPage() {
         toast.success(newValue ? 'Admin access locked' : 'Admin access unlocked');
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Update failed (${response.status})`), { operation: 'update', page: 'Settings' });
+        showError(toast, errBody || { detail: `Update failed (${response.status})` }, { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'update', page: 'Settings' });
@@ -508,7 +508,7 @@ export default function SettingsPage() {
         // Revert on error — use functional updater to avoid stale closure
         setNotificationPrefs(prev => ({ ...prev, [key]: !value }));
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Update failed (${response.status})`), { operation: 'update', page: 'Settings' });
+        showError(toast, errBody || { detail: `Update failed (${response.status})` }, { operation: 'update', page: 'Settings' });
       }
     } catch (error) {
       setNotificationPrefs(prev => ({ ...prev, [key]: !value }));

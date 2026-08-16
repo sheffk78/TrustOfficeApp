@@ -174,7 +174,7 @@ export default function TrustAdminKitsPage() {
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.detail || 'Failed to delete');
+        throw errBody || { detail: 'Failed to delete' };
       }
       toast.success('Kit deleted');
       loadKits();

@@ -85,7 +85,7 @@ export default function EntityDetailPage() {
         setEntity(data);
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || 'Failed to save entity'), { operation: 'save', page: 'EntityDetail' });
+        showError(toast, errBody || { detail: 'Failed to save entity' }, { operation: 'save', page: 'EntityDetail' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'EntityDetail' });
@@ -107,7 +107,7 @@ export default function EntityDetailPage() {
         navigate('/structures?tab=entities');
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || 'Failed to delete entity'), { operation: 'delete', page: 'EntityDetail' });
+        showError(toast, errBody || { detail: 'Failed to delete entity' }, { operation: 'delete', page: 'EntityDetail' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'delete', page: 'EntityDetail' });

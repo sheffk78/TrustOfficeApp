@@ -128,7 +128,22 @@ export function extractErrorMessage(error) {
     if (typeof error.detail === 'string') return error.detail;
     if (error.detail?.message) return String(error.detail.message);
     if (error.detail?.msg) return String(error.detail.msg);
+    // FastAPI validation errors: array of { loc, msg, type }
+    if (Array.isArray(error.detail)) {
+      const msgs = error.detail
+        .map(e => e?.msg || (typeof e === 'string' ? e : JSON.stringify(e)))
+        .filter(Boolean);
+      if (msgs.length) return msgs.join('; ');
+    }
     try { return JSON.stringify(error.detail); } catch { /* fall through */ }
+  }
+
+  // FastAPI validation errors passed directly (not wrapped in { detail })
+  if (Array.isArray(error)) {
+    const msgs = error
+      .map(e => e?.msg || (typeof e === 'string' ? e : JSON.stringify(e)))
+      .filter(Boolean);
+    if (msgs.length) return msgs.join('; ');
   }
 
   // Last resort: try to stringify, but never return [object Object]

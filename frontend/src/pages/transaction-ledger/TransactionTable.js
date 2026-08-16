@@ -15,7 +15,8 @@ import { format, parseISO } from 'date-fns';
 import { classificationColors } from './constants';
 
 const safeFormat = (isoDate) => {
-  try { return format(parseISO(isoDate), 'MMM d, yyyy'); } catch { return isoDate; }
+  if (!isoDate) return '—';
+  try { return format(parseISO(isoDate), 'MMM d, yyyy'); } catch { return String(isoDate); }
 };
 
 export default function TransactionTable({

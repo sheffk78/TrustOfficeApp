@@ -180,7 +180,7 @@ export default function TransactionLedgerPage() {
       const res = await fetchWithAuth(`/transactions/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || 'Failed to delete transaction'), { operation: 'delete', page: 'TransactionLedger' });
+        showError(toast, errBody || { detail: 'Failed to delete transaction' }, { operation: 'delete', page: 'TransactionLedger' });
         return;
       }
       toast.success('Transaction deleted');

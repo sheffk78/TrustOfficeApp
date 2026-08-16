@@ -25,7 +25,7 @@ export function useBeneficiariesData(selectedTrust, onSummaryLoaded) {
         setOverviewData(await response.json());
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to load overview (${response.status})`), { operation: 'load', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Failed to load overview (${response.status})` }, { operation: 'load', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
@@ -46,7 +46,7 @@ export function useBeneficiariesData(selectedTrust, onSummaryLoaded) {
         return data;
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to load certificates (${response.status})`), { operation: 'load', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Failed to load certificates (${response.status})` }, { operation: 'load', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
@@ -186,7 +186,7 @@ export function useCertificateForm(selectedTrust, isReadOnly, showUpgradeModal, 
         loadOverviewData();
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to save certificate (${response.status})`), { operation: 'save', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Failed to save certificate (${response.status})` }, { operation: 'save', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'Beneficiaries' });
@@ -277,7 +277,7 @@ export function useTransferForm(selectedTrust, isReadOnly, showUpgradeModal, sum
         loadOverviewData();
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Transfer failed (${response.status})`), { operation: 'transfer_certificate', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Transfer failed (${response.status})` }, { operation: 'transfer_certificate', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'transfer_certificate', page: 'Beneficiaries' });
@@ -313,7 +313,7 @@ export function useRevoke(selectedTrust, loadCertificatesData, loadOverviewData)
         loadOverviewData();
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Revoke failed (${response.status})`), { operation: 'revoke', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Revoke failed (${response.status})` }, { operation: 'revoke', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'revoke', page: 'Beneficiaries' });
@@ -375,7 +375,7 @@ export function useSettings(selectedTrust, isReadOnly, showUpgradeModal, loadCer
         if (loadOverviewDataRef?.current) loadOverviewDataRef.current();
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to save settings (${response.status})`), { operation: 'save', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Failed to save settings (${response.status})` }, { operation: 'save', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'save', page: 'Beneficiaries' });
@@ -406,7 +406,7 @@ export function usePdfPreview() {
         setPdfPreview({ show: true, loading: false, data: data.pdf_base64, filename: data.filename });
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to load PDF (${response.status})`), { operation: 'load', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Failed to load PDF (${response.status})` }, { operation: 'load', page: 'Beneficiaries' });
         setPdfPreview({ show: false, loading: false, data: null, filename: '' });
       }
     } catch (error) {
@@ -461,7 +461,7 @@ export function useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal,
         loadOverviewData();
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to add Class Beneficiary (${response.status})`), { operation: 'add', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Failed to add Class Beneficiary (${response.status})` }, { operation: 'add', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'add', page: 'Beneficiaries' });
@@ -478,7 +478,7 @@ export function useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal,
         loadOverviewData();
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to remove Class Beneficiary (${response.status})`), { operation: 'remove', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Failed to remove Class Beneficiary (${response.status})` }, { operation: 'remove', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'remove', page: 'Beneficiaries' });
@@ -575,7 +575,7 @@ export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summa
         loadOverviewData();
       } else {
         const errBody = await response.json().catch(() => ({}));
-        showError(toast, new Error(errBody.detail || `Failed to add beneficiary (${response.status})`), { operation: 'add', page: 'Beneficiaries' });
+        showError(toast, errBody || { detail: `Failed to add beneficiary (${response.status})` }, { operation: 'add', page: 'Beneficiaries' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'add', page: 'Beneficiaries' });
