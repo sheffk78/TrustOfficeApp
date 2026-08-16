@@ -50,11 +50,18 @@ export default function LinkMinutesDialog({
                     <SelectValue placeholder="Choose a minutes document" />
                   </SelectTrigger>
                   <SelectContent>
-                    {minutesList.map((m) => (
+                    {minutesList.map((m) => {
+                      let dateLabel = 'No date';
+                      if (m.meeting_date) {
+                        try { dateLabel = format(parseISO(m.meeting_date), 'MMM d, yyyy'); }
+                        catch { dateLabel = m.meeting_date; }
+                      }
+                      return (
                       <SelectItem key={m.minutes_id} value={m.minutes_id}>
-                        {m.meeting_date ? format(parseISO(m.meeting_date), 'MMM d, yyyy') : 'No date'} — {m.minutes_type || 'Minutes'}
+                        {dateLabel} — {m.minutes_type || 'Minutes'}
                       </SelectItem>
-                    ))}
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
