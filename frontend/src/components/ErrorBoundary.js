@@ -31,6 +31,8 @@ class ErrorBoundary extends React.Component {
       {
         operation: 'react_render_error',
         page: window.location.pathname,
+        component_stack: errorInfo?.componentStack || null,
+        severity: 'major',
       }
     );
   }

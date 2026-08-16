@@ -43,6 +43,12 @@ function DirectionSelect({ value, onChange, testId }) {
  */
 function DateField({ value, onChange, testId, label = 'Date *' }) {
   const [open, setOpen] = useState(false);
+  // Safe date formatter — falls back to the raw value when parsing fails
+  // (prevents RangeError: Invalid time value from date-fns format()).
+  const safeFmt = (v) => {
+    try { return format(parseISO(v), 'MMM d, yyyy'); }
+    catch { return v || ''; }
+  };
   return (
     <div>
       <Label className="label-trust">{label}</Label>
@@ -50,13 +56,13 @@ function DateField({ value, onChange, testId, label = 'Date *' }) {
         <PopoverTrigger asChild>
           <Button variant="outline" className="w-full justify-start font-normal" data-testid={testId}>
             <CalendarIcon className="w-4 h-4 mr-2" />
-            {value ? format(parseISO(value), 'MMM d, yyyy') : 'Pick date'}
+            {value ? safeFmt(value) : 'Pick date'}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             mode="single"
-            selected={value ? parseISO(value) : undefined}
+            selected={value ? (() => { try { return parseISO(value); } catch { return undefined; } })() : undefined}
             onSelect={(d) => { if (d) { onChange(format(d, 'yyyy-MM-dd')); setOpen(false); } }}
           />
         </PopoverContent>
