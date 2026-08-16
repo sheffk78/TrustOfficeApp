@@ -92,7 +92,7 @@ export default function HealthDashboard() {
         setAlerts(healthData?.risk_findings || []);
       }
     } catch (error) {
-      showError(error);
+      showError(toast, error, { operation: 'load_health_dashboard', page: 'HealthDashboard', silent: true });
     } finally {
       setLoading(false);
     }

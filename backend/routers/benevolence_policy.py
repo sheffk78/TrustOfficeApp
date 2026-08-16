@@ -55,10 +55,10 @@ async def create_benevolence_policy(policy: BenevolencePolicyCreate, user: dict 
         created_by=user["user_id"],
     )
 
-    async with await client.start_session() as session:
-        async with session.start_transaction():
-            await db.benevolence_policies.insert_one(policy_doc, session=session)
-            await db.benevolence_policy_versions.insert_one(version_doc, session=session)
+    # Insert policy container and first version (sequential — Railway MongoDB
+    # is not a replica set, so transactions are not available).
+    await db.benevolence_policies.insert_one(policy_doc)
+    await db.benevolence_policy_versions.insert_one(version_doc)
 
     await log_audit_event(user["user_id"], "benevolence_policy_created", "benevolence_policy", policy_id, {
         "policy_id": policy_id,
@@ -191,51 +191,44 @@ async def publish_policy_version(
     policy_id = version["policy_id"]
 
     # Supersede currently published version, publish the new version, and update
-    # the policy container — all atomically so a crash can't leave the policy in
-    # a half-published state.
-    async with await client.start_session() as session:
-        async with session.start_transaction():
-            # Supersede currently published version
-            current_published = await db.benevolence_policy_versions.find_one(
-                {"policy_id": policy_id, "status": "published"},
-                {"_id": 0},
-                session=session,
-            )
-            if current_published:
-                await db.benevolence_policy_versions.update_one(
-                    {"policy_version_id": current_published["policy_version_id"]},
-                    {"$set": {"status": "superseded", "updated_at": now}},
-                    session=session,
-                )
+    # the policy container — sequential operations (Railway MongoDB is not a
+    # replica set, so transactions are not available).
+    current_published = await db.benevolence_policy_versions.find_one(
+        {"policy_id": policy_id, "status": "published"},
+        {"_id": 0},
+    )
+    if current_published:
+        await db.benevolence_policy_versions.update_one(
+            {"policy_version_id": current_published["policy_version_id"]},
+            {"$set": {"status": "superseded", "updated_at": now}},
+        )
 
-            # Build published version update
-            update_fields = {
-                "status": "published",
-                "published_at": now,
-                "updated_at": now,
-            }
-            if request.get("board_approval_date"):
-                update_fields["board_approval_date"] = request["board_approval_date"]
-            if request.get("board_approval_reference"):
-                update_fields["board_approval_reference"] = request["board_approval_reference"]
+    # Build published version update
+    update_fields = {
+        "status": "published",
+        "published_at": now,
+        "updated_at": now,
+    }
+    if request.get("board_approval_date"):
+        update_fields["board_approval_date"] = request["board_approval_date"]
+    if request.get("board_approval_reference"):
+        update_fields["board_approval_reference"] = request["board_approval_reference"]
 
-            await db.benevolence_policy_versions.update_one(
-                {"policy_version_id": policy_version_id},
-                {"$set": update_fields},
-                session=session,
-            )
+    await db.benevolence_policy_versions.update_one(
+        {"policy_version_id": policy_version_id},
+        {"$set": update_fields},
+    )
 
-            # Update policy container to point to this version
-            await db.benevolence_policies.update_one(
-                {"policy_id": policy_id},
-                {"$set": {
-                    "current_version_id": policy_version_id,
-                    "current_version_label": version["version_label"],
-                    "current_version_status": "published",
-                    "updated_at": now,
-                }},
-                session=session,
-            )
+    # Update policy container to point to this version
+    await db.benevolence_policies.update_one(
+        {"policy_id": policy_id},
+        {"$set": {
+            "current_version_id": policy_version_id,
+            "current_version_label": version["version_label"],
+            "current_version_status": "published",
+            "updated_at": now,
+        }},
+    )
 
     await log_audit_event(user["user_id"], "benevolence_policy_published", "benevolence_policy", policy_id, {
         "version_id": policy_version_id,
@@ -270,53 +263,48 @@ async def amend_policy(
         raise HTTPException(status_code=404, detail="No published version to amend from. Create a policy and publish it first.")
 
     # Count existing versions, insert the new draft, and update the policy
-    # container atomically — prevents the count_documents()+1 race condition
-    # where two concurrent amends could produce the same version_number.
-    async with await client.start_session() as session:
-        async with session.start_transaction():
-            # Count existing versions to determine next version number
-            version_count = await db.benevolence_policy_versions.count_documents(
-                {"policy_id": current_policy["policy_id"]},
-                session=session,
-            )
+    # container — sequential operations (Railway MongoDB is not a replica set,
+    # so transactions are not available).
+    version_count = await db.benevolence_policy_versions.count_documents(
+        {"policy_id": current_policy["policy_id"]},
+    )
 
-            now = datetime.now(timezone.utc).isoformat()
-            new_version_id = f"benpolv_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
+    new_version_id = f"benpolv_{uuid.uuid4().hex[:12]}"
 
-            # Copy all fields from published version, override with any new values from request
-            new_version = dict(published_version)
-            new_version["policy_version_id"] = new_version_id
-            new_version["version_number"] = version_count + 1
-            new_version["version_label"] = policy.version_label or f"{published_version['version_number'] + 1}.0"
-            new_version["status"] = "draft"
-            new_version["supersedes_version_id"] = published_version["policy_version_id"]
-            new_version["published_at"] = None
+    # Copy all fields from published version, override with any new values from request
+    new_version = dict(published_version)
+    new_version["policy_version_id"] = new_version_id
+    new_version["version_number"] = version_count + 1
+    new_version["version_label"] = policy.version_label or f"{published_version['version_number'] + 1}.0"
+    new_version["status"] = "draft"
+    new_version["supersedes_version_id"] = published_version["policy_version_id"]
+    new_version["published_at"] = None
 
-            # Override fields from the request
-            update_data = {k: v for k, v in policy.dict().items() if v is not None}
-            for key, value in update_data.items():
-                if isinstance(value, list) and value:
-                    new_version[key] = value
-                elif isinstance(value, str) and value:
-                    new_version[key] = value
+    # Override fields from the request
+    update_data = {k: v for k, v in policy.dict().items() if v is not None}
+    for key, value in update_data.items():
+        if isinstance(value, list) and value:
+            new_version[key] = value
+        elif isinstance(value, str) and value:
+            new_version[key] = value
 
-            new_version["created_at"] = now
-            new_version["updated_at"] = now
-            new_version["created_by"] = user["user_id"]
+    new_version["created_at"] = now
+    new_version["updated_at"] = now
+    new_version["created_by"] = user["user_id"]
 
-            await db.benevolence_policy_versions.insert_one(new_version, session=session)
+    await db.benevolence_policy_versions.insert_one(new_version)
 
-            # Update policy container to point to the new draft
-            await db.benevolence_policies.update_one(
-                {"policy_id": current_policy["policy_id"]},
-                {"$set": {
-                    "current_version_id": new_version_id,
-                    "current_version_label": new_version["version_label"],
-                    "current_version_status": "draft",
-                    "updated_at": now,
-                }},
-                session=session,
-            )
+    # Update policy container to point to the new draft
+    await db.benevolence_policies.update_one(
+        {"policy_id": current_policy["policy_id"]},
+        {"$set": {
+            "current_version_id": new_version_id,
+            "current_version_label": new_version["version_label"],
+            "current_version_status": "draft",
+            "updated_at": now,
+        }},
+    )
 
     await log_audit_event(user["user_id"], "benevolence_policy_amended", "benevolence_policy", current_policy["policy_id"], {
         "new_version_id": new_version_id,

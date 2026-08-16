@@ -120,7 +120,7 @@ export default function DeadlineDashboard() {
         setSummary(await sumRes.json());
       }
     } catch (error) {
-      showError(error);
+      showError(toast, error, { operation: 'load_deadlines', page: 'DeadlineDashboard', silent: true });
     } finally {
       setLoading(false);
     }
@@ -155,7 +155,7 @@ export default function DeadlineDashboard() {
       setForm({ title: '', category: 'compliance', due_date: '', priority: 'medium' });
       loadDeadlines();
     } catch (error) {
-      showError(error);
+      showError(toast, error, { operation: 'create_deadline', page: 'DeadlineDashboard', silent: true });
     } finally {
       setSaving(false);
     }
@@ -178,7 +178,7 @@ export default function DeadlineDashboard() {
       );
       loadDeadlines();
     } catch (error) {
-      showError(error);
+      showError(toast, error, { operation: 'deadline_action', page: 'DeadlineDashboard', silent: true });
     }
   };
 
@@ -193,7 +193,7 @@ export default function DeadlineDashboard() {
       toast.success(`Generated ${data.created_count ?? data.created ?? 0} deadlines`);
       loadDeadlines();
     } catch (error) {
-      showError(error);
+      showError(toast, error, { operation: 'auto_generate_deadlines', page: 'DeadlineDashboard', silent: true });
     } finally {
       setAutoGenLoading(false);
     }

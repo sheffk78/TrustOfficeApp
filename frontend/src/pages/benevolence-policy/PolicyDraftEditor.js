@@ -122,7 +122,7 @@ export function PolicyDraftEditor({ version, onSave, trustId }) {
       toast.success('Draft saved');
       onSave();
     } catch (err) {
-      showError(err);
+      showError(toast, err, { operation: 'save_policy_draft', page: 'BenevolencePolicy', silent: true });
     } finally {
       setSaving(false);
     }

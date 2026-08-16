@@ -66,7 +66,7 @@ export default function BenevolencePolicyPage() {
 
       if (summaryRes?.ok) setSummary(await summaryRes.json());
     } catch (err) {
-      showError(err);
+      showError(toast, err, { operation: 'load_benevolence_policy', page: 'BenevolencePolicy', silent: true });
     } finally {
       setLoading(false);
     }
@@ -109,7 +109,7 @@ export default function BenevolencePolicyPage() {
       loadData();
       setActiveTab('edit');
     } catch (err) {
-      showError(err);
+      showError(toast, err, { operation: 'create_benevolence_policy', page: 'BenevolencePolicy', silent: true });
     }
   };
 
@@ -129,7 +129,7 @@ export default function BenevolencePolicyPage() {
       await loadData();
       setActiveTab('edit');
     } catch (err) {
-      showError(err);
+      showError(toast, err, { operation: 'amend_benevolence_policy', page: 'BenevolencePolicy', silent: true });
     }
   };
 
@@ -149,7 +149,7 @@ export default function BenevolencePolicyPage() {
       loadData();
       setActiveTab('view');
     } catch (err) {
-      showError(err);
+      showError(toast, err, { operation: 'publish_benevolence_policy', page: 'BenevolencePolicy', silent: true });
     }
   };
 
