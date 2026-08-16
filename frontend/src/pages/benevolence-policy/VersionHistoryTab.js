@@ -1,5 +1,5 @@
 import React from 'react';
-import { format, parseISO } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 import { Clock, FileText, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -40,10 +40,10 @@ export function VersionHistoryTab({ versions, activeVersionId, onSelectVersion, 
                     <StatusBadge status={v.status} />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {v.effective_date ? format(parseISO(v.effective_date), 'MMM d, yyyy') : '—'}
+                    {safeFormatDate(v.effective_date, 'MMM d, yyyy', '—')}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {v.published_at ? format(parseISO(v.published_at), 'MMM d, yyyy') : '—'}
+                    {safeFormatDate(v.published_at, 'MMM d, yyyy', '—')}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {v.supersedes_version_id ? 'v' + getVersionLabel(versions, v.supersedes_version_id) : '—'}

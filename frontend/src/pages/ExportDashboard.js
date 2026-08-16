@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
-import { format, parseISO } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 import {
   Download,
   Archive,
@@ -354,7 +354,7 @@ export default function ExportDashboard() {
                           </div>
                           <div>
                             <p className="font-medium text-sm text-navy">
-                              Archive &middot; {format(parseISO(archive.created_at), 'MMM d, yyyy h:mm a')}
+                              Archive &middot; {safeFormatDate(archive.created_at, 'MMM d, yyyy h:mm a')}
                             </p>
                             <p className="text-xs text-muted-foreground font-mono">
                               {formatBytes(archive.size_bytes)}

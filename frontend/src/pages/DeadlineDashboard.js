@@ -25,7 +25,8 @@ import {
 import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { parseISO, differenceInDays } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 import {
   CalendarClock,
   Plus,
@@ -407,7 +408,7 @@ export default function DeadlineDashboard() {
                         <div className="flex items-center gap-4 flex-shrink-0">
                           <div className="text-right">
                             <p className="font-mono text-sm text-navy">
-                              {d.due_date ? format(parseISO(d.due_date), 'MMM d, yyyy') : '—'}
+                              {safeFormatDate(d.due_date, 'MMM d, yyyy', '—')}
                             </p>
                             <p className={`text-xs font-mono ${countdownClass(du)}`}>{countdownLabel(du)}</p>
                           </div>

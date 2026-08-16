@@ -9,6 +9,7 @@ import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { format, parseISO } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 import {
   FileText,
   Download,
@@ -221,7 +222,7 @@ export default function BeneficiaryReportPage() {
                           {report.trust_name || selectedTrust?.trust_name || 'Trust Report'}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Generated {format(parseISO(report.generated_at), 'MMM d, yyyy h:mm a')}
+                          Generated {safeFormatDate(report.generated_at, 'MMM d, yyyy h:mm a')}
                           {report.beneficiary_count != null && (
                             <> &middot; {report.beneficiary_count} beneficiar{report.beneficiary_count === 1 ? 'y' : 'ies'}</>
                           )}

@@ -12,6 +12,7 @@ import {
   FileText, ExternalLink, ChevronDown, Check
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 import { toast } from 'sonner';
 import PageHelpButton from '@/components/PageHelpButton';
 
@@ -124,7 +125,7 @@ export default function TaxCalendarPage() {
   const grouped = useMemo(() => {
     const byMonth = {};
     entries.forEach(e => {
-      const mo = format(parseISO(e.due_date), 'MMMM yyyy');
+      const mo = safeFormatDate(e.due_date, 'MMMM yyyy');
       if (!byMonth[mo]) byMonth[mo] = [];
       byMonth[mo].push(e);
     });

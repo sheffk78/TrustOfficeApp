@@ -235,6 +235,8 @@ async def _build_trust_doc(trust_id: str, user: dict, trust: TrustCreate, jurisd
         "review_cadence": trust.review_cadence,
         "benevolence_enabled": False,
         "tax_status": "private",
+        "benevolence_mission": None,
+        "determination_letter_date": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 

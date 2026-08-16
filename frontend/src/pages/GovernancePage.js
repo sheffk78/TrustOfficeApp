@@ -28,6 +28,7 @@ import EducationalPanel from '@/components/EducationalPanel';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { format, parseISO, subDays } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 
 export default function GovernancePage() {
   const { selectedTrust } = useAuth();
@@ -789,7 +790,7 @@ function HiddenInsightsPanel({ trustId }) {
               <div>
                 <p className="font-medium text-sm text-navy">{item.criterion_name}</p>
                 <p className="text-xs text-muted-foreground">
-                  Dismissed {format(parseISO(item.dismissed_at), 'MMM d, yyyy')}
+                  Dismissed {safeFormatDate(item.dismissed_at, 'MMM d, yyyy')}
                 </p>
               </div>
             </div>

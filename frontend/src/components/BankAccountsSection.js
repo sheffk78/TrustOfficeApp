@@ -12,7 +12,7 @@ import {
   Landmark, Plus, ChevronDown, ChevronRight, Loader2, Trash2,
   Building2, CreditCard, FileText
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 
 const ACCOUNT_TYPES = [
   'Checking',
@@ -268,7 +268,7 @@ export default function BankAccountsSection({ entityId }) {
                           .map(stmt => {
                             const badge = EXTRACTION_BADGE[stmt.extraction_status] || EXTRACTION_BADGE.pending;
                             const periodLabel = stmt.statement_period_start && stmt.statement_period_end
-                              ? `${format(parseISO(stmt.statement_period_start), 'MMM yyyy')} - ${format(parseISO(stmt.statement_period_end), 'MMM yyyy')}`
+                              ? `${safeFormatDate(stmt.statement_period_start, 'MMM yyyy')} - ${safeFormatDate(stmt.statement_period_end, 'MMM yyyy')}`
                               : 'Period unknown';
                             return (
                               <div key={stmt.statement_id} className="flex items-start gap-3 p-2 border border-navy/5 bg-white rounded">

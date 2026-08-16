@@ -42,7 +42,9 @@ import {
   DollarSign,
   Shield,
   Lock,
-  Unlock
+  Unlock,
+  Upload,
+  FileCheck
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -105,6 +107,11 @@ export default function SettingsPage() {
   });
   const [createTrustLoading, setCreateTrustLoading] = useState(false);
   
+  // Determination letter upload state
+  const [detLetterUploading, setDetLetterUploading] = useState(false);
+  const [detLetterFile, setDetLetterFile] = useState(null);
+  const detLetterFileRef = useRef(null);
+  
   // Referral state
   const [referralData, setReferralData] = useState(null);
   const [referralStats, setReferralStats] = useState(null);
@@ -118,6 +125,8 @@ export default function SettingsPage() {
     description: selectedTrust?.description || '',
     benevolence_enabled: selectedTrust?.benevolence_enabled || false,
     tax_status: selectedTrust?.tax_status || 'private',
+    benevolence_mission: selectedTrust?.benevolence_mission || '',
+    determination_letter_date: selectedTrust?.determination_letter_date || '',
     ein: selectedTrust?.ein || '',
     state_code: selectedTrust?.state_code || '',
     start_date: selectedTrust?.start_date || '',
@@ -255,6 +264,8 @@ export default function SettingsPage() {
         description: selectedTrust.description || '',
         benevolence_enabled: selectedTrust.benevolence_enabled || false,
         tax_status: selectedTrust.tax_status || 'private',
+        benevolence_mission: selectedTrust.benevolence_mission || '',
+        determination_letter_date: selectedTrust.determination_letter_date || '',
         ein: selectedTrust.ein || '',
         state_code: selectedTrust.state_code || '',
         start_date: selectedTrust.start_date || '',
@@ -570,6 +581,37 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDetLetterUpload = async () => {
+    if (!selectedTrust || !detLetterFile) return;
+    setDetLetterUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', detLetterFile);
+      formData.append('title', 'IRS Determination Letter');
+      formData.append('category', 'irs_determination');
+      if (trustData.determination_letter_date) formData.append('date', trustData.determination_letter_date);
+      formData.append('tags', '501c3,irs,determination');
+
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE}/api/trusts/${selectedTrust.trust_id}/vault/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Upload failed');
+      }
+      toast.success('IRS Determination Letter uploaded to vault');
+      setDetLetterFile(null);
+      if (detLetterFileRef.current) detLetterFileRef.current.value = '';
+    } catch (e) {
+      toast.error(e.message || 'Failed to upload determination letter');
+    } finally {
+      setDetLetterUploading(false);
+    }
+  };
+
   const handleUpdateTrust = async () => {
     if (!selectedTrust) {
       toast.error('No trust selected');
@@ -867,21 +909,82 @@ export default function SettingsPage() {
                     />
                   </div>
                   {trustData.benevolence_enabled && (
-                    <div className="mt-4 pl-8">
-                      <Label className="label-trust">Tax Status</Label>
-                      <Select 
-                        value={trustData.tax_status} 
-                        onValueChange={(value) => setTrustData({ ...trustData, tax_status: value })}
-                      >
-                        <SelectTrigger className="mt-1 input-trust max-w-xs" data-testid="tax-status-select">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="501c3">501(c)(3) Organization</SelectItem>
-                          <SelectItem value="508">508 Church/Religious Org</SelectItem>
-                          <SelectItem value="private">Private Foundation</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="mt-4 pl-8 space-y-4">
+                      <div>
+                        <Label className="label-trust">Tax Status</Label>
+                        <Select 
+                          value={trustData.tax_status} 
+                          onValueChange={(value) => setTrustData({ ...trustData, tax_status: value })}
+                        >
+                          <SelectTrigger className="mt-1 input-trust max-w-xs" data-testid="tax-status-select">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="501c3">501(c)(3) Organization</SelectItem>
+                            <SelectItem value="508">508 Church/Religious Org</SelectItem>
+                            <SelectItem value="private">Private Foundation</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="label-trust">Mission Statement</Label>
+                        <Textarea
+                          value={trustData.benevolence_mission}
+                          onChange={(e) => setTrustData({ ...trustData, benevolence_mission: e.target.value })}
+                          className="mt-1 input-trust min-h-[80px]"
+                          placeholder="The trust's charitable mission — e.g., 'To provide benevolence for medical, housing, and educational needs of individuals in financial hardship.'"
+                          data-testid="settings-benevolence-mission"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This mission governs which benevolence requests qualify. It appears on the benevolence report PDF.
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="label-trust">IRS Determination Letter Date</Label>
+                        <Input
+                          type="date"
+                          value={trustData.determination_letter_date}
+                          onChange={(e) => setTrustData({ ...trustData, determination_letter_date: e.target.value })}
+                          className="mt-1 input-trust max-w-xs"
+                          data-testid="settings-determination-letter-date"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          The date the IRS issued the 501(c)(3) determination letter.
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="label-trust">IRS Determination Letter</Label>
+                        <div className="flex items-center gap-3 mt-1">
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            ref={detLetterFileRef}
+                            onChange={(e) => setDetLetterFile(e.target.files[0])}
+                            className="text-sm"
+                            data-testid="settings-determination-letter-upload"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleDetLetterUpload}
+                            disabled={!detLetterFile || detLetterUploading}
+                            data-testid="settings-determination-letter-upload-btn"
+                          >
+                            {detLetterUploading ? (
+                              <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Uploading...</>
+                            ) : (
+                              <><Upload className="w-4 h-4 mr-1" />Upload to Vault</>
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Upload the IRS determination letter (PDF or image). Stored securely in the Trust Document Vault.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -1113,6 +1113,31 @@ def _fmt_class_beneficiaries(items: list) -> str:
     )
 
 
+def _fmt_benevolence_policy(policy: Optional[dict], summary: Optional[dict]) -> str:
+    """Format benevolence policy context for the AI assistant."""
+    if not policy:
+        return "No benevolence policy on file."
+    lines = []
+    v = policy.get("current_version", {})
+    lines.append(f"- Policy Status: {policy.get('current_version_status', 'unknown')} (version {v.get('version_label', '?')})")
+    lines.append(f"- Charitable Class: {v.get('charitable_class', 'Not specified')}")
+    if v.get("per_recipient_annual_limit"):
+        lines.append(f"- Per-Recipient Annual Limit: ${v['per_recipient_annual_limit']:,.2f}")
+    if v.get("approval_threshold"):
+        lines.append(f"- Approval Threshold: ${v['approval_threshold']:,.2f}")
+    ats = v.get("assistance_types", [])
+    if ats:
+        allowed = [a for a in ats if a.get("is_allowed")]
+        excluded = [a for a in ats if not a.get("is_allowed")]
+        if allowed:
+            lines.append(f"- Allowed Types: {', '.join(a.get('purpose','') for a in allowed)}")
+        if excluded:
+            lines.append(f"- Excluded Types: {', '.join(a.get('purpose','') for a in excluded)}")
+    if summary:
+        lines.append(f"- Records: {summary.get('total_count', 0)} grants, ${summary.get('total_amount', 0):,.2f} total")
+    return "\n".join(lines)
+
+
 def _fmt_entities(items: list) -> str:
     """Format entities as brief one-liners."""
     if not items:
@@ -1361,6 +1386,9 @@ Defensibility Score: {health.get('total', 0)}/{health.get('max_score', 115)} ({h
 
 ## Class Beneficiaries
 {_fmt_class_beneficiaries(ctx.get('class_beneficiaries', []))}
+
+## Benevolence Policy
+{_fmt_benevolence_policy(ctx.get('benevolence_policy', None), ctx.get('benevolence_summary', None))}
 
 ## Entities (Structures)
 {_fmt_entities(ctx.get('entities', []))}

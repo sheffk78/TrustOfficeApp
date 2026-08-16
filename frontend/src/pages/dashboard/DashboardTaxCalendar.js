@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CalendarDays, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { format, parseISO } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 
 // Determine the status badge text for a tax deadline
 function getDeadlineStatusText(d) {
@@ -28,7 +28,7 @@ function getDeadlineSubtitle(d, overdue) {
   if (d.days_remaining <= 30) {
     return <p className="text-xs text-warning">Due in {d.days_remaining} days</p>;
   }
-  return <p className="text-xs text-muted-foreground">Due {format(parseISO(d.due_date), 'MMMM d, yyyy')}</p>;
+  return <p className="text-xs text-muted-foreground">Due {safeFormatDate(d.due_date, 'MMMM d, yyyy')}</p>;
 }
 
 function DeadlineRow({ d }) {
@@ -37,8 +37,8 @@ function DeadlineRow({ d }) {
     <div key={d.entry_id} className={`flex items-center justify-between p-3 border ${overdue ? 'border-error/20 bg-error/5' : 'border-navy/10'} rounded`}>
       <div className="flex items-center gap-3">
         <div className="flex flex-col items-center min-w-[48px]">
-          <div className="text-[10px] font-medium text-neutral-500 uppercase">{format(parseISO(d.due_date), 'MMM')}</div>
-          <div className={`text-lg font-bold ${overdue ? 'text-error' : 'text-navy'}`}>{format(parseISO(d.due_date), 'd')}</div>
+          <div className="text-[10px] font-medium text-neutral-500 uppercase">{safeFormatDate(d.due_date, 'MMM')}</div>
+          <div className={`text-lg font-bold ${overdue ? 'text-error' : 'text-navy'}`}>{safeFormatDate(d.due_date, 'd')}</div>
         </div>
         <div>
           <p className="font-medium text-sm text-navy">{d.description}</p>
@@ -57,7 +57,7 @@ function AllNotRequiredState({ taxDeadlines }) {
     const upcoming = taxDeadlines.find(
       d => d.filing_status !== 'not_required' && d.filing_status !== 'filed'
     );
-    return upcoming ? format(parseISO(upcoming.due_date), 'MMMM yyyy') : 'the upcoming tax year';
+    return upcoming ? safeFormatDate(upcoming.due_date, 'MMMM yyyy') : 'the upcoming tax year';
   })();
 
   return (

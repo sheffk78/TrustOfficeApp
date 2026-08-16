@@ -269,6 +269,48 @@ async def gather_risk_findings(
             "deeplink": "/settings",
         })
 
+    # === BENEVOLENCE POLICY RISK ===
+    if is_benevolence:
+        policy = await db.benevolence_policies.find_one(
+            {"trust_id": trust_id, "user_id": trust.get("user_id")},
+            {"_id": 0}
+        )
+        if not policy:
+            risks.append({
+                "type": "no_benevolence_policy",
+                "severity": "high",
+                "title": "No written benevolence policy on file",
+                "detail": "IRS requires a written policy defining eligibility criteria, charitable class, and approval processes for benevolence programs.",
+                "action": "Create a written benevolence policy",
+                "module": "benevolence",
+                "deeplink": "/benevolence/policy",
+            })
+        elif policy.get("current_version_status") == "draft":
+            risks.append({
+                "type": "policy_not_published",
+                "severity": "medium",
+                "title": "Benevolence policy draft not yet published",
+                "detail": f"Policy version {policy.get('current_version_label')} is in draft status. Publish it after board approval.",
+                "action": "Review and publish the policy draft",
+                "module": "benevolence",
+                "deeplink": "/benevolence/policy",
+            })
+        else:
+            unlinked_count = await db.benevolence_records.count_documents({
+                "trust_id": trust_id,
+                "policy_version_id": {"$in": [None, ""]},
+            })
+            if unlinked_count > 0:
+                risks.append({
+                    "type": "records_without_policy",
+                    "severity": "low",
+                    "title": f"{unlinked_count} benevolence record(s) not linked to a policy version",
+                    "detail": "Records created before the policy was established are not linked to a specific policy version.",
+                    "action": "Review historical records for policy compliance",
+                    "module": "benevolence",
+                    "deeplink": "/benevolence",
+                })
+
     return risks
 
 

@@ -18,7 +18,8 @@ import {
   Info, ChevronDown, ChevronUp,
   Printer, Trash2, Link2
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 import { PolicyViewTab } from '@/pages/benevolence-policy/PolicyViewTab';
 import { PolicyDraftEditor } from '@/pages/benevolence-policy/PolicyDraftEditor';
 import { VersionHistoryTab } from '@/pages/benevolence-policy/VersionHistoryTab';
@@ -218,7 +219,7 @@ export default function BenevolencePolicyPage() {
               </span>
               {activeVersion?.published_at && (
                 <span className="text-sm text-gray-500">
-                  Published {format(parseISO(activeVersion.published_at), 'MMM d, yyyy')}
+                  Published {safeFormatDate(activeVersion.published_at, 'MMM d, yyyy')}
                 </span>
               )}
             </div>

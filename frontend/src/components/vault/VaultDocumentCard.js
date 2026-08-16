@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDate';
 import {
   File, ExternalLink, Download, Trash2, Copy, Check, Bot,
 } from 'lucide-react';
@@ -86,7 +86,7 @@ export default function VaultDocumentCard({
           <span className="text-xs text-muted-foreground">No link</span>
         )}
         <span className="text-[10px] text-muted-foreground">
-          {doc.date ? format(parseISO(doc.date), 'MMM d, yyyy') : ''}
+          {safeFormatDate(doc.date, 'MMM d, yyyy', '')}
         </span>
       </div>
       {/* AI CTA — Summarize this document */}
@@ -102,7 +102,7 @@ export default function VaultDocumentCard({
       </div>
       {doc.needs_renewal && doc.expiration_date && (
         <div className="mt-2 text-[10px] text-warning bg-warning/5 border border-warning/10 rounded px-2 py-1">
-          Renews {format(parseISO(doc.expiration_date), 'MMM d, yyyy')}
+          Renews {safeFormatDate(doc.expiration_date, 'MMM d, yyyy')}
         </div>
       )}
     </div>
