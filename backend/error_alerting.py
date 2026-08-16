@@ -26,12 +26,16 @@ routers/error_reports.py), which calls `report_error` with the client payload.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import os
 import time
 import traceback
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, TYPE_CHECKING
+
+import httpx
 
 from discord_service import notify_alert
 from database import db
@@ -92,6 +96,112 @@ def _is_duplicate(fingerprint: str) -> bool:
     _ALERT_CACHE[fingerprint] = now
     _prune_cache()
     return False
+
+
+# ---------------------------------------------------------------------------
+# Stale-bundle detection
+# ---------------------------------------------------------------------------
+
+# The current deployed frontend bundle hash. Set via env var so Railway can
+# inject it at deploy time. When set, frontend errors with a different bundle
+# hash in their stack trace are silently suppressed (the user's browser is
+# caching an old JS bundle — the fix is already live, they just need a refresh).
+_CURRENT_BUNDLE_HASH = os.environ.get("FRONTEND_BUNDLE_HASH", "").strip()
+
+import re as _re
+_BUNDLE_HASH_RE = _re.compile(r"main\.([a-f0-9]+)\.js")
+
+
+def _extract_bundle_hash(stack_trace: str) -> str:
+    """Extract the frontend bundle hash from a stack trace, if present."""
+    if not stack_trace:
+        return ""
+    m = _BUNDLE_HASH_RE.search(stack_trace)
+    return m.group(1) if m else ""
+
+
+def _is_stale_bundle(stack_trace: str) -> bool:
+    """True if the error came from an old (non-current) frontend bundle."""
+    if not _CURRENT_BUNDLE_HASH:
+        return False  # Can't determine — don't suppress
+    bundle = _extract_bundle_hash(stack_trace)
+    if not bundle:
+        return False  # No bundle hash in stack — server error or non-JS error
+    return bundle != _CURRENT_BUNDLE_HASH
+
+
+# ---------------------------------------------------------------------------
+# Hermes webhook trigger (autonomous agent)
+# ---------------------------------------------------------------------------
+
+_HERMES_WEBHOOK_URL = os.environ.get(
+    "HERMES_WEBHOOK_URL",
+    "https://to-hook.agentictrust.app/webhooks/trustoffice-error",
+).strip()
+_HERMES_WEBHOOK_SECRET = os.environ.get(
+    "HERMES_WEBHOOK_SECRET",
+    "to-err-webhook-2026",
+).strip()
+
+
+def _build_hermes_payload(
+    *,
+    source: str,
+    error_type: str,
+    error_message: str,
+    traceback_str: Optional[str],
+    request_path: Optional[str],
+    user_id: Optional[str],
+    fingerprint: str,
+    bundle_hash: str,
+    extra_context: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Build the JSON payload for the Hermes webhook."""
+    _ctx = extra_context or {}
+    return {
+        "error_type": error_type,
+        "error_message": error_message[:1000] if error_message else "",
+        "location": request_path or _ctx.get("location") or "",
+        "failing_operation": _ctx.get("operation") or error_type,
+        "stack": (traceback_str or "")[:3000],
+        "fingerprint": fingerprint,
+        "bundle_hash": bundle_hash,
+        "user_id": user_id or "None",
+        "source": source,
+    }
+
+
+def _compute_hmac_signature(payload_bytes: bytes, secret: str) -> str:
+    """Compute HMAC-SHA256 signature for the webhook payload."""
+    import hmac as _hmac
+    return _hmac.new(
+        secret.encode("utf-8"), payload_bytes, hashlib.sha256
+    ).hexdigest()
+
+
+async def _trigger_hermes_agent(payload: Dict[str, Any]) -> bool:
+    """POST to the Hermes webhook to trigger an autonomous agent run.
+
+    Returns True if the webhook was called successfully, False on any failure.
+    Never raises — webhook failure must not crash the request path.
+    """
+    if not _HERMES_WEBHOOK_URL:
+        return False
+    try:
+        payload_bytes = json.dumps(payload).encode("utf-8")
+        signature = _compute_hmac_signature(payload_bytes, _HERMES_WEBHOOK_SECRET)
+        headers = {
+            "Content-Type": "application/json",
+            "X-Hermes-Signature": f"sha256={signature}",
+        }
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                _HERMES_WEBHOOK_URL, content=payload_bytes, headers=headers
+            )
+        return resp.status_code in (200, 202)
+    except Exception as exc:
+        logger.warning(f"Failed to trigger Hermes webhook: {exc}")
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -278,10 +388,46 @@ async def report_error(
     title_prefix = "🚨 Server Error" if source == "server" else "⚠️ Frontend Error"
     title = f"{title_prefix}: {error_type}"
 
-    # Ping Kit (Hermes bot) for actionable errors so the agent is automatically
-    # triggered to investigate and fix — no cron or polling needed.
-    # Only ping for real errors (server errors + frontend render errors),
-    # not for suppressed/noise errors where alert=False.
+    # --- Trigger autonomous agent or send Discord alert ---
+    # Extract bundle hash for stale-bundle detection
+    bundle_hash = _extract_bundle_hash(traceback_str or "")
+
+    # Suppress alerts for stale-bundle errors (user's browser is caching old JS)
+    if source == "frontend" and _is_stale_bundle(traceback_str or ""):
+        logger.info(f"Suppressed stale-bundle error (bundle={bundle_hash}, current={_CURRENT_BUNDLE_HASH})")
+        return {"alerted": False, "duplicate": False, "fingerprint": fp, "stale_bundle": True}
+
+    # Trigger Hermes autonomous agent for real errors (no Discord ping needed)
+    if alert and source in ("server", "frontend"):
+        hermes_payload = _build_hermes_payload(
+            source=source,
+            error_type=error_type,
+            error_message=error_message,
+            traceback_str=traceback_str,
+            request_path=request_path,
+            user_id=user_id,
+            fingerprint=fp,
+            bundle_hash=bundle_hash,
+            extra_context=extra_context,
+        )
+        # Fire-and-forget — don't block the response on the webhook call
+        triggered = await _trigger_hermes_agent(hermes_payload)
+        if triggered:
+            # Still send a silent Discord log (no @Kit ping) for visibility
+            try:
+                await notify_alert(
+                    title=title,
+                    message="\n".join(parts),
+                    color=ERROR_COLOR,
+                    ping_kit=False,
+                )
+            except Exception:
+                pass  # Discord is secondary — the webhook is primary
+            return {"alerted": True, "duplicate": False, "fingerprint": fp, "hermes_triggered": True}
+        # If webhook failed, fall through to Discord alert with ping as fallback
+        logger.warning("Hermes webhook failed — falling back to Discord ping")
+
+    # Fallback: Discord alert (with Kit ping if it's a real error)
     should_ping_kit = alert and source in ("server", "frontend")
 
     try:
