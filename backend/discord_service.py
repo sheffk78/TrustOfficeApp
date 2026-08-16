@@ -141,12 +141,24 @@ async def notify_lead_stage_change(
 async def notify_alert(
     title: str,
     message: str,
-    color: int = RUST
+    color: int = RUST,
+    ping_kit: bool = False,
 ) -> Dict[str, Any]:
-    """Send an alert to the alerts Discord channel (or leads channel as fallback)."""
+    """Send an alert to the alerts Discord channel (or leads channel as fallback).
+
+    If ping_kit is True, prepends a mention of the Kit bot so Hermes triggers
+    the agent to investigate and fix the error automatically — no cron or
+    polling needed, the webhook mention IS the trigger.
+    """
     webhook_url = DISCORD_ALERTS_WEBHOOK_URL or DISCORD_LEADS_WEBHOOK_URL
     if not webhook_url:
         return {"success": False, "error": "Not configured"}
+
+    # Kit bot user ID — mentioning triggers Hermes to investigate automatically
+    KIT_BOT_ID = "1488210610893230160"
+    content = f"**{title}**"
+    if ping_kit:
+        content = f"<@{KIT_BOT_ID}> {content}"
 
     embed = {
         "title": title,
@@ -158,6 +170,6 @@ async def notify_alert(
 
     return await send_discord_message(
         webhook_url=webhook_url,
-        content=f"**{title}**",
+        content=content,
         embeds=[embed]
     )

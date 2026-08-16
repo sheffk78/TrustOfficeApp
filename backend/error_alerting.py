@@ -214,7 +214,7 @@ async def report_error(
         "stack_trace": (traceback_str or "")[:8000] if traceback_str else None,
         "url": (_ctx.get("location") or request_path or "")[:1000] or None,
         "user_agent": (_ctx.get("user_agent") or "")[:500] or None,
-        "component_stack": None,
+        "component_stack": (_ctx.get("component_stack") or "")[:4000] or None,
         "boundary": False,
         "metadata": {
             "source": source,
@@ -278,11 +278,18 @@ async def report_error(
     title_prefix = "🚨 Server Error" if source == "server" else "⚠️ Frontend Error"
     title = f"{title_prefix}: {error_type}"
 
+    # Ping Kit (Hermes bot) for actionable errors so the agent is automatically
+    # triggered to investigate and fix — no cron or polling needed.
+    # Only ping for real errors (server errors + frontend render errors),
+    # not for suppressed/noise errors where alert=False.
+    should_ping_kit = alert and source in ("server", "frontend")
+
     try:
         await notify_alert(
             title=title,
             message="\n".join(parts),
             color=ERROR_COLOR,
+            ping_kit=should_ping_kit,
         )
         return {"alerted": True, "duplicate": False, "fingerprint": fp}
     except Exception as exc:
