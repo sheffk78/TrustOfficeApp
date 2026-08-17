@@ -65,7 +65,7 @@ export default function SettingsPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, setUser, selectedTrust, setSelectedTrust, loadTrusts } = useAuth();
+  const { user, setUser, selectedTrust, setSelectedTrust, loadTrusts, isReadOnly } = useAuth();
   const [loading, setLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -618,6 +618,18 @@ export default function SettingsPage() {
       return;
     }
 
+    // Read-only guard: don't attempt API call if subscription is inactive
+    if (isReadOnly) {
+      toast.error('Subscription required', {
+        description: 'Your subscription is inactive. Please subscribe to save changes.',
+        action: {
+          label: 'Subscribe',
+          onClick: () => navigate('/settings/billing')
+        }
+      });
+      return;
+    }
+
     // Auto-compute is_fiscal_year from the date
     const month = Number(trustData.tax_year_end_month);
     const day = Number(trustData.tax_year_end_day);
@@ -641,8 +653,9 @@ export default function SettingsPage() {
       });
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to update trust. Please try again.');
+        // Extract the real error message from the API response
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to update trust. Please try again.');
       }
 
       const updatedTrust = await response.json();
@@ -1137,9 +1150,15 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-navy/10 mt-6">
+                  {isReadOnly && (
+                    <p className="text-sm text-amber-600 flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4" />
+                      Subscribe to save changes
+                    </p>
+                  )}
                   <Button
                     onClick={handleUpdateTrust}
-                    disabled={loading}
+                    disabled={loading || isReadOnly}
                     className="btn-primary"
                     data-testid="save-trust-profile-btn"
                   >
@@ -1476,9 +1495,15 @@ export default function SettingsPage() {
                 {/* Save button for People tab */}
                 {selectedTrust && (
                   <div className="flex items-center justify-end pt-4 border-t border-navy/10">
+                    {isReadOnly && (
+                      <p className="text-sm text-amber-600 mr-auto flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4" />
+                        Subscribe to save changes
+                      </p>
+                    )}
                     <Button
                       onClick={handleUpdateTrust}
-                      disabled={loading}
+                      disabled={loading || isReadOnly}
                       className="btn-primary"
                       data-testid="save-people-settings"
                     >
@@ -1563,9 +1588,15 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-navy/10">
+                  {isReadOnly && (
+                    <p className="text-sm text-amber-600 flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4" />
+                      Subscribe to save changes
+                    </p>
+                  )}
                   <Button
                     onClick={handleUpdateTrust}
-                    disabled={loading}
+                    disabled={loading || isReadOnly}
                     className="btn-primary"
                     data-testid="save-trust-settings"
                   >
