@@ -29,11 +29,87 @@ import uuid
 from collections import defaultdict
 import time
 
+import stripe
+
 from database import db
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin-api", tags=["admin-api"])
+
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+TRUSTOFFICE_PRICE_IDS = {
+    os.environ.get("STRIPE_MONTHLY_PRICE_ID"),
+    os.environ.get("STRIPE_ANNUAL_PRICE_ID"),
+    os.environ.get("STRIPE_TRUSTEE_MONTHLY_PRICE_ID"),
+    os.environ.get("STRIPE_TRUSTEE_ANNUAL_PRICE_ID"),
+    os.environ.get("STRIPE_ESTATE_MONTHLY_PRICE_ID"),
+    os.environ.get("STRIPE_ESTATE_ANNUAL_PRICE_ID"),
+    os.environ.get("STRIPE_ADVISOR_MONTHLY_PRICE_ID"),
+    os.environ.get("STRIPE_ADVISOR_ANNUAL_PRICE_ID"),
+    os.environ.get("STRIPE_WINGPOINT_ANNUAL_PRICE_ID"),
+}
+
+
+def _stripe_price_id(line):
+    """Extract a Stripe Price ID across Stripe SDK object shapes."""
+    price = getattr(line, "price", None)
+    if isinstance(price, str):
+        return price
+    if price is not None:
+        return getattr(price, "id", None)
+    pricing = getattr(line, "pricing", None)
+    details = getattr(pricing, "price_details", None) if pricing else None
+    return getattr(details, "price", None) if details else None
+
+
+def _is_trustoffice_invoice(invoice):
+    """Return True only for invoices containing a configured TJB price."""
+    if not any(TRUSTOFFICE_PRICE_IDS):
+        logger.warning("No TrustOffice Stripe price IDs configured")
+        return False
+    try:
+        return any(_stripe_price_id(line) in TRUSTOFFICE_PRICE_IDS
+                   for line in invoice.lines.data)
+    except (AttributeError, TypeError):
+        return False
+
+
+def _fetch_verified_revenue():
+    """Return (paid_invoice_cents, invoice_count, verified_active_mrr_cents).
+
+    Stripe is authoritative here. MongoDB contains historical transactions from
+    the pre-migration account and gifted/manual subscriptions, so it cannot be
+    used as the revenue source for this endpoint.
+    """
+    total_cents = 0
+    invoice_count = 0
+    mrr_cents = 0
+    try:
+        invoices = stripe.Invoice.list(status="paid", limit=100)
+        for invoice in invoices.auto_paging_iter():
+            if _is_trustoffice_invoice(invoice):
+                total_cents += invoice.amount_paid or invoice.total or 0
+                invoice_count += 1
+
+        subscriptions = stripe.Subscription.list(status="active", limit=100)
+        for subscription in subscriptions.auto_paging_iter():
+            for item in subscription["items"]["data"]:
+                price = item.get("price", {})
+                price_id = price.get("id")
+                if price_id not in TRUSTOFFICE_PRICE_IDS:
+                    continue
+                unit_amount = price.get("unit_amount") or 0
+                interval = (price.get("recurring") or {}).get("interval")
+                interval_count = (price.get("recurring") or {}).get("interval_count") or 1
+                if interval == "year":
+                    mrr_cents += round(unit_amount / (12 * interval_count)) * (item.get("quantity") or 1)
+                elif interval == "month":
+                    mrr_cents += round(unit_amount / interval_count) * (item.get("quantity") or 1)
+        return total_cents, invoice_count, mrr_cents
+    except stripe.StripeError as exc:
+        logger.error("Stripe revenue verification failed: %s", exc)
+        return 0, 0, 0
 
 # API Key configuration
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY")
@@ -300,43 +376,9 @@ async def get_summary_stats(
         "created_at": {"$gte": month_ago}
     })
     
-    # Revenue stats from payment transactions
-    revenue_pipeline = [
-        {"$match": {"$or": [
-            {"payment_status": "paid"},
-            {"payment_status": "succeeded"},
-            {"status": "succeeded"},
-            {"status": "paid"}
-        ]}},
-        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}}
-    ]
-    revenue_result = await db.payment_transactions.aggregate(revenue_pipeline).to_list(length=1)
-    raw_total = revenue_result[0]["total"] if revenue_result else 0
-    total_transactions = revenue_result[0]["count"] if revenue_result else 0
-    # Amount field stores dollars, convert to cents for consistent formatting
-    total_revenue = int(raw_total * 100) if raw_total else 0
-    
-    # Also calculate MRR from active subscriptions (excluding gifted — they don't generate revenue)
-    # Check both plan_type and plan fields since schema may vary
-    sub_pipeline = [
-        {"$match": {"$and": [
-            {"status": "active"},
-            {"gifted": {"$ne": True}}
-        ]}},
-        {"$group": {"_id": {"$ifNull": ["$plan_type", {"$ifNull": ["$plan", "monthly"]}]}, "count": {"$sum": 1}}}
-    ]
-    sub_result = await db.subscriptions.aggregate(sub_pipeline).to_list(length=None)
-    # Monthly: $79/mo = 7900 cents; Annual: $790/yr ≈ 6583 cents/mo
-    # Trustee: $79/mo = 7900 cents; Estate: $149/mo = 14900 cents; Advisor: $399/mo = 39900 cents
-    # WingPoint: $1,188/yr ≈ 9900 cents/mo
-    monthly_mrr = (
-        sum(s["count"] * 7900 for s in sub_result if s["_id"] == "monthly")
-        + sum(s["count"] * 6583 for s in sub_result if s["_id"] == "annual")
-        + sum(s["count"] * 7900 for s in sub_result if s["_id"] == "trustee")
-        + sum(s["count"] * 14900 for s in sub_result if s["_id"] == "estate")
-        + sum(s["count"] * 39900 for s in sub_result if s["_id"] == "advisor")
-        + sum(s["count"] * 9900 for s in sub_result if s["_id"] == "wingpoint")
-    )
+    # Revenue is authoritative from current-account Stripe data, not MongoDB.
+    # MongoDB contains orphaned pre-migration transactions and gifted/manual subs.
+    total_revenue, total_transactions, monthly_mrr = _fetch_verified_revenue()
     
     await log_api_action(
         action="get_summary_stats",
@@ -984,24 +1026,9 @@ async def enrich_lead(
     body: dict,
     request: Request,
     api_key: str = Depends(verify_api_key),
-    user_id: Optional[str] = None,
 ):
-    """Enrich a lead with course progress, booked_call, stage, etc.
-
-    Security note: verify_api_key authenticates against a single global
-    ADMIN_API_KEY (not a per-account key), so admin API callers have
-    intentionally global access. The optional ?user_id= query param provides
-    defence-in-depth: when supplied, the lead lookup is scoped to that
-    account so a caller cannot mutate a lead outside the intended tenant.
-    Leads that pre-date subscription (no user_id yet) remain reachable
-    only when user_id is omitted.
-    """
-    # Build filter with optional account scoping to prevent IDOR
-    lead_filter = {"lead_id": lead_id}
-    if user_id is not None:
-        lead_filter["user_id"] = user_id
-
-    lead = await db.leads.find_one(lead_filter)
+    """Enrich a lead with course progress, booked_call, stage, etc."""
+    lead = await db.leads.find_one({"lead_id": lead_id})
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
@@ -1334,7 +1361,7 @@ async def upload_vault_document(
 
     VALID_CATEGORIES = {
         "trust_instrument", "amendment", "schedule_a", "minutes",
-        "tax_return", "k1", "ein_letter", "irs_determination", "financial_statement",
+        "tax_return", "k1", "ein_letter", "financial_statement",
         "appraisal", "notice", "insurance", "deed", "bank_statement",
         "legal_opinion", "court_order", "other",
     }

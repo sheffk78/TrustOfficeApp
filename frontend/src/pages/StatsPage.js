@@ -15,7 +15,13 @@ import {
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
-  AlertTriangle
+  AlertTriangle,
+  Megaphone,
+  Share2,
+  Search,
+  Users as UsersIcon,
+  Wallet,
+  TrendingDown,
 } from 'lucide-react';
 
 const DATE_PRESETS = [
@@ -37,6 +43,9 @@ export default function StatsPage() {
   const [revenueData, setRevenueData] = useState(null);
   const [error, setError] = useState(null);
   const [preset, setPreset] = useState('last_30_days');
+  const [activeTab, setActiveTab] = useState('revenue');
+  const [expenseData, setExpenseData] = useState(null);
+  const [expenseLoading, setExpenseLoading] = useState(false);
 
   // Redirect if not stats user and not admin
   useEffect(() => {
@@ -75,6 +84,28 @@ export default function StatsPage() {
       fetchRevenueData();
     }
   }, [user, isStatsUser, fetchRevenueData]);
+
+  // Fetch expense data
+  const fetchExpenseData = useCallback(async () => {
+    setExpenseLoading(true);
+    try {
+      const response = await fetchWithAuth(`/stats/marketing-expenses?preset=all_time`);
+      if (response.ok) {
+        const data = await response.json();
+        setExpenseData(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch expense data:', err);
+    } finally {
+      setExpenseLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user && isStatsUser && activeTab === 'expenses' && !expenseData) {
+      fetchExpenseData();
+    }
+  }, [user, isStatsUser, activeTab, expenseData, fetchExpenseData]);
 
   const formatCurrency = (cents) => {
     if (!cents && cents !== 0) return '$0.00';
@@ -128,28 +159,58 @@ export default function StatsPage() {
             <div>
               <h1 className="page-title flex items-center gap-3">
                 <BarChart3 className="w-8 h-8 text-navy dark:text-white" />
-                Revenue Dashboard
+                Business Dashboard
               </h1>
-              <p className="page-subtitle">Revenue metrics and subscription analytics</p>
+              <p className="page-subtitle">Revenue, expenses, and profitability</p>
             </div>
             <div className="flex items-center gap-2">
               <PageHelpButton
                 items={[
                   { text: 'View revenue metrics, subscription analytics, and business performance' },
                   { text: 'Track MRR, ARR, paid customers, and revenue trends over time' },
+                  { text: 'Monitor marketing expenses by category and net profitability' },
                   { text: 'Filter by date range to analyze specific periods' },
                 ]}
                 taPrompt="Walk me through the Stats dashboard"
               />
               <button
-                onClick={fetchRevenueData}
+                onClick={() => {
+                  fetchRevenueData();
+                  if (activeTab === 'expenses') fetchExpenseData();
+                }}
                 className="btn-primary flex items-center gap-2"
-                disabled={loading}
+                disabled={loading || expenseLoading}
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${loading || expenseLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
             </div>
+          </div>
+
+          {/* Tab Switcher */}
+          <div className="flex gap-1 mb-6 border-b border-navy/10 dark:border-white/10">
+            <button
+              onClick={() => setActiveTab('revenue')}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'revenue'
+                  ? 'border-gold text-navy dark:text-white'
+                  : 'border-transparent text-muted-foreground hover:text-navy dark:hover:text-white'
+              }`}
+            >
+              <DollarSign className="w-4 h-4 inline mr-2" />
+              Revenue
+            </button>
+            <button
+              onClick={() => setActiveTab('expenses')}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'expenses'
+                  ? 'border-gold text-navy dark:text-white'
+                  : 'border-transparent text-muted-foreground hover:text-navy dark:hover:text-white'
+              }`}
+            >
+              <TrendingDown className="w-4 h-4 inline mr-2" />
+              Expenses
+            </button>
           </div>
 
           {/* Error state */}
@@ -197,9 +258,10 @@ export default function StatsPage() {
             )}
           </div>
 
-          {/* Revenue Metric Cards */}
-          {revenueData && (
+          {/* Revenue Tab */}
+          {activeTab === 'revenue' && revenueData && (
             <>
+              {/* Revenue Metric Cards */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
                 <div className="card-trust p-4" title="Gross revenue from all paid TrustOffice invoices (Stripe) in the selected date range">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -409,8 +471,137 @@ export default function StatsPage() {
             </>
           )}
 
+          {/* Expenses Tab */}
+          {activeTab === 'expenses' && (
+            <>
+              {expenseLoading && !expenseData ? (
+                <div className="flex items-center justify-center py-20">
+                  <RefreshCw className="w-8 h-8 animate-spin text-navy dark:text-white" />
+                </div>
+              ) : expenseData ? (
+                <>
+                  {/* P&L Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <DollarSign className="w-4 h-4 text-gold" />
+                        <span className="text-xs">Revenue (All Time)</span>
+                      </div>
+                      <p className="text-2xl font-bold text-navy dark:text-white">
+                        {revenueData ? revenueData.revenue_all_time_formatted : '—'}
+                      </p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <TrendingDown className="w-4 h-4 text-rust" />
+                        <span className="text-xs">Total Expenses</span>
+                      </div>
+                      <p className="text-2xl font-bold text-rust">
+                        {expenseData.total_expenses_formatted}
+                      </p>
+                    </div>
+                    <div className="card-trust p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                        <Wallet className="w-4 h-4 text-navy dark:text-white" />
+                        <span className="text-xs">Net P&amp;L</span>
+                      </div>
+                      <p className={`text-2xl font-bold ${
+                        revenueData && (revenueData.revenue_all_time_cents - expenseData.total_expenses_cents) >= 0
+                          ? 'text-success'
+                          : 'text-rust'
+                      }`}>
+                        {revenueData
+                          ? formatCurrency(revenueData.revenue_all_time_cents - expenseData.total_expenses_cents)
+                          : formatCurrency(-expenseData.total_expenses_cents)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Category Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                    {expenseData.by_category?.filter(c => c.total_cents > 0).map((cat) => {
+                      const icon = cat.category === 'marketing_build' ? <Megaphone className="w-5 h-5 text-gold" />
+                        : cat.category === 'meta_ads' ? <Share2 className="w-5 h-5 text-gold" />
+                        : cat.category === 'google_ads' ? <Search className="w-5 h-5 text-gold" />
+                        : cat.category === 'linkdaddy_seo' ? <Search className="w-5 h-5 text-gold" />
+                        : <UsersIcon className="w-5 h-5 text-gold" />;
+                      return (
+                        <div key={cat.category} className="card-trust p-5">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
+                              {icon}
+                            </div>
+                            <div>
+                              <p className="font-medium text-navy dark:text-white">{cat.label}</p>
+                              <p className="text-xs text-muted-foreground">{cat.description}</p>
+                            </div>
+                          </div>
+                          <p className="text-xl font-bold text-rust font-mono">
+                            {cat.total_formatted}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Empty categories (no spend yet) */}
+                  {expenseData.by_category?.filter(c => c.total_cents === 0).length > 0 && (
+                    <div className="mb-8">
+                      <p className="text-sm text-muted-foreground mb-3">Categories with no spend yet:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {expenseData.by_category.filter(c => c.total_cents === 0).map((cat) => (
+                          <span key={cat.category} className="px-3 py-1.5 text-xs font-mono bg-navy/5 dark:bg-white/5 text-muted-foreground">
+                            {cat.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Monthly Expense Chart */}
+                  {expenseData.by_month?.length > 0 && (
+                    <div className="card-trust p-6 mb-8">
+                      <h2 className="font-serif text-xl text-navy dark:text-white mb-4">Expenses Over Time</h2>
+                      <div className="space-y-2">
+                        {expenseData.by_month.map((month) => {
+                          const maxExpense = Math.max(...expenseData.by_month.map(m => m.amount_cents), 1);
+                          return (
+                            <div key={month.month} className="flex items-center gap-3">
+                              <span className="text-xs font-mono text-muted-foreground w-20 shrink-0">
+                                {formatMonth(month.month)}
+                              </span>
+                              <div className="flex-1 bg-navy/5 dark:bg-white/5 h-8 relative overflow-hidden">
+                                <div
+                                  className="h-full bg-rust/60 transition-all duration-300"
+                                  style={{
+                                    width: maxExpense > 0 ? `${(month.amount_cents / maxExpense) * 100}%` : '0%',
+                                  }}
+                                />
+                              </div>
+                              <span className="text-sm font-mono text-rust w-24 text-right shrink-0">
+                                {month.amount_formatted}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="card-trust p-12 text-center">
+                  <TrendingDown className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-30" />
+                  <h2 className="font-serif text-xl text-navy dark:text-white mb-2">No Expense Data</h2>
+                  <p className="text-muted-foreground">
+                    Marketing expense data will appear here once entries are added.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
           {/* Empty state when no data and no error */}
-          {!revenueData && !loading && !error && (
+          {activeTab === 'revenue' && !revenueData && !loading && !error && (
             <div className="card-trust p-12 text-center">
               <BarChart3 className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-30" />
               <h2 className="font-serif text-xl text-navy dark:text-white mb-2">No Revenue Data</h2>
