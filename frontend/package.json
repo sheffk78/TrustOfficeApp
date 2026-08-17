@@ -65,7 +65,7 @@
     "build": "npm run lint && craco build",
     "lint": "eslint src --max-warnings 0",
     "test": "craco test",
-    "serve": "serve -s build -l ${PORT:-3000} -c build/serve.json"
+    "serve": "serve -s build -l ${PORT:-3000}"
   },
   "jest": {
     "moduleNameMapper": {

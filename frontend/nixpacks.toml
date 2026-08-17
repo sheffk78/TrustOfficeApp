@@ -5,4 +5,4 @@ cmds = ["npm install --legacy-peer-deps"]
 cmds = ["npm run build"]
 
 [start]
-cmd = "npm run serve"
+cmd = "npx --yes serve@14 -s build -l ${PORT:-3000}"
