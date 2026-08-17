@@ -215,6 +215,15 @@ export default function LoginPage() {
               Sign in to your account
             </p>
 
+            {/* Session expired banner — when redirected from a 401 mid-session */}
+            {searchParams.get('reason') === 'session-expired' && (
+              <div className="mb-6 bg-gold/10 border border-gold/30 rounded-lg p-4 text-navy" data-testid="session-expired-banner">
+                <p className="text-sm">
+                  Your session has expired. Please sign in again to continue.
+                </p>
+              </div>
+            )}
+
             {/* WingPoint welcome-back banner — only when ?wp=1 present */}
             {searchParams.get('wp') === '1' && (
               <div className="mb-6 bg-gold/10 border border-gold/30 rounded-lg p-4 text-navy" data-testid="wp-welcome-banner">

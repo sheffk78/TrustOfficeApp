@@ -30,6 +30,10 @@ export function xhrRequest(method, url, data = null, token = null) {
               }
             }
             if (xhr.status === 401) {
+              // Dispatch session-expired event so AuthContext clears token + redirects
+              if (localStorage.getItem('auth_token')) {
+                window.dispatchEvent(new CustomEvent('session-expired'));
+              }
               reject(new Error('Your session has expired. Please log in again.'));
               return;
             }

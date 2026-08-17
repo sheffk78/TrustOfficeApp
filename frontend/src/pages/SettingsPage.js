@@ -641,7 +641,8 @@ export default function SettingsPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update trust');
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to update trust. Please try again.');
       }
 
       const updatedTrust = await response.json();

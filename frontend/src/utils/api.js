@@ -71,6 +71,17 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
     }
   });
   
+  // Handle 401 Unauthorized (session expired - token invalid or missing)
+  // Dispatch a global event so AuthContext can clear the session and redirect
+  // to login. This prevents callers from showing generic "Failed to update trust"
+  // errors when the real issue is an expired JWT.
+  if (response.status === 401) {
+    // Only dispatch if we actually had a token (otherwise it's just an unauthenticated request)
+    if (localStorage.getItem('auth_token')) {
+      window.dispatchEvent(new CustomEvent('session-expired'));
+    }
+  }
+
   // Handle 402 Payment Required (subscription expired - blocks all access)
   if (response.status === 402) {
     window.dispatchEvent(new CustomEvent('subscription-expired'));

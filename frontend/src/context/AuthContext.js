@@ -439,6 +439,29 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [checkAuth]);
 
+  // Listen for session-expired events from fetchWithAuth (401 on API calls)
+  // This catches expired JWTs mid-session — clears the token and redirects to login
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      // Clear the stale token
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('selected_trust_id');
+      setUser(null);
+      setTrusts([]);
+      setSelectedTrust(null);
+      // Redirect to login (only if not already there)
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?reason=session-expired';
+      }
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired);
+
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired);
+    };
+  }, [setUser, setTrusts, setSelectedTrust]);
+
   // Listen for subscription expired events from API calls
   useEffect(() => {
     const handleSubscriptionExpired = () => {
