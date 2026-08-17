@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "npm-9_x"]
+nixPkgs = ["nodejs_22", "npm_10"]
 
 [phases.install]
 cmds = ["npm install --legacy-peer-deps"]
