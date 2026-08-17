@@ -5,4 +5,4 @@ cmds = ["npm install --legacy-peer-deps"]
 cmds = ["npm run build"]
 
 [start]
-cmd = "npx --yes serve@14 -s build -l ${PORT:-3000}"
+cmd = "node -e \"const{createServer}=require('http'),{readFile}=require('fs'),{join}=require('path'),p=process.env.PORT||3000,b='build';createServer((q,s)=>{let f=join(b,q.url==='/'?'/index.html':q.url);readFile(f,(e,d)=>{if(e){readFile(join(b,'index.html'),(e2,d2)=>{s.writeHead(200,{'Content-Type':'text/html'});s.end(d2)})}else{s.writeHead(200,{'Content-Type':f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html'});s.end(d)}})}).listen(p,()=>console.log('Serving on '+p))\""
