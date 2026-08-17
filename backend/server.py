@@ -106,6 +106,7 @@ from routers.assessments import router as assessments_router
 from routers.chat import router as chat_router  # Trust Assistant
 from routers.performance import router as performance_router
 from routers.trust_doc_analysis import router as trust_doc_analysis_router
+from routers.marketing_expenses import router as marketing_expenses_router
 from routers.trust_admin_kits import router as trust_admin_kits_router
 from routers.page_agent import router as page_agent_router  # Page Agent LLM proxy
 from routers.analytics import router as analytics_router  # Analytics events + funnel
@@ -436,6 +437,8 @@ app.include_router(assessments_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 # Trust Document Intelligence — AI extraction from trust documents
 app.include_router(trust_doc_analysis_router, prefix="/api")
+# Marketing Expenses — categorized spend tracking for investor/stats dashboard
+app.include_router(marketing_expenses_router, prefix="/api")
 # Performance Dashboard — contractor/lead performance metrics
 app.include_router(performance_router, prefix="/api")
 # Trust Administration Kits — auto-gathered paperwork packets (vehicle retitle, bank, real estate, etc.)
@@ -719,6 +722,11 @@ async def startup_event():
         await db.error_logs.create_index("resolved")
         await db.error_logs.create_index("user_id", sparse=True)
         await db.error_logs.create_index([("error_type", 1), ("timestamp", -1)])
+
+        # Marketing expenses indexes (investor/stats dashboard)
+        await db.marketing_expenses.create_index("expense_id", unique=True)
+        await db.marketing_expenses.create_index("category")
+        await db.marketing_expenses.create_index("expense_date")
         
         # Benevolence policy indexes (policy container + versioning)
         await ensure_benevolence_policy_indexes()
