@@ -75,6 +75,16 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
   if (response.status === 402) {
     window.dispatchEvent(new CustomEvent('subscription-expired'));
   }
+
+  // Handle 401 Unauthorized (session expired - token invalid or missing)
+  if (response.status === 401) {
+    // Only dispatch if we had a token (avoid firing on public endpoints)
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      localStorage.removeItem('auth_token');
+      window.dispatchEvent(new CustomEvent('session-expired'));
+    }
+  }
   
   // Handle 403 Forbidden (read-only mode - blocks write operations)
   // We check the X-Subscription-Status header to avoid consuming the body

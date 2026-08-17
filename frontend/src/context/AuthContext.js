@@ -457,9 +457,25 @@ export const AuthProvider = ({ children }) => {
     window.addEventListener('subscription-expired', handleSubscriptionExpired);
     window.addEventListener('subscription-readonly', handleSubscriptionReadOnly);
 
+    // Handle session-expired (401 on authenticated API call — JWT expired/invalid)
+    const handleSessionExpired = () => {
+      console.warn('[AuthContext] Session expired (401 on API call) — redirecting to login');
+      setUser(null);
+      setTrusts([]);
+      setSelectedTrust(null);
+      setLoading(false);
+      // Redirect to login page (preserve current path for post-login redirect)
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/signup') {
+        window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+      }
+    };
+    window.addEventListener('session-expired', handleSessionExpired);
+
     return () => {
       window.removeEventListener('subscription-expired', handleSubscriptionExpired);
       window.removeEventListener('subscription-readonly', handleSubscriptionReadOnly);
+      window.removeEventListener('session-expired', handleSessionExpired);
     };
   }, [loadSubscriptionState, user?.email]);
 
