@@ -96,18 +96,23 @@ def _fetch_verified_revenue():
 
         subscriptions = stripe.Subscription.list(status="active", limit=100)
         for subscription in subscriptions.auto_paging_iter():
-            for item in subscription.get("items", {}).get("data", []):
-                price = item.get("price") or {}
-                price_id = price.get("id")
+            for item in subscription["items"]["data"]:
+                # Stripe SDK objects don't support .get() — use getattr with defaults
+                price = getattr(item, "price", None)
+                if price is None:
+                    continue
+                price_id = getattr(price, "id", None)
                 if not price_id or price_id not in TRUSTOFFICE_PRICE_IDS:
                     continue
-                unit_amount = price.get("unit_amount") or 0
-                interval = (price.get("recurring") or {}).get("interval")
-                interval_count = (price.get("recurring") or {}).get("interval_count") or 1
+                unit_amount = getattr(price, "unit_amount", 0) or 0
+                recurring = getattr(price, "recurring", None)
+                interval = getattr(recurring, "interval", None) if recurring else None
+                interval_count = getattr(recurring, "interval_count", 1) if recurring else 1
+                quantity = getattr(item, "quantity", 1) or 1
                 if interval == "year":
-                    mrr_cents += round(unit_amount / (12 * interval_count)) * (item.get("quantity") or 1)
+                    mrr_cents += round(unit_amount / (12 * interval_count)) * quantity
                 elif interval == "month":
-                    mrr_cents += round(unit_amount / interval_count) * (item.get("quantity") or 1)
+                    mrr_cents += round(unit_amount / interval_count) * quantity
         return total_cents, invoice_count, mrr_cents
     except stripe.StripeError as exc:
         logger.error("Stripe revenue verification failed: %s", exc)
