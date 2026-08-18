@@ -34,6 +34,7 @@ import {
   HeartPulse,
   ClipboardList,
   BookOpen,
+  Library,
   NotebookTabs,
   BarChart3,
   Bot,
@@ -59,7 +60,7 @@ const NAV_GROUPS = [
 
   // ═══ LEARNING ═══
   { key: 'course', icon: GraduationCap, label: 'Trustee 101', items: [], standout: true },
-  { key: 'knowledge', icon: BookOpen, label: 'Knowledge Base', items: [
+  { key: 'knowledge', icon: Library, label: 'Knowledge Base', items: [
     { path: '/knowledge', icon: BookOpen, label: 'Browse Articles' },
     { path: '/knowledge/admin', icon: FilePen, label: 'Manage Articles', adminOnly: true },
   ], badge: 'NEW' },
