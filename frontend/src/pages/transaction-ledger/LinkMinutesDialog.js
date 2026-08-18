@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Link2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 
 export default function LinkMinutesDialog({
   open,
@@ -53,8 +53,10 @@ export default function LinkMinutesDialog({
                     {minutesList.map((m) => {
                       let dateLabel = 'No date';
                       if (m.meeting_date) {
-                        try { dateLabel = format(parseISO(m.meeting_date), 'MMM d, yyyy'); }
-                        catch { dateLabel = m.meeting_date; }
+                        try {
+                          const d = parseISO(m.meeting_date);
+                          dateLabel = isValid(d) ? format(d, 'MMM d, yyyy') : m.meeting_date;
+                        } catch { dateLabel = m.meeting_date; }
                       }
                       return (
                       <SelectItem key={m.minutes_id} value={m.minutes_id}>

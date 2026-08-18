@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Loader2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { CLASSIFICATIONS, DIRECTION_OPTIONS } from './constants';
 
@@ -46,8 +46,14 @@ function DateField({ value, onChange, testId, label = 'Date *' }) {
   // Safe date formatter — falls back to the raw value when parsing fails
   // (prevents RangeError: Invalid time value from date-fns format()).
   const safeFmt = (v) => {
-    try { return format(parseISO(v), 'MMM d, yyyy'); }
-    catch { return v || ''; }
+    if (!v) return '';
+    try {
+      const d = parseISO(v);
+      if (!isValid(d)) return String(v);
+      return format(d, 'MMM d, yyyy');
+    } catch {
+      return String(v);
+    }
   };
   return (
     <div>
@@ -62,7 +68,12 @@ function DateField({ value, onChange, testId, label = 'Date *' }) {
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             mode="single"
-            selected={value ? (() => { try { return parseISO(value); } catch { return undefined; } })() : undefined}
+            selected={value ? (() => {
+              try {
+                const d = parseISO(value);
+                return isValid(d) ? d : undefined;
+              } catch { return undefined; }
+            })() : undefined}
             onSelect={(d) => { if (d) { onChange(format(d, 'yyyy-MM-dd')); setOpen(false); } }}
           />
         </PopoverContent>

@@ -11,12 +11,18 @@ import {
   ArrowUpRight, ArrowDownLeft, FileSpreadsheet, Trash2, Edit2,
   Loader2, AlertTriangle, Link2, FileText, Building2,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { classificationColors } from './constants';
 
 const safeFormat = (isoDate) => {
   if (!isoDate) return '—';
-  try { return format(parseISO(isoDate), 'MMM d, yyyy'); } catch { return String(isoDate); }
+  try {
+    const d = parseISO(isoDate);
+    if (!isValid(d)) return String(isoDate);
+    return format(d, 'MMM d, yyyy');
+  } catch {
+    return String(isoDate);
+  }
 };
 
 export default function TransactionTable({

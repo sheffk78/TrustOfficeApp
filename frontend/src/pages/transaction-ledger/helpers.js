@@ -2,7 +2,7 @@
  * Pure helper functions for the Transaction Ledger.
  * Kept side-effect free so they are easy to test and reuse.
  */
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 
 /**
  * Filter the transactions list by entity, classification, direction and a
@@ -105,10 +105,13 @@ export const buildImportRows = (csvData, csvMapping) =>
  * Safe date formatter — falls back to the raw value when parsing fails.
  */
 export const safeFormatDate = (isoDate, fmt = 'MMM d, yyyy') => {
+  if (!isoDate) return '—';
   try {
-    return format(parseISO(isoDate), fmt);
+    const d = parseISO(isoDate);
+    if (!isValid(d)) return String(isoDate);
+    return format(d, fmt);
   } catch {
-    return isoDate;
+    return String(isoDate);
   }
 };
 
