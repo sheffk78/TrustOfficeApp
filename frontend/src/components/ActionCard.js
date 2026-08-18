@@ -202,29 +202,29 @@ const ActionCard = ({ card, onApprove, onEdit, onDiscard, disabled }) => {
 
       {/* Action buttons */}
       {!isDisabled && !isExecuting && (
-        <div className="flex items-center gap-2 pt-2 border-t border-navy/10">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-navy/10 btn-group-mobile">
           <button
             onClick={() => onApprove?.(card)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider bg-gold/10 text-gold border border-gold/30 hover:bg-gold hover:text-navy transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-mono uppercase tracking-wider bg-gold/10 text-gold border border-gold/30 hover:bg-gold hover:text-navy transition-colors min-h-[40px]"
             title="Approve and create record"
           >
-            <Check className="w-3.5 h-3.5" />
+            <Check className="w-4 h-4" />
             Approve
           </button>
           <button
             onClick={() => onEdit?.(card)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider bg-navy/5 text-navy border border-navy/20 hover:bg-navy/10 transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-mono uppercase tracking-wider bg-navy/5 text-navy border border-navy/20 hover:bg-navy/10 transition-colors min-h-[40px]"
             title="Edit details"
           >
-            <Pencil className="w-3.5 h-3.5" />
+            <Pencil className="w-4 h-4" />
             Edit
           </button>
           <button
             onClick={() => onDiscard?.(card)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider bg-rust/5 text-rust border border-rust/20 hover:bg-rust hover:text-white transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-mono uppercase tracking-wider bg-rust/5 text-rust border border-rust/20 hover:bg-rust hover:text-white transition-colors min-h-[40px]"
             title="Discard"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
             Discard
           </button>
         </div>

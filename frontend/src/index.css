@@ -1049,3 +1049,94 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ==================== MOBILE TAB SCROLL & NAV REFINEMENTS ==================== */
+
+/* Make tab lists horizontally scrollable on mobile instead of wrapping */
+@media (max-width: 768px) {
+  [role="tablist"],
+  .tabs-list,
+  [class*="TabsList"] {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    white-space: nowrap !important;
+    grid-template-columns: none !important;
+  }
+
+  [role="tablist"]::-webkit-scrollbar,
+  [class*="TabsList"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  [role="tab"],
+  [class*="TabsTrigger"],
+  .tabs-trigger {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  /* Ensure dialogs are proper bottom sheets on mobile */
+  [role="dialog"] [data-radix-dialog-content] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Fix any grid that might overflow on narrow screens */
+  [class*="grid-cols-"]:not([class*="grid-cols-1"]) {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Re-allow 2-col grids that explicitly set min widths via auto-fit */
+  [class*="auto-fit"],
+  .card-grid,
+  .mobile-more-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)) !important;
+  }
+
+  /* Bottom nav safe area */
+  .mobile-bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+
+  /* Prevent text selection on nav items for better UX */
+  .mobile-bottom-nav-item,
+  .mobile-more-item,
+  .mobile-submenu-item {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Input font-size 16px to prevent iOS zoom */
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Explicitly scrollable tab list on mobile */
+  .mobile-tabs-scroll {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    white-space: nowrap !important;
+    grid-template-columns: none !important;
+  }
+
+  .mobile-tabs-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}

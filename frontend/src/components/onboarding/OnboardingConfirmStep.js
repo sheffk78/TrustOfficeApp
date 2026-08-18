@@ -439,6 +439,26 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
             </p>
           </div>
 
+          {/* Secondary Successor Trustee - optional */}
+          <div className="p-4 border-2 border-cyan-100 bg-cyan-50/20">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="w-4 h-4 text-cyan-600/70" />
+              <Label className="label-trust text-sm" htmlFor="confirm-secondary-successor-trustee">Secondary Successor Trustee (optional)</Label>
+            </div>
+            <Input
+              id="confirm-secondary-successor-trustee"
+              type="text"
+              value={trustData.secondary_successor_trustee_name || ''}
+              onChange={(e) => updateField('secondary_successor_trustee_name', e.target.value)}
+              className="input-trust h-11 text-base"
+              placeholder="e.g., Robert Smith"
+              data-testid="confirm-secondary-successor-trustee-input"
+            />
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Backup successor trustee — steps in if the primary successor cannot serve. You can add their contact details later in Settings.
+            </p>
+          </div>
+
           {/* Formation Date */}
           <div>
             <Label className="label-trust text-sm" htmlFor="confirm-formation-date">Formation Date</Label>

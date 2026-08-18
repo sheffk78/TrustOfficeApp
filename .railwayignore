@@ -1,0 +1,9 @@
+# Exclude large directories not needed in Railway builds
+frontend/node_modules/
+backend/venv/
+video/
+**/__pycache__/
+**/.cache/
+**/.next/
+**/dist/
+*.pyc

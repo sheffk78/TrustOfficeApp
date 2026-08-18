@@ -495,11 +495,13 @@ export const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile menu button */}
+      {/* Mobile menu button — hidden on mobile via CSS (.mobile-menu-btn display:none at <1024px).
+          Bottom nav is the primary mobile navigation. Sidebar is accessible from 'More' menu. */}
       <button
         className="mobile-menu-btn"
         onClick={() => setMobileOpen(true)}
         data-testid="mobile-menu-btn"
+        aria-label="Open navigation menu"
       >
         <Menu className="w-5 h-5" />
       </button>

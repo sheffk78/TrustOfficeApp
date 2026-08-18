@@ -678,7 +678,7 @@ export default function ScheduleAPage() {
                         <p className="text-xs text-muted-foreground">active value</p>
                       </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto table-scroll-wrapper">
                       <table className="trust-table w-full">
                         <thead>
                           <tr>

@@ -269,7 +269,7 @@ const SuccessorPacketPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                   {[
                     { icon: FileText, title: 'Trust Overview', desc: 'Name, EIN, type, jurisdiction, formation date' },
-                    { icon: Users, title: 'Trustee Transition', desc: 'Current trustee, successor trustee, contact info' },
+                    { icon: Users, title: 'Trustee Transition', desc: 'Current trustee, successor trustee, secondary successor, contact info' },
                     { icon: Users, title: 'Beneficiaries', desc: 'Names, contacts, allocations, unit certificates' },
                     { icon: Building2, title: 'Asset Inventory', desc: 'Trust Assets, entity structure, ownership' },
                     { icon: Landmark, title: 'Bank Accounts', desc: 'Institutions, account types, last four digits' },
@@ -361,6 +361,15 @@ const SuccessorPacketPage = () => {
               <InfoRow label="Relationship" value={trustData?.successor_trustee_relationship} />
               <InfoRow label="Notes" value={trustData?.successor_trustee_notes} />
             </div>
+            {(trustData?.secondary_successor_trustee_name || trustData?.secondary_successor_trustee_email || trustData?.secondary_successor_trustee_phone) && (
+              <div className="bg-cyan-50/50 rounded p-4 border border-cyan-100 mt-4">
+                <h3 className="text-sm font-semibold text-cyan-700/80 mb-2">Secondary Successor Trustee (Backup)</h3>
+                <InfoRow label="Name" value={trustData?.secondary_successor_trustee_name} />
+                <InfoRow label="Email" value={trustData?.secondary_successor_trustee_email} />
+                <InfoRow label="Phone" value={trustData?.secondary_successor_trustee_phone} />
+                <InfoRow label="Relationship" value={trustData?.secondary_successor_trustee_relationship} />
+              </div>
+            )}
           </div>
         </div>
 

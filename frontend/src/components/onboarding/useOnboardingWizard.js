@@ -186,6 +186,7 @@ export function useOnboardingWizard() {
         is_fiscal_year: computedFiscalYear,
         grantor_name: trustData.grantor_name || '',
         successor_trustee_name: trustData.successor_trustee_name || '',
+        secondary_successor_trustee_name: trustData.secondary_successor_trustee_name || '',
         trustees: filteredTrusteeNames,
       };
 

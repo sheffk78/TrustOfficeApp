@@ -139,6 +139,10 @@ export default function SettingsPage() {
     successor_trustee_phone: selectedTrust?.successor_trustee_phone || '',
     successor_trustee_relationship: selectedTrust?.successor_trustee_relationship || '',
     successor_trustee_notes: selectedTrust?.successor_trustee_notes || '',
+    secondary_successor_trustee_name: selectedTrust?.secondary_successor_trustee_name || '',
+    secondary_successor_trustee_email: selectedTrust?.secondary_successor_trustee_email || '',
+    secondary_successor_trustee_phone: selectedTrust?.secondary_successor_trustee_phone || '',
+    secondary_successor_trustee_relationship: selectedTrust?.secondary_successor_trustee_relationship || '',
     trust_protector_name: selectedTrust?.trust_protector_name || '',
     trust_protector_email: selectedTrust?.trust_protector_email || '',
     trust_protector_phone: selectedTrust?.trust_protector_phone || '',
@@ -278,6 +282,10 @@ export default function SettingsPage() {
         successor_trustee_phone: selectedTrust.successor_trustee_phone || '',
         successor_trustee_relationship: selectedTrust.successor_trustee_relationship || '',
         successor_trustee_notes: selectedTrust.successor_trustee_notes || '',
+        secondary_successor_trustee_name: selectedTrust.secondary_successor_trustee_name || '',
+        secondary_successor_trustee_email: selectedTrust.secondary_successor_trustee_email || '',
+        secondary_successor_trustee_phone: selectedTrust.secondary_successor_trustee_phone || '',
+        secondary_successor_trustee_relationship: selectedTrust.secondary_successor_trustee_relationship || '',
         trust_protector_name: selectedTrust.trust_protector_name || '',
         trust_protector_email: selectedTrust.trust_protector_email || '',
         trust_protector_phone: selectedTrust.trust_protector_phone || '',
@@ -801,11 +809,11 @@ export default function SettingsPage() {
 
           {/* Settings Tabs (Fix 15: split scroll wall into 4 tabs) */}
           <Tabs value={settingsTab} onValueChange={setSettingsTab} className="mb-8">
-            <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
+            <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6 mobile-tabs-scroll">
               <TabsTrigger value="profile">Trust Profile</TabsTrigger>
               <TabsTrigger value="people">People</TabsTrigger>
               <TabsTrigger value="compliance">Governance</TabsTrigger>
-              <TabsTrigger value="account">Account & Billing</TabsTrigger>
+              <TabsTrigger value="account">Account &amp; Billing</TabsTrigger>
             </TabsList>
 
           <TabsContent value="profile">
@@ -1233,6 +1241,61 @@ export default function SettingsPage() {
                         onChange={(e) => setTrustData({ ...trustData, successor_trustee_notes: e.target.value })}
                         className="mt-1 input-trust"
                         placeholder="Any special instructions about the successor trustee"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secondary Successor Trustee */}
+                <div className="card-trust mb-8 opacity-90 border border-navy/10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield className="w-5 h-5 text-navy/60" />
+                    <h2 className="font-serif text-xl text-navy">Secondary Successor Trustee</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Backup — steps in if the primary successor cannot serve.
+                  </p>
+
+                  <div data-section="secondary-successor-trustee" className="space-y-6">
+                    <div>
+                      <Label className="label-trust">Secondary Successor Trustee Name</Label>
+                      <Input
+                        type="text"
+                        value={trustData.secondary_successor_trustee_name}
+                        onChange={(e) => setTrustData({ ...trustData, secondary_successor_trustee_name: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Backup person if the primary successor can't serve?"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">The backup person named to take over if the primary successor trustee declines, predeceases the grantor, or cannot serve</p>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Secondary Successor Trustee Email</Label>
+                      <Input
+                        type="email"
+                        value={trustData.secondary_successor_trustee_email}
+                        onChange={(e) => setTrustData({ ...trustData, secondary_successor_trustee_email: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Secondary Successor Trustee Phone</Label>
+                      <Input
+                        type="tel"
+                        value={trustData.secondary_successor_trustee_phone}
+                        onChange={(e) => setTrustData({ ...trustData, secondary_successor_trustee_phone: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="(555) 123-4567"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Relationship to Grantor</Label>
+                      <Input
+                        type="text"
+                        value={trustData.secondary_successor_trustee_relationship}
+                        onChange={(e) => setTrustData({ ...trustData, secondary_successor_trustee_relationship: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Spouse, adult child, sibling, etc."
                       />
                     </div>
                   </div>

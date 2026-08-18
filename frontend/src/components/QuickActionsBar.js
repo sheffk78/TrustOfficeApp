@@ -13,7 +13,7 @@ import { Plus, CalendarPlus, CalendarDays, Pencil } from 'lucide-react';
 export default function QuickActionsBar({ clientId, onEdit, onAddTrust }) {
   return (
     <div
-      className="flex flex-wrap items-center gap-2 mb-6"
+      className="flex flex-wrap items-center gap-2 mb-6 btn-group-mobile"
       data-testid="quick-actions-bar"
     >
       <Button

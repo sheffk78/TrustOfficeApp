@@ -262,6 +262,10 @@ class TrustCreate(BaseModel):
     successor_trustee_phone: Optional[str] = None
     successor_trustee_relationship: Optional[str] = None
     successor_trustee_notes: Optional[str] = None
+    secondary_successor_trustee_name: Optional[str] = None
+    secondary_successor_trustee_email: Optional[str] = None
+    secondary_successor_trustee_phone: Optional[str] = None
+    secondary_successor_trustee_relationship: Optional[str] = None
     trust_protector_name: Optional[str] = None
     trust_protector_email: Optional[str] = None
     trust_protector_phone: Optional[str] = None
@@ -328,6 +332,10 @@ class TrustUpdate(BaseModel):
     successor_trustee_phone: Optional[str] = None
     successor_trustee_relationship: Optional[str] = None
     successor_trustee_notes: Optional[str] = None
+    secondary_successor_trustee_name: Optional[str] = None
+    secondary_successor_trustee_email: Optional[str] = None
+    secondary_successor_trustee_phone: Optional[str] = None
+    secondary_successor_trustee_relationship: Optional[str] = None
     trust_protector_name: Optional[str] = None
     trust_protector_email: Optional[str] = None
     trust_protector_phone: Optional[str] = None
@@ -394,6 +402,10 @@ class TrustResponse(BaseModel):
     successor_trustee_phone: Optional[str] = None
     successor_trustee_relationship: Optional[str] = None
     successor_trustee_notes: Optional[str] = None
+    secondary_successor_trustee_name: Optional[str] = None
+    secondary_successor_trustee_email: Optional[str] = None
+    secondary_successor_trustee_phone: Optional[str] = None
+    secondary_successor_trustee_relationship: Optional[str] = None
     trust_protector_name: Optional[str] = None
     trust_protector_email: Optional[str] = None
     trust_protector_phone: Optional[str] = None

@@ -979,7 +979,7 @@ the user that they must review and submit the form themselves.
               </Button>
             </div>
           ) : (
-            <div className="card-trust overflow-x-auto">
+            <div className="card-trust overflow-x-auto table-scroll-wrapper">
               <table className="w-full trust-table">
                 <thead>
                   <tr>

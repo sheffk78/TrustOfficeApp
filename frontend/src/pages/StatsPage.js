@@ -188,7 +188,7 @@ export default function StatsPage() {
           </div>
 
           {/* Tab Switcher */}
-          <div className="flex gap-1 mb-6 border-b border-navy/10 dark:border-white/10">
+          <div className="flex gap-1 mb-6 border-b border-navy/10 dark:border-white/10 stats-tab-bar">
             <button
               onClick={() => setActiveTab('revenue')}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
@@ -424,7 +424,7 @@ export default function StatsPage() {
                   Recent Transactions
                 </h2>
                 {revenueData.recent_transactions?.length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto table-scroll-wrapper">
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-navy/10 dark:border-white/10">

@@ -54,6 +54,12 @@
   margin-bottom: 8px;
 }
 
+@media (max-width: 768px) {
+  .page-title {
+    font-size: 1.75rem;
+  }
+}
+
 .page-subtitle {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
@@ -65,7 +71,7 @@
 /* Card grid */
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 24px;
 }
 
@@ -143,7 +149,8 @@
   background-color: var(--gold);
 }
 
-/* Mobile sidebar toggle */
+/* Mobile sidebar toggle — hidden on mobile since bottom nav is primary.
+   The sidebar is still accessible from the 'More' menu in the bottom nav. */
 .mobile-menu-btn {
   display: none;
   position: fixed;
@@ -160,9 +167,11 @@
   justify-content: center;
 }
 
+/* On mobile, the hamburger button is hidden — bottom nav is the primary navigation.
+   The sidebar can still be opened programmatically (e.g., from 'More' menu if wired). */
 @media (max-width: 1024px) {
   .mobile-menu-btn {
-    display: flex;
+    display: none;
   }
 }
 
@@ -203,21 +212,28 @@
 /* Fix page header overlap with hamburger menu on mobile */
 @media (max-width: 1024px) {
   .page-header {
-    padding-left: 60px !important;
+    padding-left: 0 !important;
   }
   
   /* Main content area padding for mobile */
   .main-content {
     padding: 16px !important;
-    padding-top: 70px !important;
+    padding-top: 16px !important;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important;
   }
   
   /* Pages using Tailwind md:pl-64 pattern need the same mobile offsets */
   .mobile-layout-offset {
     padding-left: 16px !important;
     padding-right: 16px !important;
-    padding-top: 70px !important;
-    padding-bottom: 80px !important;
+    padding-top: 16px !important;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important;
+  }
+  
+  /* Consistent 16px horizontal padding for all page containers on mobile */
+  .page-container {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
   }
   
   /* Reduce card padding on mobile */
@@ -239,15 +255,15 @@
 
 /* Improve touch targets (minimum 44px) */
 @media (max-width: 768px) {
-  button, 
-  .btn-primary, 
+  button,
+  .btn-primary,
   .btn-secondary,
   a.btn,
   [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   /* Exempt small icon-only buttons in tables from 44px rule */
   .table-action-btn,
   .table-action-btn button,
@@ -258,25 +274,336 @@
     min-height: auto !important;
     min-width: auto !important;
   }
-  
+
   /* Larger tap targets for nav items */
   .nav-item {
     padding: 12px 16px !important;
   }
-  
+
   /* Better spacing for form inputs */
-  input, 
-  select, 
+  input,
+  select,
   textarea {
     min-height: 44px;
     font-size: 16px !important; /* Prevents iOS zoom on focus */
   }
-  
+
   /* Larger checkboxes and radio buttons */
   input[type="checkbox"],
   input[type="radio"] {
     width: 20px;
     height: 20px;
+  }
+}
+
+/* ==================== MOBILE BUTTON VISIBILITY ==================== */
+@media (max-width: 768px) {
+  /* Primary action buttons — full-width, 48px min height, navy bg, white text */
+  .btn-primary,
+  .btn-navy {
+    width: 100% !important;
+    min-height: 48px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Secondary buttons — full-width, 44px min height, outlined */
+  .btn-secondary {
+    width: 100% !important;
+    min-height: 44px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Gold action buttons also full-width on mobile */
+  .btn-gold {
+    width: 100% !important;
+    min-height: 48px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Stack button groups vertically — any flex gap row that isn't explicitly no-stack */
+  .flex.gap-2:not(.flex-nowrap):not(.no-stack),
+  .flex.gap-3:not(.flex-nowrap):not(.no-stack) {
+    flex-direction: column !important;
+  }
+
+  .flex.gap-2:not(.flex-nowrap):not(.no-stack) > button,
+  .flex.gap-2:not(.flex-nowrap):not(.no-stack) > a,
+  .flex.gap-3:not(.flex-nowrap):not(.no-stack) > button,
+  .flex.gap-3:not(.flex-nowrap):not(.no-stack) > a {
+    width: 100% !important;
+  }
+
+  /* Icon-only buttons in tables/lists — minimum 40x40px tap area */
+  td button[class*="p-1"],
+  td button[class*="p-1\\.5"],
+  td .p-1 button,
+  td .p-1\\.5 button,
+  .table-action-btn,
+  .table-action-btn button {
+    min-height: 40px !important;
+    min-width: 40px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* FAB (floating action button) for primary create/add actions */
+  .mobile-fab {
+    display: none;
+  }
+}
+
+/* FAB visible only on mobile */
+.mobile-fab {
+  display: none;
+  position: fixed;
+  bottom: 88px; /* above bottom nav */
+  right: 16px;
+  z-index: 45;
+  width: 56px;
+  height: 56px;
+  background-color: var(--navy);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(1, 0, 121, 0.3);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.mobile-fab:hover,
+.mobile-fab:active {
+  background-color: var(--gold);
+  color: var(--navy);
+  transform: scale(1.05);
+}
+
+.mobile-fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+@media (max-width: 1024px) {
+  .mobile-fab {
+    display: flex;
+  }
+}
+
+/* ==================== MOBILE FORM USABILITY ==================== */
+@media (max-width: 768px) {
+  /* Form labels — 14px minimum, not smaller */
+  label,
+  .label-trust {
+    font-size: 14px !important;
+  }
+
+  /* Form fields — 12px vertical spacing minimum on mobile */
+  .space-y-2 > * + * {
+    margin-top: 12px !important;
+  }
+
+  .space-y-3 > * + * {
+    margin-top: 12px !important;
+  }
+
+  .space-y-4 > * + * {
+    margin-top: 12px !important;
+  }
+
+  /* Select dropdowns full-width on mobile */
+  select {
+    width: 100% !important;
+  }
+
+  /* Textareas — minimum height 120px on mobile */
+  textarea {
+    min-height: 120px !important;
+  }
+
+  /* Checkbox/radio groups — 48px row height for easy tapping */
+  label input[type="checkbox"],
+  label input[type="radio"],
+  .flex.items-center.gap-2:has(input[type="checkbox"]),
+  .flex.items-center.gap-2:has(input[type="radio"]) {
+    min-height: 48px !important;
+  }
+
+  /* Form validation errors visible above keyboard — sticky error messages */
+  .form-error,
+  .text-red-500,
+  .text-rust,
+  .text-error {
+    position: relative !important;
+    z-index: 10 !important;
+  }
+}
+
+/* ==================== MOBILE TAB NAVIGATION ==================== */
+@media (max-width: 768px) {
+  /* Radix tablist — horizontally scrollable, no wrap */
+  [role="tablist"] {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  [role="tablist"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Tab triggers — don't shrink, min width, 13px text */
+  [role="tab"] {
+    flex-shrink: 0 !important;
+    min-width: max-content !important;
+    font-size: 13px !important;
+    padding: 12px 16px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Active tab — gold underline indicator */
+  [role="tab"][data-state="active"] {
+    border-bottom: 3px solid var(--gold) !important;
+    color: var(--navy) !important;
+  }
+
+  /* StatsPage custom tab buttons — same scrollable treatment */
+  .stats-tab-bar {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .stats-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stats-tab-bar > button {
+    flex-shrink: 0 !important;
+    min-width: max-content !important;
+    font-size: 13px !important;
+    padding: 12px 16px !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* ==================== MOBILE DATA DISPLAY ==================== */
+@media (max-width: 768px) {
+  /* Make all tables horizontally scrollable */
+  .trust-table,
+  table {
+    display: block !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Minimum column width so text doesn't wrap mid-word */
+  .trust-table th,
+  .trust-table td,
+  table th,
+  table td {
+    min-width: 100px;
+  }
+
+  /* Sticky first column for context */
+  .trust-table td:first-child,
+  .trust-table th:first-child,
+  table td:first-child,
+  table th:first-child {
+    position: sticky !important;
+    left: 0;
+    background-color: inherit;
+    z-index: 1;
+  }
+
+  .trust-table th:first-child,
+  table th:first-child {
+    background-color: var(--subtle-bg, #f9fafb);
+  }
+
+  /* Card-based table alternative */
+  .mobile-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Horizontal scroll indicator — visible shadow on right edge */
+  .table-scroll-wrapper {
+    position: relative;
+  }
+
+  .table-scroll-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to left, rgba(1, 0, 121, 0.08), transparent);
+    pointer-events: none;
+  }
+}
+
+/* ==================== DASHBOARD MOBILE LAYOUT ==================== */
+@media (max-width: 768px) {
+  /* Dashboard cards stack vertically (1 column) on mobile */
+  .card-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Governance score circle — 120px on mobile, not 180px */
+  .score-circle {
+    width: 120px !important;
+    height: 120px !important;
+  }
+
+  .score-circle .score-indicator {
+    font-size: 2.5rem !important;
+  }
+
+  /* Trust selector — dropdown, not horizontal list on mobile */
+  .trust-selector-horizontal {
+    flex-direction: column !important;
+  }
+}
+
+/* ==================== MOBILE MODAL/FORM IMPROVEMENTS ==================== */
+@media (max-width: 640px) {
+  /* Form inputs in modals — prevent zoom, proper spacing */
+  [role="dialog"] input,
+  [role="dialog"] select,
+  [role="dialog"] textarea {
+    font-size: 16px !important;
+  }
+
+  /* Modal footer buttons stack and go full-width */
+  [role="dialog"] .flex.gap-2:not(.flex-nowrap):not(.no-stack) {
+    flex-direction: column !important;
+  }
+
+  [role="dialog"] .flex.gap-2:not(.flex-nowrap):not(.no-stack) > button,
+  [role="dialog"] .flex.gap-2:not(.flex-nowrap):not(.no-stack) > a {
+    width: 100% !important;
   }
 }
 
@@ -302,56 +629,243 @@
   left: 0;
   right: 0;
   background: var(--navy);
-  padding: 8px 0;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  padding: 0;
+  padding-bottom: env(safe-area-inset-bottom);
   z-index: 50;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
 }
 
 @media (max-width: 1024px) {
   .mobile-bottom-nav {
     display: flex;
     justify-content: space-around;
-    align-items: center;
+    align-items: stretch;
   }
   
   /* Add padding to main content to account for bottom nav */
   .main-content {
-    padding-bottom: 80px !important;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important;
   }
+}
+
+.mobile-bottom-nav-item-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
 .mobile-bottom-nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
-  padding: 8px 4px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  padding: 10px 4px;
+  border-radius: 0;
+  transition: color 0.2s ease, background 0.2s ease;
   min-width: 0;
   flex: 1;
   overflow: hidden;
+  min-height: 56px;
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
-.mobile-bottom-nav-item:hover,
+.mobile-bottom-nav-item:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .mobile-bottom-nav-item.active {
-  color: white;
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--gold);
+}
+
+/* Gold underline indicator for active item */
+.mobile-bottom-nav-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: 3px;
+  background: var(--gold);
+  border-radius: 0;
 }
 
 .mobile-bottom-nav-item svg {
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
 }
 
 .mobile-bottom-nav-item span {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ─── Money submenu popup ─── */
+.mobile-submenu-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  background: white;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(1, 0, 121, 0.1);
+  min-width: 200px;
+  z-index: 60;
+  overflow: hidden;
+}
+
+.mobile-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  color: #334155;
+  text-decoration: none;
+  transition: background 0.15s ease;
+  min-height: 48px;
+}
+
+.mobile-submenu-item:hover {
+  background: rgba(1, 0, 121, 0.04);
+}
+
+.mobile-submenu-item.active {
+  color: var(--navy);
+  font-weight: 600;
+  background: rgba(213, 173, 54, 0.08);
+  border-left: 3px solid var(--gold);
+}
+
+/* ─── 'More' slide-up sheet ─── */
+.mobile-more-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 55;
+  animation: mobile-overlay-fade 0.2s ease;
+}
+
+@keyframes mobile-overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.mobile-more-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  z-index: 56;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: mobile-sheet-slide 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+@keyframes mobile-sheet-slide {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.mobile-more-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(1, 0, 121, 0.08);
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.mobile-more-sheet-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.mobile-more-sheet-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-more-sheet-close:hover {
+  color: var(--navy);
+}
+
+.mobile-more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: rgba(1, 0, 121, 0.06);
+  padding: 1px;
+}
+
+.mobile-more-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 12px;
+  background: white;
+  color: #334155;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  transition: background 0.15s ease, color 0.15s ease;
+  min-height: 80px;
+}
+
+.mobile-more-item:hover {
+  background: rgba(213, 173, 54, 0.06);
+}
+
+.mobile-more-item.active {
+  color: var(--navy);
+  background: rgba(213, 173, 54, 0.1);
+  font-weight: 600;
+}
+
+.mobile-more-item.active svg {
+  color: var(--gold);
+}
+
+.mobile-more-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Responsive typography */
@@ -371,13 +885,36 @@
 
 /* Fix horizontal scroll issues */
 @media (max-width: 768px) {
+  html {
+    scroll-padding-top: 70px;
+    overflow-x: hidden;
+  }
+  
   body {
     overflow-x: hidden;
   }
   
-  .container, .max-w-6xl, .max-w-4xl {
+  /* Prevent horizontal scroll on all scrollable containers */
+  .overflow-x-auto,
+  .overflow-auto,
+  [style*="overflow"] {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .container, .max-w-6xl, .max-w-4xl, .max-w-3xl, .max-w-5xl {
     padding-left: 16px;
     padding-right: 16px;
+    max-width: 100% !important;
+  }
+  
+  /* Fix whitespace-nowrap causing horizontal scroll on mobile */
+  .whitespace-nowrap {
+    white-space: normal !important;
+  }
+  
+  /* Fix flex-nowrap causing horizontal scroll on mobile */
+  .flex-nowrap, .flex.nowrap {
+    flex-wrap: wrap !important;
   }
 }
 

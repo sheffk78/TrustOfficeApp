@@ -213,7 +213,7 @@ function TrustCard({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-navy/10">
+      <div className="flex items-center justify-between pt-3 border-t border-navy/10 flex-wrap gap-2">
         <div className="flex items-center gap-3 text-xs text-navy/50">
           {trust.ein && (
             <span className="font-mono">EIN: {trust.ein}</span>
@@ -226,7 +226,7 @@ function TrustCard({
           <Button
             size="sm"
             variant="outline"
-            className="text-xs"
+            className="text-xs min-h-[40px]"
             onClick={() => onSelect(trust)}
             data-testid={`trust-open-${trust.trust_id}`}
           >
@@ -235,11 +235,11 @@ function TrustCard({
           {!isReadOnly && (
             <button
               onClick={() => onDelete(trust)}
-              className="p-1.5 text-navy/30 hover:text-error transition-colors"
+              className="p-2 text-navy/30 hover:text-error transition-colors min-h-[40px] min-w-[40px] inline-flex items-center justify-center"
               title="Delete trust"
               data-testid={`trust-delete-${trust.trust_id}`}
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -639,14 +639,14 @@ export const TrustManager = ({ embedded = false }) => {
             {selectedIds.size > 0 && ` · ${selectedIds.size} selected`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 btn-group-mobile">
           <Button
             variant="outline"
             size="sm"
             onClick={() => navigate('/settings')}
             className="text-xs"
           >
-            <Settings2 className="w-3.5 h-3.5 mr-1.5" />
+            <Settings2 className="w-4 h-4 mr-1.5" />
             Settings
           </Button>
           {!isReadOnly && (
@@ -655,7 +655,7 @@ export const TrustManager = ({ embedded = false }) => {
               className="btn-primary"
               onClick={() => navigate('/onboarding')}
             >
-              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              <Plus className="w-4 h-4 mr-1.5" />
               New Trust
             </Button>
           )}
@@ -851,7 +851,7 @@ export const TrustManager = ({ embedded = false }) => {
               {selectedIds.size} selected
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 btn-group-mobile no-stack">
             <Button
               size="sm"
               variant="outline"
@@ -861,9 +861,9 @@ export const TrustManager = ({ embedded = false }) => {
               data-testid="trust-bulk-export"
             >
               {exporting ? (
-                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
               ) : (
-                <Download className="w-3.5 h-3.5 mr-1.5" />
+                <Download className="w-4 h-4 mr-1.5" />
               )}
               Export CSV
             </Button>
