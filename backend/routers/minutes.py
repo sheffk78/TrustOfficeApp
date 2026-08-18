@@ -3991,7 +3991,7 @@ def generate_conflict_of_interest_content(data: dict) -> str:
     related_transaction = data.get("related_transaction", "[Related transaction or matter]")
     disclosure_date = data.get("disclosure_date", "[Date]")
     waiver_granted = data.get("waiver_granted", True)
-    conditions = data.get("conditions", "None")
+    conditions = data.get("conditions") or "None"
     
     content = f"""
 CONFLICT OF INTEREST DISCLOSURE AND WAIVER
@@ -4125,7 +4125,7 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
                 "disposition_notes": f"Reason: {template.template_data.get('disposition_reason', 'sale')}. " +
                     (f"Recipient: {template.template_data.get('disposition_recipient', '')}. " if template.template_data.get('disposition_recipient') else "") +
                     (f"Value: ${template.template_data.get('disposition_value', 0):,.2f}. " if template.template_data.get('disposition_value') else "") +
-                    (template.template_data.get('disposition_notes', '')),
+                    (template.template_data.get('disposition_notes') or ''),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
             await db.schedule_a_items.update_one(

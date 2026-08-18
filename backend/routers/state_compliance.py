@@ -98,6 +98,7 @@ async def get_trust_state_compliance(trust_id: str, user: dict = Depends(get_cur
             "updated_at": now,
         }
         await db.trust_state_compliance.insert_one(compliance)
+        compliance.pop("_id", None)  # ObjectId not JSON-serializable
 
     return {
         "trust_id": trust_id,
