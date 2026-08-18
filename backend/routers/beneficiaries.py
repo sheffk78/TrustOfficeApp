@@ -252,6 +252,40 @@ async def get_beneficiary_dashboard(
 # (lines 796-957) but exposed as proper REST handlers so the
 # action_registry.py endpoints resolve to real HTTP routes.
 
+@router.get("")
+async def list_beneficiaries(
+    trust_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """List beneficiaries for a trust.
+
+    READ endpoint — available to all authenticated users.
+    Returns {beneficiaries: [...]} with beneficiary_id, name, relationship,
+    created_at, and date_added fields. Used by the Audit Trail page.
+    """
+    user_id = user["user_id"]
+
+    query = {"user_id": user_id}
+    if trust_id:
+        query["trust_id"] = trust_id
+
+    beneficiaries = await db.beneficiaries.find(
+        query,
+        {
+            "_id": 0,
+            "beneficiary_id": 1,
+            "trust_id": 1,
+            "user_id": 1,
+            "name": 1,
+            "relationship": 1,
+            "created_at": 1,
+            "date_added": 1,
+        }
+    ).sort("created_at", -1).to_list(1000)
+
+    return {"beneficiaries": beneficiaries}
+
+
 @router.post("/create")
 async def create_beneficiary(
     data: BeneficiaryCreate,

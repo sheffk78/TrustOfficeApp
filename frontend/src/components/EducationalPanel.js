@@ -46,17 +46,18 @@ export default function EducationalPanel({ trustId, healthScore }) {
         fetchWithAuth('/educational/trustee-101/curriculum'),
       ]);
 
+      const safeArray = (v) => (Array.isArray(v) ? v : []);
       if (resRes.status === 'fulfilled' && resRes.value.ok) {
         const data = await resRes.value.json();
-        setResources(data.resources || data || []);
+        setResources(safeArray(data.resources || data));
       }
       if (recRes.status === 'fulfilled' && recRes.value.ok) {
         const data = await recRes.value.json();
-        setRecommended(data.recommended || data.resources || data || []);
+        setRecommended(safeArray(data.recommended || data.resources || data));
       }
       if (currRes.status === 'fulfilled' && currRes.value.ok) {
         const data = await currRes.value.json();
-        setCurriculum(data.curriculum || data.lessons || data || []);
+        setCurriculum(safeArray(data.curriculum || data.lessons || data));
       }
     } catch (error) {
       showError(toast, error, { operation: 'load_educational', page: 'EducationalPanel' });
@@ -69,7 +70,7 @@ export default function EducationalPanel({ trustId, healthScore }) {
     loadAll();
   }, [loadAll]);
 
-  const totalCount = resources.length + recommended.length + curriculum.length;
+  const totalCount = (resources?.length || 0) + (recommended?.length || 0) + (curriculum?.length || 0);
 
   const tabs = [
     { id: 'recommended', label: 'Recommended', count: recommended.length },

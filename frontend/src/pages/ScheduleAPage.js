@@ -37,6 +37,18 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
+// Returns today's date as a YYYY-MM-DD string based on the user's LOCAL
+// timezone (not UTC). Using new Date().toISOString().split('T')[0] produces
+// a UTC date which, in timezones behind UTC (e.g. America/Denver), rolls
+// over to tomorrow after late afternoon local time.
+const getLocalDateStr = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const ASSET_CATEGORIES = [
   { value: 'real_property', label: 'Real Property', icon: Home, description: 'Land, buildings, residences' },
   { value: 'personal_property', label: 'Personal Property (Tangible)', icon: Car, description: 'Vehicles, furnishings, equipment' },
@@ -67,7 +79,7 @@ export default function ScheduleAPage() {
     identifier: '',
     location: '',
     approximate_value: '',
-    date_conveyed: new Date().toISOString().split('T')[0],
+    date_conveyed: getLocalDateStr(),
     notes: '',
     minutes_ref: null
   });
@@ -81,7 +93,7 @@ export default function ScheduleAPage() {
   const [disposeDialogOpen, setDisposeDialogOpen] = useState(false);
   const [assetToDispose, setAssetToDispose] = useState(null);
   const [disposeFormData, setDisposeFormData] = useState({
-    disposition_date: new Date().toISOString().split('T')[0],
+    disposition_date: getLocalDateStr(),
     disposition_reason: 'sale',
     disposition_value: '',
     disposition_recipient: '',
@@ -248,7 +260,7 @@ export default function ScheduleAPage() {
     }
     setAssetToDispose(asset);
     setDisposeFormData({
-      disposition_date: new Date().toISOString().split('T')[0],
+      disposition_date: getLocalDateStr(),
       disposition_reason: 'sale',
       disposition_value: asset.approximate_value || '',
       disposition_recipient: '',
@@ -312,7 +324,7 @@ export default function ScheduleAPage() {
       identifier: '',
       location: '',
       approximate_value: '',
-      date_conveyed: new Date().toISOString().split('T')[0],
+      date_conveyed: getLocalDateStr(),
       notes: '',
       minutes_ref: null
     });
