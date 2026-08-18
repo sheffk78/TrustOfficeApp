@@ -355,9 +355,10 @@ async def get_subscription_state(user_id: str) -> SubscriptionState:
     is_admin = user.get("is_admin", False) if user else False
 
     is_primary_admin = user_email == PRIMARY_ADMIN_EMAIL
-    is_forever_free = user_email in FOREVER_FREE_EMAILS or is_admin or is_primary_admin
 
     sub = await _ensure_subscription_exists(user_id, now)
+    sub_plan_is_forever_free = sub.get("plan_type") == "forever_free"
+    is_forever_free = user_email in FOREVER_FREE_EMAILS or is_admin or is_primary_admin or sub_plan_is_forever_free
     effective_plan_type = _resolve_effective_plan_type(sub, is_forever_free)
 
     if effective_plan_type == "forever_free":
