@@ -527,7 +527,7 @@ export const Sidebar = () => {
         <div className="p-6 border-b border-white/10">
           <Link to="/dashboard" className="block">
             <img
-              src="/assets/trustoffice-logo-vertical.svg"
+              src="/assets/trustoffice-logo-vertical.svg?v=3"
               alt="TrustOffice"
               className="h-8 cursor-pointer hover:opacity-80 transition-opacity"
               data-testid="logo-home-link"

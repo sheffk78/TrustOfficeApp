@@ -215,7 +215,7 @@ export default function WingPointWelcomePage() {
       <header className="bg-navy text-white py-4 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/assets/trustoffice-logo.svg" alt="TrustOffice" className="h-7" />
+            <img src="/assets/trustoffice-logo.svg?v=3" alt="TrustOffice" className="h-7" />
           </Link>
           {user && (
             <Link to="/dashboard" className="text-sm text-white/70 hover:text-white transition-colors">

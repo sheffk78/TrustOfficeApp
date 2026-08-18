@@ -52,7 +52,7 @@ export default function NotificationCenter({ onNotificationClick }) {
           if (latest && 'Notification' in window && Notification.permission === 'granted') {
             new Notification('TrustOffice: ' + latest.title, {
               body: latest.body,
-              icon: '/assets/trustoffice-logo.svg',
+              icon: '/assets/trustoffice-logo.svg?v=3',
               tag: latest.notification_id,
             });
           }

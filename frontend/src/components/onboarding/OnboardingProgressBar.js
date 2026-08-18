@@ -12,7 +12,7 @@ export default function OnboardingProgressBar({ step }) {
       <div className="bg-navy text-white py-4 px-8">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <img
-            src="/assets/trustoffice-logo-vertical.svg"
+            src="/assets/trustoffice-logo-vertical.svg?v=3"
             alt="TrustOffice"
             className="h-8"
           />

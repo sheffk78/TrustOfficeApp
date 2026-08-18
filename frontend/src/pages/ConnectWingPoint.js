@@ -282,7 +282,7 @@ export default function ConnectWingPoint() {
         <div className="hidden lg:flex lg:w-1/2 login-texture relative">
           <div className="absolute inset-0 login-overlay flex flex-col justify-center items-center p-12">
             <img
-              src="/assets/trustoffice-logo-vertical.svg"
+              src="/assets/trustoffice-logo-vertical.svg?v=3"
               alt="TrustOffice"
               className="w-48 mb-8"
             />
@@ -298,7 +298,7 @@ export default function ConnectWingPoint() {
             {/* Mobile logo */}
             <div className="lg:hidden mb-12 text-center">
               <img
-                src="/assets/trustoffice-logo.svg"
+                src="/assets/trustoffice-logo.svg?v=3"
                 alt="TrustOffice"
                 className="h-10 mx-auto"
               />
@@ -438,7 +438,7 @@ export default function ConnectWingPoint() {
         {/* Mobile logo */}
         <div className="lg:hidden mb-8 text-center">
           <img
-            src="/assets/trustoffice-logo.svg"
+            src="/assets/trustoffice-logo.svg?v=3"
             alt="TrustOffice"
             className="h-10 mx-auto"
           />
