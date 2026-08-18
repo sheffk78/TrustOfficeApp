@@ -40,7 +40,7 @@ import {
   Bot,
   GraduationCap,
   Briefcase,
-  UserCheck,
+  UsersRound,
   ScrollText,
   FilePlus,
   FileText
@@ -94,7 +94,7 @@ const NAV_GROUPS = [
     { path: '/authority', icon: Gavel, label: 'Legal Powers' },
     { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
     { path: '/binder', icon: NotebookTabs, label: 'Record Book' },
-    { path: '/successor-packet', icon: UserCheck, label: 'Successor Packet' },
+    { path: '/trust-roles', icon: UsersRound, label: 'Trust Roles' },
   ]},
   { key: 'performance', icon: BarChart3, label: 'Performance', items: [] },
   { key: 'score', icon: HeartPulse, label: 'Trust Health', items: [] },

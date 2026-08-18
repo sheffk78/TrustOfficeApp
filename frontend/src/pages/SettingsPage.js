@@ -66,6 +66,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, setUser, selectedTrust, setSelectedTrust, loadTrusts, isReadOnly } = useAuth();
+  const rolePage = location.pathname === '/trust-roles';
   const [loading, setLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -164,7 +165,25 @@ export default function SettingsPage() {
   });
 
   // Settings tab state (Fix 15: split single scroll wall into 4 tabs)
-  const [settingsTab, setSettingsTab] = useState('profile');
+  const [settingsTab, setSettingsTab] = useState(rolePage ? 'people' : 'profile');
+
+  useEffect(() => {
+    setSettingsTab(location.pathname === '/trust-roles' ? 'people' : 'profile');
+  }, [location.pathname]);
+
+  // Keep the canonical Trust Roles route focused on the roles surface.
+  useEffect(() => {
+    if (rolePage && settingsTab !== 'people') setSettingsTab('people');
+  }, [rolePage, settingsTab]);
+
+  // Preserve old dashboard/deep links while keeping Trust Roles canonical.
+  useEffect(() => {
+    const legacyRoleHash = ['successor-trustee', 'trust-protector', 'successor-instructions', 'key-contacts'];
+    const hash = location.hash.slice(1);
+    if (!rolePage && legacyRoleHash.includes(hash)) {
+      navigate(`/trust-roles#${hash}`, { replace: true });
+    }
+  }, [location.hash, navigate, rolePage]);
 
   // Hash anchor → tab mapping for deep links from dashboard
   const hashToTab = {
@@ -814,28 +833,42 @@ export default function SettingsPage() {
           {/* Page Header */}
           <div className="page-header flex items-start justify-between">
             <div>
-              <h1 className="page-title">Settings</h1>
+              <h1 className="page-title">{rolePage ? 'Trust Roles' : 'Settings'}</h1>
               <p className="page-subtitle">
-                Configure trust settings, preferences, and account details — manage notifications, security, and trust profile information
+              {rolePage
+                ? 'Keep every trustee, successor, protector, and handoff instruction in one place.'
+                : 'Configure trust settings, preferences, and account details — manage notifications, security, and trust profile information'}
               </p>
             </div>
             <PageHelpButton
               items={[
-                { text: 'Configure trust settings, preferences, and account details' },
-                { text: 'Manage notifications, security, and trust profile information' },
-                { text: 'Update your personal and billing information' },
+                ...(rolePage ? [
+                  { text: 'Record the current trustees, successor trustees, and trust protector' },
+                  { text: 'Add the locations and instructions a successor will need' },
+                  { text: 'Use the Successor Trustee Packet to print or send the handoff information' },
+                ] : [
+                  { text: 'Configure trust settings, preferences, and account details' },
+                  { text: 'Manage notifications, security, and trust profile information' },
+                  { text: 'Update your personal and billing information' },
+                ]),
               ]}
               taPrompt="Walk me through the Settings page and what I can configure"
             />
+            {rolePage && (
+              <Button type="button" className="btn-secondary" onClick={() => navigate('/successor-packet')}>
+                <FileText className="w-4 h-4 mr-2" />
+                View Successor Packet
+              </Button>
+            )}
           </div>
 
-          {/* Settings Tabs (Fix 15: split scroll wall into 4 tabs) */}
+          {/* Settings Tabs (Fix 15: split single scroll wall into 4 tabs) */}
           <Tabs value={settingsTab} onValueChange={setSettingsTab} className="mb-8">
-            <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6 mobile-tabs-scroll">
-              <TabsTrigger value="profile">Trust Profile</TabsTrigger>
-              <TabsTrigger value="people">People</TabsTrigger>
-              <TabsTrigger value="compliance">Governance</TabsTrigger>
-              <TabsTrigger value="account">Account &amp; Billing</TabsTrigger>
+            <TabsList className={`grid ${rolePage ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3'} mb-6 mobile-tabs-scroll`}>
+              {!rolePage && <TabsTrigger value="profile">Trust Profile</TabsTrigger>}
+              {rolePage && <TabsTrigger value="people">Trust Roles</TabsTrigger>}
+              {!rolePage && <TabsTrigger value="compliance">Governance</TabsTrigger>}
+              {!rolePage && <TabsTrigger value="account">Account &amp; Billing</TabsTrigger>}
             </TabsList>
 
           <TabsContent value="profile">

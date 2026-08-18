@@ -477,6 +477,11 @@ const AppRouter = () => {
           <SettingsPage />
         </ProtectedRoute>
       } />
+      <Route path="/trust-roles" element={
+        <ProtectedRoute>
+          <SettingsPage />
+        </ProtectedRoute>
+      } />
       <Route path="/settings/billing" element={
         <ProtectedRoute>
           <BillingPage />
