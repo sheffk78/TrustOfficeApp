@@ -142,10 +142,10 @@ export function useDashboardData() {
 
   const toggleOnboardingStep = async (field, currentValue) => {
     try {
-      // The consolidated Trustee Roles step maps to the two legacy backend
-      // flags so existing onboarding records remain compatible.
+      // The consolidated Trustee Roles step controls the required successor
+      // setup flag. Preserve the optional/deferred protector decision.
       const update = field === 'trustee_roles'
-        ? { successor_trustee_added: !currentValue, trust_protector_added: !currentValue }
+        ? { successor_trustee_added: !currentValue }
         : { [field]: !currentValue };
       const res = await fetchWithAuth('/onboarding', {
         method: 'PATCH',
@@ -162,7 +162,7 @@ export function useDashboardData() {
         onboarding_state: {
           ...prev.onboarding_state,
           ...(field === 'trustee_roles'
-            ? { successor_trustee_added: !currentValue, trust_protector_added: !currentValue }
+            ? { successor_trustee_added: !currentValue }
             : { [field]: !currentValue }),
         }
       }));

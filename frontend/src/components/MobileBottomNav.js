@@ -6,6 +6,7 @@ import {
   Bot,
   MoreHorizontal,
   Settings,
+  UsersRound,
   Network,
   MessageSquare,
   FolderOpen,
@@ -42,6 +43,7 @@ const primaryNav = [
 // ═══ Secondary items shown in the 'More' slide-up panel ═══
 const moreNav = [
   { path: '/settings', icon: Settings, label: 'Settings' },
+  { path: '/trust-roles', icon: UsersRound, label: 'Trust Roles' },
   { path: '/structures', icon: Network, label: 'Structure' },
   { path: '/messaging', icon: MessageSquare, label: 'Messages' },
   { path: '/vault', icon: FolderOpen, label: 'Vault' },

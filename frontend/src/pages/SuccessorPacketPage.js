@@ -220,7 +220,7 @@ const SuccessorPacketPage = () => {
                 <PageHelpButton
                   items={[
                     { text: 'This packet compiles everything a successor trustee needs if the current trustee dies or becomes incapacitated' },
-                    { text: 'Fill in successor trustee info and key contacts in Settings first for a complete packet' },
+                    { text: 'Fill in successor trustee info and key contacts in Trust Roles first for a complete packet' },
                     { text: 'Print on standard letter-size paper. Uses your browser print dialog.' },
                     { text: 'You can also email a secure link to your successor trustee that is valid for 30 days.' },
                   ]}

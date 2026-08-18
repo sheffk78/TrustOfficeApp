@@ -435,7 +435,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
               data-testid="confirm-successor-trustee-input"
             />
             <p className="text-xs text-muted-foreground mt-1.5">
-              The person who steps in to manage the trust if you can no longer serve. You can add their contact details and a letter of guidance later in Settings.
+              The person who steps in to manage the trust if you can no longer serve. You can add their contact details and a letter of guidance later in Trust Roles.
             </p>
           </div>
 
@@ -455,7 +455,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
               data-testid="confirm-secondary-successor-trustee-input"
             />
             <p className="text-xs text-muted-foreground mt-1.5">
-              Backup successor trustee — steps in if the primary successor cannot serve. You can add their contact details later in Settings.
+              Backup successor trustee — steps in if the primary successor cannot serve. You can add their contact details later in Trust Roles.
             </p>
           </div>
 

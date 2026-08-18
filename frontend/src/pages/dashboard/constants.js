@@ -112,7 +112,9 @@ export function getOnboardingProgress(onboarding, selectedTrust) {
   const steps = [
     { id: 'trust_doc', label: 'Add your trust document', done: onboarding.trust_doc_uploaded, action: '/vault', priority: 1, field: 'trust_doc_uploaded' },
     { id: 'beneficiaries', label: 'Add beneficiaries', done: onboarding.beneficiaries_added, action: '/beneficiaries', priority: 2, field: 'beneficiaries_added' },
-    { id: 'trustee_roles', label: 'Update trustee roles', done: onboarding.successor_trustee_added && onboarding.trust_protector_added, action: '/trust-roles', priority: 3, field: 'trustee_roles' },
+    // Trust protector is optional and can be explicitly deferred. The
+    // canonical setup step is complete once successor-trustee setup is done.
+    { id: 'trustee_roles', label: 'Update trustee roles', done: onboarding.successor_trustee_added, action: '/trust-roles', priority: 3, field: 'trustee_roles' },
     { id: 'assets', label: 'Add your trust assets', done: onboarding.assets_added, action: '/schedule-a', priority: 4, field: 'assets_added' },
     { id: 'minutes', label: 'Hold your first trustee meeting', done: onboarding.minutes_generated, action: '/minutes/create?type=initial_trustee_meeting', priority: 5, field: 'minutes_generated' },
     { id: 'ein_doc', label: 'Add EIN letter to vault', done: onboarding.ein_doc_uploaded, action: '/vault', priority: 6, field: 'ein_doc_uploaded' },
