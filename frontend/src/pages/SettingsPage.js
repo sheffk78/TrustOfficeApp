@@ -661,9 +661,31 @@ export default function SettingsPage() {
       });
 
       if (!response.ok) {
-        // Extract the real error message from the API response
+        // On 401 (session expired), fetchWithAuth has already dispatched the
+        // 'session-expired' event which clears the token and redirects to
+        // /login. Don't show a misleading "Failed to update trust" toast on
+        // top of that redirect — just bail out silently.
+        if (response.status === 401) {
+          return;
+        }
+
+        // Extract the real error message from the API response.
+        // FastAPI validation errors come back as { detail: [{ msg }, ...] };
+        // other errors use { detail: "string" } or { message: "string" }.
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.detail || 'Failed to update trust. Please try again.');
+        let backendMessage = '';
+        if (typeof errData.detail === 'string') {
+          backendMessage = errData.detail;
+        } else if (Array.isArray(errData.detail)) {
+          // FastAPI validation error: array of { loc, msg, type }
+          backendMessage = errData.detail
+            .map(e => e?.msg || (typeof e === 'string' ? e : JSON.stringify(e)))
+            .filter(Boolean)
+            .join('; ');
+        } else if (typeof errData.message === 'string') {
+          backendMessage = errData.message;
+        }
+        throw new Error(backendMessage || 'Failed to update trust. Please try again.');
       }
 
       const updatedTrust = await response.json();

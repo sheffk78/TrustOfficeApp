@@ -24,6 +24,37 @@ const hasStoredToken = () => {
   return localStorage.getItem('auth_token') !== null;
 };
 
+// Public routes that don't require authentication (mirrors App.js routes
+// that are NOT wrapped in ProtectedRoute / SubscriptionProtectedRoute).
+// A 401 from /auth/me on these pages is expected (visitor with a stale token)
+// and must NOT be reported as a 'major' auth_check error.
+const PUBLIC_PAGES = [
+  '/',
+  '/login',
+  '/signup',
+  '/register',
+  '/wingpoint',
+  '/connect/wingpoint',
+  '/pricing',
+  '/affiliate',
+  '/help',
+  '/about',
+  '/forgot-password',
+  '/reset-password',
+  '/successor-access',
+  '/trust-governance-offer',
+  '/auth/callback',
+  '/auth/google/callback',
+];
+
+const isPublicPage = (pathname) => {
+  return PUBLIC_PAGES.some(p => {
+    if (p === '/') return pathname === '/';
+    // /successor-access has a :token param, so use startsWith
+    return pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p);
+  });
+};
+
 // Named predicate: is the given email the primary admin?
 const isPrimaryAdmin = (email) => {
   return Boolean(email) && email.toLowerCase() === PRIMARY_ADMIN_EMAIL;
@@ -334,6 +365,20 @@ const useAuthCheck = ({
       return;
     }
 
+    // Skip the /auth/me check entirely on public pages. A visitor with a
+    // stale token on /pricing, /login, /signup, etc. doesn't need auth —
+    // calling /auth/me just produces an expected 401 that gets reported as
+    // a spurious 'auth_check' error. Clear the stale token silently and
+    // let the public page render without authentication.
+    if (isPublicPage(window.location.pathname)) {
+      console.info('[AuthContext] Skipping auth check on public page:', window.location.pathname);
+      localStorage.removeItem('auth_token');
+      setLoading(false);
+      setTrustsLoading(false);
+      authCheckComplete.current = true;
+      return;
+    }
+
     // Prevent duplicate auth checks - but allow if we have a token and no user
     if (isAuthCheckAlreadyDone(authCheckComplete.current, user)) {
       return;
@@ -369,14 +414,11 @@ const useAuthCheck = ({
       // Network errors (fetch throws) should NOT wipe the token — the backend may
       // be temporarily unreachable. Only wipe on explicit 401 (caught above).
       if (error.message === 'Not authenticated') {
-        // Don't report auth_check as 'major' on public pages — a 401 is
-        // expected when visiting /pricing, /login, /signup, etc. without a
-        // token. Only report as 'major' on authenticated pages.
-        const publicPages = ['/pricing', '/login', '/signup', '/forgot-password', '/trust-governance-offer'];
-        const isPublicPage = publicPages.some(p => window.location.pathname.startsWith(p));
-        if (!isPublicPage) {
-          reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'major' });
-        }
+        // We should only reach here on authenticated (non-public) pages because
+        // public pages skip the /auth/me call entirely (see isPublicPage guard
+        // above). Report the 401 as a real auth_check error so we can detect
+        // expired-session issues on protected pages.
+        reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'major' });
         console.error('[AuthContext] Auth check failed: token invalid');
         setUser(null);
         localStorage.removeItem('auth_token');
