@@ -369,7 +369,7 @@ export default function AuthorityPage() {
                     <span className="font-medium text-navy">{rel.parent_entity_id}</span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     <span className="text-xs bg-navy/10 text-navy px-2 py-0.5 rounded font-medium">
-                      {rel.relationship_type.replace(/_/g, ' ')}
+                      {typeof rel.relationship_type === 'string' ? rel.relationship_type.replace(/_/g, ' ') : String(rel.relationship_type || '')}
                       {rel.ownership_percentage && ` (${rel.ownership_percentage}%)`}
                     </span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
