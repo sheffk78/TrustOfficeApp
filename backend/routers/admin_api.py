@@ -39,15 +39,17 @@ router = APIRouter(prefix="/admin-api", tags=["admin-api"])
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 TRUSTOFFICE_PRICE_IDS = {
-    os.environ.get("STRIPE_MONTHLY_PRICE_ID"),
-    os.environ.get("STRIPE_ANNUAL_PRICE_ID"),
-    os.environ.get("STRIPE_TRUSTEE_MONTHLY_PRICE_ID"),
-    os.environ.get("STRIPE_TRUSTEE_ANNUAL_PRICE_ID"),
-    os.environ.get("STRIPE_ESTATE_MONTHLY_PRICE_ID"),
-    os.environ.get("STRIPE_ESTATE_ANNUAL_PRICE_ID"),
-    os.environ.get("STRIPE_ADVISOR_MONTHLY_PRICE_ID"),
-    os.environ.get("STRIPE_ADVISOR_ANNUAL_PRICE_ID"),
-    os.environ.get("STRIPE_WINGPOINT_ANNUAL_PRICE_ID"),
+    pid for pid in (
+        os.environ.get("STRIPE_MONTHLY_PRICE_ID"),
+        os.environ.get("STRIPE_ANNUAL_PRICE_ID"),
+        os.environ.get("STRIPE_TRUSTEE_MONTHLY_PRICE_ID"),
+        os.environ.get("STRIPE_TRUSTEE_ANNUAL_PRICE_ID"),
+        os.environ.get("STRIPE_ESTATE_MONTHLY_PRICE_ID"),
+        os.environ.get("STRIPE_ESTATE_ANNUAL_PRICE_ID"),
+        os.environ.get("STRIPE_ADVISOR_MONTHLY_PRICE_ID"),
+        os.environ.get("STRIPE_ADVISOR_ANNUAL_PRICE_ID"),
+        os.environ.get("STRIPE_WINGPOINT_ANNUAL_PRICE_ID"),
+    ) if pid  # Filter out None / empty strings
 }
 
 
@@ -94,10 +96,10 @@ def _fetch_verified_revenue():
 
         subscriptions = stripe.Subscription.list(status="active", limit=100)
         for subscription in subscriptions.auto_paging_iter():
-            for item in subscription["items"]["data"]:
-                price = item.get("price", {})
+            for item in subscription.get("items", {}).get("data", []):
+                price = item.get("price") or {}
                 price_id = price.get("id")
-                if price_id not in TRUSTOFFICE_PRICE_IDS:
+                if not price_id or price_id not in TRUSTOFFICE_PRICE_IDS:
                     continue
                 unit_amount = price.get("unit_amount") or 0
                 interval = (price.get("recurring") or {}).get("interval")
@@ -109,6 +111,9 @@ def _fetch_verified_revenue():
         return total_cents, invoice_count, mrr_cents
     except stripe.StripeError as exc:
         logger.error("Stripe revenue verification failed: %s", exc)
+        return 0, 0, 0
+    except Exception as exc:
+        logger.error("Revenue verification unexpected error: %s", exc, exc_info=True)
         return 0, 0, 0
 
 # API Key configuration
