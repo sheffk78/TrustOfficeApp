@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Bot, Clock } from 'lucide-react';
+import { AlertTriangle, Bot, Clock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDate, eventTitle } from './calendarHelpers';
 
@@ -11,7 +11,7 @@ import { formatDate, eventTitle } from './calendarHelpers';
 //   nextUp              – the next-up event object (or null)
 //   onCompleteTask      – (taskId) => void
 //   onMarkFiledConfirm  – ({ action, entryId, label, taxYear }) => void
-export default function NextUpWidget({ nextUp, onCompleteTask, onMarkFiledConfirm }) {
+export default function NextUpWidget({ nextUp, onCompleteTask, onMarkFiledConfirm, onDismiss }) {
   if (!nextUp) return null;
 
   const isTax = nextUp.event_type === 'tax_deadline';
@@ -97,6 +97,16 @@ export default function NextUpWidget({ nextUp, onCompleteTask, onMarkFiledConfir
               <Bot className="w-3.5 h-3.5" />
               Ask AI
             </Link>
+            {onDismiss && (
+              <button
+                onClick={onDismiss}
+                className="text-muted-foreground hover:text-navy transition-colors p-1 ml-2"
+                aria-label="Dismiss"
+                data-testid="next-up-dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

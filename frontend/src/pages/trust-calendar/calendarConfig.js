@@ -1,3 +1,5 @@
+import { format, parseISO } from 'date-fns';
+
 // Task types for the create-task modal (minus tax_filing_1041 and tax_filing_k1,
 // which are now handled by the tax calendar)
 export const TASK_TYPES = [
@@ -41,3 +43,20 @@ export const defaultNewTask = (addDays, format) => ({
   due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
   description: '',
 });
+
+// Calculate the next annual review date from a trust's formation date.
+// Returns 'yyyy-MM-dd' string or null if formationDateStr is invalid.
+export const annualReviewDate = (formationDateStr) => {
+  if (!formationDateStr) return null;
+  try {
+    const formation = parseISO(formationDateStr);
+    const now = new Date();
+    // This year's anniversary
+    let nextReview = new Date(now.getFullYear(), formation.getMonth(), formation.getDate());
+    // If already passed this year, use next year
+    if (nextReview < now) {
+      nextReview = new Date(now.getFullYear() + 1, formation.getMonth(), formation.getDate());
+    }
+    return format(nextReview, 'yyyy-MM-dd');
+  } catch { return null; }
+};

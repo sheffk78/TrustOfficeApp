@@ -4,14 +4,14 @@ import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
-import { Calendar } from 'lucide-react';
+import { Calendar, X } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '../utils/api';
 
 // Extracted config + helpers + sub-components (frontend/src/pages/trust-calendar/)
-import { initialTypeFilter, defaultNewTask } from './trust-calendar/calendarConfig';
+import { initialTypeFilter, defaultNewTask, annualReviewDate } from './trust-calendar/calendarConfig';
 import { useCalendarData } from './trust-calendar/useCalendarData';
 import CalendarPageHeader from './trust-calendar/CalendarPageHeader';
 import SummaryRow from './trust-calendar/SummaryRow';
@@ -25,7 +25,7 @@ import NextUpConfirmDialog from './trust-calendar/NextUpConfirmDialog';
 
 export default function TrustCalendarPage() {
   const { selectedTrust } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +36,8 @@ export default function TrustCalendarPage() {
   const [nextUpConfirm, setNextUpConfirm] = useState(null); // null | { action: 'filed'|'extended', entryId, label, taxYear }
   const [newTask, setNewTask] = useState(() => defaultNewTask(addDays, format));
   const [trustProfile, setTrustProfile] = useState({});
+  const [dismissedNextUp, setDismissedNextUp] = useState(false);
+  const [dismissedTaxBanner, setDismissedTaxBanner] = useState(false);
 
   // ── Load unified calendar feed ─────────────────────────────
   const loadEvents = useCallback(async () => {
@@ -72,6 +74,21 @@ export default function TrustCalendarPage() {
       setLoading(false);
     }
   }, [selectedTrust, loadEvents]);
+
+  // ── Auto-open Create Task modal for annual review ───────────
+  useEffect(() => {
+    if (selectedTrust && searchParams.get('action') === 'create_annual_review') {
+      const reviewDate = annualReviewDate(selectedTrust.start_date) || format(addDays(new Date(), 30), 'yyyy-MM-dd');
+      setNewTask({
+        task_type: 'annual_review',
+        due_date: reviewDate,
+        description: 'Annual trust review',
+      });
+      setShowModal(true);
+      // Clear the action query param so it doesn't re-trigger
+      setSearchParams({}, { replace: true });
+    }
+  }, [selectedTrust, searchParams, setSearchParams]);
 
   // ── Derived calendar data (year filter, summary, tabs, next-up, grouped) ──
   const {
@@ -274,24 +291,34 @@ export default function TrustCalendarPage() {
             trustProfile={trustProfile}
           />
 
-          {/* ── "Next Up" Widget ─────────────────────────────── */}
-          {!loading && (
+          {/* ── "Next Up" Widget (priority 1) ─────────────────── */}
+          {!loading && !dismissedNextUp && nextUp && (
             <NextUpWidget
               nextUp={nextUp}
               onCompleteTask={handleCompleteTask}
               onMarkFiledConfirm={setNextUpConfirm}
+              onDismiss={() => setDismissedNextUp(true)}
             />
           )}
 
-          {/* ── Tax Setup Banner ────────────────────────────── */}
-          {!loading && !hasTaxCalendar && (
+          {/* ── Tax Setup Banner (priority 2 — only if NextUp not showing) ── */}
+          {!loading && !hasTaxCalendar && (!nextUp || dismissedNextUp) && !dismissedTaxBanner && (
             <div className="mb-4 flex items-center justify-between gap-3 bg-warning/5 border border-warning/20 px-4 py-3" data-testid="tax-setup-banner">
               <div className="text-sm text-warning">
                 Tax deadlines not set up for {year}.
               </div>
-              <Button size="sm" onClick={generateTaxCalendar} className="btn-primary" data-testid="generate-tax-banner-btn">
-                Generate
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={generateTaxCalendar} className="btn-primary" data-testid="generate-tax-banner-btn">
+                  Generate
+                </Button>
+                <button
+                  onClick={() => setDismissedTaxBanner(true)}
+                  className="text-muted-foreground hover:text-navy transition-colors p-1"
+                  aria-label="Dismiss notification"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
 

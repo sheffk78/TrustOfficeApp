@@ -1,18 +1,28 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2, X } from 'lucide-react';
 import { getNextActionVariantClass } from './constants';
 
 /**
  * "Do This Next" hero card — shows the single highest-priority action,
  * or an "all caught up" card when there are no pending actions.
  */
-export function DashboardNextActionHero({ nextAction }) {
+export function DashboardNextActionHero({ nextAction, onDismiss }) {
   if (nextAction) {
     return (
       <div
-        className={`mb-8 card-trust overflow-hidden ${getNextActionVariantClass(nextAction.variant)}`}
+        className={`mb-8 card-trust overflow-hidden relative ${getNextActionVariantClass(nextAction.variant)}`}
         data-testid="do-this-next-hero"
       >
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            className="absolute top-3 right-3 text-muted-foreground hover:text-navy transition-colors p-1"
+            aria-label="Dismiss"
+            data-testid="next-action-dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">

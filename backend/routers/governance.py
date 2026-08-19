@@ -62,7 +62,7 @@ CRITERIA_CONFIG = {
         "insight_type": "warning",
         "insight_title": "Schedule Annual Review",
         "insight_desc": "Schedule your annual review for +{max_points} points",
-        "action_path": "/calendar",
+        "action_path": "/calendar?action=create_annual_review",
         "action_label": "Schedule Review",
     },
     "Asset Valuation Freshness": {

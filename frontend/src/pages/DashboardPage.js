@@ -7,6 +7,7 @@ import PageHelpButton from '@/components/PageHelpButton';
 import { TrustManager } from '@/components/TrustManager';
 import BankingSummaryCard from '@/components/BankingSummaryCard';
 import SpendingThresholdCard from '@/components/SpendingThresholdCard';
+import { useState } from 'react';
 
 import { useDashboardData } from './dashboard/useDashboardData';
 import { DashboardBanners } from './dashboard/DashboardBanners';
@@ -25,6 +26,8 @@ import { getOnboardingProgress, computeNextAction } from './dashboard/constants'
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [nextActionDismissed, setNextActionDismissed] = useState(false);
+  const [weeklyBriefingDismissed, setWeeklyBriefingDismissed] = useState(false);
   const {
     user,
     selectedTrust,
@@ -171,7 +174,10 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              <DashboardNextActionHero nextAction={nextAction} />
+              <DashboardNextActionHero
+                nextAction={nextActionDismissed ? null : nextAction}
+                onDismiss={() => setNextActionDismissed(true)}
+              />
 
               <DashboardOnboardingChecklist
                 onboarding={onboarding}
@@ -229,8 +235,9 @@ export default function DashboardPage() {
                   />
 
                   <DashboardWeeklyBriefing
-                    weeklyBriefing={weeklyBriefing}
+                    weeklyBriefing={weeklyBriefingDismissed ? [] : weeklyBriefing}
                     insights={insights}
+                    onDismiss={() => setWeeklyBriefingDismissed(true)}
                   />
 
                   <DashboardTaxCalendar

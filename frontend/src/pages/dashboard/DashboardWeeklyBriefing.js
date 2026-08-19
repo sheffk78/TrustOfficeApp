@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CalendarCheck, ArrowRight } from 'lucide-react';
+import { CalendarCheck, ArrowRight, X } from 'lucide-react';
 import { getSeverityClass } from './constants';
 
 /**
@@ -10,7 +10,7 @@ import { getSeverityClass } from './constants';
  * the same destination as a governance insight already shown in Today's Focus
  * are dropped, so the user doesn't see the same recommendation in two places.
  */
-export function DashboardWeeklyBriefing({ weeklyBriefing, insights }) {
+export function DashboardWeeklyBriefing({ weeklyBriefing, insights, onDismiss }) {
   if (!weeklyBriefing || weeklyBriefing.length === 0) return null;
 
   // Build a set of insight action paths for quick dedup lookup.
@@ -39,6 +39,16 @@ export function DashboardWeeklyBriefing({ weeklyBriefing, insights }) {
           <h3 className="font-serif text-lg text-navy">{weeklyBriefing.length} {headingSuffix} need{verbSuffix} your attention</h3>
           <p className="text-sm text-muted-foreground">Weekly briefing</p>
         </div>
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            className="ml-auto text-muted-foreground hover:text-navy transition-colors p-1"
+            aria-label="Dismiss"
+            data-testid="weekly-briefing-dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
       <div className="space-y-2">
         {dedupedBriefing.map((item) => {
