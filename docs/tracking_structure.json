@@ -1,0 +1,181 @@
+{
+  "scheme_name": "TrustOffice UTM/Referral Tracking",
+  "version": "1.0",
+  "last_updated": "2026-08-14",
+  "description": "Full-funnel attribution: marketing UTM, friend referrals, WingPoint partner referrals. Server-side durable event recording with idempotency, carried through to Stripe checkout metadata.",
+  "attribution_channels": {
+    "marketing_utm": {
+      "url_params": ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"],
+      "canonical_source": "{utm_source}_{utm_medium|unknown}",
+      "reward": null,
+      "priority": 3
+    },
+    "friend_referral": {
+      "url_params": ["ref", "referral_code"],
+      "canonical_source": "friend_referral",
+      "reward": "50% off first payment (Stripe coupon REFERRAL50); referrer reward via process_referral_conversion",
+      "priority": 2
+    },
+    "wingpoint_partner_referral": {
+      "url_params": ["wp_ref", "wp_trust_name"],
+      "canonical_source": "wingpoint_referral",
+      "reward": "WingPoint plan gating; is_wingpoint flag",
+      "priority": 1
+    }
+  },
+  "canonical_source_resolution": {
+    "function": "resolve_signup_source / resolve_signup_source_from_payload",
+    "location": "backend/tracking/utm_tracker.py",
+    "priority_order": [
+      "wp_ref present -> wingpoint_referral",
+      "referral_code present -> friend_referral",
+      "utm_source present -> {utm_source}_{utm_medium|unknown} (sanitized, lowercased)",
+      "otherwise -> direct"
+    ]
+  },
+  "data_flow": [
+    {
+      "stage": "first_touch",
+      "trigger": "Landing page load with UTM/referral query params",
+      "component": "frontend/src/utils/utmCapture.js",
+      "action": "captureUtmParams() reads URL, sanitizes, writes to sessionStorage with 'utm_' prefix. URL overwrites stored params (last-touch).",
+      "storage": "sessionStorage: utm_utm_source, utm_utm_campaign, utm_utm_medium, utm_utm_content, utm_utm_term, utm_referrer, utm_ref, utm_wp_ref, utm_wp_trust_name"
+    },
+    {
+      "stage": "lead_capture",
+      "trigger": "POST /api/admin/leads/capture",
+      "component": "backend/routers/leads.py",
+      "action": "Creates/updates lead in db.leads; calls record_lead_capture() -> analytics._record_event('lead_captured')",
+      "idempotency_key": "lead_capture_{lead_id}_{source}",
+      "event_metadata": ["lead_id", "source", "utm_source", "utm_campaign", "utm_medium", "referrer", "is_returning"]
+    },
+    {
+      "stage": "signup",
+      "trigger": "POST /api/auth/register (or OAuth callback)",
+      "component": "backend/routers/auth.py",
+      "action": "Sanitizes UTM via _clean_utm(); creates user doc with utm_*, referrer, referral_code, wp_ref; resolves referral; sets is_wingpoint. (Design: record_signup_attribution() should be called here for signup_complete event.)",
+      "idempotency_key": "signup_{user_id}",
+      "user_doc_fields": ["utm_source", "utm_campaign", "utm_medium", "referrer", "referral_code", "wp_ref", "wp_trust_name", "is_wingpoint", "source", "created_via"]
+    },
+    {
+      "stage": "checkout",
+      "trigger": "POST /api/subscriptions/create-checkout",
+      "component": "backend/routers/subscriptions.py",
+      "action": "Builds Stripe checkout session with metadata {user_id, plan_type, billing_period, utm_source, utm_campaign, utm_medium, referrer}; sets client_reference_id=Rewardful referral_id; applies REFERRAL50 coupon if friend referral.",
+      "stripe_metadata": ["user_id", "plan_type", "billing_period", "utm_source", "utm_campaign", "utm_medium", "referrer"]
+    },
+    {
+      "stage": "purchase_complete",
+      "trigger": "Stripe webhook: checkout.session.completed",
+      "component": "backend/routers/subscriptions.py -> backend/routers/analytics.py",
+      "action": "Reads session.metadata; creates/updates subscription; record_purchase_complete() -> _record_event('purchase_complete'); _process_referral_conversion_safe(user_id).",
+      "idempotency_key": "purchase_{checkout_session_id}",
+      "event_metadata": ["user_id", "plan_type", "billing_period", "amount", "currency", "checkout_session_id", "stripe_subscription_id", "referral_id", "coupon"]
+    }
+  ],
+  "events": {
+    "lead_captured": {
+      "idempotency_key": "lead_capture_{lead_id}_{source}",
+      "user_id": null,
+      "session_id": "lead_id",
+      "metadata_fields": ["lead_id", "source", "utm_source", "utm_campaign", "utm_medium", "referrer", "is_returning"]
+    },
+    "signup_complete": {
+      "idempotency_key": "signup_{user_id}",
+      "user_id": "user_id",
+      "session_id": null,
+      "metadata_fields": ["email", "source", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "referrer", "referral_code", "wp_ref"]
+    },
+    "purchase_complete": {
+      "idempotency_key": "purchase_{checkout_session_id}",
+      "user_id": "user_id",
+      "session_id": "checkout_session_id",
+      "metadata_fields": ["user_id", "plan_type", "billing_period", "amount", "currency", "checkout_session_id", "stripe_subscription_id", "referral_id", "coupon"]
+    }
+  },
+  "collections": {
+    "users": {
+      "attribution_fields": ["utm_source", "utm_campaign", "utm_medium", "referrer", "referral_code", "wp_ref", "wp_trust_name"],
+      "derived_fields": ["is_wingpoint", "source", "created_via"]
+    },
+    "referral_codes": {
+      "fields": ["referral_id", "user_id", "code", "created_at", "referee_user_id", "discount_applied", "converted_at", "reward_status"],
+      "code_format": "4 chars from name (uppercase alphanumeric, padded with X) + 4 random alphanumeric = 8 chars",
+      "discount": "REFERRAL50 coupon (50% off, duration once)"
+    },
+    "analytics_events": {
+      "fields": ["event_name", "user_id", "session_id", "metadata", "idempotency_key", "created_at"],
+      "index": "unique sparse on idempotency_key (race-safe dedupe)"
+    },
+    "leads": {
+      "fields": ["lead_id", "email", "name", "source", "stage", "score", "utm_source", "utm_campaign", "utm_medium", "created_at", "converted_user_id", "activity_log"],
+      "stages": ["new", "engaged", "warm", "converted", "lost"],
+      "sources_enum": ["trustee-101-landing-page", "trustee-90-day-checklist", "commingling-checklist", "blog-subscribe", "blog-article-pdf", "webinar-signup", "booked-call", "resources-subscribe"]
+    }
+  },
+  "sanitization": {
+    "backend_function": "clean_utm (backend/tracking/utm_tracker.py)",
+    "frontend_function": "sanitize (frontend/src/utils/utmCapture.js)",
+    "rules": [
+      "strip control chars (\\x00-\\x1f, \\x7f)",
+      "strip angle brackets (<>)",
+      "collapse whitespace",
+      "cap length: 200 chars (UTM), 500 chars (referrer), 50 chars (referral codes, wp_ref)"
+    ]
+  },
+  "reporting": {
+    "function": "get_attribution_summary(start_date, end_date)",
+    "location": "backend/tracking/utm_tracker.py",
+    "returns": {
+      "signups_by_source": [{ "source": "string", "count": "int" }],
+      "purchases_by_source": [{ "source": "string", "count": "int", "revenue": "float" }]
+    },
+    "funnel_join": "lead_captured -> signup_complete on email; signup_complete -> purchase_complete on user_id"
+  },
+  "gaps": [
+    {
+      "id": "signup_event_not_wired",
+      "severity": "high",
+      "description": "record_signup_attribution() exists but is not called from auth.py register endpoint. No signup_complete analytics event is created.",
+      "recommendation": "Call record_signup_attribution() in auth.py after user creation (password + OAuth paths)."
+    },
+    {
+      "id": "missing_utm_content_term_on_user",
+      "severity": "medium",
+      "description": "UserCreate model lacks utm_content and utm_term. Frontend captures them but they are dropped at the API boundary.",
+      "recommendation": "Add utm_content and utm_term to UserCreate; persist on user doc."
+    },
+    {
+      "id": "lead_capture_partial_attribution",
+      "severity": "medium",
+      "description": "LeadCapture model has utm_source/campaign/medium but not utm_content, utm_term, referral_code, wp_ref. Leads arriving via referral links or A/B creative variants lose that data.",
+      "recommendation": "Extend LeadCapture model and record_lead_capture() with full attribution set."
+    },
+    {
+      "id": "last_touch_only",
+      "severity": "low",
+      "description": "Current scheme is last-touch only (URL overwrites sessionStorage). First marketing touch is lost if a later click occurs.",
+      "recommendation": "Add first_touch_utm snapshot set once, never overwritten, for multi-touch attribution."
+    },
+    {
+      "id": "no_ad_platform_server_side_forwarding",
+      "severity": "medium",
+      "description": "GA4 Measurement Protocol and Meta Conversions API server-side calls are not configured. Events recorded internally only.",
+      "recommendation": "Add forwarding calls in analytics.py after _record_event() when ad platform credentials are available."
+    }
+  ],
+  "file_map": {
+    "backend/tracking/utm_tracker.py": "Core attribution logic: clean_utm, resolve_signup_source, extract_utm_params, record_signup_attribution, build_checkout_metadata, get_attribution_summary",
+    "backend/tracking/__init__.py": "Package exports",
+    "backend/routers/analytics.py": "Durable event recording: _record_event, record_lead_capture, record_purchase_complete",
+    "backend/routers/auth.py": "Signup attribution, OAuth wp_ref survival",
+    "backend/routers/leads.py": "Lead capture with source enum and scoring",
+    "backend/routers/subscriptions.py": "Checkout metadata, Stripe webhook purchase recording, referral conversion",
+    "backend/routers/referrals.py": "Friend referral program: code generation, Stripe coupon, conversion rewards",
+    "backend/models.py": "UserCreate, CheckoutRequest, LeadCapture models",
+    "frontend/src/utils/utmCapture.js": "Client-side UTM/referral capture to sessionStorage",
+    "frontend/src/utils/analytics.js": "Client-side analytics events",
+    "docs/UTM_REFERRAL_TRACKING_SCHEME.md": "This scheme documentation",
+    "docs/tracking_structure.json": "Machine-readable tracking structure (this file)"
+  }
+}

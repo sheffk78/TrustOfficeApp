@@ -112,7 +112,7 @@ const SuccessorPacketPage = () => {
           fetchWithAuth(`/entities?trust_id=${tid}`).catch(() => null),
           fetchWithAuth(`/beneficiaries/dashboard?trust_id=${tid}`).catch(() => null),
           fetchWithAuth(`/trusts/${tid}/bank-accounts`).catch(() => null),
-          fetchWithAuth(`/vault?trust_id=${tid}`).catch(() => null),
+          fetchWithAuth(`/trusts/${tid}/vault/documents`).catch(() => null),
           fetchWithAuth(`/governance/tasks?trust_id=${tid}`).catch(() => null),
           fetchWithAuth(`/trusts/${tid}/tax-calendar`).catch(() => null),
         ]);

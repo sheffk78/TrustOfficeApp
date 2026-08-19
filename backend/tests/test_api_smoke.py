@@ -164,7 +164,7 @@ class TestAuth:
             ("/api/distributions", "GET"),
             ("/api/beneficiaries", "GET"),
             ("/api/governance/nonexistent", "GET"),  # governance requires {trust_id} path param
-            ("/api/vault", "GET"),
+            ("/api/trusts/test-nonexistent/vault/documents", "GET"),
             ("/api/audit-logs", "GET"),
         ]
         for path, method in endpoints:
