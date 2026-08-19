@@ -267,26 +267,31 @@
     border-color: var(--navy);
 }
 
-/* Input styles */
-.input-trust {
-    @apply border-primary/30 focus:border-primary focus:ring-1 focus:ring-secondary bg-white font-mono text-sm h-10 px-3;
-    border-radius: 0 !important;
-}
+/* Input styles — in @layer components so Tailwind utility classes
+   (pl-10, pl-9, pr-8, pr-10, etc.) can override the px-3 default.
+   Without @layer, unlayered CSS always beats @layer utilities, causing
+   icon overlap bugs on inputs with absolutely-positioned icons. */
+@layer components {
+    .input-trust {
+        @apply border-primary/30 focus:border-primary focus:ring-1 focus:ring-secondary bg-white font-mono text-sm h-10 px-3;
+        border-radius: 0 !important;
+    }
 
-/* Chat textarea — overrides .input-trust for the chat input specifically.
-   Removes border (the wrapper provides visual containment), adds generous
-   padding so placeholder/text isn't crammed against the edge, and lets the
-   textarea grow naturally as the user types. */
-textarea.input-trust {
-    @apply border-0 bg-transparent focus:ring-0 font-sans text-sm;
-    padding: 12px 16px;
-    line-height: 1.6;
-    resize: none;
-    overflow-y: auto;
-}
+    /* Chat textarea — overrides .input-trust for the chat input specifically.
+       Removes border (the wrapper provides visual containment), adds generous
+       padding so placeholder/text isn't crammed against the edge, and lets the
+       textarea grow naturally as the user types. */
+    textarea.input-trust {
+        @apply border-0 bg-transparent focus:ring-0 font-sans text-sm;
+        padding: 12px 16px;
+        line-height: 1.6;
+        resize: none;
+        overflow-y: auto;
+    }
 
-.dark .input-trust {
-    @apply bg-slate-800 border-slate-600 text-white;
+    .dark .input-trust {
+        @apply bg-slate-800 border-slate-600 text-white;
+    }
 }
 
 /* Card styles */
