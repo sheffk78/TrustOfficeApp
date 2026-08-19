@@ -243,10 +243,10 @@ WRITE_EXEMPT_PATHS = {
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
     "/api/auth/connect/wingpoint/confirm",
-    "/api/auth/profile",  # Allow profile updates
-    "/api/trusts",  # Allow trust creation — first trust is needed for onboarding; multiple-trust gate is enforced in the route handler
-    "/api/demo/seed",  # Allow demo data seeding — onboarding feature for new users
     # Contact Memory — inbound email flow + interaction logging are write operations
+    # First-trust creation stays exempt so free users can onboard; multi-trust
+    # gating is enforced in the route handler via check_feature_access.
+    "/api/trusts",
     "/api/contact-memory/email-flow",
     "/api/contact-memory/interactions",
 }

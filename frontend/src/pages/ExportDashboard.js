@@ -28,7 +28,7 @@ function formatBytes(bytes) {
 }
 
 export default function ExportDashboard() {
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, isReadOnly } = useAuth();
   const [format, setFormat] = useState('json');
   const [exportingTrust, setExportingTrust] = useState(false);
   const [exportingClient, setExportingClient] = useState(false);
@@ -259,7 +259,7 @@ export default function ExportDashboard() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <Button
                     onClick={handleExportTrust}
-                    disabled={exportingTrust}
+                    disabled={exportingTrust || isReadOnly}
                     className="btn-primary"
                     data-testid="export-trust-btn"
                   >
@@ -278,7 +278,7 @@ export default function ExportDashboard() {
                   {clientId && (
                     <Button
                       onClick={handleExportClient}
-                      disabled={exportingClient}
+                      disabled={exportingClient || isReadOnly}
                       variant="outline"
                       className="btn-secondary"
                       data-testid="export-client-btn"
@@ -315,7 +315,7 @@ export default function ExportDashboard() {
                   </div>
                   <Button
                     onClick={handleCreateArchive}
-                    disabled={creatingArchive}
+                    disabled={creatingArchive || isReadOnly}
                     className="btn-primary"
                     data-testid="create-archive-btn"
                   >

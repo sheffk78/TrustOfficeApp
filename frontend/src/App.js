@@ -66,7 +66,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { UpgradeModalProvider } from "@/context/UpgradeModalContext";
-import { SubscriptionGate } from "@/components/SubscriptionGate";
+import { SubscriptionGate, FullSubscriptionGate } from "@/components/SubscriptionGate";
 import { installGlobalErrorHandlers } from "@/utils/errors";
 import CoursePage from "@/pages/CoursePage";
 import TrustAdminKitsPage from "@/pages/TrustAdminKitsPage";
@@ -188,6 +188,18 @@ const SubscriptionProtectedRoute = ({ children }) => {
       <SubscriptionGate>
         {children}
       </SubscriptionGate>
+    </ProtectedRoute>
+  );
+};
+
+// Hard paywall for Trust Assistant: users retain their records elsewhere,
+// but non-paying/read-only accounts cannot use AI chat or its actions.
+const FullSubscriptionProtectedRoute = ({ children }) => {
+  return (
+    <ProtectedRoute>
+      <FullSubscriptionGate>
+        {children}
+      </FullSubscriptionGate>
     </ProtectedRoute>
   );
 };
@@ -433,10 +445,12 @@ const AppRouter = () => {
           <RiskDashboardPage />
         </SubscriptionProtectedRoute>
       } />
+      {/* Trust Assistant is a write/AI feature: free and expired accounts
+          may retain their records, but must not open or use chat. */}
       <Route path="/trust-assistant" element={
-        <SubscriptionProtectedRoute>
+        <FullSubscriptionProtectedRoute>
           <TrustAssistantPage />
-        </SubscriptionProtectedRoute>
+        </FullSubscriptionProtectedRoute>
       } />
 <Route path="/course" element={<ProtectedRoute><CoursePage /></ProtectedRoute>} />
       <Route path="/course/lesson/:lessonNumber" element={<ProtectedRoute><CoursePage /></ProtectedRoute>} />

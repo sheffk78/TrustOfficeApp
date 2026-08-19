@@ -358,7 +358,7 @@ async def chat(
 async def list_conversations(
     trust_id: Optional[str] = None,
     limit: int = 20,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """List recent conversations for the user."""
     query = {"user_id": user["user_id"]}
@@ -395,7 +395,7 @@ async def list_conversations(
 @router.get("/chat/conversations/{conversation_id}")
 async def get_conversation(
     conversation_id: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """Get a full conversation by ID."""
     conv = await db.chat_conversations.find_one(
@@ -2011,8 +2011,8 @@ async def rename_conversation(
 
 
 @router.get("/chat/status")
-async def chat_status(user: dict = Depends(get_current_user)):
-    """Check if the chat feature is available."""
+async def chat_status(user: dict = Depends(require_write_access)):
+    """Check if the chat feature is available to this subscription."""
     return {
         "chat_enabled": True,
         "conversation_count": await db.chat_conversations.count_documents({
@@ -2211,7 +2211,7 @@ async def _chat_stream_generator(
 @router.get("/chat/conversations/{conversation_id}/latest")
 async def get_latest_assistant_message(
     conversation_id: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_write_access),
 ):
     """
     Polling endpoint for disconnected clients.

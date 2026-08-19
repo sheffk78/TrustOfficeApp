@@ -755,6 +755,7 @@ async def gift_subscription(
             "plan_type": plan,
             "activated_at": now.isoformat(),
             "current_period_end": current_period_end,
+            "gift_end_date": current_period_end,
             "gifted": True,
             "gift_type": plan,
             "gift_reason": body.reason,

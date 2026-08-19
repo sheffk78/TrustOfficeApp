@@ -119,9 +119,19 @@ export const SubscriptionGate = ({ children }) => {
 export const FullSubscriptionGate = ({ children }) => {
   const navigate = useNavigate();
   const { user, subscription, subscriptionExpired, isReadOnly, loading } = useAuth();
+  const [subscriptionLoadTimedOut, setSubscriptionLoadTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!loading && subscription) {
+      setSubscriptionLoadTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setSubscriptionLoadTimedOut(true), 10000);
+    return () => clearTimeout(timer);
+  }, [loading, subscription]);
 
   // Don't block while loading - show loading spinner instead
-  if (loading || !subscription) {
+  if ((loading || !subscription) && !subscriptionLoadTimedOut) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto"></div>

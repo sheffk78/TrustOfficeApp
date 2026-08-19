@@ -369,7 +369,7 @@ async def create_minutes_draft(
 @router.post("/governance-suggestions", response_model=GovernanceSuggestionsResponse)
 async def get_governance_suggestions(
     trust_id: Optional[str] = None,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_write_access)
 ):
     """
     Generate AI-powered governance improvement suggestions.

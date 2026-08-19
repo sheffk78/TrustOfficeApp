@@ -290,10 +290,9 @@ def _apply_gifted_override(state: SubscriptionState, sub: dict, now: datetime):
 
     state.gift_days_remaining = max(0, (gift_end - now).days)
 
-    # If gift expired and no active paid subscription, mark as expired
-    has_active_paid_sub = sub.get("stripe_subscription_id") or sub.get("plan_type") in (
-        "monthly", "annual", "trustee", "estate", "advisor"
-    )
+    # A gift is not a paid subscription. Only a real Stripe subscription
+    # preserves access after the gift window ends.
+    has_active_paid_sub = bool(sub.get("stripe_subscription_id"))
     if gift_end < now and not has_active_paid_sub:
         state.status = "expired"
         state.is_active = False

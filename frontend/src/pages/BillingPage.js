@@ -26,7 +26,7 @@ import BillingFAQ from './billing/BillingFAQ';
 export default function BillingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, loadSubscriptionState } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -156,7 +156,8 @@ export default function BillingPage() {
       if (response.ok) {
         const data = await response.json();
         toast.success(data.message || `Plan changed to ${planDisplayName(planId)}.`);
-        loadSubscription();
+        await loadSubscriptionState(user?.email);
+        await loadSubscription();
       } else {
         const error = await response.json();
         showError(toast, new Error(error.detail || 'Could not change plan. Please try again or contact support@trustoffice.app.'), { operation: 'change_plan', page: 'Billing' });
@@ -179,7 +180,8 @@ export default function BillingPage() {
       if (response.ok) {
         const data = await response.json();
         toast.success(data.message);
-        loadSubscription();
+        await loadSubscriptionState(user?.email);
+        await loadSubscription();
       } else {
         const error = await response.json();
         showError(toast, new Error(error.detail || 'Could not cancel subscription. Please try again or contact support@trustoffice.app.'), { operation: 'cancel_subscription', page: 'Billing' });
@@ -198,7 +200,8 @@ export default function BillingPage() {
       if (response.ok) {
         const data = await response.json();
         toast.success(data.message);
-        loadSubscription();
+        await loadSubscriptionState(user?.email);
+        await loadSubscription();
       } else {
         const error = await response.json();
         showError(toast, new Error(error.detail || 'Could not reactivate subscription. Please try again or contact support@trustoffice.app.'), { operation: 'reactivate_subscription', page: 'Billing' });

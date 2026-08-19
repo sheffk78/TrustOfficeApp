@@ -116,6 +116,11 @@ WRITE_GATED_ENDPOINTS = [
     ('POST', '/create', "beneficiaries.py"),
 ]
 
+AI_WRITE_GATED_ENDPOINTS = [
+    ('POST', 'async def get_governance_suggestions', "ai.py"),
+    ('POST', 'async def create_minutes_draft', "ai.py"),
+]
+
 
 class TestGatingModelInvariants:
     """Static guard: the route decorators in the source must reflect the model."""
@@ -149,6 +154,17 @@ class TestGatingModelInvariants:
         block = src[src.find(frag)-50:src.find(frag)+600]
         assert "require_write_access" in block, \
             f"{frag} must be gated with require_write_access: {block[:200]}"
+
+    @pytest.mark.parametrize("method,frag,router_file", AI_WRITE_GATED_ENDPOINTS)
+    def test_ai_write_endpoints_use_write_access(self, method, frag, router_file):
+        import os
+        base = os.path.join(os.path.dirname(__file__), "..", "routers")
+        src = open(os.path.join(base, router_file)).read()
+        assert frag in src, f"route {frag} not in {router_file}"
+        start = src.find(frag)
+        next_route = src.find("\n@router.", start + 1)
+        block = src[start:next_route if next_route != -1 else start + 1000]
+        assert "require_write_access" in block
 
 
 if __name__ == "__main__":

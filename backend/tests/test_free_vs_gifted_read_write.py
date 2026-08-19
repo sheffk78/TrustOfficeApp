@@ -12,10 +12,14 @@ Pure-unit tests on the state builders — no live server or DB required.
 """
 import datetime
 from datetime import timezone
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import pytest
 
-from dependencies import _build_free_state, _build_forever_free_state
+from dependencies import _build_free_state, _build_forever_free_state, _build_paid_state
 
 
 def _mk_sub(**overrides):
@@ -82,6 +86,15 @@ def test_expired_gifted_user_is_read_only():
     state = _build_free_state("user_test", sub, NOW)
     assert state.is_gifted is True
     assert state.status == "expired"
+    assert state.is_active is False
+    assert state.is_read_only is True
+
+
+def test_expired_gifted_paid_plan_is_read_only_without_stripe_subscription():
+    """A paid-looking admin gift is still time-limited until Stripe payment exists."""
+    sub = _mk_sub(plan_type="trustee", gifted=True, gift_type="trustee", gift_end_date=PAST)
+    state = _build_paid_state("user_test", sub, NOW)
+    assert state.is_gifted is True
     assert state.is_active is False
     assert state.is_read_only is True
 
