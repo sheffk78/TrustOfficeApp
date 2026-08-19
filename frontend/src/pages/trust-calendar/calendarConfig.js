@@ -46,16 +46,20 @@ export const defaultNewTask = (addDays, format) => ({
 
 // Calculate the next annual review date from a trust's formation date.
 // Returns 'yyyy-MM-dd' string or null if formationDateStr is invalid.
+// The first annual review is 1 year after formation. If that date has
+// already passed, advance to the next anniversary that's still upcoming.
 export const annualReviewDate = (formationDateStr) => {
   if (!formationDateStr) return null;
   try {
     const formation = parseISO(formationDateStr);
     const now = new Date();
-    // Always use this year's anniversary — even if it's already passed.
-    // The dashboard insight fires when the annual review is overdue, so the
-    // task must appear in the current year's calendar (as overdue) to be
-    // visible and actionable. Pushing it to next year makes it invisible.
-    const thisYearReview = new Date(now.getFullYear(), formation.getMonth(), formation.getDate());
-    return format(thisYearReview, 'yyyy-MM-dd');
+    // First annual review = formation date + 1 year
+    let reviewDate = new Date(formation.getFullYear() + 1, formation.getMonth(), formation.getDate());
+    // If that anniversary has already passed, keep advancing by 1 year
+    // until we reach an upcoming date.
+    while (reviewDate < now) {
+      reviewDate = new Date(reviewDate.getFullYear() + 1, formation.getMonth(), formation.getDate());
+    }
+    return format(reviewDate, 'yyyy-MM-dd');
   } catch { return null; }
 };

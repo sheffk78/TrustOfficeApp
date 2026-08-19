@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Calendar, X } from 'lucide-react';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '../utils/api';
@@ -79,6 +79,12 @@ export default function TrustCalendarPage() {
   useEffect(() => {
     if (selectedTrust && searchParams.get('action') === 'create_annual_review') {
       const reviewDate = annualReviewDate(selectedTrust.start_date) || format(addDays(new Date(), 30), 'yyyy-MM-dd');
+      // Auto-switch calendar year to the review date's year so the
+      // created task is immediately visible in the event list.
+      try {
+        const reviewYear = parseISO(reviewDate).getFullYear();
+        if (reviewYear !== year) setYear(reviewYear);
+      } catch { /* ignore parse errors */ }
       setNewTask({
         task_type: 'annual_review',
         due_date: reviewDate,
@@ -174,6 +180,13 @@ export default function TrustCalendarPage() {
       if (res.ok) {
         toast.success('Task created');
         setShowModal(false);
+        // Switch calendar year to the new task's due_date year so it's visible.
+        if (newTask.due_date) {
+          try {
+            const taskYear = parseISO(newTask.due_date).getFullYear();
+            if (taskYear !== year) setYear(taskYear);
+          } catch { /* ignore parse errors */ }
+        }
         setNewTask(defaultNewTask(addDays, format));
         loadEvents();
       }

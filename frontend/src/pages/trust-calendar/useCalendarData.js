@@ -63,12 +63,14 @@ export function useCalendarData(events, year, statusFilter, typeFilter) {
   );
 
   // ── "Next Up" widget: most urgent pending item ──────────────
+  // Uses ALL events (not just yearEvents) so future-year tasks like
+  // a 2027 annual review still appear as "Next Up" when viewing 2026.
   const nextUp = useMemo(() => {
-    const pending = yearEvents.filter((e) => e.status !== 'completed' && e.date);
+    const pending = events.filter((e) => e.status !== 'completed' && e.date);
     if (pending.length === 0) return null;
     pending.sort((a, b) => a.date.localeCompare(b.date));
     return pending[0];
-  }, [yearEvents]);
+  }, [events]);
 
   // ── Filtered events (status + type) ─────────────────────────
   const filteredEvents = useMemo(() => {
