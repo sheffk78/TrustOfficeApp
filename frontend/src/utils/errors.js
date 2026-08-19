@@ -257,8 +257,14 @@ export function showError(toast, error, context = {}) {
 
   toast.error(userMessage, { autoClose: 8000 });
 
-  // Auto-report to backend (unless explicitly silenced)
-  if (!context.silent) {
+  // Skip reporting expected user-facing errors that are not application bugs.
+  // "Not found" / 404 errors from API reads are already logged server-side;
+  // re-reporting them here only creates noise in the error scanner.
+  const skipReporting =
+    (rawMessage && rawMessage.toLowerCase().includes('not found')) ||
+    (rawMessage && rawMessage.includes('404'));
+
+  if (!skipReporting && !context.silent) {
     reportErrorToBackend(error, context);
   }
 }
