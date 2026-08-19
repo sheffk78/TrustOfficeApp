@@ -174,7 +174,7 @@ class GovernanceSuggestion(BaseModel):
     """A single governance improvement suggestion"""
     title: str = Field(..., description="Short title for the suggestion")
     description: str = Field(..., description="Detailed description of the recommendation")
-    route: str = Field(..., description="App route to address this (e.g., /minutes/new)")
+    route: str = Field(..., description="App route to address this (e.g., /minutes/create)")
     estimated_points_gain: Optional[int] = Field(None, description="Estimated points improvement")
 
 
@@ -186,20 +186,25 @@ class GovernanceSuggestionsResponse(BaseModel):
 GOVERNANCE_SUGGESTIONS_SYSTEM_PROMPT = """You are a governance coach for trustees using TrustOffice.
 You see a governance health score, its criteria, and recent activity.
 You output 2-4 short, concrete, non-legal-advice recommendations to improve governance discipline.
-Each suggestion should map to one app route (like /minutes/new, /calendar, /distributions, /schedule-a, /benevolence).
+Each suggestion should map to one app route (like /minutes/create, /calendar, /distributions, /schedule-a, /benevolence).
 Do not mention laws, jurisdictions, or legal conclusions.
 
 Available routes:
-- /minutes/new - Create new meeting minutes
-- /minutes/templates - Use guided minutes templates
+- /minutes/create - Create new meeting minutes
 - /calendar - View and manage governance tasks
 - /distributions - Manage distributions to beneficiaries
-- /schedule-a - Update trust asset ledger
+- /schedule-a - View and manage trust assets
+- /minutes/template/acceptance_of_property - Add a new asset to the trust
 - /benevolence - Manage benevolent distributions
 - /compensation - Review trustee compensation
 - /governance - View governance health details
-- /entities - Manage trust entities
-- /trust-units - Manage trust certificates
+- /structures - Manage trust entities and hierarchy
+- /beneficiaries - Manage beneficiaries and certificates
+- /investments - Review investments
+- /expenses - Track trust expenses
+- /vault - Access document vault
+- /risk - View risk dashboard
+- /state-compliance - Check state compliance requirements
 
 IMPORTANT: You must respond with valid JSON only, no additional text or markdown.
 The JSON must have exactly this structure:

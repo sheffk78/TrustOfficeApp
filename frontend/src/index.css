@@ -1092,9 +1092,13 @@
 
   /* Re-allow 2-col grids that explicitly set min widths via auto-fit */
   [class*="auto-fit"],
-  .card-grid,
-  .mobile-more-grid {
+  .card-grid {
     grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)) !important;
+  }
+
+  /* Mobile more group items: 2 columns on very small screens */
+  .mobile-more-group-items {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 
   /* Bottom nav safe area */

@@ -389,16 +389,10 @@ const AppRouter = () => {
           <ClientDashboard />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/health" element={
-        <SubscriptionProtectedRoute>
-          <HealthDashboard />
-        </SubscriptionProtectedRoute>
-      } />
-      <Route path="/deadlines" element={
-        <SubscriptionProtectedRoute>
-          <DeadlineDashboard />
-        </SubscriptionProtectedRoute>
-      } />
+      {/* /health redirects to /governance (Trust Health) — HealthDashboard is superseded */}
+      <Route path="/health" element={<Navigate to="/governance" replace />} />
+      {/* /deadlines redirects to /calendar — DeadlineDashboard is superseded */}
+      <Route path="/deadlines" element={<Navigate to="/calendar" replace />} />
       <Route path="/beneficiary-reports" element={
         <SubscriptionProtectedRoute>
           <BeneficiaryReportPage />

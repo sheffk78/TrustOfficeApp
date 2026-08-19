@@ -15,24 +15,45 @@ import {
   BookOpen,
   GraduationCap,
   X,
+  Package,
+  Send,
+  Wallet,
+  TrendingUp,
+  HeartHandshake,
+  ArrowUpDown,
+  Receipt,
+  Layers,
+  Users,
+  Calendar,
+  ClipboardList,
+  Scale,
+  Activity,
+  MapPin,
+  Gavel,
+  Briefcase,
+  NotebookTabs,
+  Library,
+  FileText,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 // ═══ 5 primary nav items (max for a bottom bar) ═══
 const primaryNav = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Home' },
-  { path: '/minutes', icon: FilePen, label: 'Minutes' },
+  { path: '/schedule-a', icon: Package, label: 'Assets' },
   {
     path: '/distributions',
     icon: Coins,
     label: 'Money',
     subMenu: [
-      { path: '/distributions', icon: Coins, label: 'Distributions' },
-      { path: '/compensation', icon: Coins, label: 'Compensation' },
-      { path: '/investments', icon: BarChart3, label: 'Investments' },
-      { path: '/benevolence', icon: HeartPulse, label: 'Benevolence' },
-      { path: '/benevolence/policy', icon: FilePen, label: 'Policy' },
-      { path: '/transactions', icon: Coins, label: 'Transactions' },
+      { path: '/distributions', icon: Send, label: 'Distributions' },
+      { path: '/compensation', icon: Wallet, label: 'Compensation' },
+      { path: '/expenses', icon: Receipt, label: 'Expenses' },
+      { path: '/investments', icon: TrendingUp, label: 'Investments' },
+      { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', requiresBenevolence: true },
+      { path: '/benevolence/policy', icon: FileText, label: 'Policy', requiresBenevolence: true },
+      { path: '/transactions', icon: ArrowUpDown, label: 'Transactions' },
     ],
   },
   { path: '/trust-assistant', icon: Bot, label: 'Assistant' },
@@ -40,21 +61,69 @@ const primaryNav = [
   { path: '__more__', icon: MoreHorizontal, label: 'More', isMore: true },
 ];
 
-// ═══ Secondary items shown in the 'More' slide-up panel ═══
-const moreNav = [
-  { path: '/settings', icon: Settings, label: 'Settings' },
-  { path: '/trust-roles', icon: UsersRound, label: 'Trust Roles' },
-  { path: '/structures', icon: Network, label: 'Structure' },
-  { path: '/messaging', icon: MessageSquare, label: 'Messages' },
-  { path: '/vault', icon: FolderOpen, label: 'Vault' },
-  { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
-  { path: '/performance', icon: BarChart3, label: 'Performance' },
-  { path: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
-  { path: '/course', icon: GraduationCap, label: 'Trustee 101' },
+// ═══ Secondary items shown in the 'More' slide-up panel (grouped) ═══
+const moreNavGroups = [
+  {
+    groupLabel: 'Trust Structure',
+    items: [
+      { path: '/structures', icon: Network, label: 'Trust & Entities' },
+      { path: '/beneficiaries', icon: Users, label: 'Beneficiaries' },
+    ],
+  },
+  {
+    groupLabel: 'Governance',
+    items: [
+      { path: '/calendar', icon: Calendar, label: 'Calendar' },
+      { path: '/minutes', icon: FilePen, label: 'Minutes' },
+      { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
+    ],
+  },
+  {
+    groupLabel: 'Compliance',
+    items: [
+      { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
+      { path: '/risk', icon: Activity, label: 'Risk Dashboard' },
+      { path: '/state-compliance', icon: MapPin, label: 'State Compliance' },
+      { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
+    ],
+  },
+  {
+    groupLabel: 'Documents',
+    items: [
+      { path: '/vault', icon: FolderOpen, label: 'Vault' },
+      { path: '/admin-kits', icon: Briefcase, label: 'Admin Templates' },
+      { path: '/binder', icon: NotebookTabs, label: 'Record Book' },
+    ],
+  },
+  {
+    groupLabel: 'Communication',
+    items: [
+      { path: '/messaging', icon: MessageSquare, label: 'Messages' },
+      { path: '/communications', icon: Send, label: 'Communications' },
+    ],
+  },
+  {
+    groupLabel: 'Learn',
+    items: [
+      { path: '/course', icon: GraduationCap, label: 'Trustee 101' },
+      { path: '/knowledge', icon: BookOpen, label: 'Articles' },
+    ],
+  },
+  {
+    groupLabel: 'Settings',
+    items: [
+      { path: '/settings', icon: Settings, label: 'Settings' },
+      { path: '/trust-roles', icon: UsersRound, label: 'Trust Roles' },
+    ],
+  },
 ];
+
+// Flatten all moreNav items for active-state checking
+const allMoreItems = moreNavGroups.flatMap(g => g.items);
 
 export const MobileBottomNav = () => {
   const location = useLocation();
+  const { selectedTrust } = useAuth();
   const [openMenu, setOpenMenu] = useState(null); // 'Money' | '__more__' | null
   const menuRef = useRef(null);
   const moreSheetRef = useRef(null);
@@ -92,12 +161,21 @@ export const MobileBottomNav = () => {
       return item.subMenu.some((s) => location.pathname === s.path);
     }
     if (item.isMore) {
-      return moreNav.some((s) => location.pathname === s.path);
+      return allMoreItems.some((s) => location.pathname === s.path);
     }
     return false;
   };
 
   const isSubActive = (subPath) => location.pathname === subPath;
+
+  // Filter benevolence items from subMenu based on trust's benevolence_enabled flag
+  const filterSubMenu = (subMenu) => {
+    if (!subMenu) return subMenu;
+    return subMenu.filter(item => {
+      if (item.requiresBenevolence && !selectedTrust?.benevolence_enabled) return false;
+      return true;
+    });
+  };
 
   return (
     <>
@@ -112,6 +190,7 @@ export const MobileBottomNav = () => {
 
           // ─── Money item with submenu popup ───
           if (item.subMenu) {
+            const visibleSubItems = filterSubMenu(item.subMenu);
             return (
               <div
                 key={item.path}
@@ -134,7 +213,7 @@ export const MobileBottomNav = () => {
                     className="mobile-submenu-popup"
                     role="menu"
                   >
-                    {item.subMenu.map((sub) => {
+                    {visibleSubItems.map((sub) => {
                       const SubIcon = sub.icon;
                       const subActive = isSubActive(sub.path);
                       return (
@@ -192,7 +271,7 @@ export const MobileBottomNav = () => {
         })}
       </nav>
 
-      {/* ─── 'More' slide-up sheet ─── */}
+      {/* ─── 'More' slide-up sheet (grouped) ─── */}
       {openMenu === '__more__' && (
         <>
           <div
@@ -217,21 +296,28 @@ export const MobileBottomNav = () => {
               </button>
             </div>
             <div className="mobile-more-grid">
-              {moreNav.map((item) => {
-                const Icon = item.icon;
-                const active = isSubActive(item.path);
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`mobile-more-item ${active ? 'active' : ''}`}
-                    data-testid={`mobile-more-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <Icon className="w-6 h-6" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
+              {moreNavGroups.map((group) => (
+                <div key={group.groupLabel} className="mobile-more-group">
+                  <p className="mobile-more-group-label">{group.groupLabel}</p>
+                  <div className="mobile-more-group-items">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const active = isSubActive(item.path);
+                      return (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          className={`mobile-more-item ${active ? 'active' : ''}`}
+                          data-testid={`mobile-more-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                        >
+                          <Icon className="w-6 h-6" />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </>

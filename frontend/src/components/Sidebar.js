@@ -58,46 +58,65 @@ const NAV_GROUPS = [
   { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', items: [], standout: true },
   { key: 'trust-assistant', icon: Bot, label: 'Trust Assistant', items: [], standout: true, badge: 'NEW' },
 
-  // ═══ LEARNING ═══
-  { key: 'knowledge', icon: Library, label: 'Knowledge Base', items: [
-    { path: '/course', icon: GraduationCap, label: 'Trustee 101' },
-    { path: '/knowledge', icon: BookOpen, label: 'Browse Articles' },
-    { path: '/knowledge/admin', icon: FilePen, label: 'Manage Articles', adminOnly: true },
-  ], badge: 'NEW' },
-
-  // ═══ CORE SECTIONS ═══
-  { key: 'governance', icon: BookOpen, label: 'Governance', items: [
-    { path: '/calendar', icon: Calendar, label: 'Calendar' },
-    { path: '/minutes', icon: FilePen, label: 'Minutes' },
-    { path: '/minutes/template/acceptance_of_property', icon: FilePlus, label: 'Contribute Asset', badge: 'NEW', tooltip: 'Contribute an asset via trustee resolution' },
+  // ═══ ASSETS — the core of the trust ═══
+  { key: 'assets', icon: Package, label: 'Assets', items: [
+    { path: '/schedule-a', icon: Package, label: 'Schedule A', tooltip: 'View all trust assets' },
+    { path: '/minutes/template/acceptance_of_property', icon: FilePlus, label: 'Add Asset', badge: 'NEW', tooltip: 'Add a new asset to the trust' },
   ]},
+
+  // ═══ MONEY ═══
   { key: 'money', icon: Coins, label: 'Money', items: [
     { path: '/distributions', icon: Send, label: 'Distributions' },
     { path: '/compensation', icon: Wallet, label: 'Compensation' },
+    { path: '/expenses', icon: Receipt, label: 'Expenses' },
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
     { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', requiresBenevolence: true },
     { path: '/benevolence/policy', icon: FileText, label: 'Policy', parentPath: '/benevolence', requiresBenevolence: true },
     { path: '/transactions', icon: ArrowUpDown, label: 'Transaction Ledger' },
   ]},
-  { key: 'structure', icon: Network, label: 'Structure', items: [
+
+  // ═══ TRUST STRUCTURE — legal architecture ═══
+  { key: 'trust-structure', icon: Network, label: 'Trust Structure', items: [
     { path: '/structures', icon: Layers, label: 'Trust & Entities' },
-    { path: '/schedule-a', icon: Package, label: 'Trust Assets' },
     { path: '/beneficiaries', icon: Users, label: 'Beneficiaries' },
-    { path: '/communications', icon: MessageSquare, label: 'Communications' },
-    { path: '/messaging', icon: MessageSquare, label: 'Messages', badge: 'NEW' },
-    { path: '/vault', icon: FolderOpen, label: 'Vault' },
-    { path: '/admin-kits', icon: Briefcase, label: 'Admin Templates', badge: 'NEW' },
   ]},
-  { key: 'compliance', icon: Scale, label: 'Compliance', items: [
+
+  // ═══ COMMUNICATION ═══
+  { key: 'communication', icon: MessageSquare, label: 'Communication', items: [
+    { path: '/messaging', icon: MessageSquare, label: 'Messages', badge: 'NEW' },
+    { path: '/communications', icon: Send, label: 'Communications' },
+  ]},
+
+  // ═══ GOVERNANCE — records and meetings ═══
+  { key: 'governance', icon: BookOpen, label: 'Governance', items: [
+    { path: '/calendar', icon: Calendar, label: 'Calendar' },
+    { path: '/minutes', icon: FilePen, label: 'Minutes' },
+    { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
+  ]},
+
+  // ═══ HEALTH & COMPLIANCE ═══
+  { key: 'health-compliance', icon: Scale, label: 'Health & Compliance', items: [
+    { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
     { path: '/risk', icon: Activity, label: 'Risk Dashboard' },
     { path: '/state-compliance', icon: MapPin, label: 'State Compliance' },
-    { path: '/authority', icon: Gavel, label: 'Legal Powers' },
-    { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
-    { path: '/binder', icon: NotebookTabs, label: 'Record Book' },
-    { path: '/trust-roles', icon: UsersRound, label: 'Trust Roles' },
   ]},
-  { key: 'performance', icon: BarChart3, label: 'Performance', items: [] },
-  { key: 'score', icon: HeartPulse, label: 'Trust Health', items: [] },
+
+  // ═══ DOCUMENTS ═══
+  { key: 'documents', icon: FolderOpen, label: 'Documents', items: [
+    { path: '/vault', icon: FolderOpen, label: 'Vault' },
+    { path: '/admin-kits', icon: Briefcase, label: 'Admin Templates', badge: 'NEW' },
+    { path: '/binder', icon: NotebookTabs, label: 'Record Book' },
+  ]},
+
+  // ═══ LEARN ═══
+  { key: 'learn', icon: Library, label: 'Learn', items: [
+    { path: '/course', icon: GraduationCap, label: 'Trustee 101' },
+    { path: '/knowledge', icon: BookOpen, label: 'Browse Articles' },
+    { path: '/knowledge/admin', icon: FilePen, label: 'Manage Articles', adminOnly: true },
+  ]},
+
+  // ═══ STANDALONE ITEMS ═══
+  { key: 'trustee-powers', icon: Gavel, label: 'Trustee Powers', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
 
@@ -108,7 +127,7 @@ const SIDEBAR_SCROLL_KEY = 'sidebar-scroll';
 const SIDEBAR_GROUPS_KEY = 'sidebar-expanded-groups';
 
 // Paths that match by prefix (not just exact equality)
-const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities', '/knowledge', '/course']);
+const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities', '/knowledge', '/course', '/schedule-a', '/benevolence']);
 
 /**
  * Check whether a nav item path matches the current pathname.
@@ -121,6 +140,8 @@ const isPathActive = (itemPath, pathname) => {
     return true;
   }
   if (itemPath === '/minutes' && pathname.startsWith('/minutes')) return true;
+  if (itemPath === '/schedule-a' && pathname.startsWith('/schedule-a')) return true;
+  if (itemPath === '/benevolence' && pathname.startsWith('/benevolence')) return true;
   // /course matches by prefix so sub-routes highlight the nav item
   if (itemPath === '/course' && pathname.startsWith('/course')) return true;
   return false;
@@ -141,11 +162,9 @@ const isItemVisible = (item, selectedTrust, isAdmin) => {
 const resolveSingleGroupPath = (groupKey) => {
   switch (groupKey) {
     case 'dashboard': return '/dashboard';
-    case 'score': return '/governance';
-    case 'performance': return '/performance';
     case 'trust-assistant': return '/trust-assistant';
-    case 'course': return '/course';
-    case 'knowledge': return '/knowledge';
+    case 'trustee-powers': return '/authority';
+    case 'settings': return '/settings';
     default: return '/settings';
   }
 };
