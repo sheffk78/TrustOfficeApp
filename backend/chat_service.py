@@ -1513,9 +1513,16 @@ async def generate_response(
                 clean_text = clean_text[:-3]
             clean_text = clean_text.strip()
 
-            # Try to parse as JSON
+            # Try to parse as JSON. Guard against scalar replies (a JSON
+            # string or list) so a non-dict can never reach ai_response.get().
             try:
-                result = json.loads(clean_text)
+                result = _coerce_dict(json.loads(clean_text), {
+                    "message": response_text.strip(),
+                    "action_card": None,
+                    "citation_note": None,
+                    "unknown_note": None,
+                    "caveat": None,
+                })
                 return result
             except json.JSONDecodeError:
                 # Return as plain text message
