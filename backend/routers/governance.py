@@ -252,6 +252,17 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "completed_at": {"$gte": one_year_ago.isoformat()}
     }, {"_id": 0})
 
+    # Also check if a pending (uncompleted) annual_review task already exists.
+    # If one does, the dashboard should NOT show "Schedule Annual Review" —
+    # it's already scheduled. The insight should only fire when there's no
+    # completed review AND no pending task.
+    pending_annual_review = await db.governance_tasks.find_one({
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "task_type": "annual_review",
+        "completed_at": None
+    }, {"_id": 0})
+
     trust_doc_for_created = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "created_at": 1})
     trust_created_at = trust_doc_for_created.get("created_at") if trust_doc_for_created else None
 
@@ -294,6 +305,7 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "dist_count": dist_count,
         "benevolence_dists": benevolence_dists,
         "annual_review": annual_review,
+        "pending_annual_review": pending_annual_review,
         "trust_created_at": trust_created_at,
         "active_assets": active_assets,
         "twelve_months_ago": one_year_ago,
@@ -443,10 +455,15 @@ def _compute_annual_review_criterion(data: dict, now: datetime) -> tuple:
     annual_done = data["annual_review"] is not None
     points = mp if annual_done else 0
     is_new_trust = _parse_trust_created_age(data.get("trust_created_at"), now)
+    # Suppress the "Schedule Annual Review" insight if a pending annual_review
+    # task already exists (either auto-seeded or user-created). The insight should
+    # only fire when no review has been completed AND none is scheduled.
+    has_pending = data.get("pending_annual_review") is not None
+    no_data = is_new_trust or has_pending
     criterion = HealthScoreCriterion(
         name="Annual Review",
         description="Annual review completed in last 12 months" if not is_new_trust else "Annual review not due yet — schedule it for later",
-        points=points, max_points=mp, achieved=annual_done, no_data=is_new_trust
+        points=points, max_points=mp, achieved=annual_done, no_data=no_data
     )
     return criterion, points
 

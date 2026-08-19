@@ -939,14 +939,30 @@ async def auto_update_onboarding(user_id: str, trust_id: str):
 async def create_initial_governance_tasks(trust_id: str, user_id: str):
     """Seed a new trust with default governance tasks"""
     now = datetime.now(timezone.utc)
-    
+
+    # Calculate annual review due date from the trust's formation/start date.
+    # Falls back to now + 365 days if no start_date is set.
+    trust_doc = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "start_date": 1})
+    start_date_str = trust_doc.get("start_date") if trust_doc else None
+    annual_review_due = None
+    if start_date_str:
+        try:
+            from datetime import datetime as dt
+            # start_date is stored as 'yyyy-MM-dd'
+            formation = dt.fromisoformat(start_date_str)
+            annual_review_due = formation.replace(year=formation.year + 1)
+        except (ValueError, TypeError):
+            pass
+    if annual_review_due is None:
+        annual_review_due = now + timedelta(days=365)
+
     default_tasks = [
         {
             "task_id": f"task_{uuid.uuid4().hex[:12]}",
             "trust_id": trust_id,
             "user_id": user_id,
             "task_type": "annual_review",
-            "due_date": (now + timedelta(days=365)).isoformat(),
+            "due_date": annual_review_due.isoformat(),
             "completed_at": None,
             "description": "Annual trust review and documentation",
             "created_at": now.isoformat()
