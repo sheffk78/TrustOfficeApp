@@ -459,7 +459,16 @@ const useTrustsLoader = ({ setTrusts, setTrustsLoading, setSelectedTrust, select
         console.error('[AuthContext] Trusts API returned:', response.status);
       }
     } catch (error) {
-      reportErrorToBackend(error, { operation: 'load_trusts', page: window.location.pathname, severity: 'major' });
+      // Transient network errors (Failed to fetch) are NOT application bugs.
+      // Don't report them to the backend error pipeline.
+      const isNetworkError = error && error.message && (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('NetworkError') ||
+        error.message.includes('network')
+      );
+      if (!isNetworkError) {
+        reportErrorToBackend(error, { operation: 'load_trusts', page: window.location.pathname, severity: 'major' });
+      }
       console.error('[AuthContext] Failed to load trusts:', error);
     } finally {
       setTrustsLoading(false);

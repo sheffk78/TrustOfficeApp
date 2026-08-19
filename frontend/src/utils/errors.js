@@ -264,7 +264,10 @@ export function showError(toast, error, context = {}) {
     (rawMessage && rawMessage.toLowerCase().includes('not found')) ||
     (rawMessage && rawMessage.includes('404')) ||
     (rawMessage && rawMessage.toLowerCase().includes('forbidden')) ||
-    (rawMessage && rawMessage.includes('403'));
+    (rawMessage && rawMessage.includes('403')) ||
+    // User-facing validation / configuration messages are not application bugs
+    (rawMessage && rawMessage.toLowerCase().includes('add one in settings')) ||
+    (rawMessage && rawMessage.toLowerCase().includes('before sending'));
 
   if (!skipReporting && !context.silent) {
     reportErrorToBackend(error, context);
