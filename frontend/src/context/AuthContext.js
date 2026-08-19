@@ -255,41 +255,178 @@ const useAuthActions = ({
 
 // ─── useSubscriptionState: extracted from AuthProvider ──────────────
 // Encapsulates subscription state loading + admin override logic.
+//
+// Resilience: A paid user with an active subscription should NEVER be locked
+// out of saving because of a transient network issue. To that end:
+//   1. Transient API failures (non-401/403) are retried up to 2 times with
+//      a 1.5s delay before falling back.
+//   2. On retry exhaustion, if we have a previously-cached active subscription
+//      state, we keep it instead of forcing read-only mode (soft fallback).
+//      Only the very first load (no cached state) falls back to read-only.
+//   3. If the user ends up read-only due to an API error (not a genuine
+//      expired/inactive subscription), a 60s periodic re-check timer keeps
+//      retrying. When it succeeds and shows the user is active, write access
+//      is automatically restored.
+
+const SUBSCRIPTION_MAX_RETRIES = 2;
+const SUBSCRIPTION_RETRY_DELAY_MS = 1500;
+const SUBSCRIPTION_RECHECK_INTERVAL_MS = 60000;
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Fetch the subscription state once. Returns { state, status } where:
+//   - status: 'ok' (200 response) | 'auth' (401/403) | 'error' (anything else)
+//   - state:  parsed JSON body on 'ok', null otherwise
+const fetchSubscriptionStateOnce = async () => {
+  const response = await fetch(`${API}/subscription/state`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
+
+  if (response.ok) {
+    const state = await response.json();
+    return { state, status: 'ok' };
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return { state: null, status: 'auth' };
+  }
+
+  // Any other non-ok status (500, 502, 503, timeout-as-500, etc.) is transient.
+  return { state: null, status: 'error' };
+};
 
 const useSubscriptionState = ({ setSubscription, setSubscriptionExpired, setIsReadOnly }) => {
+  // Refs survive re-renders without being stale inside async callbacks.
+  const lastGoodStateRef = useRef(null);   // most recent successful state
+  const recheckTimerRef = useRef(null);      // 60s periodic re-check interval id
+  const isReadOnlyDueToErrorRef = useRef(false); // true only when read-only is from API failure, not genuine expiry
+
+  // Apply a successful subscription state to all setters + cache it.
+  const applyGoodSubscriptionState = useCallback((state) => {
+    lastGoodStateRef.current = state;
+    isReadOnlyDueToErrorRef.current = false;
+    setSubscription(state);
+    setSubscriptionExpired(!state.is_active);
+    setIsReadOnly(state.is_read_only);
+    // A successful load means any periodic re-check can stop.
+    if (recheckTimerRef.current) {
+      clearInterval(recheckTimerRef.current);
+      recheckTimerRef.current = null;
+    }
+  }, [setSubscription, setSubscriptionExpired, setIsReadOnly]);
+
+  // Start (or restart) the 60s periodic re-check timer. Used only when the
+  // user has been forced into read-only mode by an API error.
+  const startPeriodicRecheck = useCallback((userEmail) => {
+    // Don't stack timers
+    if (recheckTimerRef.current) return;
+    recheckTimerRef.current = setInterval(() => {
+      // Fire-and-forget; loadSubscriptionState handles the retry/fallback logic
+      loadSubscriptionStateRef.current(userEmail);
+    }, SUBSCRIPTION_RECHECK_INTERVAL_MS);
+  }, []);
+
+  // Keep a ref to loadSubscriptionState so the interval always calls the latest
+  // version without re-creating the interval on every render.
+  const loadSubscriptionStateRef = useRef(null);
+
   const loadSubscriptionState = useCallback(async (userEmail = null) => {
     // ADMIN OVERRIDE: If user is primary admin, always grant full access
     if (isPrimaryAdmin(userEmail)) {
       const adminState = buildAdminSubscriptionState();
-      setSubscription(adminState);
-      setSubscriptionExpired(false);
-      setIsReadOnly(false);
+      applyGoodSubscriptionState(adminState);
       return adminState;
     }
 
-    try {
-      const response = await fetch(`${API}/subscription/state`, {
-        credentials: 'include',
-        headers: getAuthHeaders()
-      });
+    let lastError = null;
+    let lastStatus = null;
 
-      if (response.ok) {
-        const state = await response.json();
-        setSubscription(state);
-        setSubscriptionExpired(!state.is_active);
-        setIsReadOnly(state.is_read_only);
-        return state;
-      } else {
-        console.error('[AuthContext] Subscription API returned:', response.status);
-        applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
+    // Retry loop: try up to (1 + SUBSCRIPTION_MAX_RETRIES) attempts.
+    for (let attempt = 0; attempt <= SUBSCRIPTION_MAX_RETRIES; attempt++) {
+      try {
+        const { state, status } = await fetchSubscriptionStateOnce();
+
+        if (status === 'ok') {
+          // Success — apply the real state and stop any re-check timer.
+          applyGoodSubscriptionState(state);
+          return state;
+        }
+
+        if (status === 'auth') {
+          // 401/403 — auth failure, not transient. Don't retry, don't re-check.
+          // Apply the error state directly (existing behavior for auth failures).
+          lastStatus = 'auth';
+          lastError = new Error(`Subscription API returned ${status === 'auth' ? '401/403' : 'error'}`);
+          break; // out of retry loop
+        }
+
+        // status === 'error' — transient failure, retry if attempts remain
+        lastStatus = 'error';
+        lastError = new Error('Subscription API transient failure');
+        if (attempt < SUBSCRIPTION_MAX_RETRIES) {
+          await delay(SUBSCRIPTION_RETRY_DELAY_MS);
+        }
+      } catch (error) {
+        // Network error / timeout — transient, retry if attempts remain
+        lastStatus = 'error';
+        lastError = error;
+        if (attempt < SUBSCRIPTION_MAX_RETRIES) {
+          await delay(SUBSCRIPTION_RETRY_DELAY_MS);
+        }
       }
-    } catch (error) {
-      reportErrorToBackend(error, { operation: 'load_subscription', page: window.location.pathname, severity: 'major' });
-      console.error('[AuthContext] Failed to load subscription state:', error);
-      applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
     }
+
+    // ── Retry exhaustion / non-retriable failure — apply fallback ──
+
+    // Auth failures (401/403) always fall back to the hard error state.
+    if (lastStatus === 'auth') {
+      reportErrorToBackend(lastError, { operation: 'load_subscription', page: window.location.pathname, severity: 'major' });
+      console.error('[AuthContext] Subscription API returned auth failure (401/403)');
+      applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
+      return null;
+    }
+
+    // Transient failure after all retries: report once, then soft-fallback.
+    reportErrorToBackend(lastError, { operation: 'load_subscription', page: window.location.pathname, severity: 'major' });
+    console.warn('[AuthContext] Subscription state fetch failed after retries, using fallback');
+
+    // Soft fallback: if we have a previously-cached active state, keep it so
+    // the user isn't locked out by a transient blip. Only fall back to
+    // read-only if there's no previous good state (first load).
+    const cached = lastGoodStateRef.current;
+    if (cached && cached.is_active && !cached.is_read_only) {
+      // Keep the user's previous active state — don't lock them out.
+      // Mark that we're in an error-induced state so the re-check timer kicks in.
+      isReadOnlyDueToErrorRef.current = false; // user is NOT read-only, so no timer needed
+      setSubscription({ ...cached });
+      setSubscriptionExpired(false);
+      setIsReadOnly(false);
+      // Still start a background re-check so we pick up real changes eventually.
+      startPeriodicRecheck(userEmail);
+      return { ...cached };
+    }
+
+    // No cached active state (first load) — fall back to read-only error state
+    // and start the periodic re-check so we can recover when the API comes back.
+    applyErrorSubscriptionState(setSubscription, setSubscriptionExpired, setIsReadOnly);
+    isReadOnlyDueToErrorRef.current = true;
+    startPeriodicRecheck(userEmail);
     return null;
-  }, [setSubscription, setSubscriptionExpired, setIsReadOnly]);
+  }, [setSubscription, setSubscriptionExpired, setIsReadOnly, applyGoodSubscriptionState, startPeriodicRecheck]);
+
+  // Keep the ref in sync so the periodic re-check calls the latest closure.
+  loadSubscriptionStateRef.current = loadSubscriptionState;
+
+  // Clean up the periodic re-check timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (recheckTimerRef.current) {
+        clearInterval(recheckTimerRef.current);
+        recheckTimerRef.current = null;
+      }
+    };
+  }, []);
 
   return { loadSubscriptionState };
 };
