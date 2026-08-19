@@ -180,6 +180,8 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
         "20-trust-lifecycle-stages": ["lifecycle", "initial setup", "first 90 days", "ongoing administration", "trust termination", "wind down", "trust modification", "amendment", "decanting", "final return", "trust stages", "lifecycle stage"],
         # --- Crisis escalation (21-*) ---
         "21-crisis-escalation": ["fraud", "theft", "stolen", "unauthorized", "lawsuit", "litigation", "subpoena", "court order", "audit", "creditor claim", "incapacity", "trustee death", "missing beneficiary", "exploitation", "foreclosure", "emergency", "crisis", "urgent", "police", "law enforcement", "adult protective", "dispute", "threatened"],
+        # --- Quarterly review guide (22-*) ---
+        "22-quarterly-review-guide": ["quarterly review", "quarterly", "quarter", "review checklist", "what do i do for", "quarterly meeting", "trust review", "annual review", "annual meeting"],
     }
 
     selected = []
@@ -1469,7 +1471,7 @@ Do NOT wrap your response in JSON. Do NOT include code blocks around your entire
         + f'    "requires_confirmation": {str(needs_confirm).lower()}\n'
         + "  } or null,\n"
         + '  "citation_note": "What I\'m basing this on...",\n'
-        + '  "unknown_note": "What I don\'t know...",\n'
+        + '  "unknown_note": "Trust-specific data gaps only (not domain knowledge gaps)...",\n'
         + '  "caveat": "You should review this with your legal or tax professional..."\n'
         + "}\n"
     )

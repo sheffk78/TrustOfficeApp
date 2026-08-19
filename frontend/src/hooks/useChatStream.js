@@ -397,6 +397,7 @@ export const useChatStream = () => {
     onDone = null,
     isRetry = false,
     assistantMessageId = null,
+    trustId = null,
   }) => {
     if (!text.trim()) return null;
 
@@ -469,6 +470,9 @@ export const useChatStream = () => {
       if (currentConversationId || conversationId) {
         body.conversation_id = currentConversationId || conversationId;
       }
+      if (trustId) {
+        body.trust_id = trustId;
+      }
 
       const response = await fetchWithAuth('/ai/chat/stream', {
         method: 'POST',
@@ -537,10 +541,10 @@ export const useChatStream = () => {
   }, [conversationId]);
 
   // ─── sendMessage (public wrapper around _streamMessage) ───────────
-  const sendMessage = useCallback(async (text, currentConversationId = null, currentMessages = [], onDone = null) => {
-    lastUserMessageRef.current = { text, conversationId: currentConversationId, onDone };
+  const sendMessage = useCallback(async (text, currentConversationId = null, currentMessages = [], onDone = null, trustId = null) => {
+    lastUserMessageRef.current = { text, conversationId: currentConversationId, onDone, trustId };
     retryCountRef.current = 0;
-    return _streamMessage({ text, currentConversationId, currentMessages, onDone, isRetry: false });
+    return _streamMessage({ text, currentConversationId, currentMessages, onDone, isRetry: false, trustId });
   }, [_streamMessage]);
 
   // ─── handleRetry (used by visibilitychange handler) ───────────────
@@ -567,6 +571,7 @@ export const useChatStream = () => {
       currentMessages: latestMessages,
       onDone: lastMsg.onDone,
       isRetry: true,
+      trustId: lastMsg.trustId,
     });
   }, [_streamMessage]);
 

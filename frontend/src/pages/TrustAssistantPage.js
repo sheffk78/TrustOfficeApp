@@ -80,17 +80,17 @@ const TrustAssistantPage = () => {
       sentPrompts.current.add(prompt);
       sendMessage(prompt, conversationId, messages, () => {
         fetchConversations();
-      });
+      }, selectedTrust?.trust_id);
     }
-  }, [searchParams, messages, loading, sendMessage, conversationId, fetchConversations]);
+  }, [searchParams, messages, loading, sendMessage, conversationId, fetchConversations, selectedTrust]);
 
   // Handle sending a message through the chat
   const handleSendMessage = useCallback(async (text) => {
     await sendMessage(text, conversationId, messages, () => {
       // Refresh conversation list after streaming completes
       fetchConversations();
-    });
-  }, [sendMessage, conversationId, messages, fetchConversations]);
+    }, selectedTrust?.trust_id);
+  }, [sendMessage, conversationId, messages, fetchConversations, selectedTrust]);
 
   // Show toast when the backend auto-threads into a new conversation
   useEffect(() => {

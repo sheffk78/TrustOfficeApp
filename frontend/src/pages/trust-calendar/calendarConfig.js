@@ -51,12 +51,11 @@ export const annualReviewDate = (formationDateStr) => {
   try {
     const formation = parseISO(formationDateStr);
     const now = new Date();
-    // This year's anniversary
-    let nextReview = new Date(now.getFullYear(), formation.getMonth(), formation.getDate());
-    // If already passed this year, use next year
-    if (nextReview < now) {
-      nextReview = new Date(now.getFullYear() + 1, formation.getMonth(), formation.getDate());
-    }
-    return format(nextReview, 'yyyy-MM-dd');
+    // Always use this year's anniversary — even if it's already passed.
+    // The dashboard insight fires when the annual review is overdue, so the
+    // task must appear in the current year's calendar (as overdue) to be
+    // visible and actionable. Pushing it to next year makes it invisible.
+    const thisYearReview = new Date(now.getFullYear(), formation.getMonth(), formation.getDate());
+    return format(thisYearReview, 'yyyy-MM-dd');
   } catch { return null; }
 };
