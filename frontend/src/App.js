@@ -73,6 +73,10 @@ import TrustAdminKitsPage from "@/pages/TrustAdminKitsPage";
 import TransactionLedgerPage from "@/pages/TransactionLedgerPage";
 import BenevolenceLogPage from "@/pages/BenevolenceLogPage";
 import PerformanceDashboard from "@/pages/PerformanceDashboard";
+import InvestmentsTabbed from "@/pages/InvestmentsTabbed";
+import BenevolenceTabbed from "@/pages/BenevolenceTabbed";
+import HealthComplianceTabbed from "@/pages/HealthComplianceTabbed";
+import DocumentsTabbed from "@/pages/DocumentsTabbed";
 
 // Install global uncaught error handlers once at app load
 // Reports to /api/report-error -> Discord alert (see utils/errors.js)
@@ -301,14 +305,11 @@ const AppRouter = () => {
       } />
       <Route path="/benevolence" element={
         <SubscriptionProtectedRoute>
-          <BenevolencePage />
+          <BenevolenceTabbed />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/benevolence/policy" element={
-        <SubscriptionProtectedRoute>
-          <BenevolencePolicyPage />
-        </SubscriptionProtectedRoute>
-      } />
+      {/* Redirect old /benevolence/policy to /benevolence?tab=policy */}
+      <Route path="/benevolence/policy" element={<Navigate to="/benevolence?tab=policy" replace />} />
       <Route path="/benevolence-log" element={ <Navigate to="/benevolence" replace /> } />
       <Route path="/distributions" element={
         <SubscriptionProtectedRoute>
@@ -356,7 +357,7 @@ const AppRouter = () => {
       } />
       <Route path="/governance" element={
         <SubscriptionProtectedRoute>
-          <GovernancePage />
+          <HealthComplianceTabbed />
         </SubscriptionProtectedRoute>
       } />
       <Route path="/governance/agendas/:agendaId" element={
@@ -409,16 +410,15 @@ const AppRouter = () => {
       <Route path="/trust-health" element={
         <Navigate to="/governance" replace />
       } />
-      <Route path="/state-compliance" element={
-        <SubscriptionProtectedRoute>
-          <StateCompliancePage />
-        </SubscriptionProtectedRoute>
-      } />
+      {/* Redirect old /state-compliance to /governance?tab=state */}
+      <Route path="/state-compliance" element={<Navigate to="/governance?tab=state" replace />} />
       <Route path="/investments" element={
         <SubscriptionProtectedRoute>
-          <InvestmentsPage />
+          <InvestmentsTabbed />
         </SubscriptionProtectedRoute>
       } />
+      {/* Redirect old /performance to /investments?tab=performance */}
+      <Route path="/performance" element={<Navigate to="/investments?tab=performance" replace />} />
       <Route path="/communications" element={
         <SubscriptionProtectedRoute>
           <CommunicationsPage />
@@ -431,14 +431,11 @@ const AppRouter = () => {
       } />
       <Route path="/vault" element={
         <SubscriptionProtectedRoute>
-          <VaultPage />
+          <DocumentsTabbed />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/risk" element={
-        <SubscriptionProtectedRoute>
-          <RiskDashboardPage />
-        </SubscriptionProtectedRoute>
-      } />
+      {/* Redirect old /risk to /governance?tab=risk */}
+      <Route path="/risk" element={<Navigate to="/governance?tab=risk" replace />} />
       {/* Trust Assistant is a write/AI feature: free and expired accounts
           may retain their records, but must not open or use chat. */}
       <Route path="/trust-assistant" element={
@@ -448,21 +445,15 @@ const AppRouter = () => {
       } />
 <Route path="/course" element={<ProtectedRoute><CoursePage /></ProtectedRoute>} />
       <Route path="/course/lesson/:lessonNumber" element={<ProtectedRoute><CoursePage /></ProtectedRoute>} />
-      <Route path="/binder" element={
-        <SubscriptionProtectedRoute>
-          <PrintableBinderPage />
-        </SubscriptionProtectedRoute>
-      } />
+      {/* Redirect old /binder to /vault?tab=binder */}
+      <Route path="/binder" element={<Navigate to="/vault?tab=binder" replace />} />
       <Route path="/successor-packet" element={
         <SubscriptionProtectedRoute>
           <SuccessorPacketPage />
         </SubscriptionProtectedRoute>
       } />
-      <Route path="/admin-kits" element={
-        <SubscriptionProtectedRoute>
-          <TrustAdminKitsPage />
-        </SubscriptionProtectedRoute>
-      } />
+      {/* Redirect old /admin-kits to /vault?tab=templates */}
+      <Route path="/admin-kits" element={<Navigate to="/vault?tab=templates" replace />} />
       {/* Knowledge Base / Resource Hub */}
       <Route path="/knowledge" element={
         <SubscriptionProtectedRoute>

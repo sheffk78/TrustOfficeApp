@@ -52,7 +52,7 @@ const primaryNav = [
       { path: '/expenses', icon: Receipt, label: 'Expenses' },
       { path: '/investments', icon: TrendingUp, label: 'Investments' },
       { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', requiresBenevolence: true },
-      { path: '/benevolence/policy', icon: FileText, label: 'Policy', requiresBenevolence: true },
+      { path: '/benevolence?tab=policy', icon: FileText, label: 'Policy', requiresBenevolence: true },
       { path: '/transactions', icon: ArrowUpDown, label: 'Transactions' },
     ],
   },
@@ -82,8 +82,8 @@ const moreNavGroups = [
     groupLabel: 'Compliance',
     items: [
       { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
-      { path: '/risk', icon: Activity, label: 'Risk Dashboard' },
-      { path: '/state-compliance', icon: MapPin, label: 'State Compliance' },
+      { path: '/governance?tab=risk', icon: Activity, label: 'Risk Dashboard' },
+      { path: '/governance?tab=state', icon: MapPin, label: 'State Compliance' },
       { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
     ],
   },
@@ -91,8 +91,8 @@ const moreNavGroups = [
     groupLabel: 'Documents',
     items: [
       { path: '/vault', icon: FolderOpen, label: 'Vault' },
-      { path: '/admin-kits', icon: Briefcase, label: 'Admin Templates' },
-      { path: '/binder', icon: NotebookTabs, label: 'Record Book' },
+      { path: '/vault?tab=templates', icon: Briefcase, label: 'Admin Templates' },
+      { path: '/vault?tab=binder', icon: NotebookTabs, label: 'Record Book' },
     ],
   },
   {

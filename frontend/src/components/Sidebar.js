@@ -71,7 +71,7 @@ const NAV_GROUPS = [
     { path: '/expenses', icon: Receipt, label: 'Expenses' },
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
     { path: '/benevolence', icon: HeartHandshake, label: 'Benevolence', requiresBenevolence: true },
-    { path: '/benevolence/policy', icon: FileText, label: 'Policy', parentPath: '/benevolence', requiresBenevolence: true },
+    { path: '/benevolence?tab=policy', icon: FileText, label: 'Policy', parentPath: '/benevolence', requiresBenevolence: true },
     { path: '/transactions', icon: ArrowUpDown, label: 'Transaction Ledger' },
   ]},
 
@@ -97,15 +97,15 @@ const NAV_GROUPS = [
   // ═══ HEALTH & COMPLIANCE ═══
   { key: 'health-compliance', icon: Scale, label: 'Health & Compliance', items: [
     { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
-    { path: '/risk', icon: Activity, label: 'Risk Dashboard' },
-    { path: '/state-compliance', icon: MapPin, label: 'State Compliance' },
+    { path: '/governance?tab=risk', icon: Activity, label: 'Risk Dashboard' },
+    { path: '/governance?tab=state', icon: MapPin, label: 'State Compliance' },
   ]},
 
   // ═══ DOCUMENTS ═══
   { key: 'documents', icon: FolderOpen, label: 'Documents', items: [
     { path: '/vault', icon: FolderOpen, label: 'Vault' },
-    { path: '/admin-kits', icon: Briefcase, label: 'Admin Templates', badge: 'NEW' },
-    { path: '/binder', icon: NotebookTabs, label: 'Record Book' },
+    { path: '/vault?tab=templates', icon: Briefcase, label: 'Admin Templates', badge: 'NEW' },
+    { path: '/vault?tab=binder', icon: NotebookTabs, label: 'Record Book' },
   ]},
 
   // ═══ LEARN ═══
