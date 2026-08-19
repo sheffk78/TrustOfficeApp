@@ -1445,7 +1445,7 @@ export default function SettingsPage() {
                             type="button"
                             className="btn-primary"
                             onClick={handleSendTrustProtectorNotice}
-                            disabled={loading}
+                            disabled={loading || isReadOnly}
                           >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                             Send Notice
@@ -2321,17 +2321,13 @@ export default function SettingsPage() {
               <h2 className="font-serif text-xl text-navy">Support & Feedback</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Have questions, need help, or want to share feedback? Our support team is here to assist you.
+              Have questions, need help, or want to share feedback? Use the feedback button
+              (bottom-right corner on any page) to send us a message — we'll get back to you by email.
             </p>
-            <Button
-              onClick={() => window.open('https://trustoffice.app/support', '_blank')}
-              className="btn-secondary"
-              data-testid="go-to-support-btn"
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Contact Support
-              <ExternalLink className="w-4 h-4 ml-2" />
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-mono">Tip:</span> The feedback form automatically includes
+              your account info, the page you're on, and your trust context so we can help faster.
+            </p>
           </div>
 
           {/* Privacy & Security Section */}

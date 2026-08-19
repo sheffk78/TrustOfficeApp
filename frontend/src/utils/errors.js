@@ -262,7 +262,9 @@ export function showError(toast, error, context = {}) {
   // re-reporting them here only creates noise in the error scanner.
   const skipReporting =
     (rawMessage && rawMessage.toLowerCase().includes('not found')) ||
-    (rawMessage && rawMessage.includes('404'));
+    (rawMessage && rawMessage.includes('404')) ||
+    (rawMessage && rawMessage.toLowerCase().includes('forbidden')) ||
+    (rawMessage && rawMessage.includes('403'));
 
   if (!skipReporting && !context.silent) {
     reportErrorToBackend(error, context);
