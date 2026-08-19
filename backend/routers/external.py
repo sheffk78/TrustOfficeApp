@@ -483,6 +483,9 @@ class WingPointProvisionRequest(BaseModel):
     has_declaration: Optional[bool] = None
     has_certification: Optional[bool] = None
     has_binder_kit: Optional[bool] = None
+    # URL TrustOffice can fetch to download the IRS EIN confirmation letter PDF.
+    # When provided, the letter is auto-stored in the vault during provisioning.
+    ein_confirmation_url: Optional[str] = None
 
     # Metadata
     wingpoint_ref: str = Field(..., description="Unique WingPoint reference (used as idempotency key)")
@@ -558,6 +561,9 @@ class LinkTrustRequest(BaseModel):
     has_declaration: Optional[bool] = None
     has_certification: Optional[bool] = None
     has_binder_kit: Optional[bool] = None
+    # URL TrustOffice can fetch to download the IRS EIN confirmation letter PDF.
+    # When provided, the letter is auto-stored in the vault during link-trust.
+    ein_confirmation_url: Optional[str] = None
     
     # Metadata
     source_package: Optional[Literal["single_trust", "estate_bundle", "builder_bundle"]] = None
@@ -1111,6 +1117,113 @@ def _build_provision_response(
     return response
 
 
+# ==================== IRS LETTER AUTO-FETCH ====================
+
+async def _fetch_and_store_irs_letter(
+    ein_confirmation_url: Optional[str],
+    wingpoint_ref: str,
+    trust_id: str,
+    user_id: str,
+    ein: Optional[str] = None,
+) -> bool:
+    """Fetch the IRS EIN confirmation letter from WingPoint and store it in
+    the TrustOffice vault.
+
+    Returns True if the letter was stored (or already existed).  Returns False
+    if the fetch failed or the URL was missing — the caller proceeds normally
+    either way, since the letter is a nice-to-have, not a blocker.
+
+    Reuses the same BSON-binary storage pattern as external_trust_docs.py so
+    the document appears identically to a user-uploaded vault file.
+    """
+    if not ein_confirmation_url:
+        return False
+
+    # Basic URL validation — must be HTTPS
+    from urllib.parse import urlparse
+    parsed = urlparse(str(ein_confirmation_url))
+    if parsed.scheme != "https":
+        logger.warning(f"IRS letter URL not HTTPS, skipping: {parsed.scheme}://")
+        return False
+
+    # Idempotency: skip if we already have an EIN letter for this trust + wingpoint_ref
+    existing = await db.vault_documents.find_one(
+        {
+            "user_id": user_id,
+            "trust_id": trust_id,
+            "wingpoint_ref": wingpoint_ref,
+            "wingpoint_doc_type": "ein_confirmation",
+        },
+        {"_id": 0, "doc_id": 1},
+    )
+    if existing:
+        logger.info(f"IRS letter already in vault for trust={trust_id} ref={wingpoint_ref}, skipping")
+        return True
+
+    # Download the PDF
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            resp = await client.get(str(ein_confirmation_url))
+        resp.raise_for_status()
+    except httpx.HTTPError as e:
+        logger.warning(f"Failed to fetch IRS letter from {ein_confirmation_url}: {e}")
+        return False
+    except Exception as e:
+        logger.warning(f"IRS letter fetch error: {e}")
+        return False
+
+    content = resp.content
+    if not content or len(content) > 16 * 1024 * 1024:  # 16MB BSON limit
+        logger.warning(f"IRS letter content empty or too large ({len(content)} bytes), skipping")
+        return False
+
+    # Store in vault — same shape as external_trust_docs.py
+    import uuid as _uuid
+    now = datetime.now(timezone.utc)
+    doc_id = f"doc_{_uuid.uuid4().hex[:12]}"
+
+    record = {
+        "doc_id": doc_id,
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "title": "EIN Confirmation Letter",
+        "category": "ein_letter",
+        "category_label": "EIN Letter",
+        "date": now.date().isoformat(),
+        "description": f"Auto-fetched from WingPoint (ref: {wingpoint_ref})",
+        "storage_provider": "trustoffice",
+        "storage_url": None,
+        "storage_path": None,
+        "file_name": f"EIN-Confirmation-{wingpoint_ref}.pdf",
+        "file_size": f"{len(content) / 1024:.1f} KB",
+        "file_size_bytes": len(content),
+        "file_content_type": "application/pdf",
+        "file_content": content,
+        "tags": ["wingpoint", "auto-generated", "irs"],
+        "expiration_date": None,
+        "needs_renewal": False,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+        "wingpoint_ref": wingpoint_ref,
+        "wingpoint_doc_type": "ein_confirmation",
+        "source": "wingpoint",
+    }
+    await db.vault_documents.insert_one(record)
+    logger.info(f"IRS letter stored in vault: doc_id={doc_id} trust_id={trust_id} ref={wingpoint_ref} ({len(content)} bytes)")
+
+    # Update onboarding checklist — EIN doc is now uploaded
+    try:
+        await db.user_onboarding.update_one(
+            {"user_id": user_id},
+            {"$set": {"ein_doc_uploaded": True, "updated_at": now.isoformat()}},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to update onboarding ein_doc_uploaded for user {user_id}: {e}")
+
+    return True
+
+
 # ==================== ENDPOINTS ====================
 
 @router.post("/provision-trustoffice")
@@ -1188,6 +1301,22 @@ async def provision_trustoffice(
         trust_id, user_id, request.trust_name, request.trust_formation_date,
         request.jurisdiction, request.ein, trustee_str, now,
     )
+
+    # ---- AUTO-FETCH IRS LETTER (if URL provided) ----
+    # Best-effort: fetch the EIN confirmation letter from WingPoint and store
+    # it in the vault. Non-blocking — failures are logged but don't affect
+    # the provision result.
+    irs_letter_stored = False
+    try:
+        irs_letter_stored = await _fetch_and_store_irs_letter(
+            ein_confirmation_url=request.ein_confirmation_url,
+            wingpoint_ref=request.wingpoint_ref,
+            trust_id=trust_id,
+            user_id=user_id,
+            ein=request.ein,
+        )
+    except Exception as e:
+        logger.warning(f"Provision: IRS letter auto-fetch failed for {email}: {e}")
 
     # ---- GENERATE SET-PASSWORD TOKEN (7-day expiry) ----
     set_password_token, expires_at = await _generate_set_password_token(user_id, now)
@@ -1841,6 +1970,18 @@ async def link_trust(
         trust_id, user_id, request.trust_name, request.trust_formation_date,
         request.jurisdiction, request.ein, trustee_str, now, log_prefix="LinkTrust",
     )
+    
+    # Auto-fetch IRS letter (best-effort, same as provision path)
+    try:
+        await _fetch_and_store_irs_letter(
+            ein_confirmation_url=request.ein_confirmation_url,
+            wingpoint_ref=request.wingpoint_ref,
+            trust_id=trust_id,
+            user_id=user_id,
+            ein=request.ein,
+        )
+    except Exception as e:
+        logger.warning(f"LinkTrust: IRS letter auto-fetch failed for user {user_id}: {e}")
     
     # Audit log
     await log_audit(
