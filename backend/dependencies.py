@@ -950,7 +950,11 @@ async def create_initial_governance_tasks(trust_id: str, user_id: str):
             from datetime import datetime as dt
             # start_date is stored as 'yyyy-MM-dd'
             formation = dt.fromisoformat(start_date_str)
-            annual_review_due = formation.replace(year=formation.year + 1)
+            try:
+                annual_review_due = formation.replace(year=formation.year + 1)
+            except ValueError:
+                # Feb 29 on a non-leap year → use Feb 28
+                annual_review_due = formation.replace(month=2, day=28, year=formation.year + 1)
         except (ValueError, TypeError):
             pass
     if annual_review_due is None:
