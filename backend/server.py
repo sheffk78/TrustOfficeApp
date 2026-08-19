@@ -111,6 +111,7 @@ from routers.trust_admin_kits import router as trust_admin_kits_router
 from routers.page_agent import router as page_agent_router  # Page Agent LLM proxy
 from routers.analytics import router as analytics_router  # Analytics events + funnel
 from routers.feedback import router as feedback_router  # User product feedback
+from routers.support_tickets import router as support_tickets_router  # In-app support tickets
 # Contact Memory — customer memory system + inbound email flow
 from routers.contact_memory import router as contact_memory_router
 # Knowledge Base Retrieval — read-only search source for support agents
@@ -457,6 +458,7 @@ app.include_router(knowledge_retrieval_router, prefix="/api")
 # Analytics — durable funnel event recording (purchase, activation, lead capture)
 app.include_router(analytics_router, prefix="/api")
 app.include_router(feedback_router, prefix="/api")
+app.include_router(support_tickets_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"

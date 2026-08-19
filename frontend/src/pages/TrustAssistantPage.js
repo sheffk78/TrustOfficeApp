@@ -284,6 +284,8 @@ const TrustAssistantPage = () => {
             onConversationSelect={handleConversationSelect}
             onConversationDelete={handleConversationDelete}
             onSendSuggestion={handleSendMessage}
+            onNewChat={handleNewChat}
+            conversationId={conversationId}
           />
 
           {/* Chat panel */}

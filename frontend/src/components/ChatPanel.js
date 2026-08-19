@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, Loader2, AlertCircle, X, Square, Plus, ArrowDown } from 'lucide-react';
+import { Send, Paperclip, Loader2, AlertCircle, X, Square, ArrowDown } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import FileUploadCard from './FileUploadCard';
 
@@ -13,17 +13,6 @@ const QUICK_CHIPS = [
   { label: 'Log Investment', message: "I need to record a new investment for the trust" },
   { label: 'Money Summary', message: 'Give me a summary of all money activity for my trust' },
 ];
-
-const GREETING_MESSAGE = {
-  id: 'greeting',
-  role: 'assistant',
-  content: "Hi! I'm your Trust Assistant. Ask me about your trust, deadlines, or what to do next.\n\nYou can ask me to:\n- **Check upcoming deadlines** for your trust\n- **Draft meeting minutes** from a recent trustee meeting\n- **Prepare a distribution** to a beneficiary\n- **Set up a compensation plan** for a trustee\n- **Record a compensation payment** to a trustee\n- **Log an investment** holding in the trust\n- **Assess your trust's health** and defensibility score\n- **Get guidance** on fiduciary duties and best practices",
-  timestamp: new Date().toISOString(),
-  action_cards: [],
-  video_cards: [],
-  citations: [],
-  caveat: null,
-};
 
 const ChatPanel = ({
   messages = [],
@@ -181,9 +170,8 @@ const ChatPanel = ({
     }
   }, [showUploadCard]);
 
-  const displayMessages = [GREETING_MESSAGE, ...messages];
   const hasUserMessages = messages.some(m => m.role === 'user');
-  const showQuickChips = !hasUserMessages && !loading;
+  const showEmptyState = !hasUserMessages && !loading && !loadingConversation;
 
   // Determine the loading indicator text
   const loadingText = streamPhase === 'thinking' ? 'Thinking...' : 'Generating...';
@@ -218,9 +206,30 @@ const ChatPanel = ({
                 <span className="text-xs text-muted-foreground">Loading conversation...</span>
               </div>
             </div>
+          ) : showEmptyState ? (
+            /* Empty state — welcome line + quick chips (replaces old greeting bubble) */
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+              <h2 className="font-serif text-2xl text-navy dark:text-white text-center mb-2">
+                Trust Assistant
+              </h2>
+              <p className="font-mono text-xs text-muted-foreground text-center max-w-md mb-8 leading-relaxed">
+                Ask about deadlines, minutes, distributions, investments, or your trust's health.
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                {QUICK_CHIPS.map((chip) => (
+                  <button
+                    key={chip.label}
+                    onClick={() => handleChipClick(chip.message)}
+                    className="text-[10px] uppercase tracking-wider px-3 py-1.5 border border-navy/10 bg-navy/5 text-navy hover:bg-gold/10 hover:border-gold/30 hover:text-navy/70 transition-colors dark:border-white/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-gold/10 dark:hover:border-gold/30"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : (
             <>
-              {displayMessages.map((msg) => (
+              {messages.map((msg) => (
                 <MessageBubble
                   key={msg.id}
                   message={msg}
@@ -279,37 +288,9 @@ const ChatPanel = ({
         </button>
       )}
 
-      {/* Quick-action chips — only show before first user message */}
-      {showQuickChips && (
-        <div className="px-6 pb-2 pt-1">
-          <div className="max-w-3xl mx-auto flex flex-wrap gap-2">
-            {QUICK_CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                onClick={() => handleChipClick(chip.message)}
-                disabled={loading}
-                className="text-[10px] uppercase tracking-wider px-3 py-1.5 border border-navy/10 bg-navy/5 text-navy hover:bg-gold/10 hover:border-gold/30 hover:text-navy/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Input bar — always visible */}
-      <div className="chat-input-bar border-t border-navy/10 bg-background">
-        <div className="chat-input-wrapper max-w-3xl mx-auto w-full flex items-end gap-3">
-          {/* New chat button — always visible */}
-          <button
-            onClick={onNewChat}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono font-medium text-navy/70 hover:text-navy hover:bg-navy/5 active:bg-navy/10 transition-colors border border-navy/10 hover:border-navy/20 rounded"
-            title="Start new conversation"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Conversation</span>
-          </button>
-
+      <div className="chat-input-bar">
+        <div className="chat-input-wrapper max-w-3xl mx-auto w-full flex items-end gap-2">
           {/* Paperclip — opens file upload card */}
           <button
             onClick={() => setShowUploadCard(!showUploadCard)}
@@ -326,10 +307,10 @@ const ChatPanel = ({
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about your trust..."
+            placeholder="Ask about your trust…"
             disabled={loading}
             rows={1}
-            className="input-trust flex-1 placeholder:text-muted-foreground/50 disabled:opacity-50 resize-none overflow-y-hidden py-3 leading-6 min-h-[48px] max-h-[240px]"
+            className="input-trust flex-1 placeholder:text-muted-foreground/50 disabled:opacity-50 resize-none overflow-y-auto min-h-[48px] max-h-[240px] transition-[height] duration-100"
             style={{ height: 'auto' }}
           />
 

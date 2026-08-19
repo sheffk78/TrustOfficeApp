@@ -6,16 +6,13 @@ import {
   ChevronRight,
   Shield,
   Calendar,
-  AlertCircle,
   MessageSquare,
   Loader2,
   CheckCircle2,
   Circle,
   XCircle,
-  Sparkles,
   ArrowRight,
-  Lightbulb,
-  Clock,
+  Plus,
 } from 'lucide-react';
 import ChatHistoryList from './ChatHistoryList';
 
@@ -112,8 +109,8 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
     return 'bg-rust';
   };
 
-  const unmetCriteria = criteria.filter(c => !c.achieved && !c.no_data);
-  const noDataCriteria = criteria.filter(c => c.no_data);
+  // Check if a criterion has a suggestion (for clickable affordance)
+  const getSuggestion = (criterionName) => CRITERION_SUGGESTIONS[criterionName];
 
   if (collapsed) {
     return (
@@ -137,7 +134,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
     <div className="snapshot-column flex flex-col bg-background border-r border-navy/10 dark:border-white/10">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-navy/10 dark:border-white/10">
-        <span className="label-trust">Trust Health</span>
+        <span className="label-trust">Overview</span>
         <button
           onClick={onToggle}
           className="p-1 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors"
@@ -148,7 +145,38 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {/* Trust Health Score with Criteria Breakdown */}
+        {/* ── Navigation block: New Conversation + Chat History ── */}
+        {onNewChat && (
+          <div className="px-3 pt-3">
+            <button
+              onClick={onNewChat}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-mono font-medium text-navy dark:text-white hover:bg-navy/5 dark:hover:bg-white/5 active:bg-navy/10 transition-colors border border-navy/15 dark:border-white/15"
+              title="Start new conversation"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Conversation</span>
+            </button>
+          </div>
+        )}
+
+        {/* Chat History — no card wrapper, just a hairline divider */}
+        <div className="px-3 pt-3 pb-3 border-b border-navy/10 dark:border-white/10">
+          <div className="flex items-center gap-2 mb-2 px-1">
+            <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="label-trust text-[10px]">Chat History</span>
+          </div>
+          <ChatHistoryList
+            conversations={conversations}
+            loading={conversationsLoading}
+            onSelect={onConversationSelect}
+            onDelete={onConversationDelete}
+            activeConversationId={conversationId}
+          />
+        </div>
+
+        {/* ── Data block: Trust Health (with merged Opportunities) + Deadlines ── */}
+
+        {/* Trust Health Score — with clickable unmet criteria (merged Opportunities) */}
         <div className="card-trust m-3 p-4">
           <div className="flex items-center gap-2 mb-3">
             <Shield className="w-4 h-4 text-muted-foreground" />
@@ -174,59 +202,48 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
                   style={{ width: `${Math.min(100, ((healthData.total_score ?? 0) / (healthData.max_score || 115)) * 100)}%` }}
                 />
               </div>
-              {/* Criteria breakdown */}
+              {/* Criteria breakdown — unmet rows are now clickable (merged Opportunities) */}
               <div className="space-y-1.5">
-                {criteria.map((c) => (
-                  <div key={c.name} className="flex items-center gap-2">
-                    {c.achieved ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-gold flex-shrink-0" />
-                    ) : c.no_data ? (
-                      <Circle className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />
-                    ) : (
-                      <XCircle className="w-3.5 h-3.5 text-rust/70 flex-shrink-0" />
-                    )}
-                    <span className={`text-xs ${c.achieved ? 'text-foreground' : 'text-muted-foreground'} flex-1 truncate`}>
-                      {c.name}
-                    </span>
-                    <span className={`text-[10px] ${c.achieved ? 'text-gold' : 'text-muted-foreground'}`}>
-                      {c.points}/{c.max_points}
-                    </span>
-                  </div>
-                ))}
+                {criteria.map((c) => {
+                  const suggestion = !c.achieved && !c.no_data ? getSuggestion(c.name) : null;
+                  const isClickable = suggestion && onSendSuggestion;
+                  return (
+                    <button
+                      key={c.name}
+                      onClick={() => isClickable && onSendSuggestion(suggestion.prompt)}
+                      disabled={!isClickable}
+                      className={`w-full flex items-center gap-2 text-left transition-colors ${
+                        isClickable
+                          ? 'hover:bg-gold/5 cursor-pointer group -mx-1 px-1'
+                          : 'cursor-default'
+                      }`}
+                      title={isClickable ? suggestion.label : undefined}
+                    >
+                      {c.achieved ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                      ) : c.no_data ? (
+                        <Circle className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rust/70 flex-shrink-0" />
+                      )}
+                      <span className={`text-xs flex-1 truncate ${c.achieved ? 'text-foreground' : 'text-muted-foreground'} ${isClickable ? 'group-hover:text-navy dark:group-hover:text-white' : ''}`}>
+                        {c.name}
+                      </span>
+                      {isClickable && (
+                        <ArrowRight className="w-3 h-3 text-gold flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      )}
+                      <span className={`text-[10px] ${c.achieved ? 'text-gold' : 'text-muted-foreground'}`}>
+                        {c.points}/{c.max_points}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">No score available</p>
           )}
         </div>
-
-        {/* Opportunities to Improve */}
-        {(unmetCriteria.length > 0 || noDataCriteria.length > 0) && (
-          <div className="card-trust m-3 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className="w-4 h-4 text-gold" />
-              <span className="label-trust">Opportunities</span>
-            </div>
-            <div className="space-y-2">
-              {[...unmetCriteria, ...noDataCriteria].slice(0, 4).map((c) => {
-                const suggestion = CRITERION_SUGGESTIONS[c.name];
-                return (
-                  <button
-                    key={c.name}
-                    onClick={() => suggestion && onSendSuggestion?.(suggestion.prompt)}
-                    className="w-full text-left flex items-center gap-2 px-2.5 py-2 bg-navy/5 dark:bg-white/5 hover:bg-navy/10 dark:hover:bg-white/10 transition-colors group"
-                    disabled={!suggestion || !onSendSuggestion}
-                  >
-                    <ArrowRight className="w-3 h-3 text-gold flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
-                    <span className="text-xs text-foreground group-hover:text-navy dark:group-hover:text-white transition-colors flex-1">
-                      {suggestion ? suggestion.label : c.description}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Upcoming Deadlines */}
         <div className="card-trust m-3 p-4">
@@ -278,45 +295,6 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
               <p className="text-xs text-muted-foreground">No upcoming deadlines</p>
             </div>
           )}
-        </div>
-
-        {/* Smart Suggestions */}
-        <div className="card-trust m-3 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-4 h-4 text-gold" />
-            <span className="label-trust">Ask the Assistant</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { label: 'What should I do next?', prompt: 'What are the most important things I should do for my trust right now?' },
-              { label: 'Review my health score', prompt: 'Explain my trust health score and how to improve it' },
-              { label: 'Upcoming deadlines', prompt: 'What deadlines and tasks are coming up for my trust?' },
-              { label: 'Help with minutes', prompt: 'Help me create minutes for this quarter' },
-            ].map((suggestion) => (
-              <button
-                key={suggestion.label}
-                onClick={() => onSendSuggestion?.(suggestion.prompt)}
-                className="px-2.5 py-1.5 text-xs border border-navy/20 dark:border-white/20 text-navy dark:text-white/80 hover:bg-navy/10 dark:hover:bg-white/10 transition-colors"
-                disabled={!onSendSuggestion}
-              >
-                {suggestion.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Chat History */}
-        <div className="card-trust m-3 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="w-4 h-4 text-muted-foreground" />
-            <span className="label-trust">Chat History</span>
-          </div>
-          <ChatHistoryList
-            conversations={conversations}
-            loading={conversationsLoading}
-            onSelect={onConversationSelect}
-            onDelete={onConversationDelete}
-          />
         </div>
       </div>
     </div>
