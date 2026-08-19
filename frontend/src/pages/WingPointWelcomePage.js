@@ -742,8 +742,8 @@ function LoggedInAction({ subscription, navigate, plan }) {
     );
   }
 
-  // Needs upgrade
-  if (hasActiveSubscription && needsUpgrade) {
+  // Needs upgrade — forever_free is a permanent free tier, never show upgrade nudges
+  if (hasActiveSubscription && needsUpgrade && subscription?.plan_type !== 'forever_free') {
     return (
       <ActionCard
         icon={<AlertTriangle className="w-5 h-5 text-navy" />}

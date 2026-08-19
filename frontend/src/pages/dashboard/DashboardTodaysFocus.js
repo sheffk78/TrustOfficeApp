@@ -46,16 +46,32 @@ function getInsightVariantClass(type) {
 /**
  * Today's Focus card — shows top 3 prioritized governance insights.
  * Insights are sorted by type priority (error > warning > info), then by points.
+ *
+ * Dedup with "Do This Next" hero: when nextAction.variant === 'insight', the
+ * hero already surfaces the single highest-priority insight. To avoid showing
+ * the same recommendation twice, we skip the insight whose action_path matches
+ * nextAction.action and surface the next ones (2nd, 3rd) here instead.
  */
-export function DashboardTodaysFocus({ insights, healthScore, dismissInsight }) {
+export function DashboardTodaysFocus({ insights, healthScore, dismissInsight, nextAction }) {
   const navigate = useNavigate();
 
   if (!insights || insights.length === 0) return null;
 
   const sortedInsights = sortInsightsByPriority(insights);
-  const topInsights = sortedInsights.slice(0, 3);
-  const remainingCount = sortedInsights.length - topInsights.length;
-  const totalPoints = sortedInsights.reduce((sum, i) => sum + i.points, 0);
+
+  // If the Do This Next hero is already featuring a governance insight, skip
+  // that insight here so the user sees the NEXT recommendation, not a repeat.
+  const heroInsightAction = nextAction?.variant === 'insight' ? nextAction.action : null;
+  const dedupedInsights = heroInsightAction
+    ? sortedInsights.filter(i => i.action_path !== heroInsightAction)
+    : sortedInsights;
+
+  // Nothing left after dedup — the hero covers the only actionable insight.
+  if (dedupedInsights.length === 0) return null;
+
+  const topInsights = dedupedInsights.slice(0, 3);
+  const remainingCount = dedupedInsights.length - topInsights.length;
+  const totalPoints = dedupedInsights.reduce((sum, i) => sum + i.points, 0);
   const isPerfectScore = healthScore?.total_score === healthScore?.max_score;
 
   return (

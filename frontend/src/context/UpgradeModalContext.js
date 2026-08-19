@@ -16,6 +16,10 @@ export const UpgradeModalProvider = ({ children }) => {
   const { isReadOnly, subscription } = useAuth();
   
   const showUpgradeModal = useCallback((feature = 'this feature', triggerSource = 'blocked_action', location = 'unknown') => {
+    // forever_free is a permanent free tier — never show the upgrade modal.
+    if (subscription?.plan_type === 'forever_free') {
+      return false;
+    }
     // Track the blocked action
     // Note: callers already check isReadOnly before invoking showUpgradeModal,
     // so we do NOT guard on isReadOnly here — double-guarding blocked the modal

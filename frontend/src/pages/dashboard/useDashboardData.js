@@ -19,8 +19,12 @@ export function useDashboardData() {
   const [loading, setLoading] = useState(true);
   const [weeklyBriefing, setWeeklyBriefing] = useState(null);
 
-  // Onboarding accordion expansion state (starts collapsed)
-  const [onboardingExpanded, setOnboardingExpanded] = useState(false);
+  // Onboarding accordion expansion state.
+  // Defaults to EXPANDED so new users (onboarding incomplete) see the
+  // Getting Started checklist dominating the dashboard. The checklist
+  // component returns null when onboarding is complete/dismissed, so this
+  // default only matters for the incomplete case.
+  const [onboardingExpanded, setOnboardingExpanded] = useState(true);
 
   // Tax Calendar dashboard state
   const [taxDeadlines, setTaxDeadlines] = useState([]);

@@ -1233,16 +1233,36 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
 @router.delete("/data")
 async def delete_demo_data(user: dict = Depends(require_write_access)):
     """
-    Delete only demo data (records with is_demo: True).
-    User-created data is preserved.
+    Delete only demo data (records with is_demo: True) plus orphaned records
+    that were auto-created as a side effect of having demo trusts (e.g.
+    deadlines, separation_alerts, state compliance, notifications, etc.).
+
+    These orphaned records do NOT carry is_demo: True (they were created by
+    the application, not the seeder), so we identify them by the demo trust_ids
+    that are about to be deleted.
+
+    User-created data referencing real (non-demo) trusts is always preserved.
     """
     user_id = user["user_id"]
-    
+
     # Track what was deleted
     deleted_counts = {}
-    
-    # Delete in order (children first, then parents)
-    # Only delete records that have is_demo: True
+
+    # ------------------------------------------------------------------
+    # STEP 1: Collect demo trust_ids BEFORE deleting anything.
+    # These IDs are used to clean up orphaned records in untracked collections.
+    # ------------------------------------------------------------------
+    demo_trust_ids = [
+        t["trust_id"]
+        async for t in db.trusts.find(
+            {"user_id": user_id, "is_demo": True},
+            {"_id": 0, "trust_id": 1},
+        )
+    ]
+
+    # ------------------------------------------------------------------
+    # STEP 2: Delete the 20 tracked collections (only is_demo: True records).
+    # ------------------------------------------------------------------
     collections_to_clean = [
         ("chat_conversations", "chat_conversations"),
         ("trust_document_analysis", "trust_document_analysis"),
@@ -1265,20 +1285,90 @@ async def delete_demo_data(user: dict = Depends(require_write_access)):
         ("health_score_snapshots", "health_score_snapshots"),
         ("trusts", "trusts"),
     ]
-    
+
     for collection_name, display_name in collections_to_clean:
         collection = db[collection_name]
         # Only delete records marked as demo data
         result = await collection.delete_many({"user_id": user_id, "is_demo": True})
         if result.deleted_count > 0:
             deleted_counts[display_name] = result.deleted_count
-    
+
+    # ------------------------------------------------------------------
+    # STEP 3: Clean up orphaned records in trust_id-keyed collections.
+    # These collections are NOT seeded by the demo seeder (so records lack
+    # is_demo: True) but are auto-created by the app when a trust exists.
+    # We delete only records whose trust_id matches one of the demo trusts.
+    #
+    # NOTE: state_compliance_profiles is a GLOBAL lookup table keyed by
+    # state_code (no trust_id / user_id field) — the trust_id filter is a
+    # safe no-op for it; it is listed for documentation completeness.
+    # ------------------------------------------------------------------
+    trust_id_orphan_collections = [
+        "deadlines",
+        "separation_alerts",
+        "trust_state_compliance",
+        "benevolence_policies",
+        "benevolence_policy_versions",
+        "notifications",
+        "dismissed_insights",
+        "risk_findings_cache",
+        "state_compliance_profiles",  # global table — no-op, kept for documentation
+    ]
+
+    if demo_trust_ids:
+        for col_name in trust_id_orphan_collections:
+            result = await db[col_name].delete_many(
+                {"trust_id": {"$in": demo_trust_ids}}
+            )
+            if result.deleted_count > 0:
+                deleted_counts[col_name] = result.deleted_count
+
+    # ------------------------------------------------------------------
+    # STEP 4: Clean up orphaned records in user_id-keyed collections.
+    # These collections may contain records the user created during demo
+    # exploration. We only delete records that are clearly demo-related:
+    #   - is_demo: True, OR
+    #   - trust_id references one of the demo trust_ids
+    # User-created records referencing real (non-demo) trusts are preserved.
+    # ------------------------------------------------------------------
+    user_id_orphan_collections = [
+        "bank_accounts",
+        "expenses",
+        "investments",
+        "meeting_agendas",
+        "minutes_templates",
+        "personal_vendors",  # user_id only, no trust_id/is_demo — safe no-op
+        "external_provisions",
+        "trust_admin_kits",
+    ]
+
+    if demo_trust_ids:
+        for col_name in user_id_orphan_collections:
+            result = await db[col_name].delete_many(
+                {
+                    "user_id": user_id,
+                    "$or": [
+                        {"is_demo": True},
+                        {"trust_id": {"$in": demo_trust_ids}},
+                    ],
+                }
+            )
+            if result.deleted_count > 0:
+                deleted_counts[col_name] = result.deleted_count
+
+    # ------------------------------------------------------------------
+    # user_onboarding is deliberately NOT deleted here. It is keyed by
+    # user_id only (no trust_id, no is_demo flag) and represents the user's
+    # global checklist state, not per-trust demo data. Deleting it would
+    # reset the user's onboarding progress even for real trusts.
+    # ------------------------------------------------------------------
+
     total_deleted = sum(deleted_counts.values())
-    
+
     return {
         "message": f"Successfully deleted {total_deleted} demo records",
         "deleted_counts": deleted_counts,
-        "notes": "Only demo data was removed. Your custom trusts and data remain intact."
+        "notes": "Only demo data and auto-created orphan records were removed. Your custom trusts and data remain intact."
     }
 
 
@@ -1287,9 +1377,25 @@ async def get_demo_status(user: dict = Depends(get_current_user)):
     """
     Check if user has demo data and get counts of all records.
     Separates demo data from user-created data.
+
+    Counts include both the 20 seeded collections AND the additional
+    collections where orphaned records may be auto-created as a side
+    effect of having demo trusts (deadlines, separation_alerts, etc.).
+    This keeps total_records accurate and consistent with what the user
+    actually sees in their account.
     """
     user_id = user["user_id"]
-    
+
+    # Collect demo trust_ids up-front so we can count demo-related orphan
+    # records (which lack is_demo: True) by trust_id.
+    demo_trust_ids = [
+        t["trust_id"]
+        async for t in db.trusts.find(
+            {"user_id": user_id, "is_demo": True},
+            {"_id": 0, "trust_id": 1},
+        )
+    ]
+
     # Count all records
     counts = {
         "trusts": await db.trusts.count_documents({"user_id": user_id}),
@@ -1312,8 +1418,25 @@ async def get_demo_status(user: dict = Depends(get_current_user)):
         "entity_relationships": await db.entity_relationships.count_documents({"user_id": user_id}),
         "trust_units_settings": await db.trust_units_settings.count_documents({"user_id": user_id}),
         "trust_unit_transfers": await db.trust_unit_transfers.count_documents({"user_id": user_id}),
+        # --- additional collections (orphaned/auto-created records) ---
+        "deadlines": await db.deadlines.count_documents({"user_id": user_id}),
+        "separation_alerts": await db.separation_alerts.count_documents({"user_id": user_id}),
+        "state_compliance_profiles": await db.state_compliance_profiles.count_documents({}),
+        "benevolence_policies": await db.benevolence_policies.count_documents({"user_id": user_id}),
+        "notifications": await db.notifications.count_documents({"user_id": user_id}),
+        "bank_accounts": await db.bank_accounts.count_documents({"user_id": user_id}),
+        "expenses": await db.expenses.count_documents({"user_id": user_id}),
+        "investments": await db.investments.count_documents({"user_id": user_id}),
+        "meeting_agendas": await db.meeting_agendas.count_documents({"user_id": user_id}),
+        "dismissed_insights": await db.dismissed_insights.count_documents({"user_id": user_id}),
+        "user_onboarding": await db.user_onboarding.count_documents({"user_id": user_id}),
+        "risk_findings_cache": await db.risk_findings_cache.count_documents({"trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "trust_state_compliance": await db.trust_state_compliance.count_documents({"trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "personal_vendors": await db.personal_vendors.count_documents({"user_id": user_id}),
+        "external_provisions": await db.external_provisions.count_documents({"user_id": user_id}),
+        "trust_admin_kits": await db.trust_admin_kits.count_documents({"user_id": user_id}),
     }
-    
+
     # Count demo records only
     demo_counts = {
         "trusts": await db.trusts.count_documents({"user_id": user_id, "is_demo": True}),
@@ -1336,13 +1459,30 @@ async def get_demo_status(user: dict = Depends(get_current_user)):
         "entity_relationships": await db.entity_relationships.count_documents({"user_id": user_id, "is_demo": True}),
         "trust_units_settings": await db.trust_units_settings.count_documents({"user_id": user_id, "is_demo": True}),
         "trust_unit_transfers": await db.trust_unit_transfers.count_documents({"user_id": user_id, "is_demo": True}),
+        # --- additional collections: demo-related orphans (by trust_id or is_demo) ---
+        "deadlines": await db.deadlines.count_documents({"user_id": user_id, "trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "separation_alerts": await db.separation_alerts.count_documents({"user_id": user_id, "trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "state_compliance_profiles": 0,  # global lookup table — not per-user demo data
+        "benevolence_policies": await db.benevolence_policies.count_documents({"user_id": user_id, "trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "notifications": await db.notifications.count_documents({"user_id": user_id, "trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "bank_accounts": await db.bank_accounts.count_documents({"user_id": user_id, "$or": [{"is_demo": True}, {"trust_id": {"$in": demo_trust_ids}}]}) if demo_trust_ids else await db.bank_accounts.count_documents({"user_id": user_id, "is_demo": True}),
+        "expenses": await db.expenses.count_documents({"user_id": user_id, "$or": [{"is_demo": True}, {"trust_id": {"$in": demo_trust_ids}}]}) if demo_trust_ids else await db.expenses.count_documents({"user_id": user_id, "is_demo": True}),
+        "investments": await db.investments.count_documents({"user_id": user_id, "$or": [{"is_demo": True}, {"trust_id": {"$in": demo_trust_ids}}]}) if demo_trust_ids else await db.investments.count_documents({"user_id": user_id, "is_demo": True}),
+        "meeting_agendas": await db.meeting_agendas.count_documents({"user_id": user_id, "trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "dismissed_insights": await db.dismissed_insights.count_documents({"user_id": user_id, "trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "user_onboarding": 0,  # keyed by user_id only, no is_demo/trust_id — not attributable to demo
+        "risk_findings_cache": await db.risk_findings_cache.count_documents({"trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "trust_state_compliance": await db.trust_state_compliance.count_documents({"trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "personal_vendors": 0,  # user_id only, no is_demo/trust_id — not attributable to demo
+        "external_provisions": await db.external_provisions.count_documents({"user_id": user_id, "trust_id": {"$in": demo_trust_ids}}) if demo_trust_ids else 0,
+        "trust_admin_kits": await db.trust_admin_kits.count_documents({"user_id": user_id, "$or": [{"is_demo": True}, {"trust_id": {"$in": demo_trust_ids}}]}) if demo_trust_ids else await db.trust_admin_kits.count_documents({"user_id": user_id, "is_demo": True}),
     }
-    
+
     total = sum(counts.values())
     total_demo = sum(demo_counts.values())
     has_data = total > 0
     has_demo_data = total_demo > 0
-    
+
     return {
         "has_data": has_data,
         "has_demo_data": has_demo_data,

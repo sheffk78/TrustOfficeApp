@@ -14,11 +14,13 @@ export const TrialBanner = ({ location = 'dashboard' }) => {
   const { subscription } = useAuth();
   const hasTrackedView = useRef(false);
   
-  // Show for active free users (forever_free or legacy trial) — NOT gifted users
+  // forever_free is a permanent free tier, NOT a trial — never show upgrade nudges.
+  if (subscription?.plan_type === 'forever_free') return null;
+
+  // Show for active free users (legacy trial or free) — NOT gifted users, NOT forever_free
   const isGiftedUser = subscription?.is_gifted;
   const isActiveFreeTier = !isGiftedUser && (
     (subscription?.is_trial && subscription?.is_active) || 
-    (subscription?.plan_type === 'forever_free' && subscription?.is_active) ||
     (subscription?.plan_type === 'free' && subscription?.is_active)
   );
   

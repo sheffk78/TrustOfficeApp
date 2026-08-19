@@ -59,8 +59,8 @@ const NAV_GROUPS = [
   { key: 'trust-assistant', icon: Bot, label: 'Trust Assistant', items: [], standout: true, badge: 'NEW' },
 
   // ═══ LEARNING ═══
-  { key: 'course', icon: GraduationCap, label: 'Trustee 101', items: [], standout: true },
   { key: 'knowledge', icon: Library, label: 'Knowledge Base', items: [
+    { path: '/course', icon: GraduationCap, label: 'Trustee 101' },
     { path: '/knowledge', icon: BookOpen, label: 'Browse Articles' },
     { path: '/knowledge/admin', icon: FilePen, label: 'Manage Articles', adminOnly: true },
   ], badge: 'NEW' },
@@ -108,7 +108,7 @@ const SIDEBAR_SCROLL_KEY = 'sidebar-scroll';
 const SIDEBAR_GROUPS_KEY = 'sidebar-expanded-groups';
 
 // Paths that match by prefix (not just exact equality)
-const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities', '/knowledge']);
+const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities', '/knowledge', '/course']);
 
 /**
  * Check whether a nav item path matches the current pathname.
@@ -179,8 +179,6 @@ const StandaloneNavItem = ({ group, pathname, onClick }) => {
           {group.badge && <NavBadge badge={group.badge} variant="solid" />}
         </span>
       </Link>
-      {/* Divider after Trustee 101 separates hero items from core nav */}
-      {group.key === 'course' && <div className="sidebar-section-divider" />}
     </div>
   );
 };

@@ -1,54 +1,22 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Zap, X, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 /**
- * Subscription upgrade banner + WingPoint persistent banner.
- * Shown at the top of the dashboard above the page container.
+ * Dashboard-level banners.
+ *
+ * The subscription upgrade banner ("Your current plan supports N trusts but
+ * you have M…") has been REMOVED — all upgrade/subscription/purchase
+ * messaging is now consolidated into the single <UpgradeBar /> rendered at
+ * the app root (App.js). This avoids two competing upgrade messages on the
+ * dashboard.
+ *
+ * What remains here is the WingPoint persistent banner, which is NOT an
+ * upgrade message — it notifies the user that their WingPoint trust
+ * documents are ready for review.
  */
-export function DashboardBanners({
-  subscription,
-  upgradeBannerDismissed,
-  setUpgradeBannerDismissed,
-  wpBannerVisible,
-}) {
+export function DashboardBanners({ wpBannerVisible }) {
   return (
     <>
-      {/* Subscription Banners */}
-      {subscription?.needs_upgrade && !upgradeBannerDismissed && (
-        <div
-          className="mx-auto max-w-4xl mt-4 mb-2 border border-warning/30 bg-gradient-to-r from-warning/10 to-warning/5"
-          data-testid="upgrade-banner"
-        >
-          <div className="flex items-center gap-4 p-4">
-            <div className="w-10 h-10 bg-warning/20 flex items-center justify-center flex-shrink-0">
-              <Zap className="w-5 h-5 text-warning" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-warning">
-                Your current plan supports{' '}
-                <span className="font-semibold">{subscription.trust_limit}</span> trusts but you have{' '}
-                <span className="font-semibold">{subscription.trust_count}</span>. Upgrade to manage all your trusts.
-              </p>
-            </div>
-            <Link
-              to="/settings/billing?wp=1&action=upgrade"
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium bg-warning text-white hover:bg-warning/90 transition-colors flex-shrink-0"
-              data-testid="upgrade-banner-cta"
-            >
-              Upgrade <ArrowRight className="w-4 h-4" />
-            </Link>
-            <button
-              onClick={() => setUpgradeBannerDismissed(true)}
-              className="text-warning/60 hover:text-warning flex-shrink-0"
-              aria-label="Dismiss upgrade banner"
-              data-testid="upgrade-banner-dismiss"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* WingPoint persistent banner — shows after welcome modal dismissal */}
       {wpBannerVisible && (
         <div

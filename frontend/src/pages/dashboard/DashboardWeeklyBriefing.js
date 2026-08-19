@@ -5,12 +5,29 @@ import { getSeverityClass } from './constants';
 /**
  * Weekly Briefing hero — "N things need your attention".
  * Lists AI-generated weekly briefing items with severity color coding.
+ *
+ * Dedup vs Today's Focus: weekly briefing items whose action_link points to
+ * the same destination as a governance insight already shown in Today's Focus
+ * are dropped, so the user doesn't see the same recommendation in two places.
  */
-export function DashboardWeeklyBriefing({ weeklyBriefing }) {
+export function DashboardWeeklyBriefing({ weeklyBriefing, insights }) {
   if (!weeklyBriefing || weeklyBriefing.length === 0) return null;
 
-  const headingSuffix = weeklyBriefing.length === 1 ? 'thing' : 'things';
-  const verbSuffix = weeklyBriefing.length === 1 ? 's' : '';
+  // Build a set of insight action paths for quick dedup lookup.
+  const insightActions = new Set(
+    (insights || []).map(i => i.action_path).filter(Boolean)
+  );
+
+  // Drop briefing items that point to the same destination as an insight
+  // already surfaced in Today's Focus.
+  const dedupedBriefing = weeklyBriefing.filter(
+    item => !insightActions.has(item.action_link)
+  );
+
+  if (dedupedBriefing.length === 0) return null;
+
+  const headingSuffix = dedupedBriefing.length === 1 ? 'thing' : 'things';
+  const verbSuffix = dedupedBriefing.length === 1 ? 's' : '';
 
   return (
     <div className="mb-8 card-trust border-l-4 border-l-gold" data-testid="weekly-briefing-hero">
@@ -24,7 +41,7 @@ export function DashboardWeeklyBriefing({ weeklyBriefing }) {
         </div>
       </div>
       <div className="space-y-2">
-        {weeklyBriefing.map((item) => {
+        {dedupedBriefing.map((item) => {
           const severityClass = getSeverityClass(item.severity);
           return (
             <div key={item.id} className={`flex items-center justify-between p-3 border ${severityClass}`}>

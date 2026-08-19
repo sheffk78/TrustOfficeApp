@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -43,7 +43,6 @@ import {
   Shield,
   Lock,
   Unlock,
-  Upload,
   FileCheck
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
@@ -107,11 +106,6 @@ export default function SettingsPage() {
     is_fiscal_year: false
   });
   const [createTrustLoading, setCreateTrustLoading] = useState(false);
-  
-  // Determination letter upload state
-  const [detLetterUploading, setDetLetterUploading] = useState(false);
-  const [detLetterFile, setDetLetterFile] = useState(null);
-  const detLetterFileRef = useRef(null);
   
   // Referral state
   const [referralData, setReferralData] = useState(null);
@@ -216,6 +210,15 @@ export default function SettingsPage() {
     'Distribution', 'Compensation', 'Inter-Entity Transfer',
     'Operational Expense', 'Capital Contribution', 'Tax Payment', 'Other'
   ];
+  const CLASSIFICATION_DESCRIPTIONS = {
+    'Distribution': 'Funds distributed to beneficiaries',
+    'Compensation': 'Payments to trustees for services',
+    'Inter-Entity Transfer': 'Transfers between trust entities',
+    'Operational Expense': 'Day-to-day trust operating costs',
+    'Capital Contribution': 'Adding capital to trust investments',
+    'Tax Payment': 'Tax payments made by the trust',
+    'Other': 'Any other transaction type'
+  };
   const [spendingThreshold, setSpendingThreshold] = useState(() => {
     const st = selectedTrust?.governance_settings?.spending_threshold;
     return {
@@ -608,37 +611,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDetLetterUpload = async () => {
-    if (!selectedTrust || !detLetterFile) return;
-    setDetLetterUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', detLetterFile);
-      formData.append('title', 'IRS Determination Letter');
-      formData.append('category', 'irs_determination');
-      if (trustData.determination_letter_date) formData.append('date', trustData.determination_letter_date);
-      formData.append('tags', '501c3,irs,determination');
-
-      const token = localStorage.getItem('auth_token');
-      const res = await fetch(`${API_BASE}/api/trusts/${selectedTrust.trust_id}/vault/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || 'Upload failed');
-      }
-      toast.success('IRS Determination Letter uploaded to vault');
-      setDetLetterFile(null);
-      if (detLetterFileRef.current) detLetterFileRef.current.value = '';
-    } catch (e) {
-      toast.error(e.message || 'Failed to upload determination letter');
-    } finally {
-      setDetLetterUploading(false);
-    }
-  };
-
   const handleUpdateTrust = async () => {
     if (!selectedTrust) {
       toast.error('No trust selected');
@@ -956,12 +928,12 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <Label className="label-trust">Description</Label>
+                  <Label className="label-trust">Description / Mission</Label>
                   <Textarea
                     value={trustData.description}
                     onChange={(e) => setTrustData({ ...trustData, description: e.target.value })}
                     className="mt-1 input-trust min-h-[100px]"
-                    placeholder="Brief description of the trust's purpose..."
+                    placeholder="Brief description of the trust's purpose and mission..."
                     data-testid="settings-trust-description"
                   />
                 </div>
@@ -1005,20 +977,6 @@ export default function SettingsPage() {
                       </div>
 
                       <div>
-                        <Label className="label-trust">Mission Statement</Label>
-                        <Textarea
-                          value={trustData.benevolence_mission}
-                          onChange={(e) => setTrustData({ ...trustData, benevolence_mission: e.target.value })}
-                          className="mt-1 input-trust min-h-[80px]"
-                          placeholder="The trust's charitable mission — e.g., 'To provide benevolence for medical, housing, and educational needs of individuals in financial hardship.'"
-                          data-testid="settings-benevolence-mission"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          This mission governs which benevolence requests qualify. It appears on the benevolence report PDF.
-                        </p>
-                      </div>
-
-                      <div>
                         <Label className="label-trust">IRS Determination Letter Date</Label>
                         <Input
                           type="date"
@@ -1034,32 +992,17 @@ export default function SettingsPage() {
 
                       <div>
                         <Label className="label-trust">IRS Determination Letter</Label>
-                        <div className="flex items-center gap-3 mt-1">
-                          <input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            ref={detLetterFileRef}
-                            onChange={(e) => setDetLetterFile(e.target.files[0])}
-                            className="text-sm"
-                            data-testid="settings-determination-letter-upload"
-                          />
-                          <Button
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Upload your IRS determination letter in the{' '}
+                          <button
                             type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={handleDetLetterUpload}
-                            disabled={!detLetterFile || detLetterUploading}
-                            data-testid="settings-determination-letter-upload-btn"
+                            onClick={() => navigate('/vault')}
+                            className="text-navy underline hover:text-navy/80"
+                            data-testid="settings-vault-link"
                           >
-                            {detLetterUploading ? (
-                              <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Uploading...</>
-                            ) : (
-                              <><Upload className="w-4 h-4 mr-1" />Upload to Vault</>
-                            )}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Upload the IRS determination letter (PDF or image). Stored securely in the Trust Document Vault.
+                            Vault
+                          </button>
+                          {' '}— it will be stored securely with your other trust documents.
                         </p>
                       </div>
                     </div>
@@ -1636,7 +1579,7 @@ export default function SettingsPage() {
           <TabsContent value="compliance">
           {/* Compliance tab — only shown when a trust is selected */}
           {selectedTrust && (
-            <div className="card-trust mb-8">
+            <div className="card-trust corner-mark mb-8">
               <div className="flex items-center gap-2 mb-6">
                 <Shield className="w-5 h-5 text-navy" />
                 <h2 className="font-serif text-xl text-navy">Governance</h2>
@@ -1645,11 +1588,10 @@ export default function SettingsPage() {
               {/* Governance Settings — Spending Threshold */}
               <div className="pt-4 border-t border-navy/10" data-section="governance">
                   <div className="flex items-center gap-2 mb-4">
-                    <Shield className="w-4 h-4 text-navy" />
-                    <Label className="label-trust">Governance Settings</Label>
+                    <Label className="label-trust">Spending Threshold</Label>
                   </div>
                   <p className="text-xs text-muted-foreground mb-4">
-                    Set a spending threshold. Transactions above this amount trigger an alert that can be resolved by linking meeting minutes documenting the decision.
+                    Set a spending threshold — transactions above this amount in the selected categories will trigger an alert that can be resolved by linking meeting minutes documenting the trustee decision.
                   </p>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1682,19 +1624,23 @@ export default function SettingsPage() {
                         {GOVERNANCE_CLASSIFICATIONS.map(cls => {
                           const selected = (spendingThreshold.scope_classifications || []).includes(cls);
                           return (
-                            <button
-                              key={cls}
-                              type="button"
-                              onClick={() => toggleScopeClassification(cls)}
-                              className={`px-3 py-1.5 text-xs font-medium border transition-colors ${
-                                selected
-                                  ? 'bg-navy text-white border-navy'
-                                  : 'bg-white text-navy border-navy/30 hover:border-navy'
-                              }`}
-                              data-testid={`scope-classification-${cls.replace(/\s+/g, '-').toLowerCase()}`}
-                            >
-                              {cls}
-                            </button>
+                            <div key={cls} className="flex flex-col items-start">
+                              <button
+                                type="button"
+                                onClick={() => toggleScopeClassification(cls)}
+                                className={`px-3 py-1.5 text-xs font-medium border transition-colors ${
+                                  selected
+                                    ? 'bg-navy text-white border-navy'
+                                    : 'bg-white text-navy border-navy/30 hover:border-navy'
+                                }`}
+                                data-testid={`scope-classification-${cls.replace(/\s+/g, '-').toLowerCase()}`}
+                              >
+                                {cls}
+                              </button>
+                              <span className="text-[10px] text-muted-foreground mt-0.5 max-w-[140px] leading-tight">
+                                {CLASSIFICATION_DESCRIPTIONS[cls]}
+                              </span>
+                            </div>
                           );
                         })}
                       </div>

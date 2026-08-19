@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ReadOnlyBanner } from '@/components/ReadOnlyBanner';
-import { TrialBanner } from '@/components/TrialBanner';
 import { 
   AlertTriangle, 
   CreditCard,
@@ -15,9 +13,14 @@ import {
  * SubscriptionGate - Wraps protected content
  * 
  * BEHAVIOR (Read-Only Mode):
- * - If subscription is active (including free tier): Show content with TrialBanner (if free tier)
- * - If subscription is expired/inactive: Show content with ReadOnlyBanner
- *   Users can VIEW all data but cannot CREATE/UPDATE/DELETE
+ * - If subscription is active (including free tier): Show content normally.
+ *   Upgrade/subscription messaging is handled globally by <UpgradeBar /> at
+ *   the app root (App.js), so this gate no longer renders TrialBanner or
+ *   ReadOnlyBanner — those were consolidated into UpgradeBar to ensure a
+ *   SINGLE upgrade message across the entire app.
+ * - If subscription is expired/inactive: Show content in read-only mode.
+ *   Users can VIEW all data but cannot CREATE/UPDATE/DELETE. The expired
+ *   banner is shown by UpgradeBar at the app root.
  * - Admins always get full access with no banners
  * 
  * Use on pages that require subscription awareness (NOT on settings/billing pages)
@@ -26,11 +29,11 @@ export const SubscriptionGate = ({ children }) => {
   const { user, subscription, subscriptionExpired, isReadOnly, loading } = useAuth();
 
   // Fallback for when /subscription/state never resolves (network hang, etc.).
-  // After 10s we stop showing the spinner and render the content with the
-  // ReadOnlyBanner — mirroring the DEFAULT_ERROR_SUBSCRIPTION pattern from
-  // AuthContext (expired / read-only). If the real subscription state arrives
-  // later (loading flips false / subscription becomes non-null), the normal
-  // render branches below take over and this flag is cleared.
+  // After 10s we stop showing the spinner and render the content — mirroring
+  // the DEFAULT_ERROR_SUBSCRIPTION pattern from AuthContext (expired / read-only).
+  // If the real subscription state arrives later (loading flips false /
+  // subscription becomes non-null), the normal render branches below take over
+  // and this flag is cleared.
   const [subscriptionLoadTimedOut, setSubscriptionLoadTimedOut] = useState(false);
   useEffect(() => {
     if (!loading && subscription) {
@@ -72,40 +75,31 @@ export const SubscriptionGate = ({ children }) => {
     );
   }
 
-  // Timed out and still no subscription state — render content with ReadOnlyBanner
-  // (read-only / expired fallback) rather than hanging on the spinner forever.
+  // Timed out and still no subscription state — render content in read-only
+  // mode. The expired/read-only banner is shown globally by UpgradeBar.
   if (!subscription && subscriptionLoadTimedOut) {
     return (
       <div className="flex flex-col min-h-screen">
-        <ReadOnlyBanner />
         {children}
       </div>
     );
   }
 
-  // Check if it's an active free-tier user (but NOT gifted — gifted users get GiftedBanner at app root)
-  const isGiftedUser = subscription?.is_gifted;
-  const isActiveFreeTier = !isGiftedUser && (
-    (subscription?.is_trial && subscription?.is_active) || 
-    (subscription?.plan_type === 'forever_free' && subscription?.is_active) ||
-    (subscription?.plan_type === 'free' && subscription?.is_active)
-  );
-
-  // If subscription is active, show content with UpgradeBanner for free users
+  // Subscription is active — show content normally.
+  // Upgrade messaging (free tier, gifted, etc.) is handled by UpgradeBar at
+  // the app root, so we no longer render TrialBanner here.
   if (!subscriptionExpired && !isReadOnly) {
     return (
       <div className="flex flex-col min-h-screen">
-        {isActiveFreeTier && <TrialBanner location="page" />}
         {children}
       </div>
     );
   }
 
-  // Subscription expired or read-only - show content with ReadOnlyBanner
-  // Users can still view all their data
+  // Subscription expired or read-only — show content (read-only mode).
+  // The expired banner is shown globally by UpgradeBar at the app root.
   return (
     <div className="flex flex-col min-h-screen">
-      <ReadOnlyBanner />
       {children}
     </div>
   );

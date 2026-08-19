@@ -3,7 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
-import { GiftedBanner } from "@/components/GiftedBanner";
+import { UpgradeBar } from "@/components/UpgradeBar";
 import { captureUtmParams } from "@/utils/utm";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
@@ -532,7 +532,7 @@ function App() {
         <AuthProvider>
           <UpgradeModalProvider>
             <ErrorBoundary>
-              <GiftedBanner />
+              <UpgradeBar />
               <ImpersonationBanner />
               <AppRouter />
               <Toaster position="top-right" />

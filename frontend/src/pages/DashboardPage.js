@@ -60,6 +60,14 @@ export default function DashboardPage() {
   const activities = dashboard?.recent_activity || [];
   const nextAction = computeNextAction(taxDeadlines, onboardingProgress, insights);
 
+  // Progressive disclosure gate — recommendation sections (Today's Focus,
+  // Weekly Briefing, Tax Calendar) are noise for new users who haven't
+  // finished Getting Started. They only appear once onboarding is complete
+  // OR the user has explicitly dismissed the checklist.
+  const onboardingComplete =
+    onboardingProgress.completed >= onboardingProgress.total ||
+    onboarding?.checklist_dismissed === true;
+
   // Review prompt: show when all onboarding steps are complete OR checklist is dismissed
   const showReviewPrompt = !loading && onboarding && (
     onboardingProgress.completed >= onboardingProgress.total ||
@@ -112,9 +120,6 @@ export default function DashboardPage() {
       <Sidebar />
       <main className="main-content dot-grid">
         <DashboardBanners
-          subscription={subscription}
-          upgradeBannerDismissed={upgradeBannerDismissed}
-          setUpgradeBannerDismissed={setUpgradeBannerDismissed}
           wpBannerVisible={wpBannerVisible}
         />
 
@@ -203,19 +208,38 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <DashboardWeeklyBriefing weeklyBriefing={weeklyBriefing} />
+              {/*
+               * Phase 2 — recommendations only appear once onboarding is
+               * complete or dismissed. New users (Phase 1) only see the
+               * Getting Started checklist (which dominates) and the single
+               * "Do This Next" hero that reinforces the next onboarding step.
+               *
+               * Priority order when shown: Today's Focus → Weekly Briefing
+               * → Tax Calendar. The "Do This Next" hero (above the checklist)
+               * already leads with the single top priority, so these flow as
+               * secondary recommendations rather than competing CTAs.
+               */}
+              {onboardingComplete && (
+                <>
+                  <DashboardTodaysFocus
+                    insights={insights}
+                    healthScore={healthScore}
+                    dismissInsight={dismissInsight}
+                    nextAction={nextAction}
+                  />
 
-              <DashboardTodaysFocus
-                insights={insights}
-                healthScore={healthScore}
-                dismissInsight={dismissInsight}
-              />
+                  <DashboardWeeklyBriefing
+                    weeklyBriefing={weeklyBriefing}
+                    insights={insights}
+                  />
 
-              <DashboardTaxCalendar
-                selectedTrust={selectedTrust}
-                taxDeadlines={taxDeadlines}
-                taxDeadlinesLoading={taxDeadlinesLoading}
-              />
+                  <DashboardTaxCalendar
+                    selectedTrust={selectedTrust}
+                    taxDeadlines={taxDeadlines}
+                    taxDeadlinesLoading={taxDeadlinesLoading}
+                  />
+                </>
+              )}
 
               {/* Banking Summary + Spending Threshold Cards */}
               {selectedTrust && (
