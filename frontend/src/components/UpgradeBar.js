@@ -230,18 +230,36 @@ export const UpgradeBar = () => {
   const [dismissed, setDismissed] = useState(false);
   const hasTrackedView = useRef(false);
 
+  // Compute message before any early returns so hooks run unconditionally.
+  const message = loading || isAdminUser(user)
+    ? null
+    : pickMessage({ user, subscription, subscriptionExpired, isReadOnly });
+
+  // Track view once per message key (must be before any conditional return)
+  useEffect(() => {
+    if (message && !hasTrackedView.current) {
+      try {
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'upgrade_bar_viewed', {
+            message_key: message.key,
+          });
+        }
+      } catch (e) {
+        console.error('Failed to track upgrade bar view:', e);
+      }
+      hasTrackedView.current = true;
+    }
+    // Reset tracking flag when key changes or message disappears
+    return () => {
+      hasTrackedView.current = false;
+    };
+  }, [message?.key]);
+
   // Don't render while auth is still loading (prevents flicker)
   if (loading) return null;
 
   // Admins never see the bar
   if (isAdminUser(user)) return null;
-
-  const message = pickMessage({
-    user,
-    subscription,
-    subscriptionExpired,
-    isReadOnly,
-  });
 
   // No message → render nothing
   if (!message) return null;
@@ -254,26 +272,6 @@ export const UpgradeBar = () => {
 
   const styles = SEVERITY_STYLES[message.severity] || SEVERITY_STYLES.warning;
   const Icon = message.icon;
-
-  // Track view once per message key
-  useEffect(() => {
-    if (!hasTrackedView.current) {
-      try {
-        if (typeof window.gtag === 'function') {
-          window.gtag('event', 'upgrade_bar_viewed', {
-            message_key: message.key,
-          });
-        }
-      } catch (e) {
-        console.error('Failed to track upgrade bar view:', e);
-      }
-      hasTrackedView.current = true;
-    }
-    // Reset tracking flag when key changes
-    return () => {
-      hasTrackedView.current = false;
-    };
-  }, [message.key]);
 
   const handleCtaClick = () => {
     try {

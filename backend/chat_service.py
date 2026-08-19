@@ -332,6 +332,23 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
     return "\n\n".join(sections)
 
 
+def _coerce_dict(raw, default=None):
+    """Coerce an LLM JSON payload into a dict.
+
+    Prompted models sometimes reply with a JSON scalar (e.g. a JSON-encoded
+    string like ``"general_chat"``) or an array instead of the object the
+    code expects. ``json.loads`` of a JSON string yields a Python ``str``,
+    and a later ``.get(...)`` call then raises ``AttributeError: 'str' object
+    has no attribute 'get'``. This helper degrades gracefully: it returns
+    ``default`` when the parsed value isn't a dict rather than crashing.
+    """
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, (list, tuple)) and len(raw) == 1 and isinstance(raw[0], dict):
+        return raw[0]
+    return default if default is not None else {}
+
+
 async def classify_intent(user_message: str, ai_client_module) -> dict:
     """
     Classify the user's message into an intent type.
@@ -355,8 +372,9 @@ Respond with JSON only — no other text."""
             temperature=0.1,
         )
         if response:
-            # Parse JSON from response
-            result = json.loads(response.strip())
+            # Parse JSON from response. Guard against scalar/JSON-string
+            # replies so a non-dict never leaks into the caller's .get() calls.
+            result = _coerce_dict(json.loads(response.strip()), {"intent": "general_chat", "confidence": 0.3, "entities": {}})
             return result
     except json.JSONDecodeError:
         logger.warning(f"Failed to parse intent classifier response: {response[:200]}")
@@ -395,7 +413,7 @@ Respond with JSON only — no other text."""
             temperature=0.1,
         )
         if response:
-            result = json.loads(response.strip())
+            result = _coerce_dict(json.loads(response.strip()), {"action_type": intent, "extracted": {}, "missing_required": [], "suggested_clarification": None})
             return result
     except json.JSONDecodeError:
         logger.warning(f"Failed to parse action extractor response: {response[:200]}")
