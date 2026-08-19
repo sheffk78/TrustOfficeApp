@@ -270,6 +270,7 @@ export default function StructuresPage() {
         setEntityModalTrustId={mut.setEntityModalTrustId}
         viewMode={viewMode}
         trusts={trusts}
+        selectedTrust={selectedTrust}
         onSubmit={mut.handleCreateEntity}
         formLoading={mut.formLoading}
       />

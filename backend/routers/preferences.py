@@ -2,8 +2,29 @@
 from fastapi import APIRouter, HTTPException, Depends
 
 from database import db
-from dependencies import get_current_user
+from dependencies import get_current_user, get_subscription_state
 from models import NotificationPreferencesUpdate, UserPreferencesUpdate
+
+# Plan types that qualify for watermark removal when status is active/trialing
+_WATERMARK_ELIGIBLE_PLAN_TYPES = {"trustee", "estate", "advisor", "forever_free"}
+
+
+async def _can_hide_watermark(user_id: str) -> bool:
+    """Return True if the user's subscription qualifies for watermark removal.
+
+    Qualifies when:
+      - plan_type is trustee/estate/advisor/forever_free AND status is active/trialing, OR
+      - the account is gifted (is_gifted == True)
+    """
+    try:
+        state = await get_subscription_state(user_id)
+    except Exception:
+        return False
+    if getattr(state, "is_gifted", False):
+        return True
+    if state.plan_type in _WATERMARK_ELIGIBLE_PLAN_TYPES and state.status in ("active", "trialing"):
+        return True
+    return False
 
 router = APIRouter(tags=["preferences"])
 
@@ -81,9 +102,12 @@ async def get_user_preferences(user: dict = Depends(get_current_user)):
     )
     
     if not prefs:
+        # No saved preference yet — auto-enable watermark removal for eligible
+        # subscribers (paid plans active/trialing, forever_free, or gifted).
+        hide_watermark = await _can_hide_watermark(user["user_id"])
         return {
             "user_id": user["user_id"],
-            "hide_watermark": False,
+            "hide_watermark": hide_watermark,
             "admin_access_locked": False
         }
     
@@ -103,14 +127,10 @@ async def update_user_preferences(
     
     # Check subscription for watermark removal
     if "hide_watermark" in update_fields and update_fields["hide_watermark"]:
-        subscription = await db.subscriptions.find_one(
-            {"user_id": user["user_id"]},
-            {"_id": 0}
-        )
-        if not subscription or subscription.get("status") not in ["active", "trialing"]:
+        if not await _can_hide_watermark(user["user_id"]):
             raise HTTPException(
                 status_code=403, 
-                detail="Watermark removal is only available for paid subscribers"
+                detail="Watermark removal is only available for paid, gift, and free-forever accounts"
             )
     
     # Upsert preferences

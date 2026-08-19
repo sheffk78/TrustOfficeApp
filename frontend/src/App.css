@@ -1020,3 +1020,20 @@
     background-position: -200% 0;
   }
 }
+
+/* ===== Support Widget pulse (first-appearance attention draw) ===== */
+@keyframes to-support-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(1, 0, 121, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(1, 0, 121, 0), 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(1, 0, 121, 0), 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+}
+
+.to-support-pulse {
+  animation: to-support-pulse 2.2s ease-out infinite;
+}

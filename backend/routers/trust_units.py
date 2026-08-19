@@ -37,16 +37,63 @@ def _calc_percentage(units: float, total_authorized: float) -> float:
     return round((units / total_authorized * 100) if total_authorized > 0 else 0, 4)
 
 
-async def _find_trust_entities(trust_id: str, holder_trust_id: str, user_id: str):
-    """Find the trust's own entity and the holder trust's entity."""
-    trust_entity = await db.entities.find_one(
+async def _find_or_create_trust_entity(trust_id: str, user_id: str) -> dict:
+    """Find an existing Trust-type entity for the given trust, or create one.
+
+    Each trust should have a Trust-type entity representing it in the
+    Structures hierarchy.  If it doesn't exist yet (e.g. the user hasn't
+    visited the Structures page), we create a minimal one here so that
+    beneficiary auto-linking always has entities to connect.
+    """
+    entity = await db.entities.find_one(
         {"trust_id": trust_id, "entity_type": "Trust", "user_id": user_id},
         {"_id": 0}
     )
-    holder_entity = await db.entities.find_one(
-        {"trust_id": holder_trust_id, "entity_type": "Trust", "user_id": user_id},
-        {"_id": 0}
+    if entity:
+        return entity
+
+    # Fetch the trust record so we can name the entity sensibly
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user_id}, {"_id": 0}
     )
+    entity_name = trust.get("name", trust_id) if trust else trust_id
+
+    entity_id = f"entity_{uuid.uuid4().hex[:12]}"
+    entity_doc = {
+        "entity_id": entity_id,
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "name": entity_name,
+        "legal_name": entity_name,
+        "entity_type": "Trust",
+        "formation_date": None,
+        "governing_law": "",
+        "ein": None,
+        "trustee_names": "",
+        "beneficiary_standard": "",
+        "article_ref_distribution": "",
+        "article_ref_compensation": "",
+        "article_ref_amendment": "",
+        "oversight_required": False,
+        "member_names": "",
+        "manager_names": "",
+        "article_ref_authority": "",
+        "article_ref_profit_distribution": "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.entities.insert_one(entity_doc)
+    return entity_doc
+
+
+async def _find_trust_entities(trust_id: str, holder_trust_id: str, user_id: str):
+    """Find or create the trust's own entity and the holder trust's entity.
+
+    Both entities are Trust-type.  If either doesn't exist yet in
+    db.entities, it is created on the fly (find-or-create) so that the
+    auto-link relationship can always be established.
+    """
+    trust_entity = await _find_or_create_trust_entity(trust_id, user_id)
+    holder_entity = await _find_or_create_trust_entity(holder_trust_id, user_id)
     return trust_entity, holder_entity
 
 
@@ -54,10 +101,19 @@ async def _create_auto_link_relationship(
     trust_entity: dict, holder_entity: dict, user_id: str,
     certificate_id: str, units: float, total_authorized: float
 ):
-    """Create an auto-link entity relationship if one doesn't already exist."""
+    """Create an auto-link entity relationship if one doesn't already exist.
+
+    Relationship direction: the current trust (parent) distributes TO the
+    beneficiary trust (child).  So parent_entity_id = current trust entity,
+    child_entity_id = holder (beneficiary) trust entity, with
+    relationship_type = 'receives_distributions_from' (the child receives
+    distributions from the parent).  In the tree the current trust appears
+    at the top and the beneficiary trust below it.
+    """
+    # Upsert: don't create a duplicate relationship
     existing = await db.entity_relationships.find_one({
-        "parent_entity_id": holder_entity["entity_id"],
-        "child_entity_id": trust_entity["entity_id"],
+        "parent_entity_id": trust_entity["entity_id"],
+        "child_entity_id": holder_entity["entity_id"],
         "relationship_type": "receives_distributions_from",
         "user_id": user_id
     })
@@ -66,11 +122,11 @@ async def _create_auto_link_relationship(
     ownership_pct = (units / total_authorized * 100) if total_authorized > 0 else 100
     rel_doc = {
         "relationship_id": f"rel_{uuid.uuid4().hex[:12]}",
-        "parent_entity_id": holder_entity["entity_id"],
-        "child_entity_id": trust_entity["entity_id"],
+        "parent_entity_id": trust_entity["entity_id"],
+        "child_entity_id": holder_entity["entity_id"],
         "relationship_type": "receives_distributions_from",
         "ownership_percentage": ownership_pct,
-        "trust_id": holder_entity["trust_id"],
+        "trust_id": trust_entity["trust_id"],
         "user_id": user_id,
         "source": "certificate_autolink",
         "certificate_id": certificate_id,

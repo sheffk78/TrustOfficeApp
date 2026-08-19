@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { fetchWithAuth, toast, showError } from '@/utils/sharedImports';
 
-const EMPTY_ENTITY = { name: '', entity_type: 'Trust', legal_name: '', governing_law: '' };
+const EMPTY_ENTITY = { name: '', entity_type: 'Trust', legal_name: '', governing_law: '', trustee_names: '', ein: '' };
 const EMPTY_RELATIONSHIP = {
   parent_entity_id: '', child_entity_id: '',
   relationship_type: 'owns', ownership_percentage: '', notes: '',

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-route
 import { Toaster } from "@/components/ui/sonner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { UpgradeBar } from "@/components/UpgradeBar";
+import { SupportWidget } from "@/components/SupportWidget";
 import { captureUtmParams } from "@/utils/utm";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
@@ -510,6 +511,16 @@ const AppRouter = () => {
   );
 };
 
+// Conditionally renders the SupportWidget only when the user is authenticated.
+// Lives inside <BrowserRouter> so it can use useLocation, and inside
+// <AuthProvider> so it can use useAuth. Public routes (login/register/etc.)
+// never get the widget because `user` is null there.
+const SupportWidgetMount = () => {
+  const { user } = useAuth();
+  if (!user) return null;
+  return <SupportWidget />;
+};
+
 function App() {
   return (
     <BrowserRouter>
@@ -520,6 +531,7 @@ function App() {
               <UpgradeBar />
               <ImpersonationBanner />
               <AppRouter />
+              <SupportWidgetMount />
               <Toaster position="top-right" />
             </ErrorBoundary>
           </UpgradeModalProvider>

@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -7,7 +8,65 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ENTITY_TYPES, RELATIONSHIP_TYPES } from './constants';
 
-export function EntityModal({ show, onClose, newEntity, setNewEntity, entityModalTrustId, setEntityModalTrustId, viewMode, trusts, onSubmit, formLoading }) {
+/**
+ * Normalise a trust's `trustees` value into a display string.
+ * Trustees may be stored as a comma-separated string or an array.
+ */
+function formatTrustees(trustees) {
+  if (!trustees) return '';
+  if (Array.isArray(trustees)) return trustees.filter(Boolean).join(', ');
+  return String(trustees);
+}
+
+export function EntityModal({ show, onClose, newEntity, setNewEntity, entityModalTrustId, setEntityModalTrustId, viewMode, trusts, selectedTrust, onSubmit, formLoading }) {
+  // Resolve the currently-selected trust object: in all-trusts mode it's the
+  // one picked in the dropdown; in per-trust mode it's the globally selected trust.
+  const activeTrust = useMemo(() => {
+    if (viewMode === 'all-trusts') {
+      if (!entityModalTrustId || !trusts) return null;
+      return trusts.find(t => t.trust_id === entityModalTrustId) || null;
+    }
+    return selectedTrust || null;
+  }, [viewMode, entityModalTrustId, trusts, selectedTrust]);
+
+  // Track whether each inheritable field has been manually edited by the user,
+  // so we don't clobber their edits when the trust selection changes.
+  const userEdited = useMemo(
+    () => ({ trustee_names: !!newEntity.trustee_names, governing_law: !!newEntity.governing_law, ein: !!newEntity.ein }),
+    // Intentionally only recompute when the trust changes, not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeTrust]
+  );
+
+  // Auto-fill inheritable fields from the selected trust's Settings data.
+  // Runs when the modal opens or when the trust selection changes, and only
+  // overwrites a field if the user hasn't already typed into it.
+  useEffect(() => {
+    if (!show) return;
+    setNewEntity(prev => {
+      const updates = {};
+      const trusteesStr = formatTrustees(activeTrust?.trustees);
+      if (trusteesStr && !userEdited.trustee_names) updates.trustee_names = trusteesStr;
+      const stateCode = activeTrust?.state_code || '';
+      if (stateCode && !userEdited.governing_law) updates.governing_law = stateCode;
+      const ein = activeTrust?.ein || '';
+      if (ein && !userEdited.ein) updates.ein = ein;
+      if (Object.keys(updates).length === 0) return prev;
+      return { ...prev, ...updates };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show, activeTrust]);
+
+  // Inherited-from-Settings badge — shown next to a field label when its value
+  // matches what we'd derive from the active trust.
+  const inherited = (fieldName) => {
+    if (!activeTrust) return false;
+    if (fieldName === 'trustee_names') return formatTrustees(activeTrust.trustees) && newEntity.trustee_names === formatTrustees(activeTrust.trustees);
+    if (fieldName === 'governing_law') return activeTrust.state_code && newEntity.governing_law === activeTrust.state_code;
+    if (fieldName === 'ein') return activeTrust.ein && newEntity.ein === activeTrust.ein;
+    return false;
+  };
+
   return (
     <Dialog open={show} onOpenChange={(open) => {
       onClose(open);
@@ -57,6 +116,23 @@ export function EntityModal({ show, onClose, newEntity, setNewEntity, entityModa
             </Select>
           </div>
           <div>
+            <div className="flex items-center gap-2">
+              <Label className="label-trust">Trustee Name(s)</Label>
+              {inherited('trustee_names') && (
+                <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5" data-testid="trustee-inherited-badge">
+                  Inherited from Settings
+                </span>
+              )}
+            </div>
+            <Input
+              value={newEntity.trustee_names}
+              onChange={(e) => setNewEntity({ ...newEntity, trustee_names: e.target.value })}
+              placeholder="e.g., John Smith, Jane Smith"
+              className="input-trust mt-1"
+              data-testid="entity-trustee-names"
+            />
+          </div>
+          <div>
             <Label className="label-trust">Legal Name (Optional)</Label>
             <Input
               value={newEntity.legal_name}
@@ -66,12 +142,37 @@ export function EntityModal({ show, onClose, newEntity, setNewEntity, entityModa
             />
           </div>
           <div>
-            <Label className="label-trust">Governing Law / Jurisdiction</Label>
+            <div className="flex items-center gap-2">
+              <Label className="label-trust">Governing Law / Jurisdiction</Label>
+              {inherited('governing_law') && (
+                <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5" data-testid="governing-law-inherited-badge">
+                  Inherited from Settings
+                </span>
+              )}
+            </div>
             <Input
               value={newEntity.governing_law}
               onChange={(e) => setNewEntity({ ...newEntity, governing_law: e.target.value })}
               placeholder="e.g., Delaware, California"
               className="input-trust mt-1"
+              data-testid="entity-governing-law"
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <Label className="label-trust">EIN (Optional)</Label>
+              {inherited('ein') && (
+                <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5" data-testid="ein-inherited-badge">
+                  Inherited from Settings
+                </span>
+              )}
+            </div>
+            <Input
+              value={newEntity.ein}
+              onChange={(e) => setNewEntity({ ...newEntity, ein: e.target.value })}
+              placeholder="e.g., 12-3456789"
+              className="input-trust mt-1"
+              data-testid="entity-ein"
             />
           </div>
         </div>

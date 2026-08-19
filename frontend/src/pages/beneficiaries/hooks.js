@@ -184,6 +184,14 @@ export function useCertificateForm(selectedTrust, isReadOnly, showUpgradeModal, 
         resetCertificateForm();
         loadCertificatesData();
         loadOverviewData();
+        // NOTE: When holder_type='trust', the backend auto-creates an entity
+        // relationship in the Structures hierarchy.  If the Structures page is
+        // mounted elsewhere, its data should be invalidated/refetched so the new
+        // cross-trust relationship appears in the hierarchy tree.  There is no
+        // shared cache today (each page fetches independently), so the user will
+        // see the updated tree on next visit to Structures.  If a global query
+        // cache (e.g. react-query) is added later, invalidate the
+        // 'structures-entities' and 'structures-relationships' queries here.
       } else {
         const errBody = await response.json().catch(() => null);
         showError(toast, errBody || { detail: `Failed to save certificate (${response.status})` }, { operation: 'save', page: 'Beneficiaries' });
