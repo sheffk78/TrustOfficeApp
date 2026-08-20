@@ -15,12 +15,12 @@ import {
 import { safeFormatDate } from '@/utils/safeDate';
 
 const ACCOUNT_TYPES = [
-  'Checking',
-  'Savings',
-  'Money Market',
-  'CD',
-  'Investment / Brokerage',
-  'Trust',
+  { label: 'Checking', value: 'checking' },
+  { label: 'Savings', value: 'savings' },
+  { label: 'Money Market', value: 'other' },
+  { label: 'CD', value: 'cd' },
+  { label: 'Investment / Brokerage', value: 'investment' },
+  { label: 'Trust', value: 'other' },
 ];
 
 const EXTRACTION_BADGE = {
@@ -50,7 +50,7 @@ export default function BankAccountsSection({ entityId }) {
     nickname: '',
     institution: '',
     last_four: '',
-    account_type: 'Checking',
+    account_type: 'checking',
   });
   const [expanded, setExpanded] = useState({});
   const [statements, setStatements] = useState({});
@@ -92,9 +92,10 @@ export default function BankAccountsSection({ entityId }) {
       const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/bank-accounts`, {
         method: 'POST',
         body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
           entity_id: entityId,
           nickname: form.nickname.trim(),
-          institution: form.institution.trim(),
+          institution_name: form.institution.trim(),
           last_four: form.last_four,
           account_type: form.account_type,
         }),
@@ -105,7 +106,7 @@ export default function BankAccountsSection({ entityId }) {
       }
       toast.success('Bank account added');
       setShowAdd(false);
-      setForm({ nickname: '', institution: '', last_four: '', account_type: 'Checking' });
+      setForm({ nickname: '', institution: '', last_four: '', account_type: 'checking' });
       loadAccounts();
     } catch (e) {
       showError(toast, e, { operation: 'create_bank_account', page: 'EntityDetail' });
@@ -353,7 +354,7 @@ export default function BankAccountsSection({ entityId }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ACCOUNT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {ACCOUNT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

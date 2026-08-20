@@ -64,6 +64,7 @@ export default function BankingSummaryCard() {
 
   const accountCount = summary?.account_count ?? 0;
   const totalBalance = summary?.total_latest_balance ?? null;
+  const statementsProcessing = accountCount > 0 && totalBalance == null;
 
   return (
     <div className="card-trust corner-mark" data-testid="banking-summary-card">
@@ -121,8 +122,8 @@ export default function BankingSummaryCard() {
             <p className="label-trust">Bank Accounts</p>
           </div>
           <div>
-            <p className="font-mono text-2xl text-navy">${fmtMoney(totalBalance)}</p>
-            <p className="label-trust">Latest Total Balance</p>
+            <p className="font-mono text-2xl text-navy">{statementsProcessing ? '—' : `$${fmtMoney(totalBalance)}`}</p>
+            <p className="label-trust">{statementsProcessing ? 'Statements Processing' : 'Latest Total Balance'}</p>
           </div>
         </div>
       )}

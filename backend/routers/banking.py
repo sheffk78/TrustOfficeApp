@@ -399,8 +399,26 @@ async def get_trust_banking_summary(
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
+    # Preserve summary visibility for archived accounts that still have
+    # linked statements; archiving removes the account from active CRUD but
+    # must not make its financial history look like it never existed.
+    linked_archived_ids = await db.bank_statements.distinct(
+        "account_id",
+        {
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "account_id": {"$ne": None},
+        },
+    )
     accounts = await db.bank_accounts.find(
-        {"trust_id": trust_id, "user_id": user["user_id"], "is_archived": {"$ne": True}},
+        {
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "$or": [
+                {"is_archived": {"$ne": True}},
+                {"account_id": {"$in": linked_archived_ids}},
+            ],
+        },
         {"_id": 0}
     ).to_list(100)
 

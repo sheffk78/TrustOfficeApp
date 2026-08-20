@@ -637,15 +637,23 @@ export default function SettingsPage() {
     setLoading(true);
     try {
       // Merge spending threshold into governance_settings so it persists on save
+      // Convert string state values to numbers/null for backend (mirrors CREATE path).
+      // Without this, empty strings cause Pydantic 422 errors and numeric strings
+      // may fail validation on certain fields. (TO-002 fix)
+      const numericTrustData = {
+        ...trustData,
+        tax_year_end_month: trustData.tax_year_end_month ? parseInt(trustData.tax_year_end_month, 10) : null,
+        tax_year_end_day: trustData.tax_year_end_day ? parseInt(trustData.tax_year_end_day, 10) : null,
+      };
       const governance_settings = {
         ...(selectedTrust.governance_settings || {}),
         spending_threshold: {
-          amount: spendingThreshold.amount === '' ? null : Number(spendingThreshold.amount),
+          amount: spendingThreshold.amount === '' || spendingThreshold.amount == null || isNaN(Number(spendingThreshold.amount)) ? null : Number(spendingThreshold.amount),
           requires_minutes: spendingThreshold.requires_minutes ?? false,
           scope_classifications: spendingThreshold.scope_classifications || [],
         },
       };
-      const payload = { ...trustData, trustees: trustees.filter(Boolean), is_fiscal_year: computedFiscalYear, governance_settings };
+      const payload = { ...numericTrustData, trustees: trustees.filter(Boolean), is_fiscal_year: computedFiscalYear, governance_settings };
       const response = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}`, {
         method: 'PUT',
         body: JSON.stringify(payload)

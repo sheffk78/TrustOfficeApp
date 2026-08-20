@@ -133,14 +133,15 @@ export function getOnboardingProgress(onboarding, selectedTrust) {
 // > Priority 3: highest-point governance insight
 export function computeNextAction(taxDeadlines, onboardingProgress, insights) {
   // Priority 1: Overdue tax deadline
+  // NOTE: backend field is `days_remaining` (not `days_until`). TO-003a fix.
   const overdueDeadline = taxDeadlines?.find(
-    d => d.days_until < 0 || (d.is_overdue && d.filing_status === 'pending')
+    d => (typeof d.days_remaining === 'number' && d.days_remaining < 0) || (d.is_overdue && d.filing_status === 'pending')
   );
   if (overdueDeadline) return {
     title: `${overdueDeadline.description || 'Tax deadline'} is overdue`,
     action: '/calendar',
     cta: 'Review deadline',
-    context: `${Math.abs(overdueDeadline.days_remaining ?? overdueDeadline.days_until ?? 0)} days overdue`,
+    context: `${Math.abs(overdueDeadline.days_remaining ?? 0)} days overdue`,
     variant: 'urgent'
   };
 

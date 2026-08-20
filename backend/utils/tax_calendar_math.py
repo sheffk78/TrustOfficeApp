@@ -119,18 +119,30 @@ def _generate_entries(trust: dict, tax_year: int) -> list:
 
 
 def _days_remaining(due_date_str: str) -> int:
-    """Calculate days remaining until a due date. Returns negative if past."""
-    from datetime import datetime, timezone
+    """Calculate days remaining until a due date. Returns negative if past.
+
+    Date-only strings (e.g. '2025-04-15') are treated as calendar dates,
+    not midnight UTC timestamps. This prevents a deadline due today from
+    showing as overdue before the day ends in the user's timezone.
+    TO-003b fix.
+    """
+    from datetime import date, datetime, timezone
     try:
         if isinstance(due_date_str, str):
-            due = datetime.fromisoformat(due_date_str.replace('Z', '+00:00'))
-            if due.tzinfo is None:
-                due = due.replace(tzinfo=timezone.utc)
+            parsed = datetime.fromisoformat(due_date_str.replace('Z', '+00:00'))
+            # If the string is date-only (no time component), compare as date vs today
+            if 'T' not in due_date_str and ':' not in due_date_str:
+                today = date.today()
+                due_date_only = parsed.date()
+                return max(-999, (due_date_only - today).days)
+            # Full datetime: compare as before
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            delta = parsed - now
+            return max(-999, delta.days)
         else:
             return 999
-        now = datetime.now(timezone.utc)
-        delta = due - now
-        return max(-999, delta.days)
     except (ValueError, TypeError, AttributeError):
         return 999
 

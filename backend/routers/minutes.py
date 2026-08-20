@@ -588,7 +588,25 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
         {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
     )
     if not existing:
-        raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
+        # Template-created minutes are also rendered by MinutesDetailPage,
+        # whose legacy finalize action uses this endpoint. Normalize the
+        # public status vocabulary here instead of forcing a frontend split.
+        template = await db.minutes_templates.find_one(
+            {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
+        )
+        if not template:
+            raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
+        if data.get("status") != "finalized":
+            raise HTTPException(status_code=400, detail="Template minutes can only be finalized through this endpoint.")
+        if template.get("status") == "final":
+            raise HTTPException(status_code=409, detail="Minutes are already finalized.")
+        result = await db.minutes_templates.update_one(
+            {"minutes_id": minutes_id, "user_id": user["user_id"], "status": "draft"},
+            {"$set": {"status": "final", "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": user["user_id"]}},
+        )
+        if result.modified_count != 1:
+            raise HTTPException(status_code=409, detail="Minutes could not be finalized; please refresh and try again.")
+        return {"message": "Minutes finalized", "updated_fields": ["status"], "legacy_path": True}
     
     if existing.get("status") == "finalized":
         # Only allow unfinalizing (status -> draft) with a documented reason

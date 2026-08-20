@@ -1,5 +1,6 @@
 # Meetings router — Phase 1 Core Governance (agendas, minutes, approval workflow)
 from fastapi import APIRouter, HTTPException, Depends
+from datetime import datetime, timezone
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -11,6 +12,7 @@ from models import (
     ApprovalStatus,
 )
 from services import meeting_service
+from database import db
 
 router = APIRouter(tags=["meetings"])
 
@@ -232,7 +234,6 @@ async def start_review(
 
 @router.post(
     "/meetings/minutes/{minutes_id}/finalize",
-    response_model=MinutesApprovalStatusResponse,
 )
 async def finalize_minutes(
     minutes_id: str,
@@ -240,6 +241,32 @@ async def finalize_minutes(
     user: dict = Depends(require_write_access),
 ):
     """Finalize approved minutes (approved → finalized, terminal)."""
+    # Legacy minutes created through /minutes live in minutes_records and do
+    # not have an approval document. Preserve the approval workflow for
+    # meeting_minutes, but allow the legacy draft path to finalize directly.
+    legacy = await db.minutes_records.find_one(
+        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"_id": 0, "status": 1, "trust_id": 1},
+    )
+    if legacy:
+        if legacy.get("status") == "finalized":
+            raise HTTPException(status_code=409, detail="Minutes are already finalized.")
+        if legacy.get("status") != "draft":
+            raise HTTPException(status_code=409, detail="Only draft legacy minutes can be finalized.")
+        now = datetime.now(timezone.utc).isoformat()
+        result = await db.minutes_records.update_one(
+            {"minutes_id": minutes_id, "user_id": user["user_id"], "status": "draft"},
+            {"$set": {"status": "finalized", "updated_at": now}},
+        )
+        if result.modified_count != 1:
+            raise HTTPException(status_code=409, detail="Minutes could not be finalized; please refresh and try again.")
+        return {
+            "minutes_id": minutes_id,
+            "user_id": user["user_id"],
+            "current_status": "finalized",
+            "updated_at": now,
+            "legacy_path": True,
+        }
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.finalized, user, note=payload.note
     )
