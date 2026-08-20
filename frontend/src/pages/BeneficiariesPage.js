@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -33,7 +33,23 @@ import { BeneficiariesModals } from './beneficiaries/Modals';
 export default function BeneficiariesPage() {
   const { selectedTrust, isReadOnly, trusts } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
-  const [activeTab, setActiveTab] = useState('beneficiaries');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ['overview', 'beneficiaries', 'certificates', 'transfers', 'class'];
+  const requestedTab = searchParams.get('tab');
+  const [activeTab, setActiveTabState] = useState(
+    validTabs.includes(requestedTab) ? requestedTab : 'overview'
+  );
+  const setActiveTab = useCallback((tab) => {
+    if (!validTabs.includes(tab)) return;
+    setActiveTabState(tab);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', tab);
+    setSearchParams(next);
+  }, [searchParams, setSearchParams]);
+  useEffect(() => {
+    const nextTab = validTabs.includes(requestedTab) ? requestedTab : 'overview';
+    setActiveTabState((current) => current === nextTab ? current : nextTab);
+  }, [requestedTab]);
   const [expandedHolder, setExpandedHolder] = useState(null);
   const [statusFilter, setStatusFilter] = useState('active');
 
@@ -125,14 +141,14 @@ export default function BeneficiariesPage() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="mb-6 bg-muted/50 flex flex-wrap gap-1">
-              <TabsTrigger value="beneficiaries" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-beneficiaries">
-                <Users className="w-4 h-4 mr-2" />
-                People
-              </TabsTrigger>
+            <TabsList className="mb-6 bg-muted/50 flex w-full gap-1 overflow-x-auto whitespace-nowrap">
               <TabsTrigger value="overview" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-overview">
                 <PieChart className="w-4 h-4 mr-2" />
                 Overview
+              </TabsTrigger>
+              <TabsTrigger value="beneficiaries" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-beneficiaries">
+                <Users className="w-4 h-4 mr-2" />
+                Beneficiaries
               </TabsTrigger>
               <TabsTrigger value="certificates" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-certificates">
                 <Award className="w-4 h-4 mr-2" />
@@ -154,6 +170,7 @@ export default function BeneficiariesPage() {
                 overviewData={overviewData}
                 loading={loading}
                 handleOpenPersonModal={personForm.handleOpenPersonModal}
+                openEditModal={certForm.openEditModal}
                 summary={summary}
                 setShowSettingsModal={settings.setShowSettingsModal}
               />

@@ -236,6 +236,9 @@ async def get_beneficiary_dashboard(
                     "$push": {
                         "certificate_id": "$certificate_id",
                         "certificate_number": "$certificate_number",
+                        "holder_name": "$holder_name",
+                        "holder_identifier": {"$ifNull": ["$holder_identifier", ""]},
+                        "holder_type": {"$ifNull": ["$holder_type", "individual"]},
                         "units": "$units",
                         "issue_date": "$issue_date",
                         "notes": {"$ifNull": ["$notes", ""]},

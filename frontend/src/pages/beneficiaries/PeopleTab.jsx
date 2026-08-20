@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Users, Plus, Bot, AlertCircle, Settings } from 'lucide-react';
+import { Users, Plus, Pencil, AlertCircle, Settings } from 'lucide-react';
 import { extractRelationship } from './constants';
 
 // ========== PEOPLE TAB ==========
@@ -8,6 +8,7 @@ export function PeopleTab({
   overviewData,
   loading,
   handleOpenPersonModal,
+  openEditModal,
   summary,
   setShowSettingsModal,
 }) {
@@ -73,7 +74,7 @@ export function PeopleTab({
             {overviewData.beneficiaries.map((ben, index) => {
               const relationship = extractRelationship(ben);
               return (
-                <div key={`${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}`} className="p-4 flex items-center justify-between hover:bg-muted/20 transition-colors" data-testid={`person-row-${index}`}>
+                <div key={`${ben.holder_name}-${ben.holder_identifier || ''}-${ben.holder_type || 'individual'}`} className="p-4 flex items-center justify-between gap-4 hover:bg-muted/20 transition-colors" data-testid={`person-row-${index}`}>
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-navy/10 dark:bg-gold/10 flex items-center justify-center">
                       <Users className="w-6 h-6 text-navy dark:text-gold" />
@@ -92,9 +93,23 @@ export function PeopleTab({
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
-                    <p className="text-xs text-muted-foreground">share</p>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
+                      <p className="text-xs text-muted-foreground">share</p>
+                    </div>
+                    {ben.certificates?.[0] && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditModal?.(ben.certificates[0])}
+                        data-testid={`edit-beneficiary-${index}`}
+                        aria-label={`Edit ${ben.holder_name}`}
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-1" />
+                        Edit
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
