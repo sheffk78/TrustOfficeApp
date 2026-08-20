@@ -1209,12 +1209,80 @@ async def _webhook_invoice_payment_failed(event) -> None:
 
 
 
+async def _webhook_invoice_created(event) -> None:
+    """Handle Stripe webhook event: invoice.created.
+    Apply pending referral credits to the referrer's invoice."""
+    from routers.referrals import apply_pending_credits_to_invoice
+    
+    invoice = event.data.get("object", {})
+    customer_id = invoice.get("customer")
+    invoice_id = invoice.get("id")
+    
+    if not customer_id or not invoice_id:
+        return
+    
+    # Skip if this is the first invoice (creation invoice, handled by checkout)
+    if invoice.get("billing_reason") == "subscription_create":
+        return
+    
+    # Find the user by Stripe customer ID
+    sub = await db.subscriptions.find_one(
+        {"stripe_customer_id": customer_id},
+        {"_id": 0, "user_id": 1, "billing_period": 1, "plan_type": 1}
+    )
+    
+    if not sub:
+        return
+    
+    user_id = sub["user_id"]
+    billing_period = sub.get("billing_period", "monthly")
+    
+    try:
+        result = await apply_pending_credits_to_invoice(user_id, invoice_id, billing_period)
+        if result.get("applied", 0) > 0:
+            logger.info(f"Applied {result['applied']} referral credits to invoice {invoice_id} for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to apply referral credits to invoice {invoice_id}: {e}")
+
+
+async def _webhook_charge_refunded(event) -> None:
+    """Handle Stripe webhook event: charge.refunded.
+    Claw back referral credits if the refunded charge belongs to a referee."""
+    from routers.referrals import clawback_credit
+    
+    charge = event.data.get("object", {})
+    customer_id = charge.get("customer")
+    
+    if not customer_id:
+        return
+    
+    # Find the user by Stripe customer ID
+    sub = await db.subscriptions.find_one(
+        {"stripe_customer_id": customer_id},
+        {"_id": 0, "user_id": 1}
+    )
+    
+    if not sub:
+        return
+    
+    referee_user_id = sub["user_id"]
+    
+    try:
+        result = await clawback_credit(referee_user_id, reason="referee_refunded")
+        if result.get("clawed_back"):
+            logger.info(f"Clawed back credit for referee {referee_user_id}: {result}")
+    except Exception as e:
+        logger.error(f"Failed to claw back referral credit for referee {referee_user_id}: {e}")
+
+
 WEBHOOK_EVENT_DISPATCH = {
     "checkout.session.completed": _webhook_checkout_session_completed,
     "customer.subscription.updated": _webhook_customer_subscription_updated,
     "customer.subscription.deleted": _webhook_customer_subscription_deleted,
     "invoice.paid": _webhook_invoice_paid,
     "invoice.payment_failed": _webhook_invoice_payment_failed,
+    "invoice.created": _webhook_invoice_created,
+    "charge.refunded": _webhook_charge_refunded,
 }
 
 @router.post("/stripe/webhook")

@@ -572,6 +572,13 @@ async def startup_event():
         await db.referral_codes.create_index("code", unique=True)
         await db.referral_tracking.create_index("referrer_user_id")
         await db.referral_tracking.create_index("referee_user_id", unique=True)
+
+        # Referral credits ledger
+        await db.referral_credits.create_index("credit_id", unique=True)
+        await db.referral_credits.create_index("user_id")
+        await db.referral_credits.create_index([("user_id", 1), ("status", 1)])
+        await db.referral_credits.create_index("source_referral_id", unique=True)
+        await db.referral_credits.create_index([("status", 1), ("expires_at", 1)])
         
         # OAuth auth codes (one-time use, short-lived)
         await db.oauth_auth_codes.create_index("code", unique=True)
