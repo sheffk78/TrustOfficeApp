@@ -6,6 +6,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
+import { formatEIN } from '@/utils/formatters';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
 import BankAccountsSection from '@/components/BankAccountsSection';
 import PageHelpButton from '@/components/PageHelpButton';
@@ -225,7 +226,7 @@ export default function EntityDetailPage() {
                   <label className="label-trust mb-2 block">EIN</label>
                   <Input
                     value={formData.ein || ''}
-                    onChange={(e) => updateField('ein', e.target.value)}
+                    onChange={(e) => updateField('ein', formatEIN(e.target.value))}
                     placeholder="XX-XXXXXXX"
                     className="input-trust"
                   />

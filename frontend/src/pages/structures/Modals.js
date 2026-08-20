@@ -230,14 +230,14 @@ export function RelationshipModal({
         setNewRelationship({ parent_entity_id: '', child_entity_id: '', relationship_type: 'owns', ownership_percentage: '', notes: '' });
       }
     }}>
-      <DialogContent className="sm:max-w-md" data-testid="relationship-modal">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[90vh] overflow-y-auto" data-testid="relationship-modal">
         <DialogHeader>
           <DialogTitle className="font-serif text-xl text-navy">Add Relationship</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           {/* Trust-to-Trust toggle */}
           {viewMode === 'all-trusts' && (
-            <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-3" data-testid="trust-to-trust-toggle-section">
+            <div className="border border-purple-200 bg-purple-50/50 p-3" data-testid="trust-to-trust-toggle-section">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"

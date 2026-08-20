@@ -49,7 +49,7 @@ export function StructuralMap({ entities = [], relationships = [] }) {
         data: {
           label: (
             <div className="flex flex-col items-center gap-1 cursor-pointer">
-              <span className="font-semibold text-xs">{entity.name}</span>
+              <span className="font-semibold text-xs truncate max-w-[170px]">{entity.name}</span>
               <span className="text-[10px] opacity-80">{entity.entity_type}</span>
             </div>
           ),
