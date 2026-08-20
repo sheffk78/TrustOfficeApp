@@ -72,14 +72,19 @@ export const DEFAULT_TRANSFER_FORM = {
 export const DEFAULT_SETTINGS_FORM = {
   total_authorized_units: 100,
   unit_label: 'Unit',
-  allow_fractional: false
+  allow_fractional: false,
+  allocation_mode: 'percentage',
+  authorized_units_ceiling: 100,
+  unlimited_units: false,
+  class_distribution_convention: 'per_capita'
 };
 
 export const DEFAULT_CLASS_BENEFICIARY_FORM = {
   class_type: 'children',
   description: '',
   percentage: '',
-  notes: ''
+  notes: '',
+  distribution_convention: 'per_capita'
 };
 
 export const DEFAULT_PERSON_FORM = {

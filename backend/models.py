@@ -512,12 +512,20 @@ class TrustUnitsSettingsUpdate(BaseModel):
     total_authorized_units: Optional[int] = None
     unit_label: Optional[str] = None
     allow_fractional: Optional[bool] = None
+    allocation_mode: Optional[str] = None
+    authorized_units_ceiling: Optional[int] = None
+    unlimited_units: Optional[bool] = None
+    class_distribution_convention: Optional[str] = None
 
 class TrustUnitsSettingsResponse(BaseModel):
     trust_id: str
     total_authorized_units: int
     unit_label: str
     allow_fractional: bool
+    allocation_mode: str = "percentage"
+    authorized_units_ceiling: Optional[int] = 100
+    unlimited_units: bool = False
+    class_distribution_convention: str = "per_capita"
     created_at: str
     updated_at: Optional[str] = None
 
@@ -543,6 +551,8 @@ class TrustUnitCertificateUpdate(BaseModel):
     notes: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    replacement_reason: Optional[str] = Field(None, max_length=1000)
+    effective_date: Optional[str] = None
 
 class TrustUnitCertificateResponse(BaseModel):
     certificate_id: str
@@ -557,11 +567,15 @@ class TrustUnitCertificateResponse(BaseModel):
     certificate_number: str
     status: str
     replaced_by_certificate_id: Optional[str] = None
+    supersedes_certificate_id: Optional[str] = None
+    version: int = 1
     notes: str
     email: Optional[str] = None
     phone: Optional[str] = None
     created_at: str
     updated_at: Optional[str] = None
+    replacement_reason: Optional[str] = None
+    effective_date: Optional[str] = None
 
 class TrustUnitTransferCreate(BaseModel):
     trust_id: str
@@ -1257,6 +1271,7 @@ class ClassBeneficiaryCreate(BaseModel):
     description: str = Field("", max_length=500)
     percentage: float = Field(0.0, ge=0, le=100)
     notes: str = Field("", max_length=2000)
+    distribution_convention: str = "per_capita"
 
 class ClassBeneficiaryResponse(BaseModel):
     class_beneficiary_id: str
@@ -1266,6 +1281,9 @@ class ClassBeneficiaryResponse(BaseModel):
     description: str
     percentage: float
     notes: str
+    distribution_convention: str = "per_capita"
+    reserved_units: Optional[float] = None
+    member_count: int = 0
     created_at: str
 
 
@@ -1277,6 +1295,7 @@ class BeneficiaryCreate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     allocation_pct: Optional[float] = Field(None, ge=0, le=100)
+    units: Optional[float] = Field(None, gt=0)
     holder_type: str = "individual"
     notes: Optional[str] = Field(None, max_length=2000)
 
@@ -1284,6 +1303,10 @@ class BeneficiaryUpdate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     notes: Optional[str] = Field(None, max_length=2000)
+    allocation_pct: Optional[float] = Field(None, ge=0, le=100)
+    units: Optional[float] = Field(None, gt=0)
+    replacement_reason: Optional[str] = Field(None, max_length=1000)
+    effective_date: Optional[str] = None
 
 class SendCertificateRequest(BaseModel):
     trust_id: str

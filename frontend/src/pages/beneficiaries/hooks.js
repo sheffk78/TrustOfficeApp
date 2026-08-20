@@ -348,7 +348,11 @@ export function useSettings(selectedTrust, isReadOnly, showUpgradeModal, loadCer
       setSettingsForm({
         total_authorized_units: data.settings.total_authorized_units || 100,
         unit_label: data.settings.unit_label || 'Unit',
-        allow_fractional: data.settings.allow_fractional || false
+        allow_fractional: data.settings.allow_fractional || false,
+        allocation_mode: data.settings.allocation_mode || 'percentage',
+        authorized_units_ceiling: data.settings.authorized_units_ceiling ?? 100,
+        unlimited_units: data.settings.unlimited_units || false,
+        class_distribution_convention: data.settings.class_distribution_convention || 'per_capita'
       });
     }
   }, []);
@@ -373,7 +377,8 @@ export function useSettings(selectedTrust, isReadOnly, showUpgradeModal, loadCer
         body: JSON.stringify({
           trust_id: selectedTrust.trust_id,
           ...settingsForm,
-          total_authorized_units: totalAuthorized
+          total_authorized_units: totalAuthorized,
+          authorized_units_ceiling: parseInt(settingsForm.authorized_units_ceiling, 10) || 0
         })
       });
       if (response.ok) {
@@ -459,13 +464,14 @@ export function useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal,
           class_type: classBeneficiaryForm.class_type,
           description: classBeneficiaryForm.description,
           percentage: parseFloat(classBeneficiaryForm.percentage) || 0,
-          notes: classBeneficiaryForm.notes
+          notes: classBeneficiaryForm.notes,
+          distribution_convention: classBeneficiaryForm.distribution_convention
         })
       });
       if (response.ok) {
         toast.success('Class Beneficiary added');
         setShowClassBeneficiaryModal(false);
-        setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '' });
+        setClassBeneficiaryForm({ class_type: 'children', description: '', percentage: '', notes: '', distribution_convention: 'per_capita' });
         loadOverviewData();
       } else {
         const errBody = await response.json().catch(() => null);

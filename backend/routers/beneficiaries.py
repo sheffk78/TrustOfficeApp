@@ -16,7 +16,7 @@ from models import (
     BeneficiaryCreate, BeneficiaryUpdate, SendCertificateRequest,
     TrustUnitCertificateCreate,
 )
-from routers.trust_units import create_unit_certificate as _create_cert, get_or_create_units_settings
+from routers.trust_units import create_unit_certificate as _create_cert, get_or_create_units_settings, get_next_certificate_number
 
 router = APIRouter(prefix="/beneficiaries", tags=["beneficiaries"])
 
@@ -53,6 +53,19 @@ async def create_class_beneficiary(
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
     
+    settings = await get_or_create_units_settings(data.trust_id, user_id)
+    convention = data.distribution_convention or settings.get("class_distribution_convention", "per_capita")
+    if convention not in {"per_capita", "per_stirpes"}:
+        raise HTTPException(status_code=400, detail="Unsupported class distribution convention.")
+    if settings.get("allocation_mode", "percentage") == "percentage":
+        existing_pools = await db.class_beneficiaries.aggregate([
+            {"$match": {"trust_id": data.trust_id, "user_id": user_id}},
+            {"$group": {"_id": None, "total": {"$sum": "$percentage"}}},
+        ]).to_list(1)
+        current_pct = existing_pools[0]["total"] if existing_pools else 0
+        if current_pct + data.percentage > 100:
+            raise HTTPException(status_code=400, detail="Class-beneficiary pools cannot exceed 100% combined.")
+
     class_beneficiary = {
         "class_beneficiary_id": f"cb_{uuid.uuid4().hex[:16]}",
         "trust_id": data.trust_id,
@@ -62,6 +75,9 @@ async def create_class_beneficiary(
         "description": data.description,
         "percentage": data.percentage,
         "notes": data.notes,
+        "distribution_convention": convention,
+        "reserved_units": round(settings.get("total_authorized_units", 100) * data.percentage / 100, 4),
+        "member_count": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     
@@ -114,6 +130,50 @@ async def delete_class_beneficiary(
         raise HTTPException(status_code=404, detail="Class beneficiary not found")
     
     return {"status": "deleted"}
+
+
+@router.post("/class-beneficiaries/{class_beneficiary_id}/members")
+async def add_class_member(
+    class_beneficiary_id: str,
+    member: dict,
+    user: dict = Depends(require_write_access),
+):
+    """Record a trustee-confirmed class member without inferring eligibility."""
+    user_id = user["user_id"]
+    class_doc = await db.class_beneficiaries.find_one(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0}
+    )
+    if not class_doc:
+        raise HTTPException(status_code=404, detail="Class beneficiary not found")
+    name = (member.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Member name is required")
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "class_member_id": f"cm_{uuid.uuid4().hex[:12]}",
+        "class_beneficiary_id": class_beneficiary_id,
+        "trust_id": class_doc["trust_id"], "user_id": user_id,
+        "name": name, "confirmed_by_user_id": user_id,
+        "confirmed_at": now, "created_at": now,
+    }
+    await db.class_beneficiary_members.insert_one(doc)
+    count = await db.class_beneficiary_members.count_documents({"class_beneficiary_id": class_beneficiary_id, "user_id": user_id})
+    await db.class_beneficiaries.update_one({"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"$set": {"member_count": count}})
+    doc.pop("_id", None)
+    return doc
+
+
+@router.get("/class-beneficiaries/{class_beneficiary_id}/members")
+async def list_class_members(class_beneficiary_id: str, user: dict = Depends(get_current_user)):
+    items = await db.class_beneficiary_members.find(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user["user_id"]}, {"_id": 0}
+    ).sort("created_at", 1).to_list(500)
+    class_doc = await db.class_beneficiaries.find_one({"class_beneficiary_id": class_beneficiary_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not class_doc:
+        raise HTTPException(status_code=404, detail="Class beneficiary not found")
+    pool_pct = class_doc.get("percentage", 0)
+    share_pct = round(pool_pct / len(items), 4) if items else 0
+    return {"items": items, "member_count": len(items), "pool_percentage": pool_pct, "per_member_percentage": share_pct}
 
 
 # ========== DASHBOARD ENDPOINT (updated) ==========
@@ -308,8 +368,9 @@ async def create_beneficiary(
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
-    # Get unit settings to convert allocation_pct to units
+    # Get the trust's explicit allocation mode and ceiling.
     settings = await get_or_create_units_settings(data.trust_id, user_id)
+    allocation_mode = settings.get("allocation_mode", "percentage")
     total_authorized = settings.get("total_authorized_units", 0)
     allow_fractional = settings.get("allow_fractional", False)
 
@@ -320,25 +381,28 @@ async def create_beneficiary(
         )
 
     allocation_pct = data.allocation_pct
-    if allocation_pct is None:
-        raise HTTPException(
-            status_code=400,
-            detail="allocation_pct is required (percentage > 0)"
-        )
-    if not isinstance(allocation_pct, (int, float)) or allocation_pct <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="allocation_pct must be a positive number greater than 0"
-        )
-
-    # Convert percentage to units
-    raw_units = total_authorized * allocation_pct / 100.0
+    if allocation_mode == "units" and data.units is not None:
+        raw_units = data.units
+        allocation_pct = round(raw_units / total_authorized * 100, 4)
+    else:
+        if allocation_pct is None:
+            raise HTTPException(status_code=400, detail="allocation_pct is required in percentage mode")
+        if not isinstance(allocation_pct, (int, float)) or allocation_pct <= 0:
+            raise HTTPException(status_code=400, detail="allocation_pct must be a positive number greater than 0")
+        if allocation_mode == "percentage" and allocation_pct > 100:
+            raise HTTPException(status_code=400, detail="Percentage allocations cannot exceed 100%.")
+        # Percentage mode converts the requested share to the configured
+        # certificate basis; unit mode never infers units from display values.
+        raw_units = total_authorized * allocation_pct / 100.0
 
     if allow_fractional:
         units = round(raw_units, 4)
     else:
         units = round(raw_units)
 
+    ceiling = settings.get("authorized_units_ceiling")
+    if allocation_mode == "units" and not settings.get("unlimited_units") and ceiling and units > ceiling:
+        raise HTTPException(status_code=400, detail="Allocation exceeds the configured authorized-unit ceiling.")
     if units <= 0:
         raise HTTPException(
             status_code=400,
@@ -422,12 +486,47 @@ async def update_beneficiary(
     if data.notes is not None:
         update_fields["notes"] = data.notes
 
-    if update_fields:
-        update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+    # Allocation edits are replacements, not in-place mutations. Preserve the
+    # prior certificate and write a new active version when allocation changes.
+    if data.allocation_pct is not None or data.units is not None:
+        now = datetime.now(timezone.utc).isoformat()
+        replacement = dict(existing)
+        replacement.pop("_id", None)
+        replacement["certificate_id"] = f"cert_{uuid.uuid4().hex[:12]}"
+        replacement["certificate_number"] = await get_next_certificate_number(trust_id, user_id)
+        replacement["units"] = float(replacement.get("units", 0))
+        if data.units is not None:
+            replacement["units"] = data.units
+        elif data.allocation_pct is not None:
+            settings = await get_or_create_units_settings(trust_id, user_id)
+            replacement["units"] = round(settings["total_authorized_units"] * data.allocation_pct / 100.0, 4 if settings.get("allow_fractional") else 0)
+        replacement["supersedes_certificate_id"] = beneficiary_id
+        replacement["version"] = int(existing.get("version", 1)) + 1
+        replacement["created_at"] = now
+        replacement["updated_at"] = now
+        replacement["effective_date"] = data.effective_date or now[:10]
+        replacement["status"] = "active"
         await db.trust_unit_certificates.update_one(
             {"certificate_id": beneficiary_id, "user_id": user_id, "trust_id": trust_id},
-            {"$set": update_fields}
+            {"$set": {"status": "superseded", "superseded_at": now, "updated_at": now}},
         )
+        await db.trust_unit_certificates.insert_one(replacement)
+        await db.beneficiary_allocation_audit.insert_one({
+            "audit_id": f"baa_{uuid.uuid4().hex[:12]}", "trust_id": trust_id,
+            "user_id": user_id, "action": "replacement_created",
+            "prior_certificate_id": beneficiary_id, "replacement_certificate_id": replacement["certificate_id"],
+            "created_at": now,
+            "reason": data.replacement_reason or "Allocation updated",
+            "effective_date": replacement["effective_date"],
+        })
+        update_fields = {k: v for k, v in update_fields.items() if k in {"email", "phone", "notes"}}
+        if update_fields:
+            await db.trust_unit_certificates.update_one({"certificate_id": replacement["certificate_id"]}, {"$set": update_fields})
+        return replacement
+
+    if update_fields:
+        update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.trust_unit_certificates.update_one({"certificate_id": beneficiary_id, "user_id": user_id, "trust_id": trust_id}, {"$set": update_fields})
 
     updated = await db.trust_unit_certificates.find_one(
         {"certificate_id": beneficiary_id, "user_id": user_id},

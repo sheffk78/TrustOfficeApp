@@ -358,6 +358,25 @@ export function SettingsModal({
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div>
+            <Label className="label-trust">Allocation Mode</Label>
+            <Select value={settingsForm.allocation_mode} onValueChange={(v) => setSettingsForm({ ...settingsForm, allocation_mode: v })}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="percentage">Percentage Allocation (100% cap)</SelectItem>
+                <SelectItem value="units">Unit Allocation</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">Percentage mode uses a 100% cap. Unit mode tracks raw units separately.</p>
+          </div>
+          {settingsForm.allocation_mode === 'units' && <div>
+            <Label className="label-trust">Authorized Unit Ceiling</Label>
+            <Input type="number" min="0" value={settingsForm.authorized_units_ceiling} onChange={(e) => setSettingsForm({ ...settingsForm, authorized_units_ceiling: parseInt(e.target.value, 10) || 0 })} className="mt-1" />
+            <div className="flex items-center justify-between mt-2 p-3 bg-muted/30 border border-border">
+              <Label className="label-trust">Allow unlimited units</Label>
+              <Switch checked={settingsForm.unlimited_units} onCheckedChange={(checked) => setSettingsForm({ ...settingsForm, unlimited_units: checked })} />
+            </div>
+          </div>}
+          <div>
             <Label className="label-trust">Total Authorized Units</Label>
             <Input
               type="number"
@@ -482,7 +501,22 @@ export function AddClassBeneficiaryModal({
               placeholder="e.g., 50"
               className="mt-1"
             />
-            <p className="text-xs text-muted-foreground mt-1">Percentage of trust allocated to this class (if applicable)</p>
+            <p className="text-xs text-muted-foreground mt-1">Percentage of trust allocated to this class pool.</p>
+          </div>
+          <div>
+            <Label className="label-trust">Distribution Convention</Label>
+            <Select value={classBeneficiaryForm.distribution_convention} onValueChange={(v) => setClassBeneficiaryForm({ ...classBeneficiaryForm, distribution_convention: v })}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="per_capita">Per Capita (equal shares by head)</SelectItem>
+                <SelectItem value="per_stirpes">Per Stirpes (by family branch)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">TrustOffice records this convention; it does not determine legal eligibility.</p>
+          </div>
+          <div>
+            <Label className="label-trust">Class Member Count</Label>
+            <p className="text-xs text-muted-foreground mt-1">Members are recorded separately after the class is created. Confirming a member divides the reserved pool; it does not infer legal eligibility.</p>
           </div>
           <div>
             <Label className="label-trust">Notes (Optional)</Label>

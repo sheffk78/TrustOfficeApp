@@ -37,6 +37,10 @@ async def get_or_create_units_settings(trust_id: str, user_id: str) -> dict:
             "trust_id": trust_id,
             "user_id": user_id,
             "total_authorized_units": 100,
+            "allocation_mode": "percentage",
+            "authorized_units_ceiling": 100,
+            "unlimited_units": False,
+            "class_distribution_convention": "per_capita",
             "unit_label": "Certificate Unit",
             "allow_fractional": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -291,13 +295,27 @@ async def update_trust_units_settings(
                        f"There are currently {current_active_units} active units issued."
             )
     
-    update_fields = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    update_fields: dict = {"updated_at": datetime.now(timezone.utc).isoformat()}
     if update.total_authorized_units is not None:
         update_fields["total_authorized_units"] = update.total_authorized_units
     if update.unit_label is not None:
         update_fields["unit_label"] = update.unit_label
     if update.allow_fractional is not None:
         update_fields["allow_fractional"] = update.allow_fractional
+    if update.allocation_mode is not None:
+        if update.allocation_mode not in {"percentage", "units"}:
+            raise HTTPException(status_code=400, detail="allocation_mode must be 'percentage' or 'units'.")
+        update_fields["allocation_mode"] = update.allocation_mode
+    if update.authorized_units_ceiling is not None:
+        if update.authorized_units_ceiling < 0:
+            raise HTTPException(status_code=400, detail="authorized_units_ceiling cannot be negative.")
+        update_fields["authorized_units_ceiling"] = update.authorized_units_ceiling
+    if update.unlimited_units is not None:
+        update_fields["unlimited_units"] = update.unlimited_units
+    if update.class_distribution_convention is not None:
+        if update.class_distribution_convention not in {"per_capita", "per_stirpes"}:
+            raise HTTPException(status_code=400, detail="Unsupported class distribution convention.")
+        update_fields["class_distribution_convention"] = update.class_distribution_convention
     
     await db.trust_units_settings.update_one(
         {"trust_id": trust_id, "user_id": user["user_id"]},
@@ -325,18 +343,31 @@ async def create_unit_certificate(
     settings = await get_or_create_units_settings(certificate.trust_id, user["user_id"])
     
     units = validate_units(certificate.units, settings["allow_fractional"])
+
+    if (
+        settings.get("allocation_mode", "percentage") == "units"
+        and not settings.get("unlimited_units")
+        and settings.get("authorized_units_ceiling") is not None
+        and units > settings["authorized_units_ceiling"]
+    ):
+        raise HTTPException(status_code=400, detail="Allocation exceeds the configured authorized-unit ceiling.")
     
     if units <= 0:
         raise HTTPException(status_code=400, detail="Units must be greater than 0")
     
     current_active = await get_total_active_units(certificate.trust_id, user["user_id"])
     total_authorized = settings["total_authorized_units"]
-    
-    if current_active + units > total_authorized:
+    allocation_mode = settings.get("allocation_mode", "percentage")
+    ceiling = settings.get("authorized_units_ceiling", total_authorized)
+    capacity = total_authorized if allocation_mode == "percentage" else ceiling
+    if allocation_mode == "units" and settings.get("unlimited_units"):
+        capacity = None
+
+    if capacity is not None and current_active + units > capacity:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot issue {units} units. Only {total_authorized - current_active} units remaining. "
-                   f"(Active: {current_active}, Authorized: {total_authorized})"
+            detail=f"Cannot issue {units} units. Only {capacity - current_active} units remaining. "
+                   f"(Active: {current_active}, Authorized: {capacity})"
         )
     
     certificate_id = f"cert_{uuid.uuid4().hex[:12]}"
@@ -394,7 +425,8 @@ async def update_unit_certificate(
     
     settings = await get_or_create_units_settings(cert["trust_id"], user["user_id"])
     
-    update_fields = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    now = datetime.now(timezone.utc).isoformat()
+    update_fields = {"updated_at": now}
     
     if update.holder_name is not None:
         update_fields["holder_name"] = update.holder_name
@@ -419,25 +451,43 @@ async def update_unit_certificate(
         
         new_status = update.status.value if update.status else cert["status"]
         if new_status == "active":
-            total_authorized = settings["total_authorized_units"]
-            if current_active_excluding_this + units > total_authorized:
+            allocation_mode = settings.get("allocation_mode", "percentage")
+            ceiling = settings.get("authorized_units_ceiling", settings["total_authorized_units"])
+            capacity = settings["total_authorized_units"] if allocation_mode == "percentage" else ceiling
+            if allocation_mode == "units" and settings.get("unlimited_units"):
+                capacity = None
+            if capacity is not None and current_active_excluding_this + units > capacity:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Cannot update to {units} units. Would exceed authorized total. "
-                           f"(Other active: {current_active_excluding_this}, Authorized: {total_authorized})"
+                           f"(Other active: {current_active_excluding_this}, Authorized: {capacity})"
                 )
         
         update_fields["units"] = units
     
-    await db.trust_unit_certificates.update_one(
-        {"certificate_id": certificate_id},
-        {"$set": update_fields}
-    )
+    allocation_changed = update.units is not None
+    if allocation_changed:
+        replacement = dict(cert)
+        replacement.pop("_id", None)
+        replacement["certificate_id"] = f"cert_{uuid.uuid4().hex[:12]}"
+        replacement["certificate_number"] = await get_next_certificate_number(cert["trust_id"], user["user_id"])
+        replacement["units"] = update_fields.pop("units")
+        replacement["supersedes_certificate_id"] = certificate_id
+        replacement["version"] = int(cert.get("version", 1)) + 1
+        replacement["effective_date"] = update.effective_date or now[:10]
+        replacement["replacement_reason"] = update.replacement_reason or "Allocation updated"
+        replacement["created_at"] = now
+        replacement["updated_at"] = now
+        replacement["status"] = "active"
+        replacement.update({k: v for k, v in update_fields.items() if k in {"holder_name", "holder_identifier", "holder_type", "holder_trust_id", "email", "phone", "notes"}})
+        await db.trust_unit_certificates.update_one({"certificate_id": certificate_id, "user_id": user["user_id"]}, {"$set": {"status": "superseded", "superseded_at": now, "updated_at": now}})
+        await db.trust_unit_certificates.insert_one(replacement)
+        await db.beneficiary_allocation_audit.insert_one({"audit_id": f"baa_{uuid.uuid4().hex[:12]}", "trust_id": cert["trust_id"], "user_id": user["user_id"], "action": "replacement_created", "prior_certificate_id": certificate_id, "replacement_certificate_id": replacement["certificate_id"], "reason": replacement["replacement_reason"], "effective_date": replacement["effective_date"], "created_at": now})
+        updated_cert = replacement
+    else:
+        await db.trust_unit_certificates.update_one({"certificate_id": certificate_id, "user_id": user["user_id"]}, {"$set": update_fields})
+        updated_cert = await db.trust_unit_certificates.find_one({"certificate_id": certificate_id}, {"_id": 0})
     
-    updated_cert = await db.trust_unit_certificates.find_one(
-        {"certificate_id": certificate_id},
-        {"_id": 0}
-    )
     
     total_authorized = settings["total_authorized_units"]
     percentage = (updated_cert["units"] / total_authorized * 100) if total_authorized > 0 else 0
