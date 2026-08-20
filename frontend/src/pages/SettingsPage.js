@@ -1818,12 +1818,12 @@ export default function SettingsPage() {
               <Gift className="w-5 h-5 text-gold" />
               <h2 className="font-serif text-xl text-navy">Refer a Friend</h2>
               <span className="bg-gold/20 text-gold px-2 py-0.5 text-xs font-medium rounded">
-                50% OFF
+                $50 CREDIT
               </span>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Share TrustOffice with friends and you both save! When your friend subscribes, 
-              you both get <span className="font-semibold text-navy">50% off</span> your next payment.
+              Share TrustOffice with friends. They get <span className="font-semibold text-navy">50% off</span> their first payment, 
+              and you get a <span className="font-semibold text-navy">$50 credit</span> on your next bill when they subscribe.
             </p>
             
             {referralLoading ? (
@@ -1864,9 +1864,13 @@ export default function SettingsPage() {
                   )}
                 </div>
                 
-                {/* Referral Stats */}
+                {/* Credit Balance */}
                 {referralStats && (
                   <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-3 bg-gold/10 rounded">
+                      <p className="text-2xl font-bold text-gold">${referralStats.available_credit || 0}</p>
+                      <p className="text-xs text-muted-foreground">Available Credit</p>
+                    </div>
                     <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded">
                       <p className="text-2xl font-bold text-navy">{referralStats.total_referred || 0}</p>
                       <p className="text-xs text-muted-foreground">Friends Invited</p>
@@ -1875,10 +1879,18 @@ export default function SettingsPage() {
                       <p className="text-2xl font-bold text-success">{referralStats.successful_conversions || 0}</p>
                       <p className="text-xs text-muted-foreground">Subscribed</p>
                     </div>
-                    <div className="text-center p-3 bg-gold/10 rounded">
-                      <p className="text-2xl font-bold text-gold">{referralStats.rewards_earned || 0}</p>
-                      <p className="text-xs text-muted-foreground">Rewards Earned</p>
-                    </div>
+                  </div>
+                )}
+                
+                {/* Lifetime + Expiring */}
+                {referralStats && (referralStats.lifetime_credits_earned > 0 || referralStats.credits_expiring) && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                    <span>Lifetime credits earned: <span className="font-semibold text-navy">${referralStats.lifetime_credits_earned || 0}</span> / ${referralStats.lifetime_cap || 500}</span>
+                    {referralStats.credits_expiring && (
+                      <span className="text-warning">
+                        ${referralStats.credits_expiring.amount} credit expires {new Date(referralStats.credits_expiring.expires_at).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 )}
                 
@@ -1921,7 +1933,8 @@ export default function SettingsPage() {
                   <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
                     <li>Share your unique referral link with friends</li>
                     <li>They sign up and get 50% off their first payment</li>
-                    <li>When they subscribe, you get 50% off your next payment</li>
+                    <li>When they subscribe, you earn a $50 credit</li>
+                    <li>Credits apply automatically to your next bill — ${referralStats?.lifetime_cap || 500} lifetime max</li>
                   </ol>
                 </div>
               </div>
