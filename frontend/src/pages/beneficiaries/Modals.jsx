@@ -547,6 +547,10 @@ export function AddPersonModal({
   resetPersonForm,
   handleAddPerson,
   summary,
+  allocationMode = 'percentage',
+  allocationModeHelp,
+  totalAuthorizedUnits = 100,
+  unitLabel = 'Unit',
 }) {
   return (
     <Dialog open={showPersonModal} onOpenChange={(open) => { if (!open) resetPersonForm(); setShowPersonModal(open); }}>
@@ -585,24 +589,30 @@ export function AddPersonModal({
             </Select>
           </div>
           <div>
-            <Label className="label-trust">Share Percentage *</Label>
+            <Label className="label-trust">
+              {allocationMode === 'units' ? `${unitLabel} Allocation *` : 'Share Percentage *'}
+            </Label>
             <Input
               type="number"
               step="any"
               min="0"
-              max="100"
-              value={personForm.sharePercentage}
-              onChange={(e) => setPersonForm({ ...personForm, sharePercentage: e.target.value })}
-              placeholder="e.g., 50"
+              max={allocationMode === 'units' ? undefined : 100}
+              value={allocationMode === 'units' ? personForm.shareUnits : personForm.sharePercentage}
+              onChange={(e) => setPersonForm({
+                ...personForm,
+                ...(allocationMode === 'units' ? { shareUnits: e.target.value } : { sharePercentage: e.target.value }),
+              })}
+              placeholder={allocationMode === 'units' ? 'e.g., 25' : 'e.g., 50'}
               className="mt-1"
               data-testid="person-share-input"
             />
             <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
               <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-              The percentage of the trust this person will receive. This automatically creates an ownership share record.
+              {allocationModeHelp?.description || 'This automatically creates an ownership share record.'}
+              {allocationModeHelp?.example && <span className="ml-1">{allocationModeHelp.example}.</span>}
               {summary && (
                 <span className="ml-1 font-mono">
-                  {((summary.remaining_units / (summary.settings?.total_authorized_units || 100)) * 100).toFixed(1)}% available.
+                  {summary.remaining_units} {unitLabel}{summary.remaining_units !== 1 ? 's' : ''} available ({((summary.remaining_units / totalAuthorizedUnits) * 100).toFixed(1)}%).
                 </span>
               )}
             </p>
@@ -660,6 +670,10 @@ export function BeneficiariesModals({
   setPersonForm,
   resetPersonForm,
   handleAddPerson,
+  allocationMode = 'percentage',
+  allocationModeHelp,
+  totalAuthorizedUnits = 100,
+  unitLabel = 'Unit',
   pdfPreview,
   setPdfPreview,
 }) {
@@ -726,6 +740,10 @@ export function BeneficiariesModals({
         resetPersonForm={resetPersonForm}
         handleAddPerson={handleAddPerson}
         summary={summary}
+        allocationMode={allocationMode}
+        allocationModeHelp={allocationModeHelp}
+        totalAuthorizedUnits={totalAuthorizedUnits}
+        unitLabel={unitLabel}
       />
 
       {/* PDF Preview Modal */}

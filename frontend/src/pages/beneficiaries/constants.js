@@ -91,6 +91,7 @@ export const DEFAULT_PERSON_FORM = {
   name: '',
   relationship: '',
   sharePercentage: '',
+  shareUnits: '',
 };
 
 // Build a fresh certificate form with today's issue_date
@@ -195,3 +196,41 @@ export function statusBadgeClass(status) {
   if (status === 'cancelled') return 'bg-error/10 text-error dark:bg-error/20 dark:text-error';
   return 'bg-muted text-muted-foreground';
 }
+
+// ========== EDUCATION & DISCLAIMER COPY ==========
+
+export const ALLOCATION_MODE_HELP = {
+  percentage: {
+    title: 'Percentage Allocation Mode',
+    description: 'In Percentage mode, you assign beneficiaries a share of the trust as a percentage. The TrustOffice calculates the equivalent raw units based on total authorized units.',
+    example: 'Example: 25% of a 100-unit trust = 25 units',
+    note: 'One percentage point does NOT necessarily equal one unit — it depends on the total authorized units.',
+  },
+  units: {
+    title: 'Unit Allocation Mode',
+    description: 'In Unit mode, you assign beneficiaries a specific number of raw units directly. The percentage is calculated from the total authorized units.',
+    example: 'Example: 25 units in a 100-unit trust = 25%',
+    note: 'Units are the canonical measure. Percentage is always derived (units ÷ total authorized × 100).',
+  },
+};
+
+export const DISCLAIMER_TEXT = {
+  noLegalAdvice: 'This interface shows allocation choices for planning purposes only. Unit and percentage values do not constitute legal advice. Consult qualified legal counsel before making trust distribution decisions.',
+  unitsVsPercent: 'Units and percentages are two views of the same allocation. Changing the total authorized units changes the percentage each beneficiary receives for a fixed unit amount. One unit does not equal one percent unless total authorized units equal 100.',
+  classDisclaimer: 'Class beneficiary designations define a pool and distribution convention (per capita or per stirpes). Actual distribution among class members is determined when members are confirmed. Recording members divides the reserved pool proportionally.',
+};
+
+export const EDUCATION_SECTIONS = {
+  whatAreUnits: {
+    title: 'What are Trust Units?',
+    content: 'Units represent divisible portions of your trust\'s distributable value. You decide how many total units exist and who receives them. Think of units like slices of a pie — the pie size (total units) and slice count (per beneficiary) are your choices.',
+  },
+  allocationModes: {
+    title: 'Allocation Modes',
+    content: 'TrustOffice supports two allocation approaches:\n\n• Percentage mode — assign by percentage, units calculated automatically\n• Unit mode — assign by raw unit count, percentage calculated automatically\n\nThe canonical measurement is always units. Percentage is a convenient reference view.',
+  },
+  classBeneficiaries: {
+    title: 'Class Beneficiaries',
+    content: 'A class beneficiary is a group defined by relationship (e.g., "all children") rather than named individuals. You set a pool allocation and distribution convention:\n\n• Per Capita: equal shares per confirmed member\n• Per Stirpes: shares divided by family branch\n\nMembers are recorded separately and each reduces the available pool.',
+  },
+};

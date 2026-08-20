@@ -21,6 +21,7 @@ import {
   usePdfPreview,
   useClassBeneficiary,
   usePersonForm,
+  useAllocationMode,
 } from './beneficiaries/hooks';
 import BeneficiaryListTab from './beneficiaries/BeneficiaryListTab';
 import OverviewTab from './beneficiaries/OverviewTab';
@@ -88,8 +89,19 @@ export default function BeneficiariesPage() {
   // Class beneficiary hook
   const classBeneficiary = useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal, loadOverviewData);
 
+  // Allocation mode hook
+  const allocationMode = useAllocationMode(summary);
+
   // Person form hook
-  const personForm = usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summary, loadCertificatesData, loadOverviewData);
+  const personForm = usePersonForm(
+    selectedTrust,
+    isReadOnly,
+    showUpgradeModal,
+    summary,
+    loadCertificatesData,
+    loadOverviewData,
+    allocationMode.allocationMode
+  );
 
   // Filter certificates
   const filteredCertificates = filterCertificatesByStatus(summary?.certificates, statusFilter);
@@ -271,6 +283,10 @@ export default function BeneficiariesPage() {
         setPersonForm={personForm.setPersonForm}
         resetPersonForm={personForm.resetPersonForm}
         handleAddPerson={personForm.handleAddPerson}
+        allocationMode={allocationMode.allocationMode}
+        allocationModeHelp={allocationMode.modeHelp}
+        totalAuthorizedUnits={allocationMode.totalAuthorized}
+        unitLabel={allocationMode.unitLabel}
         pdfPreview={pdfPreview.pdfPreview}
         setPdfPreview={pdfPreview.setPdfPreview}
       />

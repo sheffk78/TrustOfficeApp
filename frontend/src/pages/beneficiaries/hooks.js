@@ -8,6 +8,8 @@ import {
   DEFAULT_SETTINGS_FORM,
   DEFAULT_CLASS_BENEFICIARY_FORM,
   DEFAULT_PERSON_FORM,
+  ALLOCATION_MODE_HELP,
+  DISCLAIMER_TEXT,
 } from './constants';
 
 // ========== DATA LOADING HOOK ==========
@@ -512,12 +514,12 @@ export function useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal,
 }
 
 // ========== PERSON (ADD BENEFICIARY) HOOK ==========
-export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summary, loadCertificatesData, loadOverviewData) {
+export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summary, loadCertificatesData, loadOverviewData, allocationMode) {
   const [showPersonModal, setShowPersonModal] = useState(false);
   const [personForm, setPersonForm] = useState(DEFAULT_PERSON_FORM);
 
   const resetPersonForm = useCallback(() => {
-    setPersonForm({ name: '', relationship: '', sharePercentage: '' });
+    setPersonForm({ name: '', relationship: '', sharePercentage: '', shareUnits: '' });
   }, []);
 
   const handleOpenPersonModal = useCallback(() => {
@@ -529,33 +531,53 @@ export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summa
   }, [isReadOnly, showUpgradeModal]);
 
   const handleAddPerson = useCallback(async () => {
-    if (!personForm.name || !personForm.sharePercentage) {
-      toast.error('Name and share percentage are required');
+    if (!personForm.name) {
+      toast.error('Name is required');
       return;
     }
-    const pct = parseFloat(personForm.sharePercentage);
-    if (!pct || pct <= 0 || pct > 100) {
-      toast.error('Share percentage must be between 0 and 100');
-      return;
+    const totalAuthorized = summary?.settings?.total_authorized_units || 100;
+    const allowFrac = summary?.settings?.allow_fractional ?? false;
+
+    let units;
+    if (allocationMode === 'units') {
+      units = parseFloat(personForm.shareUnits);
+      if (!units || units <= 0) {
+        toast.error('Units must be a positive number');
+        return;
+      }
+      if (!allowFrac && !Number.isInteger(units)) {
+        toast.error('Fractional units are not allowed. Please enter a whole number.');
+        return;
+      }
+      const pct = (units / totalAuthorized) * 100;
+      if (pct > 100) {
+        toast.error(`Cannot allocate ${units} units. Only ${summary.remaining_units} units available.`);
+        return;
+      }
+    } else {
+      const pct = parseFloat(personForm.sharePercentage);
+      if (!pct || pct <= 0 || pct > 100) {
+        toast.error('Share percentage must be between 0 and 100');
+        return;
+      }
+      units = (pct / 100) * totalAuthorized;
+      if (!allowFrac) {
+        units = Math.round(units);
+      }
+      if (units <= 0) {
+        toast.error('Share is too small to allocate a unit.');
+        return;
+      }
     }
+
     if (isReadOnly) {
       showUpgradeModal('add beneficiaries', 'button_click', 'beneficiaries_page');
       return;
     }
 
-    const totalAuthorized = summary?.settings?.total_authorized_units || 100;
-    let units = (pct / 100) * totalAuthorized;
-    if (summary?.settings?.allow_fractional !== true) {
-      units = Math.round(units);
-    }
-
-    if (units <= 0) {
-      toast.error('Share is too small to allocate a unit.');
-      return;
-    }
-
     if (summary && units > summary.remaining_units) {
-      toast.error(`Cannot allocate ${pct}%. Only ${summary.remaining_units} units available (${((summary.remaining_units / totalAuthorized) * 100).toFixed(1)}%).`);
+      const pctAvail = ((summary.remaining_units / totalAuthorized) * 100).toFixed(1);
+      toast.error(`Cannot allocate that amount. Only ${summary.remaining_units} units available (${pctAvail}%).`);
       return;
     }
 
@@ -582,9 +604,10 @@ export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summa
       });
 
       if (response.ok) {
-        toast.success(`${personForm.name} added as a beneficiary (${pct}%)`);
+        const displayedPct = ((units / totalAuthorized) * 100).toFixed(2);
+        toast.success(`${personForm.name} added as a beneficiary (${displayedPct}%)`);
         setShowPersonModal(false);
-        setPersonForm({ name: '', relationship: '', sharePercentage: '' });
+        setPersonForm({ name: '', relationship: '', sharePercentage: '', shareUnits: '' });
         loadCertificatesData();
         loadOverviewData();
       } else {
@@ -594,7 +617,7 @@ export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summa
     } catch (error) {
       showError(toast, error, { operation: 'add', page: 'Beneficiaries' });
     }
-  }, [personForm, isReadOnly, showUpgradeModal, summary, selectedTrust, loadCertificatesData, loadOverviewData]);
+  }, [personForm, isReadOnly, showUpgradeModal, summary, selectedTrust, loadCertificatesData, loadOverviewData, allocationMode]);
 
   return {
     showPersonModal,
@@ -604,5 +627,68 @@ export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summa
     resetPersonForm,
     handleOpenPersonModal,
     handleAddPerson,
+  };
+}
+
+// ========== ALLOCATION MODE HOOK ==========
+// Provides allocation mode state and derived helpers used across the page.
+export function useAllocationMode(summary) {
+  const [allocationMode, setAllocationMode] = useState('percentage');
+
+  // Sync mode from summary settings when available
+  useEffect(() => {
+    if (summary?.settings?.allocation_mode) {
+      setAllocationMode(summary.settings.allocation_mode);
+    }
+  }, [summary]);
+
+  const isUnitMode = allocationMode === 'units';
+  const totalAuthorized = summary?.settings?.total_authorized_units || 100;
+  const unitLabel = summary?.settings?.unit_label || 'Unit';
+
+  // Convert between units and percentage based on active mode
+  const unitsToPercent = useCallback((units) => {
+    if (!units || !totalAuthorized) return 0;
+    return (units / totalAuthorized) * 100;
+  }, [totalAuthorized]);
+
+  const percentToUnits = useCallback((percent) => {
+    if (!percent || !totalAuthorized) return 0;
+    const units = (percent / 100) * totalAuthorized;
+    const allowFrac = summary?.settings?.allow_fractional ?? false;
+    return allowFrac ? Math.round(units * 100) / 100 : Math.round(units);
+  }, [totalAuthorized, summary]);
+
+  const modeHelp = ALLOCATION_MODE_HELP[allocationMode] || ALLOCATION_MODE_HELP.percentage;
+
+  return {
+    allocationMode,
+    setAllocationMode,
+    isUnitMode,
+    totalAuthorized,
+    unitLabel,
+    unitsToPercent,
+    percentToUnits,
+    modeHelp,
+    disclaimer: DISCLAIMER_TEXT,
+  };
+}
+
+// ========== DISPLAY HELPERS ==========
+// Format a unit/pct pair for display according to allocation mode.
+export function formatAllocation(allocationMode, units, percentage, totalAuthorized, unitLabel) {
+  if (allocationMode === 'units') {
+    return {
+      primary: `${units} ${unitLabel}${units === 1 ? '' : 's'}`,
+      secondary: `${percentage.toFixed(2)}%`,
+      primaryLabel: 'Units',
+      secondaryLabel: 'Share',
+    };
+  }
+  return {
+    primary: `${percentage.toFixed(2)}%`,
+    secondary: `${units} ${unitLabel}${units === 1 ? '' : 's'}`,
+    primaryLabel: 'Share',
+    secondaryLabel: 'Units',
   };
 }

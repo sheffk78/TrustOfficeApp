@@ -1,7 +1,21 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Users, Plus, Pencil, AlertCircle, Settings } from 'lucide-react';
+import { Users, Plus, Pencil, AlertCircle, Settings, Info } from 'lucide-react';
 import { extractRelationship } from './constants';
+import { EDUCATION_SECTIONS } from './constants';
+
+// ========== EDUCATION BANNER COMPONENT ==========
+function EducationBanner({ title, content }) {
+  return (
+    <div className="mb-4 p-3 bg-muted/30 border border-border rounded-md text-sm text-muted-foreground">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-navy mb-2">
+        <Info className="w-3.5 h-3.5 inline mr-1" />
+        {title}
+      </p>
+      <p className="text-xs">{content}</p>
+    </div>
+  );
+}
 
 // ========== BENEFICIARIES TAB ==========
 export function BeneficiaryListTab({
@@ -12,6 +26,8 @@ export function BeneficiaryListTab({
   summary,
   setShowSettingsModal,
 }) {
+  const unitLabel = summary?.settings?.unit_label || 'Unit';
+
   return (
     <>
       {/* Fully Allocated Warning */}
@@ -43,6 +59,14 @@ export function BeneficiaryListTab({
             Add Beneficiary
           </Button>
         </div>
+      </div>
+
+      {/* Education Banner */}
+      <div className="mb-6">
+        <EducationBanner
+          title={EDUCATION_SECTIONS.allocationModes.title}
+          content={EDUCATION_SECTIONS.allocationModes.content}
+        />
       </div>
 
       {/* Beneficiary List */}
@@ -95,6 +119,9 @@ export function BeneficiaryListTab({
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
+                      <p className="font-mono text-lg text-navy dark:text-foreground">{ben.total_units} <span className="text-xs text-muted-foreground">{unitLabel}{ben.total_units !== 1 ? 's' : ''}</span></p>
+                    </div>
+                    <div className="text-right min-w-[70px]">
                       <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
                       <p className="text-xs text-muted-foreground">share</p>
                     </div>

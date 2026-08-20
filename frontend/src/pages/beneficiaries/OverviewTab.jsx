@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { OwnershipPieChart } from './OwnershipPieChart';
 import { beneficiaryKey, formatDate } from './constants';
+import { DISCLAIMER_TEXT, EDUCATION_SECTIONS } from './constants';
 
 // ========== OVERVIEW TAB ==========
 
@@ -235,6 +236,23 @@ export function OverviewTab({
               ))}
             </div>
           )}
+        </div>
+      </div>
+      {/* Education & Disclaimer */}
+      <div className="mt-8 border-t border-border pt-6">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Understanding Unit Allocations</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="p-3 bg-muted/30 border border-border rounded-md">
+            <p className="font-medium text-navy dark:text-foreground mb-1">What are Units?</p>
+            <p className="text-muted-foreground text-xs">{EDUCATION_SECTIONS.whatAreUnits.content}</p>
+          </div>
+          <div className="p-3 bg-muted/30 border border-border rounded-md">
+            <p className="font-medium text-navy dark:text-foreground mb-1">Allocation Modes</p>
+            <p className="text-muted-foreground text-xs">{EDUCATION_SECTIONS.allocationModes.content}</p>
+          </div>
+        </div>
+        <div className="mt-4 p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning-foreground">
+          <strong>Disclaimer:</strong> {DISCLAIMER_TEXT.noLegalAdvice}
         </div>
       </div>
     </>

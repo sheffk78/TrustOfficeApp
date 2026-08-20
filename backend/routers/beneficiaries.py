@@ -489,9 +489,32 @@ async def update_beneficiary(
     if data.notes is not None:
         update_fields["notes"] = data.notes
 
-    # Allocation edits are replacements, not in-place mutations. Preserve the
-    # prior certificate and write a new active version when allocation changes.
+    # Allocation edits are replacements, not in-place mutations. Validate the
+    # replacement against the same canonical trust allocation rules before
+    # superseding the prior certificate.
     if data.allocation_pct is not None or data.units is not None:
+        settings = await get_or_create_units_settings(trust_id, user_id)
+        total_authorized = settings.get("total_authorized_units", 0)
+        allocation_mode = settings.get("allocation_mode", "percentage")
+        if data.allocation_pct is not None:
+            if allocation_mode == "percentage" and data.allocation_pct > 100:
+                raise HTTPException(status_code=400, detail="Percentage allocations cannot exceed 100%.")
+            replacement_units = total_authorized * data.allocation_pct / 100.0
+        else:
+            replacement_units = float(data.units or 0)
+        if settings.get("allow_fractional"):
+            replacement_units = round(replacement_units, 4)
+        else:
+            replacement_units = round(replacement_units)
+        if replacement_units <= 0:
+            raise HTTPException(status_code=400, detail="Allocation must resolve to a positive number of units.")
+        active_total = await db.trust_unit_certificates.aggregate([
+            {"$match": {"trust_id": trust_id, "user_id": user_id, "status": "active", "certificate_id": {"$ne": beneficiary_id}}},
+            {"$group": {"_id": None, "total": {"$sum": "$units"}}},
+        ]).to_list(1)
+        issued_elsewhere = active_total[0]["total"] if active_total else 0
+        if issued_elsewhere + replacement_units > total_authorized:
+            raise HTTPException(status_code=400, detail="Replacement allocation exceeds the trust's remaining authorized units.")
         now = datetime.now(timezone.utc).isoformat()
         replacement = dict(existing)
         replacement.pop("_id", None)
