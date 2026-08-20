@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # Cache bust — forces Railway to rebuild image from scratch
-ARG CACHE_BUST=2026-08-19-v1
+ARG CACHE_BUST=2026-08-20-beneficiary-v1
 RUN echo "Cache bust: $CACHE_BUST"
 
 WORKDIR /app
