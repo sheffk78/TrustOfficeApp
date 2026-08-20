@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Users, Plus, Pencil, AlertCircle, Settings } from 'lucide-react';
 import { extractRelationship } from './constants';
 
-// ========== PEOPLE TAB ==========
-export function PeopleTab({
+// ========== BENEFICIARIES TAB ==========
+export function BeneficiaryListTab({
   overviewData,
   loading,
   handleOpenPersonModal,
@@ -35,7 +35,7 @@ export function PeopleTab({
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              Add the people you want to benefit from this trust
+              Add the people or organizations you want to benefit from this trust
             </p>
           </div>
           <Button className="btn-primary" onClick={handleOpenPersonModal} disabled={summary && summary.remaining_units === 0} data-testid="add-beneficiary-btn">
@@ -45,12 +45,12 @@ export function PeopleTab({
         </div>
       </div>
 
-      {/* People List */}
+      {/* Beneficiary List */}
       <div className="card-trust overflow-hidden">
         <div className="p-4 border-b border-border flex items-center gap-2">
           <Users className="w-4 h-4 text-navy dark:text-gold" />
           <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Beneficiaries</h2>
-          <span className="ml-auto text-xs text-muted-foreground">{overviewData?.beneficiaries?.length || 0} people</span>
+          <span className="ml-auto text-xs text-muted-foreground">{overviewData?.beneficiaries?.length || 0} beneficiaries</span>
         </div>
 
         {loading ? (
@@ -63,7 +63,7 @@ export function PeopleTab({
             <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
             <p className="text-muted-foreground mb-2">No beneficiaries yet</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Add a person — like a spouse, child, or charity — and choose what share of the trust they receive.
+              Add a person, organization, or other beneficiary — then choose what share of the trust they receive.
             </p>
             <Button className="btn-primary" onClick={handleOpenPersonModal} disabled={summary && summary.remaining_units === 0} data-testid="empty-add-beneficiary-btn">
               <Plus className="w-4 h-4 mr-2" /> Add Your First Beneficiary
@@ -121,4 +121,4 @@ export function PeopleTab({
   );
 }
 
-export default PeopleTab;
+export default BeneficiaryListTab;

@@ -22,7 +22,7 @@ import {
   useClassBeneficiary,
   usePersonForm,
 } from './beneficiaries/hooks';
-import PeopleTab from './beneficiaries/PeopleTab';
+import BeneficiaryListTab from './beneficiaries/BeneficiaryListTab';
 import OverviewTab from './beneficiaries/OverviewTab';
 import CertificatesTab from './beneficiaries/CertificatesTab';
 import TransfersTab from './beneficiaries/TransfersTab';
@@ -164,9 +164,9 @@ export default function BeneficiariesPage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* ========== PEOPLE TAB ========== */}
+            {/* ========== BENEFICIARIES TAB ========== */}
             <TabsContent value="beneficiaries">
-              <PeopleTab
+              <BeneficiaryListTab
                 overviewData={overviewData}
                 loading={loading}
                 handleOpenPersonModal={personForm.handleOpenPersonModal}

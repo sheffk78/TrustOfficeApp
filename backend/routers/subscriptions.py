@@ -159,16 +159,27 @@ def calculate_subscription_status(sub: dict) -> dict:
     if sub.get("stripe_subscription_id") and sub["status"] == "active":
         try:
             stripe_sub = stripe.Subscription.retrieve(sub["stripe_subscription_id"])
-            result["current_period_end"] = datetime.fromtimestamp(
-                stripe_sub.current_period_end, tz=timezone.utc
-            ).isoformat()
-            result["cancel_at_period_end"] = stripe_sub.cancel_at_period_end
+            # Stripe can return incomplete subscription objects for legacy,
+            # canceled, or partially migrated records. Never let a missing
+            # optional field turn /api/subscription into a 500.
+            stripe_data = getattr(stripe_sub, "_data", {}) or {}
+            period_end = stripe_data.get("current_period_end")
+            if period_end:
+                result["current_period_end"] = datetime.fromtimestamp(
+                    period_end, tz=timezone.utc
+                ).isoformat()
+            result["cancel_at_period_end"] = stripe_data.get("cancel_at_period_end")
             result["is_active"] = True
             result["days_remaining"] = None
             
             # Update plan type from Stripe if needed
-            if stripe_sub.items.data:
-                price_id = stripe_sub.items.data[0].price.id
+            items = stripe_data.get("items") or {}
+            item_data = items.get("data") or []
+            if item_data:
+                price = item_data[0].get("price") or {}
+                price_id = price.get("id")
+                if not price_id:
+                    return result
                 # Check new tier price IDs first
                 plan_info = PRICE_ID_TO_PLAN.get(price_id)
                 if plan_info:
