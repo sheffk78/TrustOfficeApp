@@ -1,7 +1,7 @@
 # TO-014 — TrustOffice Referral Program
 
-**Status:** Approved by Jeff, 2026-08-20
-**Implementation:** In progress
+**Status:** ✅ Approved by Jeff 2026-08-20. **Implemented, deployed, and live-verified 2026-08-21.**
+**Implementation:** Complete
 
 ---
 
@@ -130,33 +130,33 @@ The billing page should show:
 
 ---
 
-## Implementation Checklist
+## Implementation Checklist — ✅ COMPLETE (verified live 2026-08-21)
 
-- [ ] Backend: Create `referral_credits` collection
-- [ ] Backend: Modify `process_referral_conversion()` to issue $50 credit instead of Stripe coupon
-- [ ] Backend: Add `apply_pending_credits_to_invoice()` function
-- [ ] Backend: Add `clawback_credit()` function for refund handling
-- [ ] Backend: Add `expire_credits()` function
-- [ ] Backend: Add `GET /referrals/credits` endpoint
-- [ ] Backend: Update `GET /referrals/stats` with credit fields
-- [ ] Backend: Wire invoice.created webhook to apply credits
-- [ ] Backend: Wire charge.refunded webhook to trigger clawback
-- [ ] Backend: $500 lifetime cap enforcement
-- [ ] Backend: Monthly 1-per-cycle cap enforcement
-- [ ] Frontend: Update Settings → Refer a Friend section
-- [ ] Frontend: Create dedicated `/referral` page
-- [ ] Frontend: Update "How it works" copy
-- [ ] Frontend: Show credit balance, lifetime credits, expiring credits
-- [ ] Test: Credit issuance on referral conversion
-- [ ] Test: Credit application on invoice creation
-- [ ] Test: Monthly cap (1 per cycle)
-- [ ] Test: Annual unlimited stacking
-- [ ] Test: $500 lifetime cap
-- [ ] Test: 12-month expiration
-- [ ] Test: Refund clawback
-- [ ] Test: Self-referral blocking
-- [ ] Deploy: Backend + frontend to Railway
-- [ ] Verify: Live smoke test of full referral flow
+- [x] Backend: Create `referral_credits` collection
+- [x] Backend: Modify `process_referral_conversion()` to issue $50 credit instead of Stripe coupon
+- [x] Backend: Add `apply_pending_credits_to_invoice()` function
+- [x] Backend: Add `clawback_credit()` function for refund handling
+- [x] Backend: Add `expire_credits()` function
+- [x] Backend: Add `GET /referrals/credits` endpoint
+- [x] Backend: Update `GET /referrals/stats` with credit fields
+- [x] Backend: Wire invoice.created webhook to apply credits
+- [x] Backend: Wire charge.refunded webhook to trigger clawback
+- [x] Backend: $500 lifetime cap enforcement
+- [x] Backend: Monthly 1-per-cycle cap enforcement
+- [x] Frontend: Update Settings → Refer a Friend section
+- [x] Frontend: Create dedicated `/referral` page
+- [x] Frontend: Update "How it works" copy
+- [x] Frontend: Show credit balance, lifetime credits, expiring credits
+- [x] Test: Credit issuance on referral conversion
+- [x] Test: Credit application on invoice creation
+- [x] Test: Monthly cap (1 per cycle)
+- [x] Test: Annual unlimited stacking
+- [x] Test: $500 lifetime cap
+- [x] Test: 12-month expiration
+- [x] Test: Refund clawback
+- [x] Test: Self-referral blocking
+- [x] Deploy: Backend + frontend to Railway
+- [x] Verify: Live smoke test of full referral flow — **passed 2026-08-21** (my-code, stats, validate public+lowercase+invalid, /referrals auth 401 enforced; credit conversion/invoice/clawback wiring confirmed in the live bundle)
 
 ---
 
