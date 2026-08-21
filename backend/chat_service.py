@@ -182,6 +182,8 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
         "21-crisis-escalation": ["fraud", "theft", "stolen", "unauthorized", "lawsuit", "litigation", "subpoena", "court order", "audit", "creditor claim", "incapacity", "trustee death", "missing beneficiary", "exploitation", "foreclosure", "emergency", "crisis", "urgent", "police", "law enforcement", "adult protective", "dispute", "threatened"],
         # --- Quarterly review guide (22-*) ---
         "22-quarterly-review-guide": ["quarterly review", "quarterly", "quarter", "review checklist", "what do i do for", "quarterly meeting", "trust review", "annual review", "annual meeting"],
+        # --- Beneficiary types and allocation models (23-*) ---
+        "23-beneficiary-types-and-allocations": ["beneficiary type", "class beneficiary", "individual beneficiary", "organization beneficiary", "allocation", "units", "percentage", "per capita", "per stirpes", "distribution convention", "allocation mode", "unit mode", "percentage mode", "total allocation", "mixed allocation", "reserved pool", "beneficiary share", "trust units", "authorized units", "which beneficiary type", "should i use a class", "after-born", "descendants class", "children class", "issue", "heirs at law", "blood relatives"],
     }
 
     selected = []
