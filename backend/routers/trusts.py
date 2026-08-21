@@ -15,7 +15,7 @@ from dependencies import (
 )
 from trustee_utils import parse_trustees
 from models import TrustCreate, TrustUpdate, TrustResponse
-from utils.tax_calendar_math import _generate_entries
+from utils.tax_calendar_math import _generate_entries, _seed_tax_year
 from utils.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
@@ -142,14 +142,14 @@ def _mark_past_tax_entries_not_required(tax_entries: list):
 
 async def _generate_tax_calendar(trust_doc: dict, trust_id: str):
     """Auto-generate tax deadlines for a new trust, marking past entries as not_required."""
-    current_tax_year = date.today().year
+    target_tax_year = _seed_tax_year()
     existing_count = await db.tax_calendar.count_documents({
-        "trust_id": trust_id, "tax_year": current_tax_year
+        "trust_id": trust_id, "tax_year": target_tax_year
     })
     if existing_count > 0:
         return
 
-    tax_entries = _generate_entries(trust_doc, current_tax_year)
+    tax_entries = _generate_entries(trust_doc, target_tax_year)
     if not tax_entries:
         return
 
