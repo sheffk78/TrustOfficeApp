@@ -233,4 +233,16 @@ export const EDUCATION_SECTIONS = {
     title: 'Class Beneficiaries',
     content: 'A class beneficiary is a group defined by relationship (e.g., "all children") rather than named individuals. You set a pool allocation and distribution convention:\n\n• Per Capita: equal shares per confirmed member\n• Per Stirpes: shares divided by family branch\n\nMembers are recorded separately and each reduces the available pool.',
   },
+  beneficiaryTypes: {
+    title: 'Beneficiary Types',
+    content: 'TrustOffice supports three beneficiary types:\n\n• Individual — A named person (spouse, child, friend) who receives a direct allocation of units or percentage.\n• Organization — A legal entity (charity, LLC, corporation) that holds a direct allocation. Treated identically to an individual for allocation purposes.\n• Class — A group defined by relationship rather than name (e.g., "all descendants"). The class receives a reserved pool, distributed among confirmed members per capita or per stirpes.\n\nAll three types contribute to the total allocation. The combined percentage of individuals, organizations, and class pools should not exceed 100%.',
+  },
+  unitsVsPercentage: {
+    title: 'Units vs. Percentage',
+    content: 'Units and percentages are two views of the same allocation. The canonical value is always raw units. Percentage is derived: (units ÷ total authorized) × 100.\n\nChanging the total authorized units changes the percentage each beneficiary receives for a fixed unit amount. One unit does not equal one percent unless total authorized units equal 100.\n\nExample: 50 units in a 100-unit trust = 50%. But 50 units in a 200-unit trust = 25%.',
+  },
+  distributionConventions: {
+    title: 'Distribution Conventions',
+    content: 'When a class beneficiary pool is distributed among confirmed members, you choose the convention:\n\n• Per Capita — Equal shares per person. If a class has 4 confirmed members, each receives 25% of the pool.\n• Per Stirpes — Shares divided by family branch. If a beneficiary in the class is deceased, their share passes to their descendants rather than being redistributed.\n\nThe convention is set when creating a class beneficiary and can be changed in the Class Beneficiaries tab.',
+  },
 };

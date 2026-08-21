@@ -1204,45 +1204,49 @@ export default function SettingsPage() {
                       />
                       <p className="text-xs text-muted-foreground mt-1">The person named to take over if the trustee dies or becomes incapacitated</p>
                     </div>
-                    <div>
-                      <Label className="label-trust">Successor Trustee Email</Label>
-                      <Input
-                        type="email"
-                        value={trustData.successor_trustee_email}
-                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_email: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="email@example.com"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="label-trust">Successor Trustee Email</Label>
+                        <Input
+                          type="email"
+                          value={trustData.successor_trustee_email}
+                          onChange={(e) => setTrustData({ ...trustData, successor_trustee_email: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="email@example.com"
+                        />
+                      </div>
+                      <div>
+                        <Label className="label-trust">Successor Trustee Phone</Label>
+                        <Input
+                          type="tel"
+                          value={trustData.successor_trustee_phone}
+                          onChange={(e) => setTrustData({ ...trustData, successor_trustee_phone: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label className="label-trust">Successor Trustee Phone</Label>
-                      <Input
-                        type="tel"
-                        value={trustData.successor_trustee_phone}
-                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_phone: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="(555) 123-4567"
-                      />
-                    </div>
-                    <div>
-                      <Label className="label-trust">Relationship to Grantor</Label>
-                      <Input
-                        type="text"
-                        value={trustData.successor_trustee_relationship}
-                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_relationship: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="Spouse, adult child, sibling, etc."
-                      />
-                    </div>
-                    <div>
-                      <Label className="label-trust">Notes</Label>
-                      <Input
-                        type="text"
-                        value={trustData.successor_trustee_notes}
-                        onChange={(e) => setTrustData({ ...trustData, successor_trustee_notes: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="Any special instructions about the successor trustee"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="label-trust">Relationship to Grantor</Label>
+                        <Input
+                          type="text"
+                          value={trustData.successor_trustee_relationship}
+                          onChange={(e) => setTrustData({ ...trustData, successor_trustee_relationship: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="Spouse, adult child, sibling, etc."
+                        />
+                      </div>
+                      <div>
+                        <Label className="label-trust">Notes</Label>
+                        <Input
+                          type="text"
+                          value={trustData.successor_trustee_notes}
+                          onChange={(e) => setTrustData({ ...trustData, successor_trustee_notes: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="Any special instructions about the successor trustee"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1269,25 +1273,27 @@ export default function SettingsPage() {
                       />
                       <p className="text-xs text-muted-foreground mt-1">The backup person named to take over if the primary successor trustee declines, predeceases the grantor, or cannot serve</p>
                     </div>
-                    <div>
-                      <Label className="label-trust">Secondary Successor Trustee Email</Label>
-                      <Input
-                        type="email"
-                        value={trustData.secondary_successor_trustee_email}
-                        onChange={(e) => setTrustData({ ...trustData, secondary_successor_trustee_email: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="email@example.com"
-                      />
-                    </div>
-                    <div>
-                      <Label className="label-trust">Secondary Successor Trustee Phone</Label>
-                      <Input
-                        type="tel"
-                        value={trustData.secondary_successor_trustee_phone}
-                        onChange={(e) => setTrustData({ ...trustData, secondary_successor_trustee_phone: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="(555) 123-4567"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="label-trust">Secondary Successor Trustee Email</Label>
+                        <Input
+                          type="email"
+                          value={trustData.secondary_successor_trustee_email}
+                          onChange={(e) => setTrustData({ ...trustData, secondary_successor_trustee_email: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="email@example.com"
+                        />
+                      </div>
+                      <div>
+                        <Label className="label-trust">Secondary Successor Trustee Phone</Label>
+                        <Input
+                          type="tel"
+                          value={trustData.secondary_successor_trustee_phone}
+                          onChange={(e) => setTrustData({ ...trustData, secondary_successor_trustee_phone: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
                     </div>
                     <div>
                       <Label className="label-trust">Relationship to Grantor</Label>

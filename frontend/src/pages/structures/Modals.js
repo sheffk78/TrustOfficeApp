@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ENTITY_TYPES, RELATIONSHIP_TYPES } from './constants';
+import { formatEIN } from '@/utils/formatters';
 
 /**
  * Normalise a trust's `trustees` value into a display string.
@@ -169,8 +170,8 @@ export function EntityModal({ show, onClose, newEntity, setNewEntity, entityModa
             </div>
             <Input
               value={newEntity.ein}
-              onChange={(e) => setNewEntity({ ...newEntity, ein: e.target.value })}
-              placeholder="e.g., 12-3456789"
+              onChange={(e) => setNewEntity({ ...newEntity, ein: formatEIN(e.target.value) })}
+              placeholder="XX-XXXXXXX"
               className="input-trust mt-1"
               data-testid="entity-ein"
             />
@@ -230,7 +231,7 @@ export function RelationshipModal({
         setNewRelationship({ parent_entity_id: '', child_entity_id: '', relationship_type: 'owns', ownership_percentage: '', notes: '' });
       }
     }}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[90vh] overflow-y-auto" data-testid="relationship-modal">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden" data-testid="relationship-modal">
         <DialogHeader>
           <DialogTitle className="font-serif text-xl text-navy">Add Relationship</DialogTitle>
         </DialogHeader>
@@ -284,7 +285,7 @@ export function RelationshipModal({
           <div>
             <Label className="label-trust">Parent Entity *</Label>
             <Select value={newRelationship.parent_entity_id} onValueChange={(v) => setNewRelationship({ ...newRelationship, parent_entity_id: v })}>
-              <SelectTrigger className="input-trust mt-1"><SelectValue placeholder="Select parent entity" /></SelectTrigger>
+              <SelectTrigger className="input-trust mt-1 w-full truncate"><SelectValue placeholder="Select parent entity" /></SelectTrigger>
               <SelectContent>
                 {entities.filter(e => filterEntity(e)).map(e => (
                   <SelectItem key={e.entity_id} value={e.entity_id}>{entityLabel(e)}</SelectItem>
@@ -297,7 +298,7 @@ export function RelationshipModal({
           <div>
             <Label className="label-trust">Relationship Type</Label>
             <Select value={newRelationship.relationship_type} onValueChange={(v) => setNewRelationship({ ...newRelationship, relationship_type: v })}>
-              <SelectTrigger className="input-trust mt-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="input-trust mt-1 w-full truncate"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {RELATIONSHIP_TYPES.map(t => (
                   <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
@@ -310,7 +311,7 @@ export function RelationshipModal({
           <div>
             <Label className="label-trust">Child Entity *</Label>
             <Select value={newRelationship.child_entity_id} onValueChange={(v) => setNewRelationship({ ...newRelationship, child_entity_id: v })}>
-              <SelectTrigger className="input-trust mt-1"><SelectValue placeholder="Select child entity" /></SelectTrigger>
+              <SelectTrigger className="input-trust mt-1 w-full truncate"><SelectValue placeholder="Select child entity" /></SelectTrigger>
               <SelectContent>
                 {entities.filter(e => filterEntity(e, newRelationship.parent_entity_id)).map(e => (
                   <SelectItem key={e.entity_id} value={e.entity_id}>{entityLabel(e)}</SelectItem>

@@ -72,7 +72,15 @@ export default function StructuresPage() {
 
   const structuralMapEntities = useMemo(() => {
     if (viewMode !== 'all-trusts') return entities;
-    return entities.map(e => ({ ...e, name: `${getTrustName(e.trust_id)} — ${e.name}` }));
+    return entities.map(e => {
+      const trustName = getTrustName(e.trust_id);
+      // Don't prepend trust name if the entity name already starts with it
+      // (e.g. the trust entity itself is often named the same as the trust)
+      if (trustName && e.name && !e.name.startsWith(trustName)) {
+        return { ...e, name: `${trustName} — ${e.name}` };
+      }
+      return e;
+    });
   }, [entities, viewMode, getTrustName]);
 
   const rootEntities = useMemo(

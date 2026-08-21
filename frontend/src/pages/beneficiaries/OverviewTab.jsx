@@ -327,18 +327,34 @@ export function OverviewTab({
       </div>
       {/* Education & Disclaimer */}
       <div className="mt-8 border-t border-border pt-6">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Understanding Unit Allocations</p>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Understanding Trust Allocations</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="p-3 bg-muted/30 border border-border rounded-md">
-            <p className="font-medium text-navy dark:text-foreground mb-1">What are Units?</p>
-            <p className="text-muted-foreground text-xs">{EDUCATION_SECTIONS.whatAreUnits.content}</p>
+          <div className="p-3 bg-muted/30 border border-border rounded">
+            <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.beneficiaryTypes.title}</p>
+            <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.beneficiaryTypes.content}</p>
           </div>
-          <div className="p-3 bg-muted/30 border border-border rounded-md">
-            <p className="font-medium text-navy dark:text-foreground mb-1">Allocation Modes</p>
-            <p className="text-muted-foreground text-xs">{EDUCATION_SECTIONS.allocationModes.content}</p>
+          <div className="p-3 bg-muted/30 border border-border rounded">
+            <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.whatAreUnits.title}</p>
+            <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.whatAreUnits.content}</p>
+          </div>
+          <div className="p-3 bg-muted/30 border border-border rounded">
+            <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.unitsVsPercentage.title}</p>
+            <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.unitsVsPercentage.content}</p>
+          </div>
+          <div className="p-3 bg-muted/30 border border-border rounded">
+            <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.allocationModes.title}</p>
+            <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.allocationModes.content}</p>
+          </div>
+          <div className="p-3 bg-muted/30 border border-border rounded">
+            <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.classBeneficiaries.title}</p>
+            <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.classBeneficiaries.content}</p>
+          </div>
+          <div className="p-3 bg-muted/30 border border-border rounded">
+            <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.distributionConventions.title}</p>
+            <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.distributionConventions.content}</p>
           </div>
         </div>
-        <div className="mt-4 p-3 bg-warning/10 border border-warning/30 rounded-md text-xs text-warning-foreground">
+        <div className="mt-4 p-3 bg-warning/10 border border-warning/30 rounded text-xs text-warning-foreground">
           <strong>Disclaimer:</strong> {DISCLAIMER_TEXT.noLegalAdvice}
         </div>
       </div>

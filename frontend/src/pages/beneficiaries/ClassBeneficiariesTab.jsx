@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { Plus, UsersRound, Trash2 } from 'lucide-react';
+import { Plus, UsersRound, Trash2, Info } from 'lucide-react';
+import { EDUCATION_SECTIONS } from './constants';
 
 // ========== CLASS BENEFICIARIES TAB ==========
 export function ClassBeneficiariesTab({
@@ -20,6 +21,24 @@ export function ClassBeneficiariesTab({
             <Plus className="w-4 h-4 mr-2" />
             Add Class
           </Button>
+        </div>
+      </div>
+
+      {/* Education */}
+      <div className="mb-6 space-y-4">
+        <div className="p-3 bg-muted/30 border border-border rounded text-sm text-muted-foreground">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-navy mb-2">
+            <Info className="w-3.5 h-3.5 inline mr-1" />
+            {EDUCATION_SECTIONS.classBeneficiaries.title}
+          </p>
+          <p className="text-xs whitespace-pre-line">{EDUCATION_SECTIONS.classBeneficiaries.content}</p>
+        </div>
+        <div className="p-3 bg-muted/30 border border-border rounded text-sm text-muted-foreground">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-navy mb-2">
+            <Info className="w-3.5 h-3.5 inline mr-1" />
+            {EDUCATION_SECTIONS.distributionConventions.title}
+          </p>
+          <p className="text-xs whitespace-pre-line">{EDUCATION_SECTIONS.distributionConventions.content}</p>
         </div>
       </div>
 

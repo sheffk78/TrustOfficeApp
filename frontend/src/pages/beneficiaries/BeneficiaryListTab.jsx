@@ -62,7 +62,11 @@ export function BeneficiaryListTab({
       </div>
 
       {/* Education Banner */}
-      <div className="mb-6">
+      <div className="mb-6 space-y-4">
+        <EducationBanner
+          title={EDUCATION_SECTIONS.beneficiaryTypes.title}
+          content={EDUCATION_SECTIONS.beneficiaryTypes.content}
+        />
         <EducationBanner
           title={EDUCATION_SECTIONS.allocationModes.title}
           content={EDUCATION_SECTIONS.allocationModes.content}
