@@ -237,19 +237,26 @@ export function RevenueTab({ revenueData, revenuePreset, revenueLoading, revenue
                         <td className="py-3 px-4 text-sm text-navy dark:text-white">
                           {new Date(tx.date).toLocaleDateString()}
                         </td>
-                        <td className="py-3 px-4 text-sm text-muted-foreground">
-                          {tx.customer_email || '—'}
+                        <td className="py-3 px-4 text-sm">
+                          {tx.customer_name || tx.customer_email ? (
+                            <div className="flex flex-col">
+                              {tx.customer_name && (
+                                <span className="font-medium text-navy dark:text-white">{tx.customer_name}</span>
+                              )}
+                              {tx.customer_email && (
+                                <span className="text-muted-foreground text-xs">{tx.customer_email}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-sm font-mono text-gold">
                           ${(tx.amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 text-xs font-mono ${
-                            tx.plan === 'annual'
-                              ? 'bg-navy/10 dark:bg-white/10 text-navy dark:text-white'
-                              : 'bg-gold/20 text-gold'
-                          }`}>
-                            {tx.plan}
+                          <span className="text-sm text-navy dark:text-white">
+                            {tx.package || tx.plan}
                           </span>
                         </td>
                         <td className="py-3 px-4">

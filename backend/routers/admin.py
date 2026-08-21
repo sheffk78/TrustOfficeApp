@@ -69,6 +69,21 @@ PRICE_ID_TO_PLAN_LABEL = {
     STRIPE_WINGPOINT_ANNUAL_PRICE_ID: "wingpoint_annual",
 }
 
+# Human-readable package name for each plan label. Used when a Stripe Price
+# description isn't set, so the admin Recent Transactions table shows a clear
+# package + billing period instead of an opaque technical label like
+# "trustee_monthly".
+PLAN_DISPLAY_NAMES = {
+    "trustee_monthly": "Trustee Plan (Monthly)",
+    "trustee_annual": "Trustee Plan (Annual)",
+    "estate_monthly": "Estate Plan (Monthly)",
+    "estate_annual": "Estate Plan (Annual)",
+    "advisor_monthly": "Advisor Plan (Monthly)",
+    "advisor_annual": "Advisor Plan (Annual)",
+    "wingpoint_monthly": "WingPoint Plan (Monthly)",
+    "wingpoint_annual": "WingPoint Plan (Annual)",
+}
+
 def _get_price_id(line):
     """Extract Price ID from a Stripe invoice line item.
     
@@ -1233,17 +1248,58 @@ def _detect_plan_type(inv) -> str:
     return "unknown"
 
 
-def _get_customer_email(inv, customer_id: str) -> str:
-    """Fetch customer email from Stripe or invoice fallback."""
+def _get_customer_identity(inv, customer_id) -> tuple:
+    """Fetch customer (name, email) from Stripe, preferring the expanded
+    invoice customer object to avoid an extra API call. Returns ("", "") if
+    unavailable."""
+    name = ""
+    email = ""
+    customer = getattr(inv, 'customer', None)
+    # invoice.customer is a full Customer object when the invoice list is
+    # created with expand=["data.customer"]; otherwise it is the plain ID string.
+    if not isinstance(customer, str):
+        # Expanded Customer object
+        try:
+            name = getattr(customer, 'name', '') or ''
+            email = getattr(customer, 'email', '') or ''
+        except (AttributeError, TypeError):
+            pass
+    if not name and not email:
+        target_id = customer_id or (customer if isinstance(customer, str) else None)
+        if target_id:
+            try:
+                fetched = stripe.Customer.retrieve(target_id)
+                if fetched:
+                    name = getattr(fetched, 'name', '') or name
+                    email = getattr(fetched, 'email', '') or email
+            except stripe.StripeError:
+                pass
+            except (AttributeError, TypeError):
+                pass
+    if not email:
+        email = getattr(inv, 'customer_email', '') or ""
+    return name, email
+
+
+def _get_package_label(inv, plan_type: str) -> str:
+    """Return a descriptive package label for a transaction.
+
+    Prefers the Stripe Price's own description (so the admin view stays
+    consistent with the customer's Stripe receipt once Price descriptions are
+    set), falling back to the human-readable PLAN_DISPLAY_NAMES mapping.
+    """
     try:
-        if customer_id:
-            customer = stripe.Customer.retrieve(customer_id)
-            return customer.email or ""
-        return getattr(inv, 'customer_email', '') or ""
-    except stripe.StripeError:
-        return getattr(inv, 'customer_email', '') or ""
+        for line in inv.lines.data:
+            price = getattr(line, 'price', None)
+            if isinstance(price, str):
+                continue
+            if price is not None:
+                desc = getattr(price, 'description', None) or getattr(price, 'nickname', None) or ''
+                if desc:
+                    return desc
     except (AttributeError, TypeError):
-        return getattr(inv, 'customer_email', '') or ""
+        pass
+    return PLAN_DISPLAY_NAMES.get(plan_type, plan_type)
 
 
 def _process_invoice(inv, customer_ids: set, revenue_by_month: defaultdict, subscriptions_by_plan: dict) -> dict:
@@ -1263,13 +1319,15 @@ def _process_invoice(inv, customer_ids: set, revenue_by_month: defaultdict, subs
     plan_type = _detect_plan_type(inv)
     subscriptions_by_plan[plan_type] = subscriptions_by_plan.get(plan_type, 0) + 1
 
-    customer_email = _get_customer_email(inv, customer_id)
+    customer_name, customer_email = _get_customer_identity(inv, customer_id)
 
     return {
         "date": inv_date.isoformat(),
+        "customer_name": customer_name,
         "customer_email": customer_email,
         "amount_cents": amount,
         "plan": plan_type,
+        "package": _get_package_label(inv, plan_type),
         "status": inv.status,
         "invoice_id": inv.id,
     }
@@ -1329,6 +1387,9 @@ def _fetch_revenue_invoices(start_ts: int, end_ts: int, customer_ids: set,
                 "status": "paid",
                 "created": {"gte": start_ts, "lte": end_ts},
                 "limit": 100,
+                # Embed the full Customer object so name/email don't need an
+                # extra Stripe call per invoice.
+                "expand": ["data.customer"],
             }
             if starting_after:
                 params["starting_after"] = starting_after
