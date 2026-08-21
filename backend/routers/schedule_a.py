@@ -57,7 +57,12 @@ def _apply_status_filter(query, status):
     if not status or status == "all":
         return
     if status == "active":
-        query["$or"] = [{"status": "active"}, {"status": {"$exists": False}}]
+        # Active tab: show active assets AND draft assets (drafts need user confirmation)
+        query["$or"] = [
+            {"status": "active"},
+            {"status": {"$exists": False}},
+            {"status": "draft"},
+        ]
     else:
         query["status"] = status
 
@@ -224,6 +229,24 @@ async def delete_schedule_a_item(item_id: str, user: dict = Depends(require_writ
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Asset not found")
     return {"message": "Asset deleted"}
+
+
+@router.post("/schedule-a/{item_id}/confirm", response_model=ScheduleAItemResponse)
+async def confirm_draft_asset(item_id: str, user: dict = Depends(require_write_access)):
+    """Confirm a draft Schedule A asset (created from minutes) — activates it."""
+    item = await db.schedule_a_items.find_one(
+        {"item_id": item_id, "user_id": user["user_id"], "status": "draft"},
+        {"_id": 0}
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Draft asset not found")
+    await db.schedule_a_items.update_one(
+        {"item_id": item_id},
+        {"$set": {"status": "active", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    updated = await db.schedule_a_items.find_one({"item_id": item_id}, {"_id": 0})
+    _apply_legacy_defaults(updated)
+    return ScheduleAItemResponse(**updated)
 
 
 class DisposeAssetRequest(BaseModel):

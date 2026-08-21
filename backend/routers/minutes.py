@@ -23,6 +23,108 @@ from models import (
 )
 from email_service import email_service
 from ai_service import draft_minutes_from_structured_input, MinutesDraftRequest as AiMinutesDraftRequest
+
+
+# ==================== TO-016: Draft Schedule A asset from minutes ====================
+
+_BANK_ACCOUNT_TEMPLATES = {"initial_trustee_meeting", "bank_account_authorization"}
+
+
+def _extract_bank_account_info(template_data: dict) -> dict | None:
+    """Extract bank account fields from template_data if present and non-empty.
+
+    Returns a dict with institution, account_type, initial_deposit, account_last4
+    or None if no bank name is present.
+    """
+    if not template_data:
+        return None
+    bank_name = template_data.get("bank_name", "").strip()
+    if not bank_name or bank_name == "[Bank Name]":
+        return None
+    account_number = template_data.get("account_number", "").strip()
+    # Strip to last 4 digits only — never store full account number
+    digits_only = re.sub(r"\D", "", account_number)
+    account_last4 = digits_only[-4:] if len(digits_only) >= 4 else (digits_only if digits_only else "")
+    return {
+        "institution": bank_name,
+        "account_type": template_data.get("account_type", "checking"),
+        "initial_deposit": template_data.get("initial_deposit"),
+        "account_last4": account_last4,
+    }
+
+
+async def _auto_create_draft_asset_from_minutes(
+    trust_id: str, user_id: str, minutes_id: str, template_type: str, template_data: dict, meeting_date: str | None
+):
+    """Auto-create a draft Schedule A asset when bank account info is present in finalized minutes.
+
+    The asset is created with status='draft' and requires explicit user confirmation
+    on the Schedule A page before it becomes active.
+    """
+    if template_type not in _BANK_ACCOUNT_TEMPLATES:
+        return None
+
+    bank_info = _extract_bank_account_info(template_data)
+    if not bank_info:
+        return None
+
+    # Check for duplicate — don't create if a draft asset already exists for this minutes_id
+    existing = await db.schedule_a_items.find_one({
+        "trust_id": trust_id, "user_id": user_id,
+        "source_minutes_id": minutes_id, "status": "draft"
+    }, {"_id": 0})
+    if existing:
+        return None
+
+    item_id = f"asset_{uuid.uuid4().hex[:12]}"
+    description = f"Bank Account — {bank_info['institution']}"
+    if bank_info["account_last4"]:
+        description += f" (ending {bank_info['account_last4']})"
+
+    item_doc = {
+        "item_id": item_id,
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "category": "financial_accounts",
+        "description": description,
+        "identifier": f"****{bank_info['account_last4']}" if bank_info["account_last4"] else "",
+        "location": bank_info["institution"],
+        "approximate_value": float(bank_info["initial_deposit"]) if bank_info["initial_deposit"] else None,
+        "date_conveyed": meeting_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "notes": f"Auto-created from minutes (type: {template_type}). Account type: {bank_info['account_type']}.",
+        "status": "draft",
+        "source_minutes_id": minutes_id,
+        "source_template_type": template_type,
+        "minutes_ref": minutes_id,
+        "disposition_minutes_ref": None,
+        "disposition_date": None,
+        "disposition_notes": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None
+    }
+
+    await db.schedule_a_items.insert_one(item_doc)
+
+    # Log in audit trail
+    await db.audit_trail.insert_one({
+        "audit_id": f"draft_asset_{item_id}",
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "action": "draft_asset_from_minutes",
+        "entity_type": "schedule_a_item",
+        "entity_id": item_id,
+        "details": {
+            "minutes_id": minutes_id,
+            "template_type": template_type,
+            "institution": bank_info["institution"],
+            "account_last4": bank_info["account_last4"],
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+    return item_doc
+
+
 from routers.template_registry import get_template_registry, get_template_definition, build_ai_prompt
 from pdf_utils import NAVY, GRAY, create_doc_template
 
@@ -606,7 +708,24 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
         )
         if result.modified_count != 1:
             raise HTTPException(status_code=409, detail="Minutes could not be finalized; please refresh and try again.")
-        return {"message": "Minutes finalized", "updated_fields": ["status"], "legacy_path": True}
+        # TO-016: Auto-create draft Schedule A asset if bank account info is present
+        draft_asset = None
+        try:
+            draft_asset = await _auto_create_draft_asset_from_minutes(
+                trust_id=template.get("trust_id", ""),
+                user_id=user["user_id"],
+                minutes_id=minutes_id,
+                template_type=template.get("template_type", ""),
+                template_data=template.get("template_data", {}),
+                meeting_date=template.get("meeting_date"),
+            )
+        except Exception as e:
+            logging.warning(f"TO-016 draft asset creation failed for {minutes_id}: {e}")
+        return {
+            "message": "Minutes finalized", "updated_fields": ["status"], "legacy_path": True,
+            "draft_asset_created": draft_asset is not None,
+            "draft_asset_id": draft_asset.get("item_id") if draft_asset else None,
+        }
     
     if existing.get("status") == "finalized":
         # Only allow unfinalizing (status -> draft) with a documented reason
@@ -658,7 +777,26 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
     
-    return {"message": "Minutes updated", "updated_fields": list(update_data.keys())}
+    # TO-016: Auto-create draft Schedule A asset if this is a finalization with bank account info
+    draft_asset = None
+    if data.get("status") == "finalized":
+        try:
+            draft_asset = await _auto_create_draft_asset_from_minutes(
+                trust_id=existing.get("trust_id", ""),
+                user_id=user["user_id"],
+                minutes_id=minutes_id,
+                template_type=existing.get("template_type", ""),
+                template_data=existing.get("template_data", {}),
+                meeting_date=existing.get("meeting_date"),
+            )
+        except Exception as e:
+            logging.warning(f"TO-016 draft asset creation failed for {minutes_id}: {e}")
+
+    return {
+        "message": "Minutes updated", "updated_fields": list(update_data.keys()),
+        "draft_asset_created": draft_asset is not None,
+        "draft_asset_id": draft_asset.get("item_id") if draft_asset else None,
+    }
 
 
 @router.delete("/minutes/{minutes_id}")

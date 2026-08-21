@@ -234,6 +234,21 @@ export default function ScheduleAPage() {
     }
   };
 
+  const handleConfirmDraft = async (itemId) => {
+    try {
+      const response = await fetchWithAuth(`/schedule-a/${itemId}/confirm`, { method: 'POST' });
+      if (response.ok) {
+        toast.success('Draft asset confirmed and activated');
+        await loadAssets();
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, errBody || { detail: 'Failed to confirm draft' }, { operation: 'confirm', page: 'ScheduleA' });
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'confirm', page: 'ScheduleA' });
+    }
+  };
+
   const handleEdit = (asset) => {
     if (isReadOnly) {
       showUpgradeModal('edit assets', 'button_click', 'schedule_a_page');
@@ -743,6 +758,10 @@ export default function ScheduleAPage() {
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning" data-testid={`status-badge-${asset.item_id}`}>
                                     Disposed
                                   </span>
+                                ) : asset.status === 'draft' ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gold/10 text-gold dark:bg-gold/20 dark:text-gold" data-testid={`status-badge-${asset.item_id}`}>
+                                    Draft from Minutes
+                                  </span>
                                 ) : (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success dark:bg-success/20 dark:text-success" data-testid={`status-badge-${asset.item_id}`}>
                                     Active
@@ -750,7 +769,29 @@ export default function ScheduleAPage() {
                                 )}
                               </td>
                               <td className="p-3 text-center">
-                                {asset.status !== 'disposed' ? (
+                                {asset.status === 'draft' ? (
+                                  <div className="flex justify-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      className="btn-primary"
+                                      onClick={() => handleConfirmDraft(asset.item_id)}
+                                      title="Confirm this draft asset"
+                                      data-testid={`confirm-asset-${asset.item_id}`}
+                                    >
+                                      Confirm
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="text-error hover:text-error"
+                                      onClick={() => handleDelete(asset.item_id)}
+                                      title="Delete draft"
+                                      data-testid={`delete-asset-${asset.item_id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ) : asset.status !== 'disposed' ? (
                                   <div className="flex justify-center gap-1">
                                     <Button
                                       size="sm"

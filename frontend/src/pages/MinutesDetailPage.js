@@ -140,9 +140,17 @@ export default function MinutesDetailPage() {
         body: JSON.stringify({ status: 'finalized' })
       });
       if (response.ok) {
-        toast.success('Minutes finalized successfully. A permanent record has been created.');
+        const data = await response.json();
         setShowFinalizeConfirm(false);
         loadMinutes();
+        if (data.draft_asset_created) {
+          toast.success('Minutes finalized. A draft Trust Asset was created from the bank account info — review and confirm it on the Trust Assets page.', {
+            duration: 8000,
+            action: { label: 'View Assets', onClick: () => navigate('/schedule-a') },
+          });
+        } else {
+          toast.success('Minutes finalized successfully. A permanent record has been created.');
+        }
       } else {
         toast.error('Failed to finalize minutes. Please try again. If the problem continues, contact support@trustoffice.app.');
       }
