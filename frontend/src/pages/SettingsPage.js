@@ -606,6 +606,40 @@ export default function SettingsPage() {
     }
   };
 
+  const handleFullExport = async () => {
+    if (!selectedTrust) {
+      toast.error('Select a trust to export');
+      return;
+    }
+    setExportLoading('full');
+    try {
+      const token = localStorage.getItem('auth_token') || document.cookie.split('; ').find(row => row.startsWith('session_token='))?.split('=')[1];
+      const response = await fetch(`${API_BASE}/api/export?trust_id=${selectedTrust.trust_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const trustName = (selectedTrust.name || 'Trust').replace(/[^A-Za-z0-9._ -]/g, '').replace(/\s+/g, '_');
+        a.download = `TrustOffice_Export_${trustName}_${new Date().toISOString().split('T')[0]}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Full trust export downloaded');
+      } else {
+        toast.error('Export failed. Please try again.');
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'full-export', page: 'Settings' });
+    } finally {
+      setExportLoading(null);
+    }
+  };
+
   const handleUpdateTrust = async () => {
     if (!selectedTrust) {
       toast.error('No trust selected');
@@ -2160,6 +2194,39 @@ export default function SettingsPage() {
                 )}
                 Expenses
               </Button>
+            </div>
+
+            {/* Full Trust Export — ZIP with all data + vault files + audit trail */}
+            <div className="mt-6 pt-6 border-t border-navy/10">
+              <div className="flex items-start gap-4">
+                <div className="flex-1">
+                  <h3 className="font-medium text-navy">Full Trust Export (ZIP)</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Download a complete archive of your trust data — trust profile, beneficiaries, assets, minutes, distributions, vault documents (original files), audit trail, and AI chat history. Generated as a ZIP with structured JSON and original PDFs.
+                  </p>
+                  {!selectedTrust && (
+                    <p className="text-xs text-warning mt-2">Select a trust to enable full export</p>
+                  )}
+                </div>
+                <Button
+                  onClick={handleFullExport}
+                  className="btn-primary flex items-center gap-2 flex-shrink-0"
+                  disabled={exportLoading === 'full' || !selectedTrust}
+                  data-testid="full-export-btn"
+                >
+                  {exportLoading === 'full' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Download Full Export
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 

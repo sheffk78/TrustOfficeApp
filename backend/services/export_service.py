@@ -10,6 +10,8 @@ import io
 import json
 import uuid
 import zipfile
+import base64
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -17,6 +19,25 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
 from database import db
+
+
+def _export_safe(value):
+    """Make Mongo/BSON values deterministic and JSON serializable."""
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return {"encoding": "base64", "value": base64.b64encode(bytes(value)).decode("ascii")}
+    if isinstance(value, dict):
+        return {str(k): _export_safe(v) for k, v in value.items() if k != "_id"}
+    if isinstance(value, (list, tuple)):
+        return [_export_safe(v) for v in value]
+    try:
+        json.dumps(value)
+        return value
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _safe_export_name(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._ -]+", "", value or "Unnamed Trust").strip().replace(" ", "_") or "Unnamed_Trust"
 
 
 def _now() -> str:
