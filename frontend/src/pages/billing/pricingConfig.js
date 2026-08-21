@@ -45,9 +45,10 @@ export const TIERS = [
     features: [
       'Everything in Estate',
       'Unlimited trusts & entities',
-      'Client view',
+      'Multi-trust dashboard',
+      'Recurring task automation',
       'White-label binder export',
-      'Multi-signature approvals',
+      'PDF generation & CSV export',
       'Dedicated account manager'
     ]
   }

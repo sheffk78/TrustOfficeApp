@@ -13,9 +13,9 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 from database import db
-from dependencies import get_current_user, require_write_access, should_show_watermark
+from dependencies import get_current_user, require_write_access, should_show_watermark, is_white_label
 from models import ScheduleAItemCreate, ScheduleAItemUpdate, ScheduleAItemResponse
-from pdf_utils import NAVY, GRAY, LIGHT_GRAY, separator_line, create_doc_template
+from pdf_utils import NAVY, GRAY, LIGHT_GRAY, separator_line, legal_separator_line, create_doc_template
 
 router = APIRouter(tags=["schedule-a"])
 
@@ -327,7 +327,13 @@ async def get_schedule_a_summary(trust_id: str, user: dict = Depends(get_current
 # ==================== PDF export helpers ====================
 
 # Build the set of custom ParagraphStyles used by the PDF export.
-def _build_pdf_styles():
+def _build_pdf_styles(white_label: bool = False):
+    """Build the Schedule A PDF styles.
+
+    When white_label=True, brand accents (navy) are replaced with black for
+    advisor-facing de-branded documents.
+    """
+    accent = colors.black if white_label else NAVY
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
@@ -335,7 +341,7 @@ def _build_pdf_styles():
         parent=styles['Heading1'],
         fontSize=18,
         spaceAfter=6,
-        textColor=NAVY,
+        textColor=accent,
         alignment=1,  # Center
         fontName='Helvetica-Bold'
     )
@@ -356,7 +362,7 @@ def _build_pdf_styles():
         fontSize=12,
         spaceBefore=18,
         spaceAfter=6,
-        textColor=NAVY,
+        textColor=accent,
         fontName='Helvetica-Bold'
     )
 
@@ -388,7 +394,7 @@ def _build_pdf_styles():
 
 
 # Build the asset table for one category.
-def _build_category_table(cat_items):
+def _build_category_table(cat_items, accent):
     cat_total = _sum_item_values(cat_items)
 
     table_data = [["Description", "Identifier", "Location", "Value", "Date"]]
@@ -402,7 +408,7 @@ def _build_category_table(cat_items):
     asset_table = Table(table_data, colWidths=col_widths)
     asset_table.setStyle(TableStyle([
         # Header row
-        ('BACKGROUND', (0, 0), (-1, 0), NAVY),
+        ('BACKGROUND', (0, 0), (-1, 0), accent),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 8),
@@ -422,7 +428,7 @@ def _build_category_table(cat_items):
 
         # Grid
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-        ('BOX', (0, 0), (-1, -1), 1, NAVY),
+        ('BOX', (0, 0), (-1, -1), 1, accent),
 
         # Padding
         ('TOPPADDING', (0, 0), (-1, -1), 4),
@@ -434,7 +440,9 @@ def _build_category_table(cat_items):
 
 
 # Build the story (flowables) for the Schedule A PDF.
-def _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark):
+def _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark, white_label=False):
+    accent = colors.black if white_label else NAVY
+    sep = legal_separator_line if white_label else separator_line
     trust_name = trust.get("name", "Private Trust")
     story = []
 
@@ -455,7 +463,7 @@ def _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark)
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, 0), (0, -1), NAVY),
+        ('TEXTCOLOR', (0, 0), (0, -1), accent),
         ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
         ('ALIGN', (1, 0), (1, -1), 'LEFT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -465,7 +473,7 @@ def _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark)
     story.append(Spacer(1, 12))
 
     # Separator line
-    story.append(separator_line())
+    story.append(sep())
     story.append(Spacer(1, 12))
 
     # Categories
@@ -478,12 +486,12 @@ def _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark)
         story.append(Paragraph(cat_name, styles["category"]))
         story.append(Paragraph(cat_desc, styles["category_desc"]))
 
-        story.append(_build_category_table(cat_items))
+        story.append(_build_category_table(cat_items, accent))
         story.append(Spacer(1, 12))
 
     # Grand Total
     story.append(Spacer(1, 12))
-    story.append(separator_line(thickness=2))
+    story.append(sep(thickness=2))
     story.append(Spacer(1, 8))
 
     total_data = [
@@ -493,7 +501,7 @@ def _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark)
     total_table.setStyle(TableStyle([
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 11),
-        ('TEXTCOLOR', (0, 0), (0, 0), NAVY),
+        ('TEXTCOLOR', (0, 0), (0, 0), accent),
         ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
     ]))
     story.append(total_table)
@@ -523,6 +531,7 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     # Check if watermark should be shown (soft gating based on subscription)
     show_watermark = await should_show_watermark(user["user_id"])
     hide_watermark = not show_watermark
+    white_label = await is_white_label(user["user_id"])
 
     items = await db.schedule_a_items.find(
         {"trust_id": trust_id, "user_id": user["user_id"]},
@@ -535,8 +544,8 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
 
     # Generate PDF
     doc, buffer = create_doc_template()
-    styles = _build_pdf_styles()
-    story = _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark)
+    styles = _build_pdf_styles(white_label)
+    story = _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark, white_label)
 
     # Build PDF
     doc.build(story)

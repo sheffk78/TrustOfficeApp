@@ -563,6 +563,14 @@ async def check_feature_access(user_id: str, feature: str) -> bool:
     return feature in plan_features
 
 
+async def is_white_label(user_id: str) -> bool:
+    """Return True if the user's plan includes the white-label binder export feature."""
+    try:
+        return await check_feature_access(user_id, Feature.WHITE_LABEL_BINDER)
+    except Exception:
+        return False
+
+
 async def require_feature(feature: str, user: dict) -> dict:
     """
     Dependency that checks if user has access to a specific feature.

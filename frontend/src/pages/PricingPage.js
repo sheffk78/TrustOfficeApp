@@ -89,7 +89,7 @@ const TIERS = [
   {
     id: 'advisor',
     name: 'Advisor',
-    tagline: 'Unlimited trusts, client view, white-label',
+    tagline: 'Unlimited trusts, white-label exports',
     monthly: 399,
     annual: 3990,
     trustLimit: 'Unlimited trusts',
@@ -97,11 +97,9 @@ const TIERS = [
     features: [
       'Unlimited trusts & entities',
       'Everything in Estate',
-      'Client view',
-      'White-label binder export',
-      'Multi-signature approvals',
       'Multi-trust dashboard',
       'Recurring task automation',
+      'White-label binder export',
       'PDF export with watermark control',
       'Defensibility scoring',
       'Priority email support'
@@ -122,9 +120,9 @@ const COMPARISON_ROWS = [
   { label: 'Benevolence mode for charitable trusts', trustee: true, estate: true, advisor: true },
   { label: 'Multi-trust dashboard', trustee: false, estate: true, advisor: true },
   { label: 'Recurring task automation', trustee: false, estate: true, advisor: true },
-  { label: 'Client view', trustee: false, estate: false, advisor: true },
+  { label: 'Client view', trustee: false, estate: false, advisor: 'Q3 2026' },
   { label: 'White-label binder export', trustee: false, estate: false, advisor: true },
-  { label: 'Multi-signature approvals', trustee: false, estate: false, advisor: true },
+  { label: 'Multi-signature approvals', trustee: false, estate: false, advisor: 'Q3 2026' },
   { label: 'Priority email support', trustee: false, estate: false, advisor: true },
 ];
 

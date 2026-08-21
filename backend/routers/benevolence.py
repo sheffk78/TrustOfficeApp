@@ -11,11 +11,11 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 from database import db
-from dependencies import get_current_user, require_write_access, should_show_watermark, check_feature_access, Feature, PREMIUM_FEATURE_ERROR_CODE, PREMIUM_FEATURE_ERROR_MESSAGE
+from dependencies import get_current_user, require_write_access, should_show_watermark, check_feature_access, Feature, PREMIUM_FEATURE_ERROR_CODE, PREMIUM_FEATURE_ERROR_MESSAGE, is_white_label
 from models import (
     BenevolenceRecordCreate, BenevolenceRecordUpdate, BenevolenceRecordResponse
 )
-from pdf_utils import NAVY, GRAY, separator_line, create_doc_template
+from pdf_utils import NAVY, GRAY, separator_line, legal_separator_line, create_doc_template
 
 router = APIRouter(tags=["benevolence"])
 
@@ -324,6 +324,9 @@ async def export_benevolence_pdf(
     # Check if watermark should be shown (soft gating based on subscription)
     show_watermark = await should_show_watermark(user["user_id"])
     hide_watermark = not show_watermark
+    white_label = await is_white_label(user["user_id"])
+    accent = colors.black if white_label else NAVY
+    sep = legal_separator_line if white_label else separator_line
     
     # Get records, optionally filtered by year
     query = {"trust_id": trust_id, "user_id": user["user_id"]}
@@ -385,7 +388,7 @@ async def export_benevolence_pdf(
         parent=styles['Heading1'],
         fontSize=18,
         spaceAfter=6,
-        textColor=NAVY,
+        textColor=accent,
         alignment=1,
         fontName='Helvetica-Bold'
     )
@@ -406,7 +409,7 @@ async def export_benevolence_pdf(
         fontSize=12,
         spaceBefore=18,
         spaceAfter=6,
-        textColor=NAVY,
+        textColor=accent,
         fontName='Helvetica-Bold'
     )
     
@@ -448,7 +451,7 @@ async def export_benevolence_pdf(
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, 0), (0, -1), NAVY),
+        ('TEXTCOLOR', (0, 0), (0, -1), accent),
         ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
         ('ALIGN', (1, 0), (1, -1), 'LEFT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -458,7 +461,7 @@ async def export_benevolence_pdf(
     story.append(Spacer(1, 12))
     
     # Separator line
-    story.append(separator_line())
+    story.append(sep())
     story.append(Spacer(1, 16))
     
     # Summary Statistics
@@ -476,7 +479,7 @@ async def export_benevolence_pdf(
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica'),
         ('FONTNAME', (1, 0), (1, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (1, 0), (1, -1), NAVY),
+        ('TEXTCOLOR', (1, 0), (1, -1), accent),
         ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
         ('ALIGN', (1, 0), (1, -1), 'LEFT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
@@ -515,7 +518,7 @@ async def export_benevolence_pdf(
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
                 ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('TEXTCOLOR', (0, 0), (0, -1), NAVY),
+                ('TEXTCOLOR', (0, 0), (0, -1), accent),
                 ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
                 ('ALIGN', (1, 0), (1, -1), 'LEFT'),
                 ('TOPPADDING', (0, 0), (-1, -1), 2),
@@ -579,7 +582,7 @@ async def export_benevolence_pdf(
         grant_table = Table(table_data, colWidths=col_widths)
         grant_table.setStyle(TableStyle([
             # Header row
-            ('BACKGROUND', (0, 0), (-1, 0), NAVY),
+            ('BACKGROUND', (0, 0), (-1, 0), accent),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
@@ -600,7 +603,7 @@ async def export_benevolence_pdf(
     story.append(Spacer(1, 24))
     story.append(Table([[""]], colWidths=[6.5*inch], rowHeights=[1]))
     story[-1].setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 1, NAVY),
+        ('LINEBELOW', (0, 0), (-1, -1), 1, accent),
     ]))
     story.append(Spacer(1, 8))
     
