@@ -276,14 +276,19 @@ export function CustomerDetailDialog({
   const memberSince = customerDetail.created_at ? formatDate(customerDetail.created_at) : null;
   let accessEndLabel = null;
   let accessExpired = false;
-  if (!isForeverFree && (sub.trial_end || sub.gifted_at)) {
-    const endRaw = sub.trial_end || sub.gifted_at;
-    const endDate = new Date(endRaw);
+  // Use the real gift-window end for gifted accounts; gift_end_date is the
+  // authoritative expiry. Fall back to trial_end for legacy trials.
+  const accessEndRaw = sub.gift_end_date || sub.trial_end || (isGifted ? sub.gifted_at : null);
+  if (!isForeverFree && accessEndRaw) {
+    const endDate = new Date(accessEndRaw);
     if (!isNaN(endDate.getTime())) {
       accessExpired = endDate < new Date();
-      accessEndLabel = `${formatDate(endRaw)}${accessExpired ? ' — expired' : ''}`;
+      accessEndLabel = `${formatDate(accessEndRaw)}${accessExpired ? ' — expired' : ''}`;
     }
   }
+
+  // Admin lock: an admin-controlled account cannot be impersonated or gifted.
+  const isAdminLocked = !!customerDetail.is_admin;
 
   return (
     <Dialog open={!!customerDetail} onOpenChange={onClose}>
@@ -348,22 +353,12 @@ export function CustomerDetailDialog({
             </dl>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* Stats — trusts only for a leaner admin review */}
+          <div className="grid grid-cols-1 gap-4">
             <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
               <Building2 className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
               <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.trusts}</p>
               <p className="text-xs text-muted-foreground">Trusts</p>
-            </div>
-            <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
-              <FileText className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.minutes}</p>
-              <p className="text-xs text-muted-foreground">Minutes</p>
-            </div>
-            <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
-              <DollarSign className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.distributions}</p>
-              <p className="text-xs text-muted-foreground">Distributions</p>
             </div>
           </div>
 
