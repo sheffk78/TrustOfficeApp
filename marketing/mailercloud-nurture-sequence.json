@@ -1,0 +1,98 @@
+[
+  {
+    "email_number": 1,
+    "send_day": 0,
+    "subject": "Welcome — you're now equipped to manage your trust",
+    "preview_text": "Here's what a trust actually does (in plain English)",
+    "cta_style": "soft",
+    "body": "Hi there,\n\nYou filled out a form about trust management, and I want to start by saying — you're already ahead of most trustees.\n\nMost people get handed a trust document, nod politely, and have no idea what they're supposed to do next. That was me once. It's why I built TrustOffice.\n\nSo let's start simple: a trust is a legal arrangement where you (the trustee) hold and manage assets for the benefit of someone else (the beneficiaries). Your job is to protect those assets, follow the trust's rules, and act in the beneficiaries' best interest.\n\nThat's it. Everything else — the minutes, the distributions, the tax filings — flows from those three responsibilities.\n\nOver the next few weeks, I'll send you short, practical emails covering the things I wish someone had told me when I started. No legal jargon. No fear-mongering. Just straight talk from someone who's been there.\n\nIf you ever want to skip ahead and talk through your specific situation, you can book a free call with me here:\nhttps://trustoffice.app/book-a-call/\n\nNo pressure. I'm here when you need me.\n\nBest,\nJeff Kohler\nFounder, TrustOffice"
+  },
+  {
+    "email_number": 2,
+    "send_day": 1,
+    "subject": "The #1 mistake new trustees make (it's not what you think)",
+    "preview_text": "Commingling can undo everything your trust was built for",
+    "cta_style": "soft",
+    "body": "Hi there,\n\nIf there's one thing I'd drill into every new trustee, it's this: don't mix trust money with personal money.\n\nIt's called \"commingling,\" and it's the single most common way trustees get into trouble — even when they have the best intentions.\n\nHere's how it happens: you need to pay a trust expense, your personal checking account is right there, so you just use it. Or trust income comes in and it lands in your personal account. Seems harmless, right?\n\nIt's not.\n\nCommingling can give a court reason to pierce your trust — meaning the legal protection you set up could be set aside. The fix is simple: separate accounts. One for trust funds, one for personal funds. Never the twain shall meet.\n\nIf you're not sure whether your current setup is clean, that's exactly the kind of thing I walk through on a discovery call:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 3,
+    "send_day": 3,
+    "subject": "What \"piercing the trust veil\" means (and how to prevent it)",
+    "preview_text": "The legal concept that keeps trustees up at night — explained simply",
+    "cta_style": "soft",
+    "body": "Hi there,\n\nYesterday I mentioned commingling. Today let's talk about why it matters so much: piercing the trust veil.\n\nWhen a court \"pierces\" a trust, it's saying: this trust isn't really separate from the person who controls it. The legal wall between you and the trust comes down. Creditors, lawsuits, tax authorities — they can reach the trust assets directly.\n\nThink of it like a corporation. If you run a business properly — separate accounts, proper records, regular meetings — the corporate shield holds. If you treat the business account like your personal piggy bank, a court can pierce that shield.\n\nTrusts work the same way. The key behaviors that protect you:\n\n- Separate bank accounts for trust and personal funds\n- Documented decisions (minutes of meetings)\n- Regular trust activity (distributions, investments, reviews)\n- No personal use of trust assets without proper documentation\n\nThis isn't scary — it's just discipline. And it's a lot easier than most people think.\n\nWant me to look at how your trust is set up and flag any risks? Book a call:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 4,
+    "send_day": 5,
+    "subject": "The 7-minute trustee checkup",
+    "preview_text": "Rate your trust governance in 7 minutes with this simple checklist",
+    "cta_style": "soft",
+    "body": "Hi there,\n\nLet's do a quick checkup. Grab a pen (or just keep mental notes). Here are 7 questions to gauge how well your trust is being managed:\n\n1. Does your trust have its own bank account, separate from all personal accounts?\n2. Do you have written minutes from every trust meeting or decision in the past year?\n3. Have you reviewed the trust's investments in the last 12 months?\n4. Do you know when your trust's tax return is due — and is it filed separately from your personal return?\n5. Can you name all your beneficiaries and what each is entitled to?\n6. Have you made any distributions in the past year, and are they documented?\n7. If you were hit by a bus tomorrow, would someone know how to step in as trustee?\n\nScore yourself:\n- 7 yes: You're in great shape. Keep it up.\n- 4-6 yes: You've got gaps. Let's talk about closing them.\n- 0-3 yes: You're exposed. We should talk soon.\n\nIf you scored anything less than 7, a 15-minute call could help you identify exactly what to fix first:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 5,
+    "send_day": 7,
+    "subject": "Trust taxes — the simple version nobody tells you",
+    "preview_text": "Understanding trust tax filings without the headache",
+    "cta_style": "soft",
+    "body": "Hi there,\n\nTrust taxes sound complicated. Let me make them simple.\n\nA trust is its own taxpayer. It gets its own tax identification number (EIN) and files its own tax return — typically Form 1041 for a domestic trust.\n\nHere's what most people get wrong: they think the trust's income flows onto their personal return automatically. It doesn't. The trust files separately. If the trust distributes income to beneficiaries, those distributions are reported on K-1 forms, and the beneficiaries report that income on their personal returns.\n\nThe trust itself pays tax on any income it keeps (doesn't distribute).\n\nThree things to keep in mind:\n1. File on time — the trust's tax deadline is usually April 15, same as personal returns\n2. Keep trust expenses documented — many are deductible on the trust return\n3. Don't file the trust return under your personal SSN — always use the trust's EIN\n\nIf you're not sure whether your tax setup is right, I'm happy to walk through it on a call:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 6,
+    "send_day": 10,
+    "subject": "How good trust governance saved a family (real story)",
+    "preview_text": "A cautionary tale with a happy ending",
+    "cta_style": "medium",
+    "body": "Hi there,\n\nI want to share a story that shows exactly why trust governance matters.\n\nA family I know — let's call them the Andersons — had a trust set up by their father. He passed away, and the oldest son became trustee. He meant well, but he had no system. No separate accounts. No minutes. No records of distributions. When one of the siblings asked for an accounting, he couldn't produce one.\n\nThat sibling sued. The court found that the trust had been so poorly managed — commingled funds, zero documentation, no evidence of proper trustee behavior — that the trust's protections were compromised. What should have been a clean, protected arrangement became a messy, expensive legal battle.\n\nNow contrast that with another family. Same situation — father passes, eldest child becomes trustee. But this trustee did three things: kept separate accounts, documented every decision in writing, and held an annual review meeting (with minutes). When a creditor tried to come after the trust assets, the court looked at the records and said: this trust is clean. The shield held.\n\nThe difference wasn't the trust document. It was the behavior. The governance.\n\nThat's what TrustOffice exists to make easy — the documentation, the minutes, the reminders, the structure that keeps your trust bulletproof.\n\nIf you want to make sure you're on the right side of that story, let's talk:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 7,
+    "send_day": 12,
+    "subject": "HEMS — the four letters that control every distribution",
+    "preview_text": "Understanding the standard that governs trust distributions",
+    "cta_style": "soft",
+    "body": "Hi there,\n\nIf your trust document mentions distributions — and most do — you've probably seen the word \"HEMS.\" It stands for Health, Education, Maintenance, and Support.\n\nHEMS is what's called an \"ascertainable standard.\" It gives the trustee guidance on when it's appropriate to distribute trust funds to a beneficiary. Here's what each means:\n\n- Health: Medical care, insurance, treatments, rehab\n- Education: Tuition, books, fees, reasonable living expenses while in school\n- Maintenance: Keeping the beneficiary at their established standard of living\n- Support: Food, shelter, clothing, transportation — the basics\n\nThe key word is \"ascertainable.\" A court can look at a distribution and determine whether it fits within HEMS. If a trustee distributes for a reason outside HEMS — say, buying a beneficiary a sports car — that could be questioned.\n\nThis doesn't mean you need to be rigid. It means you need to document your reasoning. \"I approved $5,000 for beneficiary's college tuition (Education — HEMS)\" is a clean, defensible record.\n\nEvery distribution you make should have a simple written record of what, why, and how much. That's it.\n\nWant to talk through your distribution process? I'm here:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 8,
+    "send_day": 14,
+    "subject": "Your first 90 days as a trustee — a roadmap",
+    "preview_text": "What to do in the first three months to set your trust up for success",
+    "cta_style": "medium",
+    "body": "Hi there,\n\nIf you're newly appointed as a trustee — or if you've been one for a while but haven't really gotten organized — here's a 90-day roadmap to get your trust governance in order.\n\nDays 1-30: Get the basics in place\n- Read the entire trust document. Understand your powers and duties.\n- Open a dedicated trust bank account if you don't have one.\n- Get the trust's EIN and make sure tax filings are current.\n- List all trust assets and their current values.\n- Identify all beneficiaries and their contact information.\n\nDays 31-60: Start documenting\n- Hold your first trustee meeting (even if it's just you). Take minutes.\n- Review the trust's investment strategy. Document your analysis.\n- If any distributions are needed, make them and document the HEMS rationale.\n- Set up a system for tracking income and expenses.\n\nDays 61-90: Build the habit\n- Schedule a recurring quarterly trustee meeting.\n- Review the trust's performance against its goals.\n- Prepare the trust's tax documents (Form 1041).\n- Create a succession plan — who takes over if you can't?\n\nThis is exactly what TrustOffice automates. The minutes templates, the distribution tracker, the reminders, the annual review prompts — all of it. But whether you use our platform or a notebook, the important thing is that you do it.\n\nIf you'd like me to walk you through this roadmap for your specific trust, book a call:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 9,
+    "send_day": 17,
+    "subject": "Why most trusts fail (and the simple fix)",
+    "preview_text": "It's not the legal document — it's the day-to-day management",
+    "cta_style": "medium",
+    "body": "Hi there,\n\nHere's something that might surprise you: most trusts don't fail because of a drafting error. They fail because of trustee inaction.\n\nA trust is a living thing. It needs regular attention. And when it doesn't get it, problems compound:\n\n- No minutes = no evidence you were acting as a trustee\n- No separate accounts = commingling risk\n- No distributions = beneficiaries get frustrated and suspicious\n- No annual review = investments drift, deadlines get missed, and the trust slowly becomes a legal fiction\n\nThe fix isn't complicated. It's just consistency. A few hours a year — maybe 4-6 total — is enough to keep a trust healthy. The problem is that without a system, those hours never happen. Life gets in the way.\n\nThat's why I built TrustOffice. It's not about adding work — it's about making the work you're already supposed to do take 15 minutes instead of 3 hours. The system sends you reminders, generates your minutes, tracks your distributions, and keeps everything in one place.\n\nIf you're ready to stop worrying about whether your trust is in good shape, let's talk:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 10,
+    "send_day": 21,
+    "subject": "The annual trustee checklist (print this out)",
+    "preview_text": "Everything you need to review once a year — all on one page",
+    "cta_style": "medium",
+    "body": "Hi there,\n\nHere's your annual trustee checklist. Bookmark this, print it, tape it to your desk — whatever works.\n\nAnnual Trust Review Checklist:\n\nBanking & Accounts\n[ ] Trust has its own bank account, separate from all personal accounts\n[ ] No personal funds have been mixed with trust funds\n[ ] All trust expenses were paid from the trust account\n\nDocumentation\n[ ] Minutes exist for every trust meeting or significant decision in the past year\n[ ] All distributions are documented with amount, date, beneficiary, and HEMS rationale\n[ ] Trust document and any amendments are stored safely and accessible\n\nTaxes\n[ ] Trust tax return (Form 1041) has been filed or is on track to be filed\n[ ] K-1 forms have been issued to beneficiaries who received distributions\n[ ] Trust expenses deductible on the return have been compiled\n\nInvestments & Assets\n[ ] Trust assets have been reviewed and valued in the past 12 months\n[ ] Investment strategy aligns with the trust's purposes and the Prudent Investor Rule\n[ ] Any changes to the investment portfolio have been documented\n\nBeneficiaries\n[ ] All beneficiaries are accounted for and contact info is current\n[ ] Any beneficiary changes (births, deaths, life events) have been noted\n[ ] Distribution plans for the coming year are outlined\n\nSuccession\n[ ] A successor trustee is identified and knows their role\n[ ] Trust documents are organized for a smooth handoff if needed\n\nIf you went through this list and found gaps, don't panic — just start fixing them. And if you want help prioritizing what to tackle first, I'm a call away:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff"
+  },
+  {
+    "email_number": 11,
+    "send_day": 25,
+    "subject": "What if trust governance just... handled itself?",
+    "preview_text": "Meet TrustOffice — the platform that makes trustee work take minutes, not hours",
+    "cta_style": "strong",
+    "body": "Hi there,\n\nOver the past few weeks, I've shared a lot about what good trust governance looks like. The minutes, the checklists, the distribution records, the annual reviews.\n\nIf you're thinking \"that sounds like a lot of work\" — I get it. That's exactly why I built TrustOffice.\n\nTrustOffice is a platform that takes the work you're already supposed to do as a trustee and makes it take minutes instead of hours. Here's what it does:\n\n- Generates your trust minutes with guided templates (no blank-page paralysis)\n- Tracks distributions with HEMS tagging and beneficiary records\n- Sends you reminders before deadlines — tax filings, annual reviews, distribution dates\n- Calculates a governance health score so you can see exactly where you stand\n- Stores all trust documents securely in one organized vault\n- Tracks your assets and investments with a Schedule A ledger\n\nInstead of spending a weekend each year scrambling to get your trust records in order, you spend 15 minutes a quarter. The system does the heavy lifting.\n\nIt's not a replacement for professional advice — it's the system that makes sure the advice you've gotten actually gets implemented.\n\nI'd love to show you how it works for your specific trust. Book a 15-minute discovery call with me:\nhttps://trustoffice.app/book-a-call/\n\nBest,\nJeff Kohler\nFounder, TrustOffice"
+  },
+  {
+    "email_number": 12,
+    "send_day": 30,
+    "subject": "Let's get your trust in order — together",
+    "preview_text": "A personal invitation to book a call with me this week",
+    "cta_style": "strong",
+    "body": "Hi there,\n\nIt's been about a month since you first reached out about trust management. I hope the emails have been helpful.\n\nNow I want to make a direct ask: book a call with me.\n\nNot a sales pitch. A 15-minute conversation where I:\n- Look at your current trust setup\n- Identify any gaps or risks\n- Give you a clear next-step plan — whether or not you use TrustOffice\n\nI do these calls because most trustees are operating with good intentions but without a system. They know they should be keeping minutes, tracking distributions, reviewing their trust annually — but they don't have the infrastructure to make it happen consistently.\n\nI can help you change that. Whether it's through TrustOffice or just pointing you in the right direction, you'll walk away from the call with clarity.\n\nHere's my calendar:\nhttps://trustoffice.app/book-a-call/\n\nPick any time that works for you. I'll be there.\n\nBest,\nJeff Kohler\nFounder, TrustOffice\n\nP.S. If you've already booked — thank you. I'm looking forward to our conversation."
+  }
+]

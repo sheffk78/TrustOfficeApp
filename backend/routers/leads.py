@@ -465,6 +465,32 @@ async def capture_lead(lead: LeadCapture):
     except Exception as e:
         logger.warning(f"Failed to send welcome email to {email}: {e}")
 
+    # Add to MailerCloud leads list for nurture campaign
+    try:
+        from mailercloud_service import add_to_lead_list
+        mc_result = await add_to_lead_list(email, name)
+        if mc_result.get("success"):
+            await _log_activity(lead_id, "email", "Added to MailerCloud Leads list")
+        else:
+            logger.warning(f"MailerCloud add failed for {email}: {mc_result.get('error')}")
+    except Exception as e:
+        logger.warning(f"MailerCloud add failed for {email}: {e}")
+
+    # Start the 5-email Postmark nurture sequence (Email 1 immediately)
+    try:
+        nurture_result = await email_service.send_nurture_email(
+            to_email=email, name=name, step=1,
+            download_url=f"{email_service.app_url}/resources/trustee-checklist",
+        )
+        if nurture_result.get("status") == "sent":
+            await db.leads.update_one(
+                {"lead_id": lead_id},
+                {"$set": {"nurture_step_sent": 1}}
+            )
+            await _log_activity(lead_id, "email", "Sent nurture email 1/5 (checklist)")
+    except Exception as e:
+        logger.warning(f"Nurture email 1 failed for {email}: {e}")
+
     logger.info(f"Lead captured: {lead_id} — {email} via {source}")
 
     # Create in-app notification
@@ -581,6 +607,13 @@ async def tidycal_webhook(request: Request):
         source="booked-call",
         lead_stage="new"
     )
+
+    # Add to MailerCloud leads list
+    try:
+        from mailercloud_service import add_to_lead_list
+        await add_to_lead_list(email, name)
+    except Exception as e:
+        logger.warning(f"MailerCloud add failed for {email}: {e}")
 
     logger.info(f"Lead created from TidyCal booking: {lead_id} — {email}")
     
@@ -752,9 +785,36 @@ async def _create_facebook_lead(parsed: dict, leadgen_id: str, form_id: str, pag
         lead_id=lead_id, lead_email=email, lead_name=name,
     )
 
-    # Send welcome email (only if we have a real email)
+    # Send welcome email + add to MailerCloud + start nurture sequence (only if we have a real email)
     if email and not email.endswith("@no-email.local"):
         await _send_lead_welcome_email(email, name, lead_id)
+
+        # Add to MailerCloud leads list for the 12-email nurture campaign
+        try:
+            from mailercloud_service import add_to_lead_list
+            mc_result = await add_to_lead_list(email, name)
+            if mc_result.get("success"):
+                await _log_activity(lead_id, "email", "Added to MailerCloud Leads list")
+            else:
+                logger.warning(f"MailerCloud add failed for {email}: {mc_result.get('error')}")
+        except Exception as e:
+            logger.warning(f"MailerCloud add failed for {email}: {e}")
+
+        # Start the 5-email Postmark nurture sequence (Email 1 immediately, 2-5 via background drip)
+        try:
+            from email_service import email_service
+            nurture_result = await email_service.send_nurture_email(
+                to_email=email, name=name, step=1,
+                download_url=f"{email_service.app_url}/resources/trustee-checklist",
+            )
+            if nurture_result.get("status") == "sent":
+                await db.leads.update_one(
+                    {"lead_id": lead_id},
+                    {"$set": {"nurture_step_sent": 1}}
+                )
+                await _log_activity(lead_id, "email", "Sent nurture email 1/5 (checklist)")
+        except Exception as e:
+            logger.warning(f"Nurture email 1 failed for {email}: {e}")
 
     logger.info(f"Facebook lead captured: {lead_id} — {name} — {email}")
     return lead_id

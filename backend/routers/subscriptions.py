@@ -909,20 +909,21 @@ async def _mark_lead_subscribed_safe(user: dict, user_id: str) -> None:
 
 
 async def _add_to_mailercloud_safe(user: dict) -> None:
-    """Add user to Mailercloud paid members list."""
+    """Move user from Mailercloud leads list to paid members list."""
     if not user:
         return
     try:
-        mailercloud_result = await add_to_paid_list(
+        from mailercloud_service import move_to_paid_list
+        mailercloud_result = await move_to_paid_list(
             email=user["email"],
             name=user.get("name", "")
         )
         if mailercloud_result and mailercloud_result.get("success"):
-            logger.info(f"Added {user['email']} to Mailercloud paid list")
+            logger.info(f"Moved {user['email']} to Mailercloud paid list (removed from leads)")
         else:
-            logger.warning(f"Could not add {user['email']} to Mailercloud: {mailercloud_result}")
+            logger.warning(f"Could not move {user['email']} to Mailercloud paid: {mailercloud_result}")
     except (Exception,) as e:
-        logger.error(f"Failed to add to Mailercloud paid list: {e}")
+        logger.error(f"Failed to move to Mailercloud paid list: {e}")
 
 
 async def _webhook_checkout_session_completed(event) -> None:
