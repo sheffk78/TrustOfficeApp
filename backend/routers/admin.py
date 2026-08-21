@@ -1164,7 +1164,25 @@ async def fix_referral(
 
 # ==================== SYSTEM STATS ====================
 
-def _fetch_stripe_all_time_revenue() -> tuple:
+def _stripe_customer_id(inv) -> Optional[str]:
+    """Extract the customer ID from an invoice's `customer` field.
+
+    Stripe may return `invoice.customer` as either a plain string ID or an
+    expanded Stripe Customer object. Only the string form is safely hashable
+    (set membership / unhashable-type guard). Returns None when absent or
+    unresolvable.
+    """
+    customer = getattr(inv, 'customer', None)
+    if customer is None:
+        return None
+    if isinstance(customer, str):
+        return customer
+    # Expanded Customer object — pull its `.id`
+    cid = getattr(customer, 'id', None)
+    return cid if isinstance(cid, str) and cid else None
+
+
+def _fetch_stripe_all_time_revenue():
     """Fetch all-time paid invoices from Stripe. Returns (total_revenue_cents, transactions, customer_ids)."""
     total_revenue_cents = 0
     total_transactions = 0
@@ -1190,7 +1208,7 @@ def _fetch_stripe_all_time_revenue() -> tuple:
             amount = inv.amount_paid or inv.total or 0
             total_revenue_cents += amount
             total_transactions += 1
-            customer_id = getattr(inv, 'customer', None)
+            customer_id = _stripe_customer_id(inv)
             if customer_id:
                 customer_ids.add(customer_id)
         except (AttributeError, TypeError, ValueError) as inv_err:
@@ -1377,7 +1395,7 @@ def _process_invoice(inv, customer_ids: set, revenue_by_month: defaultdict, subs
         return None
 
     amount = inv.amount_paid or inv.total or 0
-    customer_id = getattr(inv, 'customer', None)
+    customer_id = _stripe_customer_id(inv)
     if customer_id:
         customer_ids.add(customer_id)
 
