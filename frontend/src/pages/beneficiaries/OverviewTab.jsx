@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   PieChart, Award, FileCheck, Users, Plus,
-  ChevronDown, ChevronUp, Bot, Pencil, AlertCircle, Settings,
+  ChevronDown, ChevronUp, Bot, Pencil, AlertCircle, Settings, UsersRound,
 } from 'lucide-react';
 import { OwnershipPieChart } from './OwnershipPieChart';
 import { beneficiaryKey, formatDate } from './constants';
@@ -112,6 +112,47 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
   );
 }
 
+function ClassHolderRow({ cb, index, setActiveTab }) {
+  return (
+    <div
+      key={cb.class_beneficiary_id}
+      data-testid={`class-beneficiary-row-${index}`}
+      className="p-4 flex items-center justify-between hover:bg-muted/20 transition-colors"
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
+          <UsersRound className="w-5 h-5 text-gold" />
+        </div>
+        <div className="text-left">
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-navy dark:text-foreground">{cb.class_type_label}</p>
+            <span className="px-2 py-0.5 text-xs font-mono bg-gold/10 text-gold rounded">
+              Class
+            </span>
+            {cb.distribution_convention && (
+              <span className="px-2 py-0.5 text-xs font-mono bg-muted text-muted-foreground rounded">
+                {cb.distribution_convention === 'per_stirpes' ? 'Per Stirpes' : 'Per Capita'}
+              </span>
+            )}
+          </div>
+          {cb.description && (
+            <p className="text-sm text-muted-foreground">{cb.description}</p>
+          )}
+          {cb.member_count > 0 && (
+            <p className="text-xs text-muted-foreground mt-0.5">{cb.member_count} confirmed member{cb.member_count !== 1 ? 's' : ''}</p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="text-right">
+          <p className="font-mono text-lg text-gold">{cb.percentage.toFixed(2)}%</p>
+          <p className="text-xs text-muted-foreground">reserved pool</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OverviewTab({
   overviewData,
   loading,
@@ -138,6 +179,10 @@ export function OverviewTab({
       </div>
     );
   }
+
+  const classBens = overviewData.class_beneficiaries || [];
+  const totalBeneficiaries = overviewData.beneficiaries.length + classBens.length;
+  const totalAllocatedPct = overviewData.total_allocated_percentage ?? 0;
 
   return (
     <>
@@ -169,9 +214,33 @@ export function OverviewTab({
           bgClass="bg-warning/10 dark:bg-warning/20"
           icon={<Users className="w-5 h-5 text-warning dark:text-warning" />}
           label="Beneficiaries"
-          value={overviewData.beneficiaries.length}
+          value={totalBeneficiaries}
         />
       </div>
+
+      {/* Combined Allocation Summary */}
+      {classBens.length > 0 && (
+        <div className="mb-6 p-4 border border-border bg-muted/20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <PieChart className="w-4 h-4 text-navy dark:text-gold" />
+            <div>
+              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Total Allocated</p>
+              <p className="font-serif text-lg text-navy dark:text-foreground">
+                {totalAllocatedPct.toFixed(2)}%
+                <span className="text-sm text-muted-foreground ml-2">
+                  ({overviewData.certificate_percentage_total?.toFixed(2) || 0}% certificates + {overviewData.class_beneficiary_percentage_total?.toFixed(2) || 0}% class)
+                </span>
+              </p>
+            </div>
+          </div>
+          {totalAllocatedPct > 100 && (
+            <div className="flex items-center gap-2 text-error">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-xs font-mono">Over-allocated</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Fully Allocated Warning */}
       {overviewData.remaining_units === 0 && (
@@ -196,12 +265,16 @@ export function OverviewTab({
             <PieChart className="w-4 h-4 text-navy dark:text-gold" />
             <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Ownership Distribution</h2>
           </div>
-          {overviewData.beneficiaries.length > 0 ? (
-            <OwnershipPieChart beneficiaries={overviewData.beneficiaries} totalAuthorized={overviewData.total_authorized_units} />
+          {totalBeneficiaries > 0 ? (
+            <OwnershipPieChart
+              beneficiaries={overviewData.beneficiaries}
+              totalAuthorized={overviewData.total_authorized_units}
+              classBeneficiaries={classBens}
+            />
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-              <p>No certificates issued yet</p>
+              <p>No beneficiaries yet</p>
               <Button className="btn-primary mt-4" onClick={() => { setActiveTab('certificates'); handleOpenCertificateModal(); }}>
                 <Plus className="w-4 h-4 mr-2" /> Add First Ownership Share
               </Button>
@@ -213,9 +286,14 @@ export function OverviewTab({
           <div className="p-4 border-b border-border flex items-center gap-2">
             <Users className="w-4 h-4 text-navy dark:text-gold" />
             <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Share Holders</h2>
+            {classBens.length > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {overviewData.beneficiaries.length} named + {classBens.length} class
+              </span>
+            )}
           </div>
 
-          {overviewData.beneficiaries.length === 0 ? (
+          {totalBeneficiaries === 0 ? (
             <div className="p-8 text-center">
               <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
               <p className="text-muted-foreground">No beneficiaries yet</p>
@@ -232,6 +310,15 @@ export function OverviewTab({
                   openEditModal={openEditModal}
                   formatDateFn={formatDateFn}
                   overviewData={overviewData}
+                />
+              ))}
+              {/* Class beneficiaries inline in the holder list */}
+              {classBens.map((cb, index) => (
+                <ClassHolderRow
+                  key={cb.class_beneficiary_id}
+                  cb={cb}
+                  index={overviewData.beneficiaries.length + index}
+                  setActiveTab={setActiveTab}
                 />
               ))}
             </div>

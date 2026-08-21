@@ -284,6 +284,17 @@ async def get_beneficiary_dashboard(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
+
+    # Compute combined allocation totals (persons + organizations + class)
+    certificate_percentage_total = round(
+        sum(b.percentage for b in beneficiaries), 4
+    )
+    class_beneficiary_percentage_total = round(
+        sum(cb.get("percentage", 0) for cb in class_beneficiaries), 4
+    )
+    total_allocated_percentage = round(
+        certificate_percentage_total + class_beneficiary_percentage_total, 4
+    )
     
     # Get recent transfers
     transfers = await db.trust_unit_transfers.find(
@@ -306,7 +317,10 @@ async def get_beneficiary_dashboard(
         active_certificate_count=active_cert_count,
         beneficiaries=beneficiaries,
         class_beneficiaries=class_beneficiaries,
-        recent_transfers=transfers
+        recent_transfers=transfers,
+        total_allocated_percentage=total_allocated_percentage,
+        class_beneficiary_percentage_total=class_beneficiary_percentage_total,
+        certificate_percentage_total=certificate_percentage_total,
     )
 
 

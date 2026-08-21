@@ -476,20 +476,18 @@ async def capture_lead(lead: LeadCapture):
     except Exception as e:
         logger.warning(f"MailerCloud add failed for {email}: {e}")
 
-    # Start the 5-email Postmark nurture sequence (Email 1 immediately)
+    # Send nurture email 1 via MailerCloud Email API (12-email sequence)
     try:
-        nurture_result = await email_service.send_nurture_email(
-            to_email=email, name=name, step=1,
-            download_url=f"{email_service.app_url}/resources/trustee-checklist",
-        )
-        if nurture_result.get("status") == "sent":
+        from mailercloud_service import send_nurture_email_via_mailercloud
+        nurture_result = await send_nurture_email_via_mailercloud(email, name, step=1)
+        if nurture_result.get("success"):
             await db.leads.update_one(
                 {"lead_id": lead_id},
                 {"$set": {"nurture_step_sent": 1}}
             )
-            await _log_activity(lead_id, "email", "Sent nurture email 1/5 (checklist)")
+            await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud")
     except Exception as e:
-        logger.warning(f"Nurture email 1 failed for {email}: {e}")
+        logger.warning(f"MailerCloud nurture email 1 failed for {email}: {e}")
 
     logger.info(f"Lead captured: {lead_id} — {email} via {source}")
 
@@ -800,21 +798,18 @@ async def _create_facebook_lead(parsed: dict, leadgen_id: str, form_id: str, pag
         except Exception as e:
             logger.warning(f"MailerCloud add failed for {email}: {e}")
 
-        # Start the 5-email Postmark nurture sequence (Email 1 immediately, 2-5 via background drip)
+        # Send nurture email 1 via MailerCloud Email API (12-email sequence)
         try:
-            from email_service import email_service
-            nurture_result = await email_service.send_nurture_email(
-                to_email=email, name=name, step=1,
-                download_url=f"{email_service.app_url}/resources/trustee-checklist",
-            )
-            if nurture_result.get("status") == "sent":
+            from mailercloud_service import send_nurture_email_via_mailercloud
+            nurture_result = await send_nurture_email_via_mailercloud(email, name, step=1)
+            if nurture_result.get("success"):
                 await db.leads.update_one(
                     {"lead_id": lead_id},
                     {"$set": {"nurture_step_sent": 1}}
                 )
-                await _log_activity(lead_id, "email", "Sent nurture email 1/5 (checklist)")
+                await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud")
         except Exception as e:
-            logger.warning(f"Nurture email 1 failed for {email}: {e}")
+            logger.warning(f"MailerCloud nurture email 1 failed for {email}: {e}")
 
     logger.info(f"Facebook lead captured: {lead_id} — {name} — {email}")
     return lead_id

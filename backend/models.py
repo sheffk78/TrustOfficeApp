@@ -1325,6 +1325,10 @@ class BeneficiaryDashboardResponse(BaseModel):
     beneficiaries: List[BeneficiaryAllocation]
     class_beneficiaries: List[ClassBeneficiaryResponse] = []
     recent_transfers: List[dict]
+    # Combined allocation totals (persons + organizations + class beneficiaries)
+    total_allocated_percentage: float = 0.0
+    class_beneficiary_percentage_total: float = 0.0
+    certificate_percentage_total: float = 0.0
 
 
 # ==================== SUBSCRIPTION MODELS ====================

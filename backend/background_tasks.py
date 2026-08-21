@@ -97,7 +97,7 @@ class BackgroundTaskRunner:
             self.send_nurture_drip_emails,
             trigger=IntervalTrigger(hours=6),
             id='nurture_drip',
-            name='Send nurture sequence emails 2-5 on schedule',
+            name='Send nurture sequence emails 2-12 on schedule',
             replace_existing=True
         )
 
@@ -617,41 +617,54 @@ class BackgroundTaskRunner:
 
     async def send_nurture_drip_emails(self) -> int:
         """
-        Send nurture sequence emails 2-5 on schedule.
+        Send nurture sequence emails 2-12 on schedule via MailerCloud Email API.
 
-        Schedule:
-        - Email 1: Sent immediately on lead capture (in assessments.py / leads.py)
-        - Email 2: 2 days after Email 1
-        - Email 3: 4 days after Email 1
-        - Email 4: 7 days after Email 1
-        - Email 5: 10 days after Email 1
+        Schedule (12-email sequence):
+        - Email 1: Sent immediately on lead capture (in leads.py)
+        - Email 2: Day 1 after capture
+        - Email 3: Day 3
+        - Email 4: Day 5
+        - Email 5: Day 7
+        - Email 6: Day 10
+        - Email 7: Day 12
+        - Email 8: Day 14
+        - Email 9: Day 17
+        - Email 10: Day 21
+        - Email 11: Day 25
+        - Email 12: Day 30
 
         Runs every 6 hours. Tracks which step each lead has received
         via the `nurture_step_sent` field on the lead record.
         """
-        logger.info("Running nurture drip check")
+        logger.info("Running nurture drip check (12-email MailerCloud sequence)")
         try:
-            from email_service import email_service
+            from mailercloud_service import send_nurture_email_via_mailercloud, MAILERCLOUD_API_KEY
 
-            if not email_service.is_configured:
-                logger.warning("Email service not configured, skipping nurture drip")
+            if not MAILERCLOUD_API_KEY:
+                logger.warning("MailerCloud API key not configured, skipping nurture drip")
                 return 0
 
             now = datetime.now(timezone.utc)
             emails_sent = 0
 
-            # Nurture schedule: step -> days after capture
+            # 12-email nurture schedule: step -> days after capture
             NURTURE_SCHEDULE = {
-                2: 2,   # 2 days after capture
-                3: 4,   # 4 days after capture
-                4: 7,   # 7 days after capture
-                5: 10,  # 10 days after capture
+                2: 1,   # Day 1
+                3: 3,   # Day 3
+                4: 5,   # Day 5
+                5: 7,   # Day 7
+                6: 10,  # Day 10
+                7: 12,  # Day 12
+                8: 14,  # Day 14
+                9: 17,  # Day 17
+                10: 21, # Day 21
+                11: 25, # Day 25
+                12: 30, # Day 30
             }
 
-            # Find leads that have received Email 1 (nurture_step_sent >= 1)
-            # but haven't received all 5 emails yet
+            # Find leads that have received Email 1 but haven't completed all 12
             leads = await self.db.leads.find({
-                "nurture_step_sent": {"$exists": True, "$gte": 1, "$lt": 5},
+                "nurture_step_sent": {"$exists": True, "$gte": 1, "$lt": 12},
                 "stage": {"$ne": "converted"},
             }, {"_id": 0}).to_list(500)
 
@@ -681,14 +694,14 @@ class BackgroundTaskRunner:
                     if next_step in NURTURE_SCHEDULE:
                         required_days = NURTURE_SCHEDULE[next_step]
                         if days_since >= required_days:
-                            # Time to send this step
-                            result = await email_service.send_nurture_email(
+                            # Send via MailerCloud Email API
+                            result = await send_nurture_email_via_mailercloud(
                                 to_email=lead["email"],
                                 name=lead.get("name", ""),
                                 step=next_step,
                             )
 
-                            if result.get("status") == "sent":
+                            if result.get("success"):
                                 # Update nurture_step_sent
                                 await self.db.leads.update_one(
                                     {"lead_id": lead["lead_id"]},
@@ -703,13 +716,13 @@ class BackgroundTaskRunner:
                                     "activity_id": f"act_{uuid.uuid4().hex[:12]}",
                                     "lead_id": lead["lead_id"],
                                     "action_type": "email",
-                                    "content": f"Sent nurture email {next_step}/5",
+                                    "content": f"Sent nurture email {next_step}/12 via MailerCloud",
                                     "created_at": now.isoformat(),
                                 })
 
                                 emails_sent += 1
                                 logger.info(
-                                    f"Sent nurture email {next_step}/5 to {lead['email']}"
+                                    f"Sent nurture email {next_step}/12 to {lead['email']}"
                                 )
 
                 except Exception as e:
