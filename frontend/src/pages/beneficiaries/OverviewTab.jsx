@@ -3,10 +3,12 @@ import { Button } from '@/components/ui/button';
 import {
   PieChart, Award, FileCheck, Users, Plus,
   ChevronDown, ChevronUp, Bot, Pencil, AlertCircle, Settings, UsersRound,
+  Percent, Hash,
 } from 'lucide-react';
 import { OwnershipPieChart } from './OwnershipPieChart';
 import { beneficiaryKey, formatDate } from './constants';
 import { DISCLAIMER_TEXT, EDUCATION_SECTIONS } from './constants';
+import { formatAllocation } from './hooks';
 
 // ========== OVERVIEW TAB ==========
 
@@ -26,9 +28,12 @@ function SummaryCard({ dataTestId, bgClass, icon, label, value }) {
   );
 }
 
-function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModal, formatDateFn, overviewData }) {
+function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModal, formatDateFn, overviewData, allocationMode }) {
   const key = beneficiaryKey(ben);
   const isExpanded = expandedHolder === key;
+  const unitLabel = overviewData.unit_label || 'Unit';
+  const totalAuthorized = overviewData.total_authorized_units || 100;
+  const alloc = formatAllocation(allocationMode, ben.total_units, ben.percentage, totalAuthorized, unitLabel);
 
   return (
     <div key={key} data-testid={`beneficiary-row-${index}`}>
@@ -62,12 +67,12 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right">
-            <p className="font-mono text-lg text-navy dark:text-foreground">{ben.total_units}</p>
-            <p className="text-xs text-muted-foreground">{(overviewData.unit_label || 'Unit') + 's'}</p>
+            <p className="font-mono text-lg text-navy dark:text-foreground">{alloc.primary}</p>
+            <p className="text-xs text-muted-foreground">{alloc.primaryLabel}</p>
           </div>
           <div className="text-right min-w-[80px]">
-            <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
-            <p className="text-xs text-muted-foreground">ownership</p>
+            <p className="font-mono text-lg text-gold">{alloc.secondary}</p>
+            <p className="text-xs text-muted-foreground">{alloc.secondaryLabel}</p>
           </div>
           {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
         </div>
@@ -90,21 +95,36 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
             </Link>
           </div>
           <div className="space-y-2">
-            {ben.certificates.map((cert) => (
-              <div key={cert.certificate_id} className="flex items-center justify-between p-3 bg-background border border-border">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-sm text-navy dark:text-gold">{cert.certificate_number}</span>
-                  <span className="text-sm text-muted-foreground">{cert.units} units</span>
+            {ben.certificates.map((cert) => {
+              const certAlloc = formatAllocation(allocationMode, cert.units, cert.percentage || (cert.units / totalAuthorized * 100), totalAuthorized, unitLabel);
+              return (
+                <div key={cert.certificate_id} className="flex items-center justify-between p-3 bg-background border border-border">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-sm text-navy dark:text-gold">{cert.certificate_number}</span>
+                    <span className="text-sm text-muted-foreground">{certAlloc.primary} ({certAlloc.secondary})</span>
+                    {cert.status && cert.status !== 'active' && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-mono bg-muted text-muted-foreground rounded">
+                        {cert.status}
+                      </span>
+                    )}
+                    {cert.version && cert.version > 1 && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-mono bg-navy/5 text-muted-foreground rounded">
+                        v{cert.version}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {cert.status !== 'replaced' && cert.status !== 'superseded' && (
+                      <Button variant="ghost" size="sm" onClick={() => openEditModal(cert)} data-testid={`edit-cert-${cert.certificate_id}`}>
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span className="ml-1 text-xs">Edit</span>
+                      </Button>
+                    )}
+                    <span className="text-xs text-muted-foreground font-mono">Issued {formatDateFn(cert.issue_date)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Button variant="ghost" size="sm" onClick={() => openEditModal(cert)} data-testid={`edit-cert-${cert.certificate_id}`}>
-                    <Pencil className="w-3.5 h-3.5" />
-                    <span className="ml-1 text-xs">Edit</span>
-                  </Button>
-                  <span className="text-xs text-muted-foreground font-mono">Issued {formatDateFn(cert.issue_date)}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -156,12 +176,14 @@ function ClassHolderRow({ cb, index, setActiveTab }) {
 export function OverviewTab({
   overviewData,
   loading,
+  summary,
   expandedHolder,
   setExpandedHolder,
   openEditModal,
   setActiveTab,
   handleOpenCertificateModal,
   formatDateFn,
+  allocationMode,
 }) {
   if (loading) {
     return (
@@ -217,6 +239,26 @@ export function OverviewTab({
           value={totalBeneficiaries}
         />
       </div>
+
+      {/* Allocation Mode Indicator */}
+      {summary?.settings && (
+        <div className="mb-4 flex items-center gap-2">
+          {allocationMode === 'units' ? (
+            <Hash className="w-4 h-4 text-navy dark:text-gold" />
+          ) : (
+            <Percent className="w-4 h-4 text-navy dark:text-gold" />
+          )}
+          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            {allocationMode === 'units' ? 'Unit Mode' : 'Percentage Mode'}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {allocationMode === 'units'
+              ? `Raw units tracked (ceiling: ${summary.settings.unlimited_units ? 'unlimited' : (summary.settings.authorized_units_ceiling ?? 'N/A')})`
+              : '100% cap — units derived from percentage'
+            }
+          </span>
+        </div>
+      )}
 
       {/* Combined Allocation Summary */}
       {classBens.length > 0 && (
@@ -310,6 +352,7 @@ export function OverviewTab({
                   openEditModal={openEditModal}
                   formatDateFn={formatDateFn}
                   overviewData={overviewData}
+                  allocationMode={allocationMode}
                 />
               ))}
               {/* Class beneficiaries inline in the holder list */}

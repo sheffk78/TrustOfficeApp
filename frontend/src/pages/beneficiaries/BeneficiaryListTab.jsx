@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Users, Plus, Pencil, AlertCircle, Settings, Info } from 'lucide-react';
 import { extractRelationship } from './constants';
 import { EDUCATION_SECTIONS } from './constants';
+import { formatAllocation } from './hooks';
 
 // ========== EDUCATION BANNER COMPONENT ==========
 function EducationBanner({ title, content }) {
@@ -25,8 +26,10 @@ export function BeneficiaryListTab({
   openEditModal,
   summary,
   setShowSettingsModal,
+  allocationMode,
 }) {
   const unitLabel = summary?.settings?.unit_label || 'Unit';
+  const totalAuthorized = summary?.settings?.total_authorized_units || 100;
 
   return (
     <>
@@ -123,11 +126,32 @@ export function BeneficiaryListTab({
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="font-mono text-lg text-navy dark:text-foreground">{ben.total_units} <span className="text-xs text-muted-foreground">{unitLabel}{ben.total_units !== 1 ? 's' : ''}</span></p>
+                      <p className="font-mono text-lg text-navy dark:text-foreground">
+                        {(() => {
+                          const alloc = formatAllocation(allocationMode, ben.total_units, ben.percentage, totalAuthorized, unitLabel);
+                          return alloc.primary;
+                        })()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {(() => {
+                          const alloc = formatAllocation(allocationMode, ben.total_units, ben.percentage, totalAuthorized, unitLabel);
+                          return alloc.primaryLabel === 'Share' ? 'share' : `${unitLabel}${ben.total_units !== 1 ? 's' : ''}`;
+                        })()}
+                      </p>
                     </div>
                     <div className="text-right min-w-[70px]">
-                      <p className="font-mono text-lg text-gold">{ben.percentage.toFixed(2)}%</p>
-                      <p className="text-xs text-muted-foreground">share</p>
+                      <p className="font-mono text-lg text-gold">
+                        {(() => {
+                          const alloc = formatAllocation(allocationMode, ben.total_units, ben.percentage, totalAuthorized, unitLabel);
+                          return alloc.secondary;
+                        })()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {(() => {
+                          const alloc = formatAllocation(allocationMode, ben.total_units, ben.percentage, totalAuthorized, unitLabel);
+                          return alloc.secondaryLabel === 'Share' ? 'share' : `${unitLabel}${ben.total_units !== 1 ? 's' : ''}`;
+                        })()}
+                      </p>
                     </div>
                     {ben.certificates?.[0] && (
                       <Button

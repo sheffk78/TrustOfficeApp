@@ -26,6 +26,9 @@ export function CertificateModal({
   summary,
   trusts,
   selectedTrust,
+  allocationMode = 'percentage',
+  totalAuthorizedUnits = 100,
+  unitLabel = 'Unit',
 }) {
   return (
     <Dialog open={showCertificateModal} onOpenChange={(open) => { if (!open) resetCertificateForm(); setShowCertificateModal(open); }}>
@@ -141,14 +144,31 @@ export function CertificateModal({
             />
           </div>
           <div>
-            <Label className="label-trust">Units *</Label>
+            <Label className="label-trust">
+              {allocationMode === 'units' ? `${unitLabel}s *` : 'Share Percentage *'}
+            </Label>
             <Input
               type="number"
               step="any"
               min="0"
-              value={certificateForm.units}
-              onChange={(e) => setCertificateForm({ ...certificateForm, units: e.target.value })}
-              placeholder="25"
+              max={allocationMode === 'units' ? undefined : 100}
+              value={certificateForm.units
+                ? (allocationMode === 'units'
+                  ? certificateForm.units
+                  : ((parseFloat(certificateForm.units) / totalAuthorizedUnits) * 100).toString())
+                : ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (allocationMode === 'units') {
+                  setCertificateForm({ ...certificateForm, units: val });
+                } else {
+                  const pct = parseFloat(val);
+                  const units = !isNaN(pct) ? (pct / 100) * totalAuthorizedUnits : '';
+                  const allowFrac = summary?.settings?.allow_fractional ?? false;
+                  setCertificateForm({ ...certificateForm, units: allowFrac ? units.toString() : Math.round(units).toString() });
+                }
+              }}
+              placeholder={allocationMode === 'units' ? '25' : '25'}
               required
               className="mt-1"
               data-testid="units-input"
@@ -157,13 +177,15 @@ export function CertificateModal({
               <div className="mt-2 space-y-1">
                 {certificateForm.units && parseFloat(certificateForm.units) > 0 && (
                   <p className="text-xs text-muted-foreground font-mono">
-                    = {((parseFloat(certificateForm.units) / summary.settings.total_authorized_units) * 100).toFixed(2)}% ownership
+                    {allocationMode === 'units'
+                      ? `= ${((parseFloat(certificateForm.units) / totalAuthorizedUnits) * 100).toFixed(2)}% ownership`
+                      : `= ${parseFloat(certificateForm.units).toFixed(2)} ${unitLabel}${parseFloat(certificateForm.units) !== 1 ? 's' : ''}`}
                   </p>
                 )}
                 {certificateForm.units && parseFloat(certificateForm.units) > summary.remaining_units && !editingCertificate && (
                   <p className="text-xs text-error dark:text-error font-medium flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
-                    Exceeds available units ({summary.remaining_units} remaining)
+                    Exceeds available {unitLabel.toLowerCase()}s ({summary.remaining_units} remaining)
                   </p>
                 )}
               </div>
@@ -408,6 +430,20 @@ export function SettingsModal({
               checked={settingsForm.allow_fractional}
               onCheckedChange={(checked) => setSettingsForm({ ...settingsForm, allow_fractional: checked })}
             />
+          </div>
+          <div>
+            <Label className="label-trust">Default Distribution Convention</Label>
+            <Select
+              value={settingsForm.class_distribution_convention}
+              onValueChange={(v) => setSettingsForm({ ...settingsForm, class_distribution_convention: v })}
+            >
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="per_capita">Per Capita (equal shares by head)</SelectItem>
+                <SelectItem value="per_stirpes">Per Stirpes (by family branch)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">Used as the default when creating new class beneficiaries.</p>
           </div>
         </div>
         <DialogFooter>
@@ -690,6 +726,9 @@ export function BeneficiariesModals({
         summary={summary}
         trusts={trusts}
         selectedTrust={selectedTrust}
+        allocationMode={allocationMode}
+        totalAuthorizedUnits={totalAuthorizedUnits}
+        unitLabel={unitLabel}
       />
 
       <TransferModal

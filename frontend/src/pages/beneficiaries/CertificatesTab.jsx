@@ -14,8 +14,14 @@ import {
   statusBadgeClass,
   formatDate,
 } from './constants';
+import { formatAllocation } from './hooks';
 
-function CertRow({ cert, summary, handleViewPDF, openEditModal, setTransferForm, setShowTransferModal, setShowRevokeModal, transferForm }) {
+function CertRow({ cert, summary, handleViewPDF, openEditModal, setTransferForm, setShowTransferModal, setShowRevokeModal, transferForm, allocationMode }) {
+  const unitLabel = summary?.settings?.unit_label || 'Unit';
+  const totalAuthorized = summary?.settings?.total_authorized_units || 100;
+  const certPct = cert.percentage || (cert.units / totalAuthorized * 100);
+  const alloc = formatAllocation(allocationMode, cert.units, certPct, totalAuthorized, unitLabel);
+
   return (
     <div key={cert.certificate_id} className={`p-4 flex items-center justify-between ${cert.status !== 'active' ? 'opacity-60 bg-muted/30' : ''}`} data-testid={`cert-${cert.certificate_id}`}>
       <div className="flex items-center gap-4">
@@ -33,11 +39,24 @@ function CertRow({ cert, summary, handleViewPDF, openEditModal, setTransferForm,
             <span className={`px-2 py-0.5 text-xs font-mono ${statusBadgeClass(cert.status)}`}>
               {cert.status}
             </span>
+            {cert.version && cert.version > 1 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-mono bg-navy/5 text-muted-foreground rounded">
+                v{cert.version}
+              </span>
+            )}
+            {cert.supersedes_certificate_id && (
+              <span className="px-1.5 py-0.5 text-[10px] font-mono bg-muted text-muted-foreground rounded" title={`Replaces certificate ${cert.supersedes_certificate_id}`}>
+                replaces v{cert.version - 1}
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {cert.certificate_number} • {cert.units} {summary?.settings?.unit_label || 'Unit'}s ({cert.percentage.toFixed(2)}%)
+            {cert.certificate_number} • {alloc.primary} ({alloc.secondary})
           </p>
           <p className="text-xs text-muted-foreground font-mono">Issued {formatDate(cert.issue_date)}</p>
+          {cert.replacement_reason && (
+            <p className="text-xs text-muted-foreground italic">Reason: {cert.replacement_reason}</p>
+          )}
           {cert.email && (
             <p className="text-xs text-muted-foreground">{cert.email}</p>
           )}
@@ -99,6 +118,7 @@ export function CertificatesTab({
   setShowRevokeModal,
   transferForm,
   setShowSettingsModal,
+  allocationMode,
 }) {
   return (
     <>
@@ -189,6 +209,7 @@ export function CertificatesTab({
                 setShowTransferModal={setShowTransferModal}
                 setShowRevokeModal={setShowRevokeModal}
                 transferForm={transferForm}
+                allocationMode={allocationMode}
               />
             ))}
           </div>

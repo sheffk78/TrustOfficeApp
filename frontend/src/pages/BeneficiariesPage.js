@@ -185,6 +185,7 @@ export default function BeneficiariesPage() {
                 openEditModal={certForm.openEditModal}
                 summary={summary}
                 setShowSettingsModal={settings.setShowSettingsModal}
+                allocationMode={allocationMode.allocationMode}
               />
             </TabsContent>
 
@@ -200,6 +201,7 @@ export default function BeneficiariesPage() {
                 setActiveTab={setActiveTab}
                 handleOpenCertificateModal={certForm.handleOpenCertificateModal}
                 formatDateFn={formatDate}
+                allocationMode={allocationMode.allocationMode}
               />
             </TabsContent>
 
@@ -221,6 +223,7 @@ export default function BeneficiariesPage() {
                 setShowRevokeModal={revoke.setShowRevokeModal}
                 transferForm={transfer.transferForm}
                 setShowSettingsModal={settings.setShowSettingsModal}
+                allocationMode={allocationMode.allocationMode}
               />
             </TabsContent>
 
