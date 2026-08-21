@@ -147,6 +147,18 @@ def _days_remaining(due_date_str: str) -> int:
         return 999
 
 
+def _seed_tax_year(today: date | None = None) -> int:
+    """Determine the tax year to seed for a trust created today.
+
+    Trusts created in October or later should seed *next* calendar year
+    deadlines so that no deadline appears already overdue.
+    """
+    today = today or date.today()
+    if today.month >= 10:
+        return today.year + 1
+    return today.year
+
+
 def _mock_uuid():
     """Deterministic uuid for tests."""
     import uuid as _uuid

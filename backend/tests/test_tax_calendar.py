@@ -6,6 +6,7 @@ Verifies that:
 - Estimated taxes land on the 15th of the 4th/6th/9th/12th fiscal months
 - 1041/K-1 land ~3.5 months after year-end
 - Extension lands 6 months after original due date
+- Late-season trust creation (month >= 10) seeds next-year deadlines
 - Leap-year February is handled correctly
 - Q4 estimated tax for fiscal years ending before Dec 15 doesn't spill into next calendar year incorrectly
 """
@@ -13,12 +14,61 @@ import pytest
 from datetime import date
 from utils.tax_calendar_math import (
     _generate_entries,
+    _seed_tax_year,
     _fy_start,
     _month_delta,
     _clamp_day,
     FISCAL_RULES,
     CALENDAR_RULES,
 )
+
+
+class TestSeedTaxYear:
+    """Tests for _seed_tax_year — the month>=10 rule for late-season trust creation."""
+
+    def test_november_returns_next_year(self):
+        assert _seed_tax_year(date(2026, 11, 15)) == 2027
+
+    def test_december_returns_next_year(self):
+        assert _seed_tax_year(date(2026, 12, 31)) == 2027
+
+    def test_october_1_returns_next_year(self):
+        """Boundary: Oct 1 is the first day that triggers next-year seeding."""
+        assert _seed_tax_year(date(2026, 10, 1)) == 2027
+
+    def test_september_30_returns_same_year(self):
+        """Just before the boundary — still same year."""
+        assert _seed_tax_year(date(2026, 9, 30)) == 2026
+
+    def test_january_returns_same_year(self):
+        assert _seed_tax_year(date(2026, 1, 15)) == 2026
+
+    def test_july_returns_same_year(self):
+        assert _seed_tax_year(date(2026, 7, 4)) == 2026
+
+    def test_default_none_uses_today(self):
+        """When today=None, uses date.today() — exercise code path only."""
+        result = _seed_tax_year()  # today=None branch hits date.today()
+        assert isinstance(result, int)
+        assert result in (2026, 2027, 2028)  # must be a plausible near-year
+
+
+class TestLateSeasonSeededDeadlinesAreNotPast:
+    """Verify that seeding with next-year produces no instantly-overdue deadlines."""
+
+    def test_nov_seeded_calendar_deadlines_all_future(self):
+        """A trust created Nov 15 2026 gets 2027 deadlines — all are in the future."""
+        trust = {"trust_id": "t1", "is_fiscal_year": False}
+        entries = _generate_entries(trust, _seed_tax_year(date(2026, 11, 15)))
+        for e in entries:
+            assert e["due_date"] >= "2027-01-01", f"Deadline {e['due_date']} is in the past"
+
+    def test_oct_seeded_calendar_deadlines_all_future(self):
+        """A trust created Oct 1 2026 gets 2027 deadlines — all are in the future."""
+        trust = {"trust_id": "t1", "is_fiscal_year": False}
+        entries = _generate_entries(trust, _seed_tax_year(date(2026, 10, 1)))
+        for e in entries:
+            assert e["due_date"] >= "2027-01-01", f"Deadline {e['due_date']} is in the past"
 
 
 class TestClampDay:
