@@ -988,8 +988,8 @@ export default function AdminPage() {
                 customerSearch={customerSearch}
                 statusFilter={statusFilter}
                 selectedCustomerIds={selectedCustomerIds}
-                onSearchChange={setCustomerSearch}
-                onStatusFilterChange={setStatusFilter}
+                onSearchChange={(v) => { setCustomerSearch(v); setCustomerPage(1); }}
+                onStatusFilterChange={(v) => { setStatusFilter(v); setCustomerPage(1); }}
                 onRefresh={fetchCustomers}
                 onAddUser={() => setShowCreateUserDialog(true)}
                 onClearSelection={clearSelection}

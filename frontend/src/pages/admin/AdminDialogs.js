@@ -348,40 +348,110 @@ export function CustomerDetailDialog({
             </dl>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
-              <Building2 className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.trusts}</p>
-              <p className="text-xs text-muted-foreground">Trusts</p>
+          {/* Stats — Trusts & Referral in a two-column grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-3 border border-navy/10 dark:border-white/10 rounded">
+              <div className="flex items-start justify-between">
+                <div className="text-center flex-1">
+                  <Building2 className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.trusts}</p>
+                  <p className="text-xs text-muted-foreground">Trusts</p>
+                </div>
+                <div className="text-center flex-1">
+                  <FileText className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.minutes}</p>
+                  <p className="text-xs text-muted-foreground">Minutes</p>
+                </div>
+                <div className="text-center flex-1">
+                  <DollarSign className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.distributions}</p>
+                  <p className="text-xs text-muted-foreground">Distributions</p>
+                </div>
+              </div>
+              {customerDetail.trusts?.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-navy/10 dark:border-white/10">
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Trusts ({customerDetail.trusts.length})</p>
+                  <div className="space-y-1">
+                    {customerDetail.trusts.slice(0, 5).map((t) => (
+                      <p key={t.trust_id} className="text-sm text-navy dark:text-white truncate">{t.name}</p>
+                    ))}
+                    {customerDetail.trusts.length > 5 && (
+                      <p className="text-xs text-muted-foreground">+{customerDetail.trusts.length - 5} more</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
-              <FileText className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.minutes}</p>
-              <p className="text-xs text-muted-foreground">Minutes</p>
-            </div>
-            <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
-              <DollarSign className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.distributions}</p>
-              <p className="text-xs text-muted-foreground">Distributions</p>
+
+            <div className="p-3 border border-navy/10 dark:border-white/10 rounded">
+              <h3 className="font-medium text-navy dark:text-white text-sm mb-2">Referral</h3>
+              {customerDetail.referral_info ? (
+                <div className="space-y-1 text-sm">
+                  {customerDetail.referral_info.referral_code ? (
+                    <p className="text-muted-foreground">
+                      Code: <span className="font-mono text-navy dark:text-white">{customerDetail.referral_info.referral_code}</span>
+                    </p>
+                  ) : null}
+                  {customerDetail.referral_info.referred_by ? (
+                    <p className="text-muted-foreground">Referred by another user</p>
+                  ) : (
+                    <p className="text-muted-foreground">No referrer</p>
+                  )}
+                  <p className="text-muted-foreground">
+                    Successful referrals: <span className="font-medium text-navy dark:text-white">{customerDetail.referral_info.successful_referrals ?? 0}</span>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No referral activity</p>
+              )}
             </div>
           </div>
 
-          {/* Referral Info */}
-          {customerDetail.referral_info && (
+          {/* Acquisition Source */}
+          {(customerDetail.source || customerDetail.utm_source || customerDetail.wp_ref) && (
             <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
-              <h3 className="font-medium text-navy dark:text-white mb-2">Referral Info</h3>
-              {customerDetail.referral_info.referral_code && (
-                <p className="text-sm text-muted-foreground">
-                  Code: <span className="font-mono">{customerDetail.referral_info.referral_code}</span>
-                </p>
-              )}
-              {customerDetail.referral_info.referred_by && (
-                <p className="text-sm text-muted-foreground">Referred by another user</p>
-              )}
-              <p className="text-sm text-muted-foreground">
-                Successful referrals: {customerDetail.referral_info.successful_referrals}
-              </p>
+              <h3 className="font-medium text-navy dark:text-white mb-2">Acquisition Source</h3>
+              <div className="flex flex-wrap gap-2">
+                {customerDetail.wp_ref && (
+                  <Badge className="bg-success/10 text-success">
+                    <Crown className="w-3 h-3 mr-1" /> WingPoint
+                  </Badge>
+                )}
+                {customerDetail.source && (
+                  <Badge variant="outline" className="capitalize">{customerDetail.source.replace(/_/g, ' ')}</Badge>
+                )}
+                {customerDetail.utm_source && (
+                  <Badge className="bg-gold/20 text-gold">{customerDetail.utm_source}</Badge>
+                )}
+                {customerDetail.utm_medium && (
+                  <span className="text-xs text-muted-foreground capitalize self-center">via {customerDetail.utm_medium.replace(/_/g, ' ')}</span>
+                )}
+                {customerDetail.utm_campaign && (
+                  <span className="text-xs text-muted-foreground self-center">campaign: {customerDetail.utm_campaign}</span>
+                )}
+                {customerDetail.referrer && !customerDetail.wp_ref && (
+                  <span className="text-xs text-muted-foreground self-center truncate max-w-[240px]" title={customerDetail.referrer}>from {customerDetail.referrer}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Account Lifecycle History */}
+          {customerDetail.account_history?.length > 0 && (
+            <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
+              <h3 className="font-medium text-navy dark:text-white mb-2">Account History</h3>
+              <div className="space-y-2">
+                {customerDetail.account_history.slice(-8).reverse().map((ev, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="capitalize text-muted-foreground">{String(ev.type || '').replace(/_/g, ' ')}</span>
+                      {ev.plan_type && <span className="text-muted-foreground">· {ev.plan_type}</span>}
+                      {typeof ev.amount === 'number' && <span className="font-mono text-navy dark:text-white">${ev.amount}</span>}
+                    </div>
+                    <span className="text-xs text-muted-foreground">{ev.date ? new Date(ev.date).toLocaleDateString() : ''}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

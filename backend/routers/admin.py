@@ -212,6 +212,15 @@ class CustomerDetail(BaseModel):
     trusts: List[dict]
     referral_info: Optional[dict] = None
     stats: dict
+    # Marketing attribution / acquisition source
+    source: Optional[str] = None
+    utm_source: Optional[str] = None
+    utm_campaign: Optional[str] = None
+    utm_medium: Optional[str] = None
+    wp_ref: Optional[str] = None
+    referrer: Optional[str] = None
+    # Account lifecycle events (gift/expiry/upgrade/downgrade/resubscribe history)
+    account_history: Optional[list] = None
 
 
 class AdminActionRequest(BaseModel):
@@ -432,10 +441,63 @@ async def get_customer_detail(
         "distributions": dist_count
     }
     
-    # Enrich subscription with tier_display_name for admin display
+    # Acquisition source — prefer UTM fields captured on the user/subscription,
+    # then fall back to a matching lead's source.
+    source = user.get("source")
+    utm_source = user.get("utm_source")
+    utm_campaign = user.get("utm_campaign")
+    utm_medium = user.get("utm_medium")
+    wp_ref = user.get("wp_ref")
+    referrer = user.get("referrer")
+    # WingPoint-origin customers are flagged by their wp_ref / wp reference.
+    if not wp_ref and not source:
+        candidate_wp = user.get("wp_trust_name")
+        if candidate_wp:
+            wp_ref = candidate_wp
+    if not (source or utm_source):
+        try:
+            matched_lead = await db.leads.find_one(
+                {"email": {"$regex": f"^{re.escape(user['email'])}$", "$options": "i"}},
+                {"_id": 0, "source": 1, "utm_source": 1, "utm_campaign": 1, "utm_medium": 1},
+            )
+            if matched_lead:
+                source = source or matched_lead.get("source")
+                utm_source = utm_source or matched_lead.get("utm_source")
+                utm_campaign = utm_campaign or matched_lead.get("utm_campaign")
+                utm_medium = utm_medium or matched_lead.get("utm_medium")
+        except Exception as lead_err:  # lead match is best-effort, never block detail
+            logger.warning(f"Customer detail lead lookup failed for {user_id}: {lead_err}")
+
+    # Account lifecycle history — ordered billing/payment events plus current
+    # subscription signal (gifted/expired/upgraded/downgraded/resubscribed).
+    account_history = []
+    try:
+        pay_events = await db.payment_transactions.find(
+            {"user_id": user_id}, {"_id": 0}
+        ).sort("created_at", 1).to_list(200)
+        for ev in pay_events:
+            event = {
+                "type": "payment",
+                "plan_type": ev.get("plan_type"),
+                "amount": ev.get("amount"),
+                "status": ev.get("payment_status"),
+                "date": ev.get("created_at"),
+            }
+            account_history.append(event)
+    except Exception as e:
+        logger.warning(f"Payment history lookup failed for {user_id}: {e}")
+
     if sub:
         from routers.admin_api import _enrich_subscription_display
         sub = _enrich_subscription_display(sub)
+        sub_status = sub.get("status")
+        if sub.get("gifted") and not account_history:
+            account_history.append({"type": "gifted", "plan_type": sub.get("plan_type"),
+                                    "date": sub.get("gifted_at")})
+        # Surface a readable lifecycle signal on the current record
+        if sub_status in ("expired", "canceled"):
+            account_history.append({"type": sub_status, "plan_type": sub.get("plan_type"),
+                                    "date": sub.get("updated_at")})
 
     return CustomerDetail(
         user_id=user["user_id"],
@@ -449,7 +511,14 @@ async def get_customer_detail(
         subscription=sub or {"status": "none", "plan_type": "none"},
         trusts=[{"trust_id": t["trust_id"], "name": t["name"]} for t in trusts],
         referral_info=referral_info,
-        stats=stats
+        stats=stats,
+        source=source,
+        utm_source=utm_source,
+        utm_campaign=utm_campaign,
+        utm_medium=utm_medium,
+        wp_ref=wp_ref,
+        referrer=referrer,
+        account_history=account_history or None
     )
 
 
