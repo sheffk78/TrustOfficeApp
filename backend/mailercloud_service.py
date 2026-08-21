@@ -156,7 +156,7 @@ async def remove_contact_from_list(email: str, list_id: str, list_name: str = "l
 
 # ==================== MAILERCLOUD EMAIL API ====================
 
-MAILERCLOUD_EMAIL_API_URL = "https://cloudapi.mailercloud.com/v1/email"
+MAILERCLOUD_EMAIL_API_URL = "https://email-api.mailercloud.com/v1/email"
 MAILERCLOUD_SENDER_EMAIL = os.environ.get("MAILERCLOUD_SENDER_EMAIL", "contact@trustoffice.app")
 MAILERCLOUD_SENDER_NAME = os.environ.get("MAILERCLOUD_SENDER_NAME", "Jeff Kohler")
 
