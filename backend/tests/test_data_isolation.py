@@ -56,6 +56,20 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-isolation-tests")
 TEST_RUN_ID = uuid.uuid4().hex[:8]  # Unique per test run for cleanup identification
 
 
+# Designated QA accounts — reused across runs so isolation tests don't spawn
+# throwaway users in prod. QA1 owns data (User A), QA2 is the outside user (B).
+QA_USER_A = os.environ.get("TRUSTOFFICE_QA_USER_A", "test.qa1@trustoffice.app")
+QA_USER_B = os.environ.get("TRUSTOFFICE_QA_USER_B", "test.qa2@trustoffice.app")
+# Env-only: the shared QA password is NEVER committed to source. It ships from
+# the ops config only (nightly cron sets TRUSTOFFICE_QA_PASSWORD).
+QA_PASSWORD = os.environ.get("TRUSTOFFICE_QA_PASSWORD")
+if not QA_PASSWORD:
+    raise RuntimeError(
+        "TRUSTOFFICE_QA_PASSWORD env var is required to run the isolation suite. "
+        "The QA password is not stored in this repo."
+    )
+
+
 def _make_test_email(label: str) -> str:
     """Generate a unique test email for this run."""
     return f"isolation-{label}-{TEST_RUN_ID}@test.trustoffice.app"
@@ -80,7 +94,7 @@ def _gift_subscription(base_url: str, user_id: str, plan: str = "trustee") -> bo
         return False
 
 
-def _register_and_login(base_url: str, email: str, password: str = "TestPass123!", gift_plan: str = None) -> dict:
+def _register_and_login(base_url: str, email: str, password: str = QA_PASSWORD, gift_plan: str | None = None) -> dict:
     """Register a new user and return auth headers with token.
     Falls back to login if already registered."""
     s = requests.Session()
@@ -182,22 +196,22 @@ def base():
 
 @pytest.fixture(scope="module")
 def user_a(base):
-    """User A — the data owner. Registered fresh each run, gifted a trustee plan."""
-    email = _make_test_email("userA")
-    auth = _register_and_login(base, email, gift_plan="trustee")
+    """User A — the data owner. Uses designated QA01 (this module may clean its test trusts)."""
+    email = QA_USER_A
+    auth = _register_and_login(base, email, gift_plan=None)  # QA accounts are already forever_free
     if not auth:
-        pytest.skip(f"Could not register+login test user {email}")
+        pytest.skip(f"Could not login test user {email}")
     yield auth
     _cleanup_user(base, auth)
 
 
 @pytest.fixture(scope="module")
 def user_b(base):
-    """User B — a completely separate user. Registered fresh each run."""
-    email = _make_test_email("userB")
-    auth = _register_and_login(base, email)
+    """User B — a completely separate user. Uses designated QA02."""
+    email = QA_USER_B
+    auth = _register_and_login(base, email, gift_plan=None)
     if not auth:
-        pytest.skip(f"Could not register+login test user {email}")
+        pytest.skip(f"Could not login test user {email}")
     yield auth
     _cleanup_user(base, auth)
 

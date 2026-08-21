@@ -21,6 +21,13 @@ export function formatLastActive(lastLogin) {
   return date.toLocaleDateString();
 }
 
+export function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 const STATUS_STYLES = {
   active: 'bg-success/10 text-success',
   trialing: 'bg-gold/20 text-gold dark:bg-gold/30 dark:text-gold',

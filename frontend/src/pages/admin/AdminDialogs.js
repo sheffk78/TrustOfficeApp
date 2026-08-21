@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Target, Activity, RefreshCw, MessageSquare, Crown, BarChart3, Building2, FileText, DollarSign, LogIn, Gift, XCircle, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
-import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, LEAD_STAGES } from './helpers';
+import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, LEAD_STAGES } from './helpers';
 
 // ─── Lead Detail Dialog ────────────────────────────────────────────
 export function LeadDetailDialog({
@@ -252,6 +252,39 @@ export function CustomerDetailDialog({
   const isPrimaryAdmin = customerDetail.email === 'contact@trustoffice.app';
   const canDelete = !isPrimaryAdmin && !customerDetail.is_admin;
 
+  const sub = customerDetail.subscription || {};
+  const planType = sub.plan_type || 'free';
+  const isForeverFree = planType === 'forever_free' || /forever free/i.test(sub.tier_display_name || '');
+  const isGifted = sub.gifted === true || (typeof planType === 'string' && planType.startsWith('gifted_'));
+  const billingPeriod = sub.billing_period
+    ? sub.billing_period.charAt(0).toUpperCase() + sub.billing_period.slice(1)
+    : null;
+  const PLAN_LABELS = {
+    forever_free: 'Forever Free',
+    gifted_14day: 'Gifted Trial',
+    gifted_monthly: 'Gifted Monthly',
+    gifted_annual: 'Gifted Annual',
+    gifted_trustee: 'Gifted Trustee',
+    gifted_estate: 'Gifted Estate',
+    gifted_advisor: 'Gifted Advisor',
+    monthly: 'Monthly',
+    annual: 'Annual',
+    trial: 'Trial',
+    free: 'Free',
+  };
+  const planLabel = PLAN_LABELS[planType] || sub.tier_display_name || planType.replace(/_/g, ' ') || 'Free';
+  const memberSince = customerDetail.created_at ? formatDate(customerDetail.created_at) : null;
+  let accessEndLabel = null;
+  let accessExpired = false;
+  if (!isForeverFree && (sub.trial_end || sub.gifted_at)) {
+    const endRaw = sub.trial_end || sub.gifted_at;
+    const endDate = new Date(endRaw);
+    if (!isNaN(endDate.getTime())) {
+      accessExpired = endDate < new Date();
+      accessEndLabel = `${formatDate(endRaw)}${accessExpired ? ' — expired' : ''}`;
+    }
+  }
+
   return (
     <Dialog open={!!customerDetail} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
@@ -264,23 +297,55 @@ export function CustomerDetailDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Subscription */}
+          {/* Account State */}
           <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
-            <h3 className="font-medium text-navy dark:text-white mb-2">Subscription</h3>
-            <div className="flex items-center gap-2">
-              <Badge className={getStatusBadgeClass(customerDetail.subscription?.status)}>
-                {customerDetail.subscription?.status}
+            <h3 className="font-medium text-navy dark:text-white mb-2">Account State</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className={getStatusBadgeClass(sub.status)}>
+                {sub.status || 'none'}
               </Badge>
-              <span className="text-sm text-muted-foreground">
-                {customerDetail.subscription?.plan_type}
-              </span>
+              {isForeverFree && (
+                <Badge className="bg-success/10 text-success">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Forever Free
+                </Badge>
+              )}
+              {isGifted && !isForeverFree && (
+                <Badge className="bg-gold/20 text-gold">
+                  <Gift className="w-3 h-3 mr-1" />
+                  Gifted
+                </Badge>
+              )}
+              {billingPeriod && (
+                <Badge variant="outline">{billingPeriod}</Badge>
+              )}
               {customerDetail.is_stats_user && (
-                <Badge className="bg-gold/20 text-gold ml-2">
+                <Badge className="bg-gold/20 text-gold">
                   <BarChart3 className="w-3 h-3 mr-1" />
                   Stats Access
                 </Badge>
               )}
             </div>
+            <dl className="mt-3 grid gap-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Package</dt>
+                <dd className="font-medium text-navy dark:text-white">{planLabel}</dd>
+              </div>
+              {memberSince && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Member since</dt>
+                  <dd className="font-medium text-navy dark:text-white">{memberSince}</dd>
+                </div>
+              )}
+              {accessEndLabel && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Access ends</dt>
+                  <dd className={`font-medium ${accessExpired ? 'text-red-500' : 'text-navy dark:text-white'}`}>
+                    {accessEndLabel}
+                  </dd>
+                </div>
+              )}
+            </dl>
           </div>
 
           {/* Stats */}
