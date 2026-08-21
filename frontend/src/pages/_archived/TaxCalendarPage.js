@@ -227,7 +227,7 @@ export default function TaxCalendarPage() {
               <div className="text-sm text-neutral-600">
                 {trustProfile.ein && trustProfile.taxYearEndMonth ? (
                   <>
-                    EIN: <b>{trustProfile.ein}</b> · {' '}
+                    EIN: <b>{formatEIN(trustProfile.ein)}</b> · {' '}
                     {trustProfile.isFiscalYear ? 'Fiscal year ends' : 'Tax year ends'}: {' '}
                     <b>{trustProfile.taxYearEndMonth}/{trustProfile.taxYearEndDay}</b>
                     {trustProfile.isFiscalYear && <span className="ml-2 text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded">Fiscal</span>}

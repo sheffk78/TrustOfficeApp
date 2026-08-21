@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
+import { formatEIN } from '@/utils/formatters';
 import PageHelpButton from '@/components/PageHelpButton';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -337,7 +338,7 @@ const PrintableBinderPage = () => {
                       <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
                         {coverData?.trust_type && <div>{coverData.trust_type}</div>}
                         {coverData?.formation_date && <div>Formed: {coverData.formation_date}</div>}
-                        {coverData?.ein && <div>EIN: {coverData.ein}</div>}
+                        {coverData?.ein && <div>EIN: {formatEIN(coverData.ein)}</div>}
                         {coverData?.jurisdiction && <div>Jurisdiction: {coverData.jurisdiction}</div>}
                         {coverData?.trustees?.length > 0 && (
                           <div>Trustee{coverData.trustees.length > 1 ? 's' : ''}: {coverData.trustees.join(', ')}</div>
@@ -539,7 +540,7 @@ const PrintableBinderPage = () => {
                 <div className="text-xl font-semibold text-gray-900">{coverData?.trust_name || '_________________'}</div>
                 {coverData?.trust_type && <div className="text-gray-600">{coverData.trust_type}</div>}
                 {coverData?.formation_date && <div className="text-gray-600">Formed: {coverData.formation_date}</div>}
-                {coverData?.ein && <div className="text-gray-600">EIN: {coverData.ein}</div>}
+                {coverData?.ein && <div className="text-gray-600">EIN: {formatEIN(coverData.ein)}</div>}
                 {coverData?.jurisdiction && <div className="text-gray-600">Jurisdiction: {coverData.jurisdiction}</div>}
                 {coverData?.trustees?.length > 0 && (
                   <div className="text-gray-600">Trustee{coverData.trustees.length > 1 ? 's' : ''}: {coverData.trustees.join(', ')}</div>
@@ -1037,7 +1038,7 @@ const PrintableBinderPage = () => {
                         <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{e.name || '—'}</td>
                         <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.entity_type || '—'}</td>
                         <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.formation_date || '—'}</td>
-                        <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.ein || '—'}</td>
+                        <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.ein ? formatEIN(e.ein) : '—'}</td>
                       </tr>
                     ))}
                   </tbody>

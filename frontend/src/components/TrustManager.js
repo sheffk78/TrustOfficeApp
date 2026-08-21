@@ -5,6 +5,7 @@ import { fetchWithAuth } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { formatEIN } from '@/utils/formatters';
 import {
   Search,
   ArrowUpDown,
@@ -216,7 +217,7 @@ function TrustCard({
       <div className="flex items-center justify-between pt-3 border-t border-navy/10 flex-wrap gap-2">
         <div className="flex items-center gap-3 text-xs text-navy/50">
           {trust.ein && (
-            <span className="font-mono">EIN: {trust.ein}</span>
+            <span className="font-mono">EIN: {formatEIN(trust.ein)}</span>
           )}
           {trust.role && (
             <span className="font-mono">Role: {trust.role}</span>

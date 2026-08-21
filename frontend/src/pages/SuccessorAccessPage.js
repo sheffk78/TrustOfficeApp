@@ -5,6 +5,7 @@ import {
   FileText, Landmark, Shield, Users,
 } from 'lucide-react';
 import { API } from '@/utils/api';
+import { formatEIN } from '@/utils/formatters';
 
 const fmtDate = (value) => {
   if (!value) return '';
@@ -166,7 +167,7 @@ const SuccessorAccessPage = () => {
 
           <section className="rounded border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
             <SectionTitle icon={Building2} title="Entities" />
-            {entities.length ? <div className="space-y-3">{entities.map((entity, index) => <div key={entity.id || index} className="rounded bg-gray-50 p-4"><div className="font-semibold text-gray-900">{entity.name || entity.legal_name || 'Entity'}</div><div className="mt-1 text-sm text-gray-500">{[entity.entity_type && `Type: ${entity.entity_type}`, entity.ein && `EIN: ${entity.ein}`, entity.governing_law && `Governing law: ${entity.governing_law}`].filter(Boolean).join(' · ') || 'No additional details provided'}</div></div>)}</div> : <EmptyState />}
+            {entities.length ? <div className="space-y-3">{entities.map((entity, index) => <div key={entity.id || index} className="rounded bg-gray-50 p-4"><div className="font-semibold text-gray-900">{entity.name || entity.legal_name || 'Entity'}</div><div className="mt-1 text-sm text-gray-500">{[entity.entity_type && `Type: ${entity.entity_type}`, entity.ein && `EIN: ${formatEIN(entity.ein)}`, entity.governing_law && `Governing law: ${entity.governing_law}`].filter(Boolean).join(' · ') || 'No additional details provided'}</div></div>)}</div> : <EmptyState />}
           </section>
 
           <section className="rounded border border-gray-200 bg-white p-5 shadow-sm sm:p-6"><SectionTitle icon={Users} title="Beneficiaries" /><DataTable columns={[{ label: 'Name', key: 'holder_name' }, { label: 'Email', key: 'email' }, { label: 'Phone', key: 'phone' }, { label: 'Share', key: 'units' }]} rows={beneficiaries} emptyText="No beneficiary records were provided." /></section>

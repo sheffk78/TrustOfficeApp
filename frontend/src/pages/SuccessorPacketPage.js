@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
 import { showError } from '@/utils/errors';
+import { formatEIN } from '@/utils/formatters';
 import { toast } from 'sonner';
 import PageHelpButton from '@/components/PageHelpButton';
 import { Sidebar } from '@/components/Sidebar';
@@ -313,7 +314,7 @@ const SuccessorPacketPage = () => {
             <div className="w-24 h-0.5 bg-gray-300 mx-auto my-6"></div>
             <div className="mt-4 space-y-3" style={{ fontSize: '14pt' }}>
               <div className="text-xl font-semibold text-gray-900">{trustName}</div>
-              {trustData?.ein && <div className="text-gray-600">EIN: {trustData.ein}</div>}
+              {trustData?.ein && <div className="text-gray-600">EIN: {formatEIN(trustData.ein)}</div>}
               {trustData?.jurisdiction && <div className="text-gray-600">Jurisdiction: {trustData.jurisdiction}</div>}
               {trustData?.start_date && <div className="text-gray-600">Formed: {fmtDate(trustData.start_date)}</div>}
             </div>
@@ -331,7 +332,7 @@ const SuccessorPacketPage = () => {
             <div className="bg-gray-50 rounded p-4">
               <InfoRow label="Trust Name" value={trustData?.name} />
               <InfoRow label="Trust Type" value={trustData?.trust_type} />
-              <InfoRow label="EIN" value={trustData?.ein} />
+              <InfoRow label="EIN" value={trustData?.ein ? formatEIN(trustData.ein) : trustData?.ein} />
               <InfoRow label="Formation Date" value={fmtDate(trustData?.start_date)} />
               <InfoRow label="Jurisdiction" value={trustData?.jurisdiction} />
               <InfoRow label="State" value={trustData?.state_code} />
@@ -415,7 +416,7 @@ const SuccessorPacketPage = () => {
                     <div className="font-semibold text-sm text-gray-900">{e.name || e.legal_name || 'Entity'}</div>
                     <div className="text-xs text-gray-500 mt-1">
                       {e.entity_type && <span className="mr-3">Type: {e.entity_type}</span>}
-                      {e.ein && <span className="mr-3">EIN: {e.ein}</span>}
+                      {e.ein && <span className="mr-3">EIN: {formatEIN(e.ein)}</span>}
                       {e.governing_law && <span>Governing Law: {e.governing_law}</span>}
                     </div>
                     {e.trustee_names && <div className="text-xs text-gray-600 mt-1">Trustees: {e.trustee_names}</div>}

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowRight, ArrowLeft, Users, ChevronDown, Plus, X, Loader2, Sparkles } from 'lucide-react';
+import { formatEIN } from '@/utils/formatters';
 import PageAgentAssistant from '@/components/PageAgentAssistant';
 import PageAgentErrorBoundary from '@/components/PageAgentErrorBoundary';
 
@@ -492,7 +493,7 @@ ${maskPII(JSON.stringify(extractedFields || {}, null, 2))}
                       id="confirm-ein"
                       type="text"
                       value={trustData.ein || ''}
-                      onChange={(e) => updateField('ein', e.target.value)}
+                      onChange={(e) => updateField('ein', formatEIN(e.target.value))}
                       className="mt-1 input-trust h-9 text-sm"
                       placeholder="XX-XXXXXXX"
                       data-testid="confirm-ein-input"

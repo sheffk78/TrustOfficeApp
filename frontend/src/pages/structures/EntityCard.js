@@ -1,4 +1,5 @@
 import { ChevronRight } from 'lucide-react';
+import { formatEIN } from '@/utils/formatters';
 
 export function EntityCard({ entity, viewMode, getTrustName, getEntityColor, getEntityIcon, onClick }) {
   return (
@@ -38,7 +39,7 @@ export function EntityCard({ entity, viewMode, getTrustName, getEntityColor, get
           <span className="badge-trust">{entity.governing_law}</span>
         )}
         {entity.ein && (
-          <span className="font-mono text-xs text-muted-foreground">EIN: {entity.ein}</span>
+          <span className="font-mono text-xs text-muted-foreground">EIN: {formatEIN(entity.ein)}</span>
         )}
       </div>
 
