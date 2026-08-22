@@ -53,8 +53,8 @@ export function CustomersTab({
 
       {/* Bulk Action Bar */}
       {selectedCustomerIds.size > 0 && (
-        <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
+          <div className="flex items-center gap-3 flex-wrap">
             <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
             <span className="font-medium text-navy dark:text-white">
               {selectedCustomerIds.size} account{selectedCustomerIds.size !== 1 ? 's' : ''} selected
@@ -79,7 +79,7 @@ export function CustomersTab({
 
       {/* Customer List */}
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[1000px]">
           <thead>
             <tr className="border-b border-navy/10 dark:border-white/10">
               <th className="w-12 py-3 px-4">

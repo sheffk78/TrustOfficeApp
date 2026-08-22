@@ -6,7 +6,7 @@ export function AdminsTab({ admins, statsUsers, onAddAdmin, onRemoveAdmin, onRev
   return (
     <>
       <div className="card-trust">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h2 className="font-serif text-xl text-navy dark:text-white">Administrator Accounts</h2>
           <Button className="btn-primary" onClick={onAddAdmin}>
             <UserPlus className="w-4 h-4 mr-2" />
@@ -16,8 +16,8 @@ export function AdminsTab({ admins, statsUsers, onAddAdmin, onRemoveAdmin, onRev
 
         <div className="space-y-4">
           {admins.map((admin) => (
-            <div key={admin.user_id} className="flex items-center justify-between p-4 border border-navy/10 dark:border-white/10 rounded">
-              <div className="flex items-center gap-4">
+            <div key={admin.user_id} className="flex flex-wrap items-center justify-between gap-3 p-4 border border-navy/10 dark:border-white/10 rounded">
+              <div className="flex items-center gap-4 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
                   <Crown className="w-5 h-5 text-gold" />
                 </div>
@@ -62,8 +62,8 @@ export function AdminsTab({ admins, statsUsers, onAddAdmin, onRemoveAdmin, onRev
         ) : (
           <div className="space-y-4">
             {statsUsers.map((su) => (
-              <div key={su.user_id} className="flex items-center justify-between p-4 border border-navy/10 dark:border-white/10 rounded">
-                <div className="flex items-center gap-4">
+              <div key={su.user_id} className="flex flex-wrap items-center justify-between gap-3 p-4 border border-navy/10 dark:border-white/10 rounded">
+                <div className="flex items-center gap-4 min-w-0">
                   <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
                     <BarChart3 className="w-5 h-5 text-gold" />
                   </div>

@@ -6,7 +6,7 @@ export function RevenueTab({ revenueData, revenuePreset, revenueLoading, revenue
     <>
       {/* Date Range Selector */}
       <div className="card-trust p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-navy dark:text-white text-sm">Date Range</span>
@@ -221,7 +221,7 @@ export function RevenueTab({ revenueData, revenuePreset, revenueLoading, revenue
             </h2>
             {revenueData.recent_transactions?.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[760px]">
                   <thead>
                     <tr className="border-b border-navy/10 dark:border-white/10">
                       <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>

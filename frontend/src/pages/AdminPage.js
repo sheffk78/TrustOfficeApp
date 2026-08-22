@@ -969,11 +969,11 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-6">
+            <TabsList className="mb-6 bg-muted/50 flex w-full gap-1 overflow-x-auto whitespace-nowrap">
               {TAB_CONFIG.map((tab) => {
                 const Icon = tab.icon;
                 return (
-                  <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                  <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 shrink-0">
                     <Icon className="w-4 h-4" />
                     {tab.label}
                     {tab.showNewBadge && leadsStageCounts.new > 0 && (

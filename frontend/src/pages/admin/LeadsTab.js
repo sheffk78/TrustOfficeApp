@@ -17,7 +17,7 @@ export function LeadsTab({
 }) {
   return (
     <div className="card-trust">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h2 className="font-serif text-xl text-navy dark:text-white">Leads</h2>
         <div className="flex gap-2">
           <Button
@@ -85,8 +85,8 @@ export function LeadsTab({
           ) : (
             <div>
               {selectedLeadIds.size > 0 && (
-                <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
                     <span className="font-medium text-navy dark:text-white">
                       {selectedLeadIds.size} lead{selectedLeadIds.size !== 1 ? 's' : ''} selected

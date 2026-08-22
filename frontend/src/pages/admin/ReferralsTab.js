@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 export function ReferralsTab({ referrals, referralsLoading, onRefresh, onFixReferral }) {
   return (
     <div className="card-trust">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h2 className="font-serif text-xl text-navy dark:text-white">Referral Relationships</h2>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onRefresh}>
@@ -22,7 +22,7 @@ export function ReferralsTab({ referrals, referralsLoading, onRefresh, onFixRefe
         <p className="text-center text-muted-foreground py-8">No referrals found</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[760px]">
             <thead>
               <tr className="border-b border-navy/10 dark:border-white/10">
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Referrer</th>
