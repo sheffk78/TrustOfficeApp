@@ -570,12 +570,21 @@ export default function AdminPage() {
   useEffect(() => {
     if (!isAdmin) return;
     if (activeTab === 'referrals') fetchReferrals();
-    if (activeTab === 'leads') fetchLeads();
     if (activeTab === 'lead-analytics') fetchLeadAnalytics();
     if (activeTab === 'admins') { fetchAdmins(); fetchStatsUsers(); }
     if (activeTab === 'revenue') fetchRevenueData();
     if (activeTab === 'conversations') fetchConversations();
   }, [isAdmin, activeTab, revenuePreset, fetchRevenueData, fetchConversations]);
+
+  // ─── Fetch leads on tab open OR when stage filter / page changes ──
+  // The filter buttons and pagination only update state; this effect is what
+  // actually re-queries the API so clicking a stage filter takes effect.
+  useEffect(() => {
+    if (activeTab === 'leads' && isAdmin) {
+      fetchLeads();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, activeTab, leadsPage, leadsStageFilter]);
 
   // ─── Actions ──────────────────────────────────────────────────────
   const handleMakeAdmin = async (userId) => {
