@@ -85,6 +85,30 @@ export const LEAD_STAGE_FILTERS = [
   { key: 'lost', label: 'Lost' },
 ];
 
+// Source label helper for customer acquisition display. Maps stored source
+// tokens (WingPoint referral, friend referral, UTM source, direct) to readable labels.
+const SOURCE_LABELS = {
+  wingpoint_referral: 'WingPoint referral',
+  friend_referral: 'Friend referral',
+  referral: 'Referral',
+  'trustee-101': 'Trustee 101',
+  facebook: 'Facebook ad',
+  'facebook-lead-ad': 'Facebook ad',
+  google: 'Google',
+  organic: 'Organic search',
+  email: 'Email',
+  direct: 'Direct',
+  manual: 'Manual',
+};
+
+export function formatSourceLabel(source) {
+  if (!source) return null;
+  const found = SOURCE_LABELS[source] || SOURCE_LABELS[source.toLowerCase()];
+  if (found) return found;
+  // Heuristic fallback: humanize snake/kebab case
+  return source.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export const LEAD_STAGES = ['new', 'engaged', 'warm', 'converted', 'lost'];
 
 // Map lead capture source → short resource word shown in the table's Next Action column.

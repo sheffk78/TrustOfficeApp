@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Target, Activity, RefreshCw, MessageSquare, Crown, BarChart3, Building2, FileText, DollarSign, LogIn, Gift, XCircle, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
-import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, formatCallOutcome, getResourceWord, LEAD_STAGES } from './helpers';
+import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, formatCallOutcome, getResourceWord, formatSourceLabel, LEAD_STAGES } from './helpers';
 
 // ─── Lead Detail Dialog ────────────────────────────────────────────
 export function LeadDetailDialog({
@@ -327,6 +327,9 @@ export function CustomerDetailDialog({
   // Admin lock: an admin-controlled account cannot be impersonated or gifted.
   const isAdminLocked = !!customerDetail.is_admin;
 
+  const formattedSource = formatSourceLabel(customerDetail.origin_source);
+  const timeline = customerDetail.marketing_timeline || [];
+
   return (
     <Dialog open={!!customerDetail} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
@@ -397,6 +400,46 @@ export function CustomerDetailDialog({
               <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.trusts}</p>
               <p className="text-xs text-muted-foreground">Trusts</p>
             </div>
+          </div>
+
+          {/* Acquisition Origin */}
+          <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
+            <h3 className="font-medium text-navy dark:text-white mb-2 flex items-center gap-2">
+              <Target className="w-4 h-4 text-gold" />
+              Acquisition
+            </h3>
+            <dl className="grid gap-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Source</dt>
+                <dd className="font-medium text-navy dark:text-white text-right">
+                  {formattedSource || <span className="text-muted-foreground">Unknown</span>}
+                </dd>
+              </div>
+              {customerDetail.lead_id && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Lead</dt>
+                  <dd className="font-mono text-xs text-navy dark:text-white">{customerDetail.lead_id}</dd>
+                </div>
+              )}
+            </dl>
+            {timeline.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground mb-1.5">Marketing journey</p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {timeline.map((ev, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-gold shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-navy dark:text-white">{ev.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(ev.date)} · {ev.type}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Referral Info */}
