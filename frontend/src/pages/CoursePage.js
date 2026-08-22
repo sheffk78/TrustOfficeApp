@@ -19,7 +19,7 @@ const BUNNY_LIBRARY_ID = '609821';
 const VIDEO_EMBED_BASE = `https://iframe.mediadelivery.net/embed/${BUNNY_LIBRARY_ID}/`;
 
 export default function CoursePage() {
-  const { subscription } = useAuth();
+  const { user, subscription } = useAuth();
   const [curriculum, setCurriculum] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedLesson, setSelectedLesson] = useState(null);
@@ -55,6 +55,20 @@ export default function CoursePage() {
   const handleLessonClick = (lesson) => {
     if (!canAccessLesson(lesson)) return;
     setSelectedLesson(lesson);
+    logActivity('video_open', `Opened lesson ${lesson.lesson}: ${lesson.title}`);
+  };
+
+  // Fire-and-forget report of marketing activity (matches CRM lead by email).
+  const logActivity = (action_type, detail) => {
+    const email = user?.email;
+    if (!email) return;
+    try {
+      fetch(`/api/admin/leads/activity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, action_type, detail }),
+      }).catch(() => {});
+    } catch { /* non-blocking */ }
   };
 
   if (loading) {
@@ -158,6 +172,7 @@ export default function CoursePage() {
                             href={`https://trustoffice.app${selectedLesson.pdf_url}`}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={() => logActivity('pdf_download', `Downloaded PDF: ${selectedLesson.title}`)}
                             className="flex items-center gap-1 text-navy hover:text-navy/70 transition-colors"
                           >
                             <Download className="w-3.5 h-3.5" />

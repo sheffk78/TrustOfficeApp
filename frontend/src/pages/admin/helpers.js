@@ -87,6 +87,34 @@ export const LEAD_STAGE_FILTERS = [
 
 export const LEAD_STAGES = ['new', 'engaged', 'warm', 'converted', 'lost'];
 
+// Map lead capture source → short resource word shown in the table's Next Action column.
+const RESOURCE_WORDS = [
+  { topic: '101', re: /101|trustee-101/i },
+  { topic: 'webinar', re: /webinar/i },
+  { topic: 'PDF', re: /pdf|kit|guide|template|checklist/i },
+  { topic: 'blog', re: /blog|article|subscribe/i },
+  { topic: 'call', re: /booked-call|call/i },
+  { topic: 'facebook', re: /facebook|fb/i },
+  { topic: 'manual', re: /manual|direct/i },
+];
+
+// Return a short noun describing which marketing resource the lead interacted with.
+export function getResourceWord(source) {
+  if (!source) return null;
+  const s = source.toLowerCase();
+  for (const { topic, re } of RESOURCE_WORDS) {
+    if (re.test(s)) return topic;
+  }
+  return null;
+}
+
+// Show/no-show shorthand for the Next Action / detail view.
+export function formatCallOutcome(outcome) {
+  if (outcome === 'show') return { label: 'Showed', cls: 'bg-success/10 text-success' };
+  if (outcome === 'no_show') return { label: 'No-show', cls: 'bg-error/10 text-error' };
+  return { label: 'Pending', cls: 'bg-gold/10 text-gold' };
+}
+
 export const FUNNEL_STAGES = [
   { key: 'new', label: 'New', color: 'bg-blue-500' },
   { key: 'engaged', label: 'Engaged', color: 'bg-purple-500' },

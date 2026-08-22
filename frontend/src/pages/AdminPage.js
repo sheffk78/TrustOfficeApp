@@ -126,8 +126,8 @@ export default function AdminPage() {
   const [bulkLeadStage, setBulkLeadStage] = useState('new');
   const [bulkLeadActionLoading, setBulkLeadActionLoading] = useState(false);
 
-  // Lead triage view state
-  const [showTriageView, setShowTriageView] = useState(true);
+  // Lead triage view state — default to Table View
+  const [showTriageView, setShowTriageView] = useState(false);
 
   // Follow-up email modal state
   const [followUpLead, setFollowUpLead] = useState(null);
@@ -454,6 +454,25 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error('Failed to update lead stage:', error);
+    }
+  };
+
+  // ─── Update lead call outcome (show/no-show) ────────────────────
+  const updateLeadCallOutcome = async (leadId, callOutcome) => {
+    try {
+      const response = await fetchWithAuth(`/admin/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ call_outcome: callOutcome }),
+      });
+      if (response.ok) {
+        fetchLeads();
+        if (selectedLead?.lead_id === leadId) {
+          fetchLeadDetail(leadId);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update lead call outcome:', error);
     }
   };
 
@@ -1092,6 +1111,7 @@ export default function AdminPage() {
               leadDetailLoading={leadDetailLoading}
               onClose={() => setSelectedLead(null)}
               onUpdateLeadStage={updateLeadStage}
+              onUpdateCallOutcome={updateLeadCallOutcome}
               onAddNote={addLeadNote}
               onNoteChange={setLeadNoteText}
               leadNoteText={leadNoteText}

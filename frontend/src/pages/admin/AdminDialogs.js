@@ -5,12 +5,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Target, Activity, RefreshCw, MessageSquare, Crown, BarChart3, Building2, FileText, DollarSign, LogIn, Gift, XCircle, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
-import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, LEAD_STAGES } from './helpers';
+import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, formatCallOutcome, getResourceWord, LEAD_STAGES } from './helpers';
 
 // ─── Lead Detail Dialog ────────────────────────────────────────────
 export function LeadDetailDialog({
   selectedLead, leadDetailLoading,
-  onClose, onUpdateLeadStage, onAddNote, onNoteChange, leadNoteText,
+  onClose, onUpdateLeadStage, onUpdateCallOutcome, onAddNote, onNoteChange, leadNoteText,
 }) {
   return (
     <Dialog open={!!selectedLead} onOpenChange={onClose}>
@@ -56,7 +56,10 @@ export function LeadDetailDialog({
               <div className="p-3 border border-gold/30 bg-gold/5 rounded">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-base">📞</span>
-                  <span className="text-sm font-medium text-navy dark:text-white">Discovery Call Scheduled</span>
+                  <span className="text-sm font-medium text-navy dark:text-white">Discovery Call</span>
+                  <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full ${formatCallOutcome(selectedLead.call_outcome).cls}`}>
+                    {formatCallOutcome(selectedLead.call_outcome).label}
+                  </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {selectedLead.booked_call_at
@@ -70,6 +73,27 @@ export function LeadDetailDialog({
                       })
                     : 'Date not available'}
                 </p>
+                {onUpdateCallOutcome && (
+                  <div className="flex items-center gap-2 mt-3">
+                    <span className="text-xs text-muted-foreground">Mark as:</span>
+                    <Button
+                      size="sm"
+                      variant={selectedLead.call_outcome === 'show' ? 'default' : 'outline'}
+                      className={selectedLead.call_outcome === 'show' ? 'bg-success text-white' : ''}
+                      onClick={() => onUpdateCallOutcome(selectedLead.lead_id, 'show')}
+                    >
+                      Showed
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedLead.call_outcome === 'no_show' ? 'default' : 'outline'}
+                      className={selectedLead.call_outcome === 'no_show' ? 'bg-error text-white' : ''}
+                      onClick={() => onUpdateCallOutcome(selectedLead.lead_id, 'no_show')}
+                    >
+                      No-show
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -156,10 +180,23 @@ export function LeadDetailDialog({
               </div>
             </div>
 
+            {/* Marketing Resource */}
+            {getResourceWord(selectedLead.origin_source || selectedLead.source) && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Marketing resource:</span>
+                <span className="inline-flex items-center text-xs font-medium text-navy/70 dark:text-white/70 px-1.5 py-0.5 bg-navy/5 dark:bg-white/10 rounded-full">
+                  {getResourceWord(selectedLead.origin_source || selectedLead.source)}
+                </span>
+              </div>
+            )}
+
             {/* Activity Log */}
             {selectedLead.activities && selectedLead.activities.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-navy dark:text-white mb-3">Activity Log</h3>
+                <h3 className="text-sm font-medium text-navy dark:text-white mb-3 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-gold" />
+                  Activity
+                </h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {selectedLead.activities.map((act, i) => (
                     <div key={act.activity_id || i} className="flex items-start gap-3 p-2 border-b border-navy/5 dark:border-white/5 last:border-0">

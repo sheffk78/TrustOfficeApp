@@ -219,6 +219,8 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/error-log",
     # Facebook Lead Ads webhook (no auth — Facebook signs payloads)
     "/api/admin/leads/facebook-webhook",
+    # Public marketing-activity logging (video watch / PDF download by email)
+    "/api/admin/leads/activity",
     # Admin notification endpoints (admin-only, no subscription check needed)
     "/api/admin/notifications",
     "/api/admin/notifications/unread-count",
