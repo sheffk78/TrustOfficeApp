@@ -489,8 +489,10 @@ class TestCrossUserWritePrevention:
             headers=user_b["headers"],
             json={
                 "trust_id": trust_a["trust_id"],
-                "template_type": "general_meeting",
-                "template_data": {},
+                "minutes_type": "general",
+                "meeting_date": "2026-01-15",
+                "participants_text": "Test Trustee",
+                "decisions_text": "Test decision",
             },
         )
         assert resp.status_code in (403, 404), (
@@ -507,6 +509,7 @@ class TestCrossUserWritePrevention:
                 "beneficiary_name": "Test Beneficiary",
                 "amount": 100,
                 "date": "2026-01-01",
+                "purpose_classification": "distribution",
             },
         )
         assert resp.status_code in (403, 404), (
