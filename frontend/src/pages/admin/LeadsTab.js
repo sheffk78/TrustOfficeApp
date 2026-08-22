@@ -126,7 +126,7 @@ export function LeadsTab({
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Next Action</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Source</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Created</th>
-                      <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Actions</th>
+                      <th className="sticky right-0 py-3 px-3 text-left text-sm font-medium text-muted-foreground whitespace-nowrap bg-white dark:bg-slate-800 shadow-[-8px_0_8px_-6px_rgba(0,0,0,0.15)]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -169,11 +169,16 @@ export function LeadsTab({
                         <td className="py-3 px-3 text-xs text-muted-foreground whitespace-nowrap">
                           {lead.next_action || '—'}
                         </td>
-                        <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">{lead.source || '—'}</td>
+                        <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">
+                          {lead.origin_source || lead.source || '—'}
+                          {lead.source && (lead.origin_source !== lead.source) && (
+                            <span className="ml-1 text-[10px] text-muted-foreground/60">({lead.source})</span>
+                          )}
+                        </td>
                         <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">
                           {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
                         </td>
-                        <td className="py-3 px-3">
+                        <td className="sticky right-0 py-3 px-3 bg-white dark:bg-slate-800 shadow-[-8px_0_8px_-6px_rgba(0,0,0,0.15)]">
                           <div className="flex gap-1">
                             <button
                               onClick={() => onViewLead(lead.lead_id)}

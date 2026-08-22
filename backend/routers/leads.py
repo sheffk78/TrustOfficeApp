@@ -326,7 +326,22 @@ def determine_lead_stage(lead: dict) -> str:
 
 
 def get_next_action(lead: dict) -> str:
-    """Auto-calculate the recommended next action for a lead."""
+    """Auto-calculate the recommended next action for a lead.
+
+    A booked discovery call always takes priority — the Next Action column
+    shows the scheduled date/time so the user can see who is booked and when
+    at a glance. Falls through to stage-based guidance only when no call is booked.
+    """
+    if lead.get("booked_call") and lead.get("booked_call_at"):
+        try:
+            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+            booking_dt = _dt.fromisoformat(lead["booked_call_at"].replace("Z", "+00:00"))
+            mt_time = booking_dt.astimezone(_tz(_td(hours=-6)))
+            mt_str = mt_time.strftime("%b %d, %I:%M %p MT").replace(" 0", " ")
+            return f"Booked: {mt_str}"
+        except Exception:
+            return "Prepare for upcoming discovery call"
+
     stage = lead.get("stage", "new")
     lessons_watched = lead.get("lessons_watched", 0)
     days_since = _days_since(lead.get("created_at")) or 0
@@ -380,12 +395,16 @@ async def capture_lead(lead: LeadCapture):
     existing = await db.leads.find_one({"email": email})
     if existing:
         logger.info(f"Lead already exists for {email} — updating source")
+        # Preserve the lead's immutable origin: don't overwrite `source` after the
+        # first touch. Backfill origin_source for legacy leads that predate the field.
+        origin = existing.get("origin_source") or existing.get("source") or source
         await db.leads.update_one(
             {"email": email},
             {"$set": {
                 "name": name,
-                "source": source,
-                **({"phone": phone} if phone else {}),
+                **( {"source": source} if not existing.get("source") else {} ),
+                "origin_source": origin,
+                **( {"phone": phone} if phone else {} ),
                 "utm_source": lead.utm_source,
                 "utm_campaign": lead.utm_campaign,
                 "utm_medium": lead.utm_medium,
@@ -421,6 +440,7 @@ async def capture_lead(lead: LeadCapture):
         "email": email,
         "name": name,
         "source": source,
+        "origin_source": source,
         "phone": phone,
         "lead_type": "email_capture",
         "utm_source": lead.utm_source,
@@ -1105,7 +1125,7 @@ async def export_leads_csv(
     writer = csv.writer(output)
 
     headers = [
-        "Lead ID", "Name", "Email", "Stage", "Score", "Source",
+        "Lead ID", "Name", "Email", "Stage", "Score", "Source", "Origin Source",
         "UTM Source", "UTM Campaign", "UTM Medium", "Referrer",
         "Lessons Watched", "Booked Call", "Subscription Status",
         "Created At", "Updated At", "Next Action", "Notes"
@@ -1120,6 +1140,7 @@ async def export_leads_csv(
             lead.get("stage", ""),
             lead.get("score", 0),
             lead.get("source", ""),
+            lead.get("origin_source", "") or lead.get("source", ""),
             lead.get("utm_source", ""),
             lead.get("utm_campaign", ""),
             lead.get("utm_medium", ""),
@@ -1207,7 +1228,7 @@ async def bulk_export_csv(
     writer = csv.writer(output)
 
     headers = [
-        "Lead ID", "Name", "Email", "Stage", "Score", "Source",
+        "Lead ID", "Name", "Email", "Stage", "Score", "Source", "Origin Source",
         "UTM Source", "UTM Campaign", "UTM Medium", "Referrer",
         "Lessons Watched", "Booked Call", "Subscription Status",
         "Created At", "Updated At", "Next Action", "Notes"
@@ -1222,6 +1243,7 @@ async def bulk_export_csv(
             lead.get("stage", ""),
             lead.get("score", 0),
             lead.get("source", ""),
+            lead.get("origin_source", "") or lead.get("source", ""),
             lead.get("utm_source", ""),
             lead.get("utm_campaign", ""),
             lead.get("utm_medium", ""),

@@ -172,13 +172,17 @@ class BackgroundTaskRunner:
                 if existing.get("booked_call") and existing.get("booked_call_at"):
                     continue  # Already synced
 
+                # Preserve the lead's true origin: never overwrite `source` with
+                # "booked-call" (a booking is an action, not an origin channel).
+                # Backfill origin_source for legacy leads that predate the field.
+                origin = existing.get("origin_source") or existing.get("source") or "booked-call"
                 await self.db.leads.update_one(
                     {"email": email},
                     {"$set": {
                         "name": name,
                         "booked_call": True,
                         "booked_call_at": starts_at,
-                        "source": "booked-call",
+                        "origin_source": origin,
                         "updated_at": now,
                     }}
                 )
@@ -220,6 +224,7 @@ class BackgroundTaskRunner:
                         "email": email,
                         "name": name,
                         "source": "booked-call",
+                        "origin_source": "booked-call",
                         "lead_type": "email_capture",
                         "stage": "new",
                         "manual_stage_override": False,
