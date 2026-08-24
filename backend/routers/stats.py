@@ -154,6 +154,22 @@ def _date_range_from_preset(preset: str):
         return now - timedelta(days=30), now
 
 
+def _stripe_customer_id(inv) -> Optional[str]:
+    """Extract the customer ID from an invoice's `customer` field.
+
+    Stripe may return `invoice.customer` as either a plain string ID or an
+    expanded Stripe Customer object. Only the string form is safely hashable
+    (set membership). Returns None when absent or unresolvable.
+    """
+    customer = getattr(inv, 'customer', None)
+    if customer is None:
+        return None
+    if isinstance(customer, str):
+        return customer
+    cid = getattr(customer, 'id', None)
+    return cid if isinstance(cid, str) and cid else None
+
+
 def _fetch_stripe_revenue(start_date: datetime, end_date: datetime):
     """
     Fetch revenue data from Stripe invoices.
@@ -199,7 +215,7 @@ def _fetch_stripe_revenue(start_date: datetime, end_date: datetime):
                 total_transactions += 1
 
                 # Stripe Invoice uses .customer (not .customer_id) for the customer ID
-                customer_id = getattr(inv, 'customer', None)
+                customer_id = _stripe_customer_id(inv)
                 if customer_id:
                     customer_ids.add(customer_id)
 
