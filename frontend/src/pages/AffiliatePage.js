@@ -65,6 +65,13 @@ export default function AffiliatePage() {
 
   return (
     <div className="min-h-screen bg-subtle-bg">
+      {/* Skip-to-content link for keyboard / screen-reader users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-navy focus:text-white focus:rounded"
+      >
+        Skip to main content
+      </a>
       {/* Header */}
       <header className="bg-navy text-white">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -83,7 +90,7 @@ export default function AffiliatePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-navy text-white py-20">
+      <section id="main-content" className="bg-navy text-white py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-gold/20 text-gold px-4 py-2 rounded-full mb-6">
             <Gift className="w-4 h-4" />

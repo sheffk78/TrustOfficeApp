@@ -43,6 +43,8 @@ export function DashboardOnboardingChecklist({
         onClick={() => setOnboardingExpanded(!onboardingExpanded)}
         className="w-full flex items-center justify-between text-left"
         data-testid="onboarding-accordion-toggle"
+        aria-expanded={onboardingExpanded}
+        aria-label={`${onboardingExpanded ? 'Collapse' : 'Expand'} Getting Started checklist`}
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gold/20 flex items-center justify-center text-gold">
@@ -68,6 +70,7 @@ export function DashboardOnboardingChecklist({
             onClick={(e) => { e.stopPropagation(); dismissOnboarding(); }}
             className="text-muted-foreground hover:text-navy"
             data-testid="dismiss-onboarding"
+            aria-label="Dismiss Getting Started checklist"
           >
             <X className="w-5 h-5" />
           </button>

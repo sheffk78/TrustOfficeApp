@@ -992,6 +992,7 @@ export default function SettingsPage() {
                       checked={trustData.benevolence_enabled}
                       onCheckedChange={(checked) => setTrustData({ ...trustData, benevolence_enabled: checked })}
                       data-testid="benevolence-toggle"
+                      aria-label="Toggle benevolence mode for charitable trusts"
                     />
                   </div>
                   {trustData.benevolence_enabled && (
@@ -1655,6 +1656,7 @@ export default function SettingsPage() {
                         <Switch
                           checked={spendingThreshold.requires_minutes ?? false}
                           onCheckedChange={(checked) => updateSpendingThreshold('requires_minutes', checked)}
+                          aria-label="Toggle requiring meeting minutes documentation for spending threshold"
                         />
                         <Label className="text-sm text-navy cursor-pointer" onClick={() => updateSpendingThreshold('requires_minutes', !spendingThreshold.requires_minutes)}>
                           Requires meeting minutes documentation
@@ -2009,6 +2011,7 @@ export default function SettingsPage() {
                       onCheckedChange={(v) => handleNotificationChange('minutes_created', v)}
                       disabled={notificationLoading}
                       data-testid="notif-minutes-created"
+                      aria-label="Toggle notification for minutes created"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -2021,6 +2024,7 @@ export default function SettingsPage() {
                       onCheckedChange={(v) => handleNotificationChange('distribution_created', v)}
                       disabled={notificationLoading}
                       data-testid="notif-distribution-created"
+                      aria-label="Toggle notification for distributions created"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -2032,6 +2036,7 @@ export default function SettingsPage() {
                       checked={notificationPrefs.distribution_approved}
                       onCheckedChange={(v) => handleNotificationChange('distribution_approved', v)}
                       disabled={notificationLoading}
+                      aria-label="Toggle notification for distribution approved"
                       data-testid="notif-distribution-approved"
                     />
                   </div>
@@ -2055,6 +2060,7 @@ export default function SettingsPage() {
                       onCheckedChange={(v) => handleNotificationChange('task_reminders', v)}
                       disabled={notificationLoading}
                       data-testid="notif-task-reminders"
+                      aria-label="Toggle task reminder notifications"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -2067,6 +2073,7 @@ export default function SettingsPage() {
                       onCheckedChange={(v) => handleNotificationChange('task_overdue', v)}
                       disabled={notificationLoading}
                       data-testid="notif-task-overdue"
+                      aria-label="Toggle overdue task alert notifications"
                     />
                   </div>
                 </div>
@@ -2089,6 +2096,7 @@ export default function SettingsPage() {
                       onCheckedChange={(v) => handleNotificationChange('subscription_updates', v)}
                       disabled={notificationLoading}
                       data-testid="notif-subscription-updates"
+                      aria-label="Toggle subscription update notifications"
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -2101,6 +2109,7 @@ export default function SettingsPage() {
                       onCheckedChange={(v) => handleNotificationChange('weekly_digest', v)}
                       disabled={notificationLoading}
                       data-testid="notif-weekly-digest"
+                      aria-label="Toggle weekly digest notifications"
                     />
                   </div>
                 </div>
@@ -2254,6 +2263,7 @@ export default function SettingsPage() {
                   onCheckedChange={handleWatermarkToggle}
                   disabled={userPrefsLoading}
                   data-testid="hide-watermark-toggle"
+                  aria-label="Toggle hiding TrustOffice watermark on exported PDFs"
                 />
               </div>
             </div>

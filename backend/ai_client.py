@@ -229,6 +229,12 @@ async def ai_draft_stream(
     Streaming version of ai_draft.
     Yields content text chunks as they arrive from the AI model.
     Tries OpenRouter (Gemini) first, falls back to non-streaming if needed.
+
+    Raises AIClientError if ALL providers fail — does NOT yield a soft
+    error string as a token chunk (that would be indistinguishable from
+    a real AI response and cause the stream to end without a proper
+    'error' event, resulting in "The connection was interrupted" on the
+    frontend).
     """
     if OPENROUTER_AVAILABLE and OPENROUTER_API_KEY:
         try:
@@ -248,7 +254,7 @@ async def ai_draft_stream(
             yield result
     except AIClientError as e:
         logger.error(f"All AI providers failed for streaming: {e}")
-        yield "I'm having trouble connecting to my AI backend. Please try again."
+        raise
 
 
 # Aliases for ai_service.py

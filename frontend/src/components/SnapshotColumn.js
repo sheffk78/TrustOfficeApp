@@ -119,6 +119,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
           onClick={onToggle}
           className="p-2 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors"
           title="Expand sidebar"
+          aria-label="Expand snapshot sidebar"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -139,6 +140,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
           onClick={onToggle}
           className="p-1 text-muted-foreground hover:text-navy hover:bg-navy/5 transition-colors"
           title="Collapse sidebar"
+          aria-label="Collapse snapshot sidebar"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -152,6 +154,7 @@ const SnapshotColumn = ({ collapsed, onToggle, onConversationSelect, conversatio
               onClick={onNewChat}
               className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-mono font-medium text-navy dark:text-white hover:bg-navy/5 dark:hover:bg-white/5 active:bg-navy/10 transition-colors border border-navy/15 dark:border-white/15"
               title="Start new conversation"
+              aria-label="Start new conversation"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Conversation</span>

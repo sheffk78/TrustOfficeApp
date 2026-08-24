@@ -826,6 +826,18 @@
   word-break: break-word;
 }
 
+/* ===== Feedback Toast Slide-in Animation ===== */
+@keyframes feedback-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ===== Fade-in Animation ===== */
 @keyframes chat-msg-fade-in {
   from {

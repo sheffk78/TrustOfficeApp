@@ -74,6 +74,9 @@ const TrustAssistantPage = () => {
 
   // Auto-send ?prompt= query parameter — fires even if arriving on an open conversation,
   // as long as this exact prompt hasn't been sent yet in this page session.
+  // NOTE: `messages` is intentionally excluded from the dependency array to prevent
+  // re-firing during streaming (which would triple-post the user message).
+  // The sentPrompts ref guard prevents duplicate sends.
   useEffect(() => {
     const prompt = searchParams.get('prompt');
     if (prompt && !sentPrompts.current.has(prompt) && !loading) {
@@ -82,7 +85,8 @@ const TrustAssistantPage = () => {
         fetchConversations();
       }, selectedTrust?.trust_id);
     }
-  }, [searchParams, messages, loading, sendMessage, conversationId, fetchConversations, selectedTrust]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, sendMessage, conversationId, fetchConversations, selectedTrust]);
 
   // Handle sending a message through the chat
   const handleSendMessage = useCallback(async (text) => {

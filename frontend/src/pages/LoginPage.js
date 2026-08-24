@@ -182,6 +182,13 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex" data-testid="login-page">
+      {/* Skip-to-content link for keyboard / screen-reader users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-navy focus:text-white focus:rounded"
+      >
+        Skip to main content
+      </a>
       {/* Left side - Texture with overlay */}
       <div className="hidden lg:flex lg:w-1/2 login-texture relative">
         <div className="absolute inset-0 login-overlay flex flex-col justify-center items-center p-12">
@@ -197,7 +204,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right side - Login form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-subtle-bg">
+      <div id="main-content" className="flex-1 flex items-center justify-center p-8 bg-subtle-bg">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden mb-12 text-center">

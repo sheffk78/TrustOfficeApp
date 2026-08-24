@@ -530,6 +530,13 @@ const useAuthCheck = ({
       return;
     }
 
+    // Fire trust loading in parallel with the auth check — /trusts only needs
+    // the auth token (already in localStorage), not the /auth/me response body.
+    // This eliminates one serial round-trip from the route hydration path.
+    // loadTrustsInternal has its own try/catch and always sets trustsLoading=false
+    // in its finally, so an unhandled rejection is impossible.
+    const trustsPromise = loadTrustsInternal();
+
     try {
       const response = await fetch(`${API}/auth/me`, {
         credentials: 'include',
@@ -553,9 +560,14 @@ const useAuthCheck = ({
       const userData = await response.json();
       setUser(userData);
 
-      // Load trusts and subscription after authentication
-      await loadTrustsInternal();
-      await loadSubscriptionState(userData.email);
+      // Await the parallel trusts fetch (ProtectedRoute blocks on trustsLoading).
+      await trustsPromise;
+
+      // Fire subscription state in the background — SubscriptionGate/FullSubscriptionGate
+      // have their own loading spinners + 10s timeouts, so don't block route hydration
+      // on it. loadSubscriptionState catches all errors internally (retries + fallback),
+      // so fire-and-forget is safe.
+      loadSubscriptionState(userData.email);
     } catch (error) {
       // Network errors (fetch throws) should NOT wipe the token — the backend may
       // be temporarily unreachable. Only wipe on explicit 401 (caught above).

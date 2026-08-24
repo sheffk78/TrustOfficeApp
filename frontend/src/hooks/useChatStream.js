@@ -409,27 +409,34 @@ export const useChatStream = () => {
     const sentConvId = currentConversationId || conversationId || null;
     sentConversationIdRef.current = sentConvId;
 
+    // Use a unique client-side ID with a random suffix so repeated sends
+    // (e.g. StrictMode double-invoke, effect re-fires) can be deduped.
+    const sendKey = `send-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const userMessage = {
-      id: `user-${Date.now()}`,
+      id: sendKey,
       role: 'user',
       content: text,
       timestamp: new Date().toISOString(),
     };
 
-    let assistantId = assistantMessageId || `ai-${Date.now()}`;
-    let updatedMessages;
+    let assistantId = assistantMessageId || `ai-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-    if (isRetry) {
-      updatedMessages = currentMessages.filter(
-        msg => msg.id !== assistantId && msg.id !== userMessage.id
-      );
-      updatedMessages = [...updatedMessages, userMessage];
-      setIsReconnecting(true);
-    } else {
-      updatedMessages = [...currentMessages, userMessage];
-    }
-
-    setMessages(updatedMessages);
+    // Deduplicate: if a message with this exact id already exists (e.g.
+    // StrictMode double-invoke or an effect re-fire), skip re-appending.
+    setMessages(prev => {
+      // For retries, remove the old assistant placeholder + any duplicate user msg
+      if (isRetry) {
+        const filtered = prev.filter(
+          msg => msg.id !== assistantId && msg.id !== userMessage.id
+        );
+        setIsReconnecting(true);
+        return [...filtered, userMessage];
+      }
+      // Guard against double-append: if the user message is already present
+      // (same id), don't add it again.
+      if (prev.some(msg => msg.id === userMessage.id)) return prev;
+      return [...prev, userMessage];
+    });
     setLoading(true);
     setIsStreaming(true);
     setStreamPhase('thinking');
@@ -450,7 +457,11 @@ export const useChatStream = () => {
       isStreaming: true,
     };
 
-    setMessages(prev => [...prev, placeholderAssistant]);
+    // Append assistant placeholder only if not already present (dedup guard).
+    setMessages(prev => {
+      if (prev.some(msg => msg.id === assistantId)) return prev;
+      return [...prev, placeholderAssistant];
+    });
     lastAssistantMessageIdRef.current = assistantId;
 
     let newConvId = null;
@@ -524,7 +535,7 @@ export const useChatStream = () => {
         streamMessage: _streamMessage,
       });
 
-      return { conversationId: newConvId, messages: [...updatedMessages, { id: assistantId, content: '' }] };
+      return { conversationId: newConvId, messages: [...(currentMessages || []), { id: sendKey, role: 'user', content: text }, { id: assistantId, content: '' }] };
     } catch (err) {
       handleStreamError({ err, assistantId, setMessages, setError });
       return null;

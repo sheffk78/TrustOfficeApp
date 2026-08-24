@@ -2078,23 +2078,64 @@ async def _chat_stream_generator(
         # intent to skip heavy DB queries for lightweight intents (ask_knowledge,
         # general_chat, emergency). Awaiting intent first adds ~1s but saves
         # 8+ DB queries for knowledge questions. (CRITICAL-3 fix)
-        intent_result = await classify_intent(message, None)
-        intent = intent_result.get("intent", "general_chat")
-        entities = intent_result.get("entities", {})
+        #
+        # FIX: classify_intent + build_trust_context can take 30+ seconds
+        # (AI call + multiple MongoDB queries). During this time NO SSE
+        # events are sent, and Railway's proxy / browser drops idle
+        # connections after ~30s, causing "The connection was interrupted."
+        # Send SSE comment heartbeats every 5s while these block.
+        async def _prepare_context():
+            intent_result = await classify_intent(message, None)
+            intent = intent_result.get("intent", "general_chat")
+            entities = intent_result.get("entities", {})
+            trust_context = await build_trust_context(
+                user_id, trust_id_resolved, intent=intent
+            )
+            return intent, entities, trust_context
 
-        trust_context = await build_trust_context(user_id, trust_id_resolved, intent=intent)
+        prepare_task = asyncio.create_task(_prepare_context())
+        while True:
+            try:
+                intent, entities, trust_context = await asyncio.wait_for(
+                    asyncio.shield(prepare_task), timeout=5.0
+                )
+                break
+            except asyncio.TimeoutError:
+                # Send SSE comment (ignored by client parser, keeps
+                # the connection alive through proxy idle timeouts)
+                yield ": heartbeat\n\n"
 
         # 6. Stream the response tokens
         full_response_text = ""
         try:
-            async for chunk in generate_response_stream(
+            stream_gen = generate_response_stream(
                 intent=intent,
                 entities=entities,
                 user_message=message,
                 trust_context=trust_context,
                 conversation_history=history_for_ai,
                 ai_client_module=None,
-            ):
+            )
+            stream_ait = stream_gen.__aiter__()
+            # Race the next chunk against a 5s timer. On timeout, emit an
+            # SSE heartbeat comment and re-race the SAME pending task (do
+            # NOT call __anext__() again — that raises RuntimeError on
+            # Python <3.11 because the generator is still running).
+            while True:
+                next_chunk_task = asyncio.ensure_future(stream_ait.__anext__())
+                while True:
+                    done, pending = await asyncio.wait(
+                        {next_chunk_task}, timeout=5.0,
+                    )
+                    if next_chunk_task in done:
+                        break
+                    # Timer expired — send heartbeat, keep waiting on
+                    # the same task.
+                    yield ": heartbeat\n\n"
+                try:
+                    chunk = next_chunk_task.result()
+                except StopAsyncIteration:
+                    break
                 full_response_text += chunk
                 yield await _sse_event("token", {"text": chunk})
         except (asyncio.CancelledError, GeneratorExit):

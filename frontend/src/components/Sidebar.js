@@ -214,6 +214,7 @@ const NavGroupItem = ({ group, pathname, selectedTrust, isAdmin, isExpanded, onT
         className={`sidebar-item w-full justify-between ${hasActiveChild ? 'text-gold' : ''}`}
         data-testid={`nav-group-${group.key}`}
         aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${group.label} section`}
       >
         <div className="flex items-center gap-3">
           <GroupIcon className="w-5 h-5" />
@@ -536,6 +537,7 @@ export const Sidebar = () => {
         <button
           className="lg:hidden absolute top-4 right-4 text-white/60 hover:text-white"
           onClick={() => setMobileOpen(false)}
+          aria-label="Close navigation menu"
         >
           <X className="w-5 h-5" />
         </button>

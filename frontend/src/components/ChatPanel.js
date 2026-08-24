@@ -186,6 +186,7 @@ const ChatPanel = ({
           <button
             onClick={onClearError}
             className="text-rust hover:text-rust/70 transition-colors"
+            aria-label="Dismiss error"
           >
             <X className="w-4 h-4" />
           </button>
@@ -283,6 +284,7 @@ const ChatPanel = ({
           onClick={scrollToBottom}
           className="chat-scroll-btn"
           title="Scroll to latest"
+          aria-label="Scroll to latest message"
         >
           <ArrowDown className="w-4 h-4" />
         </button>
@@ -296,6 +298,7 @@ const ChatPanel = ({
             onClick={() => setShowUploadCard(!showUploadCard)}
             className={`p-2 transition-colors flex-shrink-0 mb-1 ${showUploadCard ? 'text-gold bg-gold/10' : 'text-muted-foreground hover:text-navy hover:bg-navy/5'}`}
             title={trustId ? "Upload a document to the vault" : "Select a trust first"}
+            aria-label={trustId ? "Upload a document to the vault" : "Select a trust first to enable file upload"}
             disabled={loading || !trustId}
           >
             <Paperclip className="w-5 h-5" />
@@ -320,6 +323,7 @@ const ChatPanel = ({
               onClick={onStopStreaming}
               className="chat-stop-btn flex-shrink-0 mb-1"
               title="Stop generating"
+              aria-label="Stop generating response"
             >
               <Square className="w-4 h-4" fill="currentColor" />
             </button>
@@ -329,6 +333,7 @@ const ChatPanel = ({
               disabled={!input.trim() || loading}
               className="btn-primary p-2 flex-shrink-0 mb-1"
               title="Send message"
+              aria-label="Send message"
             >
               <Send className="w-4 h-4" />
             </button>

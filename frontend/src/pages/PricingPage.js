@@ -287,6 +287,13 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-subtle-bg">
+      {/* Skip-to-content link for keyboard / screen-reader users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-navy focus:text-white focus:rounded"
+      >
+        Skip to main content
+      </a>
       {/* Header */}
       <header className="bg-navy text-white py-6 px-8">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
@@ -310,7 +317,7 @@ export default function PricingPage() {
       </header>
 
       {/* Hero */}
-      <section className="py-16 px-8 text-center">
+      <section id="main-content" className="py-16 px-8 text-center">
         <h1 className="font-serif text-4xl md:text-5xl text-navy mb-4">
           Trust Governance Made Simple
         </h1>
