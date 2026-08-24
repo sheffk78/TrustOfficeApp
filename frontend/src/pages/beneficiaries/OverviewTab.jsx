@@ -260,25 +260,29 @@ export function OverviewTab({
         </div>
       )}
 
-      {/* Combined Allocation Summary */}
+      {/* Allocation Layer Summary */}
       {classBens.length > 0 && (
         <div className="mb-6 p-4 border border-border bg-muted/20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <PieChart className="w-4 h-4 text-navy dark:text-gold" />
             <div>
-              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Total Allocated</p>
+              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Allocation Layers</p>
               <p className="font-serif text-lg text-navy dark:text-foreground">
-                {totalAllocatedPct.toFixed(2)}%
+                {(overviewData.certificate_percentage_total ?? totalAllocatedPct).toFixed(2)}%
+                <span className="text-sm text-muted-foreground"> issued</span>
                 <span className="text-sm text-muted-foreground ml-2">
-                  ({overviewData.certificate_percentage_total?.toFixed(2) || 0}% certificates + {overviewData.class_beneficiary_percentage_total?.toFixed(2) || 0}% class)
+                  + {(overviewData.class_beneficiary_percentage_total?.toFixed(2) || 0)}% reserved to classes
                 </span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Class pools are contingent reservations and may overlap certificate holders.
               </p>
             </div>
           </div>
-          {totalAllocatedPct > 100 && (
+          {(overviewData.certificate_percentage_total ?? 0) > 100 && (
             <div className="flex items-center gap-2 text-error">
               <AlertCircle className="w-4 h-4" />
-              <span className="text-xs font-mono">Over-allocated</span>
+              <span className="text-xs font-mono">Issued shares exceed 100%</span>
             </div>
           )}
         </div>
