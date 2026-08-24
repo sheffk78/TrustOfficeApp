@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import LeadTriageView from '@/components/LeadTriageView';
-import { LEAD_STAGE_FILTERS, getLeadStageBadgeClass, getScoreColorClass } from './helpers';
+import { LEAD_STAGE_FILTERS, getLeadStageBadgeClass, getScoreColorClass, getResourceWord, formatCallOutcome } from './helpers';
 
 export function LeadsTab({
   leads, leadsLoading, leadsTotal, leadsPage, leadsSearch, leadsStageFilter,
@@ -17,7 +17,7 @@ export function LeadsTab({
 }) {
   return (
     <div className="card-trust">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h2 className="font-serif text-xl text-navy dark:text-white">Leads</h2>
         <div className="flex gap-2">
           <Button
@@ -85,8 +85,8 @@ export function LeadsTab({
           ) : (
             <div>
               {selectedLeadIds.size > 0 && (
-                <div className="flex items-center justify-between p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 mb-4 bg-navy/5 dark:bg-white/5 rounded border border-navy/10 dark:border-white/10">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <CheckSquare className="w-5 h-5 text-navy dark:text-white" />
                     <span className="font-medium text-navy dark:text-white">
                       {selectedLeadIds.size} lead{selectedLeadIds.size !== 1 ? 's' : ''} selected
@@ -126,7 +126,7 @@ export function LeadsTab({
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Next Action</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Source</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Created</th>
-                      <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Actions</th>
+                      <th className="sticky right-0 py-3 px-3 text-left text-sm font-medium text-muted-foreground whitespace-nowrap bg-white dark:bg-slate-800 shadow-[-8px_0_8px_-6px_rgba(0,0,0,0.15)]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -166,14 +166,38 @@ export function LeadsTab({
                             <span className="text-xs text-muted-foreground">{lead.score}</span>
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {lead.next_action || '—'}
+                        <td className="py-3 px-3">
+                          <div className="flex flex-col gap-1 min-w-[120px]">
+                            {lead.booked_call && lead.booked_call_at ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-navy dark:text-white whitespace-nowrap">
+                                <span className="text-[10px]">📞</span>
+                                {new Date(lead.booked_call_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">—</span>
+                            )}
+                            {lead.booked_call && (
+                              <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full w-fit ${formatCallOutcome(lead.call_outcome).cls}`}>
+                                {formatCallOutcome(lead.call_outcome).label}
+                              </span>
+                            )}
+                            {getResourceWord(lead.origin_source || lead.source) && (
+                              <span className="inline-flex items-center text-[10px] font-medium text-navy/70 dark:text-white/70 px-1.5 py-0.5 bg-navy/5 dark:bg-white/10 rounded-full w-fit">
+                                {getResourceWord(lead.origin_source || lead.source)}
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">{lead.source || '—'}</td>
+                        <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">
+                          {lead.origin_source || lead.source || '—'}
+                          {lead.source && (lead.origin_source !== lead.source) && (
+                            <span className="ml-1 text-[10px] text-muted-foreground/60">({lead.source})</span>
+                          )}
+                        </td>
                         <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">
                           {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
                         </td>
-                        <td className="py-3 px-3">
+                        <td className="sticky right-0 py-3 px-3 bg-white dark:bg-slate-800 shadow-[-8px_0_8px_-6px_rgba(0,0,0,0.15)]">
                           <div className="flex gap-1">
                             <button
                               onClick={() => onViewLead(lead.lead_id)}
@@ -182,18 +206,6 @@ export function LeadsTab({
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            <select
-                              value={lead.stage}
-                              onChange={(e) => onUpdateLeadStage(lead.lead_id, e.target.value)}
-                              className="text-xs border border-navy/20 dark:border-white/20 bg-transparent rounded px-1 py-0.5"
-                              title="Change stage"
-                            >
-                              <option value="new">New</option>
-                              <option value="engaged">Engaged</option>
-                              <option value="warm">Warm</option>
-                              <option value="converted">Converted</option>
-                              <option value="lost">Lost</option>
-                            </select>
                           </div>
                         </td>
                       </tr>

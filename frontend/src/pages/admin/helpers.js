@@ -85,7 +85,59 @@ export const LEAD_STAGE_FILTERS = [
   { key: 'lost', label: 'Lost' },
 ];
 
+// Source label helper for customer acquisition display. Maps stored source
+// tokens (WingPoint referral, friend referral, UTM source, direct) to readable labels.
+const SOURCE_LABELS = {
+  wingpoint_referral: 'WingPoint referral',
+  friend_referral: 'Friend referral',
+  referral: 'Referral',
+  'trustee-101': 'Trustee 101',
+  facebook: 'Facebook ad',
+  'facebook-lead-ad': 'Facebook ad',
+  google: 'Google',
+  organic: 'Organic search',
+  email: 'Email',
+  direct: 'Direct',
+  manual: 'Manual',
+};
+
+export function formatSourceLabel(source) {
+  if (!source) return null;
+  const found = SOURCE_LABELS[source] || SOURCE_LABELS[source.toLowerCase()];
+  if (found) return found;
+  // Heuristic fallback: humanize snake/kebab case
+  return source.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export const LEAD_STAGES = ['new', 'engaged', 'warm', 'converted', 'lost'];
+
+// Map lead capture source → short resource word shown in the table's Next Action column.
+const RESOURCE_WORDS = [
+  { topic: '101', re: /101|trustee-101/i },
+  { topic: 'webinar', re: /webinar/i },
+  { topic: 'PDF', re: /pdf|kit|guide|template|checklist/i },
+  { topic: 'blog', re: /blog|article|subscribe/i },
+  { topic: 'call', re: /booked-call|call/i },
+  { topic: 'facebook', re: /facebook|fb/i },
+  { topic: 'manual', re: /manual|direct/i },
+];
+
+// Return a short noun describing which marketing resource the lead interacted with.
+export function getResourceWord(source) {
+  if (!source) return null;
+  const s = source.toLowerCase();
+  for (const { topic, re } of RESOURCE_WORDS) {
+    if (re.test(s)) return topic;
+  }
+  return null;
+}
+
+// Show/no-show shorthand for the Next Action / detail view.
+export function formatCallOutcome(outcome) {
+  if (outcome === 'show') return { label: 'Showed', cls: 'bg-success/10 text-success' };
+  if (outcome === 'no_show') return { label: 'No-show', cls: 'bg-error/10 text-error' };
+  return { label: 'Pending', cls: 'bg-gold/10 text-gold' };
+}
 
 export const FUNNEL_STAGES = [
   { key: 'new', label: 'New', color: 'bg-blue-500' },

@@ -562,9 +562,12 @@ const useAuthCheck = ({
       if (error.message === 'Not authenticated') {
         // We should only reach here on authenticated (non-public) pages because
         // public pages skip the /auth/me call entirely (see isPublicPage guard
-        // above). Report the 401 as a real auth_check error so we can detect
-        // expired-session issues on protected pages.
-        reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'major' });
+        // above). Report the 401 as an auth_check error so we can detect
+        // real auth regressions — but an expired session on a protected page
+        // is a normal user flow (token expiry, cookie loss), not a defect.
+        // The 401 already clears the session and routes to login, so report
+        // at 'info' severity instead of 'major' to avoid paging on every expiry.
+        reportErrorToBackend(error, { operation: 'auth_check', page: window.location.pathname, severity: 'info' });
         console.error('[AuthContext] Auth check failed: token invalid');
         setUser(null);
         localStorage.removeItem('auth_token');

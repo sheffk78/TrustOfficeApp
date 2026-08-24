@@ -126,8 +126,8 @@ export default function AdminPage() {
   const [bulkLeadStage, setBulkLeadStage] = useState('new');
   const [bulkLeadActionLoading, setBulkLeadActionLoading] = useState(false);
 
-  // Lead triage view state
-  const [showTriageView, setShowTriageView] = useState(true);
+  // Lead triage view state — default to Table View
+  const [showTriageView, setShowTriageView] = useState(false);
 
   // Follow-up email modal state
   const [followUpLead, setFollowUpLead] = useState(null);
@@ -457,6 +457,25 @@ export default function AdminPage() {
     }
   };
 
+  // ─── Update lead call outcome (show/no-show) ────────────────────
+  const updateLeadCallOutcome = async (leadId, callOutcome) => {
+    try {
+      const response = await fetchWithAuth(`/admin/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ call_outcome: callOutcome }),
+      });
+      if (response.ok) {
+        fetchLeads();
+        if (selectedLead?.lead_id === leadId) {
+          fetchLeadDetail(leadId);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update lead call outcome:', error);
+    }
+  };
+
   // ─── Fetch admins ────────────────────────────────────────────────
   const fetchAdmins = async () => {
     try {
@@ -551,12 +570,21 @@ export default function AdminPage() {
   useEffect(() => {
     if (!isAdmin) return;
     if (activeTab === 'referrals') fetchReferrals();
-    if (activeTab === 'leads') fetchLeads();
     if (activeTab === 'lead-analytics') fetchLeadAnalytics();
     if (activeTab === 'admins') { fetchAdmins(); fetchStatsUsers(); }
     if (activeTab === 'revenue') fetchRevenueData();
     if (activeTab === 'conversations') fetchConversations();
   }, [isAdmin, activeTab, revenuePreset, fetchRevenueData, fetchConversations]);
+
+  // ─── Fetch leads on tab open OR when stage filter / page changes ──
+  // The filter buttons and pagination only update state; this effect is what
+  // actually re-queries the API so clicking a stage filter takes effect.
+  useEffect(() => {
+    if (activeTab === 'leads' && isAdmin) {
+      fetchLeads();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, activeTab, leadsPage, leadsStageFilter]);
 
   // ─── Actions ──────────────────────────────────────────────────────
   const handleMakeAdmin = async (userId) => {
@@ -950,11 +978,11 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-6">
+            <TabsList className="mb-6 bg-muted/50 flex w-full gap-1 overflow-x-auto whitespace-nowrap">
               {TAB_CONFIG.map((tab) => {
                 const Icon = tab.icon;
                 return (
-                  <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                  <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 shrink-0">
                     <Icon className="w-4 h-4" />
                     {tab.label}
                     {tab.showNewBadge && leadsStageCounts.new > 0 && (
@@ -1092,6 +1120,7 @@ export default function AdminPage() {
               leadDetailLoading={leadDetailLoading}
               onClose={() => setSelectedLead(null)}
               onUpdateLeadStage={updateLeadStage}
+              onUpdateCallOutcome={updateLeadCallOutcome}
               onAddNote={addLeadNote}
               onNoteChange={setLeadNoteText}
               leadNoteText={leadNoteText}

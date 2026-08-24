@@ -285,7 +285,15 @@ async def get_beneficiary_dashboard(
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
 
-    # Compute combined allocation totals (persons + organizations + class)
+    # Compute allocation totals.
+    # Certificate percentages are ISSUED ownership (additive, capped at 100 by
+    # create_unit_certificate). Class-beneficiary percentages are RESERVED
+    # pools that may overlap with issued certificates (a descendant holding a
+    # 15% certificate can also sit in a contingent descendants class), so they
+    # are tracked separately and NOT summed into one "total allocated".
+    # total_allocated_percentage is therefore max(certificates, classes) as a
+    # conservative committed-allocation figure; cert/class totals let the UI
+    # show each layer and flag when reserved pools exceed remaining capacity.
     certificate_percentage_total = round(
         sum(b.percentage for b in beneficiaries), 4
     )
@@ -293,7 +301,7 @@ async def get_beneficiary_dashboard(
         sum(cb.get("percentage", 0) for cb in class_beneficiaries), 4
     )
     total_allocated_percentage = round(
-        certificate_percentage_total + class_beneficiary_percentage_total, 4
+        max(certificate_percentage_total, class_beneficiary_percentage_total), 4
     )
     
     # Get recent transfers

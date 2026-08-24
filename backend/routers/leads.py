@@ -104,6 +104,16 @@ class LeadCapture(BaseModel):
     referrer: Optional[str] = None  # document.referrer from the browser
 
 
+class MarketingActivityIn(BaseModel):
+    """
+    Schema for logging a marketing-site interaction against the matching lead
+    (video watch, PDF download, lesson open). Public endpoint keyed by email.
+    """
+    email: EmailStr
+    action_type: str
+    detail: Optional[str] = None
+
+
 def _normalize_phone(value: Optional[str]) -> Optional[str]:
     """Keep optional lead phone values safe and usable for callbacks."""
     if not value:
@@ -119,6 +129,7 @@ class LeadUpdate(BaseModel):
     stage: Optional[str] = None
     notes: Optional[str] = None
     next_action: Optional[str] = None
+    call_outcome: Optional[str] = None  # 'show' | 'no_show' | None (pending)
 
 
 class LeadNote(BaseModel):
@@ -326,7 +337,22 @@ def determine_lead_stage(lead: dict) -> str:
 
 
 def get_next_action(lead: dict) -> str:
-    """Auto-calculate the recommended next action for a lead."""
+    """Auto-calculate the recommended next action for a lead.
+
+    A booked discovery call always takes priority — the Next Action column
+    shows the scheduled date/time so the user can see who is booked and when
+    at a glance. Falls through to stage-based guidance only when no call is booked.
+    """
+    if lead.get("booked_call") and lead.get("booked_call_at"):
+        try:
+            from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+            booking_dt = _dt.fromisoformat(lead["booked_call_at"].replace("Z", "+00:00"))
+            mt_time = booking_dt.astimezone(_tz(_td(hours=-6)))
+            mt_str = mt_time.strftime("%b %d, %I:%M %p MT").replace(" 0", " ")
+            return f"Booked: {mt_str}"
+        except Exception:
+            return "Prepare for upcoming discovery call"
+
     stage = lead.get("stage", "new")
     lessons_watched = lead.get("lessons_watched", 0)
     days_since = _days_since(lead.get("created_at")) or 0
@@ -345,12 +371,33 @@ def get_next_action(lead: dict) -> str:
         return "Monitor — no action needed"
 
 
+def _resource_word(source: Optional[str]) -> Optional[str]:
+    """Map a lead capture source to a short noun describing the resource interacted with."""
+    if not source:
+        return None
+    s = source.lower()
+    if "101" in s or "trustee-101" in s:
+        return "101"
+    if "webinar" in s:
+        return "webinar"
+    if any(k in s for k in ("pdf", "kit", "guide", "template", "checklist")):
+        return "PDF"
+    if any(k in s for k in ("blog", "article", "subscribe")):
+        return "blog"
+    if "booked-call" in s or s == "call":
+        return "call"
+    if "facebook" in s or "fb" in s:
+        return "facebook"
+    return None
+
+
 def _enrich_lead(lead: dict) -> dict:
     """Recalculate stage, score, next_action, and stage_label on a lead dict."""
     lead["stage"] = determine_lead_stage(lead)
     lead["score"] = calculate_lead_score(lead)
     lead["next_action"] = get_next_action(lead)
     lead["stage_label"] = STAGE_LABELS.get(lead["stage"], lead["stage"])
+    lead["resource_word"] = _resource_word(lead.get("origin_source") or lead.get("source"))
     return lead
 
 
@@ -380,12 +427,16 @@ async def capture_lead(lead: LeadCapture):
     existing = await db.leads.find_one({"email": email})
     if existing:
         logger.info(f"Lead already exists for {email} — updating source")
+        # Preserve the lead's immutable origin: don't overwrite `source` after the
+        # first touch. Backfill origin_source for legacy leads that predate the field.
+        origin = existing.get("origin_source") or existing.get("source") or source
         await db.leads.update_one(
             {"email": email},
             {"$set": {
                 "name": name,
-                "source": source,
-                **({"phone": phone} if phone else {}),
+                **( {"source": source} if not existing.get("source") else {} ),
+                "origin_source": origin,
+                **( {"phone": phone} if phone else {} ),
                 "utm_source": lead.utm_source,
                 "utm_campaign": lead.utm_campaign,
                 "utm_medium": lead.utm_medium,
@@ -421,6 +472,7 @@ async def capture_lead(lead: LeadCapture):
         "email": email,
         "name": name,
         "source": source,
+        "origin_source": source,
         "phone": phone,
         "lead_type": "email_capture",
         "utm_source": lead.utm_source,
@@ -520,6 +572,34 @@ async def capture_lead(lead: LeadCapture):
         "lead_id": lead_id,
         "is_returning": False,
     }
+
+
+@router.post("/activity", include_in_schema=False)
+async def log_marketing_activity(body: MarketingActivityIn):
+    """
+    Public endpoint — logs a marketing-site interaction (video watch, PDF
+    download, lesson open) against a lead matched by email. No-op if no lead
+    exists yet (the capture request creates the lead).
+    """
+    email = body.email.strip().lower()
+    lead = await db.leads.find_one({"email": email})
+    if not lead:
+        return {"success": False, "reason": "no_matching_lead"}
+
+    # Capture here also implies marketing engagement — nudge the lead toward engaged.
+    lessons_watched = lead.get("lessons_watched", 0)
+    if body.action_type.startswith("video_") and body.action_type != "video_open":
+        await db.leads.update_one(
+            {"lead_id": lead["lead_id"]},
+            {"$set": {"lessons_watched": max(lessons_watched, 1)}}
+        )
+
+    await _log_activity(
+        lead["lead_id"],
+        body.action_type,
+        body.detail or body.action_type.replace("_", " "),
+    )
+    return {"success": True, "lead_id": lead["lead_id"]}
 
 
 @router.post("/tidycal-webhook", include_in_schema=False)
@@ -1105,7 +1185,7 @@ async def export_leads_csv(
     writer = csv.writer(output)
 
     headers = [
-        "Lead ID", "Name", "Email", "Stage", "Score", "Source",
+        "Lead ID", "Name", "Email", "Stage", "Score", "Source", "Origin Source",
         "UTM Source", "UTM Campaign", "UTM Medium", "Referrer",
         "Lessons Watched", "Booked Call", "Subscription Status",
         "Created At", "Updated At", "Next Action", "Notes"
@@ -1120,6 +1200,7 @@ async def export_leads_csv(
             lead.get("stage", ""),
             lead.get("score", 0),
             lead.get("source", ""),
+            lead.get("origin_source", "") or lead.get("source", ""),
             lead.get("utm_source", ""),
             lead.get("utm_campaign", ""),
             lead.get("utm_medium", ""),
@@ -1207,7 +1288,7 @@ async def bulk_export_csv(
     writer = csv.writer(output)
 
     headers = [
-        "Lead ID", "Name", "Email", "Stage", "Score", "Source",
+        "Lead ID", "Name", "Email", "Stage", "Score", "Source", "Origin Source",
         "UTM Source", "UTM Campaign", "UTM Medium", "Referrer",
         "Lessons Watched", "Booked Call", "Subscription Status",
         "Created At", "Updated At", "Next Action", "Notes"
@@ -1222,6 +1303,7 @@ async def bulk_export_csv(
             lead.get("stage", ""),
             lead.get("score", 0),
             lead.get("source", ""),
+            lead.get("origin_source", "") or lead.get("source", ""),
             lead.get("utm_source", ""),
             lead.get("utm_campaign", ""),
             lead.get("utm_medium", ""),
@@ -1346,6 +1428,7 @@ async def update_lead(
 
     update_data = {}
     old_stage = lead.get("stage")
+    call_was = lead.get("call_outcome")
 
     if update.stage:
         if update.stage not in LEAD_STAGES:
@@ -1362,12 +1445,26 @@ async def update_lead(
     if update.next_action is not None:
         update_data["next_action"] = update.next_action
 
+    if update.call_outcome is not None:
+        if update.call_outcome not in ("show", "no_show"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid call_outcome. Must be 'show' or 'no_show'."
+            )
+        update_data["call_outcome"] = update.call_outcome
+
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.leads.update_one(
             {"lead_id": lead_id},
             {"$set": update_data}
         )
+
+        if update.call_outcome is not None and update.call_outcome != call_was:
+            await _log_activity(
+                lead_id, "call_outcome",
+                f"Discovery call marked: {update.call_outcome.replace('_', ' ')}"
+            )
 
         if update.stage and update.stage != old_stage:
             await _log_activity(

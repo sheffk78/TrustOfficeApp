@@ -443,6 +443,7 @@ export default function SignUpPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       className="pl-10 input-trust"
                       placeholder="your@email.com"
+                      aria-label="Email address"
                       required
                       data-testid="email-input"
                     />
@@ -468,7 +469,8 @@ export default function SignUpPage() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
-                    >
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>

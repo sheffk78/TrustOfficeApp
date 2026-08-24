@@ -5,12 +5,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Target, Activity, RefreshCw, MessageSquare, Crown, BarChart3, Building2, FileText, DollarSign, LogIn, Gift, XCircle, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
-import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, LEAD_STAGES } from './helpers';
+import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, formatCallOutcome, getResourceWord, formatSourceLabel, LEAD_STAGES } from './helpers';
 
 // ─── Lead Detail Dialog ────────────────────────────────────────────
 export function LeadDetailDialog({
   selectedLead, leadDetailLoading,
-  onClose, onUpdateLeadStage, onAddNote, onNoteChange, leadNoteText,
+  onClose, onUpdateLeadStage, onUpdateCallOutcome, onAddNote, onNoteChange, leadNoteText,
 }) {
   return (
     <Dialog open={!!selectedLead} onOpenChange={onClose}>
@@ -56,7 +56,10 @@ export function LeadDetailDialog({
               <div className="p-3 border border-gold/30 bg-gold/5 rounded">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-base">📞</span>
-                  <span className="text-sm font-medium text-navy dark:text-white">Discovery Call Scheduled</span>
+                  <span className="text-sm font-medium text-navy dark:text-white">Discovery Call</span>
+                  <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full ${formatCallOutcome(selectedLead.call_outcome).cls}`}>
+                    {formatCallOutcome(selectedLead.call_outcome).label}
+                  </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {selectedLead.booked_call_at
@@ -70,6 +73,27 @@ export function LeadDetailDialog({
                       })
                     : 'Date not available'}
                 </p>
+                {onUpdateCallOutcome && (
+                  <div className="flex items-center gap-2 mt-3">
+                    <span className="text-xs text-muted-foreground">Mark as:</span>
+                    <Button
+                      size="sm"
+                      variant={selectedLead.call_outcome === 'show' ? 'default' : 'outline'}
+                      className={selectedLead.call_outcome === 'show' ? 'bg-success text-white' : ''}
+                      onClick={() => onUpdateCallOutcome(selectedLead.lead_id, 'show')}
+                    >
+                      Showed
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedLead.call_outcome === 'no_show' ? 'default' : 'outline'}
+                      className={selectedLead.call_outcome === 'no_show' ? 'bg-error text-white' : ''}
+                      onClick={() => onUpdateCallOutcome(selectedLead.lead_id, 'no_show')}
+                    >
+                      No-show
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -156,10 +180,23 @@ export function LeadDetailDialog({
               </div>
             </div>
 
+            {/* Marketing Resource */}
+            {getResourceWord(selectedLead.origin_source || selectedLead.source) && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Marketing resource:</span>
+                <span className="inline-flex items-center text-xs font-medium text-navy/70 dark:text-white/70 px-1.5 py-0.5 bg-navy/5 dark:bg-white/10 rounded-full">
+                  {getResourceWord(selectedLead.origin_source || selectedLead.source)}
+                </span>
+              </div>
+            )}
+
             {/* Activity Log */}
             {selectedLead.activities && selectedLead.activities.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-navy dark:text-white mb-3">Activity Log</h3>
+                <h3 className="text-sm font-medium text-navy dark:text-white mb-3 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-gold" />
+                  Activity
+                </h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {selectedLead.activities.map((act, i) => (
                     <div key={act.activity_id || i} className="flex items-start gap-3 p-2 border-b border-navy/5 dark:border-white/5 last:border-0">
@@ -276,14 +313,22 @@ export function CustomerDetailDialog({
   const memberSince = customerDetail.created_at ? formatDate(customerDetail.created_at) : null;
   let accessEndLabel = null;
   let accessExpired = false;
-  if (!isForeverFree && (sub.trial_end || sub.gifted_at)) {
-    const endRaw = sub.trial_end || sub.gifted_at;
-    const endDate = new Date(endRaw);
+  // Use the real gift-window end for gifted accounts; gift_end_date is the
+  // authoritative expiry. Fall back to trial_end for legacy trials.
+  const accessEndRaw = sub.gift_end_date || sub.trial_end || (isGifted ? sub.gifted_at : null);
+  if (!isForeverFree && accessEndRaw) {
+    const endDate = new Date(accessEndRaw);
     if (!isNaN(endDate.getTime())) {
       accessExpired = endDate < new Date();
-      accessEndLabel = `${formatDate(endRaw)}${accessExpired ? ' — expired' : ''}`;
+      accessEndLabel = `${formatDate(accessEndRaw)}${accessExpired ? ' — expired' : ''}`;
     }
   }
+
+  // Admin lock: an admin-controlled account cannot be impersonated or gifted.
+  const isAdminLocked = !!customerDetail.is_admin;
+
+  const formattedSource = formatSourceLabel(customerDetail.origin_source);
+  const timeline = customerDetail.marketing_timeline || [];
 
   return (
     <Dialog open={!!customerDetail} onOpenChange={onClose}>
@@ -348,110 +393,70 @@ export function CustomerDetailDialog({
             </dl>
           </div>
 
-          {/* Stats — Trusts & Referral in a two-column grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-3 border border-navy/10 dark:border-white/10 rounded">
-              <div className="flex items-start justify-between">
-                <div className="text-center flex-1">
-                  <Building2 className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.trusts}</p>
-                  <p className="text-xs text-muted-foreground">Trusts</p>
-                </div>
-                <div className="text-center flex-1">
-                  <FileText className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.minutes}</p>
-                  <p className="text-xs text-muted-foreground">Minutes</p>
-                </div>
-                <div className="text-center flex-1">
-                  <DollarSign className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.distributions}</p>
-                  <p className="text-xs text-muted-foreground">Distributions</p>
-                </div>
-              </div>
-              {customerDetail.trusts?.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-navy/10 dark:border-white/10">
-                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Trusts ({customerDetail.trusts.length})</p>
-                  <div className="space-y-1">
-                    {customerDetail.trusts.slice(0, 5).map((t) => (
-                      <p key={t.trust_id} className="text-sm text-navy dark:text-white truncate">{t.name}</p>
-                    ))}
-                    {customerDetail.trusts.length > 5 && (
-                      <p className="text-xs text-muted-foreground">+{customerDetail.trusts.length - 5} more</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-3 border border-navy/10 dark:border-white/10 rounded">
-              <h3 className="font-medium text-navy dark:text-white text-sm mb-2">Referral</h3>
-              {customerDetail.referral_info ? (
-                <div className="space-y-1 text-sm">
-                  {customerDetail.referral_info.referral_code ? (
-                    <p className="text-muted-foreground">
-                      Code: <span className="font-mono text-navy dark:text-white">{customerDetail.referral_info.referral_code}</span>
-                    </p>
-                  ) : null}
-                  {customerDetail.referral_info.referred_by ? (
-                    <p className="text-muted-foreground">Referred by another user</p>
-                  ) : (
-                    <p className="text-muted-foreground">No referrer</p>
-                  )}
-                  <p className="text-muted-foreground">
-                    Successful referrals: <span className="font-medium text-navy dark:text-white">{customerDetail.referral_info.successful_referrals ?? 0}</span>
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No referral activity</p>
-              )}
+          {/* Stats — trusts only for a leaner admin review */}
+          <div className="grid grid-cols-1 gap-4">
+            <div className="p-3 border border-navy/10 dark:border-white/10 rounded text-center">
+              <Building2 className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+              <p className="text-lg font-bold text-navy dark:text-white">{customerDetail.stats?.trusts}</p>
+              <p className="text-xs text-muted-foreground">Trusts</p>
             </div>
           </div>
 
-          {/* Acquisition Source */}
-          {(customerDetail.source || customerDetail.utm_source || customerDetail.wp_ref) && (
-            <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
-              <h3 className="font-medium text-navy dark:text-white mb-2">Acquisition Source</h3>
-              <div className="flex flex-wrap gap-2">
-                {customerDetail.wp_ref && (
-                  <Badge className="bg-success/10 text-success">
-                    <Crown className="w-3 h-3 mr-1" /> WingPoint
-                  </Badge>
-                )}
-                {customerDetail.source && (
-                  <Badge variant="outline" className="capitalize">{customerDetail.source.replace(/_/g, ' ')}</Badge>
-                )}
-                {customerDetail.utm_source && (
-                  <Badge className="bg-gold/20 text-gold">{customerDetail.utm_source}</Badge>
-                )}
-                {customerDetail.utm_medium && (
-                  <span className="text-xs text-muted-foreground capitalize self-center">via {customerDetail.utm_medium.replace(/_/g, ' ')}</span>
-                )}
-                {customerDetail.utm_campaign && (
-                  <span className="text-xs text-muted-foreground self-center">campaign: {customerDetail.utm_campaign}</span>
-                )}
-                {customerDetail.referrer && !customerDetail.wp_ref && (
-                  <span className="text-xs text-muted-foreground self-center truncate max-w-[240px]" title={customerDetail.referrer}>from {customerDetail.referrer}</span>
-                )}
+          {/* Acquisition Origin */}
+          <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
+            <h3 className="font-medium text-navy dark:text-white mb-2 flex items-center gap-2">
+              <Target className="w-4 h-4 text-gold" />
+              Acquisition
+            </h3>
+            <dl className="grid gap-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Source</dt>
+                <dd className="font-medium text-navy dark:text-white text-right">
+                  {formattedSource || <span className="text-muted-foreground">Unknown</span>}
+                </dd>
               </div>
-            </div>
-          )}
-
-          {/* Account Lifecycle History */}
-          {customerDetail.account_history?.length > 0 && (
-            <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
-              <h3 className="font-medium text-navy dark:text-white mb-2">Account History</h3>
-              <div className="space-y-2">
-                {customerDetail.account_history.slice(-8).reverse().map((ev, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="capitalize text-muted-foreground">{String(ev.type || '').replace(/_/g, ' ')}</span>
-                      {ev.plan_type && <span className="text-muted-foreground">· {ev.plan_type}</span>}
-                      {typeof ev.amount === 'number' && <span className="font-mono text-navy dark:text-white">${ev.amount}</span>}
+              {customerDetail.lead_id && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Lead</dt>
+                  <dd className="font-mono text-xs text-navy dark:text-white">{customerDetail.lead_id}</dd>
+                </div>
+              )}
+            </dl>
+            {timeline.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground mb-1.5">Marketing journey</p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {timeline.map((ev, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-gold shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-navy dark:text-white">{ev.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(ev.date)} · {ev.type}
+                        </p>
+                      </div>
                     </div>
-                    <span className="text-xs text-muted-foreground">{ev.date ? new Date(ev.date).toLocaleDateString() : ''}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
+            )}
+          </div>
+
+          {/* Referral Info */}
+          {customerDetail.referral_info && (
+            <div className="p-4 border border-navy/10 dark:border-white/10 rounded">
+              <h3 className="font-medium text-navy dark:text-white mb-2">Referral Info</h3>
+              {customerDetail.referral_info.referral_code && (
+                <p className="text-sm text-muted-foreground">
+                  Code: <span className="font-mono">{customerDetail.referral_info.referral_code}</span>
+                </p>
+              )}
+              {customerDetail.referral_info.referred_by && (
+                <p className="text-sm text-muted-foreground">Referred by another user</p>
+              )}
+              <p className="text-sm text-muted-foreground">
+                Successful referrals: {customerDetail.referral_info.successful_referrals}
+              </p>
             </div>
           )}
 

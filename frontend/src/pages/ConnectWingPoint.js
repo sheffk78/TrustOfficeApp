@@ -351,6 +351,7 @@ export default function ConnectWingPoint() {
                         onChange={(e) => { setEmail(e.target.value); if (loginError) setLoginError(''); }}
                         className={`pl-10 input-trust ${loginError ? 'border-error/40' : ''}`}
                         placeholder="your@email.com"
+                        aria-label="Email address"
                         required
                         autoFocus
                       />
@@ -377,13 +378,15 @@ export default function ConnectWingPoint() {
                         onChange={(e) => { setPassword(e.target.value); if (loginError) setLoginError(''); }}
                         className={`pl-10 pr-10 input-trust ${loginError ? 'border-error/40' : ''}`}
                         placeholder="Enter password"
+                        aria-label="Password"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
-                      >
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
