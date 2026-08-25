@@ -92,6 +92,7 @@ from routers.tax_calendar import router as tax_calendar_router
 from routers.state_compliance import router as state_compliance_router
 from routers.investments import router as investments_router
 from routers.communications import router as communications_router
+from routers.email_archive import router as email_archive_router, ensure_email_archive_indexes
 from routers.vault import router as vault_router
 from routers.risk_dashboard import router as risk_dashboard_router
 from routers.binder import router as binder_router
@@ -418,6 +419,7 @@ app.include_router(tax_calendar_router, prefix="/api")
 app.include_router(state_compliance_router, prefix="/api")
 app.include_router(investments_router, prefix="/api")
 app.include_router(communications_router, prefix="/api")
+app.include_router(email_archive_router, prefix="/api")
 app.include_router(vault_router, prefix="/api")
 app.include_router(risk_dashboard_router, prefix="/api")
 app.include_router(binder_router, prefix="/api")
@@ -743,6 +745,9 @@ async def startup_event():
         
         # Benevolence policy indexes (policy container + versioning)
         await ensure_benevolence_policy_indexes()
+        
+        # Email archive indexes (BCC capture feature)
+        await ensure_email_archive_indexes()
         
         logger.info("Database indexes created/verified successfully")
         

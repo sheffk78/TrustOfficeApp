@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
 import PageHelpButton from '@/components/PageHelpButton';
+import EmailArchiveCard from '@/components/EmailArchiveCard';
 import { 
   User,
   Building2,
@@ -1212,6 +1213,13 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Email Archive — BCC capture card */}
+            {selectedTrust && (
+              <div className="mb-8">
+                <EmailArchiveCard trustId={selectedTrust.trust_id} trustName={selectedTrust.name} />
+              </div>
+            )}
           )}
           </TabsContent>
 

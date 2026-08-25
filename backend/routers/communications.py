@@ -86,6 +86,7 @@ async def list_communications(
     comm_type: Optional[str] = None,
     direction: Optional[str] = None,
     action_required: Optional[bool] = None,
+    source: Optional[str] = None,
     search: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -103,6 +104,8 @@ async def list_communications(
         query["direction"] = direction
     if action_required is not None:
         query["action_required"] = action_required
+    if source:
+        query["source"] = source
 
     if search:
         escaped_search = re.escape(search)
