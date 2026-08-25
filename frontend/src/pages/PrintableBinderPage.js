@@ -371,7 +371,7 @@ const PrintableBinderPage = () => {
                       <p className="text-xs text-muted-foreground mt-1">{section.description}</p>
                       <Button
                         onClick={() => handlePrint(`tab-${section.id}`)}
-                        className="mt-2 h-auto p-0 text-xs font-medium text-gold hover:text-navy/60"
+                        className="mt-2 h-auto inline-flex items-center gap-1.5 text-xs font-medium text-gold border border-gold/30 rounded-md px-2.5 py-1 hover:bg-gold/10 hover:border-gold/50 transition-colors"
                       >
                         <Printer className="w-3 h-3" /> Print Divider
                       </Button>
@@ -440,7 +440,7 @@ const PrintableBinderPage = () => {
                   <p className="text-xs text-muted-foreground mt-1">Deed recording, insurance, mortgage, and tax steps.</p>
                   <Button
                     onClick={() => handlePrint('checklist-real-estate')}
-                    className="mt-2 h-auto p-0 text-xs font-medium text-gold hover:text-navy/60"
+                    className="mt-2 h-auto inline-flex items-center gap-1.5 text-xs font-medium text-gold border border-gold/30 rounded-md px-2.5 py-1 hover:bg-gold/10 hover:border-gold/50 transition-colors"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
                   </Button>
@@ -455,7 +455,7 @@ const PrintableBinderPage = () => {
                   <p className="text-xs text-muted-foreground mt-1">Title transfer, DMV, insurance, and registration steps.</p>
                   <Button
                     onClick={() => handlePrint('checklist-vehicle')}
-                    className="mt-2 h-auto p-0 text-xs font-medium text-gold hover:text-navy/60"
+                    className="mt-2 h-auto inline-flex items-center gap-1.5 text-xs font-medium text-gold border border-gold/30 rounded-md px-2.5 py-1 hover:bg-gold/10 hover:border-gold/50 transition-colors"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
                   </Button>
