@@ -884,6 +884,7 @@ export default function SettingsPage() {
           <TabsContent value="profile">
           {/* Trust Settings */}
           {selectedTrust && (
+            <>
             <div className="card-trust mb-8">
               <div className="flex items-center gap-2 mb-6">
                 <Building2 className="w-5 h-5 text-navy" />
@@ -1215,11 +1216,10 @@ export default function SettingsPage() {
             </div>
 
             {/* Email Archive — BCC capture card */}
-            {selectedTrust && (
-              <div className="mb-8">
-                <EmailArchiveCard trustId={selectedTrust.trust_id} trustName={selectedTrust.name} />
-              </div>
-            )}
+            <div className="mb-8">
+              <EmailArchiveCard trustId={selectedTrust.trust_id} trustName={selectedTrust.name} />
+            </div>
+            </>
           )}
           </TabsContent>
 
