@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { safeFormatDate } from '@/utils/safeDate';
 import {
-  File, ExternalLink, Download, Trash2, Copy, Check, Bot,
+  File, ExternalLink, Download, Trash2, Copy, Check, Bot, Eye,
 } from 'lucide-react';
 import AnalysisStatusBadge from '@/components/AnalysisStatusBadge';
 import BankStatementBadge from '@/components/BankStatementBadge';
+import VaultPreviewModal from '@/components/vault/VaultPreviewModal';
 
 /**
  * Renders a single vault document card with file/storage indicators,
@@ -20,22 +22,44 @@ export default function VaultDocumentCard({
   onDownload,
 }) {
   const isUploadedFile = doc.storage_provider === 'trustoffice';
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
     <div className="card-trust p-4 hover:shadow-sm transition-shadow">
+      {/* Clickable title opens the preview for uploaded files */}
+      {isUploadedFile ? (
+        <div className="flex items-start justify-between mb-2">
+          <button
+            onClick={() => setPreviewOpen(true)}
+            className="font-semibold text-navy text-sm line-clamp-2 text-left hover:underline"
+            data-testid={`preview-${doc.doc_id}`}
+            title="Click to preview"
+          >
+            {doc.title}
+          </button>
+          <button onClick={() => onDelete(doc.doc_id)} className="text-muted-foreground hover:text-rust ml-2 flex-shrink-0" aria-label={`Delete ${doc.title}`}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
       <div className="flex items-start justify-between mb-2">
         <p className="font-semibold text-navy text-sm line-clamp-2">{doc.title}</p>
         <button onClick={() => onDelete(doc.doc_id)} className="text-muted-foreground hover:text-rust ml-2 flex-shrink-0">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
+      )}
 
       {/* File indicator */}
       {isUploadedFile ? (
-        <div className="flex items-center gap-1.5 text-xs text-success bg-success/10 rounded px-2 py-1 mb-2 w-fit">
-          <File className="w-3 h-3" />
-          {doc.file_name} {doc.file_size && `(${doc.file_size})`}
-        </div>
+        <button
+          onClick={() => setPreviewOpen(true)}
+          className="flex items-center gap-1.5 text-xs text-success bg-success/10 rounded px-2 py-1 mb-2 w-fit hover:bg-success/20 transition-colors"
+          title="Click to preview"
+        >
+          <Eye className="w-3 h-3" />
+          Preview {doc.file_name}
+        </button>
       ) : doc.file_name ? (
         <p className="text-xs text-muted-foreground mb-2">{doc.file_name}</p>
       ) : null}
@@ -105,6 +129,8 @@ export default function VaultDocumentCard({
           Renews {safeFormatDate(doc.expiration_date, 'MMM d, yyyy')}
         </div>
       )}
+
+      <VaultPreviewModal doc={doc} open={previewOpen} onOpenChange={setPreviewOpen} />
     </div>
   );
 }

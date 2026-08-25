@@ -348,7 +348,11 @@ async def upload_document(
 
 
 @router.get("/vault/documents/{doc_id}/download")
-async def download_document(doc_id: str, user: dict = Depends(get_current_user)):
+async def download_document(
+    doc_id: str,
+    inline: bool = Query(False, description="Serve with Content-Disposition: inline for in-app preview"),
+    user: dict = Depends(get_current_user),
+):
     """Download a file from the vault."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
@@ -377,11 +381,12 @@ async def download_document(doc_id: str, user: dict = Depends(get_current_user))
     # Log vault download for audit trail
     await log_audit_event(user["user_id"], "vault_download", "vault_document", doc_id, {"file_name": safe_filename, "trust_id": doc.get("trust_id", "")})
 
+    disposition = "inline" if inline else "attachment"
     return Response(
         content=file_content,
         media_type=content_type,
         headers={
-            "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{encoded_filename}"
+            "Content-Disposition": f"{disposition}; filename=\"{safe_filename}\"; filename*=UTF-8''{encoded_filename}"
         }
     )
 
