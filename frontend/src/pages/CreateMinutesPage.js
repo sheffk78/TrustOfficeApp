@@ -143,7 +143,7 @@ const CATEGORY_MAP = {
 const RESOLUTION_SUBTITLES = {
   'initial_trustee_meeting': 'Initial Trustee Resolution & Minutes',
   'general_meeting': 'General Meeting & Resolutions',
-  'acceptance_of_property': 'Resolution to Accept Property into Trust',
+  'acceptance_of_property': 'Accept Property into Trust',
   'disposition_of_asset': 'Resolution to Dispose of Trust Asset',
   'distribution_to_beneficiaries': 'Resolution to Distribute',
   'appointment_additional_trustee': 'Resolution to Appoint Trustee',

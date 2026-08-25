@@ -53,6 +53,92 @@ def _extract_bank_account_info(template_data: dict) -> dict | None:
     }
 
 
+async def _auto_create_bank_account_from_minutes(
+    trust_id: str, user_id: str, minutes_id: str, template_data: dict
+) -> dict | None:
+    """Create a real bank account record from bank info in finalized minutes.
+
+    This is the fix for the gap where initial minutes captured bank info but
+    only created a Schedule A draft asset — never a bank_accounts record.
+    Now finalizing minutes with bank info creates both.
+    """
+    bank_info = _extract_bank_account_info(template_data)
+    if not bank_info:
+        return None
+
+    # Need a last-4 to create a proper bank account
+    if not bank_info["account_last4"]:
+        return None
+
+    # Find the trust's default entity (auto-created when trust is created)
+    entity = await db.entities.find_one(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "entity_id": 1, "name": 1},
+    )
+    if not entity:
+        logger.warning(f"Cannot create bank account from minutes {minutes_id}: no entity found for trust {trust_id}")
+        return None
+
+    # Check for duplicate — don't create if a bank account already exists for this minutes_id
+    existing = await db.bank_accounts.find_one({
+        "trust_id": trust_id, "user_id": user_id,
+        "source_minutes_id": minutes_id,
+    }, {"_id": 0})
+    if existing:
+        return None
+
+    # Map template account_type to BankAccountType enum values
+    # Template forms use: checking, savings, brokerage, money_market
+    # Enum supports: checking, savings, investment, brokerage, cd, other
+    account_type_raw = bank_info["account_type"]
+    valid_types = {"checking", "savings", "investment", "brokerage", "cd", "other"}
+    if account_type_raw not in valid_types:
+        account_type_raw = "other"
+
+    account_id = f"bac_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Build a nickname from institution + last-4
+    nickname = f"{bank_info['institution']} ****{bank_info['account_last4']}"
+
+    doc = {
+        "account_id": account_id,
+        "trust_id": trust_id,
+        "entity_id": entity["entity_id"],
+        "user_id": user_id,
+        "nickname": nickname,
+        "institution_name": bank_info["institution"],
+        "account_type": account_type_raw,
+        "last_four": bank_info["account_last4"],
+        "is_archived": False,
+        "source_minutes_id": minutes_id,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    await db.bank_accounts.insert_one(doc)
+
+    # Log in audit trail
+    await db.audit_trail.insert_one({
+        "audit_id": f"bank_acct_from_minutes_{account_id}",
+        "user_id": user_id,
+        "trust_id": trust_id,
+        "action": "bank_account_from_minutes",
+        "entity_type": "bank_account",
+        "entity_id": account_id,
+        "details": {
+            "minutes_id": minutes_id,
+            "institution": bank_info["institution"],
+            "account_last4": bank_info["account_last4"],
+            "account_type": account_type_raw,
+        },
+        "timestamp": now,
+    })
+
+    doc.pop("_id", None)
+    return doc
+
+
 async def _auto_create_draft_asset_from_minutes(
     trust_id: str, user_id: str, minutes_id: str, template_type: str, template_data: dict, meeting_date: str | None
 ):
@@ -721,10 +807,23 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
             )
         except Exception as e:
             logging.warning(f"TO-016 draft asset creation failed for {minutes_id}: {e}")
+        # Also create a real bank account record from the minutes bank info
+        bank_account = None
+        try:
+            bank_account = await _auto_create_bank_account_from_minutes(
+                trust_id=template.get("trust_id", ""),
+                user_id=user["user_id"],
+                minutes_id=minutes_id,
+                template_data=template.get("template_data", {}),
+            )
+        except Exception as e:
+            logging.warning(f"Bank account creation from minutes failed for {minutes_id}: {e}")
         return {
             "message": "Minutes finalized", "updated_fields": ["status"], "legacy_path": True,
             "draft_asset_created": draft_asset is not None,
             "draft_asset_id": draft_asset.get("item_id") if draft_asset else None,
+            "bank_account_created": bank_account is not None,
+            "bank_account_id": bank_account.get("account_id") if bank_account else None,
         }
     
     if existing.get("status") == "finalized":
@@ -779,6 +878,7 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
     
     # TO-016: Auto-create draft Schedule A asset if this is a finalization with bank account info
     draft_asset = None
+    bank_account = None
     if data.get("status") == "finalized":
         try:
             draft_asset = await _auto_create_draft_asset_from_minutes(
@@ -791,11 +891,23 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
             )
         except Exception as e:
             logging.warning(f"TO-016 draft asset creation failed for {minutes_id}: {e}")
+        # Also create a real bank account record from the minutes bank info
+        try:
+            bank_account = await _auto_create_bank_account_from_minutes(
+                trust_id=existing.get("trust_id", ""),
+                user_id=user["user_id"],
+                minutes_id=minutes_id,
+                template_data=existing.get("template_data", {}),
+            )
+        except Exception as e:
+            logging.warning(f"Bank account creation from minutes failed for {minutes_id}: {e}")
 
     return {
         "message": "Minutes updated", "updated_fields": list(update_data.keys()),
         "draft_asset_created": draft_asset is not None,
         "draft_asset_id": draft_asset.get("item_id") if draft_asset else None,
+        "bank_account_created": bank_account is not None,
+        "bank_account_id": bank_account.get("account_id") if bank_account else None,
     }
 
 
@@ -4411,27 +4523,57 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
     # If accepting property or conveying property and add_to_schedule_a is true, add to Schedule A
     CONVEYANCE_TEMPLATES = {"acceptance_of_property", "bill_of_sale", "assignment_of_personal_property", "general_assignment"}
     if template.template_type.value in CONVEYANCE_TEMPLATES and template.template_data.get("add_to_schedule_a"):
-        category = template.template_data.get("schedule_a_category", "other_property")
-        asset_doc = {
-            "item_id": f"asset_{uuid.uuid4().hex[:12]}",
-            "trust_id": template.trust_id,
-            "user_id": user["user_id"],
-            "category": category,
-            "description": template.template_data.get("property_description", ""),
-            "identifier": template.template_data.get("property_identifier", ""),
-            "location": template.template_data.get("property_location", ""),
-            "approximate_value": template.template_data.get("property_value"),
-            "date_conveyed": template.template_data.get("conveyance_date", meeting_date),
-            "notes": template.template_data.get("property_notes", ""),
-            "status": "active",
-            "minutes_ref": minutes_id,
-            "disposition_minutes_ref": None,
-            "disposition_date": None,
-            "disposition_notes": None,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": None
-        }
-        await db.schedule_a_items.insert_one(asset_doc)
+        # Support multi-item mode (property_items array) and legacy single-item mode
+        property_items = template.template_data.get("property_items")
+        if property_items and isinstance(property_items, list):
+            # Multi-item flow: create a Schedule A item for each property
+            for item in property_items:
+                if not item.get("add_to_schedule_a", True):
+                    continue
+                category = item.get("schedule_a_category", "other_property")
+                asset_doc = {
+                    "item_id": f"asset_{uuid.uuid4().hex[:12]}",
+                    "trust_id": template.trust_id,
+                    "user_id": user["user_id"],
+                    "category": category,
+                    "description": item.get("property_description", ""),
+                    "identifier": item.get("property_identifier", ""),
+                    "location": item.get("property_location", ""),
+                    "approximate_value": item.get("property_value"),
+                    "date_conveyed": item.get("conveyance_date", meeting_date),
+                    "notes": "",
+                    "status": "active",
+                    "minutes_ref": minutes_id,
+                    "disposition_minutes_ref": None,
+                    "disposition_date": None,
+                    "disposition_notes": None,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": None
+                }
+                await db.schedule_a_items.insert_one(asset_doc)
+        else:
+            # Legacy single-item flow
+            category = template.template_data.get("schedule_a_category", "other_property")
+            asset_doc = {
+                "item_id": f"asset_{uuid.uuid4().hex[:12]}",
+                "trust_id": template.trust_id,
+                "user_id": user["user_id"],
+                "category": category,
+                "description": template.template_data.get("property_description", ""),
+                "identifier": template.template_data.get("property_identifier", ""),
+                "location": template.template_data.get("property_location", ""),
+                "approximate_value": template.template_data.get("property_value"),
+                "date_conveyed": template.template_data.get("conveyance_date", meeting_date),
+                "notes": template.template_data.get("property_notes", ""),
+                "status": "active",
+                "minutes_ref": minutes_id,
+                "disposition_minutes_ref": None,
+                "disposition_date": None,
+                "disposition_notes": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": None
+            }
+            await db.schedule_a_items.insert_one(asset_doc)
     
     # If disposing of an asset and update_schedule_a is true, mark asset as disposed
     if template.template_type.value == "disposition_of_asset" and template.template_data.get("update_schedule_a"):

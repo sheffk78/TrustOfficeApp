@@ -28,6 +28,8 @@ const buildInitialTrusteeMeeting = (ctx) => {
   return {
     ...base,
     bank_name: formData.bank_name || '',
+    account_number: formData.account_number || '',
+    account_type: formData.account_type || 'checking',
     initial_deposit: formData.initial_deposit || '',
     meeting_location: formData.meeting_location || '',
     meeting_time: formData.meeting_time || '',
@@ -68,17 +70,32 @@ const buildDistributionToBeneficiaries = (ctx) => {
 const buildPropertyAcceptance = (ctx) => {
   const base = buildBaseData(ctx);
   const { propertyData } = ctx;
+  // Support multi-item mode (propertyData.items) and legacy single-item mode
+  const items = propertyData.items || [propertyData];
   return {
     ...base,
-    grantor_name: propertyData.grantor_name,
-    property_description: propertyData.property_description,
-    property_value: parseFloat(propertyData.property_value) || null,
-    property_identifier: propertyData.property_identifier,
-    property_location: propertyData.property_location,
-    conveyance_date: propertyData.conveyance_date,
-    appraiser_name: propertyData.appraiser_name || null,
-    add_to_schedule_a: propertyData.add_to_schedule_a,
-    schedule_a_category: propertyData.schedule_a_category,
+    // Keep legacy single-item fields for backward compat (first item)
+    grantor_name: items[0]?.grantor_name,
+    property_description: items[0]?.property_description,
+    property_value: parseFloat(items[0]?.property_value) || null,
+    property_identifier: items[0]?.property_identifier,
+    property_location: items[0]?.property_location,
+    conveyance_date: items[0]?.conveyance_date,
+    appraiser_name: items[0]?.appraiser_name || null,
+    add_to_schedule_a: items[0]?.add_to_schedule_a,
+    schedule_a_category: items[0]?.schedule_a_category,
+    // Multi-item array for new flow
+    property_items: items.map(item => ({
+      grantor_name: item.grantor_name || '',
+      property_description: item.property_description || '',
+      property_value: parseFloat(item.property_value) || null,
+      property_identifier: item.property_identifier || '',
+      property_location: item.property_location || '',
+      conveyance_date: item.conveyance_date || '',
+      appraiser_name: item.appraiser_name || null,
+      add_to_schedule_a: item.add_to_schedule_a !== false,
+      schedule_a_category: item.schedule_a_category || 'other_property',
+    })),
   };
 };
 
@@ -135,10 +152,11 @@ const buildDesignationOfBeneficiaries = (ctx) => {
 
 const buildBankAccountAuthorization = (ctx) => {
   const base = buildBaseData(ctx);
-  const { bankData } = ctx;
+  const { bankData, formData } = ctx;
   return {
     ...base,
     bank_name: bankData.bank_name,
+    account_number: formData.account_number || bankData.account_number || '',
     account_type: bankData.account_type,
     purpose: bankData.purpose,
     authorized_signers: bankData.authorized_signers.filter((s) => s.trim()),

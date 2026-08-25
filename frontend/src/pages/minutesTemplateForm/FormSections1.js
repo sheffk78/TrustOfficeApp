@@ -21,6 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { formatCurrency, parseCurrencyInput, ASSET_CATEGORIES, currencyInputClass } from './constants';
+import { format } from 'date-fns';
 
 const removeIconBtn = 'h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50';
 
@@ -125,100 +126,151 @@ export const DistributionFields = ({ data, setData, onAddItem, onRemoveItem, onI
 /* ── Property Acceptance / Bill of Sale / Assignment ──────── */
 export const PropertyFields = ({ data, setData, templateType }) => {
   const showAppraiser = templateType === 'assignment_of_personal_property';
+
+  // Support both legacy single-item (data.items undefined) and multi-item mode
+  const items = data.items || [data];
+  const setItems = (newItems) => setData({ ...data, items: newItems });
+
+  const updateItem = (index, field, value) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
+  };
+
+  const addItem = () => {
+    setItems([...items, {
+      grantor_name: items[0]?.grantor_name || '',
+      property_description: '',
+      property_value: '',
+      property_identifier: '',
+      property_location: '',
+      conveyance_date: format(new Date(), 'MMMM d, yyyy'),
+      add_to_schedule_a: true,
+      schedule_a_category: 'real_property',
+    }]);
+  };
+
+  const removeItem = (index) => {
+    if (items.length <= 1) return;
+    setItems(items.filter((_, i) => i !== index));
+  };
+
   return (
-    <div className="card-trust corner-mark p-6">
-      <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Property Details</h2>
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="md:col-span-2">
-          <Label className="label-trust">Grantor/Creator Name</Label>
-          <Input
-            value={data.grantor_name}
-            onChange={(e) => setData({ ...data, grantor_name: e.target.value })}
-            className="mt-1 input-trust"
-            placeholder="John Smith"
-          />
-        </div>
-        <div className="md:col-span-2">
-          <Label className="label-trust">Property Description</Label>
-          <Textarea
-            value={data.property_description}
-            onChange={(e) => setData({ ...data, property_description: e.target.value })}
-            className="mt-1"
-            placeholder="Single-family residence located at 123 Main Street, City, State 12345; Lot 4, Block 2, Subdivision XYZ"
-            rows={3}
-          />
-        </div>
-        <div>
-          <Label className="label-trust">Identifier (VIN, Account #, Legal Description)</Label>
-          <Input
-            value={data.property_identifier}
-            onChange={(e) => setData({ ...data, property_identifier: e.target.value })}
-            className="mt-1 input-trust"
-            placeholder="VIN: 1HGBH41JXMN109186"
-          />
-        </div>
-        <div>
-          <Label className="label-trust">Location / Institution</Label>
-          <Input
-            value={data.property_location}
-            onChange={(e) => setData({ ...data, property_location: e.target.value })}
-            className="mt-1 input-trust"
-            placeholder="123 Main St, City, State 12345"
-          />
-        </div>
-        <div>
-          <Label className="label-trust">Approximate Value ($)</Label>
-          <Input
-            type="text"
-            inputMode="numeric"
-            value={formatCurrency(data.property_value)}
-            onChange={(e) => setData({ ...data, property_value: parseCurrencyInput(e.target.value) })}
-            className="mt-1 input-trust"
-            placeholder="$250,000"
-          />
-        </div>
-        <div>
-          <Label className="label-trust">Date of Conveyance</Label>
-          <Input
-            value={data.conveyance_date}
-            onChange={(e) => setData({ ...data, conveyance_date: e.target.value })}
-            className="mt-1 input-trust"
-            placeholder="e.g., February 23, 2024"
-          />
-        </div>
-        {showAppraiser && (
-          <div className="md:col-span-2">
-            <Label className="label-trust">Appraiser Name (if appraised)</Label>
-            <Input
-              value={data.appraiser_name || ''}
-              onChange={(e) => setData({ ...data, appraiser_name: e.target.value })}
-              className="mt-1 input-trust"
-              placeholder="e.g., Sotheby's Appraisal Services"
-            />
+    <div className="space-y-6">
+      {items.map((item, index) => (
+        <div key={index} className="card-trust corner-mark p-6 relative">
+          {items.length > 1 && (
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-navy/20">
+              <h2 className="font-serif text-xl text-navy">Property Item {index + 1}</h2>
+              <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </Button>
+            </div>
+          )}
+          {items.length === 1 && (
+            <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Property Details</h2>
+          )}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <Label className="label-trust">Grantor/Creator Name</Label>
+              <Input
+                value={item.grantor_name || ''}
+                onChange={(e) => updateItem(index, 'grantor_name', e.target.value)}
+                className="mt-1 input-trust"
+                placeholder="John Smith"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label className="label-trust">Property Description</Label>
+              <Textarea
+                value={item.property_description || ''}
+                onChange={(e) => updateItem(index, 'property_description', e.target.value)}
+                className="mt-1"
+                placeholder="Single-family residence located at 123 Main Street, City, State 12345; Lot 4, Block 2, Subdivision XYZ"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label className="label-trust">Identifier (VIN, Account #, Legal Description)</Label>
+              <Input
+                value={item.property_identifier || ''}
+                onChange={(e) => updateItem(index, 'property_identifier', e.target.value)}
+                className="mt-1 input-trust"
+                placeholder="VIN: 1HGBH41JXMN109186"
+              />
+            </div>
+            <div>
+              <Label className="label-trust">Location / Institution</Label>
+              <Input
+                value={item.property_location || ''}
+                onChange={(e) => updateItem(index, 'property_location', e.target.value)}
+                className="mt-1 input-trust"
+                placeholder="123 Main St, City, State 12345"
+              />
+            </div>
+            <div>
+              <Label className="label-trust">Approximate Value ($)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={formatCurrency(item.property_value)}
+                onChange={(e) => updateItem(index, 'property_value', parseCurrencyInput(e.target.value))}
+                className="mt-1 input-trust"
+                placeholder="$250,000"
+              />
+            </div>
+            <div>
+              <Label className="label-trust">Date of Conveyance</Label>
+              <Input
+                value={item.conveyance_date || ''}
+                onChange={(e) => updateItem(index, 'conveyance_date', e.target.value)}
+                className="mt-1 input-trust"
+                placeholder="e.g., February 23, 2024"
+              />
+            </div>
+            {showAppraiser && (
+              <div className="md:col-span-2">
+                <Label className="label-trust">Appraiser Name (if appraised)</Label>
+                <Input
+                  value={item.appraiser_name || ''}
+                  onChange={(e) => updateItem(index, 'appraiser_name', e.target.value)}
+                  className="mt-1 input-trust"
+                  placeholder="e.g., Sotheby's Appraisal Services"
+                />
+              </div>
+            )}
+            <div className="md:col-span-2 flex items-center gap-3 mt-2">
+              <Checkbox
+                checked={item.add_to_schedule_a !== false}
+                onCheckedChange={(checked) => updateItem(index, 'add_to_schedule_a', checked)}
+                id={`add-schedule-a-${index}`}
+              />
+              <Label htmlFor={`add-schedule-a-${index}`} className="cursor-pointer">Automatically add to Schedule A</Label>
+            </div>
+            {item.add_to_schedule_a !== false && (
+              <div className="md:col-span-2">
+                <Label className="label-trust">Asset Category (for Schedule A)</Label>
+                <Select
+                  value={item.schedule_a_category || 'real_property'}
+                  onValueChange={(v) => updateItem(index, 'schedule_a_category', v)}
+                >
+                  <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ASSET_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
-        )}
-        <div className="md:col-span-2 flex items-center gap-3 mt-2">
-          <Checkbox
-            checked={data.add_to_schedule_a}
-            onCheckedChange={(checked) => setData({ ...data, add_to_schedule_a: checked })}
-            id="add-schedule-a"
-          />
-          <Label htmlFor="add-schedule-a" className="cursor-pointer">Automatically add to Schedule A</Label>
         </div>
-        {data.add_to_schedule_a && (
-          <div className="md:col-span-2">
-            <Label className="label-trust">Asset Category (for Schedule A)</Label>
-            <Select value={data.schedule_a_category} onValueChange={(v) => setData({ ...data, schedule_a_category: v })}>
-              <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ASSET_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
+      ))}
+
+      <Button type="button" variant="outline" onClick={addItem} className="w-full">
+        <Plus className="w-4 h-4 mr-2" />
+        Add Another Property
+      </Button>
     </div>
   );
 };
@@ -568,6 +620,18 @@ export const BankAccountFields = ({ data, setData }) => {
             className="mt-1 input-trust"
             placeholder="e.g., Chase Bank, Charles Schwab"
           />
+        </div>
+        <div>
+          <Label className="label-trust">Account Number (last 4)</Label>
+          <Input
+            value={data.account_number || ''}
+            onChange={(e) => setData({ ...data, account_number: e.target.value })}
+            className="mt-1 input-trust"
+            placeholder="Enter last 4 digits, e.g., 1234"
+            maxLength={4}
+            inputMode="numeric"
+          />
+          <p className="text-xs text-muted-foreground mt-1">Only the last 4 digits are stored.</p>
         </div>
         <div>
           <Label className="label-trust">Account Type</Label>

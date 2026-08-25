@@ -108,7 +108,8 @@ class TestTO016DraftAssetFromMinutes:
         import routers.schedule_a  # noqa: F401
 
     def test_finalize_minutes_with_bank_info_creates_draft_asset(self, session):
-        """Finalizing minutes with bank_name + account_number auto-creates a draft Schedule A asset."""
+        """Finalizing minutes with bank_name + account_number auto-creates a draft Schedule A asset
+        AND a real bank_account record."""
         uid = uuid.uuid4().hex[:8]
         minutes_id = _create_bank_account_minutes(session, uid, bank_name=f"TestBank_{uid}")
 
@@ -119,8 +120,23 @@ class TestTO016DraftAssetFromMinutes:
         assert data["draft_asset_created"] is True, f"Expected draft_asset_created=True, got: {data}"
         assert data.get("draft_asset_id"), f"Expected draft_asset_id, got: {data}"
 
+        # Response should also signal bank account creation
+        assert data.get("bank_account_created") is True, f"Expected bank_account_created=True, got: {data}"
+        assert data.get("bank_account_id"), f"Expected bank_account_id, got: {data}"
+
+        # Verify the bank account appears in the trust's banking list
+        r = session.get(f"{BASE_URL}/api/trusts/{TRUST_ID}/bank-accounts")
+        assert r.status_code == 200, f"GET bank-accounts failed: {r.text}"
+        accounts = r.json()
+        bank_acct_id = data.get("bank_account_id")
+        matching = [a for a in accounts if a.get("account_id") == bank_acct_id]
+        assert len(matching) == 1, f"Bank account {bank_acct_id} not found in trust accounts"
+        assert matching[0]["institution_name"] == f"TestBank_{uid}"
+        assert matching[0]["last_four"] == "7890"
+
         # Cleanup
         _cleanup_asset(session, data.get("draft_asset_id"))
+        session.delete(f"{BASE_URL}/api/trusts/{TRUST_ID}/bank-accounts/{bank_acct_id}")
 
     def test_draft_asset_visible_in_active_tab(self, session):
         """Draft assets appear in GET /schedule-a?status=active (the TO-016 status filter fix)."""

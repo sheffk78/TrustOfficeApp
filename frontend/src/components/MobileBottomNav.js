@@ -34,6 +34,7 @@ import {
   NotebookTabs,
   Library,
   FileText,
+  FilePlus,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
@@ -41,12 +42,12 @@ import { useAuth } from '@/context/AuthContext';
 // ═══ 5 primary nav items (max for a bottom bar) ═══
 const primaryNav = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Home' },
-  { path: '/schedule-a', icon: Package, label: 'Assets' },
   {
-    path: '/distributions',
-    icon: Coins,
-    label: 'Money',
+    path: '/schedule-a',
+    icon: Package,
+    label: 'Assets',
     subMenu: [
+      { path: '/schedule-a', icon: Package, label: 'Schedule A' },
       { path: '/distributions', icon: Send, label: 'Distributions' },
       { path: '/compensation', icon: Wallet, label: 'Compensation' },
       { path: '/expenses', icon: Receipt, label: 'Expenses' },
@@ -73,10 +74,12 @@ const moreNavGroups = [
   {
     groupLabel: 'Governance',
     items: [
+      { path: '/minutes/template/acceptance_of_property', icon: FilePlus, label: 'Accept Property' },
       { path: '/calendar', icon: Calendar, label: 'Calendar' },
       { path: '/minutes', icon: FilePen, label: 'Minutes' },
       { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
       { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
+      { path: '/vault', icon: FolderOpen, label: 'Documents' },
     ],
   },
   {

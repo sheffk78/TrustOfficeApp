@@ -143,7 +143,12 @@ export default function MinutesDetailPage() {
         const data = await response.json();
         setShowFinalizeConfirm(false);
         loadMinutes();
-        if (data.draft_asset_created) {
+        if (data.bank_account_created) {
+          toast.success('Minutes finalized. A bank account has been added to your trust — view it in the Banking section.', {
+            duration: 8000,
+            action: { label: 'View Banking', onClick: () => navigate('/structures') },
+          });
+        } else if (data.draft_asset_created) {
           toast.success('Minutes finalized. A draft Trust Asset was created from the bank account info — review and confirm it on the Trust Assets page.', {
             duration: 8000,
             action: { label: 'View Assets', onClick: () => navigate('/schedule-a') },

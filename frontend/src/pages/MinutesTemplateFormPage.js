@@ -63,6 +63,11 @@ export default function MinutesTemplateFormPage() {
   const [searchParams] = useSearchParams();
   const { selectedTrust, isReadOnly } = useAuth();
 
+  // ----- Scroll to top on mount — users landing mid-page was confusing -----
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [templateType]);
+
   // ----- Read-only guard -----
   // Redirect read-only (inactive subscription) users to the minutes list
   // instead of letting them hit the generate form and get a 403 error.
@@ -703,6 +708,12 @@ export default function MinutesTemplateFormPage() {
             <h1 className="font-serif text-3xl lg:text-4xl text-navy mb-2">
               {TEMPLATE_TITLES[templateType] || 'Create Minutes'}
             </h1>
+            {templateType === 'acceptance_of_property' && (
+              <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+                This creates a formal trust resolution documenting the acceptance of property into the trust.
+                Complete the form below — when saved, each property item will be automatically added to your Schedule A.
+              </p>
+            )}
             <p className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-navy/40 dark:text-gold/40 mt-1">
               {selectedTrust.name}
             </p>
@@ -1474,7 +1485,7 @@ export default function MinutesTemplateFormPage() {
                   <div className="card-trust corner-mark p-6">
                     <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Bank Information</h2>
                     <p className="text-sm text-muted-foreground mb-6">
-                      The trust will open its bank account and accept the initial deposit at this meeting.
+                      The trust will open its bank account and accept the initial deposit at this meeting. Entering the account number and type here will automatically create a bank account record in your trust's Banking section when these minutes are finalized.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -1485,6 +1496,34 @@ export default function MinutesTemplateFormPage() {
                           className="mt-1 input-trust"
                           placeholder="e.g., Chase, Wells Fargo"
                         />
+                      </div>
+                      <div>
+                        <Label className="label-trust">Account Type</Label>
+                        <Select
+                          value={formData.account_type || 'checking'}
+                          onValueChange={(v) => setFormData({ ...formData, account_type: v })}
+                        >
+                          <SelectTrigger className="mt-1 h-10"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="checking">Checking Account</SelectItem>
+                            <SelectItem value="savings">Savings Account</SelectItem>
+                            <SelectItem value="brokerage">Brokerage/Investment Account</SelectItem>
+                            <SelectItem value="cd">Certificate of Deposit (CD)</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="label-trust">Account Number (last 4)</Label>
+                        <Input
+                          value={formData.account_number || ''}
+                          onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
+                          className="mt-1 input-trust"
+                          placeholder="Enter last 4 digits, e.g., 1234"
+                          maxLength={4}
+                          inputMode="numeric"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Only the last 4 digits are stored — never the full account number.</p>
                       </div>
                       <div>
                         <Label className="label-trust">Initial Deposit Amount</Label>

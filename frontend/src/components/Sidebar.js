@@ -58,14 +58,9 @@ const NAV_GROUPS = [
   { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', items: [], standout: true },
   { key: 'trust-assistant', icon: Bot, label: 'Trust Assistant', items: [], standout: true, badge: 'NEW' },
 
-  // ═══ ASSETS — the core of the trust ═══
-  { key: 'assets', icon: Package, label: 'Assets', items: [
-    { path: '/schedule-a', icon: Package, label: 'Schedule A', tooltip: 'View all trust assets' },
-    { path: '/minutes/template/acceptance_of_property', icon: FilePlus, label: 'Add Asset', badge: 'NEW', tooltip: 'Add a new asset to the trust' },
-  ]},
-
   // ═══ MONEY ═══
   { key: 'money', icon: Coins, label: 'Money', items: [
+    { path: '/schedule-a', icon: Package, label: 'Schedule A', tooltip: 'View all trust assets' },
     { path: '/distributions', icon: Send, label: 'Distributions' },
     { path: '/compensation', icon: Wallet, label: 'Compensation' },
     { path: '/expenses', icon: Receipt, label: 'Expenses' },
@@ -87,12 +82,14 @@ const NAV_GROUPS = [
     { path: '/communications', icon: Send, label: 'Communications' },
   ]},
 
-  // ═══ GOVERNANCE — records and meetings ═══
+  // ═══ GOVERNANCE — records, meetings, property, and documents ═══
   { key: 'governance', icon: BookOpen, label: 'Governance', items: [
+    { path: '/minutes/template/acceptance_of_property', icon: FilePlus, label: 'Accept Property', badge: 'NEW', tooltip: 'Create a resolution to accept property into the trust' },
     { path: '/calendar', icon: Calendar, label: 'Calendar' },
     { path: '/minutes', icon: FilePen, label: 'Minutes' },
     { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
     { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
+    { path: '/vault', icon: FolderOpen, label: 'Documents', tooltip: 'Vault, templates, and record book' },
   ]},
 
   // ═══ HEALTH & COMPLIANCE ═══
@@ -100,13 +97,6 @@ const NAV_GROUPS = [
     { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
     { path: '/governance?tab=risk', icon: Activity, label: 'Risk Dashboard' },
     { path: '/governance?tab=state', icon: MapPin, label: 'State Compliance' },
-  ]},
-
-  // ═══ DOCUMENTS ═══
-  { key: 'documents', icon: FolderOpen, label: 'Documents', items: [
-    { path: '/vault', icon: FolderOpen, label: 'Vault' },
-    { path: '/vault?tab=templates', icon: Briefcase, label: 'Admin Templates', badge: 'NEW' },
-    { path: '/vault?tab=binder', icon: NotebookTabs, label: 'Record Book' },
   ]},
 
   // ═══ LEARN ═══
@@ -127,7 +117,7 @@ const SIDEBAR_SCROLL_KEY = 'sidebar-scroll';
 const SIDEBAR_GROUPS_KEY = 'sidebar-expanded-groups';
 
 // Paths that match by prefix (not just exact equality)
-const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities', '/knowledge', '/course', '/schedule-a', '/benevolence']);
+const PREFIX_PATHS = new Set(['/minutes', '/structures', '/entities', '/knowledge', '/course', '/schedule-a', '/benevolence', '/vault']);
 
 /**
  * Check whether a nav item path matches the current pathname.
@@ -141,6 +131,7 @@ const isPathActive = (itemPath, pathname) => {
   }
   if (itemPath === '/minutes' && pathname.startsWith('/minutes')) return true;
   if (itemPath === '/schedule-a' && pathname.startsWith('/schedule-a')) return true;
+  if (itemPath === '/vault' && pathname.startsWith('/vault')) return true;
   if (itemPath === '/benevolence' && pathname.startsWith('/benevolence')) return true;
   // /course matches by prefix so sub-routes highlight the nav item
   if (itemPath === '/course' && pathname.startsWith('/course')) return true;

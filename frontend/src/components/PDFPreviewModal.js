@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Download, ExternalLink, FileText, X, AlertCircle, RefreshCw } from 'lucide-react';
+import { Download, ExternalLink, FileText, AlertCircle, RefreshCw } from 'lucide-react';
 
 /**
  * PDFPreviewModal - A robust PDF preview component for TrustOffice
@@ -194,16 +194,7 @@ export function PDFPreviewModal({
                 <Download className="w-4 h-4 mr-2" />
                 Download
               </Button>
-              
-              {/* Close button */}
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => onOpenChange(false)}
-                data-testid="pdf-close-btn"
-              >
-                <X className="w-4 h-4" />
-              </Button>
+              {/* Close X is rendered by DialogContent automatically */}
             </div>
           </div>
         </DialogHeader>
