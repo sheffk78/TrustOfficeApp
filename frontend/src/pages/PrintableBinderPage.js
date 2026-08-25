@@ -3,8 +3,6 @@ import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
 import { formatEIN } from '@/utils/formatters';
 import PageHelpButton from '@/components/PageHelpButton';
-import { Sidebar } from '@/components/Sidebar';
-import { MobileBottomNav } from '@/components/MobileBottomNav';
 import {
   FileText, Shield, HeartPulse, Landmark, Building2, Users,
   ClipboardList, Mail, BookOpen, FilePen, Home, Car,
@@ -272,18 +270,10 @@ const PrintableBinderPage = () => {
 
   if (!selectedTrust) {
     return (
-      <div className="main-layout">
-        <Sidebar />
-        <main className="main-content no-print mobile-layout-offset">
-          <div className="page-container max-w-5xl mx-auto">
-            <div className="card-trust p-12 flex flex-col items-center justify-center">
-              <FileText className="w-12 h-12 text-muted-foreground/60 mb-3"/>
-              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
-              <p className="text-sm text-muted-foreground">Choose a trust to view the Record Book.</p>
-            </div>
-          </div>
-        </main>
-        <MobileBottomNav />
+      <div className="card-trust p-12 flex flex-col items-center justify-center">
+        <FileText className="w-12 h-12 text-muted-foreground/60 mb-3"/>
+        <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+        <p className="text-sm text-muted-foreground">Choose a trust to view the Record Book.</p>
       </div>
     );
   }
@@ -293,14 +283,13 @@ const PrintableBinderPage = () => {
   return (
     <>
       <style>{PRINT_STYLES}</style>
-      <div className="main-layout">
-        <Sidebar />
-        <main className="main-content no-print">
-          <div className="page-container max-w-5xl mx-auto">
-            <h1 className="text-2xl md:text-3xl font-bold text-navy mb-2">
-              Printable Record Book
-            </h1>
-          <div className="flex items-center gap-2 mb-2">
+      <div className="no-print">
+        <div className="page-header flex items-center justify-between">
+          <div>
+            <h1 className="page-title">Printable Record Book</h1>
+            <p className="page-subtitle">Organize your trust documents with printable inserts — print on standard letter-size paper, use a 3-ring binder with tab dividers for best results</p>
+          </div>
+          <div className="flex items-center gap-2">
             <PageHelpButton
               items={[
                 { text: 'Print cover sheets, tab dividers, and reference cards for your physical trust binder' },
@@ -310,10 +299,7 @@ const PrintableBinderPage = () => {
               taPrompt="How do I set up a physical trust compliance binder?"
             />
           </div>
-          <p className="text-muted-foreground mb-8 max-w-2xl">
-            Organize your trust documents with these printable inserts. Print on standard letter-size paper.
-            Use a 3-ring binder with tab dividers for best results.
-          </p>
+        </div>
 
           {/* COVER SHEET SECTION */}
           <div className="mb-10">
@@ -516,9 +502,6 @@ const PrintableBinderPage = () => {
               </button>
             </div>
           </div>
-        </div>
-      </main>
-      <MobileBottomNav />
       </div>
 
       {/* ==================== PRINTABLE AREAS ==================== */}

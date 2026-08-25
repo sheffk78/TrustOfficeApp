@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Sidebar } from '@/components/Sidebar';
-import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
@@ -89,18 +87,10 @@ export default function VaultPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="main-layout">
-        <Sidebar />
-        <div className="main-content dot-grid">
-          <div className="page-container">
-            <div className="card-trust p-12 flex flex-col items-center justify-center">
-              <FolderOpen className="w-12 h-12 text-muted-foreground/40 mb-3" />
-              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
-              <p className="text-sm text-muted-foreground">Choose a trust to view document vault.</p>
-            </div>
-          </div>
-        </div>
-        <MobileBottomNav />
+      <div className="card-trust p-12 flex flex-col items-center justify-center">
+        <FolderOpen className="w-12 h-12 text-muted-foreground/40 mb-3" />
+        <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+        <p className="text-sm text-muted-foreground">Choose a trust to view document vault.</p>
       </div>
     );
   }
@@ -109,12 +99,8 @@ export default function VaultPage() {
   const hasDocuments = Object.keys(byCategory).length > 0;
 
   return (
-    <div className="main-layout">
-      <Sidebar />
-      <div className="main-content dot-grid">
-        <div className="page-container">
-
-          <div className="page-header flex items-center justify-between">
+    <>
+      <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Trust Document Vault</h1>
               <p className="page-subtitle">Store, organize, and access trust documents — upload files, manage categories, and share with beneficiaries</p>
@@ -214,9 +200,6 @@ export default function VaultPage() {
               ))}
             </div>
           )}
-        </div>
-      </div>
-      <MobileBottomNav />
-    </div>
+        </>
   );
 }

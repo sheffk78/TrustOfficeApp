@@ -1091,23 +1091,28 @@ def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_water
     y_pos -= 20
     c.drawCentredString(center_x, y_pos, f"({units} of {total_units} total authorized units)")
     
-    # === GOLD SEAL (Programmatic star polygon) ===
+    # === OFFICIAL SEAL — light embossed / watermark style ===
     seal_x = page_width - content_margin - 60
     seal_y = page_height / 2 - 20
-    seal_radius = 35
-    
-    # Draw star seal
-    c.setFillColor(gold)
-    c.setStrokeColor(HexColor('#B8940B'))  # Darker gold for outline
+    seal_radius = 40
+    watermark_gray = HexColor('#CCCCCC')  # very light gray, embossed look
+
+    c.setStrokeColor(watermark_gray)
     c.setLineWidth(1)
-    
-    # 12-point star
+
+    # Outer circle
+    c.circle(seal_x, seal_y, seal_radius, stroke=1, fill=0)
+    # Inner circle (double-ring embossed look)
+    c.setLineWidth(0.5)
+    c.circle(seal_x, seal_y, seal_radius - 4, stroke=1, fill=0)
+
+    # Light starburst behind the text (outline only, no fill)
     points = 12
-    inner_radius = seal_radius * 0.5
+    inner_radius = seal_radius * 0.55
     path = c.beginPath()
     for i in range(points * 2):
         angle = math.pi / 2 + (i * math.pi / points)
-        radius = seal_radius if i % 2 == 0 else inner_radius
+        radius = (seal_radius - 8) if i % 2 == 0 else inner_radius
         x = seal_x + radius * math.cos(angle)
         y = seal_y + radius * math.sin(angle)
         if i == 0:
@@ -1115,10 +1120,10 @@ def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_water
         else:
             path.lineTo(x, y)
     path.close()
-    c.drawPath(path, stroke=1, fill=1)
-    
-    # Seal text
-    c.setFillColor(HexColor('#FFFFFF'))
+    c.drawPath(path, stroke=1, fill=0)
+
+    # Seal text — light gray so it reads as a watermark placeholder
+    c.setFillColor(watermark_gray)
     c.setFont('Helvetica-Bold', 7)
     c.drawCentredString(seal_x, seal_y + 3, "OFFICIAL")
     c.drawCentredString(seal_x, seal_y - 6, "SEAL")

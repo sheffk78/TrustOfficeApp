@@ -2,12 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import {
-  Card, CardContent, CardHeader, CardTitle
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -16,12 +12,12 @@ import { showError } from '@/utils/errors';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import {
-  MessageSquare, Send, Search, Plus, User, Users, Clock,
-  ChevronDown, Circle, Check
+  Mail, Search, Copy, Check, Inbox, Clock, Users,
+  ArrowLeft, MessageSquare,
 } from 'lucide-react';
 import PageHelpButton from '@/components/PageHelpButton';
 
-const POLL_INTERVAL_MS = 15000;
+const POLL_INTERVAL_MS = 30000;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,31 +49,176 @@ const formatRelativeTime = (dateStr) => {
   }
 };
 
+// ── Trust Email Card ─────────────────────────────────────────────────────────
+
+function TrustEmailCard({ trustId, trustName }) {
+  const [copied, setCopied] = useState(false);
+
+  // Generate a deterministic-looking email address based on trust ID
+  const emailAlias = trustId
+    ? `${trustId.replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 12)}@trustoffice.app`
+    : 'messages@trustoffice.app';
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(emailAlias).then(() => {
+      setCopied(true);
+      toast.success('Email address copied');
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="card-trust p-6 mb-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <Inbox className="w-4 h-4 text-gold" />
+            <h2 className="font-serif text-lg text-navy">Trust Message Archive</h2>
+            <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider text-gold border-gold/30">
+              Coming Soon
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+            CC or BCC this address on any email conversation with beneficiaries, advisors, or attorneys.
+            Messages are automatically archived here, creating a searchable record of all trust-related communications.
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="font-mono text-sm text-navy bg-muted px-3 py-1.5 border border-border">
+              {emailAlias}
+            </code>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              className="flex items-center gap-1.5"
+            >
+              {copied ? (
+                <><Check className="w-3.5 h-3.5 text-gold" /> Copied</>
+              ) : (
+                <><Copy className="w-3.5 h-3.5" /> Copy</>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Conversation Item ────────────────────────────────────────────────────────
+
+function ConversationItem({ conv, userId, isActive, onClick }) {
+  const otherParticipants = conv.participants?.filter(
+    (p) => p.user_id !== userId,
+  ) || [];
+  const namesStr = otherParticipants.map((p) => p.name).join(', ');
+  const lastMsgAt = conv.last_message_at
+    ? formatRelativeTime(conv.last_message_at)
+    : '';
+  const senderIsMe = conv.last_message_sender_id === userId;
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full p-3 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left border-b border-border last:border-b-0 ${
+        isActive ? 'bg-muted/30' : ''
+      }`}
+    >
+      <div className="flex -space-x-2 flex-shrink-0">
+        {otherParticipants.length === 1 ? (
+          <Avatar className="w-9 h-9 border border-border">
+            <AvatarImage src={otherParticipants[0]?.picture || undefined} alt={otherParticipants[0]?.name} />
+            <AvatarFallback className="font-mono text-xs text-navy bg-navy/5">
+              {otherParticipants[0]?.name?.charAt(0) || '?'}
+            </AvatarFallback>
+          </Avatar>
+        ) : (
+          <div className="w-9 h-9 border border-border flex items-center justify-center bg-navy/5">
+            <Users className="w-4 h-4 text-navy" />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className="text-sm font-medium text-navy truncate">
+            {namesStr || 'Unknown'}
+          </span>
+          {lastMsgAt && (
+            <span className="text-[10px] font-mono text-muted-foreground flex-shrink-0 ml-2">
+              {lastMsgAt}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground truncate">
+            {conv.last_message
+              ? senderIsMe
+                ? `You: ${conv.last_message}`
+                : conv.last_message
+              : 'No messages yet'}
+          </span>
+          {conv.unread_count > 0 && (
+            <Badge className="flex-shrink-0 ml-1 font-mono text-[10px]">
+              {conv.unread_count}
+            </Badge>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ── Message Bubble ───────────────────────────────────────────────────────────
+
+function MessageBubble({ msg, isSent, senderName }) {
+  return (
+    <div className={`flex ${isSent ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[75%] px-4 py-2.5 border ${
+          isSent
+            ? 'bg-navy text-white border-navy'
+            : 'bg-white text-navy border-border'
+        }`}
+      >
+        <div className="flex items-center gap-2 mb-0.5">
+          {!isSent && (
+            <span className="text-[10px] font-medium text-gold font-mono">
+              {senderName}
+            </span>
+          )}
+          <span
+            className={`text-[9px] font-mono ${
+              isSent ? 'text-white/50' : 'text-muted-foreground'
+            }`}
+          >
+            {formatTime(msg.created_at)}
+          </span>
+          {isSent && msg.read_by && msg.read_by.includes(msg.sender_id) && (
+            <Check className="w-3 h-3 text-gold/70" />
+          )}
+        </div>
+        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+          {msg.body}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export default function MessagingPage() {
-  const { user } = useAuth();
+  const { user, selectedTrust } = useAuth();
   const userId = user?.user_id;
 
-  // ── State ──
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-
-  // New conversation modal
-  const [showNewConv, setShowNewConv] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedRecipients, setSelectedRecipients] = useState([]);
 
-  // Polling ref
   const pollTimerRef = useRef(null);
 
-  // ── Load conversations ──
   const loadConversations = useCallback(async () => {
     if (!userId) return;
     try {
@@ -85,8 +226,6 @@ export default function MessagingPage() {
       if (!res.ok) throw new Error('Failed to load conversations');
       const data = await res.json();
       setConversations(data.conversations || []);
-
-      // If no active conversation is set, pick the first one
       if (!activeConvId && data.conversations?.length > 0) {
         setActiveConvId(data.conversations[0].conversation_id);
       }
@@ -97,7 +236,6 @@ export default function MessagingPage() {
     }
   }, [userId, activeConvId]);
 
-  // ── Load messages for active conversation ──
   const loadMessages = useCallback(async (convId) => {
     if (!convId) return;
     try {
@@ -110,163 +248,58 @@ export default function MessagingPage() {
     }
   }, []);
 
-  // ── Send message ──
-  const sendMessage = useCallback(async () => {
-    if (!activeConvId || !inputText.trim() || sending) return;
-    setSending(true);
+  const markRead = useCallback(async (convId) => {
     try {
-      const res = await fetchWithAuth(
-        `/messaging/conversations/${activeConvId}/messages`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ body: inputText.trim() }),
-        },
+      await fetchWithAuth(`/messaging/conversations/${convId}/read`, { method: 'PATCH' });
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.conversation_id === convId ? { ...c, unread_count: 0 } : c,
+        ),
       );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to send message');
-      }
-      setInputText('');
-      // Reload messages to pick up the new one
-      await loadMessages(activeConvId);
-      // Refresh conversation list for updated timestamp / unread counts
-      await loadConversations();
-    } catch (e) {
-      showError(toast, e, { operation: 'send_message', page: 'Messaging' });
-    } finally {
-      setSending(false);
-    }
-  }, [activeConvId, inputText, sending, loadMessages, loadConversations]);
-
-  // ── Mark conversation read ──
-  const markRead = useCallback(
-    async (convId) => {
-      try {
-        await fetchWithAuth(`/messaging/conversations/${convId}/read`, {
-          method: 'PATCH',
-        });
-        // Update local unread count to 0
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.conversation_id === convId ? { ...c, unread_count: 0 } : c,
-          ),
-        );
-      } catch (e) {
-        // non-fatal, will retry on next poll
-      }
-    },
-    [],
-  );
-
-  // ── Select conversation ──
-  const selectConversation = useCallback(
-    (conv) => {
-      setActiveConvId(conv.conversation_id);
-      setMessages([]);
-      loadMessages(conv.conversation_id);
-      if (conv.unread_count > 0) {
-        markRead(conv.conversation_id);
-      }
-    },
-    [loadMessages, markRead],
-  );
-
-  // ── Search users for new conversation ──
-  const searchUsers = useCallback(async (q) => {
-    setSearchQuery(q);
-    if (!q || q.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    try {
-      const res = await fetchWithAuth(`/users?name_search=${encodeURIComponent(q)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSearchResults(data.users || data || []);
-      }
-    } catch (e) {
-      showError(toast, e, { operation: 'search_users', page: 'Messaging' });
+    } catch {
+      // non-fatal
     }
   }, []);
 
-  // ── Create conversation ──
-  const createConversation = useCallback(async () => {
-    if (selectedRecipients.length === 0) return;
-    try {
-      const res = await fetchWithAuth('/messaging/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participants: selectedRecipients }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to create conversation');
-      }
-      const data = await res.json();
-      toast.success('Conversation created');
-      setShowNewConv(false);
-      setSelectedRecipients([]);
-      setSearchQuery('');
-      setSearchResults([]);
-      // Refresh and select new conversation
-      await loadConversations();
-      if (data.conversation_id) {
-        setActiveConvId(data.conversation_id);
-        setMessages([]);
-        loadMessages(data.conversation_id);
-      }
-    } catch (e) {
-      showError(toast, e, { operation: 'create_conversation', page: 'Messaging' });
-    }
-  }, [selectedRecipients, loadConversations, loadMessages]);
+  const selectConversation = useCallback((conv) => {
+    setActiveConvId(conv.conversation_id);
+    setMessages([]);
+    loadMessages(conv.conversation_id);
+    if (conv.unread_count > 0) markRead(conv.conversation_id);
+  }, [loadMessages, markRead]);
 
-  // ── Add/remove recipient in new conversation modal ──
-  const toggleRecipient = (userId) => {
-    setSelectedRecipients((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId],
-    );
-  };
-
-  // ── Polling for new messages ──
+  // Polling
   useEffect(() => {
     if (!userId) return;
-    // Initial load
     loadConversations();
-
-    // Set up polling
     pollTimerRef.current = setInterval(() => {
       loadConversations();
-      if (activeConvId) {
-        loadMessages(activeConvId);
-      }
+      if (activeConvId) loadMessages(activeConvId);
     }, POLL_INTERVAL_MS);
-
     return () => {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-      }
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
   }, [userId, loadConversations, activeConvId, loadMessages]);
 
-  // ── Reload messages when active conversation changes ──
   useEffect(() => {
     if (activeConvId) {
       loadMessages(activeConvId);
-      // Mark as read on switch
       const conv = conversations.find((c) => c.conversation_id === activeConvId);
-      if (conv?.unread_count > 0) {
-        markRead(activeConvId);
-      }
+      if (conv?.unread_count > 0) markRead(activeConvId);
     }
   }, [activeConvId, loadMessages, conversations, markRead]);
 
-  // ── Render ──
-  const activeConversation = conversations.find(
-    (c) => c.conversation_id === activeConvId,
-  );
+  // Filter conversations by search
+  const filteredConversations = conversations.filter((conv) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const otherParticipants = conv.participants?.filter((p) => p.user_id !== userId) || [];
+    const names = otherParticipants.map((p) => p.name).join(' ').toLowerCase();
+    const lastMsg = (conv.last_message || '').toLowerCase();
+    return names.includes(q) || lastMsg.includes(q);
+  });
+
+  const activeConversation = conversations.find((c) => c.conversation_id === activeConvId);
 
   return (
     <div className="main-layout">
@@ -278,179 +311,105 @@ export default function MessagingPage() {
             <div>
               <h1 className="page-title">Messages</h1>
               <p className="page-subtitle">
-                In-platform messaging with trustees, beneficiaries, advisors, and
-                administrators
+                Archive and search trust-related email conversations
               </p>
             </div>
             <div className="flex items-center gap-2">
               <PageHelpButton
                 items={[
-                  { text: 'Send and receive messages with other TrustOffice users' },
-                  { text: 'Create group conversations with multiple participants' },
-                  { text: 'Messages are polled automatically every 15 seconds' },
+                  { text: 'CC or BCC your trust email address on any conversation to archive it here' },
+                  { text: 'Search across all archived messages by sender, subject, or content' },
+                  { text: 'Messages sync automatically every 30 seconds' },
                 ]}
-                taPrompt="Walk me through the messaging system and how to send a message"
+                taPrompt="How does the message archive work?"
               />
-              <Button
-                className="btn-primary"
-                onClick={() => setShowNewConv(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New Message
-              </Button>
             </div>
+          </div>
+
+          {/* Trust Email Address Card */}
+          <TrustEmailCard trustId={selectedTrust?.trust_id} trustName={selectedTrust?.name} />
+
+          {/* Search Bar */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search archived messages..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center pt-20">
-              <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin rounded-full" />
+              <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin" />
+            </div>
+          ) : conversations.length === 0 ? (
+            /* Empty State */
+            <div className="card-trust p-12 flex flex-col items-center justify-center text-center">
+              <Mail className="w-12 h-12 text-muted-foreground/30 mb-4" />
+              <h3 className="font-serif text-xl text-navy mb-2">No archived messages yet</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Once you start CC-ing your trust email address on conversations,
+                they'll appear here as a searchable archive. This creates a permanent
+                record of all trust-related communications with beneficiaries, advisors,
+                and attorneys.
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-12 gap-4 h-[calc(100vh-16rem)] min-h-[500px]">
-              {/* ── Conversation List (Left Panel) ── */}
-              <div className="col-span-4 border border-white/10 rounded-lg overflow-hidden flex flex-col bg-[#0a0e1a]">
-                <div className="p-3 border-b border-white/10 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-white">Conversations</h3>
-                  <Badge variant="secondary">{conversations.length}</Badge>
+            /* Two-Panel Layout */
+            <div className="grid grid-cols-12 gap-4 h-[calc(100vh-24rem)] min-h-[400px]">
+              {/* Conversation List (Left) */}
+              <div className="col-span-4 lg:col-span-5 border border-border flex flex-col bg-white overflow-hidden">
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                  <h3 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Archived Conversations
+                  </h3>
+                  <Badge variant="secondary" className="font-mono text-[10px]">
+                    {filteredConversations.length}
+                  </Badge>
                 </div>
                 <ScrollArea className="flex-1">
-                  {conversations.length === 0 ? (
+                  {filteredConversations.length === 0 && searchQuery ? (
                     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-                      <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-3" />
-                      <p className="text-sm text-muted-foreground">
-                        No conversations yet
-                      </p>
-                      <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">
-                        Message trustees, beneficiaries, and advisors connected to your trust
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="mt-3"
-                        onClick={() => setShowNewConv(true)}
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1.5" />
-                        Start a Conversation
-                      </Button>
+                      <Search className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                      <p className="text-sm text-muted-foreground">No matches found</p>
                     </div>
                   ) : (
-                    conversations.map((conv) => {
-                      const otherParticipants = conv.participants.filter(
-                        (p) => p.user_id !== userId,
-                      );
-                      const namesStr = otherParticipants
-                        .map((p) => p.name)
-                        .join(', ');
-                      const isActive = conv.conversation_id === activeConvId;
-                      const lastMsgAt = conv.last_message_at
-                        ? formatRelativeTime(conv.last_message_at)
-                        : '';
-                      const senderId = conv.last_message_sender_id;
-                      const senderIsMe = senderId === userId;
-
-                      return (
-                        <button
-                          key={conv.conversation_id}
-                          onClick={() => selectConversation(conv)}
-                          className={`w-full p-3 flex items-start gap-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-b-0 ${
-                            isActive ? 'bg-white/10' : ''
-                          }`}
-                        >
-                          {/* Avatars */}
-                          <div className="flex -space-x-2 flex-shrink-0">
-                            {otherParticipants.length === 1 ? (
-                              <Avatar className="w-9 h-9 border-2 border-white/20">
-                                <AvatarImage
-                                  src={
-                                    otherParticipants[0]?.picture || undefined
-                                  }
-                                  alt={otherParticipants[0]?.name}
-                                />
-                                <AvatarFallback>
-                                  {otherParticipants[0]?.name?.charAt(0) || '?'}
-                                </AvatarFallback>
-                              </Avatar>
-                            ) : (
-                              <div className="w-9 h-9 rounded-full bg-navy flex items-center justify-center border-2 border-white/20 text-[10px] font-bold text-gold">
-                                <Users className="w-4 h-4" />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className="text-sm font-medium text-white truncate">
-                                {namesStr || 'Unknown'}
-                              </span>
-                              {lastMsgAt && (
-                                <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-2">
-                                  {lastMsgAt}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] text-muted-foreground truncate">
-                                {conv.last_message
-                                  ? senderIsMe
-                                    ? `You: ${conv.last_message}`
-                                    : conv.last_message
-                                  : 'No messages yet'}
-                              </span>
-                              {conv.unread_count > 0 && (
-                                <Badge
-                                  variant="default"
-                                  className="flex-shrink-0 ml-1"
-                                >
-                                  {conv.unread_count}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })
+                    filteredConversations.map((conv) => (
+                      <ConversationItem
+                        key={conv.conversation_id}
+                        conv={conv}
+                        userId={userId}
+                        isActive={conv.conversation_id === activeConvId}
+                        onClick={() => selectConversation(conv)}
+                      />
+                    ))
                   )}
                 </ScrollArea>
               </div>
 
-              {/* ── Message Thread (Right Panel) ── */}
-              <div className="col-span-8 border border-white/10 rounded-lg overflow-hidden flex flex-column bg-[#0a0e1a]">
+              {/* Message Detail (Right) */}
+              <div className="col-span-8 lg:col-span-7 border border-border flex flex-col bg-white overflow-hidden">
                 {/* Thread Header */}
-                <div className="p-3 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+                <div className="p-3 border-b border-border flex items-center justify-between flex-shrink-0">
                   {activeConversation ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback>
-                            <Users className="w-3.5 h-3.5" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h3 className="text-sm font-semibold text-white">
-                            {activeConversation.participants
-                              .filter((p) => p.user_id !== userId)
-                              .map((p) => p.name)
-                              .join(', ') || 'Unknown'}
-                          </h3>
-                          <p className="text-[10px] text-muted-foreground">
-                            {activeConversation.participants.length} participant
-                            {activeConversation.participants.length !== 1
-                              ? 's'
-                              : ''}
-                          </p>
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <h3 className="font-serif text-sm text-navy">
+                          {activeConversation.participants
+                            ?.filter((p) => p.user_id !== userId)
+                            .map((p) => p.name)
+                            .join(', ') || 'Unknown'}
+                        </h3>
+                        <p className="text-[10px] font-mono text-muted-foreground">
+                          {activeConversation.participants?.length || 0} participant{activeConversation.participants?.length !== 1 ? 's' : ''}
+                          {' · '}{messages.length} message{messages.length !== 1 ? 's' : ''}
+                        </p>
                       </div>
-                      <div className="flex gap-1">
-                        <Badge variant="secondary">
-                          {messages.length} messages
-                        </Badge>
-                      </div>
-                    </>
+                    </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Select a conversation to view messages
-                    </p>
+                    <p className="text-sm text-muted-foreground">Select a conversation to view messages</p>
                   )}
                 </div>
 
@@ -460,236 +419,39 @@ export default function MessagingPage() {
                     messages.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full">
                         <MessageSquare className="w-10 h-10 text-muted-foreground/30 mb-2" />
-                        <p className="text-sm text-muted-foreground">
-                          No messages yet. Start the conversation!
-                        </p>
+                        <p className="text-sm text-muted-foreground">No messages in this conversation yet</p>
                       </div>
                     ) : (
                       messages.map((msg) => {
                         const isSent = msg.sender_id === userId;
+                        const sender = activeConversation.participants?.find(
+                          (p) => p.user_id === msg.sender_id,
+                        );
                         return (
-                          <div
+                          <MessageBubble
                             key={msg.message_id}
-                            className={`flex ${isSent ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <div
-                              className={`max-w-[75%] rounded-lg px-4 py-2.5 shadow-sm ${
-                                isSent
-                                  ? 'bg-navy text-white border border-white/10'
-                                  : 'bg-white/5 text-white border border-white/5'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 mb-0.5">
-                                {!isSent && (
-                                  <span className="text-[10px] font-medium text-gold">
-                                    {(() => {
-                                      const p =
-                                        activeConversation.participants.find(
-                                          (p) => p.user_id === msg.sender_id,
-                                        );
-                                      return p?.name || 'Unknown';
-                                    })()}
-                                  </span>
-                                )}
-                                <span
-                                  className={`text-[9px] ${
-                                    isSent
-                                      ? 'text-white/50'
-                                      : 'text-muted-foreground'
-                                  }`}
-                                >
-                                  {formatTime(msg.created_at)}
-                                </span>
-                                {isSent &&
-                                  msg.read_by &&
-                                  msg.read_by.includes(userId) && (
-                                    <Check className="w-3 h-3 text-gold/70" />
-                                  )}
-                              </div>
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                                {msg.body}
-                              </p>
-                            </div>
-                          </div>
+                            msg={msg}
+                            isSent={isSent}
+                            senderName={sender?.name || 'Unknown'}
+                          />
                         );
                       })
                     )
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full">
-                      <Circle className="w-10 h-10 text-muted-foreground/20 mb-2" />
+                      <Mail className="w-10 h-10 text-muted-foreground/20 mb-2" />
                       <p className="text-sm text-muted-foreground text-center">
                         Select a conversation from the list to view messages
                       </p>
                     </div>
                   )}
                 </ScrollArea>
-
-                {/* Message Input */}
-                {activeConversation && (
-                  <div className="p-3 border-t border-white/10 flex-shrink-0">
-                    <div className="flex items-end gap-2">
-                      <Textarea
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Type a message..."
-                        className="flex-1 resize-none"
-                        rows={1}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            sendMessage();
-                          }
-                        }}
-                      />
-                      <Button
-                        className="btn-primary flex-shrink-0"
-                        onClick={sendMessage}
-                        disabled={sending || !inputText.trim()}
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
         </div>
       </div>
       <MobileBottomNav />
-
-      {/* ── New Conversation Modal ── */}
-      {showNewConv && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50">
-          <div className="bg-navy border border-white/20 rounded-lg w-full max-w-lg mx-4 shadow-xl">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">
-                New Conversation
-              </h3>
-              <button
-                onClick={() => {
-                  setShowNewConv(false);
-                  setSelectedRecipients([]);
-                  setSearchQuery('');
-                  setSearchResults([]);
-                }}
-                className="text-muted-foreground hover:text-white transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-4 border-b border-white/10">
-              <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">
-                Search users
-              </label>
-              <Input
-                placeholder="Type name to search..."
-                value={searchQuery}
-                onChange={(e) => searchUsers(e.target.value)}
-                autoFocus
-              />
-              {searchResults.length > 0 && (
-                <ScrollArea className="h-40 mt-2 border border-white/10 rounded-md overflow-y-auto">
-                  {searchResults.map((u) => (
-                    <button
-                      key={u.user_id}
-                      onClick={() => toggleRecipient(u.user_id)}
-                      className={`w-full p-2 flex items-center gap-3 hover:bg-white/10 transition-colors ${
-                        selectedRecipients.includes(u.user_id)
-                          ? 'bg-gold/20'
-                          : ''
-                      }`}
-                    >
-                      <Avatar className="w-7 h-7 flex-shrink-0">
-                        {u.picture ? (
-                          <AvatarImage
-                            src={u.picture}
-                            alt={u.name}
-                          />
-                        ) : null}
-                        <AvatarFallback className="text-[10px]">
-                          {u.name?.charAt(0) || '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm text-white">
-                        {u.name}
-                      </span>
-                      {selectedRecipients.includes(u.user_id) && (
-                        <Check className="w-3.5 h-3.5 text-gold ml-auto" />
-                      )}
-                    </button>
-                  ))}
-                </ScrollArea>
-              )}
-              {searchResults.length === 0 && searchQuery && (
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  No matching users found
-                </p>
-              )}
-            </div>
-
-            {/* Selected recipients */}
-            {selectedRecipients.length > 0 && (
-              <div className="p-3 border-b border-white/10">
-                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">
-                  Recipients ({selectedRecipients.length})
-                </label>
-                <ScrollArea className="h-16 mt-1">
-                  <div className="flex flex-wrap gap-2">
-                    {selectedRecipients.map((uid) => {
-                      const u = searchResults.find((r) => r.user_id === uid);
-                      const name = u?.name || uid;
-                      return (
-                        <Badge key={uid} variant="default" className="flex items-center gap-1">
-                          <span className="text-[10px]">{name}</span>
-                          <button
-                            onClick={() => toggleRecipient(uid)}
-                            className="ml-1 hover:text-destructive"
-                          >
-                            ✕
-                          </button>
-                        </Badge>
-                      );
-                    })}
-                    {!searchResults.some((u) =>
-                      selectedRecipients.includes(u.user_id),
-                    ) &&
-                      selectedRecipients.map((uid) => (
-                        <Badge key={uid} variant="secondary" className="text-[10px]">
-                          {uid}
-                        </Badge>
-                      ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="p-4 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowNewConv(false);
-                  setSelectedRecipients([]);
-                  setSearchQuery('');
-                  setSearchResults([]);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="btn-primary"
-                onClick={createConversation}
-                disabled={selectedRecipients.length === 0}
-              >
-                <Send className="w-3.5 h-3.5 mr-1.5" />
-                Create
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

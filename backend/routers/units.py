@@ -88,7 +88,7 @@ def validate_units(units: float, allow_fractional: bool) -> float:
 def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_watermark: bool = False) -> bytes:
     """Generate a professional PDF certificate for trust units"""
     doc, buffer = create_doc_template(margins={
-        'topMargin': 1 * inch,
+        'topMargin': 1.5 * inch,
         'bottomMargin': 0.75 * inch,
         'leftMargin': 0.75 * inch,
         'rightMargin': 0.75 * inch,
@@ -123,6 +123,8 @@ def generate_certificate_pdf(cert: dict, trust: dict, settings: dict, hide_water
     
     story = []
     
+    # Extra breathing room between the top of the page and the title
+    story.append(Spacer(1, 24))
     story.append(Paragraph("CERTIFICATE OF BENEFICIAL INTEREST", title_style))
     story.append(Paragraph(trust.get('name', 'Trust'), subtitle_style))
     

@@ -202,6 +202,7 @@ export default function BeneficiariesPage() {
                 handleOpenCertificateModal={certForm.handleOpenCertificateModal}
                 formatDateFn={formatDate}
                 allocationMode={allocationMode.allocationMode}
+                handleViewPDF={pdfPreview.handleViewPDF}
               />
             </TabsContent>
 

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import {
   PieChart, Award, FileCheck, Users, Plus,
   ChevronDown, ChevronUp, Bot, Pencil, AlertCircle, Settings, UsersRound,
-  Percent, Hash,
+  Percent, Hash, FileText,
 } from 'lucide-react';
 import { OwnershipPieChart } from './OwnershipPieChart';
 import { beneficiaryKey, formatDate } from './constants';
@@ -28,7 +28,7 @@ function SummaryCard({ dataTestId, bgClass, icon, label, value }) {
   );
 }
 
-function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModal, formatDateFn, overviewData, allocationMode }) {
+function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModal, formatDateFn, overviewData, allocationMode, handleViewPDF }) {
   const key = beneficiaryKey(ben);
   const isExpanded = expandedHolder === key;
   const unitLabel = overviewData.unit_label || 'Unit';
@@ -48,6 +48,23 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
           <div className="text-left">
             <div className="flex items-center gap-2">
               <p className="font-medium text-navy dark:text-foreground">{ben.holder_name}</p>
+              {handleViewPDF && ben.certificates && ben.certificates.length > 0 && (() => {
+                const viewable = ben.certificates.filter((c) => c.status !== 'replaced' && c.status !== 'superseded');
+                const latestCert = (viewable.length > 0 ? viewable : ben.certificates)
+                  .slice()
+                  .sort((a, b) => new Date(b.issue_date) - new Date(a.issue_date))[0];
+                return (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleViewPDF(latestCert); }}
+                    className="inline-flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
+                    title={`View certificate PDF for ${ben.holder_name}`}
+                    data-testid={`holder-pdf-${index}`}
+                  >
+                    <FileText className="w-4 h-4" />
+                  </button>
+                );
+              })()}
               {ben.holder_type && ben.holder_type !== 'individual' && (
                 <span className="px-2 py-0.5 text-xs font-mono bg-navy/10 dark:bg-gold/10 text-navy dark:text-gold rounded">
                   {ben.holder_type}
@@ -184,6 +201,7 @@ export function OverviewTab({
   handleOpenCertificateModal,
   formatDateFn,
   allocationMode,
+  handleViewPDF,
 }) {
   if (loading) {
     return (
@@ -357,6 +375,7 @@ export function OverviewTab({
                   formatDateFn={formatDateFn}
                   overviewData={overviewData}
                   allocationMode={allocationMode}
+                  handleViewPDF={handleViewPDF}
                 />
               ))}
               {/* Class beneficiaries inline in the holder list */}

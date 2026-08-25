@@ -64,8 +64,8 @@ export function BeneficiaryListTab({
         </div>
       </div>
 
-      {/* Education Banner */}
-      <div className="mb-6 space-y-4">
+      {/* Education Banners — side by side */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
         <EducationBanner
           title={EDUCATION_SECTIONS.beneficiaryTypes.title}
           content={EDUCATION_SECTIONS.beneficiaryTypes.content}

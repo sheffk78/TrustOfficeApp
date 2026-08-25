@@ -29,6 +29,77 @@ function formatRelType(type) {
   return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
+// Custom edge that renders its label inside a foreignObject so long
+// relationship names (e.g. "Receives Distributions From") wrap to
+// multiple lines instead of being overrun on a single line.
+function WrappingLabelEdge({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
+  label,
+  labelStyle = {},
+  labelBgStyle = {},
+}) {
+  const edgePath = `M ${sourceX},${sourceY} C ${sourceX + 50},${sourceY} ${targetX - 50},${targetY} ${targetX},${targetY}`;
+  const labelWidth = 120;
+  const hasLabel = Boolean(label);
+
+  return (
+    <>
+      <path
+        d={edgePath}
+        style={style}
+        fill="none"
+        strokeWidth={style.strokeWidth || 2}
+        markerEnd={markerEnd}
+      />
+      {hasLabel && (
+        <foreignObject
+          width={labelWidth}
+          height={40}
+          x={(sourceX + targetX) / 2 - labelWidth / 2}
+          y={(sourceY + targetY) / 2 - 20}
+          requiredExtensions="http://www.w3.org/1999/xhtml"
+          style={{ overflow: 'visible', pointerEvents: 'none' }}
+        >
+          <div
+            className="react-flow__edge-textwrapper"
+            style={{
+              background: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0px',
+              padding: '2px 4px',
+              textAlign: 'center',
+              ...labelBgStyle,
+            }}
+          >
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: '600',
+                color: '#333',
+                lineHeight: '1.3',
+                display: 'block',
+                wordBreak: 'break-word',
+                ...labelStyle,
+              }}
+            >
+              {label}
+            </span>
+          </div>
+        </foreignObject>
+      )}
+    </>
+  );
+}
+
+const edgeTypes = { wrapping: WrappingLabelEdge };
+
 export function StructuralMap({ entities = [], relationships = [] }) {
   const navigate = useNavigate();
   const handleNodeClick = useCallback((_, node) => {
@@ -49,7 +120,7 @@ export function StructuralMap({ entities = [], relationships = [] }) {
         data: {
           label: (
             <div className="flex flex-col items-center gap-1 cursor-pointer">
-              <span className="font-semibold text-xs truncate max-w-[170px]">{entity.name}</span>
+              <span className="font-semibold text-xs break-words text-center leading-snug max-w-[200px]">{entity.name}</span>
               <span className="text-[10px] opacity-80">{entity.entity_type}</span>
             </div>
           ),
@@ -59,12 +130,12 @@ export function StructuralMap({ entities = [], relationships = [] }) {
           background: colors.bg,
           color: colors.text,
           border: `2px solid ${colors.border}`,
-          borderRadius: '8px',
-          padding: '8px 12px',
+          borderRadius: '0px',
+          padding: '10px 14px',
           fontSize: '12px',
           fontWeight: '600',
-          minWidth: '120px',
-          maxWidth: '200px',
+          minWidth: '140px',
+          maxWidth: '240px',
           textAlign: 'center',
           cursor: 'pointer',
         },
@@ -139,7 +210,7 @@ export function StructuralMap({ entities = [], relationships = [] }) {
       source: rel.parent_entity_id,
       target: rel.child_entity_id,
       label: `${formatRelType(rel.relationship_type)}${rel.ownership_percentage ? ` (${rel.ownership_percentage}%)` : ''}`,
-      type: 'smoothstep',
+      type: 'wrapping',
       animated: rel.relationship_type === 'owns',
       style: {
         stroke: RELATIONSHIP_COLORS[rel.relationship_type] || '#666',
@@ -150,12 +221,7 @@ export function StructuralMap({ entities = [], relationships = [] }) {
         fontWeight: '600',
         fill: '#333',
       },
-      labelBgStyle: {
-        fill: '#fff',
-        fillOpacity: 0.9,
-      },
-      labelBgPadding: [4, 2],
-      labelBgBorderRadius: 4,
+      labelBgStyle: {},
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: RELATIONSHIP_COLORS[rel.relationship_type] || '#666',
@@ -178,6 +244,7 @@ export function StructuralMap({ entities = [], relationships = [] }) {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        edgeTypes={edgeTypes}
         onNodeClick={handleNodeClick}
         fitView
         fitViewOptions={{ padding: 0.3 }}

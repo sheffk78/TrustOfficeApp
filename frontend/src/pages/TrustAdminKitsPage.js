@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Sidebar } from '@/components/Sidebar';
-import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -330,7 +328,7 @@ export default function TrustAdminKitsPage() {
             <Button variant="outline" size="sm" onClick={() => selectKitType(selectedKitType)}>Retry</Button>
           </div>
         ) : (
-          <div className="max-w-2xl mx-auto mt-6 space-y-6">
+          <div className="mt-6 space-y-6">
             {/* What we already know */}
             <Card>
               <CardHeader className="pb-3">
@@ -479,10 +477,9 @@ export default function TrustAdminKitsPage() {
               display: none !important;
             }
             /* Reset layout for print */
-            .flex.min-h-screen { display: block !important; }
-            .flex-1 { width: 100% !important; max-width: 100% !important; }
-            .page-content { padding: 0.75in !important; }
-            .max-w-3xl { max-width: 100% !important; }
+            .main-layout { display: block !important; }
+            .main-content { margin-left: 0 !important; max-width: 100% !important; }
+            .page-container { padding: 0.75in !important; max-width: 100% !important; }
             /* Remove card shadows/borders for clean print */
             [class*="Card"] { box-shadow: none !important; border: 1px solid #ccc !important; }
             /* Suppress browser default headers/footers (URL, date, page numbers) */
@@ -500,7 +497,7 @@ export default function TrustAdminKitsPage() {
           </Button>
         </div>
 
-        <div className="max-w-3xl mx-auto mt-4 space-y-6">
+        <div className="mt-4 space-y-6">
           {/* Kit header */}
           <Card>
             <CardContent className="p-5">
@@ -702,11 +699,8 @@ export default function TrustAdminKitsPage() {
 
   // ==================== MAIN RENDER ====================
   return (
-    <div className="main-layout">
-      <Sidebar />
-      <div className="main-content dot-grid">
-        <div className="page-container">
-          {!trustId && view !== 'select' ? (
+    <>
+      {!trustId && view !== 'select' ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <AlertCircle className="w-8 h-8 text-warning" />
               <p className="text-sm text-muted-foreground">Please select a trust to use Administration Kits.</p>
@@ -718,9 +712,6 @@ export default function TrustAdminKitsPage() {
               {view === 'detail' && renderDetailView()}
             </>
           )}
-        </div>
-      </div>
-      <MobileBottomNav />
-    </div>
+    </>
   );
 }
