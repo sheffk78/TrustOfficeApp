@@ -49,7 +49,7 @@ export const ACCEPTED_TYPES = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.tiff,.tif,.doc,.
 export const INITIAL_FORM = {
   title: '',
   category: 'trust_instrument',
-  date: new Date().toISOString().split('T')[0], // default to today, user-editable
+  date: new Date().toLocaleDateString('en-CA'), // default to today (local), user-editable
   description: '',
   storage_provider: 'google_drive',
   storage_url: '',
