@@ -963,7 +963,13 @@ async def impersonate_user(
             "user_id": target_user["user_id"],
             "email": target_user["email"],
             "name": target_user.get("name", ""),
-            "picture": target_user.get("picture")
+            "picture": target_user.get("picture"),
+            "wp_ref": target_user.get("wp_ref"),
+            "is_wingpoint": bool(
+                target_user.get("wp_ref")
+                or target_user.get("source") == "wingpoint"
+                or target_user.get("created_via") == "wingpoint_provision"
+            )
         },
         "message": f"Now impersonating {target_user['email']}"
     }
