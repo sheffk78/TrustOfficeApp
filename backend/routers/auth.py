@@ -334,7 +334,13 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
             "name": user_doc["name"],
             "picture": user_doc.get("picture"),
             "is_admin": user_doc.get("is_admin", False) or email == PRIMARY_ADMIN_EMAIL,
-            "is_stats_user": user_doc.get("is_stats_user", False)
+            "is_stats_user": user_doc.get("is_stats_user", False),
+            "wp_ref": user_doc.get("wp_ref"),
+            "is_wingpoint": bool(
+                user_doc.get("wp_ref")
+                or user_doc.get("source") == "wingpoint"
+                or user_doc.get("created_via") == "wingpoint_provision"
+            )
         }
     }
 
@@ -540,7 +546,13 @@ async def exchange_session(request: Request, response: Response):
             "email": user_doc["email"],
             "name": user_doc["name"],
             "picture": user_doc.get("picture"),
-            "is_admin": is_admin
+            "is_admin": is_admin,
+            "wp_ref": user_doc.get("wp_ref"),
+            "is_wingpoint": bool(
+                user_doc.get("wp_ref")
+                or user_doc.get("source") == "wingpoint"
+                or user_doc.get("created_via") == "wingpoint_provision"
+            )
         }
     }
 
@@ -598,7 +610,13 @@ async def update_profile(profile: ProfileUpdate, user: dict = Depends(get_curren
             "user_id": updated_user["user_id"],
             "email": updated_user["email"],
             "name": updated_user["name"],
-            "picture": updated_user.get("picture")
+            "picture": updated_user.get("picture"),
+            "wp_ref": updated_user.get("wp_ref"),
+            "is_wingpoint": bool(
+                updated_user.get("wp_ref")
+                or updated_user.get("source") == "wingpoint"
+                or updated_user.get("created_via") == "wingpoint_provision"
+            )
         }
     }
 
