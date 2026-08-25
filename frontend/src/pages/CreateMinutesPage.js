@@ -285,10 +285,10 @@ export default function CreateMinutesPage() {
         key={t.type}
         data-testid={`template-${t.type}`}
         onClick={() => handleTemplateSelect(t.type)}
-        className="card-trust corner-mark overflow-visible group relative flex flex-col items-start gap-2 p-5 text-left transition-all hover:border-gold/50 hover:shadow-md"
+        className="card-trust overflow-visible group relative flex flex-col items-start gap-2 p-5 text-left transition-all hover:border-gold/50 hover:shadow-md"
       >
         {isPriority && (
-          <span className={`badge-trust absolute -top-2 -right-2 bg-gold text-navy text-sm font-bold px-3 py-1 rounded-full shadow-sm${fromOnboarding ? ' animate-pulse' : ''}`}>
+          <span className={`badge-trust absolute top-0 right-0 bg-gold text-navy text-xs font-bold px-2 py-1 rounded-bl-sm${fromOnboarding ? ' animate-pulse' : ''}`}>
             Start Here
           </span>
         )}
@@ -322,10 +322,10 @@ export default function CreateMinutesPage() {
   // No trust selected
   if (!selectedTrust?.trust_id) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="main-layout">
         <Sidebar />
-        <div className="lg:ml-64 min-h-screen dot-grid">
-          <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-5xl mx-auto">
+        <main className="main-content dot-grid">
+          <div className="page-container">
             <div className="flex flex-col items-center justify-center py-20">
               <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
               <h2 className="font-serif text-xl text-navy">Select a Trust</h2>
@@ -334,7 +334,7 @@ export default function CreateMinutesPage() {
               </p>
             </div>
           </div>
-        </div>
+        </main>
         <MobileBottomNav />
       </div>
     );
@@ -343,10 +343,10 @@ export default function CreateMinutesPage() {
   const categorized = buildCategorizedTemplates();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="main-layout">
       <Sidebar />
-      <div className="lg:ml-64 min-h-screen dot-grid">
-        <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-5xl mx-auto">
+      <main className="main-content dot-grid">
+        <div className="page-container">
           {/* Back to minutes list */}
           <button
             onClick={() => navigate('/minutes')}
@@ -461,7 +461,7 @@ export default function CreateMinutesPage() {
             </p>
           </div>
         </div>
-      </div>
+      </main>
       <MobileBottomNav />
     </div>
   );

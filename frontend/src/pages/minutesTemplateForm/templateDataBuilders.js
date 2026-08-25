@@ -477,6 +477,19 @@ const buildConflictOfInterest = (ctx) => {
   };
 };
 
+const buildSpendingAuthorization = (ctx) => {
+  const base = buildBaseData(ctx);
+  const { spendingAuthData } = ctx;
+  return {
+    ...base,
+    expenditure_amount: spendingAuthData.expenditure_amount,
+    expenditure_date: spendingAuthData.expenditure_date,
+    expenditure_purpose: spendingAuthData.expenditure_purpose,
+    expenditure_vendor: spendingAuthData.expenditure_vendor,
+    expenditure_source_account: spendingAuthData.expenditure_source_account,
+  };
+};
+
 const buildGeneralMeeting = (ctx) => {
   const base = buildBaseData(ctx);
   const { resolutions } = ctx;
@@ -534,6 +547,21 @@ const TEMPLATE_DATA_BUILDERS = {
   emergency_ratification: buildEmergencyRatification,
   conflict_of_interest: buildConflictOfInterest,
   general_meeting: buildGeneralMeeting,
+  spending_authorization: buildSpendingAuthorization,
+  evaluate_distribution: (ctx) => {
+    const base = buildBaseData(ctx);
+    const { evalData } = ctx;
+    return {
+      ...base,
+      beneficiary_name: evalData?.beneficiary_name || '',
+      requested_amount: evalData?.requested_amount || '',
+      request_purpose: evalData?.request_purpose || '',
+      hems_category: evalData?.hems_category || 'support',
+      beneficiary_financial_situation: evalData?.beneficiary_financial_situation || '',
+      beneficiary_other_resources: evalData?.beneficiary_other_resources || '',
+      past_distributions_note: evalData?.past_distributions_note || '',
+    };
+  },
 };
 
 /**

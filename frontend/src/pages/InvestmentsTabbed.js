@@ -1,14 +1,15 @@
 /**
  * InvestmentsPage with Tabs — wraps InvestmentsPage and PerformanceDashboard
  * Tab state driven by ?tab= URL param (holdings | performance)
+ *
+ * Layout note: This wrapper does NOT render its own Sidebar/layout.
+ * The child pages render their own Sidebar + main-content + page-container.
+ * We pass the tab state down so the child page can render the Tabs
+ * inside its own page-container, avoiding a double-sidebar layout bug.
  */
 import { useSearchParams } from 'react-router-dom';
-import { Sidebar } from '@/components/Sidebar';
-import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import InvestmentsPage from '@/pages/InvestmentsPage';
 import PerformanceDashboard from '@/pages/PerformanceDashboard';
-import { TrendingUp, BarChart3 } from 'lucide-react';
 
 export default function InvestmentsTabbed() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -18,34 +19,8 @@ export default function InvestmentsTabbed() {
     setSearchParams({ tab: newTab });
   };
 
-  return (
-    <div className="flex min-h-screen bg-subtle-bg">
-      <Sidebar />
-      <div className="flex-1 flex flex-col lg:ml-0">
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
-          <div className="page-container">
-            <Tabs value={tab} onValueChange={handleTabChange}>
-              <TabsList className="mb-6">
-                <TabsTrigger value="holdings" className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Holdings
-                </TabsTrigger>
-                <TabsTrigger value="performance" className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" />
-                  Performance
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="holdings">
-                <InvestmentsPage />
-              </TabsContent>
-              <TabsContent value="performance">
-                <PerformanceDashboard />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </main>
-        <MobileBottomNav />
-      </div>
-    </div>
-  );
+  if (tab === 'performance') {
+    return <PerformanceDashboard tab={tab} onTabChange={handleTabChange} />;
+  }
+  return <InvestmentsPage tab={tab} onTabChange={handleTabChange} />;
 }

@@ -1289,6 +1289,9 @@ def _dispatch_template_content(template_type: str, trust: dict, template_data: d
         "bill_of_sale": lambda d: generate_bill_of_sale_content(d),
         "assignment_of_personal_property": lambda d: generate_assignment_of_personal_property_content(d),
         "general_assignment": lambda d: generate_general_assignment_content(d),
+        "spending_authorization": lambda d: generate_spending_authorization_content(d),
+        "beneficiary_distribution_notice": lambda d: generate_beneficiary_distribution_notice_content(d),
+        "evaluate_distribution": lambda d: generate_evaluate_distribution_content(d),
     }
     gen = _generators.get(template_type)
     if gen is None:
@@ -4215,6 +4218,153 @@ BE IT FURTHER RESOLVED that:
 
 Vote: {"Unanimous approval (excluding conflicted Trustee)" if not waiver_granted else "Unanimous approval"}
 Effective: Immediately
+
+"""
+    return content
+
+
+# ============= MISSING TEMPLATE GENERATORS =============
+
+def generate_spending_authorization_content(data: dict) -> str:
+    """Generate content for spending authorization (expenditure exceeding threshold)"""
+    amount = data.get("expenditure_amount", "[Amount]")
+    exp_date = data.get("expenditure_date", "[Date]")
+    purpose = data.get("expenditure_purpose", "[Purpose]")
+    vendor = data.get("expenditure_vendor", "[Vendor/Payee]")
+    source_account = data.get("expenditure_source_account", "[Source Account]")
+
+    content = f"""Resolution 1: Authorization of Expenditure
+
+WHEREAS, the Trustees are responsible for the prudent management of Trust assets and must ensure that all expenditures are properly authorized and documented; and
+
+WHEREAS, the Trust's governance policy requires formal Trustee approval for expenditures that exceed the established spending threshold; and
+
+WHEREAS, the following expenditure has been reviewed and determined to be necessary and in the best interest of the Trust and its beneficiaries:
+
+    Expenditure Amount: ${amount}
+    Date: {exp_date}
+    Purpose: {purpose}
+    Vendor/Payee: {vendor}
+    Source Account: {source_account}
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby authorizes the expenditure of ${amount} to {vendor} for the purpose described above.
+
+• The expenditure shall be paid from {source_account} on or about {exp_date}.
+
+• The Trustees affirm that this expenditure exceeds the Trust's spending threshold and has been duly considered and approved in accordance with the Trust's governance policy.
+
+• The Trustees have determined that this expenditure is necessary, reasonable, and in the best interest of the Trust and its beneficiaries.
+
+BE IT FURTHER RESOLVED that:
+
+• This authorization shall be documented in the Trust's records and entered into the Transaction Ledger.
+
+• The Trustees shall review the expenditure at the next regular meeting to confirm that the funds were used for the stated purpose.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    return content
+
+
+def generate_beneficiary_distribution_notice_content(data: dict) -> str:
+    """Generate content for beneficiary distribution notice (formal letter)"""
+    beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
+    amount = data.get("distribution_amount", "[Amount]")
+    purpose = data.get("distribution_purpose", "[Purpose]")
+    dist_date = data.get("distribution_date", "[Date]")
+    trustee_name = data.get("trustee_name", "[Trustee Name]")
+
+    content = f"""Resolution 1: Beneficiary Distribution Notice
+
+WHEREAS, the Board of Trustees has approved a distribution to {beneficiary_name} in accordance with the Trust's distribution standards and the Trustee's fiduciary duty; and
+
+WHEREAS, the distribution has been duly authorized and documented in the Trust's records; and
+
+WHEREAS, formal notice of the distribution is required to be provided to the beneficiary:
+
+    Beneficiary: {beneficiary_name}
+    Distribution Amount: ${amount}
+    Purpose: {purpose}
+    Distribution Date: {dist_date}
+    Authorized by: {trustee_name}
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees hereby confirms the distribution of ${amount} to {beneficiary_name} for the purpose of {purpose}.
+
+• This distribution was made in accordance with the Trust's distribution standards, the Trustee's fiduciary duty, and the principles set forth in the Trust Indenture.
+
+• The distribution shall be disbursed on or about {dist_date}.
+
+• {trustee_name}, as authorized Trustee, is hereby directed to provide formal written notice of this distribution to {beneficiary_name}.
+
+BE IT FURTHER RESOLVED that:
+
+• A record of this distribution shall be maintained in the Trust's records for proper documentation and compliance purposes.
+
+• This distribution is made without prejudice to any future distribution decisions and does not create any ongoing obligation or entitlement.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
+
+"""
+    return content
+
+
+def generate_evaluate_distribution_content(data: dict) -> str:
+    """Generate content for distribution evaluation record"""
+    beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
+    requested_amount = data.get("requested_amount", "[Amount]")
+    purpose = data.get("request_purpose", "[Purpose]")
+    hems_category = data.get("hems_category", "support")
+    financial_situation = data.get("beneficiary_financial_situation", "Not specified")
+    other_resources = data.get("beneficiary_other_resources", "Not specified")
+    past_distributions = data.get("past_distributions_note", "None")
+
+    hems_text = {
+        "health": "Health (Medical)",
+        "education": "Education",
+        "maintenance": "Maintenance",
+        "support": "Support",
+        "other": "Other"
+    }.get(hems_category, "Support")
+
+    content = f"""Resolution 1: Distribution Evaluation Record
+
+WHEREAS, the Board of Trustees has received a distribution request from {beneficiary_name}; and
+
+WHEREAS, the Trustees have a fiduciary duty to evaluate all distribution requests in accordance with the Trust's distribution standards and applicable trust law; and
+
+WHEREAS, the following information has been considered in evaluating this request:
+
+    Beneficiary: {beneficiary_name}
+    Requested Amount: ${requested_amount}
+    Purpose: {purpose}
+    HEMS Category: {hems_text}
+    Beneficiary's Financial Situation: {financial_situation}
+    Other Resources Available: {other_resources}
+    Notes on Past Distributions: {past_distributions}
+
+NOW, THEREFORE, BE IT RESOLVED that:
+
+• The Board of Trustees has completed its evaluation of the distribution request described above.
+
+• The Trustees have considered the beneficiary's needs, financial situation, available resources, and the Trust's distribution standards in making this determination.
+
+• The Trustees affirm that this evaluation was conducted in good faith and in accordance with the Trustee's fiduciary duties of loyalty, prudence, and impartiality.
+
+BE IT FURTHER RESOLVED that:
+
+• The Trustees' determination regarding this request shall be documented separately and communicated to the beneficiary.
+
+• This evaluation record shall be maintained in the Trust's records for compliance and reference purposes.
+
+Vote: Unanimous approval
+Effective Date: Immediately upon adoption
 
 """
     return content

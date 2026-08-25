@@ -433,7 +433,7 @@ export default function MinutesPage() {
                   <p className="text-xs text-muted-foreground mb-6">
                     We'll walk you through it — most trustees finish in under 5 minutes.
                   </p>
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <Button onClick={() => navigate('/minutes/create?type=initial_trustee_meeting&from=onboarding')} className="btn-primary">
                       <FileText className="w-4 h-4 mr-2" />
                       Hold Your First Trustee Meeting

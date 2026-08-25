@@ -299,6 +299,15 @@ export default function MinutesTemplateFormPage() {
   const [evalResult, setEvalResult] = useState(null);
   const [evalLoading, setEvalLoading] = useState(false);
 
+  // Spending authorization fields
+  const [spendingAuthData, setSpendingAuthData] = useState({
+    expenditure_amount: '',
+    expenditure_date: format(new Date(), 'yyyy-MM-dd'),
+    expenditure_purpose: '',
+    expenditure_vendor: '',
+    expenditure_source_account: ''
+  });
+
   // Beneficiary loan fields
   const [beneficiaryLoanData, setBeneficiaryLoanData] = useState({
     beneficiary_name: '',
@@ -573,6 +582,8 @@ export default function MinutesTemplateFormPage() {
         hemsData,
         distributionNoticeData,
         beneficiaryLoanData,
+        spendingAuthData,
+        evalData,
         amendmentData,
         poaData,
         terminationData,
@@ -661,10 +672,10 @@ export default function MinutesTemplateFormPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="main-layout">
         <Sidebar />
-        <main className="lg:pl-64 pt-16 lg:pt-0">
-          <div className="p-8">
+        <main className="main-content dot-grid">
+          <div className="page-container">
             <div className="card-trust p-8 text-center">
               <p className="text-muted-foreground">Select a trust to create minutes</p>
             </div>
@@ -675,10 +686,10 @@ export default function MinutesTemplateFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="main-layout">
       <Sidebar />
-      <main className="lg:pl-64 pt-16 lg:pt-0">
-        <div className="p-4 lg:p-8">
+      <main className="main-content dot-grid">
+        <div className="page-container">
           {/* Header */}
           <div className="mb-8">
             <Button
@@ -989,6 +1000,65 @@ export default function MinutesTemplateFormPage() {
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {templateType === 'spending_authorization' && (
+                <div className="card-trust corner-mark p-6">
+                  <h2 className="font-serif text-xl text-navy mb-4 pb-2 border-b border-navy/20">Expenditure Details</h2>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Document trustee approval of an expenditure that exceeds the spending threshold established in the trust's governance policy.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="label-trust">Expenditure Amount *</Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatCurrency(spendingAuthData.expenditure_amount)}
+                        onChange={(e) => setSpendingAuthData({ ...spendingAuthData, expenditure_amount: parseCurrencyInput(e.target.value) })}
+                        className="mt-1 input-trust"
+                        placeholder="$5,000"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Expenditure Date *</Label>
+                      <Input
+                        type="date"
+                        value={spendingAuthData.expenditure_date}
+                        onChange={(e) => setSpendingAuthData({ ...spendingAuthData, expenditure_date: e.target.value })}
+                        className="mt-1 input-trust"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="label-trust">Purpose of Expenditure *</Label>
+                      <Textarea
+                        value={spendingAuthData.expenditure_purpose}
+                        onChange={(e) => setSpendingAuthData({ ...spendingAuthData, expenditure_purpose: e.target.value })}
+                        className="mt-1"
+                        placeholder="Describe the purpose and necessity of this expenditure"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Vendor/Payee</Label>
+                      <Input
+                        value={spendingAuthData.expenditure_vendor}
+                        onChange={(e) => setSpendingAuthData({ ...spendingAuthData, expenditure_vendor: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="e.g., ABC Contractors, LLC"
+                      />
+                    </div>
+                    <div>
+                      <Label className="label-trust">Source Account</Label>
+                      <Input
+                        value={spendingAuthData.expenditure_source_account}
+                        onChange={(e) => setSpendingAuthData({ ...spendingAuthData, expenditure_source_account: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="e.g., Trust Checking ****1234"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 

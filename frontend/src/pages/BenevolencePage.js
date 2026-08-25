@@ -40,6 +40,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays } from 'date-fns';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const PURPOSE_OPTIONS = [
   { value: 'medical', label: 'Medical Expenses' },
@@ -68,7 +69,7 @@ const DATE_FILTER_OPTIONS = [
   { value: 'last_year', label: 'Last Year' }
 ];
 
-export default function BenevolencePage() {
+export default function BenevolencePage({ tab, onTabChange }) {
   const navigate = useNavigate();
   const { selectedTrust, isReadOnly } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
@@ -480,6 +481,21 @@ export default function BenevolencePage() {
       <Sidebar />
       <main className="main-content dot-grid">
         <div className="page-container">
+          {/* Tab switcher (Benevolence ↔ Policy) */}
+          {onTabChange && (
+            <Tabs value={tab || 'distributions'} onValueChange={onTabChange} className="mb-6">
+              <TabsList>
+                <TabsTrigger value="distributions" className="flex items-center gap-2">
+                  <HeartHandshake className="w-4 h-4" />
+                  Distributions
+                </TabsTrigger>
+                <TabsTrigger value="policy" className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Policy
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
             <div>

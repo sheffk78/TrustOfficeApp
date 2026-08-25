@@ -33,6 +33,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -43,7 +44,7 @@ const CHART_COLORS = {
   approved: '#f59e0b',
 };
 
-export default function PerformanceDashboard() {
+export default function PerformanceDashboard({ tab, onTabChange }) {
   const { user, selectedTrust } = useAuth();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
@@ -264,6 +265,21 @@ export default function PerformanceDashboard() {
       <Sidebar />
       <main className="flex-1 p-4 lg:p-8 lg:ml-64 pb-24 lg:pb-8">
         <div className="max-w-7xl mx-auto">
+          {/* Tab switcher (Holdings ↔ Performance) */}
+          {onTabChange && (
+            <Tabs value={tab || 'performance'} onValueChange={onTabChange} className="mb-6">
+              <TabsList>
+                <TabsTrigger value="holdings" className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Holdings
+                </TabsTrigger>
+                <TabsTrigger value="performance" className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Performance
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
           {/* Page Header */}
           <div className="page-header flex items-start justify-between">
             <div>

@@ -21,6 +21,10 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { safeFormatDate } from '@/utils/safeDate';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Sidebar } from '@/components/Sidebar';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
+import { HeartHandshake } from 'lucide-react';
 import { PolicyViewTab } from '@/pages/benevolence-policy/PolicyViewTab';
 import { PolicyDraftEditor } from '@/pages/benevolence-policy/PolicyDraftEditor';
 import { VersionHistoryTab } from '@/pages/benevolence-policy/VersionHistoryTab';
@@ -32,7 +36,7 @@ const STATUS_OPTIONS = [
   { value: 'superseded', label: 'Superseded' },
 ];
 
-export default function BenevolencePolicyPage() {
+export default function BenevolencePolicyPage({ tab, onTabChange }) {
   const { selectedTrust, isReadOnly } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
   const [activeTab, setActiveTab] = useState('view'); // 'view' | 'edit' | 'history'
@@ -164,6 +168,25 @@ export default function BenevolencePolicyPage() {
   }
 
   return (
+    <div className="main-layout">
+      <Sidebar />
+      <main className="main-content dot-grid">
+        <div className="page-container">
+          {/* Tab switcher (Benevolence ↔ Policy) */}
+          {onTabChange && (
+            <Tabs value={tab || 'policy'} onValueChange={onTabChange} className="mb-6">
+              <TabsList>
+                <TabsTrigger value="distributions" className="flex items-center gap-2">
+                  <HeartHandshake className="w-4 h-4" />
+                  Distributions
+                </TabsTrigger>
+                <TabsTrigger value="policy" className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Policy
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
     <div className="space-y-6">
       {/* Header */}
       <div className="page-header flex items-center justify-between">
@@ -298,6 +321,10 @@ export default function BenevolencePolicyPage() {
       {activeVersion && (
         <ComplianceChecklist version={activeVersion} />
       )}
+    </div>
+        </div>
+      </main>
+      <MobileBottomNav />
     </div>
   );
 }

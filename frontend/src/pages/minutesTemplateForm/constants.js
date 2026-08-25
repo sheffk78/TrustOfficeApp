@@ -56,6 +56,7 @@ export const TEMPLATE_TITLES = {
   'bill_of_sale': 'Resolution & Bill of Sale',
   'assignment_of_personal_property': 'Resolution to Assign Personal Property',
   'general_assignment': 'Resolution for General Assignment',
+  'spending_authorization': 'Resolution to Authorize Spending',
 };
 
 export const ASSET_CATEGORIES = [

@@ -17,8 +17,9 @@ import PageHelpButton from '@/components/PageHelpButton';
 import {
   TrendingUp, Plus, Wallet, Building2, Landmark,
   ArrowUpRight, Coins, Home, Activity, ChevronRight,
-  Trash2, Pencil, Loader2
+  Trash2, Pencil, Loader2, BarChart3
 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ASSET_TYPE_ICONS = {
   stock: TrendingUp,
@@ -38,7 +39,7 @@ const ASSET_TYPE_LABELS = {
   other: 'Other',
 };
 
-export default function InvestmentsPage() {
+export default function InvestmentsPage({ tab, onTabChange }) {
   const { selectedTrust, isReadOnly } = useAuth();
   const { showUpgradeModal } = useUpgradeModal();
   const [investments, setInvestments] = useState([]);
@@ -231,6 +232,21 @@ export default function InvestmentsPage() {
       <Sidebar />
       <div className="main-content dot-grid">
         <div className="page-container">
+          {/* Tab switcher (Holdings ↔ Performance) */}
+          {onTabChange && (
+            <Tabs value={tab || 'holdings'} onValueChange={onTabChange} className="mb-6">
+              <TabsList>
+                <TabsTrigger value="holdings" className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Holdings
+                </TabsTrigger>
+                <TabsTrigger value="performance" className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Performance
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
 
           {/* Header */}
           <div className="page-header flex items-center justify-between">

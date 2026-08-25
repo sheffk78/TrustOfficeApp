@@ -1,14 +1,16 @@
 /**
  * BenevolenceTabbed — wraps BenevolencePage and BenevolencePolicyPage
  * Tab state driven by ?tab= URL param (distributions | policy)
+ *
+ * Layout note: This wrapper does NOT render its own Sidebar/layout.
+ * The child pages (BenevolencePage, BenevolencePolicyPage) each render
+ * their own Sidebar + main-content + page-container. We pass the tab
+ * state down so the child page can render the Tabs inside its own
+ * page-container, avoiding a double-sidebar layout bug.
  */
 import { useSearchParams } from 'react-router-dom';
-import { Sidebar } from '@/components/Sidebar';
-import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import BenevolencePage from '@/pages/BenevolencePage';
 import BenevolencePolicyPage from '@/pages/BenevolencePolicyPage';
-import { HeartHandshake, FileText } from 'lucide-react';
 
 export default function BenevolenceTabbed() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -18,34 +20,8 @@ export default function BenevolenceTabbed() {
     setSearchParams({ tab: newTab });
   };
 
-  return (
-    <div className="flex min-h-screen bg-subtle-bg">
-      <Sidebar />
-      <div className="flex-1 flex flex-col lg:ml-0">
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
-          <div className="page-container">
-            <Tabs value={tab} onValueChange={handleTabChange}>
-              <TabsList className="mb-6">
-                <TabsTrigger value="distributions" className="flex items-center gap-2">
-                  <HeartHandshake className="w-4 h-4" />
-                  Distributions
-                </TabsTrigger>
-                <TabsTrigger value="policy" className="flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Policy
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="distributions">
-                <BenevolencePage />
-              </TabsContent>
-              <TabsContent value="policy">
-                <BenevolencePolicyPage />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </main>
-        <MobileBottomNav />
-      </div>
-    </div>
-  );
+  if (tab === 'policy') {
+    return <BenevolencePolicyPage tab={tab} onTabChange={handleTabChange} />;
+  }
+  return <BenevolencePage tab={tab} onTabChange={handleTabChange} />;
 }
