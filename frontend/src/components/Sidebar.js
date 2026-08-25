@@ -92,6 +92,7 @@ const NAV_GROUPS = [
     { path: '/calendar', icon: Calendar, label: 'Calendar' },
     { path: '/minutes', icon: FilePen, label: 'Minutes' },
     { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
+    { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
   ]},
 
   // ═══ HEALTH & COMPLIANCE ═══
@@ -116,7 +117,6 @@ const NAV_GROUPS = [
   ]},
 
   // ═══ STANDALONE ITEMS ═══
-  { key: 'trustee-powers', icon: Gavel, label: 'Trustee Powers', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
 
@@ -163,7 +163,6 @@ const resolveSingleGroupPath = (groupKey) => {
   switch (groupKey) {
     case 'dashboard': return '/dashboard';
     case 'trust-assistant': return '/trust-assistant';
-    case 'trustee-powers': return '/authority';
     case 'settings': return '/settings';
     default: return '/settings';
   }

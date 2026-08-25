@@ -76,6 +76,7 @@ const moreNavGroups = [
       { path: '/calendar', icon: Calendar, label: 'Calendar' },
       { path: '/minutes', icon: FilePen, label: 'Minutes' },
       { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
+      { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
     ],
   },
   {
@@ -84,7 +85,6 @@ const moreNavGroups = [
       { path: '/governance', icon: HeartPulse, label: 'Trust Health' },
       { path: '/governance?tab=risk', icon: Activity, label: 'Risk Dashboard' },
       { path: '/governance?tab=state', icon: MapPin, label: 'State Compliance' },
-      { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
     ],
   },
   {
