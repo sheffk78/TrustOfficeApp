@@ -32,8 +32,9 @@ export default function BillingPage() {
   const [processing, setProcessing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   // Phase 3: billing period toggle for the no-subscription plan picker
-  const [pickerBillingPeriod, setPickerBillingPeriod] = useState('monthly');
-  const [changePlanBillingPeriod, setChangePlanBillingPeriod] = useState('monthly');
+  // Default to 'annual' — shows the cheapest monthly amount with total annual savings.
+  const [pickerBillingPeriod, setPickerBillingPeriod] = useState('annual');
+  const [changePlanBillingPeriod, setChangePlanBillingPeriod] = useState('annual');
 
   // WingPoint flow: ?plan=XX triggers auto-scroll + highlight on the matching
   // tier card; ?action=upgrade shows a contextual banner at the top.

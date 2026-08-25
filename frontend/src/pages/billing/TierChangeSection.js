@@ -80,14 +80,21 @@ export default function TierChangeSection({
                   {tier.maxTrusts === Infinity ? 'unlimited' : tier.maxTrusts}.
                 </p>
               )}
-              <div className="flex items-baseline gap-1 mb-2">
+              <div className="flex items-baseline gap-1 mb-1">
                 <span className="font-mono text-2xl text-navy">
-                  ${billingPeriod === 'annual' ? tier.annual : tier.monthly}
+                  ${billingPeriod === 'annual' ? (tier.annual / 12).toFixed(2).replace(/\.00$/, '') : tier.monthly}
                 </span>
-                <span className="text-muted-foreground text-sm">
-                  /{billingPeriod === 'annual' ? 'year' : 'month'}
-                </span>
+                <span className="text-muted-foreground text-sm">/month</span>
               </div>
+              {billingPeriod === 'annual' ? (
+                <p className="text-xs text-muted-foreground mb-2">
+                  ${tier.annual.toLocaleString()}/yr
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mb-2">
+                  ${tier.monthly * 12}/yr
+                </p>
+              )}
               <Button
                 onClick={() => onChangePlan(tier.id, billingPeriod)}
                 disabled={(isCurrentTier && billingPeriod === currentBillingPeriod) || actionLoading === 'change-plan' || isIneligible}

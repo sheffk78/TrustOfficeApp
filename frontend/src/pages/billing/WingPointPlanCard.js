@@ -29,8 +29,8 @@ import { WINGPOINT_TIER, TRUSTEE_TIER } from './pricingConfig';
 
 // ── Trustee $79 option card ─────────────────────────────────────
 function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef, userTrustCount }) {
-  const [period, setPeriod] = useState('monthly');
-  const price = period === 'annual' ? TRUSTEE_TIER.annual : TRUSTEE_TIER.monthly;
+  const [period, setPeriod] = useState('annual');
+  const monthlyEquivalent = period === 'annual' ? (TRUSTEE_TIER.annual / 12).toFixed(2).replace(/\.00$/, '') : TRUSTEE_TIER.monthly;
 
   const isIneligible =
     userTrustCount != null &&
@@ -83,13 +83,22 @@ function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef, use
         </div>
       </div>
 
-      <div className="flex items-baseline gap-1 mb-2">
-        <span className="font-mono text-4xl text-navy">${price}</span>
-        <span className="text-muted-foreground">/{period === 'annual' ? 'year' : 'month'}</span>
+      <div className="flex items-baseline gap-1 mb-1">
+        <span className="font-mono text-4xl text-navy">${monthlyEquivalent}</span>
+        <span className="text-muted-foreground">/month</span>
       </div>
-      {period === 'annual' && (
-        <p className="text-xs text-success mb-3 font-medium">
-          Save ${TRUSTEE_TIER.monthly * 2} (2 months free)
+      {period === 'annual' ? (
+        <>
+          <p className="text-xs text-muted-foreground mb-2">
+            ${TRUSTEE_TIER.annual.toLocaleString()} billed annually · save ${TRUSTEE_TIER.monthly * 2}
+          </p>
+          <p className="text-xs text-success mb-3 font-medium">
+            2 months free
+          </p>
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground mb-3">
+          ${TRUSTEE_TIER.monthly * 12}/year · switch to annual to save ${TRUSTEE_TIER.monthly * 2}
         </p>
       )}
 
@@ -133,7 +142,7 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
   const [period, setPeriod] = useState('annual');
   // Both monthly and annual are now real purchasable plans.
   // Monthly: $119/mo   Annual: $1,188/yr ($99/mo equivalent)
-  const displayPrice = period === 'annual' ? WINGPOINT_TIER.annual : WINGPOINT_TIER.monthly;
+  const monthlyEquivalent = period === 'annual' ? (WINGPOINT_TIER.annual / 12).toFixed(2).replace(/\.00$/, '') : WINGPOINT_TIER.monthly;
 
   return (
     <div
@@ -167,11 +176,11 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
         </div>
       </div>
 
-      {/* Price display */}
+      {/* Price display — always shows $/mo headline */}
       {period === 'monthly' ? (
         <>
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-mono text-4xl text-navy">${displayPrice}</span>
+            <span className="font-mono text-4xl text-navy">${monthlyEquivalent}</span>
             <span className="text-muted-foreground">/month</span>
             <span className="font-mono text-lg text-muted-foreground line-through ml-2">$149</span>
             <span className="text-xs text-muted-foreground">/mo</span>
@@ -180,22 +189,22 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
             Save $30/mo vs Estate $149/mo
           </div>
           <p className="text-xs text-muted-foreground mb-3 font-medium">
-            Billed monthly · cancel anytime
+            ${WINGPOINT_TIER.monthly * 12}/year · switch to annual to save $240/yr
           </p>
         </>
       ) : (
         <>
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-mono text-4xl text-navy">${displayPrice}</span>
-            <span className="text-muted-foreground">/year</span>
-            <span className="font-mono text-lg text-muted-foreground line-through ml-2">$1,490</span>
-            <span className="text-xs text-muted-foreground">/yr</span>
+            <span className="font-mono text-4xl text-navy">${monthlyEquivalent}</span>
+            <span className="text-muted-foreground">/month</span>
+            <span className="font-mono text-lg text-muted-foreground line-through ml-2">$149</span>
+            <span className="text-xs text-muted-foreground">/mo</span>
           </div>
           <div className="inline-block bg-gold/10 text-gold px-2 py-1 rounded font-mono text-xs font-semibold mb-2">
-            Save $302/yr vs Estate $1,490/yr
+            Save $30/mo vs Estate $149/mo
           </div>
           <p className="text-xs text-success mb-3 font-medium">
-            $99/month · billed annually · save $240/yr vs monthly
+            ${WINGPOINT_TIER.annual.toLocaleString()} billed annually · save $240/yr vs monthly
           </p>
         </>
       )}
