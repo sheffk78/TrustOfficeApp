@@ -4,6 +4,7 @@ import { fetchWithAuth } from '@/utils/api';
 import { showError } from '@/utils/errors';
 import { formatEIN } from '@/utils/formatters';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
@@ -77,14 +78,14 @@ const fmtDate = (dateStr) => {
 const InfoRow = ({ label, value }) => (
   <div className="flex py-1.5 border-b border-gray-100">
     <div className="w-40 flex-shrink-0 text-gray-500 text-sm">{label}</div>
-    <div className="text-gray-900 text-sm font-medium">{value || 'Not specified'}</div>
+    <div className="text-navy text-sm font-medium">{value || 'Not specified'}</div>
   </div>
 );
 
 const SectionTitle = ({ icon: Icon, title }) => (
   <div className="flex items-center gap-2 mb-4">
     {Icon && <Icon className="w-5 h-5 text-gold" />}
-    <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+    <h2 className="text-lg font-bold text-navy">{title}</h2>
   </div>
 );
 
@@ -227,20 +228,20 @@ const SuccessorPacketPage = () => {
                   ]}
                   taPrompt="What should I include in my successor trustee packet?"
                 />
-                <button
+                <Button
                   onClick={handleSend}
                   disabled={loading || sending}
-                  className="flex items-center gap-2 px-4 py-2 bg-navy hover:bg-navy/90 text-white font-medium shadow-sm transition-colors disabled:opacity-50"
+                  className="bg-navy hover:bg-navy/90 text-white font-medium disabled:opacity-50"
                 >
                   <Mail className="w-4 h-4" /> {sending ? 'Sending...' : 'Send Packet to Successor'}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handlePrint}
                   disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors disabled:opacity-50"
+                  className="bg-gold hover:bg-gold/80 text-navy font-medium disabled:opacity-50"
                 >
                   <Printer className="w-4 h-4" /> Print Full Packet
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -257,7 +258,7 @@ const SuccessorPacketPage = () => {
                 <div className="h-48 bg-subtle-bg rounded"></div>
               </div>
             ) : (
-              <div className="card-trust border border-border p-6 shadow-sm">
+              <div className="card-trust border border-border p-6">
                 <p className="text-sm text-muted-foreground mb-4">
                   Click "Print Full Packet" to generate a printable document with all sections below. The packet includes trust identification, trustee transition info, beneficiaries, assets, bank accounts, professional contacts, governance rules, upcoming deadlines, and your letter of guidance.
                 </p>
@@ -308,12 +309,12 @@ const SuccessorPacketPage = () => {
               <div className="text-xs tracking-widest text-gray-400 uppercase mb-2">Trust Governance Workspace</div>
               <div className="w-16 h-0.5 bg-gold mx-auto mb-6"></div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{ fontSize: '28pt' }}>
+            <h1 className="text-3xl font-bold text-navy mb-2" style={{ fontSize: '28pt' }}>
               SUCCESSOR TRUSTEE PACKET
             </h1>
             <div className="w-24 h-0.5 bg-gray-300 mx-auto my-6"></div>
             <div className="mt-4 space-y-3" style={{ fontSize: '14pt' }}>
-              <div className="text-xl font-semibold text-gray-900">{trustName}</div>
+              <div className="text-xl font-semibold text-navy">{trustName}</div>
               {trustData?.ein && <div className="text-gray-600">EIN: {formatEIN(trustData.ein)}</div>}
               {trustData?.jurisdiction && <div className="text-gray-600">Jurisdiction: {trustData.jurisdiction}</div>}
               {trustData?.start_date && <div className="text-gray-600">Formed: {fmtDate(trustData.start_date)}</div>}
@@ -391,7 +392,7 @@ const SuccessorPacketPage = () => {
                 <tbody>
                   {beneficiaries.map((b, i) => (
                     <tr key={i} className="border-b border-gray-100">
-                      <td className="py-2 text-sm text-gray-900">{b.holder_name || b.name || ''}</td>
+                      <td className="py-2 text-sm text-navy">{b.holder_name || b.name || ''}</td>
                       <td className="py-2 text-sm text-gray-600">{b.email || ''}</td>
                       <td className="py-2 text-sm text-gray-600">{b.phone || ''}</td>
                       <td className="py-2 text-sm text-gray-600">{b.units || b.allocation_percentage || ''}</td>
@@ -413,7 +414,7 @@ const SuccessorPacketPage = () => {
               <div className="space-y-3">
                 {entities.map((e, i) => (
                   <div key={i} className="bg-gray-50 rounded p-3">
-                    <div className="font-semibold text-sm text-gray-900">{e.name || e.legal_name || 'Entity'}</div>
+                    <div className="font-semibold text-sm text-navy">{e.name || e.legal_name || 'Entity'}</div>
                     <div className="text-xs text-gray-500 mt-1">
                       {e.entity_type && <span className="mr-3">Type: {e.entity_type}</span>}
                       {e.ein && <span className="mr-3">EIN: {formatEIN(e.ein)}</span>}
@@ -447,7 +448,7 @@ const SuccessorPacketPage = () => {
                 <tbody>
                   {bankAccounts.map((a, i) => (
                     <tr key={i} className="border-b border-gray-100">
-                      <td className="py-2 text-sm text-gray-900">{a.nickname || a.name || ''}</td>
+                      <td className="py-2 text-sm text-navy">{a.nickname || a.name || ''}</td>
                       <td className="py-2 text-sm text-gray-600">{a.institution || a.bank_name || ''}</td>
                       <td className="py-2 text-sm text-gray-600">{a.account_type || a.type || ''}</td>
                       <td className="py-2 text-sm text-gray-600">****{a.last_four || a.last4 || ''}</td>
@@ -507,7 +508,7 @@ const SuccessorPacketPage = () => {
                 <tbody>
                   {vaultDocs.slice(0, 25).map((d, i) => (
                     <tr key={i} className="border-b border-gray-100">
-                      <td className="py-2 text-sm text-gray-900">{d.name || d.title || d.filename || ''}</td>
+                      <td className="py-2 text-sm text-navy">{d.name || d.title || d.filename || ''}</td>
                       <td className="py-2 text-sm text-gray-600">{d.category || d.document_type || ''}</td>
                       <td className="py-2 text-sm text-gray-600">{fmtDate(d.uploaded_at || d.date || d.created_at)}</td>
                     </tr>
@@ -544,7 +545,7 @@ const SuccessorPacketPage = () => {
                   <tbody>
                     {governanceTasks.slice(0, 10).map((t, i) => (
                       <tr key={i} className="border-b border-gray-100">
-                        <td className="py-2 text-sm text-gray-900">{t.title || t.task_type || ''}</td>
+                        <td className="py-2 text-sm text-navy">{t.title || t.task_type || ''}</td>
                         <td className="py-2 text-sm text-gray-600 text-right">{fmtDate(t.due_date)}</td>
                       </tr>
                     ))}
@@ -559,7 +560,7 @@ const SuccessorPacketPage = () => {
                   <tbody>
                     {taxCalendar.slice(0, 10).map((t, i) => (
                       <tr key={i} className="border-b border-gray-100">
-                        <td className="py-2 text-sm text-gray-900">{t.deadline_type || t.title || ''}</td>
+                        <td className="py-2 text-sm text-navy">{t.deadline_type || t.title || ''}</td>
                         <td className="py-2 text-sm text-gray-600 text-right">{fmtDate(t.due_date)}</td>
                       </tr>
                     ))}

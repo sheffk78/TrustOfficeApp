@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import KnowledgeCard from '@/components/KnowledgeCard';
+import PageHelpButton from '@/components/PageHelpButton';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -166,17 +167,22 @@ export default function KnowledgeBasePage() {
       <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0 lg:ml-64 pt-16 lg:pt-0">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-navy/10 flex items-center justify-center rounded-lg">
-                <BookOpen className="w-5 h-5 text-navy" />
-              </div>
-              <div>
-                <h1 className="font-serif text-2xl md:text-3xl text-navy">Knowledge Base</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Centralized resources for trust administrators
-                </p>
-              </div>
+          <div className="page-header flex items-center justify-between">
+            <div>
+              <h1 className="page-title">Knowledge Base</h1>
+              <p className="page-subtitle">
+                Trust education articles and resources for trust administrators
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
+              <PageHelpButton
+                items={[
+                  { text: 'Browse published trust education articles across all categories' },
+                  { text: 'Search, filter by category, and sort articles' },
+                  { text: 'Click any article card to read the full content' },
+                ]}
+                taPrompt="Walk me through the Knowledge Base"
+              />
             </div>
           </div>
 
@@ -212,20 +218,22 @@ export default function KnowledgeBasePage() {
 
             {/* View toggle */}
             <div className="flex items-center border border-border rounded overflow-hidden">
-              <button
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setViewMode('grid')}
-                className={`p-2 ${viewMode === 'grid' ? 'bg-navy text-white' : 'bg-white text-navy'} transition-colors`}
                 title="Grid view"
               >
                 <Grid className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setViewMode('list')}
-                className={`p-2 ${viewMode === 'list' ? 'bg-navy text-white' : 'bg-white text-navy'} transition-colors`}
                 title="List view"
               >
                 <List className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
 
             {/* Sort */}
@@ -253,12 +261,14 @@ export default function KnowledgeBasePage() {
                     ? CATEGORY_LABELS[activeCategory] || activeCategory
                     : ''}
                   {searchQuery ? (activeCategory ? ' + ' : '') + `"${searchQuery}"` : ''}
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={clearFilters}
-                    className="ml-1 text-muted-foreground hover:text-navy"
+                    className="ml-1 h-auto p-0 text-muted-foreground hover:text-navy"
                   >
                     ✕
-                  </button>
+                  </Button>
                 </Badge>
               )}
             </div>

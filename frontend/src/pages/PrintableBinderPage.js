@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
 import { formatEIN } from '@/utils/formatters';
+import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
 import {
   FileText, Shield, HeartPulse, Landmark, Building2, Users,
@@ -307,7 +308,7 @@ const PrintableBinderPage = () => {
               <FileText className="w-5 h-5 text-gold" />
               Binder Cover Sheet
             </h2>
-            <div className="card-trust border border-border p-6 shadow-sm">
+            <div className="card-trust border border-border p-6">
               {loading ? (
                 <div className="animate-pulse space-y-3">
                   <div className="h-8 bg-subtle-bg rounded w-1/2"></div>
@@ -331,12 +332,12 @@ const PrintableBinderPage = () => {
                         )}
                       </div>
                     </div>
-                    <button
+                    <Button
                       onClick={() => handlePrint('cover')}
-                      className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
-                    >
+                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      >
                       <Printer className="w-4 h-4" /> Print Cover Sheet
-                    </button>
+                    </Button>
                   </div>
                 </>
               )}
@@ -357,7 +358,7 @@ const PrintableBinderPage = () => {
                 return (
                   <div
                     key={section.id}
-                    className="flex items-start gap-3 card-trust border border-border p-4 shadow-sm hover:shadow-md transition-shadow"
+                    className="flex items-start gap-3 card-trust border border-border p-4"
                   >
                     <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
                       <Icon className="w-5 h-5 text-gold" />
@@ -368,12 +369,12 @@ const PrintableBinderPage = () => {
                         <h3 className="text-sm font-semibold text-navy">{section.title}</h3>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{section.description}</p>
-                      <button
+                      <Button
                         onClick={() => handlePrint(`tab-${section.id}`)}
-                        className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
+                        className="mt-2 h-auto p-0 text-xs font-medium text-gold hover:text-navy/60"
                       >
                         <Printer className="w-3 h-3" /> Print Divider
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 );
@@ -387,17 +388,17 @@ const PrintableBinderPage = () => {
               <BookOpen className="w-5 h-5 text-gold" />
               Trustee Quick Reference Card
             </h2>
-            <div className="card-trust border border-border p-6 shadow-sm">
+            <div className="card-trust border border-border p-6">
               <p className="text-sm text-muted-foreground mb-3">
                 A single-page cheat sheet covering your fiduciary duties, decision filter, signing rules, and emergency protocols.
                 Print this and keep it at the front of your binder.
               </p>
-              <button
+              <Button
                 onClick={() => handlePrint('quick-ref')}
-                className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
-              >
+                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      >
                 <Printer className="w-4 h-4" /> Print Reference Card
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -407,17 +408,17 @@ const PrintableBinderPage = () => {
               <FilePen className="w-5 h-5 text-gold" />
               Resolution Template
             </h2>
-            <div className="card-trust border border-border p-6 shadow-sm">
+            <div className="card-trust border border-border p-6">
               <p className="text-sm text-muted-foreground mb-3">
                 A blank WHEREAS/BE IT RESOLVED template with signature, witness, and notary blocks.
                 Print a fresh copy each time you need to record a formal trust resolution.
               </p>
-              <button
+              <Button
                 onClick={() => handlePrint('resolution')}
-                className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
-              >
+                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      >
                 <Printer className="w-4 h-4" /> Print Resolution Template
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -430,34 +431,34 @@ const PrintableBinderPage = () => {
               Step-by-step checklists for transferring specific asset types into or out of your trust. Print when you're ready to start a transfer.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-start gap-3 card-trust border border-border p-4 shadow-sm">
+              <div className="flex items-start gap-3 card-trust border border-border p-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
                   <Home className="w-5 h-5 text-gold" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-navy">Real Estate Transfer</h3>
                   <p className="text-xs text-muted-foreground mt-1">Deed recording, insurance, mortgage, and tax steps.</p>
-                  <button
+                  <Button
                     onClick={() => handlePrint('checklist-real-estate')}
-                    className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
+                    className="mt-2 h-auto p-0 text-xs font-medium text-gold hover:text-navy/60"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
-                  </button>
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-start gap-3 card-trust border border-border p-4 shadow-sm">
+              <div className="flex items-start gap-3 card-trust border border-border p-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
                   <Car className="w-5 h-5 text-gold" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-navy">Vehicle Transfer</h3>
                   <p className="text-xs text-muted-foreground mt-1">Title transfer, DMV, insurance, and registration steps.</p>
-                  <button
+                  <Button
                     onClick={() => handlePrint('checklist-vehicle')}
-                    className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-navy/60 transition-colors"
+                    className="mt-2 h-auto p-0 text-xs font-medium text-gold hover:text-navy/60"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -469,17 +470,17 @@ const PrintableBinderPage = () => {
               <DollarSign className="w-5 h-5 text-gold" />
               Financial Records
             </h2>
-            <div className="card-trust border border-border p-6 shadow-sm">
+            <div className="card-trust border border-border p-6">
               <p className="text-sm text-muted-foreground mb-3">
                 Transaction ledger summary, distribution history, compensation summary, and investment portfolio.
                 Print this section for a comprehensive financial snapshot of your trust.
               </p>
-              <button
+              <Button
                 onClick={() => handlePrint('money')}
-                className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
-              >
+                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      >
                 <Printer className="w-4 h-4" /> Print Financial Records
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -489,17 +490,17 @@ const PrintableBinderPage = () => {
               <Network className="w-5 h-5 text-gold" />
               Entity Structure
             </h2>
-            <div className="card-trust border border-border p-6 shadow-sm">
+            <div className="card-trust border border-border p-6">
               <p className="text-sm text-muted-foreground mb-3">
                 Entity list, beneficiary roster, Schedule A assets, and communications log summary.
                 Print this section for a structural overview of your trust.
               </p>
-              <button
+              <Button
                 onClick={() => handlePrint('structure')}
-                className="flex items-center gap-2 px-4 py-2 bg-gold hover:bg-gold/80 text-navy font-medium shadow-sm transition-colors"
-              >
+                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      >
                 <Printer className="w-4 h-4" /> Print Entity Structure
-              </button>
+              </Button>
             </div>
           </div>
       </div>

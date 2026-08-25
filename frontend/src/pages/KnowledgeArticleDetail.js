@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import PageHelpButton from '@/components/PageHelpButton';
 
 const CATEGORY_LABELS = {
   trust_basics: 'Trust Basics',
@@ -35,16 +36,16 @@ const CATEGORY_LABELS = {
 };
 
 const CATEGORY_COLORS = {
-  trust_basics: 'bg-blue-100 text-blue-700',
-  compliance: 'bg-green-100 text-green-700',
-  tax: 'bg-purple-100 text-purple-700',
-  distributions: 'bg-orange-100 text-orange-700',
-  compensation: 'bg-pink-100 text-pink-700',
-  governance: 'bg-indigo-100 text-indigo-700',
-  structures: 'bg-cyan-100 text-cyan-700',
-  onboarding: 'bg-yellow-100 text-yellow-700',
-  glossary: 'bg-gray-100 text-gray-700',
-  best_practices: 'bg-emerald-100 text-emerald-700',
+  trust_basics: 'bg-navy/10 text-navy',
+  compliance: 'bg-gold/10 text-gold',
+  tax: 'bg-navy/10 text-navy',
+  distributions: 'bg-gold/10 text-gold',
+  compensation: 'bg-navy/10 text-navy',
+  governance: 'bg-gold/10 text-gold',
+  structures: 'bg-navy/10 text-navy',
+  onboarding: 'bg-gold/10 text-gold',
+  glossary: 'bg-navy/10 text-navy',
+  best_practices: 'bg-gold/10 text-gold',
 };
 
 export default function KnowledgeArticleDetail() {
@@ -166,7 +167,7 @@ export default function KnowledgeArticleDetail() {
     );
   }
 
-  const catColor = CATEGORY_COLORS[article.category] || 'bg-gray-100 text-gray-700';
+  const catColor = CATEGORY_COLORS[article.category] || 'bg-navy/10 text-navy';
   const catLabel = CATEGORY_LABELS[article.category] || article.category;
 
   return (
@@ -174,16 +175,25 @@ export default function KnowledgeArticleDetail() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0 lg:ml-64 pt-16 lg:pt-0 print:bg-white">
         <div className="max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-8">
-          {/* Back button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/knowledge')}
-            className="mb-6"
-          >
-            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            Back to Knowledge Base
-          </Button>
+          {/* Page header with back button + help */}
+          <div className="page-header flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/knowledge')}
+            >
+              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+              Back to Knowledge Base
+            </Button>
+            <PageHelpButton
+              items={[
+                { text: 'Read trust education articles from the Knowledge Base' },
+                { text: 'Use the Trust Assistant to ask questions about this article' },
+                { text: 'Print or share articles for your trust records' },
+              ]}
+              taPrompt="Help me understand this article and how it applies to my trust"
+            />
+          </div>
 
           {/* Article header */}
           <article className="card-trust border border-border overflow-hidden">

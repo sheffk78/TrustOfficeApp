@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { showError } from '@/utils/errors';
 import { fetchWithAuth } from '@/utils/api';
+import PageHelpButton from '@/components/PageHelpButton';
 import {
   Plus, Download, Upload, FileText,
   AlertCircle, CheckCircle2, Clock,
@@ -165,14 +166,22 @@ export default function BenevolencePolicyPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="page-header flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Benevolence Policy</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="page-title">Benevolence Policy</h1>
+          <p className="page-subtitle">
             Create, manage, and publish your written benevolence policy
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <PageHelpButton
+            items={[
+              { text: 'Create, manage, and publish your written benevolence policy' },
+              { text: 'Draft, amend, and publish policy versions with version history' },
+              { text: 'Review the IRS compliance checklist before publishing' },
+            ]}
+            taPrompt="Walk me through the Benevolence Policy page and how to create or amend a policy"
+          />
           {activeTab === 'view' && policy && (
             <Button onClick={handleAmend} variant="outline">
               <Plus className="h-4 w-4 mr-2" /> Amend Policy
@@ -192,7 +201,7 @@ export default function BenevolencePolicyPage() {
       </div>
 
       {/* Status Banner */}
-      <div className="rounded-lg border p-4 bg-white shadow-sm">
+      <div className="card-trust border p-4">
         {!policy ? (
           <div className="flex items-center gap-3 text-amber-600">
             <AlertCircle className="h-5 w-5" />
@@ -210,15 +219,15 @@ export default function BenevolencePolicyPage() {
               </div>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                 activeVersion?.status === 'published'
-                  ? 'bg-green-100 text-green-800'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-600'
                   : activeVersion?.status === 'draft'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'bg-gold/10 text-gold border border-gold'
+                  : 'bg-navy/10 text-navy border border-navy/30'
               }`}>
                 {activeVersion?.status?.toUpperCase() || policy.current_version_status?.toUpperCase()}
               </span>
               {activeVersion?.published_at && (
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted-foreground">
                   Published {safeFormatDate(activeVersion.published_at, 'MMM d, yyyy')}
                 </span>
               )}
@@ -267,8 +276,8 @@ export default function BenevolencePolicyPage() {
         />
       )}
       {activeTab === 'edit' && activeVersion?.status !== 'draft' && (
-        <div className="text-center py-12 text-gray-500">
-          <AlertCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+        <div className="text-center py-12 text-muted-foreground">
+          <AlertCircle className="h-12 w-12 mx-auto mb-3 text-navy/40" />
           <p className="font-medium">Cannot edit a {activeVersion.status} version</p>
           <p className="text-sm">Create a new draft via "Amend Policy" or view the published version.</p>
         </div>

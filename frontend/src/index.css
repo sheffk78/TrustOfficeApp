@@ -1192,3 +1192,33 @@
     display: none;
   }
 }
+
+/* ==================== IMPERSONATION BANNER OFFSET ==================== */
+/* When body.impersonating is active, push sidebar and main content down
+   so the fixed banner doesn't cover anything. Banner height: ~44px (py-2
+   + content). We use 48px for comfortable spacing. */
+
+body.impersonating .sidebar-trust {
+  top: 48px;
+}
+
+body.impersonating .main-content {
+  margin-top: 48px;
+}
+
+/* Pages using the lg:ml-64 pt-16 lg:pt-0 pattern */
+body.impersonating main[class*="lg:ml-64"] {
+  padding-top: 64px !important;
+}
+
+/* UpgradeBar (z-90) sits below the impersonation banner (z-100) — push it down too */
+body.impersonating .fixed.top-0.z-\[90\] {
+  top: 48px;
+}
+
+/* On mobile, the sidebar is off-canvas so only the main content needs offset */
+@media (max-width: 1023px) {
+  body.impersonating .sidebar-trust {
+    top: 0;
+  }
+}

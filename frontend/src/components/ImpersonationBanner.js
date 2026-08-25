@@ -28,14 +28,23 @@ export const ImpersonationBanner = () => {
       try {
         const data = JSON.parse(stored);
         setImpersonationData(data);
+        // Add body class so sidebar + main content get pushed down
+        document.body.classList.add('impersonating');
       } catch (e) {
         console.error('Failed to parse impersonation data:', e);
         setImpersonationData(null);
+        document.body.classList.remove('impersonating');
       }
     } else {
       // No impersonation data — clear the banner
       setImpersonationData(null);
+      document.body.classList.remove('impersonating');
     }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.classList.remove('impersonating');
+    };
   }, [user]);
 
   const handleExit = async () => {
@@ -81,6 +90,7 @@ export const ImpersonationBanner = () => {
       sessionStorage.removeItem('impersonation_data');
       sessionStorage.removeItem('admin_token');
       sessionStorage.removeItem('admin_user_data');
+      document.body.classList.remove('impersonating');
       
       // Reload trusts and subscription for admin
       await loadTrusts();

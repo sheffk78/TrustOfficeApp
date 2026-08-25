@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import PageHelpButton from '@/components/PageHelpButton';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -202,6 +203,16 @@ export default function TrustAdminKitsPage() {
           <h1 className="page-title">Administration Kits</h1>
           <p className="page-subtitle">Generate ready-to-go paperwork packets for DMV visits, bank account setup, tax prep, and more</p>
         </div>
+        <div className="flex items-center gap-2">
+          <PageHelpButton
+            items={[
+              { text: 'Generate ready-to-go paperwork packets for common trust administration tasks' },
+              { text: 'DMV visits, bank account setup, tax prep, and more' },
+              { text: 'Each kit includes all required forms and instructions' },
+            ]}
+            taPrompt="Walk me through the Administration Kits and how to generate a kit"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
@@ -313,6 +324,16 @@ export default function TrustAdminKitsPage() {
               <h1 className="page-title">{kitType?.label || 'Kit'}</h1>
               <p className="page-subtitle">{kitType?.description}</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <PageHelpButton
+              items={[
+                { text: `Generate the ${kitType?.label || 'kit'} paperwork packet for this trust` },
+                { text: 'Fields marked * are required before generating' },
+                { text: 'Data already in your trust profile is filled in automatically' },
+              ]}
+              taPrompt="Walk me through generating an Administration Kit"
+            />
           </div>
         </div>
 
@@ -491,6 +512,16 @@ export default function TrustAdminKitsPage() {
             <Button variant="ghost" size="sm" onClick={backToSelect}>
               <ArrowLeft className="w-4 h-4 mr-1" /> Back to Kits
             </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <PageHelpButton
+              items={[
+                { text: 'Review the generated kit: instructions, forms, and documents to bring' },
+                { text: 'Download each form or print the full packet' },
+                { text: 'Check the Fees section for costs at submission' },
+              ]}
+              taPrompt="Walk me through this Administration Kit"
+            />
           </div>
           <Button variant="outline" size="sm" onClick={printKit}>
             <Printer className="w-4 h-4 mr-1" /> Print

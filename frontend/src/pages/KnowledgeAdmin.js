@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
+import PageHelpButton from '@/components/PageHelpButton';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import {
-  BookOpen,
   Plus,
   Edit,
   Trash2,
@@ -79,16 +79,16 @@ const CATEGORY_LABELS = {
 };
 
 const CATEGORY_COLORS = {
-  trust_basics: 'bg-blue-100 text-blue-700',
-  compliance: 'bg-green-100 text-green-700',
-  tax: 'bg-purple-100 text-purple-700',
-  distributions: 'bg-orange-100 text-orange-700',
-  compensation: 'bg-pink-100 text-pink-700',
-  governance: 'bg-indigo-100 text-indigo-700',
-  structures: 'bg-cyan-100 text-cyan-700',
-  onboarding: 'bg-yellow-100 text-yellow-700',
-  glossary: 'bg-gray-100 text-gray-700',
-  best_practices: 'bg-emerald-100 text-emerald-700',
+  trust_basics: 'bg-navy/10 text-navy',
+  compliance: 'bg-gold/10 text-gold',
+  tax: 'bg-navy/10 text-navy',
+  distributions: 'bg-gold/10 text-gold',
+  compensation: 'bg-navy/10 text-navy',
+  governance: 'bg-gold/10 text-gold',
+  structures: 'bg-navy/10 text-navy',
+  onboarding: 'bg-gold/10 text-gold',
+  glossary: 'bg-navy/10 text-navy',
+  best_practices: 'bg-gold/10 text-gold',
 };
 
 function ArticleForm({ article, onSave, onCancel, saving }) {
@@ -399,25 +399,26 @@ export default function KnowledgeAdmin() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0 lg:ml-64 pt-16 lg:pt-0">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-navy/10 flex items-center justify-center rounded-lg">
-                <BookOpen className="w-5 h-5 text-navy" />
-              </div>
-              <div>
-                <h1 className="font-serif text-2xl md:text-3xl text-navy">
-                  Knowledge Base Admin
-                </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Create, edit, and manage knowledge articles
-                </p>
-              </div>
+          {/* Page Header */}
+          <div className="page-header flex items-center justify-between">
+            <div>
+              <h1 className="page-title">Knowledge Base Admin</h1>
+              <p className="page-subtitle">Create, edit, and manage knowledge articles</p>
             </div>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Article
-            </Button>
+            <div className="flex items-center gap-2">
+              <PageHelpButton
+                items={[
+                  { text: 'Create, edit, and manage trust education articles' },
+                  { text: 'Organize articles by category for the Knowledge Base' },
+                  { text: 'Articles appear in the Knowledge Base for all users' },
+                ]}
+                taPrompt="Walk me through the Knowledge Base Admin and how to create an article"
+              />
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Article
+              </Button>
+            </div>
           </div>
 
           {/* Toolbar */}
@@ -508,7 +509,7 @@ export default function KnowledgeAdmin() {
                       <Badge
                         className={`flex-shrink-0 ${
                           CATEGORY_COLORS[article.category] ||
-                          'bg-gray-100 text-gray-700'
+                          'bg-navy/10 text-navy'
                         }`}
                       >
                         {CATEGORY_LABELS[article.category] || article.category}
