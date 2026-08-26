@@ -15,6 +15,7 @@ import { useVaultUpload } from '@/components/vault/useVaultUpload';
 import VaultAddForm from '@/components/vault/VaultAddForm';
 import VaultCategorySection from '@/components/vault/VaultCategorySection';
 import CriticalDocumentsAlert from '@/components/vault/CriticalDocumentsAlert';
+import CloudBackupSection from '@/components/vault/CloudBackupSection';
 import { deleteDocument, downloadDocument } from '@/components/vault/vaultOperations';
 
 export default function VaultPage() {
@@ -126,6 +127,9 @@ export default function VaultPage() {
             missingCritical={!criticalDismissed ? summary?.missing_critical : null}
             onDismiss={() => setCriticalDismissed(true)}
           />
+
+          {/* Cloud Backup */}
+          <CloudBackupSection selectedTrust={selectedTrust} />
 
           {/* Search + Category Filter */}
           <div className="flex gap-2 mb-6">

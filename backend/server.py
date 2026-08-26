@@ -126,6 +126,10 @@ from routers.error_reports import router as error_reports_router
 from routers.error_log import router as error_log_router
 from routers.error_log import admin_router as error_log_admin_router
 
+# Cloud backup
+from routers.cloud_backup import router as cloud_backup_router
+from cloud_backup_scheduler import init_backup_scheduler, shutdown_backup_scheduler
+
 # Import security middleware
 from security import (
     RateLimitMiddleware,
@@ -465,6 +469,7 @@ app.include_router(knowledge_retrieval_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(feedback_router, prefix="/api")
 app.include_router(support_tickets_router, prefix="/api")
+app.include_router(cloud_backup_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -501,6 +506,14 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to start background runner: {e}")
         startup_errors.append(f"background_runner: {e}")
+
+    # Start cloud backup scheduler
+    try:
+        init_backup_scheduler()
+        logger.info("Cloud backup scheduler started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start cloud backup scheduler: {e}")
+        startup_errors.append(f"backup_scheduler: {e}")
     
     # Create database indexes for performance
     try:
@@ -584,6 +597,13 @@ async def startup_event():
         await db.referral_credits.create_index("user_id")
         await db.referral_credits.create_index([("user_id", 1), ("status", 1)])
         await db.referral_credits.create_index("source_referral_id", unique=True)
+
+        # Cloud backup connections
+        await db.cloud_backup_connections.create_index([("user_id", 1), ("provider", 1)], unique=True)
+        await db.cloud_backup_connections.create_index("is_active")
+
+        # Vault backup tracking
+        await db.vault_documents.create_index([("user_id", 1), ("last_backup_at", 1)])
         await db.referral_credits.create_index([("status", 1), ("expires_at", 1)])
         
         # OAuth auth codes (one-time use, short-lived)
@@ -855,4 +875,5 @@ async def ensure_primary_admin():
 async def shutdown_db_client():
     """Stop background tasks and close database connection"""
     await background_runner.stop()
+    shutdown_backup_scheduler()
     client.close()

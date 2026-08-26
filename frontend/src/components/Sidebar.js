@@ -70,6 +70,16 @@ const NAV_GROUPS = [
     { path: '/transactions', icon: ArrowUpDown, label: 'Transaction Ledger' },
   ]},
 
+  // ═══ GOVERNANCE — records, meetings, property, and documents ═══
+  { key: 'governance', icon: BookOpen, label: 'Governance', items: [
+    { path: '/minutes/template/acceptance_of_property', icon: FilePlus, label: 'Accept Property', badge: 'NEW', tooltip: 'Create a resolution to accept property into the trust' },
+    { path: '/calendar', icon: Calendar, label: 'Calendar' },
+    { path: '/minutes', icon: FilePen, label: 'Minutes' },
+    { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
+    { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
+    { path: '/vault', icon: FolderOpen, label: 'Documents', tooltip: 'Vault, templates, and record book' },
+  ]},
+
   // ═══ TRUST STRUCTURE — legal architecture ═══
   { key: 'trust-structure', icon: Network, label: 'Trust Structure', items: [
     { path: '/structures', icon: Layers, label: 'Trust & Entities' },
@@ -80,16 +90,6 @@ const NAV_GROUPS = [
   { key: 'communication', icon: MessageSquare, label: 'Communication', items: [
     { path: '/messaging', icon: MessageSquare, label: 'Messages', badge: 'NEW' },
     { path: '/communications', icon: Send, label: 'Communications' },
-  ]},
-
-  // ═══ GOVERNANCE — records, meetings, property, and documents ═══
-  { key: 'governance', icon: BookOpen, label: 'Governance', items: [
-    { path: '/minutes/template/acceptance_of_property', icon: FilePlus, label: 'Accept Property', badge: 'NEW', tooltip: 'Create a resolution to accept property into the trust' },
-    { path: '/calendar', icon: Calendar, label: 'Calendar' },
-    { path: '/minutes', icon: FilePen, label: 'Minutes' },
-    { path: '/audit-trail', icon: ClipboardList, label: 'Audit Trail' },
-    { path: '/authority', icon: Gavel, label: 'Trustee Powers' },
-    { path: '/vault', icon: FolderOpen, label: 'Documents', tooltip: 'Vault, templates, and record book' },
   ]},
 
   // ═══ HEALTH & COMPLIANCE ═══
@@ -395,7 +395,14 @@ const useExpandedGroups = (activeGroup) => {
   }, [expandedGroups]);
 
   const toggleGroup = useCallback((key) => {
-    setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+    setExpandedGroups(prev => {
+      // Accordion behavior: expanding one group collapses all others.
+      // Toggling the already-expanded group closes it (empty state).
+      if (prev[key]) {
+        return {};  // Collapse the open group
+      }
+      return { [key]: true };  // Expand this group, collapse all others
+    });
   }, []);
 
   return { expandedGroups, toggleGroup };
