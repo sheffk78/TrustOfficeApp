@@ -173,11 +173,26 @@ def calculate_subscription_status(sub: dict) -> dict:
             result["days_remaining"] = None
             
             # Update plan type from Stripe if needed
-            items = stripe_data.get("items") or {}
-            item_data = items.get("data") or []
+            # Stripe may return items as a ListObject (not a plain dict),
+            # so access via .data attribute or .to_dict() to avoid
+            # AttributeError: 'get' is a dict method, but a ListObject is not a dict.
+            items = stripe_data.get("items")
+            if items is None:
+                item_data = []
+            elif hasattr(items, "data"):
+                # Stripe ListObject — use attribute access
+                item_data = items.data
+            elif isinstance(items, dict):
+                item_data = items.get("data") or []
+            elif hasattr(items, "to_dict"):
+                item_data = items.to_dict().get("data") or []
+            else:
+                item_data = []
+
             if item_data:
-                price = item_data[0].get("price") or {}
-                price_id = price.get("id")
+                first_item = item_data[0]
+                price = getattr(first_item, "price", None) or (first_item.get("price") if isinstance(first_item, dict) else {}) or {}
+                price_id = price.get("id") if isinstance(price, dict) else getattr(price, "id", None)
                 if not price_id:
                     return result
                 # Check new tier price IDs first

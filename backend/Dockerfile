@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # Cache bust — forces Railway to rebuild image from scratch
-ARG CACHE_BUST=2026-08-26-knowledge-fix-v2
+ARG CACHE_BUST=2026-08-26-knowledge-fix-v3
 RUN echo "Cache bust: $CACHE_BUST"
 
 WORKDIR /app
@@ -34,6 +34,16 @@ RUN ls /app/routers/knowledge.py /app/routers/messaging.py /app/routers/performa
     && python -m py_compile /app/routers/performance.py \
     && python -m py_compile /app/routers/knowledge_retrieval.py \
     && python -m py_compile /app/services/trust_knowledge.py
+
+# Full import test — catch import errors that py_compile misses (missing deps,
+# circular imports, etc.). Uses dummy env vars so module-level code that reads
+# os.environ doesn't crash during the import check.
+RUN MONGO_URL="mongodb://dummy:27017" \
+    DB_NAME="dummy" \
+    JWT_SECRET="dummy" \
+    JWT_ALGORITHM="HS256" \
+    CORS_ORIGINS="http://localhost" \
+    python -c "from routers.knowledge import router; from routers.knowledge_retrieval import router; print('✅ All knowledge modules import successfully')"
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser && \
