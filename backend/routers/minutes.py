@@ -2692,7 +2692,7 @@ def generate_bank_account_content(data: dict) -> str:
     purpose = data.get("purpose", "general trust administration")
     authorized_signers = data.get("authorized_signers", [])
     signature_requirement = data.get("signature_requirement", "any_one")
-    initial_deposit = data.get("initial_deposit")
+    initial_deposit = data.get("initial_deposit") or 0
     
     account_type_text = {
         "checking": "checking account",
@@ -2704,7 +2704,7 @@ def generate_bank_account_content(data: dict) -> str:
     sig_text = {
         "any_one": "Any one authorized Trustee may sign individually for all transactions.",
         "any_two": "Any two authorized Trustees must sign jointly for all transactions.",
-        "threshold": f"Any one Trustee may sign for transactions up to ${(data.get('signature_threshold') or 10000):,.2f}; two signatures required above that amount."
+        "threshold": f"Any one Trustee may sign for transactions up to ${int(data.get('signature_threshold') or 10000):,.2f}; two signatures required above that amount."
     }.get(signature_requirement, "Any one authorized Trustee may sign individually.")
     
     deposit_text = f"${initial_deposit:,.2f}" if initial_deposit else "[Amount]"
