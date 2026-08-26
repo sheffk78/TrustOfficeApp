@@ -2181,7 +2181,7 @@ Effective Date: {res.get('effective_date', 'Immediately upon adoption')}
 
 def generate_distribution_content(data: dict) -> str:
     """Generate content for distribution to beneficiaries"""
-    total = data.get("distribution_total", 0)
+    total = data.get("distribution_total") or 0
     items = data.get("distribution_items", [])
     dist_date = data.get("distribution_date", "[Date]")
     characterization = data.get("distribution_characterization", "income")
@@ -2204,8 +2204,8 @@ NOW, THEREFORE, BE IT RESOLVED that:
     if items:
         for item in items:
             name = item.get("beneficiary_name", "[Beneficiary Name]")
-            amount = item.get("amount", 0)
-            percentage = item.get("percentage", 0)
+            amount = item.get("amount") or 0
+            percentage = item.get("percentage") or 0
             content += f"    • {name}: ${amount:,.2f} (representing {percentage}% beneficial interest)\n"
     else:
         content += "    • [Beneficiary Name]: $__________ (representing ____% beneficial interest)\n"
@@ -2704,7 +2704,7 @@ def generate_bank_account_content(data: dict) -> str:
     sig_text = {
         "any_one": "Any one authorized Trustee may sign individually for all transactions.",
         "any_two": "Any two authorized Trustees must sign jointly for all transactions.",
-        "threshold": f"Any one Trustee may sign for transactions up to ${data.get('signature_threshold', 10000):,.2f}; two signatures required above that amount."
+        "threshold": f"Any one Trustee may sign for transactions up to ${(data.get('signature_threshold') or 10000):,.2f}; two signatures required above that amount."
     }.get(signature_requirement, "Any one authorized Trustee may sign individually.")
     
     deposit_text = f"${initial_deposit:,.2f}" if initial_deposit else "[Amount]"
@@ -2811,7 +2811,7 @@ def generate_benevolence_approval_content(data: dict) -> str:
     beneficiary_type = data.get("beneficiary_type", "individual")
     purpose = data.get("benevolence_purpose", "assistance")
     purpose_description = data.get("purpose_description", "[Description of need]")
-    amount = data.get("amount", 0)
+    amount = data.get("amount") or 0
     payment_method = data.get("payment_method", "check")
     criteria_met = data.get("criteria_met", [])
     
@@ -2977,7 +2977,7 @@ def generate_loan_authorization_content(data: dict) -> str:
     loan_direction = data.get("loan_direction", "making")  # making or receiving
     borrower_name = data.get("borrower_name", "[Borrower Name]")
     lender_name = data.get("lender_name", "[Lender Name]")
-    loan_amount = float(data.get("loan_amount", 0))
+    loan_amount = float(data.get("loan_amount") or 0)
     interest_rate = data.get("interest_rate", "AFR")
     term_months = data.get("term_months", 60)
     purpose = data.get("loan_purpose", "")
@@ -3054,8 +3054,8 @@ def generate_insurance_authorization_content(data: dict) -> str:
     insurance_type = data.get("insurance_type", "property")
     policy_action = data.get("policy_action", "obtain")  # obtain, renew, cancel, modify
     insurer_name = data.get("insurer_name", "[Insurance Company]")
-    coverage_amount = float(data.get("coverage_amount", 0))
-    premium_amount = float(data.get("premium_amount", 0))
+    coverage_amount = float(data.get("coverage_amount") or 0)
+    premium_amount = float(data.get("premium_amount") or 0)
     coverage_description = data.get("coverage_description", "")
     policy_number = data.get("policy_number", "")
     
@@ -3121,10 +3121,10 @@ Effective Date: Immediately upon adoption
 def generate_annual_review_content(data: dict) -> str:
     """Generate content for annual review meeting"""
     fiscal_year = data.get("fiscal_year", str(datetime.now().year - 1))
-    total_assets = float(data.get("total_assets", 0))
-    total_income = float(data.get("total_income", 0))
-    total_expenses = float(data.get("total_expenses", 0))
-    total_distributions = float(data.get("total_distributions", 0))
+    total_assets = float(data.get("total_assets") or 0)
+    total_income = float(data.get("total_income") or 0)
+    total_expenses = float(data.get("total_expenses") or 0)
+    total_distributions = float(data.get("total_distributions") or 0)
     investment_return = data.get("investment_return", "0%")
     key_accomplishments = data.get("key_accomplishments", [])
     upcoming_priorities = data.get("upcoming_priorities", [])
@@ -3223,11 +3223,11 @@ def generate_quarterly_review_content(data: dict) -> str:
     """Generate content for quarterly review meeting"""
     quarter = data.get("quarter", "Q1")
     year = data.get("year", str(datetime.now().year))
-    beginning_balance = float(data.get("beginning_balance", 0))
-    ending_balance = float(data.get("ending_balance", 0))
-    income_received = float(data.get("income_received", 0))
-    expenses_paid = float(data.get("expenses_paid", 0))
-    distributions_made = float(data.get("distributions_made", 0))
+    beginning_balance = float(data.get("beginning_balance") or 0)
+    ending_balance = float(data.get("ending_balance") or 0)
+    income_received = float(data.get("income_received") or 0)
+    expenses_paid = float(data.get("expenses_paid") or 0)
+    distributions_made = float(data.get("distributions_made") or 0)
     discussion_items = data.get("discussion_items", [])
     action_items = data.get("action_items", [])
     
@@ -3305,7 +3305,7 @@ def generate_trustee_compensation_content(data: dict) -> str:
     """Generate content for trustee compensation approval"""
     trustee_name = data.get("trustee_name", "[Trustee Name]")
     compensation_type = data.get("compensation_type", "annual")  # annual, hourly, per_meeting, percentage
-    compensation_amount = float(data.get("compensation_amount", 0))
+    compensation_amount = float(data.get("compensation_amount") or 0)
     effective_date = data.get("effective_date", "[Effective Date]")
     compensation_basis = data.get("compensation_basis", "")
     duties_description = data.get("duties_description", "")
@@ -3445,7 +3445,7 @@ def generate_beneficiary_denial_content(data: dict) -> str:
     """Generate content for beneficiary request denial"""
     beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
     request_type = data.get("request_type", "distribution")
-    request_amount = float(data.get("request_amount", 0))
+    request_amount = float(data.get("request_amount") or 0)
     request_purpose = data.get("request_purpose", "")
     request_date = data.get("request_date", "[Request Date]")
     denial_reasons = data.get("denial_reasons", [])
@@ -3514,7 +3514,7 @@ def generate_hems_distribution_content(data: dict) -> str:
     """Generate content for HEMS distribution (Health, Education, Maintenance, Support)"""
     beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
     hems_category = data.get("hems_category", "support")  # health, education, maintenance, support
-    distribution_amount = float(data.get("distribution_amount", 0))
+    distribution_amount = float(data.get("distribution_amount") or 0)
     specific_purpose = data.get("specific_purpose", "")
     supporting_documentation = data.get("supporting_documentation", [])
     recurring = data.get("recurring", False)
@@ -3618,7 +3618,7 @@ Effective Date: Immediately upon adoption
 def generate_beneficiary_loan_content(data: dict) -> str:
     """Generate content for loan to beneficiary"""
     beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
-    loan_amount = float(data.get("loan_amount", 0))
+    loan_amount = float(data.get("loan_amount") or 0)
     interest_rate = data.get("interest_rate", "AFR (Applicable Federal Rate)")
     term_months = data.get("term_months", 60)
     loan_purpose = data.get("loan_purpose", "")
