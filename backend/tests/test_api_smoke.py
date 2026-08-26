@@ -152,11 +152,12 @@ def _register(base_url: str, label: str = "smoke") -> dict:
 # ============================================================================
 
 @pytest.fixture(scope="session", autouse=True)
-def _cleanup_throwaways(base):
+def _cleanup_throwaways():
     """After the whole smoke run, delete any throwaway test users this run spawned."""
     yield
     try:
-        _delete_throwaway_users(base)
+        if BASE_URL:
+            _delete_throwaway_users(BASE_URL)
     except Exception:
         pass
 
