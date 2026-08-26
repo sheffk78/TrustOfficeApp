@@ -213,9 +213,9 @@ const NavGroupItem = ({ group, pathname, selectedTrust, isAdmin, isExpanded, onT
         <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
       </button>
 
-      {isExpanded && (
-        <div className="ml-4 border-l border-white/10">
-          {visibleItems.map((item) => {
+      <div className={`sidebar-accordion ml-4 border-l border-white/10 ${isExpanded ? 'expanded' : 'collapsed'}`}>
+        <div className="sidebar-accordion-inner">
+          {visibleItems.map((item, idx) => {
             const ItemIcon = item.icon;
             const isActive = isPathActive(item.path, pathname);
             return (
@@ -236,7 +236,7 @@ const NavGroupItem = ({ group, pathname, selectedTrust, isAdmin, isExpanded, onT
             );
           })}
         </div>
-      )}
+      </div>
     </div>
   );
 };

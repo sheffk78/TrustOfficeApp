@@ -402,6 +402,27 @@
     border-color: rgba(1, 0, 121, 0.08) !important;
 }
 
+/* ─── Sidebar accordion animation ─── */
+.sidebar-accordion {
+    overflow: hidden;
+    max-height: 800px;
+    opacity: 1;
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.2s ease-in-out;
+}
+.sidebar-accordion.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+.sidebar-accordion-inner {
+    /* inner wrapper so opacity fade doesn't clip during height transition */
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: top;
+}
+.sidebar-accordion.collapsed .sidebar-accordion-inner {
+    transform: translateY(-4px);
+}
+
 /* Dark mode: keep nav dark */
 .dark .sidebar-trust nav {
     background-color: transparent;
