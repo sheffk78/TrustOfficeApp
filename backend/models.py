@@ -1500,6 +1500,7 @@ class GovernanceClassification(str, Enum):
     operational_expense = "Operational Expense"
     capital_contribution = "Capital Contribution"
     tax_payment = "Tax Payment"
+    benevolence = "Benevolence"
     other = "Other"
 
 class TransactionCreate(BaseModel):

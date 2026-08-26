@@ -6,6 +6,7 @@ import uuid
 
 from database import db
 from dependencies import get_current_user, require_write_access
+from ledger_sync import auto_write_ledger_transaction
 
 router = APIRouter(tags=["expenses"])
 
@@ -76,6 +77,18 @@ async def create_expense(
 
     await db.expenses.insert_one(expense_doc)
     expense_doc.pop("_id", None)
+
+    # Auto-write to ledger if expense is created as approved
+    if status == "approved":
+        await auto_write_ledger_transaction(
+            trust_id=trust_id,
+            user_id=user["user_id"],
+            amount=amount,
+            date=expense_doc.get("date", now),
+            governance_classification="Operational Expense",
+            purpose_memo=f"Expense — {expense_doc.get('payee', '')} ({expense_doc.get('category', 'Uncategorized')})" + (f" — {expense_doc.get('notes', '')}" if expense_doc.get('notes') else ""),
+        )
+
     return expense_doc
 
 
@@ -114,6 +127,11 @@ async def update_expense(
 
     update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
 
+    # Track if status changed to "approved" for ledger sync
+    old_status = expense.get("status", "")
+    new_status = update_fields.get("status", old_status)
+    status_changed_to_approved = old_status != "approved" and new_status == "approved"
+
     await db.expenses.update_one(
         {"expense_id": expense_id, "user_id": user["user_id"]},
         {"$set": update_fields}
@@ -123,6 +141,18 @@ async def update_expense(
         {"expense_id": expense_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
+
+    # Auto-write to ledger when expense transitions to "approved"
+    if status_changed_to_approved and updated:
+        await auto_write_ledger_transaction(
+            trust_id=updated.get("trust_id", ""),
+            user_id=user["user_id"],
+            amount=updated.get("amount", 0),
+            date=updated.get("date", datetime.now(timezone.utc).isoformat()),
+            governance_classification="Operational Expense",
+            purpose_memo=f"Expense — {updated.get('payee', '')} ({updated.get('category', 'Uncategorized')})" + (f" — {updated.get('notes', '')}" if updated.get('notes') else ""),
+        )
+
     return updated
 
 

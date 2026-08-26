@@ -5,7 +5,8 @@ import {
 
 export const CLASSIFICATIONS = [
   'Distribution', 'Compensation', 'Inter-Entity Transfer',
-  'Operational Expense', 'Capital Contribution', 'Tax Payment', 'Other'
+  'Operational Expense', 'Capital Contribution', 'Tax Payment',
+  'Benevolence', 'Other'
 ];
 
 export const DIRECTION_OPTIONS = [
@@ -20,6 +21,7 @@ export const classificationColors = {
   'Operational Expense': 'bg-muted text-muted-foreground dark:bg-muted/30 dark:text-muted-foreground',
   'Capital Contribution': 'bg-success/10 text-success dark:bg-success/20 dark:text-success',
   'Tax Payment': 'bg-error/10 text-error dark:bg-error/20 dark:text-error',
+  'Benevolence': 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary',
   'Other': 'bg-navy/5 text-navy/70 dark:bg-navy/20 dark:text-navy/70',
 };
 

@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
+
+from ledger_sync import auto_write_ledger_transaction
 import re
 
 from database import db
@@ -420,6 +422,18 @@ async def approve_distribution(
         beneficiary=dist["beneficiary_name"],
         approved_by=user.get("name", user["email"]),
         approval_date=approval_time.split("T")[0]
+    )
+
+    # Auto-write to the transaction ledger (idempotent — skips if already exists)
+    classification = "Benevolence" if dist.get("is_benevolence") else "Distribution"
+    await auto_write_ledger_transaction(
+        trust_id=dist["trust_id"],
+        user_id=user["user_id"],
+        amount=dist["amount"],
+        date=dist.get("date", approval_time),
+        governance_classification=classification,
+        purpose_memo=f"Distribution to {dist['beneficiary_name']}" + (f" — {dist.get('purpose_classification', '')}" if dist.get('purpose_classification') else ""),
+        linked_distribution_id=distribution_id,
     )
 
     return DistributionResponse(**updated)

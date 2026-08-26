@@ -7,6 +7,7 @@ import uuid
 from database import db
 from dependencies import get_current_user, require_write_access, get_year_start
 from trustee_utils import parse_trustees
+from ledger_sync import auto_write_ledger_transaction
 from models import (
     CompensationPlanCreate, CompensationPlanResponse,
     CompensationPaymentCreate, CompensationPaymentResponse
@@ -411,7 +412,18 @@ async def create_comp_payment(payment: CompensationPaymentCreate, user: dict = D
     
     await db.compensation_payments.insert_one(payment_doc)
     await auto_update_onboarding(user["user_id"], payment.trust_id)
-    
+
+    # Auto-write to the transaction ledger (idempotent — skips if already exists)
+    await auto_write_ledger_transaction(
+        trust_id=payment.trust_id,
+        user_id=user["user_id"],
+        amount=payment.amount,
+        date=payment.date,
+        governance_classification="Compensation",
+        purpose_memo=f"Compensation payment — {payment.trustee_name or 'Trustee'}" + (f" ({payment.classification_text})" if payment.classification_text else ""),
+        linked_compensation_payment_id=payment_id,
+    )
+
     return CompensationPaymentResponse(**payment_doc)
 
 

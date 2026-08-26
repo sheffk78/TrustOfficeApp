@@ -11,6 +11,26 @@ from models import (
 
 router = APIRouter(tags=["categories"])
 
+# Trust expense categories — used by the Expenses page dropdown
+EXPENSE_CATEGORIES = [
+    "Administration",
+    "Professional Fees",
+    "Accounting / Legal",
+    "Insurance",
+    "Property / Maintenance",
+    "Taxes",
+    "Travel",
+    "Marketing",
+    "Technology",
+    "Utilities",
+    "Bank Fees",
+    "Investment Management",
+    "Education",
+    "Healthcare",
+    "Charitable / Benevolence",
+    "Other",
+]
+
 
 @router.get("/categories")
 async def get_categories():
@@ -20,5 +40,6 @@ async def get_categories():
         "task_types": [t.value for t in TaskType],
         "minutes_types": [m.value for m in MinutesType],
         "entity_types": [e.value for e in EntityType],
-        "relationship_types": [r.value for r in RelationshipType]
+        "relationship_types": [r.value for r in RelationshipType],
+        "expense_categories": EXPENSE_CATEGORIES,
     }
