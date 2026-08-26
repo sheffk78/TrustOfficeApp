@@ -383,8 +383,13 @@ async def get_minutes(
 # ==================== STATIC-PATH MINUTES ENDPOINTS (must be before /minutes/{minutes_id}) ====================
 
 def _resolve_participants(request, trust: dict) -> list:
-    """Resolve participants list from request, falling back to trust trustees / role."""
-    return (request.participants
+    """Resolve participants list from request, falling back to trust trustees / role.
+
+    Handles cases where request.participants might be None, str, or list.
+    """
+    # Ensure participants is always a list
+    participants = request.participants if isinstance(request.participants, list) else None
+    return (participants
             or parse_trustees(trust.get("trustees") or "")
             or [trust.get("role", "Trustee")])
 
