@@ -1,0 +1,86 @@
+[
+  {
+    "template_type": "trust_amendment",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "create HTTP 422: {\"detail\": [{\"type\": \"enum\", \"loc\": [\"body\", \"minutes_type\"], \"msg\": \"Input should be 'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\", \"input\": \"trust_amendment\", \"ctx\": {\"expected\": \"'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\"}, \"u"
+    ],
+    "response_snippet": "",
+    "draft_http": 422,
+    "create_http": 422,
+    "pdf_http": null
+  },
+  {
+    "template_type": "conflict_of_interest",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "create HTTP 422: {\"detail\": [{\"type\": \"enum\", \"loc\": [\"body\", \"minutes_type\"], \"msg\": \"Input should be 'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\", \"input\": \"conflict_of_interest\", \"ctx\": {\"expected\": \"'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\""
+    ],
+    "response_snippet": "",
+    "draft_http": 422,
+    "create_http": 422,
+    "pdf_http": null
+  },
+  {
+    "template_type": "emergency_ratification",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "create HTTP 422: {\"detail\": [{\"type\": \"enum\", \"loc\": [\"body\", \"minutes_type\"], \"msg\": \"Input should be 'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\", \"input\": \"emergency_ratification\", \"ctx\": {\"expected\": \"'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general"
+    ],
+    "response_snippet": "",
+    "draft_http": 422,
+    "create_http": 422,
+    "pdf_http": null
+  },
+  {
+    "template_type": "power_of_attorney",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "create HTTP 422: {\"detail\": [{\"type\": \"enum\", \"loc\": [\"body\", \"minutes_type\"], \"msg\": \"Input should be 'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\", \"input\": \"power_of_attorney\", \"ctx\": {\"expected\": \"'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\"}, "
+    ],
+    "response_snippet": "",
+    "draft_http": 422,
+    "create_http": 422,
+    "pdf_http": null
+  },
+  {
+    "template_type": "trust_termination",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "create HTTP 422: {\"detail\": [{\"type\": \"enum\", \"loc\": [\"body\", \"minutes_type\"], \"msg\": \"Input should be 'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\", \"input\": \"trust_termination\", \"ctx\": {\"expected\": \"'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\"}, "
+    ],
+    "response_snippet": "",
+    "draft_http": 422,
+    "create_http": 422,
+    "pdf_http": null
+  },
+  {
+    "template_type": "change_of_situs",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "create HTTP 422: {\"detail\": [{\"type\": \"enum\", \"loc\": [\"body\", \"minutes_type\"], \"msg\": \"Input should be 'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\", \"input\": \"change_of_situs\", \"ctx\": {\"expected\": \"'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\"}, \"u"
+    ],
+    "response_snippet": "",
+    "draft_http": 422,
+    "create_http": 422,
+    "pdf_http": null
+  },
+  {
+    "template_type": "fiscal_year_election",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "create HTTP 422: {\"detail\": [{\"type\": \"enum\", \"loc\": [\"body\", \"minutes_type\"], \"msg\": \"Input should be 'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\", \"input\": \"fiscal_year_election\", \"ctx\": {\"expected\": \"'annual', 'quarterly', 'compensation', 'distribution', 'solvency' or 'general'\""
+    ],
+    "response_snippet": "",
+    "draft_http": 422,
+    "create_http": 422,
+    "pdf_http": null
+  }
+]

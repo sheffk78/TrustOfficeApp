@@ -285,6 +285,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ],
         "ai_prompt_template": (
             "Generate a bill of sale for transfer of tangible personal property to {trust_name}. "
+            "The meeting was held on {meeting_date}. Trustees present: {participants}. "
             "Grantor: {grantor_name}. Property: {property_description}. Identifier: {property_identifier}. "
             "Value: {property_value}. Date: {conveyance_date}. Trustee: {trustee_name}. EIN: {ein}. "
             "Include conveyance language, consideration statement, 'as-is' clause, and notary acknowledgment block "
@@ -310,6 +311,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ],
         "ai_prompt_template": (
             "Generate an assignment of personal property for transfer of artwork, jewelry, or collectibles to {trust_name}. "
+            "The meeting was held on {meeting_date}. Trustees present: {participants}. "
             "Grantor: {grantor_name}. Property: {property_description}. Appraised value: {property_value}. "
             "Appraiser: {appraiser_name}. Date: {conveyance_date}. Trustee: {trustee_name}. EIN: {ein}. "
             "Include assignment and conveyance language, consideration statement, warranty of title, "
@@ -333,6 +335,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ],
         "ai_prompt_template": (
             "Generate a general assignment of intangible assets to {trust_name}. "
+            "The meeting was held on {meeting_date}. Trustees present: {participants}. "
             "Grantor: {grantor_name}. Asset: {property_description}. Identifier: {property_identifier}. "
             "Value: {property_value}. Date: {conveyance_date}. Trustee: {trustee_name}. EIN: {ein}. "
             "Include general assignment language, consideration statement, warranty of title, "
@@ -619,6 +622,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ],
         "ai_prompt_template": (
             "Generate a formal beneficiary distribution notice for {trust_name}. "
+            "Trustees present: {participants}. "
             "Beneficiary: {beneficiary_name}. Amount: {distribution_amount}. "
             "Purpose: {distribution_purpose}. Date: {distribution_date}. "
             "Trustee: {trustee_name}. Meeting date: {meeting_date}. "
@@ -653,6 +657,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ],
         "ai_prompt_template": (
             "Evaluate a distribution request for {trust_name}. "
+            "The meeting was held on {meeting_date}. Trustees present: {participants}. "
             "Beneficiary: {beneficiary_name}. Requested amount: {requested_amount}. "
             "Purpose: {request_purpose}. HEMS category: {hems_category}. "
             "Beneficiary financial situation: {beneficiary_financial_situation}. "

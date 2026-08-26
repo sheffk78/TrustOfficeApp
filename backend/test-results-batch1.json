@@ -1,0 +1,69 @@
+{
+  "results": [
+    {
+      "template_type": "initial_trustee_meeting",
+      "status": "FAIL",
+      "issues": [
+        "draft HTTP 500: {\"detail\":\"Internal server error. Our team has been notified.\"}"
+      ],
+      "response_snippet": " | PDF OK 3540B md5:66bb731ecb"
+    },
+    {
+      "template_type": "annual_review",
+      "status": "FAIL",
+      "issues": [
+        "draft HTTP 500: {\"detail\":\"Internal server error. Our team has been notified.\"}"
+      ],
+      "response_snippet": " | PDF OK 3521B md5:d644335966"
+    },
+    {
+      "template_type": "quarterly_review",
+      "status": "FAIL",
+      "issues": [
+        "draft HTTP 500: {\"detail\":\"Internal server error. Our team has been notified.\"}"
+      ],
+      "response_snippet": " | PDF OK 3529B md5:45b290d969"
+    },
+    {
+      "template_type": "general_meeting",
+      "status": "FAIL",
+      "issues": [
+        "draft HTTP 500: {\"detail\":\"Internal server error. Our team has been notified.\"}"
+      ],
+      "response_snippet": " | PDF OK 3524B md5:809a3550d2"
+    },
+    {
+      "template_type": "appointment_additional_trustee",
+      "status": "FAIL",
+      "issues": [
+        "draft HTTP 500: {\"detail\":\"Internal server error. Our team has been notified.\"}"
+      ],
+      "response_snippet": " | PDF OK 3524B md5:81caf84761"
+    },
+    {
+      "template_type": "appointment_successor_trustee",
+      "status": "FAIL",
+      "issues": [
+        "draft HTTP 500: {\"detail\":\"Internal server error. Our team has been notified.\"}"
+      ],
+      "response_snippet": " | PDF OK 3524B md5:4ff1b1c2a9"
+    },
+    {
+      "template_type": "trustee_resignation",
+      "status": "FAIL",
+      "issues": [
+        "draft HTTP 500: {\"detail\":\"Internal server error. Our team has been notified.\"}"
+      ],
+      "response_snippet": " | PDF OK 3524B md5:5d3f96b1b7"
+    },
+    {
+      "template_type": "trustee_compensation",
+      "status": "FAIL",
+      "issues": [
+        "draft HTTP 500: {\"detail\":\"Internal server error. Our team has been notified.\"}"
+      ],
+      "response_snippet": " | PDF OK 3531B md5:37c6851d82"
+    }
+  ],
+  "duplicate_pdfs": {}
+}

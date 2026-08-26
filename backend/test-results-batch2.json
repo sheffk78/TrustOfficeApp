@@ -1,0 +1,114 @@
+[
+  {
+    "template_type": "real_estate_purchase",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "CONFIRMED BUG: /api/minutes/draft expects 'request' as QUERY param \u2014 route decorator misapplied to _resolve_participants helper; AI drafting broken for all templates"
+    ],
+    "response_snippet": "",
+    "draft_http_status": 422,
+    "create_http_status": 200,
+    "minutes_id": "minutes_dc59bc446587",
+    "pdf_http_status": 200,
+    "pdf_bytes": 3875
+  },
+  {
+    "template_type": "acceptance_of_property",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "CONFIRMED BUG: /api/minutes/draft expects 'request' as QUERY param \u2014 route decorator misapplied to _resolve_participants helper; AI drafting broken for all templates"
+    ],
+    "response_snippet": "",
+    "draft_http_status": 422,
+    "create_http_status": 200,
+    "minutes_id": "minutes_e847c5c77fa2",
+    "pdf_http_status": 200,
+    "pdf_bytes": 3952
+  },
+  {
+    "template_type": "disposition_of_asset",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "CONFIRMED BUG: /api/minutes/draft expects 'request' as QUERY param \u2014 route decorator misapplied to _resolve_participants helper; AI drafting broken for all templates"
+    ],
+    "response_snippet": "",
+    "draft_http_status": 422,
+    "create_http_status": 200,
+    "minutes_id": "minutes_b585501d3fcd",
+    "pdf_http_status": 200,
+    "pdf_bytes": 3860
+  },
+  {
+    "template_type": "business_interest_acquisition",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "CONFIRMED BUG: /api/minutes/draft expects 'request' as QUERY param \u2014 route decorator misapplied to _resolve_participants helper; AI drafting broken for all templates"
+    ],
+    "response_snippet": "",
+    "draft_http_status": 422,
+    "create_http_status": 200,
+    "minutes_id": "minutes_ea3e7362e013",
+    "pdf_http_status": 200,
+    "pdf_bytes": 3805
+  },
+  {
+    "template_type": "real_estate_lease",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "CONFIRMED BUG: /api/minutes/draft expects 'request' as QUERY param \u2014 route decorator misapplied to _resolve_participants helper; AI drafting broken for all templates"
+    ],
+    "response_snippet": "",
+    "draft_http_status": 422,
+    "create_http_status": 200,
+    "minutes_id": "minutes_09892a47f418",
+    "pdf_http_status": 200,
+    "pdf_bytes": 3766
+  },
+  {
+    "template_type": "bill_of_sale",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "CONFIRMED BUG: /api/minutes/draft expects 'request' as QUERY param \u2014 route decorator misapplied to _resolve_participants helper; AI drafting broken for all templates"
+    ],
+    "response_snippet": "",
+    "draft_http_status": 422,
+    "create_http_status": 200,
+    "minutes_id": "minutes_584826754420",
+    "pdf_http_status": 200,
+    "pdf_bytes": 3820
+  },
+  {
+    "template_type": "assignment_of_personal_property",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "CONFIRMED BUG: /api/minutes/draft expects 'request' as QUERY param \u2014 route decorator misapplied to _resolve_participants helper; AI drafting broken for all templates"
+    ],
+    "response_snippet": "",
+    "draft_http_status": 422,
+    "create_http_status": 200,
+    "minutes_id": "minutes_644f8dfe7ce9",
+    "pdf_http_status": 200,
+    "pdf_bytes": 3820
+  },
+  {
+    "template_type": "general_assignment",
+    "status": "FAIL",
+    "issues": [
+      "draft HTTP 422: {\"detail\": [{\"type\": \"missing\", \"loc\": [\"query\", \"request\"], \"msg\": \"Field required\", \"input\": null, \"url\": \"https://errors.pydantic.dev/2.13/v/missing\"}]}",
+      "CONFIRMED BUG: /api/minutes/draft expects 'request' as QUERY param \u2014 route decorator misapplied to _resolve_participants helper; AI drafting broken for all templates"
+    ],
+    "response_snippet": "",
+    "draft_http_status": 422,
+    "create_http_status": 200,
+    "minutes_id": "minutes_0f0d4354771e",
+    "pdf_http_status": 200,
+    "pdf_bytes": 3802
+  }
+]

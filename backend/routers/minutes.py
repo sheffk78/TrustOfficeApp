@@ -382,7 +382,6 @@ async def get_minutes(
 
 # ==================== STATIC-PATH MINUTES ENDPOINTS (must be before /minutes/{minutes_id}) ====================
 
-@router.post("/minutes/draft", response_model=MinutesDraftResponse)
 def _resolve_participants(request, trust: dict) -> list:
     """Resolve participants list from request, falling back to trust trustees / role."""
     return (request.participants
@@ -467,6 +466,7 @@ async def _call_ai_draft(ai_request) -> object:
         )
 
 
+@router.post("/minutes/draft", response_model=MinutesDraftResponse)
 async def create_minutes_draft(
     request: MinutesDraftRequest,
     user: dict = Depends(require_write_access)

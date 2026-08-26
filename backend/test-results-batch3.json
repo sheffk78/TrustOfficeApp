@@ -1,0 +1,54 @@
+[
+  {
+    "template_type": "bank_account_authorization",
+    "status": "FAIL",
+    "issues": [
+      "BLOCKED BEFORE TEMPLATE TESTING: POST /api/minutes/draft returned HTTP 403 {\"detail\":\"Your subscription is inactive. Please subscribe to create, update, or delete data.\",\"subscription_status\":\"expired\",\"is_read_only\":true}",
+      "Test account (user_9224d7937d3a) has plan_type=none, status=expired, is_active=false, is_read_only=true (confirmed via GET /api/subscription and /api/subscription/state)",
+      "GET /api/trusts returns [] — no trusts exist; trust creation also blocked by read-only mode (POST /api/demo/seed → 403 same error)"
+    ],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive. Please subscribe to create, update, or delete data.\",\"subscription_status\":\"expired\",\"is_read_only\":true,\"trial_days_remaining\":null}"
+  },
+  {
+    "template_type": "investment_policy",
+    "status": "FAIL",
+    "issues": ["Same global blocker as bank_account_authorization: all write/draft endpoints return 403 due to expired subscription; no template-level testing possible"],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive...\",\"subscription_status\":\"expired\",\"is_read_only\":true}"
+  },
+  {
+    "template_type": "loan_authorization",
+    "status": "FAIL",
+    "issues": ["Same global blocker: 403 subscription-inactive on /api/minutes/draft; /api/minutes creation and PDF endpoints unreachable"],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive...\"}"
+  },
+  {
+    "template_type": "insurance_authorization",
+    "status": "FAIL",
+    "issues": ["Same global blocker: 403 subscription-inactive on /api/minutes/draft"],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive...\"}"
+  },
+  {
+    "template_type": "spending_authorization",
+    "status": "FAIL",
+    "issues": ["Same global blocker: 403 subscription-inactive on /api/minutes/draft"],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive...\"}"
+  },
+  {
+    "template_type": "distribution_to_beneficiaries",
+    "status": "FAIL",
+    "issues": ["Same global blocker: 403 subscription-inactive on /api/minutes/draft; distributionData fields never exercised"],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive...\"}"
+  },
+  {
+    "template_type": "hems_distribution",
+    "status": "FAIL",
+    "issues": ["Same global blocker: 403 subscription-inactive on /api/minutes/draft"],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive...\"}"
+  },
+  {
+    "template_type": "beneficiary_loan",
+    "status": "FAIL",
+    "issues": ["Same global blocker: 403 subscription-inactive on /api/minutes/draft"],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive...\"}"
+  }
+]

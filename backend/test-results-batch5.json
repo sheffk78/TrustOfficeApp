@@ -1,0 +1,42 @@
+[
+  {
+    "template_type": "tax_filing_authorization",
+    "status": "FAIL",
+    "issues": [
+      "BLOCKER (account-level): POST /api/minutes/draft returned 403-style error {\"detail\":\"Your subscription is inactive. Please subscribe to create, update, or delete data.\",\"subscription_status\":\"expired\",\"is_read_only\":true} — test account subscription expired; all writes blocked.",
+      "No trusts available: GET /api/trusts returned []; attempt to create trust via POST /api/trusts rejected with \"Your plan supports up to 0 trusts.\"",
+      "Draft endpoint and PDF/finalization never reached."
+    ],
+    "response_snippet": "{\"detail\":\"Your subscription is inactive. Please subscribe to create, update, or delete data.\",\"subscription_status\":\"expired\",\"is_read_only\":true,\"trial_days_remaining\":null}"
+  },
+  {
+    "template_type": "designation_of_beneficiaries",
+    "status": "FAIL",
+    "issues": ["Same account-level blockers as tax_filing_authorization: expired subscription blocks all writes; no trust_id obtainable. Not tested."],
+    "response_snippet": "subscription_status=expired, is_read_only=true"
+  },
+  {
+    "template_type": "beneficiary_request_denial",
+    "status": "FAIL",
+    "issues": ["Same account-level blockers: expired subscription; no trusts. Not tested."],
+    "response_snippet": "subscription_status=expired, is_read_only=true"
+  },
+  {
+    "template_type": "beneficiary_distribution_notice",
+    "status": "FAIL",
+    "issues": ["Same account-level blockers: expired subscription; no trusts. Not tested."],
+    "response_snippet": "subscription_status=expired, is_read_only=true"
+  },
+  {
+    "template_type": "evaluate_distribution",
+    "status": "FAIL",
+    "issues": ["Same account-level blockers: expired subscription; no trusts. Not tested."],
+    "response_snippet": "subscription_status=expired, is_read_only=true"
+  },
+  {
+    "template_type": "benevolence_approval",
+    "status": "FAIL",
+    "issues": ["Same account-level blockers: expired subscription; no trusts. Not tested."],
+    "response_snippet": "subscription_status=expired, is_read_only=true"
+  }
+]
