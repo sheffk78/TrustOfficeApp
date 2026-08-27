@@ -175,7 +175,7 @@ export function useCertificateForm(selectedTrust, isReadOnly, showUpgradeModal, 
           holder_trust_id: sanitizeOptional(certificateForm.holder_trust_id),
           email: sanitizeOptional(certificateForm.email),
           phone: sanitizeOptional(certificateForm.phone),
-          notes: sanitizeOptional(certificateForm.notes),
+          notes: certificateForm.notes?.trim() ? certificateForm.notes.trim() : '',
           units: parseFloat(certificateForm.units)
         })
       });
