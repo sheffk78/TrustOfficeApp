@@ -446,15 +446,6 @@ export default function ScheduleAPage() {
                 taPrompt="Walk me through the Trust Assets page and how to add an asset"
               />
               <Button
-                variant="outline" 
-                onClick={handleExportPDF}
-                disabled={exporting || assets.length === 0}
-                data-testid="export-pdf-btn"
-              >
-                <FileDown className="w-4 h-4 mr-2" />
-                {exporting ? 'Exporting...' : 'Export PDF'}
-              </Button>
-              <Button
                 variant="outline"
                 onClick={() => navigate('/minutes/template/acceptance_of_property?from=schedule-a')}
                 data-testid="create-resolution-btn"
@@ -623,22 +614,37 @@ export default function ScheduleAPage() {
 
           {/* Summary Cards */}
           {summary && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <div className="card-trust p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Active Assets</p>
-                <p className="font-serif text-2xl text-navy">{activeAssets.length}</p>
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Trust Assets Summary</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPDF}
+                  disabled={exporting || assets.length === 0}
+                  data-testid="export-pdf-btn"
+                >
+                  <FileDown className="w-4 h-4 mr-2" />
+                  {exporting ? 'Exporting...' : 'Export PDF'}
+                </Button>
               </div>
-              <div className="card-trust p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Value</p>
-                <p className="font-serif text-2xl text-navy">{formatValue(summary.total_value)}</p>
-              </div>
-              <div className="card-trust p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Categories</p>
-                <p className="font-serif text-2xl text-navy">{Object.keys(summary.categories || {}).length}</p>
-              </div>
-              <div className="card-trust p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Disposed</p>
-                <p className="font-serif text-2xl text-warning">{disposedAssets.length}</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="card-trust p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Active Assets</p>
+                  <p className="font-serif text-2xl text-navy">{activeAssets.length}</p>
+                </div>
+                <div className="card-trust p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Total Value</p>
+                  <p className="font-serif text-2xl text-navy">{formatValue(summary.total_value)}</p>
+                </div>
+                <div className="card-trust p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Categories</p>
+                  <p className="font-serif text-2xl text-navy">{Object.keys(summary.categories || {}).length}</p>
+                </div>
+                <div className="card-trust p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Disposed</p>
+                  <p className="font-serif text-2xl text-warning">{disposedAssets.length}</p>
+                </div>
               </div>
             </div>
           )}
