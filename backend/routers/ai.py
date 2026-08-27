@@ -873,9 +873,9 @@ async def auto_draft_quarterly_minutes(
         "date": {"$gte": q_start, "$lte": q_end},
     }).to_list(100)
     for d in distributions:
-        amt = d.get("amount", 0)
+        amt = d.get("amount") or 0
         bene = d.get("beneficiary_name", "beneficiary")
-        decisions.append(f"Approved ${amt:,.2f} distribution to {bene} on {d.get('date', 'N/A')}.")
+        decisions.append(f"Approved ${float(amt):,.2f} distribution to {bene} on {d.get('date', 'N/A')}.")
 
     # Assets recorded in this quarter
     assets = await _db.schedule_a_items.find({
@@ -885,8 +885,8 @@ async def auto_draft_quarterly_minutes(
     }).to_list(100)
     for a in assets:
         desc = a.get("description", "asset")
-        val = a.get("approximate_value", 0)
-        decisions.append(f"Recorded asset: {desc} (approximate value ${val:,.2f}).")
+        val = a.get("approximate_value") or 0
+        decisions.append(f"Recorded asset: {desc} (approximate value ${float(val):,.2f}).")
 
     # Transactions in this quarter
     transactions = await _db.transactions.find({
@@ -895,9 +895,9 @@ async def auto_draft_quarterly_minutes(
         "date": {"$gte": q_start, "$lte": q_end},
     }).to_list(100)
     for t in transactions:
-        amt = t.get("amount", 0)
+        amt = t.get("amount") or 0
         desc = t.get("description", "transaction")
-        decisions.append(f"Logged {t.get('governance_classification', 'transaction')}: {t.get('purpose_memo', t.get('other_note', 'transaction'))} (${amt:,.2f}).")
+        decisions.append(f"Logged {t.get('governance_classification', 'transaction')}: {t.get('purpose_memo', t.get('other_note', 'transaction'))} (${float(amt):,.2f}).")
 
     # Compensation payments in this quarter
     payments = await _db.compensation_payments.find({
@@ -906,8 +906,8 @@ async def auto_draft_quarterly_minutes(
         "date": {"$gte": q_start, "$lte": q_end},
     }).to_list(100)
     for p in payments:
-        amt = p.get("amount", 0)
-        decisions.append(f"Recorded trustee compensation payment of ${amt:,.2f} on {p.get('date', 'N/A')}.")
+        amt = p.get("amount") or 0
+        decisions.append(f"Recorded trustee compensation payment of ${float(amt):,.2f} on {p.get('date', 'N/A')}.")
 
     # Other minutes in this quarter
     other_minutes = await _db.minutes_records.find({

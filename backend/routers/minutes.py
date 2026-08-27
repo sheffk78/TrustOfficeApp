@@ -504,7 +504,8 @@ async def create_minutes_draft(
 
     trust_name = trust.get("name", "")
     jurisdiction = trust.get("jurisdiction", "")
-    participants_str = ", ".join(request.participants) if request.participants else ""
+    participants_list = _resolve_participants(request, trust)
+    participants_str = ", ".join(participants_list) if participants_list else ""
     minutes_type = request.minutes_type or "general"
 
     if request.template_type:
@@ -2202,7 +2203,7 @@ WHEREAS, the Trustees, in the exercise of their discretion{article_text}, deem i
 
 NOW, THEREFORE, BE IT RESOLVED that:
 
-• A distribution in the total amount of ${total:,.2f} shall be made from the Trust to the Beneficiaries as follows:
+• A distribution in the total amount of ${float(total or 0):,.2f} shall be made from the Trust to the Beneficiaries as follows:
 
 """
     
@@ -2211,7 +2212,7 @@ NOW, THEREFORE, BE IT RESOLVED that:
             name = item.get("beneficiary_name", "[Beneficiary Name]")
             amount = item.get("amount") or 0
             percentage = item.get("percentage") or 0
-            content += f"    • {name}: ${amount:,.2f} (representing {percentage}% beneficial interest)\n"
+            content += f"    • {name}: ${float(amount or 0):,.2f} (representing {percentage}% beneficial interest)\n"
     else:
         content += "    • [Beneficiary Name]: $__________ (representing ____% beneficial interest)\n"
     
@@ -2236,7 +2237,7 @@ def generate_property_acceptance_content(data: dict) -> str:
     value = data.get("property_value")
     conveyance_date = data.get("conveyance_date", "[Date]")
     
-    value_text = f"${value:,.2f}" if value else "$______________"
+    value_text = f"${float(value or 0):,.2f}" if value else "$______________"
     
     content = f"""Resolution 1: Acceptance of Additional Property into Trust
 
@@ -2274,7 +2275,7 @@ def generate_bill_of_sale_content(data: dict) -> str:
     ein = data.get("ein", "[EIN]")
     state_code = data.get("state_code", "[State]")
 
-    value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
+    value_text = f"${float(value or 0):,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
     ein_text = f" (EIN: {ein})" if ein and ein != "[EIN]" else ""
 
     content = f"""BILL OF SALE
@@ -2340,7 +2341,7 @@ def generate_assignment_of_personal_property_content(data: dict) -> str:
     ein = data.get("ein", "[EIN]")
     state_code = data.get("state_code", "[State]")
 
-    value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
+    value_text = f"${float(value or 0):,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
     appraiser_text = f"\n    Appraised by: {appraiser_name}" if appraiser_name else ""
     ein_text = f" (EIN: {ein})" if ein and ein != "[EIN]" else ""
 
@@ -2404,7 +2405,7 @@ def generate_general_assignment_content(data: dict) -> str:
     ein = data.get("ein", "[EIN]")
     state_code = data.get("state_code", "[State]")
 
-    value_text = f"${value:,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
+    value_text = f"${float(value or 0):,.2f}" if value else "$1.00 (One Dollar) and other good and valuable consideration"
     ein_text = f" (EIN: {ein})" if ein and ein != "[EIN]" else ""
 
     content = f"""GENERAL ASSIGNMENT OF ASSETS
@@ -2471,7 +2472,7 @@ def generate_disposition_content(data: dict) -> str:
         "other": "the Trustees have determined to dispose of"
     }.get(disposition_reason, "the Trustees have determined to dispose of")
     
-    value_text = f"${disposition_value:,.2f}" if disposition_value else "[Fair Market Value]"
+    value_text = f"${float(disposition_value or 0):,.2f}" if disposition_value else "[Fair Market Value]"
     
     recipient_text = f" to {disposition_recipient}" if disposition_recipient else ""
     
@@ -2548,8 +2549,8 @@ def generate_trustee_appointment_content(data: dict, appointment_type: str) -> s
     sig_text = {
         "any_one": "Any one Trustee may sign individually for all transactions without limit.",
         "any_two": "Any two Trustees must sign jointly for all transactions.",
-        "all_trustees": f"All Trustees must sign jointly for transactions exceeding ${threshold:,.2f}." if threshold else "All Trustees must sign jointly for all transactions.",
-        "threshold": f"Any one Trustee may sign individually for transactions up to ${threshold:,.2f}, and any two Trustees must sign jointly for transactions exceeding that amount." if threshold else "Any one Trustee may sign individually for transactions up to $[amount]."
+        "all_trustees": f"All Trustees must sign jointly for transactions exceeding ${float(threshold or 0):,.2f}." if threshold else "All Trustees must sign jointly for all transactions.",
+        "threshold": f"Any one Trustee may sign individually for transactions up to ${float(threshold or 0):,.2f}, and any two Trustees must sign jointly for transactions exceeding that amount." if threshold else "Any one Trustee may sign individually for transactions up to $[amount]."
     }.get(signature_req, "Any one Trustee may sign individually for all transactions.")
     
     content = f"""Resolution 1: {title}
@@ -2712,7 +2713,7 @@ def generate_bank_account_content(data: dict) -> str:
         "threshold": f"Any one Trustee may sign for transactions up to ${int(data.get('signature_threshold') or 10000):,.2f}; two signatures required above that amount."
     }.get(signature_requirement, "Any one authorized Trustee may sign individually.")
     
-    deposit_text = f"${initial_deposit:,.2f}" if initial_deposit else "[Amount]"
+    deposit_text = f"${float(initial_deposit or 0):,.2f}" if initial_deposit else "[Amount]"
     
     content = f"""Resolution 1: Authorization to Open Bank Account
 
@@ -2868,11 +2869,11 @@ WHEREAS, the request is summarized as follows:
     Beneficiary: {beneficiary_name}
     Type: {beneficiary_type.title()}
     Purpose: {purpose_description}
-    Amount Requested: ${amount:,.2f}
+    Amount Requested: ${float(amount or 0):,.2f}
 
 NOW, THEREFORE, BE IT RESOLVED that:
 
-• The Board of Trustees hereby approves benevolence assistance to {beneficiary_name} in the amount of ${amount:,.2f} for the purpose described above.
+• The Board of Trustees hereby approves benevolence assistance to {beneficiary_name} in the amount of ${float(amount or 0):,.2f} for the purpose described above.
 
 • The assistance shall be disbursed via {payment_method} within a reasonable time following adoption of this resolution.
 
@@ -2991,7 +2992,7 @@ def generate_loan_authorization_content(data: dict) -> str:
     if loan_direction == "making":
         content = f"""Resolution 1: Authorization of Loan from Trust
 
-WHEREAS, {borrower_name} has requested a loan from this Trust in the principal amount of ${loan_amount:,.2f};
+WHEREAS, {borrower_name} has requested a loan from this Trust in the principal amount of ${float(loan_amount or 0):,.2f};
 
 WHEREAS, the Board of Trustees has evaluated this loan request and determined that:
     • The loan serves a legitimate purpose consistent with Trust administration
@@ -3006,7 +3007,7 @@ NOW, THEREFORE, BE IT RESOLVED that:
 • The Trust is hereby authorized to make a loan to {borrower_name} under the following terms:
 
 LOAN TERMS:
-    Principal Amount: ${loan_amount:,.2f}
+    Principal Amount: ${float(loan_amount or 0):,.2f}
     Interest Rate: {interest_rate}
     Term: {term_months} months
     Purpose: {purpose if purpose else 'As described in loan application'}
@@ -3033,7 +3034,7 @@ NOW, THEREFORE, BE IT RESOLVED that:
 • The Trust is hereby authorized to obtain a loan from {lender_name} under the following terms:
 
 LOAN TERMS:
-    Principal Amount: ${loan_amount:,.2f}
+    Principal Amount: ${float(loan_amount or 0):,.2f}
     Interest Rate: {interest_rate}
     Term: {term_months} months
     Purpose: {purpose if purpose else 'Trust administration and investment purposes'}
@@ -3097,8 +3098,8 @@ NOW, THEREFORE, BE IT RESOLVED that:
 INSURANCE DETAILS:
     Insurance Type: {insurance_type.replace('_', ' ').title()}
     Insurer: {insurer_name}
-    Coverage Amount: ${coverage_amount:,.2f}
-    Annual Premium: ${premium_amount:,.2f}
+    Coverage Amount: ${float(coverage_amount or 0):,.2f}
+    Annual Premium: ${float(premium_amount or 0):,.2f}
     {f'Policy Number: {policy_number}' if policy_number else ''}
     Coverage Description: {coverage_description if coverage_description else 'Standard coverage for Trust assets and operations'}
 
@@ -3151,10 +3152,10 @@ NOW, THEREFORE, BE IT RESOLVED that:
 
 FINANCIAL SUMMARY – FISCAL YEAR {fiscal_year}
 
-    Total Trust Assets (Year End): ${total_assets:,.2f}
-    Total Income Received: ${total_income:,.2f}
-    Total Expenses Paid: ${total_expenses:,.2f}
-    Total Distributions Made: ${total_distributions:,.2f}
+    Total Trust Assets (Year End): ${float(total_assets or 0):,.2f}
+    Total Income Received: ${float(total_income or 0):,.2f}
+    Total Expenses Paid: ${float(total_expenses or 0):,.2f}
+    Total Distributions Made: ${float(total_distributions or 0):,.2f}
     Investment Return: {investment_return}
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -3250,11 +3251,11 @@ NOW, THEREFORE, BE IT RESOLVED that:
 
 QUARTERLY FINANCIAL SUMMARY – {quarter} {year}
 
-    Beginning Balance: ${beginning_balance:,.2f}
-    Income Received: ${income_received:,.2f}
-    Expenses Paid: ${expenses_paid:,.2f}
-    Distributions Made: ${distributions_made:,.2f}
-    Ending Balance: ${ending_balance:,.2f}
+    Beginning Balance: ${float(beginning_balance or 0):,.2f}
+    Income Received: ${float(income_received or 0):,.2f}
+    Expenses Paid: ${float(expenses_paid or 0):,.2f}
+    Distributions Made: ${float(distributions_made or 0):,.2f}
+    Ending Balance: ${float(ending_balance or 0):,.2f}
     Net Change: ${ending_balance - beginning_balance:,.2f}
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -3317,11 +3318,11 @@ def generate_trustee_compensation_content(data: dict) -> str:
     all_trustees = data.get("all_trustees", False)
     
     type_text = {
-        "annual": f"${compensation_amount:,.2f} per year",
-        "hourly": f"${compensation_amount:,.2f} per hour",
-        "per_meeting": f"${compensation_amount:,.2f} per meeting attended",
+        "annual": f"${float(compensation_amount or 0):,.2f} per year",
+        "hourly": f"${float(compensation_amount or 0):,.2f} per hour",
+        "per_meeting": f"${float(compensation_amount or 0):,.2f} per meeting attended",
         "percentage": f"{compensation_amount}% of Trust assets annually"
-    }.get(compensation_type, f"${compensation_amount:,.2f}")
+    }.get(compensation_type, f"${float(compensation_amount or 0):,.2f}")
     
     trustee_text = "all serving Trustees" if all_trustees else trustee_name
     
@@ -3460,7 +3461,7 @@ def generate_beneficiary_denial_content(data: dict) -> str:
 
 WHEREAS, {beneficiary_name}, a beneficiary of this Trust, submitted a request dated {request_date};
 
-WHEREAS, the request was for a {request_type} in the amount of ${request_amount:,.2f}{f' for the purpose of: {request_purpose}' if request_purpose else ''};
+WHEREAS, the request was for a {request_type} in the amount of ${float(request_amount or 0):,.2f}{f' for the purpose of: {request_purpose}' if request_purpose else ''};
 
 WHEREAS, the Board of Trustees has carefully reviewed and considered this request in light of the Trust Indenture, the interests of all beneficiaries, and sound fiduciary principles;
 
@@ -3574,7 +3575,7 @@ NOW, THEREFORE, BE IT RESOLVED that:
 DISTRIBUTION DETAILS:
     Beneficiary: {beneficiary_name}
     HEMS Category: {hems_category.title()}
-    Amount: ${distribution_amount:,.2f}{f' {recurring_frequency}' if recurring else ''}
+    Amount: ${float(distribution_amount or 0):,.2f}{f' {recurring_frequency}' if recurring else ''}
     Purpose: {specific_purpose if specific_purpose else category_text}
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -3653,7 +3654,7 @@ NOW, THEREFORE, BE IT RESOLVED that:
 LOAN TERMS AND CONDITIONS
 
     Borrower: {beneficiary_name}
-    Principal Amount: ${loan_amount:,.2f}
+    Principal Amount: ${float(loan_amount or 0):,.2f}
     Interest Rate: {interest_rate}
     Term: {term_months} months
     Purpose: {loan_purpose if loan_purpose else 'Personal use'}

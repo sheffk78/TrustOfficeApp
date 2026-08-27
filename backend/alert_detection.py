@@ -107,7 +107,7 @@ async def check_transaction_alerts(txn_doc: dict):
 
     direction = txn_doc.get("direction", "")
     classification = txn_doc.get("governance_classification", "")
-    amount = txn_doc.get("amount", 0)
+    amount = txn_doc.get("amount") or 0
     destination = txn_doc.get("destination_account", "")
     source = txn_doc.get("source_account", "")
     memo = txn_doc.get("purpose_memo", "")
@@ -115,12 +115,12 @@ async def check_transaction_alerts(txn_doc: dict):
     date = txn_doc.get("date", "")
 
     fmt = {
-        "amount": f"{amount:,.2f}",
+        "amount": f"{float(amount):,.2f}",
         "entity_name": entity_name,
-        "classification": classification,
-        "destination": destination,
-        "source": source,
-        "date": date,
+        "classification": classification or "",
+        "destination": destination or "",
+        "source": source or "",
+        "date": date or "",
     }
 
     # ---- Rule 1: Trust paying personal obligation ----
@@ -163,7 +163,7 @@ async def check_transaction_alerts(txn_doc: dict):
         gov_settings = trust.get("governance_settings") if trust else None
         if gov_settings and gov_settings.get("spending_threshold"):
             threshold_config = gov_settings["spending_threshold"]
-            threshold_amount = threshold_config.get("amount", 0)
+            threshold_amount = threshold_config.get("amount") or 0
             threshold_requires_minutes = threshold_config.get("requires_minutes", True)
             scope = threshold_config.get("scope_classifications", ["Operational Expense", "Other"])
 
@@ -201,7 +201,7 @@ async def run_pattern_alerts(trust_id: str, user_id: str):
     amount_counts = Counter()
     amount_txns = {}
     for t in outflows:
-        amt = t["amount"]
+        amt = t.get("amount") or 0
         if amt == round(amt) and amt >= 100:  # Round number, at least $100
             key = (t["entity_id"], amt)
             amount_counts[key] += 1
