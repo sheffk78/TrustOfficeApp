@@ -203,7 +203,7 @@ export default function TrustAdminKitsPage() {
           <h1 className="page-title">Administration Kits</h1>
           <p className="page-subtitle">Generate ready-to-go paperwork packets for DMV visits, bank account setup, tax prep, and more</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
           <PageHelpButton
             items={[
               { text: 'Generate ready-to-go paperwork packets for common trust administration tasks' },
@@ -325,7 +325,7 @@ export default function TrustAdminKitsPage() {
               <p className="page-subtitle">{kitType?.description}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
             <PageHelpButton
               items={[
                 { text: `Generate the ${kitType?.label || 'kit'} paperwork packet for this trust` },

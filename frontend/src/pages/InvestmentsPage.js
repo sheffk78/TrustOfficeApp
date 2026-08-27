@@ -254,7 +254,7 @@ export default function InvestmentsPage({ tab, onTabChange }) {
               <h1 className="page-title">Investment Holdings</h1>
               <p className="page-subtitle">Manage trust investments, track performance, and document investment decisions for fiduciary compliance</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Manage trust investments and track portfolio performance' },

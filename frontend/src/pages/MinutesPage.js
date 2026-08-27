@@ -225,12 +225,12 @@ export default function MinutesPage() {
         
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-start justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Minutes & Decisions</h1>
               <p className="page-subtitle">Create, review, and manage trust meeting minutes — document decisions, track approvals, and maintain a complete fiduciary record</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Create, review, and manage trust meeting minutes for all your trust decisions' },

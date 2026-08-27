@@ -132,7 +132,7 @@ export default function HealthDashboard() {
                 Detailed breakdown of {selectedTrust?.trust_name || 'trust'} health, risk findings, and score history
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'View your trust health score broken down by criterion' },

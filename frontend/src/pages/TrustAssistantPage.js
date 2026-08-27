@@ -262,7 +262,7 @@ const TrustAssistantPage = () => {
       <main className="main-content dot-grid flex flex-col">
         <div className="page-container flex flex-col flex-1 min-h-0">
           {/* Page header */}
-          <div className="page-header flex items-start justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Trust Assistant</h1>
               <p className="page-subtitle">

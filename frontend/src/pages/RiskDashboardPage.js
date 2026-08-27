@@ -136,7 +136,7 @@ export default function RiskDashboardPage() {
               <h1 className="page-title">Risk Dashboard</h1>
               <p className="page-subtitle">Monitor trust risks, compliance gaps, and alerts — review flagged items and take corrective action</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Monitor trust risks, compliance gaps, and alerts across all modules' },

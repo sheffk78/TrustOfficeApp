@@ -264,7 +264,7 @@ export default function ClientDashboard() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'View all trusts linked to this client in one place' },

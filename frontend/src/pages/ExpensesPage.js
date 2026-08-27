@@ -194,12 +194,12 @@ export default function ExpensesPage() {
       <main className="main-content">
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-start justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Expenses</h1>
               <p className="page-subtitle">Track and manage trust expenses — record payments, categorize spending, and maintain accurate financial records</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Track and manage trust-related expenses and payments' },

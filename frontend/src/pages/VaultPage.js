@@ -106,7 +106,7 @@ export default function VaultPage() {
               <h1 className="page-title">Trust Document Vault</h1>
               <p className="page-subtitle">Store, organize, and access trust documents — upload files, manage categories, and share with beneficiaries</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Store, organize, and access all trust documents in one place' },

@@ -185,7 +185,7 @@ export default function CommunicationsPage() {
               <h1 className="page-title">Communication Log</h1>
               <p className="page-subtitle">Record and track all beneficiary communications — document calls, emails, and notices to satisfy UTC § 813</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Record and track all beneficiary communications in one place' },

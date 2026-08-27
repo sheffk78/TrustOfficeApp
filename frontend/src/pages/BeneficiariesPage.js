@@ -135,7 +135,7 @@ export default function BeneficiariesPage() {
               <h1 className="page-title">Beneficiaries</h1>
               <p className="page-subtitle">Manage trust beneficiaries, ownership interests, and class designations — add, update, or remove beneficiaries with proper documentation</p>
             </div>
-            <div className="flex items-center gap-2 mt-4 md:mt-0">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-centerflex items-center gap-2 mt-4 md:mt-0
               <PageHelpButton
                 items={[
                   { text: 'Manage trust beneficiaries, ownership interests, and class designations' },

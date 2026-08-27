@@ -128,7 +128,7 @@ export default function ClientsListPage() {
                 Manage multi-trust clients — view health, deadlines, and meetings across all linked trusts
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'View all your multi-trust clients in one place' },

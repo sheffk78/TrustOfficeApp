@@ -180,7 +180,7 @@ export default function ExportDashboard() {
                 {selectedTrust?.trust_name || 'your trust'}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Export trust data as JSON or ZIP' },

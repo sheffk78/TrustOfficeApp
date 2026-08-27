@@ -134,7 +134,7 @@ export default function DashboardPage() {
           />
 
           {/* Page Header */}
-          <div className="page-header flex items-start justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Dashboard</h1>
               <p className="page-subtitle">

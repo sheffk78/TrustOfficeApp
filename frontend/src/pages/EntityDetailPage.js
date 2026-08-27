@@ -173,7 +173,7 @@ export default function EntityDetailPage() {
                 <p className="page-subtitle">View and manage entity details — update information, track relationships, and maintain accurate trust records</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center flex-shrink-0">
               <PageHelpButton
                 items={[
                   { text: 'View and manage entity details including type, status, and relationships' },

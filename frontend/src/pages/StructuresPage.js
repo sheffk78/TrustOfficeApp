@@ -138,14 +138,14 @@ export default function StructuresPage() {
       <main className="main-content dot-grid">
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between mb-6">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Trust & Entities</h1>
               <p className="page-subtitle">
                 Manage trust structures, entities, and relationships — define the organizational framework of your trust
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Manage trust structures, entities, and their relationships' },

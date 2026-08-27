@@ -365,7 +365,7 @@ export default function CompensationPage() {
                 Set up and manage trustee compensation plans — track payments, document approvals, and maintain compliance
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Set up and manage trustee compensation plans and payment schedules' },

@@ -72,7 +72,7 @@ export default function AuditTrailPage() {
                 access, and decisions for compliance
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'View a complete log of all trust administration actions' },

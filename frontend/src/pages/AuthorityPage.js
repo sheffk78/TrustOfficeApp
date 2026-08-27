@@ -195,7 +195,7 @@ export default function AuthorityPage() {
               <h1 className="page-title">Legal Powers</h1>
               <p className="page-subtitle">View trustee authorities, signing powers, and delegation structure as defined in your trust agreement</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'View who has authority to act on behalf of the trust' },

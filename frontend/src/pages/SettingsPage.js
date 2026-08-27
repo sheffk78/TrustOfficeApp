@@ -841,7 +841,7 @@ export default function SettingsPage() {
       <main className="main-content">
         <div className="page-container max-w-3xl">
           {/* Page Header */}
-          <div className="page-header flex items-start justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">{rolePage ? 'Trust Roles' : 'Settings'}</h1>
               <p className="page-subtitle">

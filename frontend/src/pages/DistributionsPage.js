@@ -623,12 +623,12 @@ the user that they must review and submit the form themselves.
 
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-start justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Distributions</h1>
               <p className="page-subtitle">Record and manage trust distributions to beneficiaries — document amounts, purposes, and approvals for fiduciary compliance</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Record and manage all distributions to trust beneficiaries' },

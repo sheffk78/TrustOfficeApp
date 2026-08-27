@@ -399,7 +399,7 @@ export default function TransactionLedgerPage() {
               <h1 className="page-title">Transaction Ledger</h1>
               <p className="page-subtitle">View and manage all trust financial transactions — track income, expenses, and transfers across accounts</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'View and manage all trust financial transactions in one ledger' },

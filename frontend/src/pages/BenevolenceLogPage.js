@@ -176,7 +176,7 @@ export default function BenevolenceLogPage() {
               <h1 className="page-title">Benevolence Log</h1>
               <p className="page-subtitle">Track charitable giving and benevolence distributions — document donations, recipients, and trust purposes</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Track charitable giving and benevolence distributions' },

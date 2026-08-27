@@ -297,7 +297,7 @@ export default function MeetingAgenda() {
                 {meetingDate ? `${meetingDate} · ` : ''}Review, reorder, and finalize agenda items before the meeting
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Review the generated agenda items for this trustee meeting' },

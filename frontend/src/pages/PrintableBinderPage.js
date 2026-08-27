@@ -290,7 +290,7 @@ const PrintableBinderPage = () => {
             <h1 className="page-title">Printable Record Book</h1>
             <p className="page-subtitle">Organize your trust documents with printable inserts — print on standard letter-size paper, use a 3-ring binder with tab dividers for best results</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
             <PageHelpButton
               items={[
                 { text: 'Print cover sheets, tab dividers, and reference cards for your physical trust binder' },

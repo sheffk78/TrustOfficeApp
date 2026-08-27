@@ -257,7 +257,7 @@ export default function DeadlineDashboard() {
                 Track compliance, tax, and filing deadlines for {selectedTrust?.trust_name || 'your trust'}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'View upcoming, due soon, and overdue deadlines' },

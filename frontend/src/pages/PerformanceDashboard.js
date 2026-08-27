@@ -281,7 +281,7 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
             </Tabs>
           )}
           {/* Page Header */}
-          <div className="page-header flex items-start justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title flex items-center gap-3">
                 <BarChart3 className="w-8 h-8 text-navy dark:text-white" />
@@ -291,7 +291,7 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
                 Key performance metrics for your trusts — minutes, distributions, compliance, and trends
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'View aggregated KPIs across all your managed trusts' },

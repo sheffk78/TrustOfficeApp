@@ -218,7 +218,7 @@ const SuccessorPacketPage = () => {
                 <h1 className="page-title">Successor Trustee Packet</h1>
                 <p className="page-subtitle">A complete handoff document for your successor trustee. Print and store with your trust records.</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
                 <PageHelpButton
                   items={[
                     { text: 'This packet compiles everything a successor trustee needs if the current trustee dies or becomes incapacitated' },

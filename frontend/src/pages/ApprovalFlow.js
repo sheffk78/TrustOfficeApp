@@ -174,7 +174,7 @@ export default function ApprovalFlow() {
                 Track minutes from draft through approval for {selectedTrust.trust_name || 'this trust'}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'See where the current minutes stand in the approval process' },

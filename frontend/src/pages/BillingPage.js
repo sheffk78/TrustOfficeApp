@@ -302,7 +302,7 @@ export default function BillingPage() {
           </Button>
 
           {/* Page Header */}
-          <div className="page-header flex items-start justify-between">
+          <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Billing & Subscription</h1>
               <p className="page-subtitle">

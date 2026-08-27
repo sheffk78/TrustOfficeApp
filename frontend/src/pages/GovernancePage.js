@@ -157,7 +157,7 @@ export default function GovernancePage() {
                 Assess trust health across 8 criteria — track defensibility, compliance, and overall governance quality
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
               <PageHelpButton
                 items={[
                   { text: 'Assess trust health across 8 criteria including defensibility and compliance' },
