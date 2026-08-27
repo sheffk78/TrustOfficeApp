@@ -70,8 +70,11 @@ async def draft_minutes_from_structured_input(req: MinutesDraftRequest) -> Minut
     professional minutes with WHEREAS/RESOLVED language.
     """
     # Build the user content with all structured input
-    participants_str = ", ".join(req.participants) if req.participants else "No participants listed"
-    decisions_str = "\n".join([f"- {d}" for d in req.decisions_outline]) if req.decisions_outline else "No decisions recorded"
+    # Defensive type handling: participants could be str or list
+    participants_list = req.participants if isinstance(req.participants, list) else [req.participants] if req.participants else []
+    decisions_list = req.decisions_outline if isinstance(req.decisions_outline, list) else [req.decisions_outline] if req.decisions_outline else []
+    participants_str = ", ".join(participants_list) if participants_list else "No participants listed"
+    decisions_str = "\n".join([f"- {d}" for d in decisions_list]) if decisions_list else "No decisions recorded"
     
     user_content = f"""Please draft meeting minutes with the following details:
 
