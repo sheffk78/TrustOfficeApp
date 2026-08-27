@@ -19,6 +19,7 @@ import {
   Save,
   X,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -261,6 +262,8 @@ export default function KnowledgeAdmin() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
 
   const fetchArticles = useCallback(
     async (page = 1) => {
@@ -384,6 +387,35 @@ export default function KnowledgeAdmin() {
     setShowEditModal(true);
   };
 
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetchWithAuth('/knowledge/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSyncResult(data);
+        toast.success(
+          `Synced ${data.synced} articles (${data.created} new, ${data.updated} updated)`
+        );
+        fetchArticles(1);
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+        toast.error(err.detail || 'Failed to sync articles');
+      }
+    } catch (error) {
+      showError(toast, error, {
+        operation: 'sync_articles',
+        page: 'KnowledgeAdmin',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const openDelete = (article) => {
     setSelectedArticle(article);
     setShowDeleteDialog(true);
@@ -411,15 +443,60 @@ export default function KnowledgeAdmin() {
                   { text: 'Create, edit, and manage trust education articles' },
                   { text: 'Organize articles by category for the Knowledge Base' },
                   { text: 'Articles appear in the Knowledge Base for all users' },
+                  { text: 'Sync pulls articles from trustoffice.app/blog and resource guides' },
                 ]}
                 taPrompt="Walk me through the Knowledge Base Admin and how to create an article"
               />
+              <Button
+                variant="outline"
+                onClick={handleSync}
+                disabled={syncing}
+                title="Pull articles from the marketing site (trustoffice.app)"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing…' : 'Sync from Marketing Site'}
+              </Button>
               <Button onClick={() => setShowCreateModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 New Article
               </Button>
             </div>
           </div>
+
+          {/* Sync result banner */}
+          {syncResult && (
+            <div className="card-trust border border-border p-4 mb-6 bg-navy/5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="text-sm">
+                  <span className="font-semibold text-navy">Sync complete:</span>{' '}
+                  {syncResult.synced} articles synced ({syncResult.created} new, {syncResult.updated} updated, {syncResult.skipped} skipped)
+                  {syncResult.errors.length > 0 && (
+                    <span className="text-error ml-2">· {syncResult.errors.length} errors</span>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSyncResult(null)}
+                  className="h-auto p-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              {syncResult.errors.length > 0 && (
+                <details className="mt-2">
+                  <summary className="text-xs text-muted-foreground cursor-pointer">
+                    View errors
+                  </summary>
+                  <ul className="mt-1 text-xs text-error space-y-0.5">
+                    {syncResult.errors.slice(0, 10).map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-3 mb-6">
