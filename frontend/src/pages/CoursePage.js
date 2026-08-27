@@ -26,7 +26,8 @@ export default function CoursePage() {
   const [loading, setLoading] = useState(true);
   const [selectedLesson, setSelectedLesson] = useState(null);
 
-  const isActive = subscription?.is_active ?? false;
+  // Course is open to all logged-in users (route is behind ProtectedRoute)
+  const isActive = true;
 
   useEffect(() => {
     fetchCurriculum();
@@ -196,21 +197,7 @@ export default function CoursePage() {
                   </div>
                 </div>
 
-                {/* Upgrade prompt for non-subscribers on paid lessons */}
-                {!isActive && selectedLesson && !selectedLesson.free && (
-                  <div className="mt-4 p-4 card-trust bg-gold/5 border border-gold/30">
-                    <p className="text-sm text-navy">
-                      This lesson is part of the subscriber course.{' '}
-                      <a
-                        href="/subscription"
-                        className="font-medium text-gold hover:underline"
-                      >
-                        Subscribe at $79/mo
-                      </a>{' '}
-                      to unlock all 9 lessons and downloadable PDFs.
-                    </p>
-                  </div>
-                )}
+
               </div>
             )}
 
@@ -304,26 +291,7 @@ export default function CoursePage() {
               </div>
             </div>
 
-            {/* Subscribe CTA for non-subscribers */}
-            {!isActive && (
-              <div className="mt-8 p-6 card-trust bg-navy text-white text-center">
-                <h3 className="font-serif text-xl text-white mb-2">
-                  Unlock All 9 Lessons
-                </h3>
-                <p className="text-white/70 text-sm mb-4 max-w-md mx-auto">
-                  Get full access to the Trustee 101 course, downloadable PDFs, and the complete TrustOffice governance platform.
-                </p>
-                <a
-                  href="/subscription"
-                  className="btn-gold inline-flex items-center justify-center gap-2 text-sm"
-                >
-                  Subscribe at $79/mo
-                </a>
-                <p className="text-white/40 text-xs mt-3">
-                  $79/mo is a trust expense. Paid from the trust, for the trust.
-                </p>
-              </div>
-            )}
+            {/* All lessons open — no paywall */}
           </div>
         </div>
 
