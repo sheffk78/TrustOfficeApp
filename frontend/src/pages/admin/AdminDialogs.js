@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -629,61 +630,180 @@ export function DeleteDialog({ show, selectedCustomerEmail, onClose, onConfirm }
   );
 }
 
-// ─── Create Admin Dialog ───────────────────────────────────────────
-export function CreateAdminDialog({ show, createAdminForm, onClose, onFormChange, onConfirm }) {
+// ─── Promote Admin Dialog (search existing users) ─────────────────
+export function PromoteAdminDialog({ show, onClose, onPromote, fetchWithAuthFn }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [promoting, setPromoting] = useState(false);
+  const debounceRef = useRef(null);
+
+  // Search existing users as the admin types
+  useEffect(() => {
+    if (!show) {
+      setSearchTerm('');
+      setResults([]);
+      setSelectedUser(null);
+      return;
+    }
+    if (searchTerm.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const fn = fetchWithAuthFn || fetchWithAuth;
+        const url = `/admin/customers?search=${encodeURIComponent(searchTerm)}&is_admin=false&limit=10`;
+        const response = await fn(url);
+        if (response.ok) {
+          const data = await response.json();
+          setResults(data.customers || []);
+        }
+      } catch (e) {
+        console.error('Admin user search failed:', e);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(debounceRef.current);
+  }, [searchTerm, show]);
+
+  const handlePromote = async () => {
+    if (!selectedUser) return;
+    setPromoting(true);
+    await onPromote(selectedUser);
+    setPromoting(false);
+    setSelectedUser(null);
+    setSearchTerm('');
+    setResults([]);
+  };
+
+  const handleClose = () => {
+    setSearchTerm('');
+    setResults([]);
+    setSelectedUser(null);
+    onClose();
+  };
+
   return (
-    <Dialog open={show} onOpenChange={onClose}>
+    <Dialog open={show} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-serif text-xl text-navy dark:text-white">Create Admin User</DialogTitle>
+          <DialogTitle className="font-serif text-xl text-navy dark:text-white flex items-center gap-2">
+            <Crown className="w-5 h-5 text-gold" />
+            Promote User to Admin
+          </DialogTitle>
           <DialogDescription>
-            Create a new admin account with full TrustOffice access.
+            Search for an existing TrustOffice user by name or email, then grant them admin privileges.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div>
-            <Label className="label-trust">Email *</Label>
-            <Input
-              type="email"
-              value={createAdminForm.email}
-              onChange={(e) => onFormChange({ ...createAdminForm, email: e.target.value })}
-              className="mt-1 input-trust"
-              placeholder="admin@example.com"
-            />
+          {/* Search input */}
+          <div className="relative">
+            <Label className="label-trust">Search by name or email</Label>
+            <div className="relative mt-1">
+              <Input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setSelectedUser(null); }}
+                className="input-trust pr-10"
+                placeholder="Start typing a name or email..."
+                autoFocus
+              />
+              {loading && (
+                <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground absolute right-3 top-3" />
+              )}
+            </div>
           </div>
-          <div>
-            <Label className="label-trust">Name *</Label>
-            <Input
-              value={createAdminForm.name}
-              onChange={(e) => onFormChange({ ...createAdminForm, name: e.target.value })}
-              className="mt-1 input-trust"
-              placeholder="Admin Name"
-            />
-          </div>
-          <div>
-            <Label className="label-trust">Password (optional)</Label>
-            <Input
-              type="password"
-              value={createAdminForm.password}
-              onChange={(e) => onFormChange({ ...createAdminForm, password: e.target.value })}
-              className="mt-1 input-trust"
-              placeholder="Leave blank for OAuth-only"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              If no password is set, the user can only log in via Google OAuth.
-            </p>
-          </div>
+
+          {/* Search results dropdown */}
+          {searchTerm.trim().length >= 2 && !selectedUser && (
+            <div className="border border-navy/10 dark:border-white/10 rounded max-h-64 overflow-y-auto">
+              {loading && results.length === 0 && (
+                <p className="text-center text-muted-foreground py-6 text-sm">Searching...</p>
+              )}
+              {!loading && results.length === 0 && (
+                <p className="text-center text-muted-foreground py-6 text-sm">
+                  No users found matching "{searchTerm}".
+                </p>
+              )}
+              {results.map((user) => (
+                <button
+                  key={user.user_id}
+                  onClick={() => setSelectedUser(user)}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-navy/5 dark:hover:bg-white/5 border-b border-navy/5 dark:border-white/5 last:border-0 text-left transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-full bg-navy/10 dark:bg-white/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-medium text-navy dark:text-white">
+                      {(user.name || user.email || '?').charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-navy dark:text-white truncate">{user.name || '(no name)'}</p>
+                    <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                  {user.is_admin && (
+                    <Badge className="bg-gold/20 text-gold shrink-0">
+                      <Crown className="w-3 h-3 mr-1" />
+                      Admin
+                    </Badge>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Selected user confirmation */}
+          {selectedUser && (
+            <div className="p-4 border border-gold/30 bg-gold/5 rounded">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center shrink-0">
+                  <Crown className="w-5 h-5 text-gold" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-navy dark:text-white">{selectedUser.name || '(no name)'}</p>
+                  <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedUser(null)}
+                  className="text-muted-foreground"
+                >
+                  <XCircle className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                This will grant full admin privileges: access to all admin panel features, forever-free subscription, and the ability to manage users.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={handleClose} disabled={promoting}>Cancel</Button>
           <Button
             className="btn-primary"
-            onClick={onConfirm}
-            disabled={!createAdminForm.email || !createAdminForm.name}
+            onClick={handlePromote}
+            disabled={!selectedUser || promoting}
           >
-            Create Admin
+            {promoting ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Promoting...
+              </>
+            ) : (
+              <>
+                <Crown className="w-4 h-4 mr-2" />
+                Grant Admin Access
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

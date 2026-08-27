@@ -10,7 +10,7 @@ export function AdminsTab({ admins, statsUsers, onAddAdmin, onRemoveAdmin, onRev
           <h2 className="font-serif text-xl text-navy dark:text-white">Administrator Accounts</h2>
           <Button className="btn-primary" onClick={onAddAdmin}>
             <UserPlus className="w-4 h-4 mr-2" />
-            Add Admin
+            Promote User
           </Button>
         </div>
 

@@ -26,7 +26,7 @@ import { LeadAnalyticsTab } from './admin/LeadAnalyticsTab';
 import { ConversationsTab } from './admin/ConversationsTab';
 import {
   LeadDetailDialog, BulkLeadStageDialog, CustomerDetailDialog,
-  GrantAccessDialog, DeleteDialog, CreateAdminDialog,
+  GrantAccessDialog, DeleteDialog, PromoteAdminDialog,
   CreateUserDialog, FixReferralDialog, BulkDeleteDialog, ImpersonateDialog,
 } from './admin/AdminDialogs';
 
@@ -85,7 +85,6 @@ export default function AdminPage() {
   // Form states
   const [grantAccessForm, setGrantAccessForm] = useState({ plan_type: 'gifted_14day', days: 14 });
   const [createUserForm, setCreateUserForm] = useState({ email: '', name: '', gifted_tier: '14day' });
-  const [createAdminForm, setCreateAdminForm] = useState({ email: '', name: '', password: '' });
   const [fixReferralForm, setFixReferralForm] = useState({ referrer_email: '', referee_email: '', action: 'create', status: '' });
 
   // Referrals list
@@ -680,26 +679,25 @@ export default function AdminPage() {
     }
   };
 
-  const handleCreateAdmin = async () => {
+  const handlePromoteAdmin = async (selectedUser) => {
     try {
-      const response = await fetchWithAuth('/admin/create-admin', {
+      const response = await fetchWithAuth(`/admin/customers/${selectedUser.user_id}/make-admin`, {
         method: 'POST',
-        body: JSON.stringify(createAdminForm)
+        body: JSON.stringify({ reason: 'Promoted via admin panel' })
       });
 
       if (response.ok) {
         const data = await response.json();
-        toast.success(data.message);
+        toast.success(`Admin privileges granted to ${selectedUser.name || selectedUser.email}`);
         setShowCreateAdminDialog(false);
-        setCreateAdminForm({ email: '', name: '', password: '' });
         fetchAdmins();
         fetchCustomers();
       } else {
         const data = await response.json();
-        toast.error(data.detail || 'Failed to create admin');
+        toast.error(data.detail || 'Failed to grant admin privileges');
       }
     } catch (error) {
-      toast.error('Failed to create admin');
+      toast.error('Failed to grant admin privileges');
     }
   };
 
@@ -1164,12 +1162,10 @@ export default function AdminPage() {
               onConfirm={handleDeleteCustomer}
             />
 
-            <CreateAdminDialog
+            <PromoteAdminDialog
               show={showCreateAdminDialog}
-              createAdminForm={createAdminForm}
               onClose={() => setShowCreateAdminDialog(false)}
-              onFormChange={setCreateAdminForm}
-              onConfirm={handleCreateAdmin}
+              onPromote={handlePromoteAdmin}
             />
 
             <CreateUserDialog
