@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { UpgradeBar } from "@/components/UpgradeBar";
 import { SupportWidget } from "@/components/SupportWidget";
+import { AssistantFab } from "@/components/AssistantFab";
+import { PageHelpProvider } from "@/context/PageHelpContext";
 import { captureUtmParams } from "@/utils/utm";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
@@ -526,15 +528,18 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <UpgradeModalProvider>
-            <ErrorBoundary>
-              <UpgradeBar />
-              <ImpersonationBanner />
-              <AppRouter />
-              <SupportWidgetMount />
-              <Toaster position="top-right" />
-            </ErrorBoundary>
-          </UpgradeModalProvider>
+          <PageHelpProvider>
+            <UpgradeModalProvider>
+              <ErrorBoundary>
+                <UpgradeBar />
+                <ImpersonationBanner />
+                <AppRouter />
+                <SupportWidgetMount />
+                <AssistantFab />
+                <Toaster position="top-right" />
+              </ErrorBoundary>
+            </UpgradeModalProvider>
+          </PageHelpProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -22,7 +22,6 @@ import {
   Eye,
   Loader2,
   Pencil,
-  Bot,
   Trash2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -240,7 +239,7 @@ export default function MinutesPage() {
                 ]}
                 taPrompt="Help me understand the Minutes page and how to create trust meeting minutes"
               />
-              <Button 
+              <Button
                 onClick={handleCreateMinutes}
                 className={`btn-primary ${isReadOnly ? 'opacity-60' : ''}`}
                 data-testid="create-minutes-btn"
@@ -248,14 +247,6 @@ export default function MinutesPage() {
                 <Plus className="w-4 h-4 mr-2" />
                 Create Minutes
               </Button>
-              <Link
-                to={`/trust-assistant?prompt=${encodeURIComponent('Draft Q1 minutes from recent activity — review recent distributions, deadlines, and trust actions and draft meeting minutes summarizing this quarter.')}`}
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gold border border-gold/30 hover:bg-gold/10 transition-colors rounded font-medium"
-                data-testid="ta-draft-q1-hero"
-              >
-                <Bot className="w-4 h-4" />
-                Draft Q1 Minutes with AI
-              </Link>
             </div>
           </div>
 
@@ -282,21 +273,6 @@ export default function MinutesPage() {
               </button>
               {draftsOpen && (
                 <div className="mt-4 space-y-3">
-                  {/* Trust Assistant quick-draft banner */}
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gold/5 border border-gold/20 rounded">
-                    <Bot className="w-4 h-4 text-gold flex-shrink-0" />
-                    <p className="font-mono text-xs text-navy/70 flex-1">
-                      Draft quarterly review minutes from recent trust activity.
-                    </p>
-                    <Link
-                      to={`/trust-assistant?prompt=${encodeURIComponent('Draft quarterly review minutes from recent trust activity.')}`}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gold hover:bg-gold/10 transition-colors font-medium"
-                      data-testid="ta-draft-quarterly-review"
-                    >
-                      <Bot className="w-3.5 h-3.5" />
-                      Draft with AI
-                    </Link>
-                  </div>
                   {drafts.map((draft) => {
                     const summary = draft.summary || `${(draft.minutes_type || 'Meeting').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Minutes`;
                     const entryDate = draft.date || draft.meeting_date;
@@ -454,17 +430,6 @@ export default function MinutesPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Trust Assistant banner */}
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-gold/5 border border-gold/20 rounded">
-                <Bot className="w-4 h-4 text-gold flex-shrink-0" />
-                <p className="font-mono text-xs text-navy/70">
-                  Need help drafting minutes?{' '}
-                  <Link to="/trust-assistant?prompt=I+need+to+document+a+meeting" className="text-gold hover:underline font-medium">
-                    Ask Trust Assistant
-                  </Link>.
-                </p>
-              </div>
-
               {filteredMinutes.map((entry) => {
                 const summary = entry.summary || `${(entry.minutes_type || 'Meeting').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Minutes`;
                 const details = entry.details || entry.decisions_text || '';
@@ -556,18 +521,6 @@ export default function MinutesPage() {
         </div>
       </main>
       <MobileBottomNav />
-
-      {/* Trust Assistant FAB */}
-      {selectedTrust && (
-        <Link
-          to="/trust-assistant?prompt=I+need+to+document+a+meeting"
-          className="fixed bottom-24 md:bottom-8 right-8 z-40 shadow-lg bg-gold text-navy font-medium inline-flex items-center gap-2 px-4 py-3 rounded hover:bg-gold/90 transition-colors"
-          data-testid="trust-assistant-fab"
-        >
-          <Bot className="w-5 h-5" />
-          <span className="hidden sm:inline font-mono text-xs uppercase tracking-wider">Ask Trust Assistant</span>
-        </Link>
-      )}
 
       {/* PDF Preview Modal */}
       <PDFPreviewModal
