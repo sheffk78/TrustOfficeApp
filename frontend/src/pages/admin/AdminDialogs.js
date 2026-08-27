@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Target, Activity, RefreshCw, MessageSquare, Crown, BarChart3, Building2, FileText, DollarSign, LogIn, Gift, XCircle, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, formatCallOutcome, getResourceWord, formatSourceLabel, LEAD_STAGES } from './helpers';
+import { fetchWithAuth } from '@/utils/api';
 
 // ─── Lead Detail Dialog ────────────────────────────────────────────
 export function LeadDetailDialog({
