@@ -5,15 +5,15 @@ This module provides a unified interface for AI calls in TrustOffice.
 It uses OpenRouter for access to Google Gemini and other models,
 with automatic fallback to Claude if OpenRouter fails.
 
-Primary model via OpenRouter: google/gemini-2.5-flash-preview-05-20
-Fallback model via OpenRouter: google/gemini-2.5-pro-preview-05-20
+Primary model via OpenRouter: google/gemini-2.5-flash
+Fallback model via OpenRouter: google/gemini-2.5-pro
 Emergency fallback: Claude (via claude_client)
 
 Environment variables:
 - OPENROUTER_API_KEY: Required for primary provider
 - CLAUDE_API_KEY or EMERGENT_LLM_KEY: Required for fallback
-- OPENROUTER_DEFAULT_MODEL (default: google/gemini-2.5-flash-preview-05-20)
-- OPENROUTER_FALLBACK_MODEL (default: google/gemini-2.5-pro-preview-05-20)
+- OPENROUTER_DEFAULT_MODEL (default: google/gemini-2.5-flash)
+- OPENROUTER_FALLBACK_MODEL (default: google/gemini-2.5-pro)
 """
 import os
 import logging
@@ -25,11 +25,11 @@ logger = logging.getLogger(__name__)
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 OPENROUTER_DEFAULT_MODEL = os.environ.get(
     'OPENROUTER_DEFAULT_MODEL',
-    'google/gemini-2.5-flash-preview-05-20'
+    'google/gemini-2.5-flash'
 )
 OPENROUTER_FALLBACK_MODEL = os.environ.get(
     'OPENROUTER_FALLBACK_MODEL',
-    'google/gemini-2.5-pro-preview-05-20'
+    'google/gemini-2.5-pro'
 )
 
 # Fallback: Claude

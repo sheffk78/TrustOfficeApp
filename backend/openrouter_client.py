@@ -59,7 +59,7 @@ def _call_openrouter(
     Call OpenRouter chat completions API (non-streaming).
 
     Args:
-        model: Model ID (e.g., 'google/gemini-2.5-flash-preview-05-20')
+        model: Model ID (e.g., 'google/gemini-2.5-flash')
         system_prompt: System message
         user_content: User message
         max_tokens: Maximum tokens in response
