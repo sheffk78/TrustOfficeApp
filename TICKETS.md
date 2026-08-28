@@ -112,3 +112,23 @@ Remaining errors are expected user flows or require frontend fixes not accessibl
 8. err_6e459289714d (Subscription inactive)
 9. err_d16994029530 (Chat stream fallback)
 10. err_ee63dc3fadb7 (Trust not found)
+---
+
+## Auto-Fixer Run 2026-08-27 (evening)
+
+**Result: 0 unresolved errors remaining.** All 29 previously-unresolved errors triaged and resolved.
+
+### Resolved this run (stale — already fixed + deployed)
+
+| Error IDs | Type | Root cause | Fix commit (deployed) |
+|---|---|---|---|
+| 16× `'str' object has no attribute 'participants'` | AttributeError | `/api/minutes/draft` passed `participants` as str | `38a10ea` defensive type handling |
+| 4× `unsupported format string passed to NoneType.__format__` | TypeError | `signature_threshold` None in minutes-templates | `d179e5f` int() conversion |
+| 4× `Network error` (MinutesTemplateForm) | generate | Frontend catch paired with above TypeError | `d179e5f` |
+| `err_a257500362ac` | AttributeError | `current_period_end` on Stripe sub | `fe67ac5` stripe_data.get guard |
+| `err_f9adaafd9148` | create_checkout | Single 2026-08-19 occurrence; handling hardened | `fd3e6e4`/`fe67ac5` |
+| `err_ee63dc3fadb7` | load | Expected 404 (trust deleted/no access) | n/a — not a bug |
+| `err_d16994029530` | chat_stream | Transient client network drop | n/a — not a bug |
+| `err_verify_final_001` | react_render_error | Synthetic test error | n/a — test data |
+
+All fix commits verified as ancestors of HEAD and deployed in the 2026-08-27T19:58Z SUCCESS backend deploy. Health check: 200.
