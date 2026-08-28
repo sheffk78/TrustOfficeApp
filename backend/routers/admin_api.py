@@ -1065,15 +1065,23 @@ async def enrich_lead(
         update_fields["updated_at"] = now.isoformat()
         await db.leads.update_one({"lead_id": lead_id}, {"$set": update_fields})
 
-    # Add activity log entry if provided
+    # Add activity log entries if provided.
+    # Accept both a single activity dict (legacy) and a list of activity entries
+    # — a list previously crashed here with AttributeError: 'list' has no get().
     if body.get("activity"):
-        await db.lead_activities.insert_one({
-            "activity_id": f"act_{uuid.uuid4().hex[:12]}",
-            "lead_id": lead_id,
-            "action_type": body["activity"].get("type", "system"),
-            "content": body["activity"]["content"],
-            "created_at": body["activity"].get("created_at", now.isoformat()),
-        })
+        activities = body["activity"]
+        if not isinstance(activities, list):
+            activities = [activities]
+        for act in activities:
+            if not isinstance(act, dict):
+                continue
+            await db.lead_activities.insert_one({
+                "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+                "lead_id": lead_id,
+                "action_type": act.get("type", "system"),
+                "content": act.get("content", ""),
+                "created_at": act.get("created_at", now.isoformat()),
+            })
 
     await log_api_action(
         action="enrich_lead",
