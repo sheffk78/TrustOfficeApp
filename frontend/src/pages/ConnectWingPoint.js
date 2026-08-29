@@ -26,8 +26,18 @@ const xhrPost = (url, data, headers = {}) => {
           const response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve(response);
+          } else if (xhr.status === 0 && attempts < 1) {
+            // Status 0 = network-level failure (connection drop, transient
+            // DNS/CORS hiccup, ad-blocker). Often transient — retry once.
+            attempts += 1;
+            setTimeout(() => send(), 1500);
           } else {
-            reject(new Error(response.detail || `Request failed with status ${xhr.status}`));
+            reject(new Error(
+              response.detail ||
+              (xhr.status === 0
+                ? 'Network error - please check your connection and try again'
+                : `Request failed with status ${xhr.status}`)
+            ));
           }
         } catch (e) {
           reject(new Error('Invalid server response'));
@@ -38,8 +48,10 @@ const xhrPost = (url, data, headers = {}) => {
     xhr.onerror = function () {
       reject(new Error('Network error - please check your connection'));
     };
-
-    xhr.send(JSON.stringify(data));
+    
+    const send = () => xhr.send(JSON.stringify(data));
+    let attempts = 0;
+    send();
   });
 };
 
