@@ -13,42 +13,53 @@ const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.ap
 // Use XMLHttpRequest for maximum mobile compatibility
 const xhrPost = (url, data) => {
   return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url, true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('Accept', 'application/json');
-    
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState === 4) {
-        try {
-          const response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(response);
-          } else if (xhr.status === 0 && attempts < 1) {
-            // Status 0 = network-level failure (connection drop, transient
-            // DNS/CORS hiccup, ad-blocker). Often transient — retry once.
-            attempts += 1;
-            setTimeout(() => send(), 1500);
-          } else {
-            reject(new Error(
-              response.detail ||
-              (xhr.status === 0
-                ? 'Network error - please check your connection and try again'
-                : `Request failed with status ${xhr.status}`)
-            ));
-          }
-        } catch (e) {
-          reject(new Error('Invalid server response'));
-        }
-      }
-    };
-    
-    xhr.onerror = function() {
-      reject(new Error('Network error - please check your connection'));
-    };
-    
-    const send = () => xhr.send(JSON.stringify(data));
     let attempts = 0;
+
+    const send = () => {
+      let failureHandled = false;
+      // Status 0 / onerror = network-level failure (connection drop,
+      // transient DNS/CORS hiccup, ad-blocker). Often transient — retry once.
+      // Browsers fire BOTH onerror and a final readystatechange(status 0)
+      // for one failure, so only handle the first signal.
+      const retryOrFail = (detail) => {
+        if (failureHandled) return;
+        failureHandled = true;
+        if (attempts < 1) {
+          attempts += 1;
+          setTimeout(send, 1500);
+        } else {
+          reject(new Error(detail || 'Network error - please check your connection and try again'));
+        }
+      };
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          try {
+            const response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(response);
+            } else if (xhr.status === 0) {
+              retryOrFail(response.detail);
+            } else {
+              reject(new Error(response.detail || `Request failed with status ${xhr.status}`));
+            }
+          } catch (e) {
+            reject(new Error('Invalid server response'));
+          }
+        }
+      };
+
+      xhr.onerror = function() {
+        retryOrFail();
+      };
+
+      xhr.send(JSON.stringify(data));
+    };
+
     send();
   });
 };
