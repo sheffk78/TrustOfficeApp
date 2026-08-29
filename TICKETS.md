@@ -132,3 +132,14 @@ Remaining errors are expected user flows or require frontend fixes not accessibl
 | `err_verify_final_001` | react_render_error | Synthetic test error | n/a — test data |
 
 All fix commits verified as ancestors of HEAD and deployed in the 2026-08-27T19:58Z SUCCESS backend deploy. Health check: 200.
+
+## Auto-Fixer Run 2026-08-29
+
+**Result: 2 unresolved errors resolved, both deployed.**
+
+| Error ID | Type | Root cause | Fix commit (deployed) |
+|---|---|---|---|
+| `err_2d644c08786e` | AttributeError `'list' object has no attribute 'get'` | `/api/admin-api/leads/{id}/enrich` crashed when `activity` sent as a list | `7c38c98` accept list or dict of activities (backend deploy `7e1cec04` SUCCESS) |
+| `err_12d5d645070c` | login `Request failed with status 0` | Client-side transient network failure (XHR status 0), server healthy throughout | `1e735b0` auto-retry once on status-0 + clearer error message in LoginPage/SignUpPage/ConnectWingPoint xhrPost (backend `341eeef9` + frontend `986f4a6a` SUCCESS) |
+
+Health checks: api 200, app 200 post-deploy.
