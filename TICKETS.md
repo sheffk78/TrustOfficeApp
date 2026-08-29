@@ -143,3 +143,4 @@ All fix commits verified as ancestors of HEAD and deployed in the 2026-08-27T19:
 | `err_12d5d645070c` | login `Request failed with status 0` | Client-side transient network failure (XHR status 0), server healthy throughout | `1e735b0` auto-retry once on status-0 + clearer error message in LoginPage/SignUpPage/ConnectWingPoint xhrPost (backend `341eeef9` + frontend `986f4a6a` SUCCESS) |
 
 Health checks: api 200, app 200 post-deploy.
+- Correction: `1e735b0`'s retry was dead code in browsers (onerror rejects before the readystatechange retry path; re-send on spent XHR throws). `d3e9b19` restructures xhrPost (fresh XHR per attempt, single retryOrFail path). Verified ad-hoc: 3/3 JSX parse + 4/4 behavior cases incl. real onerror→RS4 event order. Deployed backend `b985cb60` + frontend `59feddfd` SUCCESS, health 200.
