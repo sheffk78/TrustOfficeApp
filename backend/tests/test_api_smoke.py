@@ -17,6 +17,7 @@ import requests
 import os
 import sys
 import uuid
+import time
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
@@ -73,19 +74,52 @@ def _login(base_url: str, email: str, password: str = QA_PASSWORD) -> dict | Non
 def _delete_throwaway_users(base_url: str) -> None:
     """Bulk-delete any throwaway test users this run may have created, so the
     smoke suite never pollutes prod's customer list. Skips the designated QA
-    accounts (reused across runs) and any real accounts."""
+    accounts (reused across runs) and any real accounts.
+
+    Retries on transient failures and FAILS LOUDLY when the admin key is
+    present — a silent skip here causes throwaway accounts to accumulate
+    across nights (observed 2026-08-28: 4 stray accounts from 2 runs)."""
     if not ADMIN_API_KEY:
+        print("  [cleanup] WARNING: no ADMIN_API_KEY — cannot delete throwaways")
         return
-    ids = []
-    try:
-        users = requests.get(
-            f"{base_url}/api/admin-api/users?limit=200",
-            headers={"X-Admin-API-Key": ADMIN_API_KEY},
-            timeout=10,
-        ).json().get("users", [])
-    except Exception:
+
+    # --- Fetch user list with retry (was: bare except → silent skip) ---
+    # NOTE: API caps limit at 100 (422 if exceeded). The original code used
+    # limit=200, which ALWAYS failed with 422 — the bare except swallowed it,
+    # so throwaways accumulated every night. Fixed to limit=100 + pagination.
+    users = None
+    for attempt in range(3):
+        try:
+            resp = requests.get(
+                f"{base_url}/api/admin-api/users?limit=100",
+                headers={"X-Admin-API-Key": ADMIN_API_KEY},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                users = resp.json().get("users", [])
+                break
+            elif resp.status_code in (401, 403):
+                # Auth failure — retrying won't help; fail loudly
+                print(f"  [cleanup] ERROR: admin API returned {resp.status_code} — "
+                      f"key may be invalid/expired. Throwaways NOT cleaned.")
+                return
+            else:
+                # Transient (5xx, timeout-ish) — retry
+                print(f"  [cleanup] attempt {attempt+1}/3: got {resp.status_code}, retrying...")
+                time.sleep(2 ** attempt)
+        except requests.RequestException as e:
+            print(f"  [cleanup] attempt {attempt+1}/3: {type(e).__name__}: {e}")
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+
+    if users is None:
+        # All retries exhausted — this is a real problem, not a silent skip
+        print("  [cleanup] ❌ FAILED to fetch user list after 3 attempts. "
+              "Throwaway accounts may accumulate. Investigate admin API health.")
         return
+
     throwaway_patterns = ("smoke-reg-", "smoke-login-", "smoke-user-", "kit-smoke-test@")
+    ids = []
     for u in users:
         email = (u.get("email") or "").lower()
         uid = u.get("user_id")
@@ -94,13 +128,29 @@ def _delete_throwaway_users(base_url: str) -> None:
         if email.startswith(("smoke-", "isolation-", "test_register_")) or any(email.startswith(p) for p in throwaway_patterns):
             if "@test.trustoffice.app" in email or "@example.com" in email or "@test.com" in email:
                 ids.append(uid)
+
     if ids:
-        requests.post(
-            f"{base_url}/api/admin-api/users/bulk-delete",
-            headers={"X-Admin-API-Key": ADMIN_API_KEY, "Content-Type": "application/json"},
-            json={"user_ids": ids},
-            timeout=15,
-        )
+        # --- Bulk-delete with retry (was: fire-and-forget, no error check) ---
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    f"{base_url}/api/admin-api/users/bulk-delete",
+                    headers={"X-Admin-API-Key": ADMIN_API_KEY, "Content-Type": "application/json"},
+                    json={"user_ids": ids},
+                    timeout=20,
+                )
+                if resp.status_code == 200:
+                    print(f"  [cleanup] deleted {len(ids)} throwaway accounts")
+                    return
+                print(f"  [cleanup] bulk-delete attempt {attempt+1}/3: got {resp.status_code}, "
+                      f"retrying... {resp.text[:200]}")
+            except requests.RequestException as e:
+                print(f"  [cleanup] bulk-delete attempt {attempt+1}/3: {type(e).__name__}: {e}")
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+        print(f"  [cleanup] ❌ FAILED to delete {len(ids)} throwaway accounts after 3 attempts.")
+    else:
+        print("  [cleanup] no throwaway accounts found — prod is clean")
 
 
 def _register(base_url: str, label: str = "smoke") -> dict:
@@ -153,13 +203,18 @@ def _register(base_url: str, label: str = "smoke") -> dict:
 
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup_throwaways():
-    """After the whole smoke run, delete any throwaway test users this run spawned."""
+    """After the whole smoke run, delete any throwaway test users this run spawned.
+
+    Errors are logged, NOT swallowed — a silent failure here causes throwaway
+    accounts to accumulate in prod across nights (observed 2026-08-28)."""
     yield
-    try:
-        if BASE_URL:
+    if BASE_URL:
+        try:
             _delete_throwaway_users(BASE_URL)
-    except Exception:
-        pass
+        except Exception as e:
+            # Last-resort catch — but make it VISIBLE, not silent
+            print(f"  [cleanup] ❌ UNEXPECTED ERROR during throwaway cleanup: "
+                  f"{type(e).__name__}: {e}")
 
 
 @pytest.fixture(scope="module")
@@ -179,7 +234,8 @@ def auth(base):
 
 @pytest.fixture(scope="module")
 def trust(base, auth):
-    """Create a trust for testing."""
+    """Create a trust for testing. Tears down at module exit so QA1's trust
+    slot is freed for the isolation suite (Trustee plan = 1 trust limit)."""
     resp = auth["session"].post(
         f"{base}/api/trusts",
         headers=auth["headers"],
@@ -187,7 +243,19 @@ def trust(base, auth):
     )
     if resp.status_code not in (200, 201):
         pytest.skip(f"Could not create trust: {resp.status_code}")
-    return resp.json()
+    trust_data = resp.json()
+    yield trust_data
+    # Teardown: delete the trust so QA1's slot is freed
+    tid = trust_data.get("trust_id")
+    if tid:
+        try:
+            auth["session"].delete(
+                f"{base}/api/trusts/{tid}",
+                headers=auth["headers"],
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"  [fixture] trust teardown: {type(e).__name__}: {e}")
 
 
 # ============================================================================
