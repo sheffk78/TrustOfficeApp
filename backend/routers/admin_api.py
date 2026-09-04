@@ -1289,6 +1289,43 @@ async def get_user_trusts(
     }
 
 
+@router.post("/users/{user_id}/purge-demo-data")
+async def purge_user_demo_data(
+    user_id: str,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """Remove all demo (is_demo: True) data from a user's account.
+
+    Admin remediation for accounts where demo trusts coexist with real trusts
+    (e.g. accounts provisioned via external flows before auto-cleanup existed).
+    Real trusts and user-created data are never touched.
+    """
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from services.demo_cleanup import purge_demo_data_for_user
+    deleted_counts = await purge_demo_data_for_user(user_id)
+    total_deleted = sum(deleted_counts.values())
+
+    await log_api_action(
+        action="purge_demo_data",
+        details={"target_user_id": user_id, "total_deleted": total_deleted, "deleted_counts": deleted_counts},
+        ip_address=get_client_ip(request),
+    )
+
+    logger.info(f"API: Purged demo data for user {user_id} ({total_deleted} records)")
+
+    return {
+        "user_id": user_id,
+        "email": user.get("email"),
+        "total_deleted": total_deleted,
+        "deleted_counts": deleted_counts,
+        "message": f"Removed {total_deleted} demo records",
+    }
+
+
 @router.post("/users/{user_id}/trusts")
 async def create_user_trust(
     user_id: str,
@@ -1332,6 +1369,12 @@ async def create_user_trust(
     }
 
     await db.trusts.insert_one(trust_doc)
+
+    try:
+        from services.demo_cleanup import cleanup_demo_on_first_real_trust
+        await cleanup_demo_on_first_real_trust(user_id, trust_id)
+    except Exception:
+        logger.warning(f"Admin API: demo data cleanup failed for user {user_id}", exc_info=True)
 
     await log_api_action(
         action="create_trust",

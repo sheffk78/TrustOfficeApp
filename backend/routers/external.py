@@ -871,6 +871,11 @@ async def _create_trust(
 
     await db.trusts.insert_one(trust_doc)
     logger.info(f"Provision: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
+    try:
+        from services.demo_cleanup import cleanup_demo_on_first_real_trust
+        await cleanup_demo_on_first_real_trust(user_id, trust_id)
+    except Exception:
+        logger.warning(f"Provision: demo data cleanup failed for user {user_id}", exc_info=True)
     return trust_id
 
 
@@ -1905,6 +1910,11 @@ async def _resolve_or_create_trust(
     if not existing_trust:
         await db.trusts.insert_one(trust_doc)
         logger.info(f"{log_prefix}: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
+        try:
+            from services.demo_cleanup import cleanup_demo_on_first_real_trust
+            await cleanup_demo_on_first_real_trust(user_id, trust_id)
+        except Exception:
+            logger.warning(f"{log_prefix}: demo data cleanup failed for user {user_id}", exc_info=True)
         return trust_id, False
 
     existing_trust_id = existing_trust["trust_id"]

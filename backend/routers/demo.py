@@ -1244,127 +1244,15 @@ async def delete_demo_data(user: dict = Depends(require_write_access)):
     that are about to be deleted.
 
     User-created data referencing real (non-demo) trusts is always preserved.
+
+    Delegates to the shared demo_cleanup service — the same logic also runs
+    automatically when a user creates their first real trust, when an external
+    (WingPoint) trust is provisioned, and via the admin purge endpoint.
     """
+    from services.demo_cleanup import purge_demo_data_for_user
+
     user_id = user["user_id"]
-
-    # Track what was deleted
-    deleted_counts = {}
-
-    # ------------------------------------------------------------------
-    # STEP 1: Collect demo trust_ids BEFORE deleting anything.
-    # These IDs are used to clean up orphaned records in untracked collections.
-    # ------------------------------------------------------------------
-    demo_trust_ids = [
-        t["trust_id"]
-        async for t in db.trusts.find(
-            {"user_id": user_id, "is_demo": True},
-            {"_id": 0, "trust_id": 1},
-        )
-    ]
-
-    # ------------------------------------------------------------------
-    # STEP 2: Delete the 20 tracked collections (only is_demo: True records).
-    # ------------------------------------------------------------------
-    collections_to_clean = [
-        ("chat_conversations", "chat_conversations"),
-        ("trust_document_analysis", "trust_document_analysis"),
-        ("vault_documents", "vault_documents"),
-        ("class_beneficiaries", "class_beneficiaries"),
-        ("trust_unit_certificates", "trust_unit_certificates"),
-        ("trust_unit_transfers", "trust_unit_transfers"),
-        ("trust_units_settings", "trust_units_settings"),
-        ("compensation_payments", "compensation_payments"),
-        ("compensation_plans", "compensation_plans"),
-        ("benevolence_records", "benevolence_records"),
-        ("distribution_records", "distribution_records"),
-        ("schedule_a_items", "schedule_a_items"),
-        ("minutes_records", "minutes_records"),
-        ("governance_tasks", "governance_tasks"),
-        ("entity_relationships", "entity_relationships"),
-        ("entities", "entities"),
-        ("transactions", "transactions"),
-        ("tax_calendar", "tax_calendar"),
-        ("health_score_snapshots", "health_score_snapshots"),
-        ("trusts", "trusts"),
-    ]
-
-    for collection_name, display_name in collections_to_clean:
-        collection = db[collection_name]
-        # Only delete records marked as demo data
-        result = await collection.delete_many({"user_id": user_id, "is_demo": True})
-        if result.deleted_count > 0:
-            deleted_counts[display_name] = result.deleted_count
-
-    # ------------------------------------------------------------------
-    # STEP 3: Clean up orphaned records in trust_id-keyed collections.
-    # These collections are NOT seeded by the demo seeder (so records lack
-    # is_demo: True) but are auto-created by the app when a trust exists.
-    # We delete only records whose trust_id matches one of the demo trusts.
-    #
-    # NOTE: state_compliance_profiles is a GLOBAL lookup table keyed by
-    # state_code (no trust_id / user_id field) — the trust_id filter is a
-    # safe no-op for it; it is listed for documentation completeness.
-    # ------------------------------------------------------------------
-    trust_id_orphan_collections = [
-        "deadlines",
-        "separation_alerts",
-        "trust_state_compliance",
-        "benevolence_policies",
-        "benevolence_policy_versions",
-        "notifications",
-        "dismissed_insights",
-        "risk_findings_cache",
-        "state_compliance_profiles",  # global table — no-op, kept for documentation
-    ]
-
-    if demo_trust_ids:
-        for col_name in trust_id_orphan_collections:
-            result = await db[col_name].delete_many(
-                {"trust_id": {"$in": demo_trust_ids}}
-            )
-            if result.deleted_count > 0:
-                deleted_counts[col_name] = result.deleted_count
-
-    # ------------------------------------------------------------------
-    # STEP 4: Clean up orphaned records in user_id-keyed collections.
-    # These collections may contain records the user created during demo
-    # exploration. We only delete records that are clearly demo-related:
-    #   - is_demo: True, OR
-    #   - trust_id references one of the demo trust_ids
-    # User-created records referencing real (non-demo) trusts are preserved.
-    # ------------------------------------------------------------------
-    user_id_orphan_collections = [
-        "bank_accounts",
-        "expenses",
-        "investments",
-        "meeting_agendas",
-        "minutes_templates",
-        "personal_vendors",  # user_id only, no trust_id/is_demo — safe no-op
-        "external_provisions",
-        "trust_admin_kits",
-    ]
-
-    if demo_trust_ids:
-        for col_name in user_id_orphan_collections:
-            result = await db[col_name].delete_many(
-                {
-                    "user_id": user_id,
-                    "$or": [
-                        {"is_demo": True},
-                        {"trust_id": {"$in": demo_trust_ids}},
-                    ],
-                }
-            )
-            if result.deleted_count > 0:
-                deleted_counts[col_name] = result.deleted_count
-
-    # ------------------------------------------------------------------
-    # user_onboarding is deliberately NOT deleted here. It is keyed by
-    # user_id only (no trust_id, no is_demo flag) and represents the user's
-    # global checklist state, not per-trust demo data. Deleting it would
-    # reset the user's onboarding progress even for real trusts.
-    # ------------------------------------------------------------------
-
+    deleted_counts = await purge_demo_data_for_user(user_id)
     total_deleted = sum(deleted_counts.values())
 
     return {
