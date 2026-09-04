@@ -244,6 +244,7 @@ WRITE_EXEMPT_PATHS = {
     "/api/subscription/cancel",
     "/api/subscription/reactivate",
     "/api/subscription/upgrade",
+    "/api/subscription/change-plan",
     "/api/stripe/webhook",
     "/api/auth/register",
     "/api/auth/login",
@@ -253,12 +254,40 @@ WRITE_EXEMPT_PATHS = {
     "/api/auth/reset-password",
     "/api/auth/connect/wingpoint/confirm",
     # Contact Memory — inbound email flow + interaction logging are write operations
-    # First-trust creation stays exempt so free users can onboard; multi-trust
-    # gating is enforced in the route handler via check_feature_access.
-    "/api/trusts",
     "/api/contact-memory/email-flow",
     "/api/contact-memory/interactions",
 }
+
+# Paths unpaid accounts can still READ (account/session + subscription state
+# so the pricing/subscribe flow works). Everything else requires payment.
+READ_EXEMPT_PATHS = {
+    "/api/auth/me",
+    "/api/auth/session",
+    "/api/subscription",
+    "/api/subscription/state",
+    "/api/subscription/verify-payment",
+    "/api/subscription/features",
+}
+
+
+async def _user_has_payment_history(user_id: str) -> bool:
+    """True if this user ever had a real Stripe subscription or successful payment.
+
+    Churned payers keep read-only access to their records (never hold customer
+    data hostage); never-paid accounts get nothing. Cached per-request loop via
+    lru would be wrong (subscription changes), but this is a single indexed query.
+    """
+    sub = await db.subscriptions.find_one(
+        {"user_id": user_id, "stripe_subscription_id": {"$nin": [None, ""]}},
+        {"_id": 1}
+    )
+    if sub:
+        return True
+    txn = await db.payment_transactions.find_one(
+        {"user_id": user_id, "payment_status": {"$in": ["paid", "succeeded"]}},
+        {"_id": 1}
+    )
+    return txn is not None
 
 
 class SubscriptionMiddleware(BaseHTTPMiddleware):
@@ -317,9 +346,25 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         # Get subscription state
         state = await get_subscription_state(user_id)
         
-        # Allow all GET requests (read-only access)
+        # Checkout-first model: never-paid accounts have NO product access.
+        # GET requests are only allowed for session/account paths (READ_EXEMPT_PATHS),
+        # active subscriptions (incl. gifts/forever-free/admin), and users who
+        # previously paid (churned customers keep read access to their records).
         if method == "GET":
-            return await call_next(request)
+            if path in READ_EXEMPT_PATHS or state.is_active:
+                return await call_next(request)
+            if await _user_has_payment_history(user_id):
+                return await call_next(request)  # churned payer — read-only by design
+            return JSONResponse(
+                status_code=READ_ONLY_ERROR_CODE,
+                content={
+                    "detail": "An active subscription is required to access TrustOffice. Subscribe at /pricing to continue.",
+                    "subscription_status": state.status,
+                    "is_read_only": True,
+                    "trial_days_remaining": state.trial_days_remaining
+                },
+                headers={"X-Subscription-Status": state.status}
+            )
         
         # For write operations, check if subscription is active
         if method in WRITE_METHODS:
@@ -341,7 +386,6 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
                 )
         
         return await call_next(request)
-
 
 # ==================== MIDDLEWARE & ROUTER REGISTRATION ====================
 # NOTE: In FastAPI/Starlette, middleware is LIFO — the LAST added executes FIRST.

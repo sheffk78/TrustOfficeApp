@@ -1430,6 +1430,25 @@ class CheckoutRequest(BaseModel):
     referrer: Optional[str] = None
 
 
+class GuestCheckoutRequest(BaseModel):
+    """Checkout-first signup: account is provisioned by the Stripe webhook
+    after payment (checkout.session.completed). No user doc exists before pay."""
+    email: str
+    name: str
+    plan_type: str  # "trustee", "estate", "advisor" (wingpoint requires a provisioned WP user)
+    billing_period: str = "monthly"
+    success_url: str
+    cancel_url: str
+    promotion_code: Optional[str] = None
+    coupon: Optional[str] = None  # Direct Stripe coupon ID (e.g., TRUST49)
+    referral_id: Optional[str] = None  # Rewardful affiliate referral ID
+    utm_source: Optional[str] = None
+    utm_campaign: Optional[str] = None
+    utm_medium: Optional[str] = None
+    referrer: Optional[str] = None
+    wp_ref: Optional[str] = None  # WingPoint connect-flow attribution (no user yet)
+
+
 class ChangePlanRequest(BaseModel):
     """Request to change plan tier (upgrade/downgrade between trustee/estate/advisor)"""
     plan_type: str  # "trustee", "estate", "advisor"

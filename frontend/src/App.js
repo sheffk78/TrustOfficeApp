@@ -10,6 +10,7 @@ import { PageHelpProvider } from "@/context/PageHelpContext";
 import { captureUtmParams } from "@/utils/utm";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
+import PostCheckoutPage from "@/pages/PostCheckoutPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import AuthCallback from "@/pages/AuthCallback";
@@ -236,6 +237,7 @@ const AppRouter = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/register" element={<SignUpPage />} />
+      <Route path="/post-checkout" element={<PostCheckoutPage />} />
       <Route path="/wingpoint" element={<WingPointRedirect />} />
       {/* Connect to WingPoint — account linking flow (public, checks auth internally) */}
       <Route path="/connect/wingpoint" element={<ConnectWingPoint />} />
