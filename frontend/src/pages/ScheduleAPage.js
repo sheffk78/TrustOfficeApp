@@ -477,14 +477,22 @@ export default function ScheduleAPage() {
                         <SelectContent>
                           {ASSET_CATEGORIES.map(cat => (
                             <SelectItem key={cat.value} value={cat.value}>
-                              <div className="flex items-center gap-2">
-                                <cat.icon className="w-4 h-4" />
-                                {cat.label}
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  <cat.icon className="w-4 h-4" />
+                                  {cat.label}
+                                </div>
+                                <span className="text-xs text-muted-foreground">{cat.description}</span>
                               </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {formData.category && (
+                        <p className="text-xs text-muted-foreground mt-1.5" data-testid="asset-category-hint">
+                          {getCategoryInfo(formData.category).description}
+                        </p>
+                      )}
                     </div>
                     
                     <div>
@@ -703,7 +711,7 @@ export default function ScheduleAPage() {
                         </div>
                         <div>
                           <h3 className="font-serif text-lg text-navy">{category.label}</h3>
-                          <p className="text-xs text-muted-foreground">{categoryAssets.length} item{categoryAssets.length !== 1 ? 's' : ''}</p>
+                          <p className="text-xs text-muted-foreground">{category.description} · {categoryAssets.length} item{categoryAssets.length !== 1 ? 's' : ''}</p>
                         </div>
                       </div>
                       <div className="text-right">

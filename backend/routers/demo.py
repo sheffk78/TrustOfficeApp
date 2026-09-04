@@ -25,14 +25,30 @@ router = APIRouter(prefix="/demo", tags=["demo"])
 @router.post("/seed")
 async def seed_demo_data(user: dict = Depends(get_current_user)):
     """
-    Seed comprehensive demo data for new users.
+    Seed comprehensive demo data for users exploring the product.
+
     Creates 2 sample trusts with rich data showcasing all features.
-    Only seeds if no demo data exists (allows seeding alongside user's own trusts).
+    Only seeds if the user has NO data at all — demo data must never mix
+    with real trusts (that mixing was a reported production bug). Once a
+    user has any real trust, demo seeding is refused; use Settings →
+    "Remove demo data" first if they truly want to start over.
     """
+    user_id = user["user_id"]
     # Check if demo data already exists (not all trusts, just demo trusts)
-    existing_demo = await db.trusts.count_documents({"user_id": user["user_id"], "is_demo": True})
+    existing_demo = await db.trusts.count_documents({"user_id": user_id, "is_demo": True})
     if existing_demo > 0:
         return {"message": "Demo data already exists", "seeded": False}
+
+    # Never mix demo data with real trusts — refuse if any real trust exists
+    existing_real = await db.trusts.count_documents({
+        "user_id": user_id, "is_demo": {"$ne": True}
+    })
+    if existing_real > 0:
+        return {
+            "message": "Cannot create demo data: your account already has real trusts. Demo data can only be created on empty accounts.",
+            "seeded": False,
+            "blocked_by_real_data": True,
+        }
     
     now = datetime.now(timezone.utc)
     
@@ -82,7 +98,13 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "created_at": now.isoformat(),
         "is_demo": True
     })
-    
+
+    # Trust records kept in memory so later sections (tax calendar seeding)
+    # can filter entries by tax status.
+    seeded_trusts = [
+        {"trust_id": trust1_id, "benevolence_enabled": True, "tax_status": "501c3"},
+        {"trust_id": trust2_id, "benevolence_enabled": False, "tax_status": "private"},
+    ]
     # ==================== ENTITIES for Trust 1 (Multi-level Hierarchy) ====================
     trust1_entity_id = f"entity_{uuid.uuid4().hex[:12]}"
     await db.entities.insert_one({
@@ -878,8 +900,11 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     ])
 
     # ==================== TAX CALENDAR ENTRIES ====================
-    # Demo trust is 501c3 (tax-exempt): seed Form 990, not income-tax entries.
-    await db.tax_calendar.insert_many([
+    # trust1 is benevolence (508c3-style) tax-exempt: it gets NO income-tax
+    # entries (1041/extension/estimated) — mirrors _generate_entries policy.
+    # Kept: Form 990 (informational return for the 501c3 tax status), state
+    # entries, and the filed 1041-extension history item for trust2.
+    tax_entries_seed = [
         {
             "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
             "trust_id": trust1_id,
@@ -960,7 +985,21 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "updated_at": now.isoformat(),
             "is_demo": True
         },
-    ])
+    ]
+    # Tax-status gating in demo seed: exempt trusts (508/501c3) carry no
+    # income-tax entries (1041/extension/estimated). 501c3 keeps Form 990.
+    from utils.tax_calendar_math import is_tax_exempt as _demo_exempt
+    status_by_trust = {t["trust_id"]: (t.get("tax_status") or "private") for t in seeded_trusts}
+    filtered_tax_entries = [
+        e for e in tax_entries_seed
+        if not _demo_exempt({"tax_status": status_by_trust.get(e["trust_id"], "private")})
+        or e.get("deadline_type") not in {
+            "federal_1041", "federal_1041_extension", "k1_beneficiaries",
+            "estimated_q1", "estimated_q2", "estimated_q3", "estimated_q4",
+        }
+    ]
+    if filtered_tax_entries:
+        await db.tax_calendar.insert_many(filtered_tax_entries)
 
     # ==================== CLASS BENEFICIARIES (Beneficiary Dashboard) ====================
     await db.class_beneficiaries.insert_many([
@@ -1245,127 +1284,15 @@ async def delete_demo_data(user: dict = Depends(require_write_access)):
     that are about to be deleted.
 
     User-created data referencing real (non-demo) trusts is always preserved.
+
+    Delegates to the shared demo_cleanup service — the same logic also runs
+    automatically when a user creates their first real trust, when an external
+    (WingPoint) trust is provisioned, and via the admin purge endpoint.
     """
+    from services.demo_cleanup import purge_demo_data_for_user
+
     user_id = user["user_id"]
-
-    # Track what was deleted
-    deleted_counts = {}
-
-    # ------------------------------------------------------------------
-    # STEP 1: Collect demo trust_ids BEFORE deleting anything.
-    # These IDs are used to clean up orphaned records in untracked collections.
-    # ------------------------------------------------------------------
-    demo_trust_ids = [
-        t["trust_id"]
-        async for t in db.trusts.find(
-            {"user_id": user_id, "is_demo": True},
-            {"_id": 0, "trust_id": 1},
-        )
-    ]
-
-    # ------------------------------------------------------------------
-    # STEP 2: Delete the 20 tracked collections (only is_demo: True records).
-    # ------------------------------------------------------------------
-    collections_to_clean = [
-        ("chat_conversations", "chat_conversations"),
-        ("trust_document_analysis", "trust_document_analysis"),
-        ("vault_documents", "vault_documents"),
-        ("class_beneficiaries", "class_beneficiaries"),
-        ("trust_unit_certificates", "trust_unit_certificates"),
-        ("trust_unit_transfers", "trust_unit_transfers"),
-        ("trust_units_settings", "trust_units_settings"),
-        ("compensation_payments", "compensation_payments"),
-        ("compensation_plans", "compensation_plans"),
-        ("benevolence_records", "benevolence_records"),
-        ("distribution_records", "distribution_records"),
-        ("schedule_a_items", "schedule_a_items"),
-        ("minutes_records", "minutes_records"),
-        ("governance_tasks", "governance_tasks"),
-        ("entity_relationships", "entity_relationships"),
-        ("entities", "entities"),
-        ("transactions", "transactions"),
-        ("tax_calendar", "tax_calendar"),
-        ("health_score_snapshots", "health_score_snapshots"),
-        ("trusts", "trusts"),
-    ]
-
-    for collection_name, display_name in collections_to_clean:
-        collection = db[collection_name]
-        # Only delete records marked as demo data
-        result = await collection.delete_many({"user_id": user_id, "is_demo": True})
-        if result.deleted_count > 0:
-            deleted_counts[display_name] = result.deleted_count
-
-    # ------------------------------------------------------------------
-    # STEP 3: Clean up orphaned records in trust_id-keyed collections.
-    # These collections are NOT seeded by the demo seeder (so records lack
-    # is_demo: True) but are auto-created by the app when a trust exists.
-    # We delete only records whose trust_id matches one of the demo trusts.
-    #
-    # NOTE: state_compliance_profiles is a GLOBAL lookup table keyed by
-    # state_code (no trust_id / user_id field) — the trust_id filter is a
-    # safe no-op for it; it is listed for documentation completeness.
-    # ------------------------------------------------------------------
-    trust_id_orphan_collections = [
-        "deadlines",
-        "separation_alerts",
-        "trust_state_compliance",
-        "benevolence_policies",
-        "benevolence_policy_versions",
-        "notifications",
-        "dismissed_insights",
-        "risk_findings_cache",
-        "state_compliance_profiles",  # global table — no-op, kept for documentation
-    ]
-
-    if demo_trust_ids:
-        for col_name in trust_id_orphan_collections:
-            result = await db[col_name].delete_many(
-                {"trust_id": {"$in": demo_trust_ids}}
-            )
-            if result.deleted_count > 0:
-                deleted_counts[col_name] = result.deleted_count
-
-    # ------------------------------------------------------------------
-    # STEP 4: Clean up orphaned records in user_id-keyed collections.
-    # These collections may contain records the user created during demo
-    # exploration. We only delete records that are clearly demo-related:
-    #   - is_demo: True, OR
-    #   - trust_id references one of the demo trust_ids
-    # User-created records referencing real (non-demo) trusts are preserved.
-    # ------------------------------------------------------------------
-    user_id_orphan_collections = [
-        "bank_accounts",
-        "expenses",
-        "investments",
-        "meeting_agendas",
-        "minutes_templates",
-        "personal_vendors",  # user_id only, no trust_id/is_demo — safe no-op
-        "external_provisions",
-        "trust_admin_kits",
-    ]
-
-    if demo_trust_ids:
-        for col_name in user_id_orphan_collections:
-            result = await db[col_name].delete_many(
-                {
-                    "user_id": user_id,
-                    "$or": [
-                        {"is_demo": True},
-                        {"trust_id": {"$in": demo_trust_ids}},
-                    ],
-                }
-            )
-            if result.deleted_count > 0:
-                deleted_counts[col_name] = result.deleted_count
-
-    # ------------------------------------------------------------------
-    # user_onboarding is deliberately NOT deleted here. It is keyed by
-    # user_id only (no trust_id, no is_demo flag) and represents the user's
-    # global checklist state, not per-trust demo data. Deleting it would
-    # reset the user's onboarding progress even for real trusts.
-    # ------------------------------------------------------------------
-
+    deleted_counts = await purge_demo_data_for_user(user_id)
     total_deleted = sum(deleted_counts.values())
 
     return {

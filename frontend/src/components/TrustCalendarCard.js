@@ -65,9 +65,9 @@ function formatDate(dateString) {
  * Polymorphic calendar card.
  * Renders governance task or tax deadline variant based on event_type.
  */
-export default function TrustCalendarCard({ event, onComplete, onUncomplete, onDelete, onToggleChecklist, onMarkFiled, onMarkExtended }) {
+export default function TrustCalendarCard({ event, onComplete, onUncomplete, onDelete, onToggleChecklist, onMarkFiled, onMarkExtended, onDeleteTax }) {
   const [expanded, setExpanded] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(null); // null | 'filed' | 'extended'
+  const [showConfirm, setShowConfirm] = useState(null); // null | 'filed' | 'extended' | 'delete'
 
   const isTax = event.event_type === 'tax_deadline';
   const isGovernance = event.event_type === 'governance_task';
@@ -168,35 +168,48 @@ export default function TrustCalendarCard({ event, onComplete, onUncomplete, onD
               <Bot className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Ask AI</span>
             </Link>
+            <Button
+              onClick={() => setShowConfirm('delete')}
+              size="sm"
+              variant="ghost"
+              className="text-red-600 hover:text-red-600 hover:bg-red-50"
+              aria-label="Delete tax deadline"
+              data-testid={`delete-tax-${event.entry_id}`}
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </Button>
           </div>
         </div>
 
         {/* Confirm dialog */}
         {showConfirm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowConfirm(null)}>
-            <div className="bg-white p-6 w-full max-w-sm corner-mark" onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') setShowConfirm(null); if (e.key === 'Enter') { if (showConfirm === 'filed') onMarkFiled(event.entry_id); else onMarkExtended(event.entry_id); setShowConfirm(null); } }} role="dialog" aria-modal="true" aria-label={showConfirm === 'filed' ? 'Confirm mark as filed' : 'Confirm mark as extended'} data-testid={`confirm-${showConfirm}-${event.entry_id}`}>
+            <div className="bg-white p-6 w-full max-w-sm corner-mark" onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') setShowConfirm(null); if (e.key === 'Enter') { if (showConfirm === 'filed') onMarkFiled(event.entry_id); else if (showConfirm === 'extended') onMarkExtended(event.entry_id); else if (showConfirm === 'delete') onDeleteTax(event.entry_id); setShowConfirm(null); } }} role="dialog" aria-modal="true" aria-label={showConfirm === 'filed' ? 'Confirm mark as filed' : showConfirm === 'extended' ? 'Confirm mark as extended' : 'Confirm delete tax deadline'} data-testid={`confirm-${showConfirm}-${event.entry_id}`}>
               <h3 className="font-serif text-lg text-navy mb-2">
-                {showConfirm === 'filed' ? 'Confirm: Mark as Filed' : 'Confirm: Mark as Extended'}
+                {showConfirm === 'filed' ? 'Confirm: Mark as Filed' : showConfirm === 'extended' ? 'Confirm: Mark as Extended' : 'Confirm: Delete Tax Deadline'}
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {showConfirm === 'filed'
                   ? `Mark "${label}" as filed for tax year ${event.tax_year}?`
-                  : `Mark "${label}" as extended?`}
+                  : showConfirm === 'extended'
+                  ? `Mark "${label}" as extended?`
+                  : `Delete "${label}" for tax year ${event.tax_year}? This removes it from all calendar views.`}
               </p>
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1 btn-secondary" onClick={() => setShowConfirm(null)}>
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 btn-primary"
+                  className={`flex-1 ${showConfirm === 'delete' ? 'bg-red-600 hover:bg-red-700 text-white' : 'btn-primary'}`}
                   onClick={() => {
                     if (showConfirm === 'filed') onMarkFiled(event.entry_id);
-                    else onMarkExtended(event.entry_id);
+                    else if (showConfirm === 'extended') onMarkExtended(event.entry_id);
+                    else if (showConfirm === 'delete') onDeleteTax(event.entry_id);
                     setShowConfirm(null);
                   }}
                   data-testid={`confirm-${showConfirm}-btn-${event.entry_id}`}
                 >
-                  Confirm
+                  {showConfirm === 'delete' ? 'Delete' : 'Confirm'}
                 </Button>
               </div>
             </div>

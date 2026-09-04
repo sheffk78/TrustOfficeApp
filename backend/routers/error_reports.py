@@ -89,6 +89,9 @@ class FrontendErrorReport(BaseModel):
     # Free-form extra context (component name, form data, etc.)
     context: Optional[Dict[str, Any]] = Field(None)
 
+    # Severity: 'info' = expected user flow (never alerts), 'minor'/'major'/'critical'
+    severity: Optional[str] = Field(None, max_length=20)
+
     @field_validator("error_type")
     @classmethod
     def validate_error_type(cls, v: str) -> str:
@@ -182,6 +185,13 @@ async def report_frontend_error(payload: FrontendErrorReport, request: Request):
             extra_context[k] = v_str[:400] if len(v_str) > 400 else v_str
 
     # --- Report the error (logs + deduped Discord alert) ---
+    # severity: the frontend tags expected user flows as 'info' (e.g. an
+    # expired session hitting /auth/me); those must never alert.
+    severity = ""
+    if payload.severity:
+        severity = str(payload.severity)
+    elif payload.context and payload.context.get("severity"):
+        severity = str(payload.context["severity"])
     await report_error(
         source="frontend",
         error_type=payload.error_type,
@@ -192,6 +202,7 @@ async def report_frontend_error(payload: FrontendErrorReport, request: Request):
         email=email,
         trust_id=trust_id,
         extra_context=extra_context,
+        severity=severity or None,
     )
 
     return {"status": "reported", "support": "contact@trustoffice.app"}

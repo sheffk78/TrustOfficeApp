@@ -505,7 +505,10 @@ async def get_calendar_events(
     else:
         exempt_ids = {
             t["trust_id"] for t in await db.trusts.find(
-                {"user_id": user["user_id"], "tax_status": {"$in": ["508", "501c3"]}},
+                {"user_id": user["user_id"], "$or": [
+                    {"tax_status": {"$in": ["508", "501c3"]}},
+                    {"benevolence_enabled": True},
+                ]},
                 {"_id": 0, "trust_id": 1}
             ).to_list(100)
         }

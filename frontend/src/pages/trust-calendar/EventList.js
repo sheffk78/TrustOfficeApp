@@ -11,6 +11,7 @@ import TrustCalendarCard from '@/components/TrustCalendarCard';
 //   onToggleChecklist     – (taskId, itemIndex) => void
 //   onMarkFiled           – (entryId) => void
 //   onMarkExtended        – (entryId) => void
+//   onDeleteTax           – (entryId) => void
 export default function EventList({
   grouped,
   onComplete,
@@ -19,6 +20,7 @@ export default function EventList({
   onToggleChecklist,
   onMarkFiled,
   onMarkExtended,
+  onDeleteTax,
 }) {
   return (
     <div className="space-y-6" data-testid="event-list">
@@ -41,6 +43,7 @@ export default function EventList({
                 onToggleChecklist={onToggleChecklist}
                 onMarkFiled={onMarkFiled}
                 onMarkExtended={onMarkExtended}
+                onDeleteTax={onDeleteTax}
               />
             ))}
           </div>

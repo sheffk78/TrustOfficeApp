@@ -225,6 +225,7 @@ async def report_error(
     trust_id: Optional[str] = None,
     extra_context: Optional[Dict[str, Any]] = None,
     alert: bool = True,
+    severity: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Report an error: log it with full context and (optionally) alert Discord.
 
@@ -289,6 +290,15 @@ async def report_error(
                 break
     fp = _fingerprint(error_type, request_path or "", tb_first_line)
 
+    # --- Severity gate: info-severity reports are expected user flows ---
+    # (e.g. an expired session hitting /auth/me on a protected page). They are
+    # still logged and stored in error_logs for the auto-fixer loop, but they
+    # must never trigger the Hermes agent / Discord alert. The frontend marks
+    # these explicitly; defense-in-depth: also match the known benign pattern
+    # in case a caller forgets to pass severity.
+    _BENIGN = error_message == "Not authenticated" and error_type == "auth_check"
+    is_info = (severity or "").lower() == "info" or (_BENIGN and source == "frontend")
+
     # --- Log with full context (always, even if deduped) ---
     log_lines = [
         f"[{source}] {error_type}: {error_message}",
@@ -330,7 +340,8 @@ async def report_error(
             "source": source,
             "fingerprint": fp,
             "operation": _ctx.get("operation"),
-            **{k: v for k, v in _ctx.items() if k not in ("location", "user_agent", "operation")},
+            "severity": severity or ("info" if is_info else None),
+            **{k: v for k, v in _ctx.items() if k not in ("location", "user_agent", "operation", "severity")},
         },
         "resolved": False,
         "ip_address": None,
@@ -389,6 +400,11 @@ async def report_error(
     title = f"{title_prefix}: {error_type}"
 
     # --- Trigger autonomous agent or send Discord alert ---
+    # Info-severity reports never alert (expected user flows — see gate above).
+    if is_info:
+        logger.info(f"Suppressed info-severity alert ({source}/{error_type}) — expected flow, stored in error_logs")
+        return {"alerted": False, "duplicate": False, "fingerprint": fp, "severity": "info"}
+
     # Extract bundle hash for stale-bundle detection
     bundle_hash = _extract_bundle_hash(traceback_str or "")
 

@@ -285,3 +285,36 @@ class TestExemptReadPathFilter:
         legacy = [{"deadline_type": "federal_1041"}]
         out = filter_income_tax_entries(legacy, {})
         assert out == legacy
+
+
+class TestBenevolenceExemption:
+    """Benevolence (508c3) trusts are tax-exempt — no deadlines generated."""
+
+    def test_benevolence_calendar_year_returns_empty(self):
+        trust = {"trust_id": "t1", "is_fiscal_year": False, "benevolence_enabled": True}
+        assert _generate_entries(trust, 2025) == []
+
+    def test_benevolence_fiscal_year_returns_empty(self):
+        trust = {
+            "trust_id": "t1", "is_fiscal_year": True,
+            "tax_year_end_month": 6, "tax_year_end_day": 30,
+            "benevolence_enabled": True,
+        }
+        assert _generate_entries(trust, 2025) == []
+
+    def test_non_benevolence_unaffected(self):
+        trust = {"trust_id": "t1", "is_fiscal_year": False, "benevolence_enabled": False}
+        entries = _generate_entries(trust, 2025)
+        assert len(entries) == len(CALENDAR_RULES)
+
+    def test_missing_flag_defaults_to_generate(self):
+        """Trusts without the benevolence_enabled field keep current behavior."""
+        trust = {"trust_id": "t1", "is_fiscal_year": False}
+        entries = _generate_entries(trust, 2025)
+        assert len(entries) == len(CALENDAR_RULES)
+
+    def test_benevolence_with_501c3_status_still_generates_990(self):
+        """Benevolence + explicit 501c3 tax_status: Form 990 applies (per-status refinement)."""
+        trust = {"trust_id": "t1", "is_fiscal_year": False, "benevolence_enabled": True, "tax_status": "501c3"}
+        entries = _generate_entries(trust, 2025)
+        assert [e["deadline_type"] for e in entries] == ["form_990"]

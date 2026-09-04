@@ -25,6 +25,7 @@ import NextUpConfirmDialog from './trust-calendar/NextUpConfirmDialog';
 
 export default function TrustCalendarPage() {
   const { selectedTrust } = useAuth();
+  const isBenevolence = selectedTrust?.benevolence_enabled === true;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [events, setEvents] = useState([]);
@@ -169,6 +170,22 @@ export default function TrustCalendarPage() {
     }
   };
 
+  const handleDeleteTaxEntry = async (entryId) => {
+    if (!confirm('Delete this tax deadline? This removes it from all calendar views.')) return;
+    try {
+      const res = await fetchWithAuth(`/tax-calendar/${entryId}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Tax deadline deleted');
+        loadEvents();
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        showError(toast, errBody || { detail: 'Failed to delete tax deadline' }, { operation: 'delete', page: 'TrustCalendar' });
+      }
+    } catch (e) {
+      showError(toast, e, { operation: 'delete', page: 'TrustCalendar' });
+    }
+  };
+
   // ── Governance task actions ────────────────────────────────
   const handleCreateTask = async () => {
     if (!selectedTrust) return;
@@ -287,7 +304,7 @@ export default function TrustCalendarPage() {
   }
 
   // Named predicates for the tax-info bar / generate-button visibility.
-  const isTaxExempt = ['508', '501c3'].includes(selectedTrust?.tax_status);
+  const isTaxExempt = ['508', '501c3'].includes(selectedTrust?.tax_status) || selectedTrust?.benevolence_enabled === true;
   const showTaxInfoBar = (typeFilter === 'all' || typeFilter === 'tax_deadline') && !['money', 'structure'].includes(typeFilter);
   const showGenerateBtn = !isTaxExempt && (typeFilter === 'all' || typeFilter === 'tax_deadline') && !hasTaxCalendar && !['money', 'structure'].includes(typeFilter);
   const hasTaxInFilter = filteredEvents.some((e) => e.event_type === 'tax_deadline');
@@ -389,6 +406,7 @@ export default function TrustCalendarPage() {
               year={year}
               onCreateTask={() => setShowModal(true)}
               onGenerateTaxCalendar={generateTaxCalendar}
+              isBenevolence={isBenevolence}
             />
           ) : isFilteredEmpty ? (
             <CalendarEmptyState
@@ -397,6 +415,7 @@ export default function TrustCalendarPage() {
               statusFilter={statusFilter}
               typeFilter={typeFilter}
               onGenerateTaxCalendar={generateTaxCalendar}
+              isBenevolence={isBenevolence}
             />
           ) : (
             <EventList
@@ -407,6 +426,7 @@ export default function TrustCalendarPage() {
               onToggleChecklist={handleToggleChecklist}
               onMarkFiled={markFiled}
               onMarkExtended={markExtended}
+              onDeleteTax={handleDeleteTaxEntry}
             />
           )}
         </div>

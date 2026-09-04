@@ -2231,15 +2231,31 @@ Effective Date: Immediately upon adoption
     return content
 
 def generate_property_acceptance_content(data: dict) -> str:
-    """Generate content for acceptance of additional property into trust"""
-    grantor = data.get("grantor_name", "[Grantor/Creator]")
-    description = data.get("property_description", "[Description of property]")
-    value = data.get("property_value")
-    conveyance_date = data.get("conveyance_date", "[Date]")
-    
-    value_text = f"${float(value or 0):,.2f}" if value else "$______________"
-    
-    content = f"""Resolution 1: Acceptance of Additional Property into Trust
+    """Generate content for acceptance of additional property into trust.
+
+    Supports multi-item mode (property_items list — one resolution per
+    property, all in the same minutes record) and legacy single-item mode
+    (top-level fields). Every property submitted in one submission gets its
+    own numbered resolution block in the same document.
+    """
+    property_items = data.get("property_items")
+    if isinstance(property_items, list) and property_items:
+        items = property_items
+    else:
+        items = [data]  # legacy single-item mode
+
+    blocks = []
+    for idx, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            item = {}
+        grantor = item.get("grantor_name") or data.get("grantor_name") or "[Grantor/Creator]"
+        description = item.get("property_description") or data.get("property_description") or "[Description of property]"
+        value = item.get("property_value", data.get("property_value"))
+        conveyance_date = item.get("conveyance_date") or data.get("conveyance_date") or "[Date]"
+
+        value_text = f"${float(value or 0):,.2f}" if value else "$______________"
+
+        blocks.append(f"""Resolution {idx}: Acceptance of Additional Property into Trust
 
 WHEREAS, {grantor} has offered to convey the following property to the Trust:
 
@@ -2257,10 +2273,9 @@ NOW, THEREFORE, BE IT RESOLVED that:
 Vote: Unanimous approval
 Requires unanimous consent per Indenture: YES
 Effective Date: Immediately upon adoption
+""")
 
-"""
-    
-    return content
+    return "\n".join(blocks)
 
 def generate_bill_of_sale_content(data: dict) -> str:
     """Generate bill of sale content for tangible personal property transfer."""
@@ -4679,6 +4694,31 @@ async def update_minutes_template(minutes_id: str, update_data: MinutesTemplateU
             await auto_update_onboarding(user["user_id"], minutes["trust_id"])
         except Exception:
             pass
+
+        # TO-016: Auto-create draft Schedule A asset if bank account info is present
+        # (parity with the legacy PUT /minutes/{minutes_id} finalize path — template
+        # minutes were skipping the bank-account → Schedule A asset creation)
+        try:
+            await _auto_create_draft_asset_from_minutes(
+                trust_id=minutes.get("trust_id", ""),
+                user_id=user["user_id"],
+                minutes_id=minutes_id,
+                template_type=minutes.get("template_type", ""),
+                template_data=minutes.get("template_data", {}),
+                meeting_date=minutes.get("meeting_date"),
+            )
+        except Exception as e:
+            logging.warning(f"TO-016 draft asset creation failed for template minutes {minutes_id}: {e}")
+        # Also create a real bank account record from the minutes bank info
+        try:
+            await _auto_create_bank_account_from_minutes(
+                trust_id=minutes.get("trust_id", ""),
+                user_id=user["user_id"],
+                minutes_id=minutes_id,
+                template_data=minutes.get("template_data", {}),
+            )
+        except Exception as e:
+            logging.warning(f"Bank account creation from template minutes failed for {minutes_id}: {e}")
     
     updated = await db.minutes_templates.find_one({"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0})
     return updated

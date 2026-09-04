@@ -65,8 +65,11 @@ INCOME_TAX_DEADLINE_TYPES = {
 
 
 def is_tax_exempt(trust: dict) -> bool:
-    """True if the trust's tax_status is a tax-exempt organization (508, 501c3)."""
-    return (trust.get("tax_status") or "private").lower() in ("508", "501c3")
+    """True if the trust is tax-exempt: explicit 508/501c3 tax_status, or
+    benevolence mode enabled (treated as 508-style blanket exemption)."""
+    if (trust.get("tax_status") or "private").lower() in ("508", "501c3"):
+        return True
+    return trust.get("benevolence_enabled") is True
 
 
 def filter_income_tax_entries(entries: list, trust: dict) -> list:
@@ -116,10 +119,17 @@ def _calendar_due_date(tax_year: int, month: int, day: int) -> date:
 def _generate_entries(trust: dict, tax_year: int) -> list:
     """Generate deadline entries based on trust's tax year configuration.
 
-    Deadline applicability is filtered by the trust's tax_status: tax-exempt
-    statuses (508, 501c3) skip fiduciary income-tax deadlines entirely; 501c3
-    additionally gets a Form 990 informational-return deadline.
+    Tax-status gating: tax-exempt statuses skip fiduciary income-tax deadlines —
+      - 508 (church/religious, tax exempt): generates ZERO entries (no IRS
+        filings at all).
+      - 501c3 (tax-exempt org): skips 1041/K-1/estimated; gets Form 990.
+      - private (default): full fiduciary calendar.
+    Benevolence mode enabled is treated as tax-exempt (508) for backwards
+    compatibility — benevolence trusts also generate zero entries.
     """
+    # Benevolence mode ON without an explicit exempt tax_status → treat as 508.
+    if trust.get("benevolence_enabled") is True and (trust.get("tax_status") or "private").lower() == "private":
+        return []
     entries = []
     from datetime import datetime, timezone  # local import to keep this module light
     now = datetime.now(timezone.utc).isoformat()

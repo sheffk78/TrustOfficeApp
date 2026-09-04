@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 // mode='complete'  – no events at all for the year (offers Create Task + Generate Tax).
 // mode='filtered'  – events exist but the current filters match nothing.
 //
+// Benevolence (508c3) trusts are tax-exempt, so the Generate Tax buttons are
+// hidden for them regardless of mode.
+//
 // Props:
 //   mode                   – 'complete' | 'filtered'
 //   year                   – selected calendar year
@@ -12,6 +15,7 @@ import { Button } from '@/components/ui/button';
 //   typeFilter             – current type filter key
 //   onCreateTask           – () => void   (complete mode only)
 //   onGenerateTaxCalendar  – () => void  (both modes)
+//   isBenevolence          – boolean (trust has benevolence mode enabled)
 export default function CalendarEmptyState({
   mode,
   year,
@@ -19,6 +23,7 @@ export default function CalendarEmptyState({
   typeFilter,
   onCreateTask,
   onGenerateTaxCalendar,
+  isBenevolence = false,
 }) {
   if (mode === 'complete') {
     return (
@@ -32,9 +37,11 @@ export default function CalendarEmptyState({
           <Button onClick={onCreateTask} className="btn-secondary">
             Create a Task
           </Button>
-          <Button onClick={onGenerateTaxCalendar} className="btn-primary" data-testid="empty-generate-tax">
-            Generate Tax Deadlines
-          </Button>
+          {!isBenevolence && (
+            <Button onClick={onGenerateTaxCalendar} className="btn-primary" data-testid="empty-generate-tax">
+              Generate Tax Deadlines
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -52,7 +59,11 @@ export default function CalendarEmptyState({
     if (statusFilter === 'upcoming') return "No upcoming deadlines. You're all caught up.";
     if (statusFilter === 'overdue') return "No overdue items. Great work.";
     if (statusFilter === 'completed') return "No completed items yet.";
-    if (statusFilter === 'all' && typeFilter === 'tax_deadline') return `No tax calendar for ${year}. Generate one to see deadlines.`;
+    if (statusFilter === 'all' && typeFilter === 'tax_deadline') {
+      return isBenevolence
+        ? `No tax deadlines for ${year}. Benevolence (tax-exempt) trusts don't have federal tax filing deadlines.`
+        : `No tax calendar for ${year}. Generate one to see deadlines.`;
+    }
     if (statusFilter === 'all' && typeFilter === 'governance_task') return "No trust tasks of this type.";
     if (statusFilter === 'all' && typeFilter === 'money') return "No money events (distributions, compensation, investments) for this year.";
     if (statusFilter === 'all' && typeFilter === 'structure') return "No structure events (entities, assets, communications) for this year.";
@@ -65,7 +76,7 @@ export default function CalendarEmptyState({
         No {emptyLabel} items
       </h3>
       <p className="text-muted-foreground">{emptyMessage}</p>
-      {statusFilter === 'all' && typeFilter === 'tax_deadline' && (
+      {statusFilter === 'all' && typeFilter === 'tax_deadline' && !isBenevolence && (
         <Button onClick={onGenerateTaxCalendar} className="btn-primary mt-4" data-testid="empty-tax-generate">
           Generate {year} Tax Calendar
         </Button>

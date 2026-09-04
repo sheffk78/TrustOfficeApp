@@ -871,6 +871,11 @@ async def _create_trust(
 
     await db.trusts.insert_one(trust_doc)
     logger.info(f"Provision: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
+    try:
+        from services.demo_cleanup import cleanup_demo_on_first_real_trust
+        await cleanup_demo_on_first_real_trust(user_id, trust_id)
+    except Exception:
+        logger.warning(f"Provision: demo data cleanup failed for user {user_id}", exc_info=True)
     return trust_id
 
 
@@ -946,6 +951,44 @@ async def _ensure_entity_record(
     except Exception as e:
         logger.error(f"{log_prefix}: Failed to create entity for trust {trust_id}: {e}", exc_info=True)
         return False
+
+
+async def _seed_trust_governance(
+    trust_id: str, user_id: str, trust_doc: dict, log_prefix: str = "Provision",
+) -> dict:
+    """Seed initial governance tasks + tax calendar for a provisioned trust.
+
+    Matches the in-app trust creation path (routers/trusts.py create_trust),
+    which calls create_initial_governance_tasks() and _generate_tax_calendar().
+    WingPoint provisioning was skipping both, leaving trusts with zero
+    governance tasks (health score Task Compliance/Annual Review = 0) and no
+    tax calendar (missing tax risk findings + empty tax page).
+
+    Best-effort: failures are logged but never block provisioning.
+    Skips if the trust already has tasks (idempotent re-links).
+    """
+    result = {"tasks_seeded": False, "tax_seeded": False}
+    try:
+        existing_tasks = await db.governance_tasks.count_documents({"trust_id": trust_id})
+        if existing_tasks == 0:
+            from dependencies import create_initial_governance_tasks
+            await create_initial_governance_tasks(trust_id, user_id)
+            result["tasks_seeded"] = True
+            logger.info(f"{log_prefix}: Seeded initial governance tasks for trust {trust_id}")
+    except Exception as e:
+        logger.error(f"{log_prefix}: Failed to seed governance tasks for trust {trust_id}: {e}", exc_info=True)
+
+    try:
+        existing_tax = await db.tax_calendar.count_documents({"trust_id": trust_id})
+        if existing_tax == 0:
+            from routers.trusts import _generate_tax_calendar
+            await _generate_tax_calendar(trust_doc, trust_id)
+            result["tax_seeded"] = True
+            logger.info(f"{log_prefix}: Seeded tax calendar for trust {trust_id}")
+    except Exception as e:
+        logger.error(f"{log_prefix}: Failed to seed tax calendar for trust {trust_id}: {e}", exc_info=True)
+
+    return result
 
 
 async def _resolve_provision_plan(
@@ -1301,6 +1344,12 @@ async def provision_trustoffice(
         trust_id, user_id, request.trust_name, request.trust_formation_date,
         request.jurisdiction, request.ein, trustee_str, now,
     )
+
+    # ---- SEED GOVERNANCE TASKS + TAX CALENDAR (matches in-app trust creation) ----
+    # The in-app path seeds 4 initial governance tasks and auto-generates the tax
+    # calendar. Provisioning was skipping both — health score showed 0 with no
+    # path to recovery. Best-effort, never blocks provisioning.
+    await _seed_trust_governance(trust_id, user_id, trust_doc, log_prefix="Provision")
 
     # ---- AUTO-FETCH IRS LETTER (if URL provided) ----
     # Best-effort: fetch the EIN confirmation letter from WingPoint and store
@@ -1905,6 +1954,11 @@ async def _resolve_or_create_trust(
     if not existing_trust:
         await db.trusts.insert_one(trust_doc)
         logger.info(f"{log_prefix}: Created trust {trust_id} ('{request.trust_name}') for user {user_id}")
+        try:
+            from services.demo_cleanup import cleanup_demo_on_first_real_trust
+            await cleanup_demo_on_first_real_trust(user_id, trust_id)
+        except Exception:
+            logger.warning(f"{log_prefix}: demo data cleanup failed for user {user_id}", exc_info=True)
         return trust_id, False
 
     existing_trust_id = existing_trust["trust_id"]
@@ -1970,7 +2024,10 @@ async def link_trust(
         trust_id, user_id, request.trust_name, request.trust_formation_date,
         request.jurisdiction, request.ein, trustee_str, now, log_prefix="LinkTrust",
     )
-    
+
+    # Seed governance tasks + tax calendar (same as provision path). Idempotent —
+    # skipped automatically if the trust already has tasks/tax entries.
+    await _seed_trust_governance(trust_id, user_id, trust_doc, log_prefix="LinkTrust")
     # Auto-fetch IRS letter (best-effort, same as provision path)
     try:
         await _fetch_and_store_irs_letter(

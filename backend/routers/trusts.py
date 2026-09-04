@@ -24,13 +24,8 @@ router = APIRouter(tags=["trusts"])
 
 # ==================== HELPER FUNCTIONS ====================
 
-# Collections to clean up when deleting demo data
-_DEMO_CLEANUP_COLLECTIONS = [
-    "trust_unit_certificates", "trust_unit_transfers", "trust_unit_counters", "trust_units_settings",
-    "trust_unit_settings", "vault_documents", "governance_tasks", "tax_calendar", "minutes_records",
-    "minutes_templates", "entities", "benevolence_logs", "compensation_payments",
-    "bank_accounts", "bank_statements", "distributions", "investments",
-]
+# Collections to clean up when deleting demo data — superseded by the shared
+# services/demo_cleanup.py module (kept only so old references don't break).
 
 # Collections to cascade-delete when removing a trust
 _TRUST_CASCADE_COLLECTIONS = [
@@ -101,28 +96,14 @@ async def _enforce_trust_creation_limits(user: dict, sub_state, existing_count: 
         )
 
 
-async def _cleanup_demo_data(user_id: str, new_trust_id: str):
-    """Delete all demo data when the user creates their first REAL trust."""
-    existing_real = await db.trusts.count_documents({
-        "user_id": user_id,
-        "is_demo": {"$ne": True},
-        "trust_id": {"$ne": new_trust_id}
-    })
-    if existing_real > 0:
-        return
+async def _cleanup_demo_data(user_id: str, new_trust_id: str) -> dict:
+    """Delete all demo data when the user creates their first REAL trust.
 
-    demo_trusts = await db.trusts.find(
-        {"user_id": user_id, "is_demo": True},
-        {"_id": 0, "trust_id": 1}
-    ).to_list(100)
-    demo_trust_ids = [t["trust_id"] for t in demo_trusts]
-    if not demo_trust_ids:
-        return
-
-    for coll_name in _DEMO_CLEANUP_COLLECTIONS:
-        await getattr(db, coll_name).delete_many({"trust_id": {"$in": demo_trust_ids}})
-    await db.trusts.delete_many({"trust_id": {"$in": demo_trust_ids}})
-    logger.info(f"Cleaned up {len(demo_trust_ids)} demo trusts for user {user_id} (first real trust created)")
+    Delegates to the shared demo_cleanup service (single source of truth also
+    used by Settings' "Remove demo data", external provisioning, and admin API).
+    """
+    from services.demo_cleanup import cleanup_demo_on_first_real_trust
+    return await cleanup_demo_on_first_real_trust(user_id, new_trust_id)
 
 
 def _mark_past_tax_entries_not_required(tax_entries: list):
@@ -279,7 +260,10 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
     sub_state = await get_subscription_state(user["user_id"])
     trust_limit = get_trust_limit(sub_state.plan_type, sub_state.legacy_trust_limit)
 
-    existing_count = await db.trusts.count_documents({"user_id": user["user_id"]})
+    existing_count = await db.trusts.count_documents({
+        "user_id": user["user_id"],
+        "is_demo": {"$ne": True}
+    })
     await _enforce_trust_creation_limits(user, sub_state, existing_count, trust_limit)
 
     try:
@@ -328,8 +312,16 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
 
 @router.get("/trusts", response_model=List[TrustResponse])
 async def get_trusts(user: dict = Depends(get_current_user)):
-    """Get all trusts for the current user"""
-    trusts = await db.trusts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
+    """Get trusts for the current user.
+
+    Demo trusts (is_demo: True) are excluded once the user has at least one
+    real trust — they must never appear in the sidebar trust selector alongside
+    real data. Demo-only accounts (legacy exploration data, no real trust yet)
+    still see their demo trusts so the demo experience keeps working.
+    """
+    all_trusts = await db.trusts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
+    real_trusts = [t for t in all_trusts if t.get("is_demo") is not True]
+    trusts = real_trusts if real_trusts else all_trusts
     
     result = []
     for trust in trusts:
@@ -373,6 +365,27 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
     day = update_data.get("tax_year_end_day", trust.get("tax_year_end_day"))
     if month is not None and day is not None:
         update_data["is_fiscal_year"] = (month != 12 or day != 31)
+    
+    # Tax-exempt status set (or benevolence turned ON): purge income-tax
+    # deadlines that don't apply — same policy as _generate_entries. Form 990
+    # (501c3) and non-tax entries are preserved.
+    new_tax_status = (update_data.get("tax_status") or trust.get("tax_status") or "private").lower()
+    became_exempt = (
+        (new_tax_status in ("508", "501c3") and (trust.get("tax_status") or "private").lower() not in ("508", "501c3"))
+        or (update_data.get("benevolence_enabled") is True and not trust.get("benevolence_enabled")
+            and new_tax_status == "private")
+    )
+    if became_exempt:
+        try:
+            if new_tax_status == "508":
+                removed = await db.tax_calendar.delete_many({"trust_id": trust_id})
+            else:  # 501c3: drop income-tax types only, keep Form 990 / other entries
+                income_tax_types = ["federal_1041", "federal_1041_extension", "k1_beneficiaries",
+                                    "estimated_q1", "estimated_q2", "estimated_q3", "estimated_q4"]
+                removed = await db.tax_calendar.delete_many({"trust_id": trust_id, "deadline_type": {"$in": income_tax_types}})
+            logger.info(f"Tax-exempt status ({new_tax_status}) for trust {trust_id}: purged {removed.deleted_count} income-tax calendar entries")
+        except Exception:
+            logger.warning(f"Failed to purge tax entries after tax-status change for trust {trust_id}", exc_info=True)
     
     if update_data:
         await db.trusts.update_one({"trust_id": trust_id}, {"$set": update_data})

@@ -585,6 +585,17 @@ def _compute_health_score(data: dict) -> dict:
     c, pts = _compute_separation_alert_criterion(data)
     criteria.append(c); total_score += pts
 
+    # --- Applicable-criteria denominator ---
+    # Criteria with no_data=True have nothing to measure yet (no comp plan, no
+    # distributions logged, annual review not due, no transactions). Counting
+    # them as 0/earned understates governance for new trusts. Score against the
+    # APPLICABLE max only; floor at 35 so a fresh trust can't show a perfect
+    # 115 from an empty slate.
+    applicable_max = sum(
+        c.max_points for c in criteria if not c.no_data
+    )
+    effective_max = max(35, applicable_max)
+
     # --- Risk Penalty (separate from criteria) ---
     risk_findings = data.get("risk_findings", [])
     penalty_result = compute_risk_penalty(risk_findings)
@@ -596,20 +607,29 @@ def _compute_health_score(data: dict) -> dict:
     base_score = sum(c["points"] for c in [cr.model_dump() for cr in criteria])
 
     # --- Final Score with Critical Cap ---
+    # Scale against effective_max (applicable criteria only), then convert to
+    # the 0-100 display scale so colors/thresholds stay consistent.
+    applicable_ratio = base_score / effective_max if effective_max else 0
+    scaled_base = int(applicable_ratio * 100)
+
+    # Risk penalty stays absolute (its points are defined against the full
+    # 115-scale) but is applied after scaling, capped by the scaled base.
     if has_critical:
-        final_score = min(50, max(0, base_score + total_penalty))
+        final_score = min(50, max(0, scaled_base + total_penalty))
     else:
-        final_score = max(0, base_score + total_penalty)
+        final_score = max(0, scaled_base + total_penalty)
 
     color = _score_to_color(final_score)
 
     return {
         "criteria": criteria,
         "base_score": base_score,
+        "applicable_max": effective_max,
+        "scaled_base": scaled_base,
         "risk_penalty": total_penalty,
         "has_critical_risk": has_critical,
         "total_score": final_score,
-        "max_score": TOTAL_MAX_POINTS,
+        "max_score": 100,
         "color": color,
         "risk_findings": findings_with_penalty,
         "risk_penalty_breakdown": breakdown,
@@ -649,7 +669,7 @@ async def _maybe_notify_score_drop(
         "trust_id": trust_id,
         "type": "score_drop",
         "title": "Your Trust Health Score changed",
-        "message": f"Your score is now {total_score}/{TOTAL_MAX_POINTS}. "
+        "message": f"Your score is now {total_score}/100. "
                    f"{len(new_findings)} new risk{'s' if len(new_findings) > 1 else ''} "
                    f"affecting your score. Review and resolve to recover points.",
         "action_path": "/governance",
@@ -660,22 +680,25 @@ async def _maybe_notify_score_drop(
 
 async def _save_health_snapshot(
     trust_id: str, user_id: str, criteria: list, base_score: int,
-    risk_penalty: int, total_score: int, color: HealthColor,
+    applicable_max: int, scaled_base: int, risk_penalty: int,
+    total_score: int, color: HealthColor,
     risk_penalty_breakdown: dict, now: datetime
 ) -> None:
-    """Persist a health-score snapshot (schema v2)."""
+    """Persist a health-score snapshot (schema v3 — applicable-criteria scoring)."""
     snapshot = {
         "snapshot_id": f"health_{uuid.uuid4().hex[:12]}",
         "trust_id": trust_id,
         "user_id": user_id,
-        "schema_version": 2,
+        "schema_version": 3,
         "base_score": base_score,
+        "applicable_max": applicable_max,
+        "scaled_base": scaled_base,
         "risk_penalty": risk_penalty,
         "score_value": total_score,
         "color": color.value,
         "calculated_at": now.isoformat(),
         "criteria_breakdown": [
-            {"name": c.name, "points": c.points, "max_points": c.max_points, "achieved": c.achieved}
+            {"name": c.name, "points": c.points, "max_points": c.max_points, "achieved": c.achieved, "no_data": c.no_data}
             for c in criteria
         ],
         "risk_findings_count": {
@@ -703,6 +726,8 @@ async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: boo
     result = _compute_health_score(data)
     criteria = result["criteria"]
     base_score = result["base_score"]
+    applicable_max = result["applicable_max"]
+    scaled_base = result["scaled_base"]
     risk_penalty = result["risk_penalty"]
     has_critical_risk = result["has_critical_risk"]
     total_score = result["total_score"]
@@ -718,16 +743,19 @@ async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: boo
     if save_snapshot:
         await _maybe_notify_score_drop(trust_id, user_id, total_score, risk_findings, now)
         await _save_health_snapshot(
-            trust_id, user_id, criteria, base_score, risk_penalty,
-            total_score, color, risk_penalty_breakdown, now
+            trust_id, user_id, criteria, base_score, applicable_max,
+            scaled_base, risk_penalty, total_score, color,
+            risk_penalty_breakdown, now
         )
 
     return {
         "trust_id": trust_id,
         "total_score": total_score,
-        "max_score": TOTAL_MAX_POINTS,
+        "max_score": 100,
         "color": color.value,
         "base_score": base_score,
+        "applicable_max": applicable_max,
+        "scaled_base": scaled_base,
         "risk_penalty": risk_penalty,
         "has_critical_risk": has_critical_risk,
         "criteria": [c.model_dump() for c in criteria],
@@ -836,11 +864,12 @@ async def generate_additional_governance_insights(trust_id: str, user_id: str) -
 
     # --- 2. Overdue Tax Filings ---
     # tax_calendar entries whose due_date has passed and are still pending.
-    # Skipped entirely for tax-exempt trusts (508/501c3) — they don't file
-    # income tax returns.
+    # Skipped entirely for tax-exempt trusts (benevolence/508/501c3) — they
+    # don't file income tax returns.
     today_iso = now.date().isoformat()
-    trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "tax_status": 1})
-    if trust and (trust.get("tax_status") or "private").lower() in ("508", "501c3"):
+    trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "tax_status": 1, "benevolence_enabled": 1})
+    from utils.tax_calendar_math import is_tax_exempt
+    if is_tax_exempt(trust or {}):
         overdue_tax_count = 0
     else:
         overdue_tax_count = await db.tax_calendar.count_documents({

@@ -481,6 +481,7 @@ async def capture_lead(lead: LeadCapture):
         "referrer": lead.referrer,
         "stage": "new",
         "manual_stage_override": False,
+        "nurture_step_sent": 0,  # explicit 0 = nothing sent yet; drip catches missing/null too
         "lessons_watched": 0,
         "subscription_status": None,
         "last_login": None,
@@ -494,13 +495,15 @@ async def capture_lead(lead: LeadCapture):
     await db.leads.insert_one(lead_doc)
     await _log_activity(lead_id, "created", f"Lead captured via {source}")
 
-    # Send Discord notification
+    # Send Discord notification (phone leads ping Kenneth — he calls them ASAP;
+    # the FB-lead path does the same in _send_facebook_discord_notification)
     await notify_new_lead(
         name=name,
         email=email,
         source=source,
         lead_stage="new",
-        phone=phone
+        phone=phone,
+        ping_on_phone=True,
     )
 
     # Send welcome email (fire-and-forget — non-blocking)
@@ -535,7 +538,10 @@ async def capture_lead(lead: LeadCapture):
         if nurture_result.get("success"):
             await db.leads.update_one(
                 {"lead_id": lead_id},
-                {"$set": {"nurture_step_sent": 1}}
+                {"$set": {
+                    "nurture_step_sent": 1,
+                    "nurture_step1_sent_at": datetime.now(timezone.utc).isoformat(),
+                }}
             )
             await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud")
     except Exception as e:
@@ -665,6 +671,7 @@ async def tidycal_webhook(request: Request):
         "manual_stage_override": False,
         "booked_call": True,
         "booked_call_at": booked_at,
+        "nurture_step_sent": 12,  # booked-call leads skip the nurture drip entirely
         "lessons_watched": 0,
         "subscription_status": None,
         "last_login": None,
@@ -841,6 +848,7 @@ async def _create_facebook_lead(parsed: dict, leadgen_id: str, form_id: str, pag
         "stage": "new",
         "manual_stage_override": False,
         "booked_call": False,
+        "nurture_step_sent": 0,  # explicit 0 = nothing sent yet; drip catches missing/null too
         "lessons_watched": 0,
         "subscription_status": None,
         "last_login": None,
@@ -885,7 +893,10 @@ async def _create_facebook_lead(parsed: dict, leadgen_id: str, form_id: str, pag
             if nurture_result.get("success"):
                 await db.leads.update_one(
                     {"lead_id": lead_id},
-                    {"$set": {"nurture_step_sent": 1}}
+                    {"$set": {
+                        "nurture_step_sent": 1,
+                        "nurture_step1_sent_at": datetime.now(timezone.utc).isoformat(),
+                    }}
                 )
                 await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud")
         except Exception as e:
@@ -914,9 +925,18 @@ async def _send_facebook_discord_notification(parsed: dict, name: str, email: st
 
         from discord_service import send_discord_message, DISCORD_LEADS_WEBHOOK_URL, NAVY
         if DISCORD_LEADS_WEBHOOK_URL:
+            # Kenneth calls phone leads immediately — ping him directly when a
+            # lead has a phone number so the notification actually interrupts.
+            if parsed["phone"]:
+                content = (
+                    f"<@1479298864539373702> **📞 Call now** — {name} · "
+                    f"{parsed['phone']} · {email}"
+                )
+            else:
+                content = f"**NEW FACEBOOK LEAD** — {name} | no phone | {email}"
             await send_discord_message(
                 webhook_url=DISCORD_LEADS_WEBHOOK_URL,
-                content=f"**NEW FACEBOOK LEAD** — {name} | {parsed['phone'] or 'no phone'} | {email}",
+                content=content,
                 embeds=[{
                     "title": f"New Facebook Lead: {name}",
                     "color": NAVY,

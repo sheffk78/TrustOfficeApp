@@ -369,9 +369,9 @@ async def auto_generate_deadlines(trust_id: str, user_id: str) -> List[dict]:
         return []
 
     year = _today().year
-    tax_status = (trust.get("tax_status") or "private").lower()
+    from utils.tax_calendar_math import is_tax_exempt
     skip_categories: set = set()
-    if tax_status in ("508", "501c3"):
+    if is_tax_exempt(trust):
         skip_categories = {
             DeadlineCategory.tax_filing_1041.value,
             DeadlineCategory.tax_filing_k1.value,
