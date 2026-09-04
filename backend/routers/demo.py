@@ -878,18 +878,19 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     ])
 
     # ==================== TAX CALENDAR ENTRIES ====================
+    # Demo trust is 501c3 (tax-exempt): seed Form 990, not income-tax entries.
     await db.tax_calendar.insert_many([
         {
             "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
             "trust_id": trust1_id,
             "user_id": user["user_id"],
             "tax_year": 2026,
-            "deadline_type": "federal_1041",
-            "description": "Federal trust income tax return (Form 1041)",
+            "deadline_type": "form_990",
+            "description": "Form 990 — Return of Organization Exempt From Income Tax",
             "due_date": (now + timedelta(days=90)).date().isoformat(),
             "filing_status": "pending",
             "filed_date": None,
-            "notes": "Estimated based on prior year income",
+            "notes": "Informational return for 501(c)(3) organizations",
             "accountant_engaged": False,
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),

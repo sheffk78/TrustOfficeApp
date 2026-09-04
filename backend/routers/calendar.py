@@ -9,7 +9,13 @@ from datetime import datetime, date
 
 from database import db
 from dependencies import get_current_user
-from utils.tax_calendar_math import _days_remaining
+from utils.tax_calendar_math import _days_remaining, filter_income_tax_entries as _filter_exempt_tax
+
+# Income-tax deadline types, mirrored for exempt-trust filtering in the feed.
+_INCOME_TAX_TYPES = {
+    "federal_1041", "federal_1041_extension", "k1_beneficiaries",
+    "estimated_q1", "estimated_q2", "estimated_q3", "estimated_q4",
+}
 
 router = APIRouter(tags=["calendar"])
 
@@ -21,23 +27,6 @@ _TAX_OVERLAP_TASK_TYPES = {
     "tax_filing_1041": "federal_1041",
     "tax_filing_k1": "k1_beneficiaries",
 }
-
-
-def _status_from_date(event_date: str) -> str:
-    """Derive a simple upcoming/completed status from a date.
-
-    Past events are treated as 'completed' (they happened).
-    Today and future events are 'upcoming'.
-    """
-    if not event_date:
-        return "upcoming"
-    try:
-        d = event_date[:10]
-        if d < date.today().isoformat():
-            return "completed"
-    except Exception:
-        pass
-    return "upcoming"
 
 
 def _safe_date(raw: Optional[str], fallback: Optional[str] = None) -> Optional[str]:
@@ -299,8 +288,7 @@ def _build_distribution_event(dist: dict) -> Optional[dict]:
         "description": dist.get("notes") or "",
         "trust_id": dist.get("trust_id"),
         "completed": True,
-        "status": _status_from_date(d_date),
-        "days_remaining": _days_remaining(d_date),
+        "status": "completed",
         "link": "/distributions",
         "category": "money",
     }
@@ -332,8 +320,7 @@ def _build_compensation_event(pmt: dict) -> Optional[dict]:
         "description": pmt.get("classification_text") or "",
         "trust_id": pmt.get("trust_id"),
         "completed": True,
-        "status": _status_from_date(p_date),
-        "days_remaining": _days_remaining(p_date),
+        "status": "completed",
         "link": "/compensation",
         "category": "money",
     }
@@ -355,8 +342,7 @@ def _build_investment_event(inv: dict) -> Optional[dict]:
         "description": inv.get("asset_type") or "",
         "trust_id": inv.get("trust_id"),
         "completed": True,
-        "status": _status_from_date(i_date),
-        "days_remaining": _days_remaining(i_date),
+        "status": "completed",
         "link": "/investments",
         "category": "money",
     }
@@ -378,8 +364,7 @@ def _build_entity_event(ent: dict) -> Optional[dict]:
         "description": ent.get("entity_type") or "",
         "trust_id": ent.get("trust_id"),
         "completed": True,
-        "status": _status_from_date(e_date),
-        "days_remaining": _days_remaining(e_date),
+        "status": "completed",
         "link": "/structures",
         "category": "structure",
     }
@@ -401,8 +386,7 @@ def _build_schedule_a_event(item: dict) -> Optional[dict]:
         "description": item.get("category") or "",
         "trust_id": item.get("trust_id"),
         "completed": True,
-        "status": _status_from_date(s_date),
-        "days_remaining": _days_remaining(s_date),
+        "status": "completed",
         "link": "/schedule-a",
         "category": "structure",
     }
@@ -424,8 +408,7 @@ def _build_communication_event(comm: dict) -> Optional[dict]:
         "description": comm.get("comm_type_label") or "",
         "trust_id": comm.get("trust_id"),
         "completed": True,
-        "status": _status_from_date(c_date),
-        "days_remaining": _days_remaining(c_date),
+        "status": "completed",
         "link": "/communications",
         "category": "structure",
     }
@@ -510,6 +493,27 @@ async def get_calendar_events(
     tax_query = await _build_tax_query(trust_id, user["user_id"])
     tax_query_filter = _build_tax_query_filter(tax_query, start_date, end_date)
     tax_entries = await db.tax_calendar.find(tax_query_filter, {"_id": 0}).to_list(1000)
+
+    # Hide income-tax deadlines for tax-exempt trusts (508/501c3) — including
+    # legacy entries created before per-status generation gating.
+    if trust_id:
+        trust_doc = await db.trusts.find_one(
+            {"trust_id": trust_id}, {"_id": 0, "tax_status": 1, "benevolence_enabled": 1}
+        )
+        if trust_doc:
+            tax_entries = _filter_exempt_tax(tax_entries, trust_doc)
+    else:
+        exempt_ids = {
+            t["trust_id"] for t in await db.trusts.find(
+                {"user_id": user["user_id"], "tax_status": {"$in": ["508", "501c3"]}},
+                {"_id": 0, "trust_id": 1}
+            ).to_list(100)
+        }
+        if exempt_ids:
+            tax_entries = [
+                e for e in tax_entries
+                if not (e.get("trust_id") in exempt_ids and e.get("deadline_type") in _INCOME_TAX_TYPES)
+            ]
     tax_events, tax_dedup_keys, tax_trust_map = await _build_tax_events(tax_entries)
 
     # 3. Fetch and process governance tasks

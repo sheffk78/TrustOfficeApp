@@ -111,7 +111,7 @@ export function useDashboardData() {
   // Load upcoming tax deadlines for dashboard widget
   const loadTaxDeadlines = async () => {
     if (!selectedTrust) return;
-    if (selectedTrust.benevolence_enabled) {
+    if (selectedTrust.benevolence_enabled || ['508', '501c3'].includes(selectedTrust.tax_status)) {
       setTaxDeadlines([]);
       setTaxDeadlinesLoading(false);
       return;

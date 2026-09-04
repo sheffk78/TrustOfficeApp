@@ -287,8 +287,9 @@ export default function TrustCalendarPage() {
   }
 
   // Named predicates for the tax-info bar / generate-button visibility.
+  const isTaxExempt = ['508', '501c3'].includes(selectedTrust?.tax_status);
   const showTaxInfoBar = (typeFilter === 'all' || typeFilter === 'tax_deadline') && !['money', 'structure'].includes(typeFilter);
-  const showGenerateBtn = (typeFilter === 'all' || typeFilter === 'tax_deadline') && !hasTaxCalendar && !['money', 'structure'].includes(typeFilter);
+  const showGenerateBtn = !isTaxExempt && (typeFilter === 'all' || typeFilter === 'tax_deadline') && !hasTaxCalendar && !['money', 'structure'].includes(typeFilter);
   const hasTaxInFilter = filteredEvents.some((e) => e.event_type === 'tax_deadline');
 
   return (
@@ -315,7 +316,7 @@ export default function TrustCalendarPage() {
           )}
 
           {/* ── Tax Setup Banner (priority 2 — only if NextUp not showing) ── */}
-          {!loading && !hasTaxCalendar && (!nextUp || dismissedNextUp) && !dismissedTaxBanner && (
+          {!loading && !hasTaxCalendar && !isTaxExempt && (!nextUp || dismissedNextUp) && !dismissedTaxBanner && (
             <div className="mb-4 flex items-center justify-between gap-3 bg-warning/5 border border-warning/20 px-4 py-3" data-testid="tax-setup-banner">
               <div className="text-sm text-warning">
                 Tax deadlines not set up for {year}.
@@ -332,6 +333,15 @@ export default function TrustCalendarPage() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* ── Tax-exempt note (508 / 501c3 — no income-tax deadlines) ── */}
+          {!loading && isTaxExempt && (typeFilter === 'all' || typeFilter === 'tax_deadline') && (
+            <div className="mb-4 bg-navy/5 border border-navy/10 px-4 py-3 text-sm text-muted-foreground" data-testid="tax-exempt-note">
+              {selectedTrust.tax_status === '508'
+                ? 'This trust is set to 508 Church/Religious Org (tax exempt). No federal income-tax deadlines apply, so the tax calendar is disabled.'
+                : 'This trust is set to 501(c)(3) (tax exempt). Federal income-tax deadlines are disabled; only the Form 990 informational return appears.'}
             </div>
           )}
 

@@ -13,6 +13,7 @@ from database import db
 from dependencies import require_write_access
 from email_service import email_service
 from utils.audit import log_audit_event
+from utils.tax_calendar_math import filter_income_tax_entries
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["successor"])
@@ -123,6 +124,8 @@ async def get_successor_packet(token: str):
     ).to_list(1000)
     governance_tasks = await db.governance_tasks.find(scope, {"_id": 0}).to_list(1000)
     tax_calendar = await db.tax_calendar.find(scope, {"_id": 0}).sort("due_date", 1).to_list(1000)
+    # Tax-exempt trusts (508/501c3): hide income-tax deadlines from successor packets.
+    tax_calendar = filter_income_tax_entries(tax_calendar, trust)
 
     packet = {
         "trust": _public_doc(trust),

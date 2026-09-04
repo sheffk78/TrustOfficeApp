@@ -424,7 +424,7 @@ async def export_benevolence_pdf(
     # Trust & Report info
     trust_name = trust.get("name", "Private Trust")
     tax_status = trust.get("tax_status", "private")
-    tax_label = {"501c3": "501(c)(3) Organization", "508": "508 Church/Religious Org", "private": "Private Foundation"}.get(tax_status, tax_status)
+    tax_label = {"501c3": "501(c)(3) Organization (Tax-Exempt, Files Form 990)", "508": "508 Church/Religious Org (Tax-Exempt — No IRS Filings)", "private": "Private Foundation"}.get(tax_status, tax_status)
     current_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
     
     info_data = [

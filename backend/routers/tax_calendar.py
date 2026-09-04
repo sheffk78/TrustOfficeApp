@@ -15,6 +15,7 @@ from utils.tax_calendar_math import (
     _days_remaining,
     CALENDAR_RULES,
     FISCAL_RULES,
+    filter_income_tax_entries,
 )
 
 router = APIRouter(tags=["tax_calendar"])
@@ -59,6 +60,8 @@ async def get_tax_calendar(trust_id: str, tax_year: Optional[int] = None, user: 
         {"_id": 0}
     ).sort("due_date", 1).to_list(50)
 
+    raw = filter_income_tax_entries(raw, trust)
+
     entries = []
     for doc in raw:
         days = _days_remaining(doc["due_date"])
@@ -94,6 +97,8 @@ async def get_upcoming_deadlines(trust_id: str, days: int = 90, user: dict = Dep
         {"trust_id": trust_id, "tax_year": year, "filing_status": "pending"},
         {"_id": 0}
     ).sort("due_date", 1).to_list(50)
+
+    raw = filter_income_tax_entries(raw, trust)
 
     results = []
     for doc in raw:

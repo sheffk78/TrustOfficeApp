@@ -358,13 +358,29 @@ def _standard_deadlines_for_year(year: int) -> List[dict]:
 
 async def auto_generate_deadlines(trust_id: str, user_id: str) -> List[dict]:
     """Generate standard deadlines for a trust based on trust type, jurisdiction,
-    and the current tax year. Skips categories/titles that already exist."""
+    and the current tax year. Skips categories/titles that already exist.
+
+    Tax-status gating: trusts with tax-exempt status (508, 501c3) skip all
+    fiduciary income-tax deadlines (Form 1041, Schedule K-1, estimated tax
+    payments) — these orgs do not file income tax returns.
+    """
     trust = await get_owned_trust(trust_id, user_id)
     if not trust:
         return []
 
     year = _today().year
-    specs = _standard_deadlines_for_year(year)
+    tax_status = (trust.get("tax_status") or "private").lower()
+    skip_categories: set = set()
+    if tax_status in ("508", "501c3"):
+        skip_categories = {
+            DeadlineCategory.tax_filing_1041.value,
+            DeadlineCategory.tax_filing_k1.value,
+            DeadlineCategory.estimated_tax_payment.value,
+        }
+    specs = [
+        s for s in _standard_deadlines_for_year(year)
+        if s["category"].value not in skip_categories
+    ]
 
     # Pull existing titles to avoid duplicates
     existing = await db.deadlines.find(

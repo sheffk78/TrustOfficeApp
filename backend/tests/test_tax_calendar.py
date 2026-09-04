@@ -219,3 +219,69 @@ class TestEntryMetadata:
             assert "deadline_type" in e
             assert "due_date" in e
             assert "description" in e
+
+class TestTaxStatusGating:
+    """Tax-status gating — tax-exempt trusts don't generate income-tax deadlines.
+
+    508 (church/religious, tax exempt): generates NOTHING.
+    501c3 (tax-exempt org): skips income-tax deadlines, gets Form 990 instead.
+    private / default: full fiduciary calendar (unchanged).
+    """
+
+    def test_508_generates_nothing(self):
+        entries = _generate_entries({"trust_id": "t1", "tax_status": "508"}, 2026)
+        assert entries == []
+
+    def test_508_fiscal_generates_nothing(self):
+        entries = _generate_entries(
+            {"trust_id": "t1", "tax_status": "508", "is_fiscal_year": True,
+             "tax_year_end_month": 6, "tax_year_end_day": 30}, 2026)
+        assert entries == []
+
+    def test_501c3_gets_only_form_990(self):
+        entries = _generate_entries({"trust_id": "t1", "tax_status": "501c3"}, 2026)
+        assert [e["deadline_type"] for e in entries] == ["form_990"]
+        assert entries[0]["due_date"] == "2026-05-15"
+
+    def test_501c3_fiscal_form_990_five_months_after_fy_end(self):
+        entries = _generate_entries(
+            {"trust_id": "t1", "tax_status": "501c3", "is_fiscal_year": True,
+             "tax_year_end_month": 6, "tax_year_end_day": 30}, 2026)
+        assert [e["deadline_type"] for e in entries] == ["form_990"]
+        # 15th day of 5th month after June 30 = Nov 15.
+        assert entries[0]["due_date"] == "2026-11-15"
+
+    def test_private_keeps_full_calendar(self):
+        entries = _generate_entries({"trust_id": "t1", "tax_status": "private"}, 2026)
+        types = {e["deadline_type"] for e in entries}
+        assert types == {"federal_1041", "federal_1041_extension", "k1_beneficiaries",
+                         "estimated_q1", "estimated_q2", "estimated_q3", "estimated_q4"}
+
+    def test_missing_tax_status_defaults_to_private(self):
+        entries = _generate_entries({"trust_id": "t1"}, 2026)
+        assert len(entries) == 7
+
+
+class TestExemptReadPathFilter:
+    """filter_income_tax_entries hides legacy income-tax entries for exempt trusts."""
+
+    def test_filters_1041_for_508(self):
+        from utils.tax_calendar_math import filter_income_tax_entries
+        legacy = [
+            {"deadline_type": "federal_1041", "due_date": "2025-04-15"},
+            {"deadline_type": "form_990", "due_date": "2026-05-15"},
+        ]
+        out = filter_income_tax_entries(legacy, {"tax_status": "508"})
+        assert [e["deadline_type"] for e in out] == ["form_990"]
+
+    def test_passes_through_for_private(self):
+        from utils.tax_calendar_math import filter_income_tax_entries
+        legacy = [{"deadline_type": "federal_1041"}]
+        out = filter_income_tax_entries(legacy, {"tax_status": "private"})
+        assert out == legacy
+
+    def test_missing_trust_status_passes_through(self):
+        from utils.tax_calendar_math import filter_income_tax_entries
+        legacy = [{"deadline_type": "federal_1041"}]
+        out = filter_income_tax_entries(legacy, {})
+        assert out == legacy

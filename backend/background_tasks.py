@@ -841,6 +841,13 @@ class BackgroundTaskRunner:
                     if not trust:
                         continue
 
+                    # Tax-exempt trusts (benevolence mode 508/501c3) don't file
+                    # income tax returns — never remind on income-tax deadlines.
+                    if deadline.get("category") in (
+                        "tax_filing_1041", "tax_filing_k1", "estimated_tax_payment",
+                    ) and (trust.get("tax_status") or "private").lower() in ("508", "501c3"):
+                        continue
+
                     # Resolve recipient user (cached)
                     user_id = deadline.get("user_id")
                     if user_id not in user_cache:

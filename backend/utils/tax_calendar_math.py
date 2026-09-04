@@ -15,12 +15,65 @@ CALENDAR_RULES = [
 FISCAL_RULES = [
     {"deadline_type": "federal_1041",          "months_after": 4,  "day": 15, "desc": "Form 1041 — Estate and Trust Income Tax Return"},
     {"deadline_type": "federal_1041_extension","months_after": 9, "day": 30, "desc": "Form 1041 — Extended filing deadline (5.5-month extension via Form 7004)"},
-    {"deadline_type": "k1_beneficiaries",      "months_after": 4, "day": 15, "desc": "Schedule K-1 — Filed with Form 1041"},
+    {"deadline_type": "k1_beneficiaries",      "months_after": 4,  "day": 15, "desc": "Schedule K-1 — Filed with Form 1041"},
     {"deadline_type": "estimated_q1",          "fy_month_offset": 3,  "day": 15, "desc": "Q1 Estimated tax payment"},
     {"deadline_type": "estimated_q2",          "fy_month_offset": 5,  "day": 15, "desc": "Q2 Estimated tax payment"},
     {"deadline_type": "estimated_q3",          "fy_month_offset": 8,  "day": 15, "desc": "Q3 Estimated tax payment"},
     {"deadline_type": "estimated_q4",          "fy_month_offset": 11, "day": 15, "desc": "Q4 Estimated tax payment"},
 ]
+
+# Tax filing applicability by trust tax status (benevolence mode).
+# Tax-exempt organizations do not file fiduciary income tax returns (Form 1041),
+# Schedule K-1s, or federal estimated tax payments:
+#   - "508": Church/religious organization — tax-exempt by statute with NO IRS
+#     filing requirement (no Form 990 obligation). Nothing is generated.
+#   - "501c3": Tax-exempt organization that files Form 990 (informational return,
+#     not an income tax return) — income-tax deadlines are skipped; a Form 990
+#     deadline is generated instead.
+#   - "private": Default (private/family trust) — full fiduciary filing calendar.
+# Deadline types listed here are SKIPPED for that tax status.
+TAX_STATUS_SKIP_DEADLINES = {
+    "508": {
+        "federal_1041", "federal_1041_extension", "k1_beneficiaries",
+        "estimated_q1", "estimated_q2", "estimated_q3", "estimated_q4",
+    },
+    "501c3": {
+        "federal_1041", "federal_1041_extension", "k1_beneficiaries",
+        "estimated_q1", "estimated_q2", "estimated_q3", "estimated_q4",
+    },
+}
+
+# Extra deadlines generated only for specific tax statuses.
+TAX_STATUS_EXTRA_RULES = {
+    "501c3": [
+        {"deadline_type": "form_990",          "month": 5,  "day": 15, "desc": "Form 990 — Return of Organization Exempt From Income Tax"},
+    ],
+    # Form 990 fiscal-year rule: 15th day of the 5th month after year-end.
+    "501c3_fiscal": [
+        {"deadline_type": "form_990",          "months_after": 5, "day": 15, "desc": "Form 990 — Return of Organization Exempt From Income Tax"},
+    ],
+}
+
+
+# Income-tax deadline types (fiduciary income tax). Never applicable to
+# tax-exempt organizations (508, 501c3) — filtered from all read paths so
+# legacy entries generated before tax-status gating are also hidden.
+INCOME_TAX_DEADLINE_TYPES = {
+    "federal_1041", "federal_1041_extension", "k1_beneficiaries",
+    "estimated_q1", "estimated_q2", "estimated_q3", "estimated_q4",
+}
+
+
+def is_tax_exempt(trust: dict) -> bool:
+    """True if the trust's tax_status is a tax-exempt organization (508, 501c3)."""
+    return (trust.get("tax_status") or "private").lower() in ("508", "501c3")
+
+
+def filter_income_tax_entries(entries: list, trust: dict) -> list:
+    """Drop income-tax deadline entries for tax-exempt trusts; pass through otherwise."""
+    if not is_tax_exempt(trust):
+        return entries
+    return [e for e in entries if e.get("deadline_type") not in INCOME_TAX_DEADLINE_TYPES]
 
 
 def _clamp_day(year: int, month: int, day: int) -> int:
@@ -61,7 +114,12 @@ def _calendar_due_date(tax_year: int, month: int, day: int) -> date:
 
 
 def _generate_entries(trust: dict, tax_year: int) -> list:
-    """Generate deadline entries based on trust's tax year configuration."""
+    """Generate deadline entries based on trust's tax year configuration.
+
+    Deadline applicability is filtered by the trust's tax_status: tax-exempt
+    statuses (508, 501c3) skip fiduciary income-tax deadlines entirely; 501c3
+    additionally gets a Form 990 informational-return deadline.
+    """
     entries = []
     from datetime import datetime, timezone  # local import to keep this module light
     now = datetime.now(timezone.utc).isoformat()
@@ -69,6 +127,24 @@ def _generate_entries(trust: dict, tax_year: int) -> list:
     is_fiscal = trust.get("is_fiscal_year") is True
     fy_month = trust.get("tax_year_end_month")
     fy_day_raw = trust.get("tax_year_end_day")
+    tax_status = (trust.get("tax_status") or "private").lower()
+    skip = TAX_STATUS_SKIP_DEADLINES.get(tax_status, set())
+
+    def _entry(rule: dict) -> dict:
+        return {
+            "entry_id": f"tax_{_mock_uuid()}",
+            "trust_id": trust["trust_id"],
+            "tax_year": tax_year,
+            "deadline_type": rule["deadline_type"],
+            "due_date": rule["due"],
+            "filing_status": "pending",
+            "filed_date": None,
+            "description": rule["desc"],
+            "notes": None,
+            "accountant_engaged": False,
+            "created_at": now,
+            "updated_at": now,
+        }
 
     if is_fiscal and fy_month and fy_day_raw:
         fy_day = _clamp_day(tax_year, fy_month, fy_day_raw)
@@ -76,44 +152,32 @@ def _generate_entries(trust: dict, tax_year: int) -> list:
         fy_start = _fy_start(tax_year, fy_month, fy_day)
 
         for rule in FISCAL_RULES:
+            if rule["deadline_type"] in skip:
+                continue
             if "fy_month_offset" in rule:
                 due = _month_delta(fy_start, rule["fy_month_offset"])
                 due = due.replace(day=_clamp_day(due.year, due.month, rule["day"]))
             else:
                 due = _month_delta(year_end, rule["months_after"])
                 due = due.replace(day=_clamp_day(due.year, due.month, rule["day"]))
+            entries.append(_entry({"deadline_type": rule["deadline_type"], "due": due.isoformat(), "desc": rule["desc"]}))
 
-            entries.append({
-                "entry_id": f"tax_{_mock_uuid()}",
-                "trust_id": trust["trust_id"],
-                "tax_year": tax_year,
-                "deadline_type": rule["deadline_type"],
-                "due_date": due.isoformat(),
-                "filing_status": "pending",
-                "filed_date": None,
-                "description": rule["desc"],
-                "notes": None,
-                "accountant_engaged": False,
-                "created_at": now,
-                "updated_at": now,
-            })
+        # Status-specific extras for fiscal-year trusts (e.g. Form 990).
+        for rule in TAX_STATUS_EXTRA_RULES.get(f"{tax_status}_fiscal", []):
+            due = _month_delta(year_end, rule["months_after"])
+            due = due.replace(day=_clamp_day(due.year, due.month, rule["day"]))
+            entries.append(_entry({"deadline_type": rule["deadline_type"], "due": due.isoformat(), "desc": rule["desc"]}))
     else:
         for rule in CALENDAR_RULES:
+            if rule["deadline_type"] in skip:
+                continue
             due = _calendar_due_date(tax_year, rule["month"], rule["day"])
-            entries.append({
-                "entry_id": f"tax_{_mock_uuid()}",
-                "trust_id": trust["trust_id"],
-                "tax_year": tax_year,
-                "deadline_type": rule["deadline_type"],
-                "due_date": due.isoformat(),
-                "filing_status": "pending",
-                "filed_date": None,
-                "description": rule["desc"],
-                "notes": None,
-                "accountant_engaged": False,
-                "created_at": now,
-                "updated_at": now,
-            })
+            entries.append(_entry({"deadline_type": rule["deadline_type"], "due": due.isoformat(), "desc": rule["desc"]}))
+
+        # Status-specific extras for calendar-year trusts (e.g. Form 990).
+        for rule in TAX_STATUS_EXTRA_RULES.get(tax_status, []):
+            due = _calendar_due_date(tax_year, rule["month"], rule["day"])
+            entries.append(_entry({"deadline_type": rule["deadline_type"], "due": due.isoformat(), "desc": rule["desc"]}))
 
     return entries
 

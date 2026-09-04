@@ -1009,9 +1009,9 @@ export default function SettingsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="501c3">501(c)(3) Organization</SelectItem>
-                            <SelectItem value="508">508 Church/Religious Org</SelectItem>
-                            <SelectItem value="private">Private Foundation</SelectItem>
+                            <SelectItem value="501c3">501(c)(3) Organization — tax-exempt, files Form 990</SelectItem>
+                            <SelectItem value="508">508 Church/Religious Org — tax exempt, no IRS filings</SelectItem>
+                            <SelectItem value="private">Private Foundation — files Form 990-PF</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
