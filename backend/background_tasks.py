@@ -678,6 +678,12 @@ class BackgroundTaskRunner:
                     {"nurture_step_sent": {"$in": [None, False]}},
                 ],
                 "stage": {"$ne": "converted"},
+                # Booked leads are owned by the post-meeting flow (see
+                # leads/MEETING-PROCESS.md). Booking is the conversion event:
+                # drip emails with booking CTAs are noise for them, and a
+                # booked lead whose nurture field was never set must NOT be
+                # caught by the step-0 catch-up branch. no_show leads stay in.
+                "booked_call": {"$ne": True},
             }, {"_id": 0}).to_list(500)
 
             for lead in leads:
