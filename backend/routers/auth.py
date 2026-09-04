@@ -130,109 +130,16 @@ def sanitize_name(name: str) -> str:
 
 @router.post("/auth/register", response_model=UserResponse)
 async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(5, 60))):
-    """Register a new user with email/password"""
-    
-    # Validate email format
-    if not validate_email_format(user.email):
-        raise HTTPException(status_code=400, detail="Please enter a valid email address (e.g., name@example.com).")
-    
-    # Sanitize and validate inputs
-    email = user.email.lower().strip()
-    name = sanitize_name(user.name)
+    """DISABLED (checkout-first model, 2026-09-04): account creation happens
+    only after payment via Stripe checkout.session.completed webhook
+    (_provision_guest_account in routers/subscriptions.py).
 
-    # Block registration of privileged emails — these are admin-only emails
-    # that must never be claimable through the public registration endpoint
-    PRIVILEGED_EMAILS = {"contact@trustoffice.app", "admin@wingpointtrusts.com", "jeff@socialize.video"}
-    if email in PRIVILEGED_EMAILS:
-        raise HTTPException(status_code=403, detail="This email address is reserved. Please contact support if you believe this is an error.")
-
-    if not name:
-        raise HTTPException(status_code=400, detail="Name is required. Please enter your full name and try again.")
-    
-    # Validate password strength
-    is_valid, error_msg = validate_password_strength(user.password)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_msg)
-    
-    existing = await db.users.find_one({"email": email}, {"_id": 0})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered. Please log in instead, or use a different email address.")
-    
-    user_id = f"user_{uuid.uuid4().hex[:12]}"
-    user_doc = {
-        "user_id": user_id,
-        "email": email,
-        "name": name,
-        "password_hash": hash_password(user.password),
-        "picture": None,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "wp_ref": user.wp_ref or None,
-        "wp_trust_name": user.wp_trust_name or None,
-        # Marketing attribution — captured from the signup form / URL params so
-        # direct-to-checkout conversions can be attributed to ad campaigns.
-        "utm_source": _clean_utm(user.utm_source),
-        "utm_campaign": _clean_utm(user.utm_campaign),
-        "utm_medium": _clean_utm(user.utm_medium),
-        "referrer": _clean_utm(user.referrer, max_len=500),
-    }
-    
-    await db.users.insert_one(user_doc)
-    
-    # Initialize onboarding state
-    await db.user_onboarding.insert_one({
-        "user_id": user_id,
-        "formation_date_added": False,
-        "ein_entered": False,
-        "trust_doc_uploaded": False,
-        "ein_doc_uploaded": False,
-        "beneficiaries_added": False,
-        "assets_added": False,
-        "minutes_generated": False,
-        "calendar_set": False,
-        "checklist_dismissed": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    })
-    
-    # Track referral if code provided
-    if user.referral_code:
-        try:
-            from routers.referrals import track_referral
-            await track_referral(
-                referee_user_id=user_id,
-                referral_code=user.referral_code
-            )
-            logger.info(f"Tracked referral for new user {user_id} with code {user.referral_code}")
-        except Exception as e:
-            logger.error(f"Failed to track referral: {e}")
-            # Don't fail registration if referral tracking fails
-    
-    # Send welcome email in background
-    background_tasks.add_task(
-        email_service.send_welcome_email,
-        to_email=user.email,
-        user_name=user.name
-    )
-
-    # Fire signup_completed webhook to WingPoint if this was a WingPoint-referred signup
-    if user.wp_ref:
-        from routers.external import fire_activation_webhook
-        background_tasks.add_task(fire_activation_webhook, user_id, "signup_completed")
-
-    # Note: No longer adding to Mailercloud trial list — trial model removed
-    
-    return UserResponse(
-        user_id=user_id,
-        email=user.email,
-        name=user.name,
-        picture=None,
-        created_at=user_doc["created_at"],
-        wp_ref=user_doc.get("wp_ref"),
-        is_wingpoint=bool(
-            user_doc.get("wp_ref")
-            or user_doc.get("source") == "wingpoint"
-            or user_doc.get("created_via") == "wingpoint_provision"
-        ),
+    Kept as a hard stop so stale frontends / bookmarked clients get a clear
+    410 instead of silently re-opening a free-registration door.
+    """
+    raise HTTPException(
+        status_code=410,
+        detail="Direct signup is disabled. TrustOffice is subscribe-first — please choose a plan at /pricing to create your account.",
     )
 
 
@@ -251,7 +158,9 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if not user_doc.get("password_hash"):
-        raise HTTPException(status_code=401, detail="Please use Google login")
+        # Checkout-first accounts have no password until the user sets one via
+        # the email link — point them at forgot-password, not Google.
+        raise HTTPException(status_code=401, detail="Your account is ready but no password is set yet. Use 'Forgot password' below to set one — the link is in your welcome email.")
     
     if not verify_password(user.password, user_doc["password_hash"]):
         # Log failed login attempt (for security monitoring)
@@ -721,9 +630,9 @@ async def google_callback(request: Request, response: Response, code: str = None
         return RedirectResponse(url=f"{frontend_url}/login?error=state_expired")
     
     redirect_after = state_record.get("redirect_after", "/onboarding")
-    # Pull WingPoint attribution from the OAuth state (set at login initiation)
-    oauth_wp_ref = state_record.get("wp_ref")
-    oauth_wp_trust_name = state_record.get("wp_trust_name")
+    # WingPoint attribution from OAuth state is carried into Stripe checkout
+    # metadata by the pricing page (checkout-first model); no longer consumed
+    # here since Google sign-in cannot create accounts.
 
     # Delete used state
     await db.oauth_states.delete_one({"state": state})
@@ -785,56 +694,17 @@ async def google_callback(request: Request, response: Response, code: str = None
                 }}
             )
         else:
-            # Create new user
-            user_id = f"user_{uuid.uuid4().hex[:12]}"
-            user_doc = {
-                "user_id": user_id,
-                "email": email,
-                "name": google_user.get("name", "User"),
-                "picture": google_user.get("picture"),
-                "google_id": google_user.get("id"),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                # Preserve WingPoint attribution from OAuth state
-                "wp_ref": oauth_wp_ref or None,
-                "wp_trust_name": oauth_wp_trust_name or None,
-            }
-            await db.users.insert_one(user_doc)
-            
-            # Initialize onboarding state for new users
-            await db.user_onboarding.insert_one({
-                "user_id": user_id,
-                "formation_date_added": False,
-                "ein_entered": False,
-                "trust_doc_uploaded": False,
-                "ein_doc_uploaded": False,
-                "beneficiaries_added": False,
-                "assets_added": False,
-                "minutes_generated": False,
-                "calendar_set": False,
-                "checklist_dismissed": False,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            })
-            
-            # Send welcome email
-            try:
-                await email_service.send_welcome_email(
-                    to_email=email,
-                    user_name=google_user.get("name", "User")
-                )
-            except Exception as e:
-                logger.error(f"Failed to send welcome email: {e}")
-            
-            # Fire signup_completed webhook to WingPoint if this was a WingPoint-referred signup
-            if oauth_wp_ref:
-                try:
-                    from routers.external import fire_activation_webhook
-                    await fire_activation_webhook(user_id, "signup_completed")
-                except Exception as e:
-                    logger.error(f"Failed to fire signup_completed webhook for Google OAuth user {user_id}: {e}")
-            
-            # Note: No longer adding Google OAuth user to Mailercloud trial list — trial model removed
-            # add_to_trial_list call removed
+            # Checkout-first model: Google sign-in must NOT create free accounts.
+            # New Google users are bounced to pricing to subscribe first; their
+            # account gets created by the Stripe webhook on first payment.
+            logger.info(f"Google OAuth signup blocked (checkout-first): {email}")
+            from urllib.parse import quote as _quote
+            pricing_params = f"?google_email={_quote(email)}&google_name={_quote(google_user.get('name', ''))}"
+            return RedirectResponse(url=f"{frontend_url}/pricing{pricing_params}&error=signup_disabled")
+        
+        # Note: Google OAuth no longer creates accounts (checkout-first model) —
+        # existing-account sign-in continues below.
+        # Note: No longer adding Google OAuth user to Mailercloud trial list — trial model removed
         
         # Generate JWT token
         jwt_token = create_jwt_token(user_id, email)

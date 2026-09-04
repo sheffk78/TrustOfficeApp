@@ -163,26 +163,10 @@ const useAuthActions = ({
   }, [setUser]);
 
   const register = useCallback(async (email, password, name) => {
-    // Use a simple fetch approach that works reliably on mobile
-    const url = `${API}/auth/register`;
-    const body = JSON.stringify({ email, password, name });
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: body
-    });
-
-    const data = await parseJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(data.detail || 'Registration failed');
-    }
-
-    return data;
+    // DISABLED (checkout-first model): free account registration is gone.
+    // Kept as a hard stop so any stale caller fails loudly instead of
+    // silently re-opening a free-registration path.
+    throw new Error('Direct signup is disabled. TrustOffice is subscribe-first — please choose a plan at /pricing.');
   }, []);
 
   const logout = useCallback(async () => {

@@ -138,6 +138,7 @@ export default function PricingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const [guestCheckout, setGuestCheckout] = useState(null); // {planType, period} | null
   const [loading, setLoading] = useState(null);
   const [couponApplied, setCouponApplied] = useState(false);
   // Monthly / annual billing toggle (Phase 3)
@@ -178,20 +179,9 @@ export default function PricingPage() {
   }, [targetPlan]);
 
   // Phase 3: handleCheckout now takes a tier (trustee/estate/advisor) AND a billing period
+  // Checkout-first model: logged-out visitors go straight to Stripe via
+  // guest-checkout (account is provisioned by the webhook after payment).
   const handleCheckout = async (planType, period = billingPeriod) => {
-    // If not logged in, redirect to signup first
-    if (!user) {
-      // Store intent in sessionStorage so we can continue after signup
-      sessionStorage.setItem('checkout_intent', JSON.stringify({
-        plan: planType,
-        billing_period: period,
-        coupon: couponCode
-      }));
-      toast.info('Please create an account first to start your subscription');
-      navigate('/signup');
-      return;
-    }
-
     // Already-subscribed guard (Phase 3): authenticated users with an active
     // subscription should manage their plan in billing settings, not re-checkout.
     // WingPoint users arriving with ?wp=1 bypass this guard — they may need to
@@ -199,6 +189,18 @@ export default function PricingPage() {
     if (user?.subscription?.is_active && !isWingPointFlow) {
       toast.info("You're already subscribed. Manage your plan in Settings.");
       navigate('/settings/billing');
+      return;
+    }
+
+    // Logged out → guest checkout modal (collect email/name, then Stripe).
+    // WingPoint plan requires a provisioned WP account → log in first.
+    if (!user) {
+      if (planType === 'wingpoint') {
+        toast.info('The WingPoint plan requires your WingPoint account. Please log in first.');
+        navigate('/login');
+        return;
+      }
+      setGuestCheckout({ planType, period });
       return;
     }
 
@@ -667,6 +669,150 @@ export default function PricingPage() {
           <a href="https://trustoffice.app/terms-of-service/" className="hover:text-navy">Terms</a>
         </div>
       </footer>
+
+      {/* Guest checkout modal — checkout-first signup (no free account) */}
+      {guestCheckout && (
+        <GuestCheckoutModal
+          planType={guestCheckout.planType}
+          billingPeriod={guestCheckout.period}
+          couponCode={couponCode}
+          onClose={() => setGuestCheckout(null)}
+          onSuccess={() => setGuestCheckout(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ==================== Guest Checkout Modal (checkout-first signup) ====================
+
+function GuestCheckoutModal({ planType, billingPeriod, couponCode, onClose, onSuccess }) {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const planLabels = { trustee: 'Trustee', estate: 'Estate', advisor: 'Advisor' };
+  const planLabel = planLabels[billingPeriod && ['monthly', 'annual'].includes(billingPeriod) && !planLabels[billingPeriod] ? billingPeriod : planType] || planType;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!trimmedName) {
+      setError('Please enter your full name.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const baseUrl = window.location.origin;
+      const utm = getUtmParams();
+      const checkoutData = {
+        email: trimmedEmail,
+        name: trimmedName,
+        plan_type: planType,
+        billing_period: billingPeriod,
+        success_url: `${baseUrl}/post-checkout?welcome=true`,
+        cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`,
+      };
+      if (couponCode) checkoutData.promotion_code = couponCode;
+      if (utm.utm_source) checkoutData.utm_source = utm.utm_source;
+      if (utm.utm_campaign) checkoutData.utm_campaign = utm.utm_campaign;
+      if (utm.utm_medium) checkoutData.utm_medium = utm.utm_medium;
+      if (utm.referrer) checkoutData.referrer = utm.referrer;
+      if (typeof window !== 'undefined' && window.Rewardful && window.Rewardful.referral) {
+        checkoutData.referral_id = window.Rewardful.referral;
+      }
+      // WingPoint connect-flow attribution (session storage, no account yet)
+      const wpRef = sessionStorage.getItem('wp_ref');
+      if (wpRef) checkoutData.wp_ref = wpRef;
+
+      const result = await xhrPost(`${API_URL}/api/subscription/guest-checkout`, checkoutData);
+
+      trackCheckoutInitiated({
+        plan_type: planType,
+        billing_period: billingPeriod,
+        origin: 'pricing_page_guest',
+      });
+
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url;
+      } else {
+        setError('Could not start checkout. Please try again.');
+        setSubmitting(false);
+      }
+    } catch (err) {
+      setError(err?.message || 'Could not start checkout. Please try again.');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/60 p-4" data-testid="guest-checkout-modal">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-muted-foreground hover:text-navy"
+          aria-label="Close"
+          data-testid="guest-checkout-close"
+        >
+          ✕
+        </button>
+        <h2 className="text-xl font-semibold text-navy">Subscribe to {planLabel}</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Enter your details and you'll be taken to secure Stripe checkout. Your account is created the moment your payment completes.
+        </p>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3" data-testid="guest-checkout-form">
+          {error && (
+            <div className="p-3 bg-error/10 border border-error/20 rounded text-sm text-error" data-testid="guest-checkout-error">
+              {error}
+            </div>
+          )}
+          <div>
+            <label htmlFor="guest-name" className="block text-sm font-medium text-navy mb-1">Full name</label>
+            <input
+              id="guest-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
+              placeholder="Jane Smith"
+              autoComplete="name"
+              data-testid="guest-checkout-name"
+            />
+          </div>
+          <div>
+            <label htmlFor="guest-email" className="block text-sm font-medium text-navy mb-1">Email</label>
+            <input
+              id="guest-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
+              placeholder="jane@example.com"
+              autoComplete="email"
+              data-testid="guest-checkout-email"
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={submitting}
+            className="w-full bg-navy hover:bg-navy/90 text-white"
+            data-testid="guest-checkout-submit"
+          >
+            {submitting ? 'Starting checkout…' : `Continue to ${planLabel} checkout`}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Already have an account? <a href="/login" className="text-navy underline">Log in</a>
+          </p>
+        </form>
+      </div>
     </div>
   );
 }

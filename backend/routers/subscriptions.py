@@ -19,7 +19,8 @@ from dependencies import (
     get_trust_limit,
     TRIAL_DAYS
 )
-from models import SubscriptionResponse, CheckoutRequest, PortalRequest, ChangePlanRequest
+from routers.auth import rate_limit
+from models import SubscriptionResponse, CheckoutRequest, GuestCheckoutRequest, PortalRequest, ChangePlanRequest
 
 # Import email service
 from email_service import email_service
@@ -478,9 +479,153 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         })
         
         return {"checkout_url": session.url, "session_id": session.id}
-        
+
     except stripe.StripeError as e:
         logger.error(f"Stripe error: {e}")
+        raise HTTPException(status_code=500, detail="Payment service is currently unavailable. Please try again in a few minutes. If this continues, contact support@trustoffice.app.")
+
+
+async def _validate_guest_checkout(checkout) -> tuple[str, str]:
+    """Shared validation for guest checkout. Returns (email, name)."""
+    if checkout.plan_type == "wingpoint":
+        # WingPoint plan requires a provisioned (existing) WingPoint user —
+        # guest checkout cannot verify WP eligibility pre-account, so block it.
+        raise HTTPException(
+            status_code=403,
+            detail="The WingPoint plan is only available to WingPoint customers. Please log in first.",
+        )
+
+    email = checkout.email.lower().strip()
+    name = (checkout.name or "").strip()
+
+    if not email or "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address (e.g., name@example.com).")
+
+    # Privileged emails must never be claimable through checkout
+    PRIVILEGED_EMAILS = {"contact@trustoffice.app", "admin@wingpointtrusts.com", "jeff@socialize.video"}
+    if email in PRIVILEGED_EMAILS:
+        raise HTTPException(status_code=403, detail="This email address is reserved. Please contact support if you believe this is an error.")
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required. Please enter your full name and try again.")
+
+    return email, name
+
+
+@router.post("/subscription/guest-checkout")
+async def create_guest_checkout_session(checkout: GuestCheckoutRequest, _rl: None = Depends(rate_limit(10, 60))):
+    """Checkout-first signup (no free account creation).
+
+    Creates a Stripe Checkout session WITHOUT any user account. The account
+    (user + onboarding + subscription) is provisioned by the Stripe webhook
+    on checkout.session.completed. Existing users with an active subscription
+    are redirected to log in instead (prevents duplicate accounts).
+    """
+    email, name = await _validate_guest_checkout(checkout)
+
+    # Existing paying user? Send them to login instead of creating a duplicate.
+    existing_user = await db.users.find_one({"email": email}, {"_id": 0, "user_id": 1})
+    if existing_user:
+        sub = await db.subscriptions.find_one({"user_id": existing_user["user_id"]}, {"_id": 0, "status": 1, "plan_type": 1})
+        if sub and sub.get("status") == "active" and sub.get("plan_type") not in (None, "none", "expired"):
+            raise HTTPException(
+                status_code=409,
+                detail="An active account already exists with this email. Please log in to manage your subscription.",
+            )
+
+    if checkout.plan_type in ("monthly", "annual"):
+        billing_period = checkout.plan_type
+        checkout.billing_period = billing_period  # legacy: period IS the plan
+    elif checkout.plan_type in ("trustee", "estate", "advisor"):
+        billing_period = checkout.billing_period or "monthly"
+        if billing_period not in ("monthly", "annual"):
+            raise HTTPException(status_code=400, detail="Invalid billing period. Choose 'monthly' or 'annual'.")
+    else:
+        raise HTTPException(status_code=400, detail="Invalid plan type. Choose 'trustee', 'estate', or 'advisor'.")
+
+    price_id = PRICE_IDS.get((checkout.plan_type, billing_period))
+    if not price_id:
+        raise HTTPException(status_code=500, detail=f"Price ID not configured for {checkout.plan_type}/{billing_period}")
+
+    _amount_fallbacks = {"trustee": 79.00, "estate": 149.00, "advisor": 399.00, "wingpoint": 1188.00, "monthly": 79.00, "annual": 790.00}
+    amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 79.00))
+
+    try:
+        # Reuse the Stripe customer if this email already paid before (test->live safe)
+        customer_id = None
+        try:
+            customers = stripe.Customer.list(email=email, limit=1)
+            if customers.data:
+                customer_id = customers.data[0].id
+        except stripe.StripeError:
+            pass
+
+        checkout_params = {
+            "mode": "subscription",
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "success_url": checkout.success_url,
+            "cancel_url": checkout.cancel_url,
+            "metadata": {
+                "guest_checkout": "1",
+                "guest_email": email,
+                "guest_name": name[:200],
+                "plan_type": checkout.plan_type,
+                "billing_period": billing_period,
+            },
+            "allow_promotion_codes": True,
+        }
+        if customer_id:
+            checkout_params["customer"] = customer_id
+        else:
+            checkout_params["customer_email"] = email  # Stripe pre-fills the email field
+
+        # Marketing attribution
+        for _k, _v in (("utm_source", checkout.utm_source), ("utm_campaign", checkout.utm_campaign),
+                       ("utm_medium", checkout.utm_medium), ("referrer", checkout.referrer)):
+            if _v:
+                checkout_params["metadata"][_k] = str(_v)[:200]
+        if checkout.wp_ref:
+            checkout_params["metadata"]["wp_ref"] = str(checkout.wp_ref)[:200]
+        if checkout.referral_id:
+            checkout_params["client_reference_id"] = checkout.referral_id
+
+        # Coupons (same logic as logged-in checkout)
+        if checkout.coupon:
+            try:
+                coupon = stripe.Coupon.retrieve(checkout.coupon)
+                if coupon and coupon.valid:
+                    checkout_params["discounts"] = [{"coupon": checkout.coupon}]
+                    checkout_params.pop("allow_promotion_codes", None)
+            except stripe.StripeError:
+                pass
+        if "discounts" not in checkout_params and checkout.promotion_code:
+            try:
+                promo_codes = stripe.PromotionCode.list(code=checkout.promotion_code, active=True, limit=1)
+                if promo_codes.data:
+                    checkout_params["discounts"] = [{"promotion_code": promo_codes.data[0].id}]
+            except stripe.StripeError:
+                pass
+
+        session = stripe.checkout.Session.create(**checkout_params)
+
+        await db.payment_transactions.insert_one({
+            "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
+            "guest_email": email,
+            "session_id": session.id,
+            "amount": amount,
+            "currency": "usd",
+            "plan_type": checkout.plan_type,
+            "billing_period": billing_period,
+            "guest_checkout": True,
+            "payment_status": "initiated",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        })
+
+        return {"checkout_url": session.url, "session_id": session.id}
+
+    except stripe.StripeError as e:
+        logger.error(f"Stripe error (guest checkout): {e}")
         raise HTTPException(status_code=500, detail="Payment service is currently unavailable. Please try again in a few minutes. If this continues, contact support@trustoffice.app.")
 
 
@@ -490,8 +635,14 @@ async def verify_payment(session_id: str, user: dict = Depends(get_current_user)
     try:
         session = stripe.checkout.Session.retrieve(session_id)
 
-        # Ownership check: ensure the payment session belongs to the calling user
+        # Ownership check: ensure the payment session belongs to the calling user.
+        # Guest-checkout sessions (checkout-first) have no user_id in metadata —
+        # they're verified by matching the session email to the logged-in account.
         session_user_id = session.metadata.get("user_id") if session.metadata else None
+        if not session_user_id:
+            guest_email = (session.metadata.get("guest_email") or "").lower() if session.metadata else ""
+            if guest_email and guest_email == user["email"].lower():
+                session_user_id = user["user_id"]
         if not session_user_id:
             raise HTTPException(status_code=403, detail="Payment session missing user identity — cannot verify ownership")
         if session_user_id != user["user_id"]:
@@ -877,6 +1028,115 @@ async def _process_referral_conversion_safe(user_id: str) -> None:
         logger.error(f"Failed to process referral conversion: {e}")
 
 
+async def _provision_guest_account(session, metadata: dict, plan_type: str, billing_period: Optional[str]) -> Optional[str]:
+    """Provision a user account after a guest (checkout-first) payment.
+
+    Called from checkout.session.completed when metadata.guest_checkout == "1"
+    and no user_id exists yet. Creates user + onboarding + subscription in one
+    pass, then returns the new user_id so the normal post-payment flow
+    (subscription activation, emails, CRM) runs unchanged.
+
+    Idempotent: if the email already has a user (webhook redelivery), returns
+    the existing user_id without duplicating anything.
+    """
+    email = (metadata.get("guest_email") or "").lower().strip()
+    name = (metadata.get("guest_name") or "").strip()
+    if not email:
+        return None
+
+    existing = await db.users.find_one({"email": email}, {"_id": 0, "user_id": 1})
+    if existing:
+        logger.info(f"Guest checkout for existing user {email} — skipping provisioning (webhook redelivery or prior account)")
+        return existing["user_id"]
+
+    # Privileged emails can never be claimed via checkout (defense in depth —
+    # guest-checkout endpoint already blocks these before Stripe sees them)
+    PRIVILEGED_EMAILS = {"contact@trustoffice.app", "admin@wingpointtrusts.com", "jeff@socialize.video"}
+    if email in PRIVILEGED_EMAILS:
+        logger.error(f"Guest checkout attempted for privileged email {email} — blocked")
+        return None
+
+    now = datetime.now(timezone.utc).isoformat()
+    new_user_id = f"user_{uuid.uuid4().hex[:12]}"
+    customer_id = getattr(session, "customer", None)
+
+    await db.users.insert_one({
+        "user_id": new_user_id,
+        "email": email,
+        "name": name or email.split("@")[0],
+        # No password yet — user sets one via the welcome email's
+        # password-setup link (purpose="set_password") or "forgot password".
+        "password_hash": None,
+        "created_at": now,
+        "created_via": "guest_checkout",
+        # Marketing attribution from checkout metadata
+        "utm_source": metadata.get("utm_source"),
+        "utm_campaign": metadata.get("utm_campaign"),
+        "utm_medium": metadata.get("utm_medium"),
+        "referrer": metadata.get("referrer"),
+        "wp_ref": metadata.get("wp_ref"),
+    })
+
+    await db.user_onboarding.insert_one({
+        "user_id": new_user_id,
+        "formation_date_added": False,
+        "ein_entered": False,
+        "trust_doc_uploaded": False,
+        "ein_doc_uploaded": False,
+        "beneficiaries_added": False,
+        "assets_added": False,
+        "minutes_generated": False,
+        "calendar_set": False,
+        "checklist_dismissed": False,
+        "created_at": now,
+        "updated_at": now,
+    })
+
+    # Subscription doc — active plan stamped by the caller right after this
+    await db.subscriptions.update_one(
+        {"user_id": new_user_id},
+        {"$setOnInsert": {
+            "subscription_id": f"sub_{uuid.uuid4().hex[:12]}",
+            "user_id": new_user_id,
+            "plan_type": plan_type,
+            "status": "active",
+            "stripe_customer_id": customer_id,
+            "created_at": now,
+            "updated_at": now,
+        }},
+        upsert=True
+    )
+
+    # Welcome + set-password email (independent of the activation email)
+    try:
+        frontend_url = os.environ.get("FRONTEND_URL", "")
+        if frontend_url and email_service.is_configured:
+            import secrets as _secrets
+            reset_token = _secrets.token_urlsafe(32)
+            expires_at = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
+            await db.password_resets.update_one(
+                {"user_id": new_user_id},
+                {"$set": {
+                    "token": reset_token,
+                    "expires_at": expires_at,
+                    "created_at": now,
+                }, "$setOnInsert": {"purpose": "set_password"}},
+                upsert=True
+            )
+            set_password_url = f"{frontend_url}/reset-password?token={reset_token}"
+            await email_service.send_password_reset_email(
+                to_email=email,
+                user_name=name or email.split("@")[0],
+                reset_url=set_password_url,
+            )
+            logger.info(f"Set-password email sent to new paid user {email}")
+    except Exception as e:
+        logger.error(f"Failed to send set-password email to {email}: {e}")
+
+    logger.info(f"Guest checkout account provisioned: {email} -> {new_user_id} (plan={plan_type}/{billing_period})")
+    return new_user_id
+
+
 async def _send_activation_emails_safe(user: dict, plan_type: str, amount: str, session: dict) -> None:
     """Send activation email and admin purchase notification."""
     if not user or not email_service.is_configured:
@@ -954,6 +1214,17 @@ async def _webhook_checkout_session_completed(event) -> None:
     # For legacy plans, billing_period wasn't in metadata — infer from plan_type
     if not billing_period and plan_type in ("monthly", "annual"):
         billing_period = plan_type
+
+    # ===== Checkout-first signup: provision account on first payment =====
+    if not user_id and metadata.get("guest_checkout") == "1":
+        user_id = await _provision_guest_account(session, metadata, plan_type, billing_period)
+        if not user_id:
+            logger.error(
+                f"Guest checkout provisioning failed for session {getattr(session, 'id', '?')} "
+                f"(email={metadata.get('guest_email')}). Payment captured but account NOT created — "
+                "manual intervention required."
+            )
+            return
 
     if not user_id:
         return
