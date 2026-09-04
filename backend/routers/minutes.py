@@ -4694,6 +4694,31 @@ async def update_minutes_template(minutes_id: str, update_data: MinutesTemplateU
             await auto_update_onboarding(user["user_id"], minutes["trust_id"])
         except Exception:
             pass
+
+        # TO-016: Auto-create draft Schedule A asset if bank account info is present
+        # (parity with the legacy PUT /minutes/{minutes_id} finalize path — template
+        # minutes were skipping the bank-account → Schedule A asset creation)
+        try:
+            await _auto_create_draft_asset_from_minutes(
+                trust_id=minutes.get("trust_id", ""),
+                user_id=user["user_id"],
+                minutes_id=minutes_id,
+                template_type=minutes.get("template_type", ""),
+                template_data=minutes.get("template_data", {}),
+                meeting_date=minutes.get("meeting_date"),
+            )
+        except Exception as e:
+            logging.warning(f"TO-016 draft asset creation failed for template minutes {minutes_id}: {e}")
+        # Also create a real bank account record from the minutes bank info
+        try:
+            await _auto_create_bank_account_from_minutes(
+                trust_id=minutes.get("trust_id", ""),
+                user_id=user["user_id"],
+                minutes_id=minutes_id,
+                template_data=minutes.get("template_data", {}),
+            )
+        except Exception as e:
+            logging.warning(f"Bank account creation from template minutes failed for {minutes_id}: {e}")
     
     updated = await db.minutes_templates.find_one({"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0})
     return updated
