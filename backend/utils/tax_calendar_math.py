@@ -61,7 +61,15 @@ def _calendar_due_date(tax_year: int, month: int, day: int) -> date:
 
 
 def _generate_entries(trust: dict, tax_year: int) -> list:
-    """Generate deadline entries based on trust's tax year configuration."""
+    """Generate deadline entries based on trust's tax year configuration.
+
+    Benevolence (508c3) trusts are tax-exempt — they file no 1041, make no
+    estimated payments, and issue no K-1s — so they get zero entries.
+    """
+    # Benevolence (508c3) trusts are tax-exempt: skip all federal deadlines.
+    if trust.get("benevolence_enabled") is True:
+        return []
+
     entries = []
     from datetime import datetime, timezone  # local import to keep this module light
     now = datetime.now(timezone.utc).isoformat()

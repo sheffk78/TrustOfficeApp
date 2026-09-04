@@ -35,6 +35,10 @@ async def generate_tax_calendar(trust_id: str, request: dict, user: dict = Depen
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
+    # Benevolence (508c3) trusts are tax-exempt — no tax deadlines to generate.
+    if trust.get("benevolence_enabled") is True:
+        raise HTTPException(status_code=400, detail="Tax deadlines do not apply to benevolence (tax-exempt) trusts")
+
     existing = await db.tax_calendar.count_documents({"trust_id": trust_id, "tax_year": tax_year})
     if existing > 0:
         raise HTTPException(status_code=409, detail=f"Tax calendar for tax year {tax_year} already exists")
@@ -128,3 +132,24 @@ async def update_tax_entry(entry_id: str, update: TaxCalendarEntryUpdate, user: 
     updated["is_overdue"] = days < 0
 
     return TaxCalendarEntryResponse(**updated)
+
+
+@router.delete("/tax-calendar/{entry_id}")
+async def delete_tax_entry(entry_id: str, user: dict = Depends(require_write_access)):
+    """Delete a tax calendar entry (e.g. a deadline that doesn't apply to this trust)."""
+    entry = await db.tax_calendar.find_one({"entry_id": entry_id}, {"trust_id": 1, "_id": 0})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found. It may have been already deleted. Please refresh and try again.")
+
+    trust = await db.trusts.find_one(
+        {"trust_id": entry["trust_id"], "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    result = await db.tax_calendar.delete_one({"entry_id": entry_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Entry not found. It may have been already deleted. Please refresh and try again.")
+
+    return {"message": "Tax calendar entry deleted", "entry_id": entry_id}

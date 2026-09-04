@@ -98,7 +98,13 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         "created_at": now.isoformat(),
         "is_demo": True
     })
-    
+
+    # Trust records kept in memory so later sections (tax calendar seeding)
+    # can filter entries by benevolence status.
+    seeded_trusts = [
+        {"trust_id": trust1_id, "benevolence_enabled": True},
+        {"trust_id": trust2_id, "benevolence_enabled": False},
+    ]
     # ==================== ENTITIES for Trust 1 (Multi-level Hierarchy) ====================
     trust1_entity_id = f"entity_{uuid.uuid4().hex[:12]}"
     await db.entities.insert_one({
@@ -894,7 +900,9 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
     ])
 
     # ==================== TAX CALENDAR ENTRIES ====================
-    await db.tax_calendar.insert_many([
+    # Benevolence (508c3) trusts are tax-exempt — trust1 has benevolence mode
+    # enabled, so it gets NO tax calendar entries (mirrors _generate_entries policy).
+    tax_entries_seed = [
         {
             "entry_id": f"tax_{uuid.uuid4().hex[:12]}",
             "trust_id": trust1_id,
@@ -975,7 +983,18 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "updated_at": now.isoformat(),
             "is_demo": True
         },
-    ])
+    ]
+    # Only entries for NON-benevolence trusts get seeded; benevolence trusts
+    # are tax-exempt and must not carry tax deadlines.
+    non_benevolence_tax_entries = [
+        e for e in tax_entries_seed
+        if not any(
+            t["trust_id"] == e["trust_id"] and t.get("benevolence_enabled") is True
+            for t in seeded_trusts
+        )
+    ]
+    if non_benevolence_tax_entries:
+        await db.tax_calendar.insert_many(non_benevolence_tax_entries)
 
     # ==================== CLASS BENEFICIARIES (Beneficiary Dashboard) ====================
     await db.class_beneficiaries.insert_many([

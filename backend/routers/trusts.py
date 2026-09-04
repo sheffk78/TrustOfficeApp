@@ -366,6 +366,15 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
     if month is not None and day is not None:
         update_data["is_fiscal_year"] = (month != 12 or day != 31)
     
+    # Benevolence mode turned ON: purge tax deadlines that don't apply to a
+    # tax-exempt (508c3) trust — same policy as _generate_entries.
+    if update_data.get("benevolence_enabled") is True and not trust.get("benevolence_enabled"):
+        try:
+            removed = await db.tax_calendar.delete_many({"trust_id": trust_id})
+            logger.info(f"Benevolence enabled for trust {trust_id}: purged {removed.deleted_count} tax calendar entries")
+        except Exception:
+            logger.warning(f"Failed to purge tax entries after enabling benevolence for trust {trust_id}", exc_info=True)
+    
     if update_data:
         await db.trusts.update_one({"trust_id": trust_id}, {"$set": update_data})
     
