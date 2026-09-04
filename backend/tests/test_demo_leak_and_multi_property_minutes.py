@@ -130,6 +130,19 @@ class TestSharedDemoCleanupService:
         src = (BACKEND_DIR / "routers/demo.py").read_text()
         assert "purge_demo_data_for_user" in src
 
+    def test_seed_refuses_when_real_trusts_exist(self):
+        src = (BACKEND_DIR / "routers/demo.py").read_text()
+        start = src.index('async def seed_demo_data(')
+        end = src.index("TRUST 1:")
+        body = src[start:end]
+        # Seeding must never mix demo data with real trusts
+        assert '"is_demo": {"$ne": True}' in body, (
+            "seed must count real (non-demo) trusts"
+        )
+        assert '"blocked_by_real_data": True' in body, (
+            "seed must refuse with blocked_by_real_data when real trusts exist"
+        )
+
     def test_trust_limit_count_excludes_demo_trusts(self):
         src = (BACKEND_DIR / "routers/trusts.py").read_text()
         start = src.index('async def create_trust(')

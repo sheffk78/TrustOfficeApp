@@ -25,14 +25,30 @@ router = APIRouter(prefix="/demo", tags=["demo"])
 @router.post("/seed")
 async def seed_demo_data(user: dict = Depends(get_current_user)):
     """
-    Seed comprehensive demo data for new users.
+    Seed comprehensive demo data for users exploring the product.
+
     Creates 2 sample trusts with rich data showcasing all features.
-    Only seeds if no demo data exists (allows seeding alongside user's own trusts).
+    Only seeds if the user has NO data at all — demo data must never mix
+    with real trusts (that mixing was a reported production bug). Once a
+    user has any real trust, demo seeding is refused; use Settings →
+    "Remove demo data" first if they truly want to start over.
     """
+    user_id = user["user_id"]
     # Check if demo data already exists (not all trusts, just demo trusts)
-    existing_demo = await db.trusts.count_documents({"user_id": user["user_id"], "is_demo": True})
+    existing_demo = await db.trusts.count_documents({"user_id": user_id, "is_demo": True})
     if existing_demo > 0:
         return {"message": "Demo data already exists", "seeded": False}
+
+    # Never mix demo data with real trusts — refuse if any real trust exists
+    existing_real = await db.trusts.count_documents({
+        "user_id": user_id, "is_demo": {"$ne": True}
+    })
+    if existing_real > 0:
+        return {
+            "message": "Cannot create demo data: your account already has real trusts. Demo data can only be created on empty accounts.",
+            "seeded": False,
+            "blocked_by_real_data": True,
+        }
     
     now = datetime.now(timezone.utc)
     
