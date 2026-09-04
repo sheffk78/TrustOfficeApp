@@ -682,7 +682,9 @@ class BackgroundTaskRunner:
                 # leads/MEETING-PROCESS.md). Booking is the conversion event:
                 # drip emails with booking CTAs are noise for them, and a
                 # booked lead whose nurture field was never set must NOT be
-                # caught by the step-0 catch-up branch. no_show leads stay in.
+                # caught by the step-0 catch-up branch. no_show leads are
+                # excluded too (they carry booked_call: true) — the no-show
+                # flow (reschedule email, 7-day nudge, 14-day DNC) owns them.
                 "booked_call": {"$ne": True},
             }, {"_id": 0}).to_list(500)
 
