@@ -185,12 +185,12 @@ export async function reportErrorToBackend(error, context = {}) {
       stack: error?.stack || null,
       user_agent: navigator.userAgent,
       trust_id: context.trustId || null,
+      severity: context.severity || 'minor',
       context: {
         ...context,
         userId,
         email,
       },
-      severity: context.severity || 'minor',
     };
 
     // Fire-and-forget — use sendBeacon if available for reliability on unloads
