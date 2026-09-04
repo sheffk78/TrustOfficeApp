@@ -312,16 +312,16 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
 
 @router.get("/trusts", response_model=List[TrustResponse])
 async def get_trusts(user: dict = Depends(get_current_user)):
-    """Get all real (non-demo) trusts for the current user.
+    """Get trusts for the current user.
 
-    Demo trusts (is_demo: True) are excluded: they must never appear in the
-    sidebar trust selector or count against trust limits once a user has real
-    data. Use GET /demo/status for demo-data visibility.
+    Demo trusts (is_demo: True) are excluded once the user has at least one
+    real trust — they must never appear in the sidebar trust selector alongside
+    real data. Demo-only accounts (legacy exploration data, no real trust yet)
+    still see their demo trusts so the demo experience keeps working.
     """
-    trusts = await db.trusts.find(
-        {"user_id": user["user_id"], "is_demo": {"$ne": True}},
-        {"_id": 0}
-    ).to_list(100)
+    all_trusts = await db.trusts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
+    real_trusts = [t for t in all_trusts if t.get("is_demo") is not True]
+    trusts = real_trusts if real_trusts else all_trusts
     
     result = []
     for trust in trusts:

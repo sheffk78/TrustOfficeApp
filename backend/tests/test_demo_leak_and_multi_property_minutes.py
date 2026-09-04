@@ -58,8 +58,13 @@ class TestGetTrustsExcludesDemo:
         start = src.index('async def get_trusts(')
         end = src.index('@router.get("/trusts/{trust_id}"')
         body = src[start:end]
-        assert '"is_demo": {"$ne": True}' in body, (
-            "GET /trusts must filter out demo trusts (is_demo: {'$ne': True})"
+        # Demo trusts must be filtered out when the user has real trusts;
+        # demo-only accounts (no real trust) keep seeing their demo trusts.
+        assert 't.get("is_demo") is not True' in body, (
+            "GET /trusts must filter out demo trusts once real trusts exist"
+        )
+        assert "real_trusts if real_trusts else all_trusts" in body, (
+            "demo-only accounts must still see their demo trusts"
         )
 
     def test_docstring_documents_demo_exclusion(self):
