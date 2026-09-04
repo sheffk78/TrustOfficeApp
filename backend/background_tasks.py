@@ -667,68 +667,109 @@ class BackgroundTaskRunner:
                 12: 30, # Day 30
             }
 
-            # Find leads that have received Email 1 but haven't completed all 12
+            # Find leads that have received Email 1 but haven't completed all 12.
+            # Leads whose `nurture_step_sent` field is missing/null are treated as
+            # step 0 (never received Email 1) so they still enter the drip: the
+            # loop sends step 1 first via the `current_step < 1` catch-up branch
+            # below, instead of being permanently skipped by the $gte:1 filter.
             leads = await self.db.leads.find({
-                "nurture_step_sent": {"$exists": True, "$gte": 1, "$lt": 12},
+                "$or": [
+                    {"nurture_step_sent": {"$exists": True, "$gte": 1, "$lt": 12}},
+                    {"nurture_step_sent": {"$in": [None, False]}},
+                ],
                 "stage": {"$ne": "converted"},
             }, {"_id": 0}).to_list(500)
 
             for lead in leads:
                 try:
-                    current_step = lead.get("nurture_step_sent", 0)
-                    created_at = lead.get("created_at")
+                    # Missing/null nurture_step_sent = step 0 (never got Email 1)
+                    if not lead.get("nurture_step_sent"):
+                        current_step = 0
+                    else:
+                        current_step = lead.get("nurture_step_sent", 0)
 
-                    if not created_at:
+                    # Schedule anchor: prefer the step-1 send timestamp over the
+                    # capture timestamp. Catch-up leads (backfill/re-engagement)
+                    # were captured long before they entered the sequence —
+                    # anchoring on created_at would make every remaining step
+                    # instantly due (one email per 6-hourly run until done).
+                    # Falls back to created_at for leads that got step 1 before
+                    # timestamps were introduced.
+                    anchor_raw = (
+                        lead.get("nurture_step1_backfill_at")
+                        or lead.get("nurture_step1_sent_at")
+                        or lead.get("created_at")
+                    )
+                    if not anchor_raw:
                         continue
 
-                    # Parse created_at
+                    # Parse anchor timestamp
                     try:
-                        if isinstance(created_at, str):
-                            if created_at.endswith('Z'):
-                                created_at = created_at[:-1] + '+00:00'
-                            created_dt = datetime.fromisoformat(created_at)
+                        if isinstance(anchor_raw, str):
+                            if anchor_raw.endswith('Z'):
+                                anchor_raw = anchor_raw[:-1] + '+00:00'
+                            anchor_dt = datetime.fromisoformat(anchor_raw)
                         else:
-                            created_dt = created_at
+                            anchor_dt = anchor_raw
                     except (ValueError, TypeError):
                         continue
+                    if anchor_dt.tzinfo is None:
+                        anchor_dt = anchor_dt.replace(tzinfo=timezone.utc)
 
-                    days_since = (now - created_dt).days
+                    days_since = (now - anchor_dt).days
 
                     # Check which step to send next
                     next_step = current_step + 1
-                    if next_step in NURTURE_SCHEDULE:
-                        required_days = NURTURE_SCHEDULE[next_step]
-                        if days_since >= required_days:
-                            # Send via MailerCloud Email API
-                            result = await send_nurture_email_via_mailercloud(
-                                to_email=lead["email"],
-                                name=lead.get("name", ""),
-                                step=next_step,
+                    # Catch-up: a lead with no nurture_step_sent never got Email 1
+                    # (the sequence opener). The schedule below only covers steps
+                    # 2-12, so such a lead is due immediately for step 1; the next
+                    # drip run (6h later) sends step 2 onward. Normal leads are
+                    # due once their Day-N schedule requirement has elapsed.
+                    if current_step < 1:
+                        due = True
+                        sent_step = 1
+                    else:
+                        due = next_step in NURTURE_SCHEDULE and days_since >= NURTURE_SCHEDULE[next_step]
+                        sent_step = next_step
+
+                    if due:
+                        # Send via MailerCloud Email API
+                        result = await send_nurture_email_via_mailercloud(
+                            to_email=lead["email"],
+                            name=lead.get("name", ""),
+                            step=sent_step,
+                        )
+
+                        if result.get("success"):
+                            # Update nurture_step_sent (+ step-1 send timestamp so
+                            # the schedule anchors on enrollment, not capture)
+                            step1_stamp = (
+                                {"nurture_step1_sent_at": now.isoformat()}
+                                if sent_step == 1
+                                else {}
+                            )
+                            await self.db.leads.update_one(
+                                {"lead_id": lead["lead_id"]},
+                                {"$set": {
+                                    "nurture_step_sent": sent_step,
+                                    "updated_at": now.isoformat(),
+                                    **step1_stamp,
+                                }}
                             )
 
-                            if result.get("success"):
-                                # Update nurture_step_sent
-                                await self.db.leads.update_one(
-                                    {"lead_id": lead["lead_id"]},
-                                    {"$set": {
-                                        "nurture_step_sent": next_step,
-                                        "updated_at": now.isoformat(),
-                                    }}
-                                )
+                            # Log activity
+                            await self.db.lead_activities.insert_one({
+                                "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+                                "lead_id": lead["lead_id"],
+                                "action_type": "email",
+                                "content": f"Sent nurture email {sent_step}/12 via MailerCloud",
+                                "created_at": now.isoformat(),
+                            })
 
-                                # Log activity
-                                await self.db.lead_activities.insert_one({
-                                    "activity_id": f"act_{uuid.uuid4().hex[:12]}",
-                                    "lead_id": lead["lead_id"],
-                                    "action_type": "email",
-                                    "content": f"Sent nurture email {next_step}/12 via MailerCloud",
-                                    "created_at": now.isoformat(),
-                                })
-
-                                emails_sent += 1
-                                logger.info(
-                                    f"Sent nurture email {next_step}/12 to {lead['email']}"
-                                )
+                            emails_sent += 1
+                            logger.info(
+                                f"Sent nurture email {sent_step}/12 to {lead['email']}"
+                            )
 
                 except Exception as e:
                     logger.error(

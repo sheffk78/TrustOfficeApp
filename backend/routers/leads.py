@@ -481,6 +481,7 @@ async def capture_lead(lead: LeadCapture):
         "referrer": lead.referrer,
         "stage": "new",
         "manual_stage_override": False,
+        "nurture_step_sent": 0,  # explicit 0 = nothing sent yet; drip catches missing/null too
         "lessons_watched": 0,
         "subscription_status": None,
         "last_login": None,
@@ -535,7 +536,10 @@ async def capture_lead(lead: LeadCapture):
         if nurture_result.get("success"):
             await db.leads.update_one(
                 {"lead_id": lead_id},
-                {"$set": {"nurture_step_sent": 1}}
+                {"$set": {
+                    "nurture_step_sent": 1,
+                    "nurture_step1_sent_at": datetime.now(timezone.utc).isoformat(),
+                }}
             )
             await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud")
     except Exception as e:
@@ -665,6 +669,7 @@ async def tidycal_webhook(request: Request):
         "manual_stage_override": False,
         "booked_call": True,
         "booked_call_at": booked_at,
+        "nurture_step_sent": 12,  # booked-call leads skip the nurture drip entirely
         "lessons_watched": 0,
         "subscription_status": None,
         "last_login": None,
@@ -841,6 +846,7 @@ async def _create_facebook_lead(parsed: dict, leadgen_id: str, form_id: str, pag
         "stage": "new",
         "manual_stage_override": False,
         "booked_call": False,
+        "nurture_step_sent": 0,  # explicit 0 = nothing sent yet; drip catches missing/null too
         "lessons_watched": 0,
         "subscription_status": None,
         "last_login": None,
@@ -885,7 +891,10 @@ async def _create_facebook_lead(parsed: dict, leadgen_id: str, form_id: str, pag
             if nurture_result.get("success"):
                 await db.leads.update_one(
                     {"lead_id": lead_id},
-                    {"$set": {"nurture_step_sent": 1}}
+                    {"$set": {
+                        "nurture_step_sent": 1,
+                        "nurture_step1_sent_at": datetime.now(timezone.utc).isoformat(),
+                    }}
                 )
                 await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud")
         except Exception as e:
