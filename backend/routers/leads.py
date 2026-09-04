@@ -495,13 +495,15 @@ async def capture_lead(lead: LeadCapture):
     await db.leads.insert_one(lead_doc)
     await _log_activity(lead_id, "created", f"Lead captured via {source}")
 
-    # Send Discord notification
+    # Send Discord notification (phone leads ping Kenneth — he calls them ASAP;
+    # the FB-lead path does the same in _send_facebook_discord_notification)
     await notify_new_lead(
         name=name,
         email=email,
         source=source,
         lead_stage="new",
-        phone=phone
+        phone=phone,
+        ping_on_phone=True,
     )
 
     # Send welcome email (fire-and-forget — non-blocking)
@@ -923,9 +925,18 @@ async def _send_facebook_discord_notification(parsed: dict, name: str, email: st
 
         from discord_service import send_discord_message, DISCORD_LEADS_WEBHOOK_URL, NAVY
         if DISCORD_LEADS_WEBHOOK_URL:
+            # Kenneth calls phone leads immediately — ping him directly when a
+            # lead has a phone number so the notification actually interrupts.
+            if parsed["phone"]:
+                content = (
+                    f"<@1479298864539373702> **📞 Call now** — {name} · "
+                    f"{parsed['phone']} · {email}"
+                )
+            else:
+                content = f"**NEW FACEBOOK LEAD** — {name} | no phone | {email}"
             await send_discord_message(
                 webhook_url=DISCORD_LEADS_WEBHOOK_URL,
-                content=f"**NEW FACEBOOK LEAD** — {name} | {parsed['phone'] or 'no phone'} | {email}",
+                content=content,
                 embeds=[{
                     "title": f"New Facebook Lead: {name}",
                     "color": NAVY,

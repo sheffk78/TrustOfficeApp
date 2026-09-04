@@ -76,12 +76,29 @@ async def notify_new_lead(
     email: str,
     source: str,
     lead_stage: str = "new",
-    phone: Optional[str] = None
+    phone: Optional[str] = None,
+    ping_on_phone: bool = False,
 ) -> Dict[str, Any]:
-    """Send a new lead notification to the leads Discord channel."""
+    """Send a new lead notification to the leads Discord channel.
+
+    ping_on_phone=True prepends a direct @mention of Kenneth when the lead has
+    a phone number — he calls phone leads immediately, so the notification
+    must actually interrupt him (web-form + FB-lead-ad capture both use this).
+    TidyCal booking notifications omit the flag: that's an appointment, not a
+    cold lead to call.
+    """
     if not DISCORD_LEADS_WEBHOOK_URL:
         logger.info("Discord leads webhook not configured — skipping lead notification")
         return {"success": False, "error": "Not configured"}
+
+    KENNETH_DISCORD_ID = "1479298864539373702"
+    if ping_on_phone and phone:
+        content = (
+            f"<@{KENNETH_DISCORD_ID}> **📞 Call now** — {name} · "
+            f"{phone} · {email}"
+        )
+    else:
+        content = f"**New lead** — {name} ({email}) via {source}"
 
     embed = {
         "title": f"{_stage_emoji(lead_stage)} New Lead: {name}",
@@ -99,7 +116,7 @@ async def notify_new_lead(
 
     return await send_discord_message(
         webhook_url=DISCORD_LEADS_WEBHOOK_URL,
-        content=f"**New lead** — {name} ({email}) via {source}",
+        content=content,
         embeds=[embed]
     )
 
