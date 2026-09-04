@@ -692,8 +692,8 @@ function GuestCheckoutModal({ planType, billingPeriod, couponCode, onClose, onSu
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const planLabels = { trustee: 'Trustee', estate: 'Estate', advisor: 'Advisor' };
-  const planLabel = planLabels[billingPeriod && ['monthly', 'annual'].includes(billingPeriod) && !planLabels[billingPeriod] ? billingPeriod : planType] || planType;
+  const planLabels = { trustee: 'Trustee', estate: 'Estate', advisor: 'Advisor', monthly: 'Trustee', annual: 'Trustee' };
+  const planLabel = planLabels[planType] || planType;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
