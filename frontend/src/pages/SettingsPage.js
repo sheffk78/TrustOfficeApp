@@ -1011,7 +1011,7 @@ export default function SettingsPage() {
                           <SelectContent>
                             <SelectItem value="501c3">501(c)(3) Organization — tax-exempt, files Form 990</SelectItem>
                             <SelectItem value="508">508 Church/Religious Org — tax exempt, no IRS filings</SelectItem>
-                            <SelectItem value="private">Private Foundation — files Form 990-PF</SelectItem>
+                            <SelectItem value="private">Private Trust — full tax calendar (Form 1041)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
