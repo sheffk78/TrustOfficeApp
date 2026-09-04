@@ -1007,10 +1007,22 @@ async def get_user_by_customer_id(customer_id: str):
     """Look up a user and their subscription by Stripe customer ID.
 
     Returns (user_dict, subscription_dict) or (None, None) if not found.
+    Falls back to the subscriptions collection: guest-checkout-provisioned
+    users carry stripe_customer_id on the subscription doc (the user doc may
+    not have it), and lifecycle webhooks (invoice.paid, subscription.updated,
+    payment_failed) MUST resolve them or renewals/dunning silently no-op.
     """
     if not customer_id:
         return None, None
     user = await db.users.find_one({"stripe_customer_id": customer_id}, {"_id": 0})
+    if not user:
+        # Fallback: resolve via the subscriptions doc (guest checkout path)
+        sub_ref = await db.subscriptions.find_one(
+            {"stripe_customer_id": customer_id},
+            {"_id": 0, "user_id": 1}
+        )
+        if sub_ref and sub_ref.get("user_id"):
+            user = await db.users.find_one({"user_id": sub_ref["user_id"]}, {"_id": 0})
     if not user:
         return None, None
     sub = await db.subscriptions.find_one({"user_id": user.get("user_id")}, {"_id": 0})
@@ -1044,6 +1056,21 @@ async def _provision_guest_account(session, metadata: dict, plan_type: str, bill
     if not email:
         return None
 
+    # Stripe-side email wins: the payer can EDIT the prefilled email at Stripe
+    # Checkout. If they paid with a different address than the modal collected,
+    # provision the account (and send the set-password link) to the address
+    # that actually completed payment — otherwise receipts and login diverge.
+    customer_details = _stripe_to_dict(getattr(session, "customer_details", None))
+    stripe_email = (customer_details.get("email") or "").lower().strip()
+    if stripe_email and stripe_email != email:
+        logger.info(
+            f"Guest checkout email mismatch: modal={email} stripe={stripe_email} "
+            f"(session {getattr(session, 'id', '?')}) — provisioning with Stripe email"
+        )
+        email = stripe_email
+        if not name:
+            name = email.split("@")[0]
+
     existing = await db.users.find_one({"email": email}, {"_id": 0, "user_id": 1})
     if existing:
         logger.info(f"Guest checkout for existing user {email} — skipping provisioning (webhook redelivery or prior account)")
@@ -1069,6 +1096,8 @@ async def _provision_guest_account(session, metadata: dict, plan_type: str, bill
         "password_hash": None,
         "created_at": now,
         "created_via": "guest_checkout",
+        # Stripe identity on the user doc so lifecycle webhooks resolve directly
+        "stripe_customer_id": customer_id,
         # Marketing attribution from checkout metadata
         "utm_source": metadata.get("utm_source"),
         "utm_campaign": metadata.get("utm_campaign"),
@@ -1224,7 +1253,30 @@ async def _webhook_checkout_session_completed(event) -> None:
                 f"(email={metadata.get('guest_email')}). Payment captured but account NOT created — "
                 "manual intervention required."
             )
-            return
+            # Alert the admin inbox so this is visible immediately, not just in logs.
+            try:
+                await email_service.send_email(
+                    to_email="contact@trustoffice.app",
+                    subject="URGENT: Paid checkout could not provision an account",
+                    html_body=(
+                        f"<p>Guest checkout provisioning FAILED.</p>"
+                        f"<p>Session: {getattr(session, 'id', '?')}<br>"
+                        f"Email: {metadata.get('guest_email')}<br>"
+                        f"Plan: {plan_type}/{billing_period}</p>"
+                        f"<p>Payment was captured but no account exists. The webhook event "
+                        f"was marked failed and Stripe will retry. If retries exhaust, "
+                        f"provision manually via admin.</p>"
+                    ),
+                    tag="provisioning_alert",
+                )
+            except Exception as alert_err:
+                logger.error(f"Failed to send provisioning-failure alert: {alert_err}")
+            # Raise so the webhook dispatcher marks this event FAILED and Stripe
+            # re-delivers — a paying customer must not be left without an account.
+            raise RuntimeError(
+                f"guest provisioning failed for session {getattr(session, 'id', '?')} "
+                f"email={metadata.get('guest_email')}"
+            )
 
     if not user_id:
         return
@@ -1257,7 +1309,13 @@ async def _webhook_checkout_session_completed(event) -> None:
 
     await db.payment_transactions.update_one(
         {"session_id": getattr(session, "id", None) or str(session)},
-        {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {
+            "payment_status": "paid",
+            # Stamp the (possibly just-provisioned) user so revenue reports and
+            # payment-history lookups resolve for guest checkouts.
+            "user_id": user_id,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
     )
 
     await _process_referral_conversion_safe(user_id)
@@ -1592,23 +1650,21 @@ async def stripe_webhook(request: Request):
         if existing:
             if existing.get("status") == "completed":
                 return JSONResponse(content={"status": "already_processed"})
-            # If "processing" or "failed", allow reprocessing
-            logger.info(f"Webhook event {event_id} found in status '{existing.get('status')}' — reprocessing")
-        # Record the event as processing
-        # Use try/except to handle race condition when two backends process the same webhook
-        try:
+            # "failed"/"processing": retry is real — reset to processing so the
+            # handler runs again (a failed guest-provisioning event MUST be
+            # retried or a paying customer is left without an account).
+            await db.webhook_events.update_one(
+                {"event_id": event_id},
+                {"$set": {"status": "processing", "retry_count": (existing.get("retry_count") or 0) + 1}}
+            )
+            logger.info(f"Webhook event {event_id} found in status '{existing.get('status')}' — reprocessing (retry #{existing.get('retry_count', 0) + 1})")
+        else:
             await db.webhook_events.insert_one({
                 "event_id": event_id,
                 "type": event.type,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "status": "processing"
             })
-        except Exception as insert_err:
-            # DuplicateKeyError — another instance already inserted this event
-            if "duplicate key" in str(insert_err).lower() or "11000" in str(insert_err):
-                logger.info(f"Webhook event {event_id} already inserted by another instance — skipping")
-                return JSONResponse(content={"status": "already_processed"})
-            raise
 
     event_type = event.type
     logger.info(f"Stripe webhook received: {event_type}")

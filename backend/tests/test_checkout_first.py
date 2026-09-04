@@ -177,11 +177,18 @@ class _FakeDB:
         return getattr(self, name, _FakeCollection({}))
 
 
-def _fake_session(customer="cus_test123"):
+def _fake_session(customer="cus_test123", stripe_email=None):
     s = MagicMock()
     s.customer = customer
     s.id = "cs_test_123"
     s.subscription = "sub_test_123"
+    # Model real Stripe: customer_details is a StripeObject or None.
+    if stripe_email is None:
+        s.customer_details = None
+    else:
+        cd = MagicMock(spec=["to_dict"])
+        cd.to_dict.return_value = {"email": stripe_email}
+        s.customer_details = cd
     return s
 
 
@@ -234,7 +241,7 @@ class TestProvisionGuestAccount:
                 "guest_checkout": "1", "guest_email": "x@example.com",
                 "guest_name": "X", "plan_type": "trustee",
             }, "trustee", "monthly")
-        assert uid == "user_existing_ignored" if False else uid == "user_existing_ignored" or uid is not None
+        assert uid == "user_existing123", f"must return the EXISTING user_id, got {uid}"
         # no duplicate insert
         assert "last_insert" not in fake.users.store
 
@@ -251,6 +258,52 @@ class TestProvisionGuestAccount:
     async def test_missing_email_returns_none(self, provision, fresh_db):
         uid = await provision(_fake_session(), {"guest_checkout": "1"}, "trustee", "monthly")
         assert uid is None
+
+    @pytest.mark.asyncio
+    async def test_stripe_email_mismatch_wins(self, provision, fresh_db):
+        """Payer edited their email at Stripe Checkout — provision with the
+        Stripe-side email (the one that actually paid), not the modal email."""
+        uid = await provision(
+            _fake_session(stripe_email="actualpayer@example.com"),
+            {"guest_checkout": "1", "guest_email": "modalemail@example.com",
+             "guest_name": "Modal Name", "plan_type": "trustee"},
+            "trustee", "monthly"
+        )
+        assert uid and uid.startswith("user_")
+        user_doc = fresh_db.users.store["last_insert"]
+        assert user_doc["email"] == "actualpayer@example.com"
+        assert user_doc["stripe_customer_id"] == "cus_test123"
+
+    @pytest.mark.asyncio
+    async def test_user_doc_gets_stripe_customer_id(self, provision, fresh_db):
+        """Lifecycle webhooks resolve users by stripe_customer_id on the user doc."""
+        uid = await provision(_fake_session(customer="cus_lifecycle"), {
+            "guest_checkout": "1", "guest_email": "lifecycle@example.com",
+            "guest_name": "L", "plan_type": "trustee",
+        }, "trustee", "monthly")
+        user_doc = fresh_db.users.store["last_insert"]
+        assert user_doc["stripe_customer_id"] == "cus_lifecycle"
+
+
+class TestWebhookCheckoutCompletedGuest:
+    """Behavior tests for the guest branch of _webhook_checkout_session_completed."""
+
+    @pytest.mark.asyncio
+    async def test_provision_failure_raises(self):
+        """Provisioning failure must propagate (so the webhook dispatcher marks
+        the event failed and Stripe retries) — never silently return 'ok'."""
+        import routers.subscriptions as subs
+        fake = _FakeDB()
+        fake.users.store["find_one_result"] = None  # no existing user
+        with patch.object(subs, "db", fake), \
+             patch.object(subs.db.users, "insert_one", side_effect=RuntimeError("mongo down")):
+            with pytest.raises(Exception):
+                await subs._provision_guest_account(
+                    _fake_session(), {
+                        "guest_checkout": "1", "guest_email": "boom@example.com",
+                        "guest_name": "B", "plan_type": "trustee",
+                    }, "trustee", "monthly"
+                )
 
 
 # ---------------------------------------------------------------------------

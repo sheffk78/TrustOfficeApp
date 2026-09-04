@@ -265,8 +265,32 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
     if not user:
         return {"message": "If an account exists with this email, you will receive a password reset link."}
     
-    # Check if user has a password (not OAuth-only)
+    # Passwordless account (checkout-first provisioning): issue a SET-password
+    # token instead of silently doing nothing. These users were told to use
+    # this flow — a lost/expired welcome link must not lock a paying customer out.
     if not user.get("password_hash"):
+        set_token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=72)
+        await db.password_resets.update_one(
+            {"user_id": user["user_id"]},
+            {
+                "$set": {
+                    "token": set_token,
+                    "expires_at": expires_at.isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                },
+                "$setOnInsert": {"purpose": "set_password"},
+            },
+            upsert=True
+        )
+        frontend_url = os.environ.get('FRONTEND_URL', '')
+        reset_url = f"{frontend_url}/reset-password?token={set_token}"
+        background_tasks.add_task(
+            email_service.send_password_reset_email,
+            to_email=user["email"],
+            user_name=user.get("name", ""),
+            reset_url=reset_url
+        )
         return {"message": "If an account exists with this email, you will receive a password reset link."}
     
     # Generate reset token (expires in 1 hour)
