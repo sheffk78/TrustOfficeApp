@@ -1388,7 +1388,7 @@ State: {trust_info.get('state_code', 'Not specified')}
 Establishment Date: {trust_info.get('start_date', 'Not specified')}
 Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
 Trustees: {trust_info.get('trustees', 'Not specified')}
-Defensibility Score: {health.get('total', 0)}/{health.get('max_score', 115)} ({health.get('color', 'red')})
+Defensibility Score: {health.get('total', 0)}/{health.get('max_score', 100)} ({health.get('color', 'red')})
 
 {vault_section}
 
@@ -1721,7 +1721,7 @@ def build_citation_notes(trust_context: dict, intent: str, user_message: str = "
 
     health = ctx.get("health_score", {})
     if health.get("total", 0) > 0:
-        citations.append(f"Defensibility score: {health['total']}/{health.get('max_score', 115)}")
+        citations.append(f"Defensibility score: {health['total']}/{health.get('max_score', 100)}")
 
     deadlines = ctx.get("upcoming_deadlines", [])
     if deadlines:

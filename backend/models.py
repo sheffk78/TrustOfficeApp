@@ -1221,9 +1221,11 @@ class RiskPenaltyBreakdown(BaseModel):
 class HealthScoreResponse(BaseModel):
     trust_id: str
     total_score: int
-    max_score: int = 115
+    max_score: int = 100
     color: str
     base_score: int = 0
+    applicable_max: Optional[int] = None
+    scaled_base: Optional[int] = None
     risk_penalty: int = 0
     has_critical_risk: bool = False
     criteria: List[HealthScoreCriterion]
