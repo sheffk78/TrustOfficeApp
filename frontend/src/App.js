@@ -225,6 +225,16 @@ const AppRouter = () => {
     captureUtmParams();
   }, [location]);
 
+  // Scroll to top on route change — SPA navigation otherwise keeps the
+  // previous page's scroll offset, so clicking a nav item (e.g. Trust Roles)
+  // lands the user mid-page instead of at the top.
+  // Keyed on pathname only: search-param-only changes (tab switches) must not
+  // yank the scroll. Skipped when the target URL carries a #hash so pages
+  // with hash-anchor deep links (SettingsPage) keep control of positioning.
+  useEffect(() => {
+    if (!location.hash) window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   // CRITICAL: Check URL fragment synchronously for session_id (OAuth callback)
   // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
   if (location.hash?.includes('session_id=')) {

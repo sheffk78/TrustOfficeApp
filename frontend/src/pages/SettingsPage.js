@@ -872,14 +872,17 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Settings Tabs (Fix 15: split single scroll wall into 4 tabs) */}
+          {/* Settings Tabs (Fix 15: split single scroll wall into 4 tabs).
+              Hidden on /trust-roles: that page has one section only, so a lone
+              "Trust Roles" tab would just duplicate the page title above it. */}
           <Tabs value={settingsTab} onValueChange={setSettingsTab} className="mb-8">
-            <TabsList className={`grid ${rolePage ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3'} mb-6 mobile-tabs-scroll`}>
-              {!rolePage && <TabsTrigger value="profile">Trust Profile</TabsTrigger>}
-              {rolePage && <TabsTrigger value="people">Trust Roles</TabsTrigger>}
-              {!rolePage && <TabsTrigger value="compliance">Governance</TabsTrigger>}
-              {!rolePage && <TabsTrigger value="account">Account &amp; Billing</TabsTrigger>}
-            </TabsList>
+            {!rolePage && (
+              <TabsList className="grid grid-cols-2 md:grid-cols-3 mb-6 mobile-tabs-scroll">
+                <TabsTrigger value="profile">Trust Profile</TabsTrigger>
+                <TabsTrigger value="compliance">Governance</TabsTrigger>
+                <TabsTrigger value="account">Account &amp; Billing</TabsTrigger>
+              </TabsList>
+            )}
 
           <TabsContent value="profile">
           {/* Trust Settings */}
