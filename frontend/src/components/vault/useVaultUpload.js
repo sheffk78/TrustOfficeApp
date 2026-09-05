@@ -2,6 +2,8 @@ import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { showError } from '@/utils/errors';
 import { fetchWithAuth } from '@/utils/api';
+import { uploadWithProgress } from '@/utils/uploadWithProgress';
+import { validateVaultFile } from '@/utils/uploadValidation';
 import { INITIAL_FORM } from './vaultConstants';
 
 /**
@@ -61,18 +63,6 @@ export function useVaultUpload(selectedTrust, loadData) {
     }
   }, [form, isLinkUrlValid, resetForm, selectedTrust, loadData]);
 
-  /** Read the JSON body of an upload response, falling back to a status-based message. */
-  const readUploadErrorMessage = async (res) => {
-    let errorMsg = 'Upload failed';
-    try {
-      const errData = await res.json();
-      errorMsg = errData.detail || errorMsg;
-    } catch {
-      errorMsg = `Upload failed (${res.status})`;
-    }
-    return errorMsg;
-  };
-
   const handleUpload = useCallback(async () => {
     if (!uploadFile) {
       toast.error('Please select a file to upload first.');
@@ -84,7 +74,7 @@ export function useVaultUpload(selectedTrust, loadData) {
     }
 
     setUploading(true);
-    setUploadProgress('Uploading...');
+    setUploadProgress('Uploading 0%');
 
     try {
       const formData = new FormData();
@@ -98,36 +88,24 @@ export function useVaultUpload(selectedTrust, loadData) {
       formData.append('needs_renewal', form.needs_renewal ? 'true' : 'false');
 
       const token = localStorage.getItem('auth_token');
-      const controller = new AbortController();
-      // Big files on slow connections need headroom: 100MB at 3Mbps ≈ 4.5min.
-      const timeoutId = setTimeout(() => controller.abort(), 480000);
+      const API_BASE = (process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app') + '/api';
 
-      let res;
-      try {
-        const API_BASE = (process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app') + '/api';
-        res = await fetch(`${API_BASE}/trusts/${selectedTrust.trust_id}/vault/upload`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-          signal: controller.signal,
-        });
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        if (fetchError.name === 'AbortError') {
-          throw new Error('Upload timed out after 8 minutes — the file may be too large for your connection speed. Please try again, use a faster connection, or use "Link External" to store a link to the file instead.');
-        }
-        throw new Error('Could not reach the server. Please check your internet connection and try again.');
-      }
-      clearTimeout(timeoutId);
+      const res = await uploadWithProgress({
+        url: `${API_BASE}/trusts/${selectedTrust.trust_id}/vault/upload`,
+        token,
+        formData,
+        onProgress: ({ percent }) => {
+          // Transfer caps around 95% — the final stretch is server-side
+          // compression, tracked by the separate "Processing" message below.
+          if (percent < 100) {
+            setUploadProgress(`Uploading ${percent}%`);
+          } else {
+            setUploadProgress('Almost done — processing document…');
+          }
+        },
+      });
 
-      if (!res.ok) throw new Error(await readUploadErrorMessage(res));
-
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = {};
-      }
+      if (!res.ok) throw new Error(res.data.detail || `Upload failed (${res.status})`);
 
       setUploadProgress('Upload complete!');
       toast.success('File uploaded to vault');
@@ -136,9 +114,6 @@ export function useVaultUpload(selectedTrust, loadData) {
     } catch (e) {
       setUploadProgress('');
       let errorMsg = e.message || 'Upload failed';
-      if (errorMsg === 'Failed to fetch' || errorMsg.includes('Could not reach the server')) {
-        errorMsg = 'Could not reach the server. The file may be too large or your connection timed out. Please try again, or use "Link External" to store a link to the file instead.';
-      }
       if (errorMsg.includes('timed out')) {
         errorMsg = `This upload timed out after 8 minutes — the file may be too large for your connection speed. ${uploadFile?.name ? `${uploadFile.name} is ${(uploadFile.size / (1024 * 1024)).toFixed(1)}MB. ` : ''}Please try again on a faster connection, or use "Link External" to store a link instead.`;
       }
@@ -163,15 +138,12 @@ export function useVaultUpload(selectedTrust, loadData) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Size guidance at file-select time — only reject what the server genuinely
-    // can't take. Up to 100MB is accepted; the server deep-compresses PDFs
-    // (image recompression) before storing, so most big scans just work.
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error(
-        `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. ` +
-        `Uploads are limited to 100MB (PDFs are compressed automatically after upload, but the transfer limit is 100MB). ` +
-        `Please compress the PDF first (e.g. ilovepdf.com/compress_pdf), or use "Link External" to store a link instead.`
-      );
+    // Shared validation (size + type) with exact guidance — same messages on
+    // every upload surface.
+    const validationError = validateVaultFile(file);
+    if (validationError) {
+      setUploadError(validationError);
+      toast.error(validationError.split('. ')[0]);
       return;
     }
 

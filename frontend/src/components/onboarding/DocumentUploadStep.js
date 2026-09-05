@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import {
-  Upload, Sparkles, Lock, Loader2, FileCheck,
+  Upload, Sparkles, Lock, FileCheck,
 } from './onboardingConstants';
 
 /**
@@ -76,7 +76,7 @@ export default function DocumentUploadStep({
               <div>
                 <Upload className="w-12 h-12 text-navy/30 mx-auto mb-3" />
                 <p className="font-medium text-navy mb-1">Click to upload or drag and drop</p>
-                <p className="text-sm text-muted-foreground">PDF, Word document, or text file (max 16MB)</p>
+                <p className="text-sm text-muted-foreground">PDF, Word document, or text file — up to 100MB (large PDFs auto-compressed)</p>
               </div>
             )}
           </div>
@@ -93,9 +93,26 @@ export default function DocumentUploadStep({
           )}
 
           {uploadingDoc && (
-            <div className="flex items-center justify-center gap-2 py-4">
-              <Loader2 className="w-5 h-5 text-navy animate-spin" />
-              <span className="text-sm text-muted-foreground">{uploadProgress}</span>
+            <div className="py-4" aria-live="polite">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm text-muted-foreground">{uploadProgress}</span>
+                <span className="text-xs text-muted-foreground/70">
+                  {uploadProgress.includes('%') ? 'Large files may take a few minutes' : 'Compressing and securing your document — no need to do anything'}
+                </span>
+              </div>
+              <div
+                className="h-1.5 w-full rounded-full bg-muted overflow-hidden"
+                role="progressbar"
+                aria-label="Upload progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={uploadProgress.includes('%') ? parseInt(uploadProgress.replace(/\D/g, ''), 10) || 0 : 95}
+              >
+                <div
+                  className="h-full bg-navy transition-all duration-300"
+                  style={{ width: uploadProgress.includes('%') ? `${parseInt(uploadProgress.replace(/\D/g, ''), 10) || 0}%` : '95%' }}
+                />
+              </div>
             </div>
           )}
 

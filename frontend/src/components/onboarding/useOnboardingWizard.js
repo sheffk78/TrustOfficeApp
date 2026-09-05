@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { showError } from '@/utils/errors';
 import { xhrRequest } from './xhrRequest';
 import { validateDocFile } from './docValidation';
+import { uploadWithProgress } from '@/utils/uploadWithProgress';
 import {
   API_URL,
   INITIAL_TRUST_DATA,
@@ -72,41 +73,25 @@ export function useOnboardingWizard() {
 
   /** Upload the selected trust document to the newly created trust's vault. */
   const uploadTrustDocument = useCallback(async (trustId, file) => {
-    setUploadProgress('Uploading document...');
+    setUploadProgress('Uploading document 0%');
     const formData = new FormData();
     formData.append('file', file);
     formData.append('title', 'Declaration of Trust');
     formData.append('category', 'trust_instrument');
 
     const token = localStorage.getItem('auth_token');
-    const controller = new AbortController();
-    // Big files need headroom: 100MB at 3Mbps ≈ 4.5min. Server deep-compresses PDFs.
-    const timeoutId = setTimeout(() => controller.abort(), 480000);
 
-    let res;
-    try {
-      res = await fetch(`${API_URL}/api/trusts/${trustId}/vault/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-        signal: controller.signal,
-      });
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') throw new Error('Upload timed out after 8 minutes — the file may be too large for your connection speed. Please try again, or use a faster connection.');
-      throw new Error('Could not reach the server. Check your connection and try again.');
-    }
-    clearTimeout(timeoutId);
+    const res = await uploadWithProgress({
+      url: `${API_URL}/api/trusts/${trustId}/vault/upload`,
+      token,
+      formData,
+      onProgress: ({ percent }) => {
+        setUploadProgress(percent < 100 ? `Uploading document ${percent}%` : 'Almost done — processing document…');
+      },
+    });
 
     if (!res.ok) {
-      let errorMsg = 'Upload failed';
-      try {
-        const errData = await res.json();
-        errorMsg = errData.detail || errorMsg;
-      } catch {
-        errorMsg = `Upload failed (${res.status})`;
-      }
-      throw new Error(errorMsg);
+      throw new Error(res.data.detail || `Upload failed (${res.status})`);
     }
     return res;
   }, []);

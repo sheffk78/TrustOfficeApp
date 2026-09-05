@@ -134,9 +134,31 @@ export default function VaultAddForm({
           )}
         </div>
 
-        {/* Upload progress */}
+        {/* Upload progress — bar + label (label carries the %, or the processing note) */}
         {uploadProgress && (
-          <p className="text-sm text-warning mb-2">{uploadProgress}</p>
+          <div className="mb-3" aria-live="polite">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm text-warning">{uploadProgress}</p>
+              {uploading && (
+                <p className="text-xs text-muted-foreground">
+                  {uploadProgress.includes('%') ? 'Large files may take a few minutes' : 'Compressing and securing your document — no need to do anything'}
+                </p>
+              )}
+            </div>
+            <div
+              className="h-1.5 w-full rounded-full bg-muted overflow-hidden"
+              role="progressbar"
+              aria-label="Upload progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={uploadProgress.includes('%') ? parseInt(uploadProgress.replace(/\D/g, ''), 10) || 0 : 95}
+            >
+              <div
+                className="h-full bg-warning transition-all duration-300"
+                style={{ width: uploadProgress.includes('%') ? `${parseInt(uploadProgress.replace(/\D/g, ''), 10) || 0}%` : '95%' }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Persistent upload error — inline, stays visible until user fixes it or picks a new file */}

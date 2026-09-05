@@ -1,5 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, File as FileIcon, X, Check, Loader2, FolderOpen } from 'lucide-react';
+import { Upload, File as FileIcon, X, Check, FolderOpen } from 'lucide-react';
+import { uploadWithProgress } from '@/utils/uploadWithProgress';
+import { validateVaultFile } from '@/utils/uploadValidation';
 
 const VAULT_CATEGORIES = [
   { value: 'trust_instrument', label: 'Trust Instrument / Governing Document' },
@@ -33,17 +35,17 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
   const [description, setDescription] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null); // { success, docId, error }
+  const [progressPct, setProgressPct] = useState(0); // 0-95 transfer; 95 = processing
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleFileSelect = useCallback((file) => {
     if (!file) return;
-    // Only reject what the server can't take — server deep-compresses PDFs after upload.
-    if (file.size > 100 * 1024 * 1024) {
-      setUploadResult({
-        success: false,
-        error: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Uploads are limited to 100MB (large PDFs are compressed automatically after upload). Please compress the PDF first (e.g. ilovepdf.com/compress_pdf), or use "Link External" to store a link instead.`,
-      });
+    // Shared validation (size + type) with exact guidance — same messages on
+    // every upload surface.
+    const validationError = validateVaultFile(file);
+    if (validationError) {
+      setUploadResult({ success: false, error: validationError });
       return;
     }
     setSelectedFile(file);
@@ -83,6 +85,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
 
     setUploading(true);
     setUploadResult(null);
+    setProgressPct(0);
 
     try {
       const formData = new FormData();
@@ -95,40 +98,24 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
 
       const token = localStorage.getItem('auth_token');
       const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api';
-      const controller = new AbortController();
-      // Big files need headroom: 100MB at 3Mbps ≈ 4.5min.
-      const timeoutId = setTimeout(() => controller.abort(), 480000);
 
-      const res = await fetch(`${backendUrl}/trusts/${trustId}/vault/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-        signal: controller.signal,
+      const res = await uploadWithProgress({
+        url: `${backendUrl}/trusts/${trustId}/vault/upload`,
+        token,
+        formData,
+        onProgress: ({ percent }) => {
+          // Cap display at 95% — the final stretch is server-side compression.
+          setProgressPct(Math.min(percent, 95));
+        },
       });
 
-      clearTimeout(timeoutId);
-
       if (!res.ok) {
-        let errorMsg = 'Upload failed';
-        try {
-          const errData = await res.json();
-          errorMsg = errData.detail || errorMsg;
-        } catch {
-          errorMsg = `Upload failed (${res.status})`;
-        }
-        throw new Error(errorMsg);
+        throw new Error(res.data.detail || `Upload failed (${res.status})`);
       }
 
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = {};
-      }
-
-      setUploadResult({ success: true, docId: data.doc_id, title: title.trim(), category });
+      setUploadResult({ success: true, docId: res.data.doc_id, title: title.trim(), category });
       if (onUploadComplete) {
-        onUploadComplete({ success: true, docId: data.doc_id, title: title.trim(), category, fileName: selectedFile.name });
+        onUploadComplete({ success: true, docId: res.data.doc_id, title: title.trim(), category, fileName: selectedFile.name });
       }
     } catch (err) {
       const errorMsg = err.name === 'AbortError'
@@ -137,6 +124,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
       setUploadResult({ success: false, error: errorMsg });
     } finally {
       setUploading(false);
+      setProgressPct(0);
     }
   };
 
@@ -315,11 +303,34 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
             </div>
           )}
 
-          {/* Uploading state */}
+          {/* Uploading state — progress bar + reassurance while server compresses */}
           {uploading && (
-            <div className="flex items-center gap-2 pt-3 mt-3 border-t border-navy/10">
-              <Loader2 className="w-4 h-4 animate-spin text-gold" />
-              <span className="text-xs text-muted-foreground">Uploading to vault...</span>
+            <div className="pt-3 mt-3 border-t border-navy/10" aria-live="polite">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-muted-foreground">
+                  {progressPct >= 95
+                    ? 'Almost done — processing document…'
+                    : `Uploading ${progressPct}%`}
+                </span>
+                <span className="text-[10px] text-muted-foreground/70">
+                  {progressPct >= 95
+                    ? 'Compressing and securing your document — no need to do anything'
+                    : 'Large files may take a few minutes'}
+                </span>
+              </div>
+              <div
+                className="h-1.5 w-full rounded-full bg-muted overflow-hidden"
+                role="progressbar"
+                aria-label="Upload progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={progressPct}
+              >
+                <div
+                  className="h-full bg-gold transition-all duration-300"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
             </div>
           )}
         </>

@@ -227,7 +227,11 @@ async def upload_document(
         if not content_type.startswith(("image/", "application/pdf", "application/msword", "application/vnd.", "text/")):
             raise HTTPException(
                 status_code=400,
-                detail=f"File type '{content_type}' is not supported. Supported types: PDF, images, Word docs, Excel, and text files."
+                detail=(
+                    f"This file type ({content_type}) isn't supported. Supported types: PDF, images (JPG/PNG), Word, Excel, and text files. "
+                    "To fix: (1) export or print your document to PDF (most apps: File → Save As PDF, or File → Print → Save as PDF) and upload that; "
+                    "or (2) photograph paper documents and upload the photos."
+                ),
             )
 
     # Read file content (up to UPLOAD_ACCEPT_LIMIT; FastAPI/Starlette streams it in)

@@ -219,6 +219,21 @@ class TestDeepCompressionLadder:
         assert getattr(fake_db.vault_documents, "last_record", None) is None
 
 
+class TestWrongTypeGuidance:
+    def test_unsupported_type_gets_actionable_message(self, client, fake_db):
+        """An unsupported file type (e.g. .exe-style octet-stream) → 400 with numbered fixes."""
+        resp = client.post(
+            "/api/trusts/t1/vault/upload",
+            files={"file": ("archive.zip", io.BytesIO(b"PK\x03\x04dummy"), "application/zip")},
+            data={"title": "Zip", "category": "other"},
+        )
+        assert resp.status_code == 400, f"got {resp.status_code}: {resp.text[:300]}"
+        detail = resp.json()["detail"]
+        assert "isn't supported" in detail
+        assert "Save As PDF" in detail or "Save as PDF" in detail
+        assert getattr(fake_db.vault_documents, "last_record", None) is None
+
+
 class TestNormalUploadStillWorks:
     def test_small_pdf_accepted(self, client, fake_db):
         small_pdf = _make_pdf_bytes(200 * 1024)
