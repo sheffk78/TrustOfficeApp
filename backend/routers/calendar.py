@@ -142,7 +142,7 @@ async def _fetch_tax_trust_map(tax_entries: list) -> dict:
         if tax_trust_ids
         else []
     )
-    return {t["trust_id"]: t for t in tax_trusts}
+    return {t.get("trust_id"): t for t in tax_trusts if t.get("trust_id")}
 
 
 def _build_tax_event(entry: dict, trust_doc: dict) -> dict:
@@ -242,10 +242,11 @@ async def _build_governance_events(
         if trust_ids
         else []
     )
-    trust_map = {t["trust_id"]: t["name"] for t in trusts}
+    trust_map = {t.get("trust_id"): t.get("name", "") for t in trusts if t.get("trust_id")}
     for t in trusts:
-        if t["trust_id"] not in tax_trust_map:
-            tax_trust_map[t["trust_id"]] = t
+        tid = t.get("trust_id")
+        if tid and tid not in tax_trust_map:
+            tax_trust_map[tid] = t
 
     events = []
     for task in tasks:
@@ -504,13 +505,14 @@ async def get_calendar_events(
             tax_entries = _filter_exempt_tax(tax_entries, trust_doc)
     else:
         exempt_ids = {
-            t["trust_id"] for t in await db.trusts.find(
+            t.get("trust_id") for t in await db.trusts.find(
                 {"user_id": user["user_id"], "$or": [
                     {"tax_status": {"$in": ["508", "501c3"]}},
                     {"benevolence_enabled": True},
                 ]},
                 {"_id": 0, "trust_id": 1}
             ).to_list(100)
+            if t.get("trust_id")
         }
         if exempt_ids:
             tax_entries = [

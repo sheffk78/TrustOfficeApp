@@ -49,7 +49,11 @@ export default function TrustCalendarPage() {
     setLoading(true);
     try {
       const res = await fetchWithAuth(`/calendar/events?trust_id=${selectedTrust.trust_id}`);
-      if (!res.ok) throw new Error('Failed to load calendar');
+      if (!res.ok) {
+        // Include status code in the error for better diagnostics
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.detail || `Failed to load calendar (HTTP ${res.status})`);
+      }
       const data = await res.json();
       setEvents(data.events || []);
     } catch (e) {
