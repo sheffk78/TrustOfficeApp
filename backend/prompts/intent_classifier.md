@@ -33,7 +33,7 @@ Given a user message in a trust administration context, classify it into exactly
 | `schedule_task` | "Schedule a quarterly review", "Remind me to file taxes", "Create a task for annual review" | Create a governance task with due date |
 | `add_transaction` | "I paid the insurance", "Record trust income", "Log a bank fee", "Add a transaction" | Log a trust income or expense transaction |
 | `change_settings` | "Change my EIN", "Update the trust name", "Change my state", "Modify formation date" | Update trust profile settings |
-| `create_entity` | "Add a holding LLC", "I need to set up an operating LLC", "Add an entity to my trust", "Create a new structure", "Add an LLC under my trust" | Create a new entity (Trust, Holding LLC, or Operating LLC) in the Structures section |
+| `create_entity` | "Add a holding LLC", "I need to set up an operating LLC", "Add an entity to my trust", "Create a new structure", "Add an LLC under my trust", "Add TRUE JOY BIRTHING LLC as an entity", "Register my LLC with EIN 12-3456789" | Create a new entity (Trust, Holding LLC, or Operating LLC) in the Structures section |
 | `general_chat` | "Hello", "Thanks", "What can you do?", "Tell me a joke" | Greeting, casual, off-topic |
 | `emergency` | "I'm worried I messed up", "I think I missed a deadline", "I need help urgently" | Distress, concern, anxiety about trust duties |
 
@@ -43,6 +43,7 @@ Given a user message in a trust administration context, classify it into exactly
 - Extract any `entities` from the message (names, dates, amounts, document types)
 - `entities` can be empty `{}` if nothing specific is mentioned
 - If multiple intents seem equally strong, prefer the intent that requires action (output) over knowledge (input)
+- IMPORTANT: If the message is a short approval ("yes", "yes please", "go ahead", "do it", "approved", "correct") or rejection ("no", "cancel", "stop", "not now"), classify it as `approval_response` with the highest confidence you can justify. The system handles approval responses deterministically BEFORE you run — you will rarely see them. If you do see one with no action-card context available, still return `approval_response` so the assistant confirms status instead of re-asking.
 - IMPORTANT: Distinguish between `create_beneficiary` (individual person) vs `create_class_beneficiary` (a class like children, descendants, blood relatives). If the user mentions a class or group (children, descendants, blood relatives, heirs, after-born, future members), prefer `create_class_beneficiary`. If they mention a specific named person, prefer `create_beneficiary`.
 - IMPORTANT: Distinguish between `create_beneficiary` (new person) vs `update_beneficiary` (modifying an existing person). If the user mentions an existing name and says "change" or "update" or "modify", prefer `update_beneficiary`. If they say "add" or "new" without modification language, prefer `create_beneficiary`.
 - IMPORTANT: Distinguish between `remove_beneficiary` (delete) and `update_beneficiary` (modify) — "remove", "delete", "take off" = remove; "change", "update", "modify" = update.

@@ -184,6 +184,27 @@ function createStreamEventHandler({
         handleDoneEvent({ data, assistantId, fullText, setMessages, onDoneCallbackRef, newConvId: getNewConvId() });
         break;
 
+      case 'action_status': {
+        // Backend executed a pending action card because the user approved or
+        // rejected it by TEXT (e.g. typed "yes"). Update the original card so
+        // the UI reflects Approved/Rejected without a button click.
+        const { message_index: msgIdx, confirmation_status, execution_result } = data;
+        if (typeof msgIdx === 'number') {
+          setMessages(prev => prev.map((msg, idx) => {
+            if (idx !== msgIdx) return msg;
+            return {
+              ...msg,
+              action_cards: (msg.action_cards || []).map(ac => ({
+                ...ac,
+                status: confirmation_status || ac.status,
+                execution_result: execution_result || ac.execution_result || null,
+              })),
+            };
+          }));
+        }
+        break;
+      }
+
       case 'error':
         setError(data.message || 'An error occurred during streaming');
         finalizePlaceholder(setMessages, assistantId, {

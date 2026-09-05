@@ -28,6 +28,13 @@ from chat_service import (
     build_citation_notes,
 )
 from action_registry import requires_confirmation, get_action, ACTION_REGISTRY
+from approval_handler import (
+    is_approval_message,
+    is_rejection_message,
+    get_latest_pending_action,
+    handle_text_approval,
+    handle_text_rejection,
+)
 
 router = APIRouter(prefix="/ai", tags=["ai", "chat"])
 logger = logging.getLogger(__name__)
@@ -217,12 +224,81 @@ async def chat(
         request.conversation_id, user_id, trust_id, request.message
     )
 
-    # 3. Load conversation history
+    # 3. Load conversation history (keep action-card status for prompt markers)
     conversation = await db.chat_conversations.find_one(
         {"conversation_id": conv_id, "user_id": user_id}
     )
     messages = conversation.get("messages", []) if conversation else []
-    history_for_ai = [{"role": m.get("role"), "content": m.get("content")} for m in messages[-20:]]
+    history_for_ai = []
+    for m in messages[-20:]:
+        entry = {"role": m.get("role"), "content": m.get("content")}
+        card = m.get("action_card") if m.get("role") == "assistant" else None
+        if card:
+            entry["action_card"] = {
+                "type": card.get("type", "action"),
+                "confirmation_status": card.get("confirmation_status") or "pending",
+            }
+        history_for_ai.append(entry)
+
+    # 3b. Deterministic approval interception — BEFORE intent classification.
+    # If the user typed "yes"/"approve it" and the latest assistant message
+    # has a pending action card, execute it directly. The LLM never sees this
+    # message: its history strips action cards, so it would otherwise re-ask
+    # the exact same approval question (the bug Kenneth hit on 2026-09-04).
+    if is_approval_message(request.message) or is_rejection_message(request.message):
+        pending_idx, pending_card = await get_latest_pending_action(conv_id, user_id)
+        if pending_idx is not None and pending_card is not None:
+            if is_approval_message(request.message):
+                approval_result = await handle_text_approval(
+                    conversation_id=conv_id,
+                    message_index=pending_idx,
+                    action_card=pending_card,
+                    user_id=user_id,
+                )
+            else:
+                approval_result = await handle_text_rejection(
+                    conversation_id=conv_id,
+                    message_index=pending_idx,
+                    user_id=user_id,
+                )
+
+            # Save the user message + a synthetic assistant confirmation.
+            now = datetime.now(timezone.utc).isoformat()
+            user_msg_doc = ChatMessage(role="user", content=request.message)
+            confirm_msg_doc = ChatMessage(
+                role="assistant",
+                content=approval_result["message"],
+                action_card=None,
+                citation_note="Action card approval processed directly.",
+                unknown_note=None,
+                caveat=None,
+            )
+            await db.chat_conversations.update_one(
+                {"conversation_id": conv_id, "user_id": user_id},
+                {
+                    "$push": {"messages": {"$each": [user_msg_doc.model_dump(), confirm_msg_doc.model_dump()]}},
+                    "$set": {"updated_at": now},
+                    "$inc": {"message_count": 2},
+                }
+            )
+
+            ctx = await build_trust_context(user_id, trust_id, intent="general_chat")
+            trust_context_summary = {
+                "trust_name": ctx.get("trust", {}).get("name", trust_name),
+                "health_score": ctx.get("health_score", {}).get("total", 0),
+                "health_color": ctx.get("health_score", {}).get("color", "red"),
+                "upcoming_deadlines": ctx.get("upcoming_deadlines", [])[:3],
+                "pending_items": ctx.get("pending_items", [])[:3],
+                "beneficiary_count": len(ctx.get("beneficiaries", [])),
+            }
+            return ChatResponse(
+                message=confirm_msg_doc,
+                conversation_id=conv_id,
+                trust_context_summary=trust_context_summary,
+                has_pending_actions=False,
+            )
+        # No pending card: fall through to normal flow (the LLM can ask for
+        # clarification if "yes" is genuinely ambiguous).
 
     # 4. Classify intent
     intent_result = await classify_intent(request.message, None)
@@ -2062,7 +2138,79 @@ async def _chat_stream_generator(
             {"conversation_id": conv_id, "user_id": user_id}
         )
         messages = conversation.get("messages", []) if conversation else []
-        history_for_ai = [{"role": m.get("role"), "content": m.get("content")} for m in messages[-20:]]
+        history_for_ai = []
+        for m in messages[-20:]:
+            entry = {"role": m.get("role"), "content": m.get("content")}
+            card = m.get("action_card") if m.get("role") == "assistant" else None
+            if card:
+                entry["action_card"] = {
+                    "type": card.get("type", "action"),
+                    "confirmation_status": card.get("confirmation_status") or "pending",
+                }
+            history_for_ai.append(entry)
+
+        # 3b. Deterministic approval interception (same as the batch endpoint).
+        # Approval/rejection by text executes the pending action card directly;
+        # the LLM never re-asks. Emits an action_status event so the frontend
+        # updates the original card's state, then a normal-looking response.
+        if is_approval_message(message) or is_rejection_message(message):
+            pending_idx, pending_card = await get_latest_pending_action(conv_id, user_id)
+            if pending_idx is not None and pending_card is not None:
+                if is_approval_message(message):
+                    approval_result = await handle_text_approval(
+                        conversation_id=conv_id,
+                        message_index=pending_idx,
+                        action_card=pending_card,
+                        user_id=user_id,
+                    )
+                else:
+                    approval_result = await handle_text_rejection(
+                        conversation_id=conv_id,
+                        message_index=pending_idx,
+                        user_id=user_id,
+                    )
+
+                now = datetime.now(timezone.utc).isoformat()
+                user_msg_doc = ChatMessage(role="user", content=message)
+                confirm_msg_doc = ChatMessage(
+                    role="assistant",
+                    content=approval_result["message"],
+                    action_card=None,
+                    citation_note="Action card approval processed directly.",
+                    unknown_note=None,
+                    caveat=None,
+                )
+                await db.chat_conversations.update_one(
+                    {"conversation_id": conv_id, "user_id": user_id},
+                    {
+                        "$push": {"messages": {"$each": [user_msg_doc.model_dump(), confirm_msg_doc.model_dump()]}},
+                        "$set": {"updated_at": now},
+                        "$inc": {"message_count": 2},
+                    }
+                )
+
+                # Tell the frontend the original card changed state
+                yield await _sse_event("action_status", {
+                    "message_index": pending_idx,
+                    "confirmation_status": "approved" if approval_result.get("success") and is_approval_message(message) else ("rejected" if is_rejection_message(message) else "pending"),
+                    "execution_result": approval_result.get("execution_result"),
+                })
+
+                # Stream the confirmation text through the normal token path
+                yield await _sse_event("status", {"phase": "generating"})
+                text = approval_result["message"]
+                for i in range(0, len(text), 80):
+                    yield await _sse_event("token", {"text": text[i:i + 80]})
+                yield await _sse_event("done", {
+                    "action_card": None,
+                    "citation_note": "Action card approval processed directly.",
+                    "unknown_note": None,
+                    "caveat": None,
+                    "intent": "approval",
+                })
+                logger.info(f"CHAT_TEXT_APPROVAL | user={user_id} | conversation={conv_id} | card_index={pending_idx} | success={approval_result.get('success')}")
+                return
+            # No pending card: fall through to normal flow.
 
         # 4. Send meta event with conversation_id
         yield await _sse_event("meta", {

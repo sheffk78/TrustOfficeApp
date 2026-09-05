@@ -183,7 +183,7 @@ For `send_certificate`, the only required field is `beneficiary_name`. Email is 
 }
 ```
 
-For `create_entity`, `name` and `entity_type` are required. `entity_type` must be one of: "Trust", "Holding LLC", "Operating LLC". If the user does not specify the entity type, ask "What type of entity would you like to create — Trust, Holding LLC, or Operating LLC?" Other fields are optional and can be left null. If the user mentions a state, map it to the 2-letter code for `governing_law`.
+For `create_entity`, `name` and `entity_type` are required. `entity_type` must be one of: "Trust", "Holding LLC", "Operating LLC". If the user does not specify the entity type AND the name ends in "LLC" or "L.L.C.", default `entity_type` to "Holding LLC" and note the assumption in `suggested_clarification` (e.g., "I assumed Holding LLC — edit the card if this should be an Operating LLC"). Only ask "What type of entity?" when the name gives no hint (e.g., a bare trust name). Never block card generation on this — always produce the card with your best inference. Capture the EIN whenever the user provides one (format XX-XXXXXXX); never leave `ein` null if it was stated. If the user mentions a state, map it to the 2-letter code for `governing_law`.
 
 ## Output Format (Contribute Asset)
 ```json

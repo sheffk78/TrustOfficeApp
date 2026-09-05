@@ -1188,7 +1188,13 @@ def _fmt_tax_deadlines(items: list) -> str:
 
 
 def _fmt_history(history: list) -> str:
-    """Format conversation history as brief text (truncated)."""
+    """Format conversation history as brief text (truncated).
+
+    Includes action-card status markers so the model knows when a card is
+    pending/approved/rejected — the raw message list sent over the wire
+    strips action cards entirely, which previously made the model blind to
+    approvals and caused it to re-ask the same question.
+    """
     if not history:
         return "None"
     lines = []
@@ -1197,7 +1203,13 @@ def _fmt_history(history: list) -> str:
         content = m.get("content", "")
         if len(content) > 200:
             content = content[:200] + "..."
-        lines.append(f"{role}: {content}")
+        card = m.get("action_card")
+        if role == "assistant" and card:
+            status = card.get("confirmation_status") or "pending"
+            ctype = card.get("type", "action")
+            lines.append(f"{role}: {content} [ACTION CARD: {ctype} — status: {status}]")
+        else:
+            lines.append(f"{role}: {content}")
     return "\n".join(lines)
 
 
@@ -1362,6 +1374,20 @@ def _build_system_prompt(
     if intent in ESCALATION_INTENTS:
         system_prompt_base += "\n\n" + CHAT_SYSTEM_ESCALATION
 
+    # Approval-response guidance: the model should never re-ask for approval.
+    # When the deterministic interception didn't fire (no pending card found),
+    # the correct behavior is to briefly confirm status — not ask again.
+    if intent == "approval_response":
+        system_prompt_base += """
+
+## Approval Response Handling
+The user's message is an approval or rejection. Check the Conversation History for the most recent [ACTION CARD ... status: ...] marker:
+- If the latest card is APPROVED: confirm in one line what was done (e.g., "Done — the entity was added to your Structures."). Do NOT summarize the card again, do NOT ask any further approval question, do NOT create another card.
+- If the latest card is REJECTED: confirm nothing was created, in one line.
+- If the latest card is PENDING (rare — approval text usually executes automatically): tell the user the card is still awaiting their click on Approve, OR simply confirm you're ready to proceed on their word. Do NOT re-present or re-summarize the card.
+- If there is no card in history at all: say you don't have a pending action to approve and ask what they'd like to do.
+Keep it to one or two sentences. Never re-ask for approval.
+"""
     # Distribution evaluation guidance (only for distribution intents)
     if intent in ("create_distribution", "evaluate_distribution"):
         system_prompt_base += """
