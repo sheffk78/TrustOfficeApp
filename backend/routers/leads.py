@@ -1075,11 +1075,14 @@ def _verify_facebook_signature(payload: bytes, signature: str, app_secret: str) 
 async def _fetch_facebook_lead_data(leadgen_id: str, access_token: str) -> Optional[dict]:
     """
     Fetch lead data from Facebook Graph API.
-    Endpoint: GET /{leadgen_id}?fields=field_data,name
+    Endpoint: GET /{leadgen_id}?fields=field_data
+    Note: do NOT request the "name" field — Graph API rejects it on /{leadgen_id}
+    ("(#100) Tried accessing nonexisting field (name)"), which fails the whole fetch.
+    Name comes from the form's full_name field instead (handled by _parse_facebook_field_data).
     """
     url = f"https://graph.facebook.com/v18.0/{leadgen_id}"
     params = {
-        "fields": "field_data,name",
+        "fields": "field_data",
         "access_token": access_token,
     }
     try:
