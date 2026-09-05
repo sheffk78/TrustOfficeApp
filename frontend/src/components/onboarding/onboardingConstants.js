@@ -50,7 +50,8 @@ export const ALLOWED_DOC_TYPES = [
 export const ALLOWED_DOC_EXTENSIONS = /\.(pdf|doc|docx|txt|png|jpg|jpeg)$/i;
 
 /** Max upload size (16 MB). */
-export const MAX_DOC_SIZE = 16 * 1024 * 1024;
+// Uploads up to 100MB accepted — server deep-compresses PDFs before storing (16MB vault cap).
+export const MAX_DOC_SIZE = 100 * 1024 * 1024;
 
 // Re-export icons used by step components
 export {

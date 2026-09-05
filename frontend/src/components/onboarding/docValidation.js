@@ -10,7 +10,10 @@ export function validateDocFile(file) {
     return false;
   }
   if (file.size > MAX_DOC_SIZE) {
-    toast.error('File is too large. Maximum size is 16MB.');
+    toast.error(
+      `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Uploads are limited to 100MB ` +
+      '(large PDFs are compressed automatically after upload). Please compress the PDF first (e.g. ilovepdf.com/compress_pdf).'
+    );
     return false;
   }
   return true;

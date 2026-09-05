@@ -38,8 +38,12 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
 
   const handleFileSelect = useCallback((file) => {
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      setUploadResult({ success: false, error: 'File too large. Maximum size is 50MB.' });
+    // Only reject what the server can't take — server deep-compresses PDFs after upload.
+    if (file.size > 100 * 1024 * 1024) {
+      setUploadResult({
+        success: false,
+        error: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Uploads are limited to 100MB (large PDFs are compressed automatically after upload). Please compress the PDF first (e.g. ilovepdf.com/compress_pdf), or use "Link External" to store a link instead.`,
+      });
       return;
     }
     setSelectedFile(file);
@@ -92,7 +96,8 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
       const token = localStorage.getItem('auth_token');
       const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app/api';
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      // Big files need headroom: 100MB at 3Mbps ≈ 4.5min.
+      const timeoutId = setTimeout(() => controller.abort(), 480000);
 
       const res = await fetch(`${backendUrl}/trusts/${trustId}/vault/upload`, {
         method: 'POST',
@@ -127,7 +132,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
       }
     } catch (err) {
       const errorMsg = err.name === 'AbortError'
-        ? 'Upload timed out. The file may be too large or your connection is slow.'
+        ? 'Upload timed out after 8 minutes — the file may be too large for your connection speed. Please try again, use a faster connection, or use "Link External" to store a link instead.'
         : err.message || 'Upload failed';
       setUploadResult({ success: false, error: errorMsg });
     } finally {
@@ -210,7 +215,7 @@ const FileUploadCard = ({ trustId, onUploadComplete, onCancel }) => {
                   {dragOver ? 'Drop file here' : 'Click to upload or drag and drop'}
                 </p>
                 <p className="font-mono text-[10px] text-muted-foreground/60">
-                  PDF, images, Word, Excel, text — max 16MB
+                  PDF, images, Word, Excel, text — up to 100MB (large PDFs auto-compressed)
                 </p>
               </div>
             </label>

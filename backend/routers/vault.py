@@ -56,7 +56,26 @@ ALLOWED_MIME_TYPES = {
     "image/tiff": "tiff",
 }
 
-MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB BSON limit
+MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB BSON limit (what we can STORE)
+UPLOAD_ACCEPT_LIMIT = 100 * 1024 * 1024  # accept uploads up to 100MB — we compress down before storing
+
+
+def deep_compress_pdf(file_content: bytes, quality: int = 60, dpi_target: int = 100) -> bytes:
+    """
+    Deep-compress a PDF by recompressing embedded images (PyMuPDF rewrite_images).
+    Handles scanned/image-heavy PDFs that the cheap garbage-collect pass can't shrink.
+    Returns the (possibly unchanged) bytes — never raises.
+    """
+    try:
+        import pymupdf
+        doc = pymupdf.open(stream=file_content, filetype="pdf")
+        doc.rewrite_images(dpi_threshold=120, dpi_target=dpi_target, quality=quality)
+        out = doc.tobytes(garbage=4, deflate=True, clean=True)
+        doc.close()
+        return out
+    except Exception as e:
+        logger.warning(f"Deep PDF compression failed (proceeding with previous bytes): {e}")
+        return file_content
 
 
 def compress_pdf(file_content: bytes) -> tuple[bytes, bool]:
@@ -211,27 +230,61 @@ async def upload_document(
                 detail=f"File type '{content_type}' is not supported. Supported types: PDF, images, Word docs, Excel, and text files."
             )
 
-    # Read file content
+    # Read file content (up to UPLOAD_ACCEPT_LIMIT; FastAPI/Starlette streams it in)
     file_content = await file.read()
 
-    # For PDFs, attempt compression before size check (may shrink large scanned docs)
-    # Skip the Content-Length pre-check for PDFs to allow compression to bring them under 16MB
-    if content_type == "application/pdf" or file_content[:4] == b'%PDF':
-        file_content, was_compressed = compress_pdf(file_content)
-        if was_compressed:
-            logger.info(
-                f"PDF compressed for upload: original {file.size / (1024*1024) if file.size else '?':.1f}MB -> {len(file_content) / (1024*1024):.1f}MB"
-            )
+    is_pdf = content_type == "application/pdf" or file_content[:4] == b"%PDF"
+    orig_size = file.size or len(file_content)
 
-    # Size check (post-compression for PDFs, direct for other types)
-    if len(file_content) > MAX_FILE_SIZE:
-        orig_size = file.size or len(file_content)
+    # Hard gate: reject anything over 100MB before doing expensive work
+    if len(file_content) > UPLOAD_ACCEPT_LIMIT:
         raise HTTPException(
             status_code=413,
             detail=(
-                f"Your file is {orig_size / (1024*1024):.1f}MB, but the vault stores files up to 16MB"
-                + (" even after automatic compression." if content_type == "application/pdf" else ".")
-                + " To fix: (1) compress the PDF at ilovepdf.com/compress_pdf (or any PDF compressor), then upload the smaller file; "
+                f"Your file is {len(file_content) / (1024*1024):.1f}MB. We accept uploads up to 100MB "
+                "(PDFs are compressed automatically after upload, but there's a 100MB transfer limit). "
+                "To fix: (1) compress the PDF at ilovepdf.com/compress_pdf first, then upload the smaller file; "
+                "or (2) use 'Link External' on the Vault page to store a link to the file instead."
+            ),
+        )
+
+    # Compression ladder for PDFs — try progressively deeper compression until it fits:
+    #   pass 1: cheap garbage-collect (existing compress_pdf)
+    #   pass 2: image recompression, quality 60 / ~100 DPI
+    #   pass 3: aggressive, quality 40 / ~85 DPI
+    if is_pdf and len(file_content) > MAX_FILE_SIZE:
+        compressed, was_compressed = compress_pdf(file_content)
+        if was_compressed:
+            file_content = compressed
+            logger.info(
+                f"PDF compressed (pass 1): original {orig_size / (1024*1024):.1f}MB -> {len(file_content) / (1024*1024):.1f}MB"
+            )
+
+        if len(file_content) > MAX_FILE_SIZE:
+            deep = deep_compress_pdf(file_content, quality=60, dpi_target=100)
+            if len(deep) < len(file_content):
+                file_content = deep
+                logger.info(
+                    f"PDF compressed (pass 2, images q60/100dpi): {orig_size / (1024*1024):.1f}MB -> {len(file_content) / (1024*1024):.1f}MB"
+                )
+
+        if len(file_content) > MAX_FILE_SIZE:
+            deep = deep_compress_pdf(file_content, quality=40, dpi_target=85)
+            if len(deep) < len(file_content):
+                file_content = deep
+                logger.info(
+                    f"PDF compressed (pass 3, images q40/85dpi): {orig_size / (1024*1024):.1f}MB -> {len(file_content) / (1024*1024):.1f}MB"
+                )
+
+    # Size check (post-compression) — only reached if all passes left it over 16MB
+    if len(file_content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Your file is {orig_size / (1024*1024):.1f}MB, and even after automatic compression it's "
+                f"{len(file_content) / (1024*1024):.1f}MB — larger than the 16MB vault storage cap. "
+                "This usually means the file is mostly scans or photos. To fix: (1) compress the PDF at "
+                "ilovepdf.com/compress_pdf (or any PDF compressor), then upload the smaller file; "
                 "or (2) use 'Link External' on the Vault page to store a link to the file instead."
             ),
         )

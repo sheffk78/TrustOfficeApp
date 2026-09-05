@@ -73,10 +73,21 @@ class FakeDB:
 def fake_db(monkeypatch):
     import database
     import routers.vault as vault
+    import utils.audit as audit
+    import trust_doc_analyzer
 
     db = FakeDB()
     # vault.py does `from database import db` — patch the name the router bound.
     monkeypatch.setattr(vault, "db", db)
+
+    # Audit + AI-analysis touch the real Motor client, whose event loop dies
+    # between tests (Event loop is closed). Both are out of scope here.
+    async def _noop(*a, **k):
+        return None
+
+    monkeypatch.setattr(audit, "log_audit_event", _noop)
+    monkeypatch.setattr(vault, "log_audit_event", _noop)
+    monkeypatch.setattr(trust_doc_analyzer, "analyze_trust_document", _noop)
     return db
 
 
@@ -108,7 +119,7 @@ def client(fake_db, monkeypatch):
 
 class TestOversizedUploadRejected:
     def test_39mb_pdf_rejected_413_with_actionable_message(self, client):
-        """The exact scenario Kenneth hit: 39MB PDF of his trust declaration."""
+        """A 39MB text-only PDF (nothing to recompress) gets 413 + actionable message."""
         big_pdf = _make_pdf_bytes(39 * 1024 * 1024)
         resp = client.post(
             "/api/trusts/t1/vault/upload",
@@ -154,6 +165,58 @@ class TestOversizedUploadRejected:
         )
         assert resp.status_code == 413
         assert f"{size / (1024*1024):.1f}MB" in resp.json()["detail"]
+
+
+class TestDeepCompressionLadder:
+    def test_39mb_image_pdf_compressed_and_stored(self, client, fake_db):
+        """A 39MB scanned-style PDF (big embedded image) is auto-compressed under 16MB and stored."""
+        import pymupdf
+
+        # Build an image-heavy PDF: 20 pages, each with a large noisy JPEG
+        # (JPEG-encoded so insert_image accepts it; noise so deflate can't shrink it).
+        import random
+        from io import BytesIO
+        from PIL import Image
+        rng = random.Random(42)
+        doc = pymupdf.open()
+        for _ in range(20):
+            page = doc.new_page(width=612, height=792)
+            # 1500x1900 noise RGB image ≈ 1.8MB raw, incompressible by deflate
+            img = Image.new("RGB", (1500, 1900))
+            img.putdata([(rng.getrandbits(8), rng.getrandbits(8), rng.getrandbits(8)) for _ in range(1500 * 1900)])
+            buf = BytesIO()
+            img.save(buf, format="JPEG", quality=95)  # high q → big, still lossy-compressible by rewriter
+            page.insert_image(page.rect, stream=buf.getvalue())
+        pdf_bytes = doc.tobytes(deflate=False)
+        doc.close()
+        assert len(pdf_bytes) > 25 * 1024 * 1024, f"test fixture too small: {len(pdf_bytes)}"
+
+        resp = client.post(
+            "/api/trusts/t1/vault/upload",
+            files={"file": ("scanned-trust.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+            # category 'other' → skips the AI-analysis background task (which would
+            # outlive this test's event loop and break the next test); the
+            # compression ladder under test runs regardless of category.
+            data={"title": "Scanned Trust", "category": "other"},
+        )
+        assert resp.status_code == 200, f"got {resp.status_code}: {resp.text[:300]}"
+        saved = getattr(fake_db.vault_documents, "last_record", None)
+        assert saved is not None
+        assert len(saved["file_content"]) <= 16 * 1024 * 1024
+        assert saved["file_content"][:4] == b"%PDF"  # still a valid PDF
+
+    def test_101mb_pdf_rejected_at_hard_gate(self, client, fake_db):
+        """Over the 100MB accept limit → 413 with the 100MB message, no compression attempt."""
+        big_pdf = _make_pdf_bytes(101 * 1024 * 1024)
+        resp = client.post(
+            "/api/trusts/t1/vault/upload",
+            files={"file": ("huge.pdf", io.BytesIO(big_pdf), "application/pdf")},
+            data={"title": "Huge", "category": "trust_instrument"},
+        )
+        assert resp.status_code == 413
+        detail = resp.json()["detail"]
+        assert "100MB" in detail
+        assert getattr(fake_db.vault_documents, "last_record", None) is None
 
 
 class TestNormalUploadStillWorks:

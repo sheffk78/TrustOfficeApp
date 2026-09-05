@@ -80,7 +80,8 @@ export function useOnboardingWizard() {
 
     const token = localStorage.getItem('auth_token');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    // Big files need headroom: 100MB at 3Mbps ≈ 4.5min. Server deep-compresses PDFs.
+    const timeoutId = setTimeout(() => controller.abort(), 480000);
 
     let res;
     try {
@@ -92,7 +93,7 @@ export function useOnboardingWizard() {
       });
     } catch (fetchError) {
       clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') throw new Error('Upload timed out. Please try again.');
+      if (fetchError.name === 'AbortError') throw new Error('Upload timed out after 8 minutes — the file may be too large for your connection speed. Please try again, or use a faster connection.');
       throw new Error('Could not reach the server. Check your connection and try again.');
     }
     clearTimeout(timeoutId);

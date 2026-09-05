@@ -60,7 +60,7 @@ export default function VaultAddForm({
               >
                 <CloudUpload className="w-10 h-10 text-muted-foreground/40 mb-2" />
                 <p className="text-sm font-medium text-foreground">Click to upload or drag and drop</p>
-                <p className="text-xs text-muted-foreground mt-1">PDF, images, Word, Excel — up to 50MB (PDFs auto-compressed)</p>
+                <p className="text-xs text-muted-foreground mt-1">PDF, images, Word, Excel — up to 100MB (large PDFs auto-compressed)</p>
                 <input
                   id="vault-file-upload"
                   ref={fileInputRef}

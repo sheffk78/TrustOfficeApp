@@ -99,7 +99,8 @@ export function useVaultUpload(selectedTrust, loadData) {
 
       const token = localStorage.getItem('auth_token');
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      // Big files on slow connections need headroom: 100MB at 3Mbps ≈ 4.5min.
+      const timeoutId = setTimeout(() => controller.abort(), 480000);
 
       let res;
       try {
@@ -113,7 +114,7 @@ export function useVaultUpload(selectedTrust, loadData) {
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
-          throw new Error('Upload timed out — the file may be too large or your connection is slow. Please try again.');
+          throw new Error('Upload timed out after 8 minutes — the file may be too large for your connection speed. Please try again, use a faster connection, or use "Link External" to store a link to the file instead.');
         }
         throw new Error('Could not reach the server. Please check your internet connection and try again.');
       }
@@ -139,7 +140,7 @@ export function useVaultUpload(selectedTrust, loadData) {
         errorMsg = 'Could not reach the server. The file may be too large or your connection timed out. Please try again, or use "Link External" to store a link to the file instead.';
       }
       if (errorMsg.includes('timed out')) {
-        errorMsg = `This upload timed out after 2 minutes — files this large take too long to transfer. ${uploadFile?.name ? `${uploadFile.name} is ${(uploadFile.size / (1024 * 1024)).toFixed(1)}MB. ` : ''}Please compress the PDF before uploading (e.g. ilovepdf.com/compress_pdf), or use "Link External" to store a link instead.`;
+        errorMsg = `This upload timed out after 8 minutes — the file may be too large for your connection speed. ${uploadFile?.name ? `${uploadFile.name} is ${(uploadFile.size / (1024 * 1024)).toFixed(1)}MB. ` : ''}Please try again on a faster connection, or use "Link External" to store a link instead.`;
       }
       console.error('Vault upload error:', e);
       setUploadError(errorMsg);
@@ -162,26 +163,16 @@ export function useVaultUpload(selectedTrust, loadData) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Size guidance at file-select time — fail fast with exact numbers instead
-    // of a doomed 2-minute upload that ends in an easy-to-miss toast.
-    if (file.size > 25 * 1024 * 1024) {
+    // Size guidance at file-select time — only reject what the server genuinely
+    // can't take. Up to 100MB is accepted; the server deep-compresses PDFs
+    // (image recompression) before storing, so most big scans just work.
+    if (file.size > 100 * 1024 * 1024) {
       toast.error(
         `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. ` +
-        `The vault stores files up to 16MB (PDFs are compressed first, but files over 25MB won't compress enough). ` +
-        `Please compress the PDF before uploading (e.g. ilovepdf.com/compress_pdf), or use "Link External" to store a link instead.`
+        `Uploads are limited to 100MB (PDFs are compressed automatically after upload, but the transfer limit is 100MB). ` +
+        `Please compress the PDF first (e.g. ilovepdf.com/compress_pdf), or use "Link External" to store a link instead.`
       );
       return;
-    }
-    if (file.size > 16 * 1024 * 1024) {
-      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      if (!isPdf) {
-        toast.error(
-          `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. The vault stores files up to 16MB. ` +
-          `Please compress the file first, or use "Link External" to store a link instead.`
-        );
-        return;
-      }
-      // PDF between 16-25MB: allow — server-side compression may bring it under 16MB.
     }
 
     setUploadFile(file);
