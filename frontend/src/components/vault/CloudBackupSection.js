@@ -15,33 +15,33 @@ const PROVIDER_ICONS = {
   onedrive: OneDriveIcon,
 };
 
+// Official brand marks — Google Drive four-color triangle (Google brand asset, viewBox 0 0 87.3 78),
+// Dropbox official glyph + OneDrive official cloud (Simple Icons, CC0, viewBox 0 0 24 24).
 function DriveIcon({ className }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M9.5 14.5L4 5h6l4 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-      <path d="M14 19H4l3-5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-      <path d="M18 5h6l-5 9" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-      <path d="M9 14.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <svg className={className} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+      <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+      <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+      <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+      <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
     </svg>
   );
 }
 
 function DropboxIcon({ className }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M7 2L2 6l5 4 5-4-5-4z" fill="currentColor"/>
-      <path d="M12 6l5 4 5-4-5-4-5 4z" fill="currentColor"/>
-      <path d="M2 6v5l5 4v-5L2 6z" fill="currentColor" opacity="0.7"/>
-      <path d="M17 10v5l5-4V6l-5 4z" fill="currentColor" opacity="0.7"/>
-      <path d="M7 15l5 4 5-4-5-4-5 4z" fill="currentColor" opacity="0.5"/>
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 1.807L0 5.629l6 3.822 6.001-3.822L6 1.807zM18 1.807l-6 3.822 6 3.822 6-3.822-6-3.822zM0 13.274l6 3.822 6.001-3.822L6 9.452l-6 3.822zM18 9.452l-6 3.822 6 3.822 6-3.822-6-3.822zM6 18.371l6.001 3.822 6-3.822-6-3.822L6 18.371z"/>
     </svg>
   );
 }
 
 function OneDriveIcon({ className }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M8 8a4 4 0 014-4 4 4 0 014 4M16 8a3 3 0 013 3 3 3 0 010 6H7a3 3 0 010-6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M19.453 9.95q.961.058 1.787.468.826.41 1.442 1.066.615.657.966 1.512.352.856.352 1.816 0 1.008-.387 1.893-.386.885-1.049 1.547-.662.662-1.546 1.049-.885.387-1.893.387H6q-1.242 0-2.332-.475-1.09-.475-1.904-1.29-.815-.814-1.29-1.903Q0 14.93 0 13.688q0-.985.31-1.887.311-.903.862-1.658.55-.756 1.324-1.325.774-.568 1.711-.861.434-.129.85-.187.416-.06.861-.082h.012q.515-.786 1.207-1.413.691-.627 1.5-1.066.808-.44 1.705-.668.896-.229 1.845-.229 1.278 0 2.456.417 1.177.416 2.144 1.16.967.744 1.658 1.78.692 1.038 1.008 2.28zm-7.265-4.137q-1.325 0-2.52.544-1.195.545-2.04 1.565.446.117.85.299.405.181.792.416l4.78 2.86 2.731-1.15q.27-.117.545-.204.276-.088.58-.147-.293-.937-.855-1.705-.563-.768-1.324-1.324-.762-.557-1.67-.856-.908-.298-1.859-.298Zm2.52 4.455-.023.012-.023.012.046-.024Zm-.046.024-.117.058-.117.059.234-.117Z"/>
     </svg>
   );
 }
