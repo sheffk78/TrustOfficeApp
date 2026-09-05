@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Circle, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { getScoreColor } from './constants';
@@ -87,24 +87,46 @@ function ScoreBanners({ healthScore, isNewTrust }) {
   const isUrgent = score < 72 && !isNewTrust;
   const isNewAndLowScore = score < 72 && isNewTrust;
 
+  // Risk findings (API: health_score.risk_findings) are the concrete items
+  // dragging the score down — each carries title/action/deeplink/penalty.
+  // Show them so the warning always names WHAT to fix, never a vague
+  // "complete pending tasks" with nothing listed (Kenneth, 2026-09-05).
+  const riskFindings = (healthScore?.risk_findings || [])
+    .filter((r) => r?.title)
+    .sort((a, b) => {
+      const order = { critical: 0, high: 1, medium: 2, low: 3 };
+      return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
+    });
+  const showRiskList = riskFindings.length > 0;
+
   if (needsAttention) {
     return (
-      <div className="mt-6 p-4 bg-warning/10 border border-warning/20 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
-        <p className="text-sm text-warning">
-          Your governance score needs attention. Consider completing the suggested actions above.
-        </p>
+      <div className="mt-6 p-4 bg-warning/10 border border-warning/20">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
+          <p className="text-sm text-warning">
+            {showRiskList
+              ? `Your governance score needs attention. ${riskFindings.length} item${riskFindings.length > 1 ? 's' : ''} are reducing your score:`
+              : 'Your governance score needs attention. Consider completing the suggested actions above.'}
+          </p>
+        </div>
+        {showRiskList && <RiskFindingList findings={riskFindings} />}
       </div>
     );
   }
 
   if (isUrgent) {
     return (
-      <div className="mt-6 p-4 bg-error/10 border border-error/20 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
-        <p className="text-sm text-error">
-          Urgent: Your trust requires immediate attention. Complete pending tasks to improve your score.
-        </p>
+      <div className="mt-6 p-4 bg-error/10 border border-error/20">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
+          <p className="text-sm text-error">
+            {showRiskList
+              ? `Urgent: ${riskFindings.length} item${riskFindings.length > 1 ? 's' : ''} require${riskFindings.length > 1 ? '' : 's'} attention:`
+              : 'Urgent: Your trust requires immediate attention. Complete pending tasks to improve your score.'}
+          </p>
+        </div>
+        {showRiskList && <RiskFindingList findings={riskFindings} error />}
       </div>
     );
   }
@@ -126,4 +148,63 @@ function ScoreBanners({ healthScore, isNewTrust }) {
   }
 
   return null;
+}
+
+// Severity chip colors for the risk-finding list inside score banners.
+const SEVERITY_STYLES = {
+  critical: 'bg-error/20 text-error',
+  high: 'bg-error/15 text-error',
+  medium: 'bg-warning/15 text-warning',
+  low: 'bg-navy/10 text-muted-foreground',
+};
+
+/**
+ * Concrete list of risk findings reducing the score. Each row shows the
+ * finding title, its per-finding point penalty, and the fix — linked to the
+ * page where the fix happens (deeplink from the risk-gathering service).
+ */
+function RiskFindingList({ findings, error = false }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="mt-3 space-y-2">
+      {findings.map((r, i) => (
+        <div
+          key={`${r.type}-${i}`}
+          data-testid={`risk-finding-${r.type}`}
+          className="flex items-start justify-between gap-3 p-3 bg-white/60 border border-error/10"
+        >
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-navy">{r.title}</span>
+              <span className={`font-mono text-[10px] px-1.5 py-0.5 uppercase tracking-wide ${SEVERITY_STYLES[r.severity] || SEVERITY_STYLES.low}`}>
+                {r.severity}
+              </span>
+              {r.penalty ? (
+                <span className="font-mono text-[10px] text-error">{r.penalty} pts</span>
+              ) : null}
+            </div>
+            {r.detail && (
+              <p className="text-xs text-muted-foreground mt-1">{r.detail}</p>
+            )}
+            {r.action && (
+              <p className="text-xs text-navy/80 mt-1">Fix: {r.action}</p>
+            )}
+          </div>
+          {r.deeplink && (
+            <button
+              type="button"
+              onClick={() => navigate(r.deeplink)}
+              data-testid={`risk-finding-fix-${r.type}`}
+              className={`flex-shrink-0 font-mono text-[10px] uppercase tracking-widest px-2 py-1 border ${
+                error ? 'border-error/40 text-error hover:bg-error/10' : 'border-warning/40 text-warning hover:bg-warning/10'
+              }`}
+            >
+              Resolve
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
