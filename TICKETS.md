@@ -144,3 +144,18 @@ All fix commits verified as ancestors of HEAD and deployed in the 2026-08-27T19:
 
 Health checks: api 200, app 200 post-deploy.
 - Correction: `1e735b0`'s retry was dead code in browsers (onerror rejects before the readystatechange retry path; re-send on spent XHR throws). `d3e9b19` restructures xhrPost (fresh XHR per attempt, single retryOrFail path). Verified ad-hoc: 3/3 JSX parse + 4/4 behavior cases incl. real onerror→RS4 event order. Deployed backend `b985cb60` + frontend `59feddfd` SUCCESS, health 200.
+
+## Auto-Fixer Run 2026-09-05
+
+**Result: 1 error resolved (already fixed + deployed).**
+
+| Error ID | Type | Root cause | Fix commit (deployed) |
+|---|---|---|---|
+| `err_e6c4989c447d` | load | `Failed to load calendar` — `/api/calendar/events` crashed with HTTP 500 (KeyError) when any trust document was missing `trust_id` or `name` fields. Dict comprehensions used `t["trust_id"]` / `t["name"]` instead of `.get()`. | `d62dc99` — guarded all dict comprehensions in `_fetch_tax_trust_map`, `_build_governance_events`, and exempt_ids set with `.get()` + `if t.get("trust_id")` filters. Frontend error message updated to include HTTP status code. |
+
+**Deploy verification:**
+- Backend health: `https://api.trustoffice.app/health` → 200
+- `/api/calendar/events` (unauthenticated) → 401 (not 500 — endpoint no longer crashes)
+- Frontend bundle: live = `main.141d4c96.js` (error was from stale `main.a167a610.js`), confirmed new error message pattern in bundle
+- TrustOffice uses auto-deploy from git push; commit `d62dc99` pushed to `origin/main` at 2026-09-05T13:40Z
+- Error first seen 2026-09-04T22:52Z (pre-fix), 6 attempts — stale report from old bundle
