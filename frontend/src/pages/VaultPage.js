@@ -169,6 +169,7 @@ export default function VaultPage() {
               addDocument={upload.addDocument}
               uploading={upload.uploading}
               uploadProgress={upload.uploadProgress}
+              uploadError={upload.uploadError}
               resetForm={upload.resetForm}
               fileInputRef={upload.fileInputRef}
               categories={categories}

@@ -227,10 +227,13 @@ async def upload_document(
     if len(file_content) > MAX_FILE_SIZE:
         orig_size = file.size or len(file_content)
         raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is 16MB. Your file is {orig_size / (1024*1024):.1f}MB"
-                  + (" even after compression." if content_type == "application/pdf" else ".")
-                  + " Please reduce the file size or use 'Link External' to reference it."
+            status_code=413,
+            detail=(
+                f"Your file is {orig_size / (1024*1024):.1f}MB, but the vault stores files up to 16MB"
+                + (" even after automatic compression." if content_type == "application/pdf" else ".")
+                + " To fix: (1) compress the PDF at ilovepdf.com/compress_pdf (or any PDF compressor), then upload the smaller file; "
+                "or (2) use 'Link External' on the Vault page to store a link to the file instead."
+            ),
         )
 
     # Parse tags

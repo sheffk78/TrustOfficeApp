@@ -16,6 +16,7 @@ export function useVaultUpload(selectedTrust, loadData) {
   const [addMode, setAddMode] = useState('upload'); // 'upload' or 'link'
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadError, setUploadError] = useState(null); // persistent inline error display
   const [uploadFile, setUploadFile] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const fileInputRef = useRef(null);
@@ -25,6 +26,7 @@ export function useVaultUpload(selectedTrust, loadData) {
     setUploadFile(null);
     setAddMode('upload');
     setUploadProgress('');
+    setUploadError(null);
     setForm(INITIAL_FORM);
   }, []);
 
@@ -136,7 +138,11 @@ export function useVaultUpload(selectedTrust, loadData) {
       if (errorMsg === 'Failed to fetch' || errorMsg.includes('Could not reach the server')) {
         errorMsg = 'Could not reach the server. The file may be too large or your connection timed out. Please try again, or use "Link External" to store a link to the file instead.';
       }
+      if (errorMsg.includes('timed out')) {
+        errorMsg = `This upload timed out after 2 minutes — files this large take too long to transfer. ${uploadFile?.name ? `${uploadFile.name} is ${(uploadFile.size / (1024 * 1024)).toFixed(1)}MB. ` : ''}Please compress the PDF before uploading (e.g. ilovepdf.com/compress_pdf), or use "Link External" to store a link instead.`;
+      }
       console.error('Vault upload error:', e);
+      setUploadError(errorMsg);
       toast.error(errorMsg);
       loadData();
     } finally {
@@ -156,12 +162,30 @@ export function useVaultUpload(selectedTrust, loadData) {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error(`File too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum is 50MB. PDFs are automatically compressed.`);
+    // Size guidance at file-select time — fail fast with exact numbers instead
+    // of a doomed 2-minute upload that ends in an easy-to-miss toast.
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error(
+        `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. ` +
+        `The vault stores files up to 16MB (PDFs are compressed first, but files over 25MB won't compress enough). ` +
+        `Please compress the PDF before uploading (e.g. ilovepdf.com/compress_pdf), or use "Link External" to store a link instead.`
+      );
       return;
+    }
+    if (file.size > 16 * 1024 * 1024) {
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (!isPdf) {
+        toast.error(
+          `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. The vault stores files up to 16MB. ` +
+          `Please compress the file first, or use "Link External" to store a link instead.`
+        );
+        return;
+      }
+      // PDF between 16-25MB: allow — server-side compression may bring it under 16MB.
     }
 
     setUploadFile(file);
+    setUploadError(null); // clear any previous error when a fresh file is chosen
     const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
     setForm(f => ({
       ...f,
@@ -181,6 +205,7 @@ export function useVaultUpload(selectedTrust, loadData) {
     showAdd, setShowAdd,
     addMode, setAddMode,
     uploading, uploadProgress,
+    uploadError,
     uploadFile,
     form, setForm,
     fileInputRef,

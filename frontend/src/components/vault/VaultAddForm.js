@@ -17,6 +17,7 @@ export default function VaultAddForm({
   uploadFile, handleFileSelect, clearUploadFile,
   handleUpload, addDocument,
   uploading, uploadProgress,
+  uploadError,
   resetForm,
   fileInputRef,
   categories,
@@ -136,6 +137,21 @@ export default function VaultAddForm({
         {/* Upload progress */}
         {uploadProgress && (
           <p className="text-sm text-warning mb-2">{uploadProgress}</p>
+        )}
+
+        {/* Persistent upload error — inline, stays visible until user fixes it or picks a new file */}
+        {uploadError && (
+          <div
+            className="mb-3 p-3 rounded border border-rust/30 bg-rust/5 flex items-start gap-2"
+            role="alert"
+            aria-live="assertive"
+          >
+            <X className="w-4 h-4 text-rust flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="text-sm">
+              <p className="font-medium text-rust">Upload failed</p>
+              <p className="text-foreground/90 mt-0.5">{uploadError}</p>
+            </div>
+          </div>
         )}
 
         <div className="flex gap-2">
