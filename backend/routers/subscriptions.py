@@ -951,11 +951,21 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
 # ==================== STRIPE WEBHOOK EVENT HANDLERS ====================
 
 def _stripe_get(obj, key, default=None):
-    """Safely get a field from a Stripe StripeObject (which lacks .get())."""
+    """Safely get a field from a Stripe StripeObject (which lacks .get()).
+
+    Handles dict (via .get), list/tuple (via int index), and StripeObject
+    (via getattr). Passing an int key against a list returns the indexed
+    element instead of crashing with "attribute name must be string".
+    """
     if obj is None:
         return default
     if isinstance(obj, dict):
         return obj.get(key, default)
+    if isinstance(obj, (list, tuple)) and isinstance(key, int):
+        try:
+            return obj[key]
+        except IndexError:
+            return default
     return getattr(obj, key, default)
 
 
@@ -1403,7 +1413,8 @@ async def _webhook_customer_subscription_updated(event) -> None:
     old_price = prev_items[0].get("price") or {}
     if isinstance(old_price, dict):
         old_price = old_price.get("id")
-    new_price = _stripe_get(_stripe_get(_stripe_get(_stripe_get(subscription, "items"), "data"), 0), "price")
+    new_price_obj = _stripe_get(_stripe_get(_stripe_get(_stripe_get(subscription, "items"), "data"), 0), "price")
+    new_price = _stripe_get(new_price_obj, "id") if new_price_obj else None
     if old_price and new_price and old_price != new_price:
         await _handle_subscription_plan_change(user, sub, old_price, new_price)
 
