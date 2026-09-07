@@ -579,7 +579,7 @@ class BackgroundTaskRunner:
             }, {"_id": 0}).to_list(200)
 
             emails_sent = 0
-            course_url = f"{email_service.app_url}/courses/trustee-101"
+            course_url = f"{email_service.app_url}/trustee-101"
 
             for lead in leads:
                 try:
