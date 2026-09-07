@@ -34,9 +34,10 @@ router = APIRouter(prefix="/admin/leads", tags=["leads"])
 # ==================== LEAD STAGES ====================
 
 LEAD_STAGES = [
-    "new",         # Just entered their email on a marketing form
+    "new",         # Just entered their email on a marketing forms
     "engaged",     # Watched 1+ lessons / interacted with content
     "warm",        # Been around a while but hasn't engaged yet
+    "registered",  # Email matched a created account (lead -> user linkage)
     "converted",   # Subscribed to TrustOffice
     "lost",        # Went cold or unsubscribed
 ]
@@ -45,6 +46,7 @@ STAGE_LABELS = {
     "new": "New",
     "engaged": "Engaged",
     "warm": "Warm",
+    "registered": "Registered",
     "converted": "Converted",
     "lost": "Lost",
 }
@@ -1585,37 +1587,101 @@ async def _log_activity(lead_id: str, action_type: str, content: str):
     })
 
 
+async def stamp_lead_registered(email: str, user_id: str) -> bool:
+    """
+    Attribution stamp #1 (Lead -> Registered).
+
+    When a new account is provisioned (checkout-first, _provision_guest_account
+    in routers/subscriptions.py), link any matching lead to that user and mark
+    it as `registered`. Match is by email OR by an existing user_id on the lead
+    doc. The lead's `user_id` field is the canonical join key going forward.
+
+    Backward-compatible: never raises. If matching fails, logs a warning and
+    returns False so the caller's signup/provisioning flow is unaffected.
+    """
+    if not email and not user_id:
+        return False
+    try:
+        query = {"$or": [{"email": email}, {"user_id": user_id}]} if (email and user_id) else (
+            {"email": email} if email else {"user_id": user_id}
+        )
+        lead = await db.leads.find_one(query)
+        if not lead:
+            return False
+
+        now = datetime.now(timezone.utc)
+        old_stage = lead.get("stage")
+        await db.leads.update_one(
+            {"lead_id": lead["lead_id"]},
+            {"$set": {
+                "user_id": user_id,
+                "registered_at": now.isoformat(),
+                "stage": "registered",
+                "manual_stage_override": False,
+                "updated_at": now.isoformat(),
+            }},
+        )
+        if old_stage != "registered":
+            await _log_activity(
+                lead["lead_id"], "registered",
+                f"Lead linked to new account {user_id} (registered) â email {email}",
+            )
+            await notify_lead_stage_change(
+                name=lead.get("name", ""),
+                email=email,
+                old_stage=old_stage or "unknown",
+                new_stage="registered",
+                details=f"Account created (user_id {user_id})",
+            )
+        logger.info(f"Lead {lead['lead_id']} stamped registered -> {user_id} ({email})")
+        return True
+    except Exception as e:
+        logger.warning(f"stamp_lead_registered failed for email={email} user_id={user_id}: {e}")
+        return False
+
+
 async def mark_lead_as_subscribed(email: str, user_id: str):
     """
     Mark an existing lead as having subscribed to TrustOffice.
     Called from the Stripe webhook when a lead completes checkout.
     This is the bridge between the lead CRM and the subscription system.
+
+    Attribution stamp #2 (Lead -> Subscriber). Matches by email OR user_id and
+    stamps converted_at + stage='converted'. Never raises â on any failure it
+    logs a warning so the webhook's subscription flow continues unaffected.
     """
-    lead = await db.leads.find_one({"email": email})
-    if not lead:
-        logger.info(f"No lead found for {email} — they subscribed without being a lead first")
+    if not email and not user_id:
         return
-
-    old_stage = lead.get("stage")
-    now = datetime.now(timezone.utc)
-
-    await db.leads.update_one(
-        {"email": email},
-        {"$set": {
-            "lead_type": "paid_subscriber",
-            "subscription_status": "active",
-            "user_id": user_id,
-            "stage": "converted",
-            "manual_stage_override": False,
-            "updated_at": now.isoformat(),
-        }}
-    )
-
-    if old_stage != "converted":
-        await _log_activity(
-            lead["lead_id"], "stage_change",
-            f"Auto-advanced from {old_stage} to converted (subscribed to TrustOffice)"
+    try:
+        query = {"$or": [{"email": email}, {"user_id": user_id}]} if (email and user_id) else (
+            {"email": email} if email else {"user_id": user_id}
         )
+        lead = await db.leads.find_one(query)
+        if not lead:
+            logger.info(f"No lead found for email={email} user_id={user_id} â subscribed without a lead first")
+            return
+
+        old_stage = lead.get("stage")
+        now = datetime.now(timezone.utc)
+
+        await db.leads.update_one(
+            {"lead_id": lead["lead_id"]},
+            {"$set": {
+                "lead_type": "paid_subscriber",
+                "subscription_status": "active",
+                "user_id": user_id,
+                "converted_at": now.isoformat(),
+                "stage": "converted",
+                "manual_stage_override": False,
+                "updated_at": now.isoformat(),
+            }}
+        )
+
+        if old_stage != "converted":
+            await _log_activity(
+                lead["lead_id"], "converted",
+                f"Lead converted to subscriber (user_id {user_id}) â linked from {old_stage}"
+            )
         await notify_lead_stage_change(
             name=lead.get("name", ""),
             email=email,
@@ -1633,23 +1699,25 @@ async def mark_lead_as_subscribed(email: str, user_id: str):
             lead_name=lead.get("name", ""),
         )
 
-    # Bridge the converted lead into the customer-memory layer so the admin
-    # Conversations view can show who converted and where they came from.
-    try:
-        from services.contact_memory_service import upsert_contact_from_lead
-        await upsert_contact_from_lead(
-            email=email,
-            name=lead.get("name"),
-            lead=lead,
-            user_id=user_id,
-        )
-        logger.info(f"Lead {lead['lead_id']} linked to a contact record ({email})")
-    except Exception as e:
-        logger.warning(
-            f"Failed to link lead {lead['lead_id']} to a contact record: {e}"
-        )
+        # Bridge the converted lead into the customer-memory layer so the admin
+        # Conversations view can show who converted and where they came from.
+        try:
+            from services.contact_memory_service import upsert_contact_from_lead
+            await upsert_contact_from_lead(
+                email=email,
+                name=lead.get("name"),
+                lead=lead,
+                user_id=user_id,
+            )
+            logger.info(f"Lead {lead['lead_id']} linked to a contact record ({email})")
+        except Exception as e:
+            logger.warning(
+                f"Failed to link lead {lead['lead_id']} to a contact record: {e}"
+            )
 
-    logger.info(f"Lead {lead['lead_id']} marked as subscribed — {email}")
+        logger.info(f"Lead {lead['lead_id']} marked as subscribed â {email}")
+    except Exception as e:
+        logger.warning(f"mark_lead_as_subscribed failed for email={email} user_id={user_id}: {e}")
 
 
 async def update_lead_course_progress(email: str, lessons_watched: int):

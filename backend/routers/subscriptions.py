@@ -1101,7 +1101,7 @@ async def _provision_guest_account(session, metadata: dict, plan_type: str, bill
         "user_id": new_user_id,
         "email": email,
         "name": name or email.split("@")[0],
-        # No password yet — user sets one via the welcome email's
+        # No password yet â user sets one via the welcome email's
         # password-setup link (purpose="set_password") or "forgot password".
         "password_hash": None,
         "created_at": now,
@@ -1115,6 +1115,15 @@ async def _provision_guest_account(session, metadata: dict, plan_type: str, bill
         "referrer": metadata.get("referrer"),
         "wp_ref": metadata.get("wp_ref"),
     })
+
+    # Attribution stamp #1: link any matching lead to this new account so the
+    # Lead -> Registered -> Subscriber funnel is tracked. Backward-compatible:
+    # failures are swallowed by stamp_lead_registered (logged warning only).
+    try:
+        from routers.leads import stamp_lead_registered
+        await stamp_lead_registered(email=email, user_id=new_user_id)
+    except Exception as e:
+        logger.warning(f"Failed to stamp lead as registered for {email}: {e}")
 
     await db.user_onboarding.insert_one({
         "user_id": new_user_id,
