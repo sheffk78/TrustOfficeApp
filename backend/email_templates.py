@@ -34,10 +34,10 @@ def _booking_cta_html(booking_url: str, phone_request: bool = True) -> str:
     return f"""
             <div style="background-color: #f0f4ff; border-left: 4px solid #D5AD36; padding: 20px; margin: 25px 0;">
               <h3 style="color: #010079; margin-top: 0;">Want to see how TrustOffice works for your trust?</h3>
-              <p>Book a free discovery call with Jeff Kohler, founder of TrustOffice. He'll walk you through the platform and answer any questions about your specific situation.</p>
-              {f"<p>If you'd rather talk by phone, reply with the best number to reach you and Jeff can call.</p>" if phone_request else ""}
+              <p>Book a free discovery call with Kenneth Kohler, founder of TrustOffice. He'll walk you through the platform and answer any questions about your specific situation.</p>
+              {f"<p>If you'd rather talk by phone, reply with the best number to reach you and Kenneth can call.</p>" if phone_request else ""}
               <p style="text-align: center; margin: 20px 0;">
-                <a href="{booking_url}" class="button">Book a Call with Jeff</a>
+                <a href="{booking_url}" class="button">Book a Call with Kenneth</a>
               </p>
             </div>
     """
@@ -49,9 +49,9 @@ def _booking_cta_text(booking_url: str, phone_request: bool = True) -> str:
         return ""
     return f"""
 Want to see how TrustOffice works for your trust?
-Book a free discovery call with Jeff Kohler, founder of TrustOffice.
+Book a free discovery call with Kenneth Kohler, founder of TrustOffice.
 Schedule here: {booking_url}
-{"If you'd rather talk by phone, reply with the best number to reach you and Jeff can call." if phone_request else ""}
+{"If you'd rather talk by phone, reply with the best number to reach you and Kenneth can call." if phone_request else ""}
 """
 
 
@@ -1087,7 +1087,7 @@ The TrustOffice Team
         "html": lambda data: _base_template(f"""
             <h2>Your call with TrustOffice is today</h2>
             <p>Hi {data.get('name', 'there')},</p>
-            <p>Just a quick heads-up that your 15-minute discovery call with <strong>Jeff Kohler, founder of TrustOffice</strong>, is scheduled for today.</p>
+            <p>Just a quick heads-up that your 15-minute discovery call with <strong>Kenneth Kohler, founder of TrustOffice</strong>, is scheduled for today.</p>
 
             <div class="task-card">
               <p class="label">Date</p>
@@ -1113,14 +1113,14 @@ The TrustOffice Team
             <p>Need to reschedule or cancel? You can do that right from your original booking confirmation email, or reply to this one.</p>
 
             <p>Looking forward to it,</p>
-            <p><strong>Jeff Kohler</strong><br>Founder, TrustOffice</p>
+            <p><strong>Kenneth Kohler</strong><br>Founder, TrustOffice</p>
         """),
         "text": lambda data: f"""
 Your call with TrustOffice is today
 
 Hi {data.get('name', 'there')},
 
-Just a quick heads-up that your 15-minute discovery call with Jeff Kohler, founder of TrustOffice, is scheduled for today.
+Just a quick heads-up that your 15-minute discovery call with Kenneth Kohler, founder of TrustOffice, is scheduled for today.
 
 Date: {data.get('call_date', '')}
 Time: {data.get('call_time', '')}
@@ -1136,7 +1136,7 @@ Need to reschedule or cancel? You can do that right from your original booking c
 
 Looking forward to it,
 
-Jeff Kohler
+Kenneth Kohler
 Founder, TrustOffice
         """
     },

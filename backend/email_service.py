@@ -642,7 +642,7 @@ Amount: ${amount}
         timezone: str,
         meeting_url: str,
     ) -> Dict[str, Any]:
-        """Send same-day booking confirmation with Google Meet link, signed as Jeff Kohler."""
+        """Send same-day booking confirmation with Google Meet link, signed as Kenneth Kohler."""
         return await self.send_templated_email(
             to_email=to_email,
             template_name="booking_confirmation",
