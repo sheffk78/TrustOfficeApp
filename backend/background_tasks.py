@@ -633,13 +633,19 @@ class BackgroundTaskRunner:
         - Email 5: Day 18
         - Email 6: Day 25
         - Email 7: Day 35
+        - Email 8: Day 42
+        - Email 9: Day 50
+        - Email 10: Day 60
+        - Email 11: Day 70
+        - Email 12: Day 80
+        - Email 13: Day 90
 
         Runs every 6 hours. Tracks which step each lead has received
         via the `nurture_step_sent` field on the lead record.
 
         Backward-compat: leads partway through the old 12-email sequence may
         carry nurture_step_sent values 1-12. Any lead with nurture_step_sent
-        >= 7 is treated as sequence-complete (step 7 of the new schedule is the
+        >= 13 is treated as sequence-complete (step 7 of the new schedule is the
         final email) and is skipped without error.
         """
         logger.info("Running nurture drip check (7-email MailerCloud sequence)")
@@ -656,23 +662,29 @@ class BackgroundTaskRunner:
             # 7-email nurture schedule: step -> days after capture
             NURTURE_SCHEDULE = {
                 2: 3,   # Day 3
-                3: 7,   # Day 7
+                3: 8,   # Day 8
                 4: 12,  # Day 12
                 5: 18,  # Day 18
                 6: 25,  # Day 25
                 7: 35,  # Day 35
+                8: 42,  # Day 42
+                9: 50,  # Day 50
+                10: 60, # Day 60
+                11: 70, # Day 70
+                12: 80, # Day 80
+                13: 90, # Day 90
             }
 
-            # Find leads that have received Email 1 but haven't completed all 7.
+            # Find leads that have received Email 1 but haven't completed all 13.
             # Leads whose `nurture_step_sent` field is missing/null are treated as
             # step 0 (never received Email 1) so they still enter the drip: the
             # loop sends step 1 first via the `current_step < 1` catch-up branch
             # below, instead of being permanently skipped by the $gte:1 filter.
-            # Leads with nurture_step_sent >= 7 (incl. legacy 8-12 values from the old sequence) are
+            # Leads with nurture_step_sent >= 13 are treated as sequence-complete;
             # treated as sequence-complete and skipped.
             leads = await self.db.leads.find({
                 "$or": [
-                    {"nurture_step_sent": {"$exists": True, "$gte": 1, "$lt": 7}},
+                    {"nurture_step_sent": {"$exists": True, "$gte": 1, "$lt": 13}},
                     {"nurture_step_sent": {"$in": [None, False]}},
                 ],
                 "stage": {"$ne": "converted"},
@@ -696,9 +708,9 @@ class BackgroundTaskRunner:
 
                     # Backward-compat: legacy leads from the old 12-email sequence
                     # may carry nurture_step_sent values 8-12. The new schedule tops
-                    # out at step 7, so treat any lead at step >= 7 as
+                    # out at step 13, so treat any lead at step >= 13 as
                     # sequence-complete: skip without sending or raising.
-                    if current_step >= 7:
+                    if current_step >= 13:
                         continue
                     # capture timestamp. Catch-up leads (backfill/re-engagement)
                     # were captured long before they entered the sequence —
@@ -773,13 +785,13 @@ class BackgroundTaskRunner:
                                 "activity_id": f"act_{uuid.uuid4().hex[:12]}",
                                 "lead_id": lead["lead_id"],
                                 "action_type": "email",
-                                "content": f"Sent nurture email {sent_step}/7 via MailerCloud",
+                                "content": f"Sent nurture email {sent_step}/13 via MailerCloud",
                                 "created_at": now.isoformat(),
                             })
 
                             emails_sent += 1
                             logger.info(
-                                f"Sent nurture email {sent_step}/7 to {lead['email']}"
+                                f"Sent nurture email {sent_step}/13 to {lead['email']}"
                             )
 
                 except Exception as e:
