@@ -159,3 +159,19 @@ Health checks: api 200, app 200 post-deploy.
 - Frontend bundle: live = `main.141d4c96.js` (error was from stale `main.a167a610.js`), confirmed new error message pattern in bundle
 - TrustOffice uses auto-deploy from git push; commit `d62dc99` pushed to `origin/main` at 2026-09-05T13:40Z
 - Error first seen 2026-09-04T22:52Z (pre-fix), 6 attempts — stale report from old bundle
+
+## Auto-Fixer Run 2026-09-06
+
+**Result: 3 errors resolved, fixed + deployed.**
+
+| Error ID | Type | Root cause | Fix commit (deployed) |
+|---|---|---|---|
+| `err_0d53bf8d4cc7` | TypeError `attribute name must be string, not 'int'` | `/api/stripe/webhook` — `customer.subscription.updated` handler called `_stripe_get(_stripe_get(_stripe_get(_stripe_get(subscription, "items"), "data"), 0), "price")`. The `items.data` field is a **list**, but `_stripe_get` only handled `None` and `dict`; for a list it fell through to `getattr(list_obj, 0, default)` → `TypeError: attribute name must be string, not 'int'`. This crashed every subscription.updated webhook. | `41cb72f` — `_stripe_get` now handles `list`/`tuple` with int key via index access (IndexError-safe). Also fixed a downstream bug at the same call site: `new_price` was the raw price StripeObject, not its id, so the `old_price != new_price` comparison always mismatched and spurious plan-change handlers fired. Now normalizes to the price id. Deploy `3ecb7707` SUCCESS. |
+| `err_197fb14f57d9` | TypeError `attribute name must be string, not 'int'` | Same root cause as `err_0d53bf8d4cc7` (same webhook, same code path). | `41cb72f` (same fix, same deploy `3ecb7707`). |
+| `err_2d6f2b1ed455` | TypeError `attribute name must be string, not 'int'` | Same root cause as `err_0d53bf8d4cc7` (same webhook, same code path). | `41cb72f` (same fix, same deploy `3ecb7707`). |
+
+**Deploy verification:**
+- Commit `41cb72f` pushed to `origin/main` at 2026-09-07T01:11Z
+- Railway deploy `3ecb7707-0fc6-413e-9d7f-ecf941cfb35f` → SUCCESS
+- Backend health: `https://api.trustoffice.app/health` → 200 `{"status":"ok","service":"trustoffice-api","db":"connected"}`
+- Fix logic unit-tested locally: int-key list access returns indexed element; empty list returns None; None-safe.
