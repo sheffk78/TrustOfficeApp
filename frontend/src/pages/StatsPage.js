@@ -272,7 +272,7 @@ export default function StatsPage() {
                     {revenueData.total_revenue_formatted}
                   </p>
                 </div>
-                <div className="card-trust p-4" title="Monthly Recurring Revenue — (monthly subscribers × $79) + (annual subscribers × $65.83)">
+                <div className="card-trust p-4" title="Monthly Recurring Revenue — (monthly subscribers × $99) + (annual subscribers × $79 equivalent, legacy grandfathered annuals at $65.83)">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <TrendingUp className="w-4 h-4 text-gold" />
                     <span className="text-xs">MRR</span>

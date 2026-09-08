@@ -76,17 +76,18 @@ export const setUserId = (userId) => {
 
 /**
  * 3-tier pricing lookup (Phase 3).
- * Trustee: $79/mo, $790/yr
- * Estate:  $149/mo, $1,490/yr
- * Advisor: $399/mo, $3,990/yr
- * Legacy 'monthly'/'annual' plan types map to Trustee for backward compat.
+ * 2026-09-08 restructure: annual anchor (save 20% with annual).
+ * Trustee: $99/mo, $948/yr (billed — $79/mo equivalent)
+ * Estate:  $189/mo, $1,788/yr (billed — $149/mo equivalent)
+ * Advisor: $499/mo, $4,788/yr (billed — $399/mo equivalent)
+ * Legacy 'monthly'/'annual' plan types map to grandfathered Trustee rates.
  */
 const TIER_PRICES = {
-  trustee: { monthly: 79, annual: 790 },
-  estate: { monthly: 149, annual: 1490 },
-  advisor: { monthly: 399, annual: 3990 },
+  trustee: { monthly: 99, annual: 948 },
+  estate: { monthly: 189, annual: 1788 },
+  advisor: { monthly: 499, annual: 4788 },
   wingpoint: { annual: 1188 }, // WingPoint is annual-only
-  // Legacy compat — old single-tier plans treated as Trustee
+  // Grandfathered (pre-2026-09-08) Trustee rates
   monthly: { monthly: 79, annual: 790 },
   annual: { monthly: 79, annual: 790 },
 };

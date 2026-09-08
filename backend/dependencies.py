@@ -72,6 +72,8 @@ class SubscriptionState(BaseModel):
     status: str  # "trialing", "active", "past_due", "canceled", "expired"
     billing_period: Optional[str] = None  # "monthly" | "annual" (new tiers)
     legacy_trust_limit: Optional[int] = None  # for grandfathered users
+    is_legacy_price: Optional[bool] = None  # holds a pre-restructure price object (legacy rate locked)
+    price_amount: Optional[float] = None  # exact legacy amount the price bills at
     trial_start_date: Optional[str] = None
     trial_end_date: Optional[str] = None
     trial_days_remaining: Optional[int] = None

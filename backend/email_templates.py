@@ -1005,6 +1005,7 @@ The TrustOffice Team
                 </tr>
               </table>
             </div>
+            {'<div class="warning" style="border: 1px solid #856404; background: #fff3cd; padding: 12px; margin: 12px 0; border-radius: 4px;"><p style="margin: 0; color: #856404;">' + data.get('legacy_rate_notice') + '</p></div>' if data.get('legacy_rate_notice') else ''}
             
             <p>Thank you for your continued commitment to good governance!</p>
             
@@ -1025,6 +1026,7 @@ Upgrade Details:
 - Previous Plan: {data.get('old_plan', 'Monthly').title()}
 - New Plan: {data.get('new_plan', 'Annual').title()}
 - Annual Savings: {data.get('annual_savings', 'See your billing page for details')}
+{'- ' + data.get('legacy_rate_notice') + chr(10) if data.get('legacy_rate_notice') else ''}
 
 Thank you for your continued commitment to good governance!
 

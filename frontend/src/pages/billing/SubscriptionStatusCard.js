@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StatusBadge from './StatusBadge';
-import { TIERS, planDisplayName, tierPriceFor } from './pricingConfig';
+import { TIERS, planDisplayName, tierPriceFor, LEGACY_TRUSTEE_RATES } from './pricingConfig';
 
 // The "Current Plan" status card for the existing-subscription view.
 // Encapsulates the plan name header, free-plan info, details grid,
@@ -32,6 +32,7 @@ export default function SubscriptionStatusCard({
   isCanceling,
   isGrandfathered,
   legacyTrustLimit,
+  isLegacyPrice,
   normalizedPlanType,
   canUpgrade,
   formatDate,
@@ -49,7 +50,13 @@ export default function SubscriptionStatusCard({
   };
 
   const currentPriceLabel = (() => {
-    const price = tierPriceFor(normalizedPlanType, subscription?.billing_period || 'monthly');
+    // Grandfathered subscribers: the backend reports the exact legacy amount
+    // their Stripe price bills at — display that, never the current rate.
+    if (subscription?.is_legacy_price && subscription?.price_amount != null) {
+      const periodLabel = subscription?.billing_period === 'annual' ? '/year' : '/month';
+      return `$${subscription.price_amount}${periodLabel}`;
+    }
+    const price = tierPriceFor(subscription?.plan_type, subscription?.billing_period || 'monthly');
     if (price == null) return 'N/A';
     const periodLabel = subscription?.billing_period === 'annual' ? '/year' : '/month';
     return `$${price}${periodLabel}`;
@@ -73,6 +80,11 @@ export default function SubscriptionStatusCard({
           {isGrandfathered && (
             <p className="text-xs text-success mt-1 font-medium">
               Grandfathered: {legacyTrustLimit} trusts at your current price
+            </p>
+          )}
+          {isLegacyPrice && !isCanceling && (
+            <p className="text-xs text-success mt-1 font-medium">
+              Legacy rate locked in — ${subscription?.billing_period === 'annual' ? LEGACY_TRUSTEE_RATES.annual + '/yr' : LEGACY_TRUSTEE_RATES.monthly + '/mo'}. You keep this price on renewal; changing plans ends it.
             </p>
           )}
         </div>

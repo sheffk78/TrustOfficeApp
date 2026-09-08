@@ -513,18 +513,22 @@ class EmailService:
         user_name: str,
         old_plan: str,
         new_plan: str,
-        annual_savings: str = None
+        annual_savings: Optional[str] = None,
+        legacy_rate_notice: Optional[str] = None
     ) -> Dict[str, Any]:
         """Send notification when subscription is upgraded"""
+        template_data = {
+            "user_name": user_name,
+            "old_plan": old_plan,
+            "new_plan": new_plan,
+            "annual_savings": annual_savings or "See your billing page for details"
+        }
+        if legacy_rate_notice:
+            template_data["legacy_rate_notice"] = legacy_rate_notice
         return await self.send_templated_email(
             to_email=to_email,
             template_name="subscription_upgraded",
-            template_data={
-                "user_name": user_name,
-                "old_plan": old_plan,
-                "new_plan": new_plan,
-                "annual_savings": annual_savings or "See your billing page for details"
-            },
+            template_data=template_data,
             to_name=user_name,
             tag="subscription",
             metadata={"email_type": "subscription_upgraded", "new_plan": new_plan}

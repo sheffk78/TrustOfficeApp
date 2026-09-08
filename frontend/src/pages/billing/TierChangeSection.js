@@ -21,6 +21,8 @@ import BillingPeriodToggle from './BillingPeriodToggle';
 //   userTrustCount             – number (optional) trust count the user
 //                                currently holds; used to gray out tiers
 //                                whose maxTrusts is exceeded
+//   isLegacyPrice              – boolean: user holds a grandfathered legacy
+//                                price; changing ANY plan setting ends that rate
 export default function TierChangeSection({
   billingPeriod,
   onBillingPeriodChange,
@@ -32,6 +34,7 @@ export default function TierChangeSection({
   actionLoading,
   cardRef,
   userTrustCount,
+  isLegacyPrice,
 }) {
   return (
     <div className="mt-8" data-testid="tier-change-section">
@@ -39,6 +42,15 @@ export default function TierChangeSection({
       <p className="text-sm text-muted-foreground mb-4">
         Upgrade or downgrade at any time. Changes are prorated for the remainder of your billing cycle.
       </p>
+      {isLegacyPrice && (
+        <div className="p-4 bg-warning/10 border border-warning/20 mb-4" data-testid="legacy-rate-warning">
+          <p className="text-sm font-medium text-warning">
+            ⚠️ You're on a grandfathered legacy rate. Your current price is locked in for as long as you
+            keep your current plan — renewals stay at your rate. Changing plans or billing period ends
+            the legacy rate, and your subscription moves to the current listed price below.
+          </p>
+        </div>
+      )}
       <BillingPeriodToggle value={billingPeriod} onChange={onBillingPeriodChange} />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TIERS.map((tier) => {

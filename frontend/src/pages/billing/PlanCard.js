@@ -66,15 +66,15 @@ export default function PlanCard({
       {billingPeriod === 'annual' ? (
         <>
           <p className="text-xs text-muted-foreground mb-2">
-            ${tier.annual.toLocaleString()} billed annually · save ${tier.monthly * 2}
+            ${tier.annual.toLocaleString()} billed annually · save ${tier.monthly * 12 - tier.annual}/yr
           </p>
           <p className="text-xs text-success mb-3 font-medium">
-            2 months free
+            Save 20% with annual
           </p>
         </>
       ) : (
         <p className="text-xs text-muted-foreground mb-3">
-          ${tier.monthly * 12}/year · switch to annual to save ${tier.monthly * 2}
+          ${tier.monthly * 12}/year · switch to annual to save ${tier.monthly * 12 - tier.annual}
         </p>
       )}
       <ul className="space-y-3 mb-6">

@@ -58,16 +58,22 @@ PRICE_IDS = {
 }
 
 # Amount lookup (for payment_transactions logging)
+# 2026-09-08: annual anchor structure — annual billed = monthly × 12 × 0.8
+# ("save 20% with annual"). Legacy (trustee, legacy-monthly/legacy-annual)
+# keys preserve the pre-restructure amounts for grandfathered flows.
 PLAN_AMOUNTS = {
-    ("trustee", "monthly"): 79.00,
-    ("trustee", "annual"): 790.00,
-    ("estate", "monthly"): 149.00,
-    ("estate", "annual"): 1490.00,
+    ("trustee", "monthly"): 99.00,
+    ("trustee", "annual"): 948.00,
+    ("estate", "monthly"): 189.00,
+    ("estate", "annual"): 1788.00,
     ("wingpoint", "monthly"): 119.00,
     ("wingpoint", "annual"): 1188.00,
-    ("advisor", "monthly"): 399.00,
-    ("advisor", "annual"): 3990.00,
-    # Legacy
+    ("advisor", "monthly"): 499.00,
+    ("advisor", "annual"): 4788.00,
+    # Legacy rates (grandfathered subscribers keep these until cancel)
+    ("trustee", "legacy-monthly"): 79.00,
+    ("trustee", "legacy-annual"): 790.00,
+    # Pre-2026-09-08 legacy identifiers (kept for backward compatibility)
     ("monthly", "monthly"): 79.00,
     ("annual", "annual"): 790.00,
 }
@@ -85,6 +91,13 @@ LEGACY_PRICE_MAP = {
     STRIPE_MONTHLY_PRICE_ID: ("trustee", "monthly", 10),   # (plan_type, billing_period, legacy_trust_limit)
     STRIPE_ANNUAL_PRICE_ID: ("trustee", "annual", 10),
 }
+
+# 2026-09-08 pricing restructure: subscribers who hold one of these legacy
+# price objects (Trustee $79/mo, $790/yr) keep their rate until they cancel.
+# The rate survives renewals automatically (Stripe keeps billing the same
+# price). Changing tier or billing period swaps the price and ENDS the
+# legacy rate — the UI and plan-change email warn about this.
+LEGACY_TRUSTEE_PRICE_IDS = {STRIPE_MONTHLY_PRICE_ID, STRIPE_ANNUAL_PRICE_ID}
 
 # Mailercloud Config
 from mailercloud_service import add_to_paid_list
@@ -201,6 +214,13 @@ def calculate_subscription_status(sub: dict) -> dict:
                 if plan_info:
                     result["plan_type"] = plan_info[0]
                     result["billing_period"] = plan_info[1]
+                    if price_id in LEGACY_TRUSTEE_PRICE_IDS:
+                        # 2026-09-08 restructure: this subscriber holds a
+                        # pre-restructure Trustee price ($79/mo or $790/yr).
+                        # They keep that rate on renewal until they cancel;
+                        # changing tier/period ends the legacy rate.
+                        result["is_legacy_price"] = True
+                        result["price_amount"] = (79.00 if plan_info[1] == "monthly" else 790.00)
                 elif price_id in LEGACY_PRICE_MAP:
                     # Legacy price IDs (backward compat)
                     legacy_info = LEGACY_PRICE_MAP[price_id]
@@ -364,8 +384,12 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         price_id = STRIPE_MONTHLY_PRICE_ID if checkout.plan_type == "monthly" else STRIPE_ANNUAL_PRICE_ID
     
     # Get amount for logging
-    _amount_fallbacks = {"trustee": 79.00, "estate": 149.00, "advisor": 399.00, "wingpoint": 1188.00, "monthly": 79.00, "annual": 790.00}
-    amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 79.00))
+    # 2026-09-08 restructure: checkout fallbacks reflect current listed prices
+    # (new signups always bill at current prices; grandfathered subscribers
+    # don't go through checkout — their Stripe price persists). Legacy
+    # plan_type identifiers (monthly/annual) still map to legacy price IDs.
+    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 1188.00, "monthly": 79.00, "annual": 790.00}
+    amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 99.00))
     
     # Get or create subscription to get/create stripe customer
     sub = await get_or_create_subscription(user["user_id"])
@@ -547,8 +571,12 @@ async def create_guest_checkout_session(checkout: GuestCheckoutRequest, _rl: Non
     if not price_id:
         raise HTTPException(status_code=500, detail=f"Price ID not configured for {checkout.plan_type}/{billing_period}")
 
-    _amount_fallbacks = {"trustee": 79.00, "estate": 149.00, "advisor": 399.00, "wingpoint": 1188.00, "monthly": 79.00, "annual": 790.00}
-    amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 79.00))
+    # 2026-09-08 restructure: checkout fallbacks reflect current listed prices
+    # (new signups always bill at current prices; grandfathered subscribers
+    # don't go through checkout — their Stripe price persists). Legacy
+    # plan_type identifiers (monthly/annual) still map to legacy price IDs.
+    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 1188.00, "monthly": 79.00, "annual": 790.00}
+    amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 99.00))
 
     try:
         # Reuse the Stripe customer if this email already paid before (test->live safe)
@@ -899,7 +927,17 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
         stripe_sub = stripe.Subscription.retrieve(sub["stripe_subscription_id"])
         old_plan_label = f"{current_plan} ({current_billing})" if current_billing else current_plan
         new_plan_label = f"{request.plan_type} ({request.billing_period})"
-        
+
+        # 2026-09-08 restructure: detect whether the CURRENT Stripe price is a
+        # legacy (pre-restructure) Trustee price. If so, this change ENDS the
+        # legacy rate — surface that in the confirmation response and email.
+        current_price_id = None
+        try:
+            current_price_id = stripe_sub["items"]["data"][0]["price"]["id"]
+        except (KeyError, IndexError, TypeError):
+            current_price_id = None
+        current_plan_info_is_legacy = current_price_id in LEGACY_TRUSTEE_PRICE_IDS if current_price_id else False
+
         stripe.Subscription.modify(
             sub["stripe_subscription_id"],
             items=[{
@@ -929,14 +967,26 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
                 to_email=user["email"],
                 user_name=user.get("name", ""),
                 old_plan=old_plan_label,
-                new_plan=new_plan_label
+                new_plan=new_plan_label,
+                legacy_rate_notice=(
+                    "Your previous plan carried a legacy rate. Changing plans ends that rate — "
+                    "your subscription now bills at the current listed price for this plan."
+                ) if current_plan_info_is_legacy else None
             ),
             "plan change email"
         )
         
         return {
             "status": "changed",
-            "message": f"Successfully changed to {request.plan_type} ({request.billing_period}). Proration will be applied to your next billing cycle.",
+            "message": (
+                f"Successfully changed to {request.plan_type} ({request.billing_period}). "
+                "Proration will be applied to your next billing cycle. "
+                "Note: if you were on a legacy rate, changing plans ends that rate — "
+                "your subscription now bills at the current listed price."
+                if current_plan_info_is_legacy else
+                f"Successfully changed to {request.plan_type} ({request.billing_period}). "
+                "Proration will be applied to your next billing cycle."
+            ),
             "new_plan": request.plan_type,
             "billing_period": request.billing_period
         }
@@ -1387,7 +1437,11 @@ async def _handle_subscription_plan_change(user: dict, sub: dict, old_price: str
             to_email=user["email"],
             user_name=user.get("name", ""),
             old_plan=old_plan,
-            new_plan=new_plan
+            new_plan=new_plan,
+            legacy_rate_notice=(
+                "Your previous plan carried a legacy rate. Changing plans ends that rate — "
+                "your subscription now bills at the current listed price for this plan."
+            ) if (old_price in LEGACY_TRUSTEE_PRICE_IDS) else None
         ),
         "upgrade email"
     )

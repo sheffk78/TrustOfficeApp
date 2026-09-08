@@ -20,7 +20,7 @@ export default function BillingPeriodToggle({ value, onChange }) {
           onClick={() => onChange('annual')}
           className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${value === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
         >
-          Annual <span className="ml-1 text-xs text-success">2 months free</span>
+          Annual <span className="ml-1 text-xs text-success">Save 20%</span>
         </button>
       </div>
     </div>

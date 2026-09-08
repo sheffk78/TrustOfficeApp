@@ -178,15 +178,15 @@ export const FullSubscriptionGate = ({ children }) => {
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Trustee ($79/mo): 1 trust, all governance tools
+                Trustee ($79/mo with annual billing): 1 trust, all governance tools
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Estate ($149/mo): up to 8 trusts, multi-trust dashboard
+                Estate ($149/mo with annual): up to 8 trusts, multi-trust dashboard
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Advisor ($399/mo): unlimited trusts, client view, white-label
+                Advisor ($399/mo with annual): unlimited trusts, client view, white-label
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
@@ -211,7 +211,7 @@ export const FullSubscriptionGate = ({ children }) => {
             </Button>
             
             <p className="text-xs text-muted-foreground">
-              Starting at $79/month for Trustee, $149/month for Estate, or $399/month for Advisor — or save with annual billing
+              Annual billing from $79/mo (Trustee), $149/mo (Estate), or $399/mo (Advisor) — save 20% vs monthly. Monthly plans from $99.
             </p>
           </div>
 

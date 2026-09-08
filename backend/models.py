@@ -1409,6 +1409,8 @@ class SubscriptionResponse(BaseModel):
     status: str
     billing_period: Optional[str] = None  # "monthly" | "annual" (new tiers)
     legacy_trust_limit: Optional[int] = None  # grandfathered users
+    is_legacy_price: Optional[bool] = None  # holds a pre-restructure price object (legacy rate locked)
+    price_amount: Optional[float] = None  # exact monthly/annual amount the legacy price bills at
     trial_start_date: Optional[str] = None
     trial_end_date: Optional[str] = None
     stripe_customer_id: Optional[str] = None

@@ -145,7 +145,10 @@ export default function BillingPage() {
   // Body: { plan_type, billing_period }. Used by the existing-subscription
   // "Change Plan" buttons rendered for each tier card below.
   const handleChangePlan = async (planId, period = 'monthly') => {
-    if (!window.confirm(`Change your plan to ${planDisplayName(planId)} (${period})? Your billing will be prorated for the remainder of your current cycle.`)) {
+    const legacyWarning = subscription?.is_legacy_price
+      ? `\n\n⚠️ You're on a grandfathered rate. Changing plans (including switching billing period) ENDS that rate — your subscription will bill at the current listed price for ${planDisplayName(planId)}. Your rate is only protected if you keep your current plan.`
+      : '';
+    if (!window.confirm(`Change your plan to ${planDisplayName(planId)} (${period})? Your billing will be prorated for the remainder of your current cycle.${legacyWarning}`)) {
       return;
     }
     setActionLoading('change-plan');
@@ -391,6 +394,7 @@ export default function BillingPage() {
                 isCanceling={isCanceling}
                 isGrandfathered={isGrandfathered}
                 legacyTrustLimit={legacyTrustLimit}
+                isLegacyPrice={subscription?.is_legacy_price === true}
                 normalizedPlanType={normalizedPlanType}
                 canUpgrade={canUpgrade}
                 formatDate={formatDate}
@@ -413,6 +417,7 @@ export default function BillingPage() {
                   actionLoading={actionLoading}
                   cardRef={tierCardRef}
                   userTrustCount={userTrustCount}
+                  isLegacyPrice={subscription?.is_legacy_price === true}
                 />
               )}
 

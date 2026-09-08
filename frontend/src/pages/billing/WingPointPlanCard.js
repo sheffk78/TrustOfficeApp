@@ -5,7 +5,7 @@ import { WINGPOINT_TIER, TRUSTEE_TIER } from './pricingConfig';
 
 // WingPoint-exclusive purchase section — only shown to WingPoint customers
 // (user.is_wingpoint). Renders BOTH options Jeff requires:
-//   (a) Trustee — $79/mo  (annual $790/yr)
+//   (a) Trustee — $99/mo (legacy grandfathered $79/mo) · annual $948/yr
 //   (b) WingPoint — $99/mo  (annual $1,188/yr)
 //
 // Each card carries its own Monthly/Annual toggle. Because the backend only
@@ -27,7 +27,7 @@ import { WINGPOINT_TIER, TRUSTEE_TIER } from './pricingConfig';
 //                     user currently holds. If it exceeds tier.maxTrusts
 //                     the card is grayed out and the button is disabled.
 
-// ── Trustee $79 option card ─────────────────────────────────────
+// ── Trustee option card ─────────────────────────────────────
 function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef, userTrustCount }) {
   const [period, setPeriod] = useState('annual');
   const monthlyEquivalent = period === 'annual' ? (TRUSTEE_TIER.annual / 12).toFixed(2).replace(/\.00$/, '') : TRUSTEE_TIER.monthly;
@@ -78,7 +78,7 @@ function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef, use
             onClick={() => setPeriod('annual')}
             className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
           >
-            Annual <span className="ml-1 text-success">2 months free</span>
+            Annual <span className="ml-1 text-success">Save 20%</span>
           </button>
         </div>
       </div>
@@ -90,15 +90,15 @@ function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef, use
       {period === 'annual' ? (
         <>
           <p className="text-xs text-muted-foreground mb-2">
-            ${TRUSTEE_TIER.annual.toLocaleString()} billed annually · save ${TRUSTEE_TIER.monthly * 2}
+            ${TRUSTEE_TIER.annual.toLocaleString()} billed annually · save ${TRUSTEE_TIER.monthly * 12 - TRUSTEE_TIER.annual}/yr
           </p>
           <p className="text-xs text-success mb-3 font-medium">
-            2 months free
+            Save 20% with annual
           </p>
         </>
       ) : (
         <p className="text-xs text-muted-foreground mb-3">
-          ${TRUSTEE_TIER.monthly * 12}/year · switch to annual to save ${TRUSTEE_TIER.monthly * 2}
+          ${TRUSTEE_TIER.monthly * 12}/year · switch to annual to save ${TRUSTEE_TIER.monthly * 12 - TRUSTEE_TIER.annual}
         </p>
       )}
 
@@ -241,8 +241,9 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
 
 // ── Combined WingPoint purchase section ────────────────────────
 // Replaces the previous single WingPointPlanCard. Renders the two options
-// Jeff requires side by side so a WingPoint customer sees both a $79 Trustee
-// plan and a $99 WingPoint plan, each with a monthly/annual billing toggle.
+// Jeff requires side by side so a WingPoint customer sees both a $79/mo
+// (annual) Trustee plan and a $99 WingPoint plan, each with a
+// monthly/annual billing toggle.
 export default function WingPointPlanCard({
   onSubscribe,
   processing,

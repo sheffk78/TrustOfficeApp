@@ -44,14 +44,15 @@ const xhrPost = (url, data, token = null) => {
 };
 
 // 3-tier pricing structure (Phase 3)
-// Annual = monthly × 10 (2 months free)
+// 2026-09-08 restructure: annual anchor — annual billed = monthly × 12 × 0.8
+// ("save 20% with annual"). Monthly is the flexible (higher) rate.
 const TIERS = [
   {
     id: 'trustee',
     name: 'Trustee',
     tagline: '1 trust, all governance tools',
-    monthly: 79,
-    annual: 790,
+    monthly: 99,
+    annual: 948,
     trustLimit: '1 trust',
     popular: false,
     features: [
@@ -69,8 +70,8 @@ const TIERS = [
     id: 'estate',
     name: 'Estate',
     tagline: 'Up to 8 trusts, multi-trust dashboard',
-    monthly: 149,
-    annual: 1490,
+    monthly: 189,
+    annual: 1788,
     trustLimit: 'Up to 8 trusts',
     popular: true, // "Most Popular" badge
     features: [
@@ -90,8 +91,8 @@ const TIERS = [
     id: 'advisor',
     name: 'Advisor',
     tagline: 'Unlimited trusts, white-label exports',
-    monthly: 399,
-    annual: 3990,
+    monthly: 499,
+    annual: 4788,
     trustLimit: 'Unlimited trusts',
     popular: false,
     features: [
@@ -387,7 +388,7 @@ export default function PricingPage() {
                           onClick={() => setTrusteePeriod('annual')}
                           className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${trusteePeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
                         >
-                          Annual <span className="ml-1 text-success">2 months free</span>
+                          Annual <span className="ml-1 text-success">Save 20%</span>
                         </button>
                       </div>
                     </div>
@@ -396,7 +397,7 @@ export default function PricingPage() {
                     {trusteePeriod === 'monthly' ? (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-serif text-5xl text-navy">$79</span>
+                          <span className="font-serif text-5xl text-navy">${TIERS.find(t => t.id === 'trustee').monthly}</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4">billed monthly · cancel anytime</p>
@@ -404,11 +405,11 @@ export default function PricingPage() {
                     ) : (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-serif text-5xl text-navy">$66</span>
+                          <span className="font-serif text-5xl text-navy">${(TIERS.find(t => t.id === 'trustee').annual / 12).toFixed(2).replace(/\.00$/, '')}</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
-                        <p className="text-sm text-success font-medium mb-1">Save $158/yr (2 months free)</p>
-                        <p className="text-sm text-muted-foreground mb-4">billed annually ($790/year)</p>
+                        <p className="text-sm text-success font-medium mb-1">Save 20% with annual (${TIERS.find(t => t.id === 'trustee').monthly * 12 - TIERS.find(t => t.id === 'trustee').annual}/yr)</p>
+                        <p className="text-sm text-muted-foreground mb-4">billed annually (${TIERS.find(t => t.id === 'trustee').annual.toLocaleString()}/year)</p>
                       </>
                     )}
 
@@ -481,7 +482,7 @@ export default function PricingPage() {
                     <div className="bg-navy/5 border border-navy/10 rounded-lg p-4 mb-4 text-left">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-muted-foreground">Public Advisor plan</span>
-                        <span className="text-sm font-mono text-muted-foreground line-through">${wingPointPeriod === 'monthly' ? '399/mo' : '3,990/yr'}</span>
+                        <span className="text-sm font-mono text-muted-foreground line-through">${wingPointPeriod === 'monthly' ? '499/mo' : '4,788/yr'}</span>
                       </div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-navy">Your WingPoint rate</span>
@@ -489,7 +490,7 @@ export default function PricingPage() {
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-navy/10">
                         <span className="text-sm font-bold text-gold">You save</span>
-                        <span className="text-lg font-mono font-bold text-gold">${wingPointPeriod === 'monthly' ? '280/mo' : '2,802/year'}</span>
+                        <span className="text-lg font-mono font-bold text-gold">${wingPointPeriod === 'monthly' ? '380/mo' : '3,600/year'}</span>
                       </div>
                     </div>
 
@@ -556,7 +557,7 @@ export default function PricingPage() {
               data-testid="billing-period-annual"
             >
               Annual
-              <span className="ml-2 text-xs text-success">2 months free</span>
+              <span className="ml-2 text-xs text-success">Save 20%</span>
             </button>
           </div>
         </div>
@@ -594,7 +595,7 @@ export default function PricingPage() {
                   </p>
                   {billingPeriod === 'annual' && (
                     <p className="text-sm text-success font-medium mt-1">
-                      Save ${tier.monthly * 2} (2 months free)
+                      Save ${tier.monthly * 12 - tier.annual}/yr (20% off)
                     </p>
                   )}
                 </div>
@@ -655,8 +656,10 @@ export default function PricingPage() {
       {/* Trial Note */}
       <section className="pb-12 px-8">
         <p className="text-center text-sm text-muted-foreground max-w-2xl mx-auto">
-          Subscribe to start — $79/month for Trustee, $149/month for Estate, or $399/month for Advisor. 
-          Save 2 months with annual billing. The trust pays for governance tools the same way it pays for legal counsel.
+          Subscribe to start — $99/month for Trustee, $189/month for Estate, or $499/month for Advisor,
+          or lock in the lower annual rate: $79/mo Trustee (billed $948/yr), $149/mo Estate (billed $1,788/yr),
+          or $399/mo Advisor (billed $4,788/yr) — save 20% with annual billing.
+          The trust pays for governance tools the same way it pays for legal counsel.
         </p>
       </section>
 

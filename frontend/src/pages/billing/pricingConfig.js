@@ -1,12 +1,13 @@
 // Phase 3: 3-tier pricing structure (Trustee, Estate, Advisor)
 // Each tier supports both monthly and annual billing periods.
-// Annual price = monthly × 10 (2 months free).
+// 2026-09-08 restructure: annual anchor — annual billed = monthly × 12 × 0.8
+// ("save 20% with annual"). Monthly is the flexible (higher) rate.
 export const TIERS = [
   {
     id: 'trustee',
     name: 'Trustee Plan',
-    monthly: 79,
-    annual: 790,
+    monthly: 99,
+    annual: 948,
     maxTrusts: 1,
     trustLimit: '1 trust',
     features: [
@@ -21,8 +22,8 @@ export const TIERS = [
   {
     id: 'estate',
     name: 'Estate Plan',
-    monthly: 149,
-    annual: 1490,
+    monthly: 189,
+    annual: 1788,
     maxTrusts: 8,
     trustLimit: 'Up to 8 trusts',
     popular: true,
@@ -38,8 +39,8 @@ export const TIERS = [
   {
     id: 'advisor',
     name: 'Advisor Plan',
-    monthly: 399,
-    annual: 3990,
+    monthly: 499,
+    annual: 4788,
     maxTrusts: Infinity,
     trustLimit: 'Unlimited trusts',
     features: [
@@ -86,6 +87,14 @@ export const WINGPOINT_TIER = {
 // in the Estate/Advisor tiers.
 export const TRUSTEE_TIER = TIERS.find((t) => t.id === 'trustee');
 
+// Legacy (grandfathered) Trustee rates — subscribers who subscribed BEFORE the
+// 2026-09-08 pricing restructure keep these prices until they cancel. The rate
+// survives renewals; changing tier or billing period ends it.
+export const LEGACY_TRUSTEE_RATES = { monthly: 79, annual: 790 };
+
+// Uniform annual-savings copy (annual = 20% off monthly).
+export const ANNUAL_SAVINGS_LABEL = 'Save 20% with annual';
+
 // Map subscription plan_type to a display name.
 // Handles the new tiers (trustee/estate/advisor) AND legacy values
 // (monthly/annual) which are now grandfathered Trustee plans.
@@ -108,7 +117,10 @@ export const planDisplayName = (planType) => {
 };
 
 // Return the tier price for a given billing period.
+// Legacy plan types (monthly/annual) map to the grandfathered Trustee rates.
 export const tierPriceFor = (tierId, period) => {
+  if (tierId === 'monthly') return LEGACY_TRUSTEE_RATES.monthly;
+  if (tierId === 'annual') return LEGACY_TRUSTEE_RATES.annual;
   const tier = TIERS.find((t) => t.id === tierId);
   if (!tier) return null;
   return period === 'annual' ? tier.annual : tier.monthly;
