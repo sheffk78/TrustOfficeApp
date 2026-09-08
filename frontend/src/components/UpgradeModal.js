@@ -173,7 +173,7 @@ export const UpgradeModal = ({
                         <span className="text-xs font-normal text-slate-400">{unit}</span>
                       </p>
                       {billingPeriod === 'annual' && (
-                        <p className="text-xs text-success">save ${tier.monthly * 2}</p>
+                        <p className="text-xs text-success">save ${tier.monthly * 12 - tier.annual}/yr</p>
                       )}
                     </div>
                   </div>
@@ -187,12 +187,16 @@ export const UpgradeModal = ({
           )}
 
           <div className="flex items-center justify-center gap-2 text-sm text-slate-500 mb-4">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">${billingPeriod === 'annual' ? '790' : '79'}/{billingPeriod === 'annual' ? 'yr' : 'mo'}</span>
-            <span>for Trustee ·</span>
-            <span className="font-semibold text-slate-700 dark:text-slate-300">${billingPeriod === 'annual' ? '1,490' : '149'}/{billingPeriod === 'annual' ? 'yr' : 'mo'}</span>
-            <span>for Estate ·</span>
-            <span className="font-semibold text-slate-700 dark:text-slate-300">${billingPeriod === 'annual' ? '3,990' : '399'}/{billingPeriod === 'annual' ? 'yr' : 'mo'}</span>
-            <span>for Advisor</span>
+            {TIERS.map((tier, i) => (
+              <span key={tier.id}>
+                {i > 0 && <span className="mr-2">·</span>}
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  ${billingPeriod === 'annual' ? tier.annual.toLocaleString() : tier.monthly}
+                  /{billingPeriod === 'annual' ? 'yr' : 'mo'}
+                </span>
+                <span> for {tier.name}</span>
+              </span>
+            ))}
           </div>
         </div>
         
