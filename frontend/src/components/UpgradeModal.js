@@ -11,44 +11,10 @@ import {
 } from '@/components/ui/dialog';
 import { useAuth } from '@/context/AuthContext';
 import { trackUpgradeModalShown, trackUpgradeModalClicked } from '@/utils/analytics';
-
-/**
- * Phase 3: 3-tier pricing structure used by the upgrade modal.
- * Matches the canonical tiers in PricingPage.js / BillingPage.js.
- * Annual = monthly × 10 (2 months free).
- */
-const TIERS = [
-  {
-    id: 'trustee',
-    name: 'Trustee',
-    monthly: 79,
-    annual: 790,
-    tagline: '1 trust, all governance tools',
-    trustLimit: '1 trust'
-  },
-  {
-    id: 'estate',
-    name: 'Estate',
-    monthly: 149,
-    annual: 1490,
-    tagline: 'Up to 8 trusts, multi-trust dashboard',
-    trustLimit: 'Up to 8 trusts'
-  },
-  {
-    id: 'advisor',
-    name: 'Advisor',
-    monthly: 399,
-    annual: 3990,
-    tagline: 'Unlimited trusts, client view, white-label',
-    trustLimit: 'Unlimited trusts'
-  }
-];
-
-// Normalize legacy plan types (monthly/annual) to the Trustee tier.
-const normalizeTier = (planType) => {
-  if (planType === 'monthly' || planType === 'annual') return 'trustee';
-  return planType;
-};
+// Canonical 3-tier pricing (2026-09-08 restructure: annual anchor, save 20%).
+// Imported from the billing config so this modal can never drift from the
+// real Stripe-backed prices again.
+import { TIERS } from '@/pages/billing/pricingConfig';
 
 /**
  * UpgradeModal - Shows when read-only user tries a blocked action
@@ -83,6 +49,10 @@ export const UpgradeModal = ({
   // Trustee (or legacy) → show Estate + Advisor.
   // Estate → show Advisor only.
   // Advisor → show all (no upgrades available, just re-subscribe options).
+  const normalizeTier = (planType) => {
+    if (planType === 'monthly' || planType === 'annual') return 'trustee';
+    return planType;
+  };
   const currentPlanType = normalizeTier(subscription?.plan_type);
   const currentTierIndex = TIERS.findIndex((t) => t.id === currentPlanType);
   const isOnPaidTier = currentTierIndex >= 0 && currentPlanType !== 'forever_free' && currentPlanType !== 'free' && currentPlanType !== 'trial' && currentPlanType !== 'none';
@@ -170,7 +140,7 @@ export const UpgradeModal = ({
                 onClick={() => setBillingPeriod('annual')}
                 className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${billingPeriod === 'annual' ? 'bg-navy text-white' : 'text-slate-500 dark:text-slate-400'}`}
               >
-                Annual <span className="text-success">· 2 months free</span>
+                Annual <span className="text-success">· Save 20%</span>
               </button>
             </div>
           </div>
