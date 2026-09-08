@@ -362,7 +362,7 @@ export default function PricingPage() {
           <section className="pb-8 px-8 pt-6" data-testid="wp-preselected-card">
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8 items-stretch">
-                {/* Card 1: Trustee Plan — $79/mo or $66/mo (1 trust) */}
+                {/* Card 1: Trustee Plan — $99/mo, or $79/mo with annual (1 trust) */}
                 <div className="card-trust corner-mark p-8 border border-border relative overflow-visible flex flex-col">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-white px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
                     1 Trust
