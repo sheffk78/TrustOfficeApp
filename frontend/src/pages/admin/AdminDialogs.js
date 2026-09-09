@@ -6,6 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Target, Activity, RefreshCw, MessageSquare, Crown, BarChart3, Building2, FileText, DollarSign, LogIn, Gift, XCircle, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
+const LinkedInIcon = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.57-1.85-3.57-1.85-.53-3.09.53-3.66 1.6-.3.63-.37 1.52-.37 2.36v5.17H8.46s.05-9.65 0-10.65h3.55v1.51h.05c.49-.94 1.68-1.93 3.32-1.93 2.66 0 4.38 1.74 4.38 5.28v6.13zM4.69 4.19c0 1.06-.86 1.92-1.92 1.92S.86 5.25.86 4.19 1.71 2.28 2.77 2.28s1.92.85 1.92 1.91zM.86 9.77h3.56v10.68H.86V9.77z"/>
+  </svg>
+);
+
 import { getStatusBadgeClass, getLeadStageBadgeClass, getRatioColorClass, formatStageLabel, formatDate, formatCallOutcome, getResourceWord, formatSourceLabel, LEAD_STAGES } from './helpers';
 import { fetchWithAuth } from '@/utils/api';
 
@@ -27,6 +33,13 @@ export function LeadDetailDialog({
             {selectedLead?.phone && (
               <span className="ml-2">
                 · <a href={`tel:${selectedLead.phone}`} className="underline hover:text-navy dark:hover:text-white" title="Click to call">{selectedLead.phone}</a>
+              </span>
+            )}
+            {selectedLead?.linkedin_url && (
+              <span className="ml-2">
+                · <a href={selectedLead.linkedin_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline hover:text-navy dark:hover:text-white" title="Open LinkedIn profile">
+                  <LinkedInIcon className="w-3.5 h-3.5 inline" /> LinkedIn
+                </a>
               </span>
             )}
           </DialogDescription>

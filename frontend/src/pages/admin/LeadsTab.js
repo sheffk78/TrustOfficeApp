@@ -1,4 +1,10 @@
 import { Target, FileText, RefreshCw, Search, CheckSquare, Eye, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
+
+const LinkedInIcon = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.57-1.85-.53-3.09.42-3.66 1.6-.3.63-.37 1.52-.37 2.36v5.18H8.46s.05-9.66 0-10.66h3.55v1.51h-.02c.49-.94 1.68-2.02 3.32-2.02 2.66 0 4.38 1.74 4.38 5.28v6.12zM4.42 8.29H.86V7.63h3.56v.66zM.86 9.77h3.56v10.68H.86V9.77zM4.69 4.19c0 1.06-.86 1.92-1.92 1.92S.86 5.25.86 4.19 1.71 2.28 2.77 2.28s1.92.85 1.92 1.91z"/>
+  </svg>
+);
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -109,7 +115,7 @@ export function LeadsTab({
               )}
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px]">
+                <table className="w-full min-w-[1180px]">
                   <thead>
                     <tr className="border-b border-navy/10 dark:border-white/10">
                       <th className="w-8 py-3 px-2">
@@ -122,6 +128,7 @@ export function LeadsTab({
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Name</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Email</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Phone</th>
+                      <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">LinkedIn</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Stage</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Score</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Next Action</th>
@@ -156,6 +163,23 @@ export function LeadsTab({
                             <a href={`tel:${lead.phone}`} className="hover:text-navy dark:hover:text-white transition-colors" title="Click to call">{lead.phone}</a>
                           ) : (
                             <span>—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          {lead.linkedin_url ? (
+                            <a
+                              href={lead.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#0A66C2] text-white hover:opacity-80 transition-opacity"
+                              title={`LinkedIn: ${lead.linkedin_url}`}
+                              aria-label={`${lead.name || lead.email} on LinkedIn`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <LinkedInIcon />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="py-3 px-3">

@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Target, Phone, AlertTriangle, Trophy, RefreshCw, Mail, Eye } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/api';
+
+const LinkedInIcon = ({ className = 'w-3 h-3' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.57-1.85-3.57-1.85-.53-3.09.53-3.66 1.6-.3.63-.37 1.52-.37 2.36v5.18H8.46s.05-9.65 0-10.65h3.55v1.51h.05c.49-.94 1.68-1.93 3.32-1.93 2.66 0 4.38 1.74 4.38 5.28v6.13zM4.69 4.19c0 1.06-.86 1.92-1.92 1.92S.86 5.25.86 4.19 1.71 2.28 2.77 2.28s1.92.85 1.92 1.91zM.86 9.77h3.56v10.68H.86V9.77z"/>
+  </svg>
+);
 import { Badge } from '@/components/ui/badge';
 
 function relativeTime(isoString) {
@@ -89,6 +95,19 @@ export default function LeadTriageView({ onViewLead, onFollowUp }) {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-navy truncate">{lead.name || 'Unknown'}</span>
           <StageBadge stage={lead.stage} />
+          {lead.linkedin_url && (
+            <a
+              href={lead.linkedin_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center w-5 h-5 rounded bg-[#0A66C2] text-white hover:opacity-80 transition-opacity flex-shrink-0"
+              title={`LinkedIn: ${lead.linkedin_url}`}
+              aria-label={`${lead.name || 'Lead'} on LinkedIn`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <LinkedInIcon />
+            </a>
+          )}
         </div>
         <p className="text-xs text-navy/60 truncate mt-0.5">{lead.email}</p>
         {lead.phone && (
