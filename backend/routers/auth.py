@@ -244,6 +244,7 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
             "picture": user_doc.get("picture"),
             "is_admin": user_doc.get("is_admin", False) or email == PRIMARY_ADMIN_EMAIL,
             "is_stats_user": user_doc.get("is_stats_user", False),
+            "is_leads_user": user_doc.get("is_leads_user", False),
             "wp_ref": user_doc.get("wp_ref"),
             "is_wingpoint": bool(
                 user_doc.get("wp_ref")
@@ -498,6 +499,7 @@ async def get_me(user: dict = Depends(get_current_user)):
     PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
     is_admin = user.get("is_admin", False) or user.get("email", "").lower() == PRIMARY_ADMIN_EMAIL
     is_stats_user = user.get("is_stats_user", False)
+    is_leads_user = user.get("is_leads_user", False)
     
     return UserResponse(
         user_id=user["user_id"],
@@ -507,6 +509,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         created_at=user.get("created_at", ""),
         is_admin=is_admin,
         is_stats_user=is_stats_user,
+        is_leads_user=is_leads_user,
         wp_ref=user.get("wp_ref"),
         is_wingpoint=bool(
             user.get("wp_ref")

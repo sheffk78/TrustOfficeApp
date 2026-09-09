@@ -243,6 +243,7 @@ class UserResponse(BaseModel):
     created_at: str
     is_admin: bool = False
     is_stats_user: bool = False
+    is_leads_user: bool = False
     wp_ref: Optional[str] = None
     is_wingpoint: bool = False
 

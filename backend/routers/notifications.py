@@ -12,7 +12,19 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 
 from database import db
+from dependencies import get_current_user
 from routers.admin import require_admin
+
+def _leads_guard():
+    """Leads-or-admin dependency, resolved lazily at request time
+    (a module-level import of routers.leads would cycle)."""
+
+    async def _dep(user: dict = Depends(get_current_user)):
+        from routers.leads import require_leads_or_admin
+        return await require_leads_or_admin(user)
+
+    return _dep
+
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +266,7 @@ async def get_lead_triage(
 
 @router.get("/templates")
 async def list_templates(
-    admin: dict = Depends(require_admin),
+    admin: dict = Depends(_leads_guard()),
 ):
     """List all follow-up email templates. Seeds defaults if empty."""
     templates = await db.lead_email_templates.find({}, {"_id": 0}).to_list(50)
@@ -338,7 +350,7 @@ class SendEmailRequest(BaseModel):
 async def send_followup_email(
     lead_id: str,
     req: SendEmailRequest,
-    admin: dict = Depends(require_admin),
+    admin: dict = Depends(_leads_guard()),
 ):
     """Send a follow-up email to a lead using a template. Rate-limited: 1 per lead per 5 min."""
     from routers.leads import _log_activity

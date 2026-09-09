@@ -191,6 +191,7 @@ class CustomerListItem(BaseModel):
     name: str
     is_admin: bool = False
     is_stats_user: bool = False
+    is_leads_user: bool = False
     created_at: str
     subscription_status: str
     subscription_plan: str
@@ -206,6 +207,7 @@ class CustomerDetail(BaseModel):
     picture: Optional[str] = None
     is_admin: bool = False
     is_stats_user: bool = False
+    is_leads_user: bool = False
     created_at: str
     google_id: Optional[str] = None
     subscription: dict
@@ -382,6 +384,7 @@ async def _enrich_customers(users: list, status_filter: Optional[str]) -> list:
             name=user.get("name", ""),
             is_admin=user.get("is_admin", False),
             is_stats_user=user.get("is_stats_user", False),
+            is_leads_user=user.get("is_leads_user", False),
             created_at=user.get("created_at", ""),
             subscription_status=sub_status,
             subscription_plan=sub_plan,
@@ -506,6 +509,7 @@ async def get_customer_detail(
         picture=user.get("picture"),
         is_admin=user.get("is_admin", False),
         is_stats_user=user.get("is_stats_user", False),
+        is_leads_user=user.get("is_leads_user", False),
         created_at=user.get("created_at", ""),
         google_id=user.get("google_id"),
         subscription=sub or {"status": "none", "plan_type": "none"},
@@ -1667,6 +1671,79 @@ async def list_stats_users(admin: dict = Depends(require_admin)):
                 "stats_granted_at": u.get("stats_granted_at"),
             }
             for u in stats_users
+        ]
+    }
+
+
+@router.post("/customers/{user_id}/grant-leads")
+async def grant_leads_access(
+    user_id: str,
+    admin: dict = Depends(require_admin)
+):
+    """Grant leads-CRM access to a user (leads area only, not full admin)."""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "is_leads_user": True,
+            "leads_granted_by": admin["user_id"],
+            "leads_granted_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    logger.info(f"Admin {admin['email']} granted leads access to {user['email']}")
+
+    return {"message": f"Leads access granted to {user['email']}"}
+
+
+@router.post("/customers/{user_id}/revoke-leads")
+async def revoke_leads_access(
+    user_id: str,
+    admin: dict = Depends(require_admin)
+):
+    """Revoke leads-CRM access from a user."""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "is_leads_user": False,
+            "leads_revoked_by": admin["user_id"],
+            "leads_revoked_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    logger.info(f"Admin {admin['email']} revoked leads access from {user['email']}")
+
+    return {"message": f"Leads access revoked from {user['email']}"}
+
+
+@router.get("/leads-users")
+async def list_leads_users(admin: dict = Depends(require_admin)):
+    """List all users with leads access."""
+    leads_users = await db.users.find(
+        {"is_leads_user": True},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+
+    return {
+        "leads_users": [
+            {
+                "user_id": u["user_id"],
+                "email": u.get("email", ""),
+                "name": u.get("name", ""),
+                "is_admin": u.get("is_admin", False),
+                "created_at": u.get("created_at", ""),
+                "leads_granted_at": u.get("leads_granted_at"),
+            }
+            for u in leads_users
         ]
     }
 

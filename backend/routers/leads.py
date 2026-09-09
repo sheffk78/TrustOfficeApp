@@ -21,6 +21,7 @@ from pydantic import BaseModel, EmailStr
 
 from database import db
 from routers.admin import require_admin
+from routers.auth import get_current_user
 from discord_service import notify_new_lead, notify_lead_stage_change
 from email_service import email_service
 from routers.notifications import create_notification
@@ -30,6 +31,35 @@ import httpx
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin/leads", tags=["leads"])
+
+
+# ==================== LEADS-SCOPE AUTH ====================
+
+async def require_leads_or_admin(user: dict = Depends(get_current_user)) -> dict:
+    """
+    Dependency for the leads CRM area: full admins OR leads-scoped users
+    (is_leads_user). Grants access ONLY to lead endpoints — customer,
+    revenue, and system-admin endpoints keep require_admin.
+    """
+    user_doc = await db.users.find_one(
+        {"user_id": user["user_id"]},
+        {"_id": 0, "is_admin": 1, "is_leads_user": 1, "email": 1}
+    )
+
+    if not user_doc:
+        raise HTTPException(status_code=403, detail="User not found")
+
+    is_admin = user_doc.get("is_admin", False)
+    is_leads = user_doc.get("is_leads_user", False)
+
+    # Bootstrap admin by email
+    if user_doc.get("email", "").lower() == "contact@trustoffice.app":
+        is_admin = True
+
+    if not is_admin and not is_leads:
+        raise HTTPException(status_code=403, detail="Leads access required")
+
+    return user
 
 # ==================== LEAD STAGES ====================
 
@@ -1139,7 +1169,7 @@ async def _fetch_facebook_lead_data(leadgen_id: str, access_token: str) -> Optio
 
 @router.get("/analytics")
 async def get_lead_analytics(
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Get lead analytics: funnel, conversion by source, time-to-convert, trend."""
     now = datetime.now(timezone.utc)
@@ -1225,7 +1255,7 @@ async def get_lead_analytics(
 async def export_leads_csv(
     stage: Optional[str] = Query(None, description="Filter by stage"),
     source: Optional[str] = Query(None, description="Filter by source"),
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Export leads as CSV."""
     query = {}
@@ -1292,7 +1322,7 @@ async def export_leads_csv(
 @router.post("/bulk/stage")
 async def bulk_update_stage(
     update: BulkStageUpdate,
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Bulk update stage for multiple leads."""
     if update.stage not in LEAD_STAGES:
@@ -1322,7 +1352,7 @@ async def bulk_update_stage(
 @router.post("/bulk/notes")
 async def bulk_add_notes(
     note: BulkNoteAdd,
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Bulk add notes to multiple leads."""
     for lead_id in note.lead_ids:
@@ -1335,7 +1365,7 @@ async def bulk_add_notes(
 @router.post("/bulk/export")
 async def bulk_export_csv(
     lead_ids: List[str],
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Export selected leads as CSV."""
     leads = await db.leads.find(
@@ -1403,7 +1433,7 @@ async def list_leads(
     sort_order: str = Query("desc", description="Sort order: asc or desc"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """List all leads with filtering, search, and pagination."""
     query = {}
@@ -1465,7 +1495,7 @@ async def list_leads(
 @router.get("/{lead_id}")
 async def get_lead(
     lead_id: str,
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Get detailed lead information with score breakdown."""
     lead = await db.leads.find_one({"lead_id": lead_id}, {"_id": 0})
@@ -1488,7 +1518,7 @@ async def get_lead(
 async def update_lead(
     lead_id: str,
     update: LeadUpdate,
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Update a lead's stage, notes, or next action."""
     lead = await db.leads.find_one({"lead_id": lead_id})
@@ -1578,7 +1608,7 @@ async def update_lead(
 async def set_lead_course_progress(
     lead_id: str,
     body: dict,
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Set a lead's course progress. Auto-advances stage from new → engaged."""
     lead = await db.leads.find_one({"lead_id": lead_id})
@@ -1606,7 +1636,7 @@ async def set_lead_course_progress(
 async def add_lead_note(
     lead_id: str,
     note: LeadNote,
-    admin: dict = Depends(require_admin)
+    admin: dict = Depends(require_leads_or_admin)
 ):
     """Add a note to a lead's activity log."""
     lead = await db.leads.find_one({"lead_id": lead_id})

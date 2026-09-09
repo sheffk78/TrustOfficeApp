@@ -310,7 +310,7 @@ export function BulkLeadStageDialog({
 export function CustomerDetailDialog({
   customerDetail,
   onClose, onImpersonate, onGrantAccess, onMakeAdmin, onRemoveAdmin,
-  onGrantStats, onRevokeStats, onDelete,
+  onGrantStats, onRevokeStats, onDelete, onGrantLeads, onRevokeLeads,
 }) {
   if (!customerDetail) return null;
   const isPrimaryAdmin = customerDetail.email === 'contact@trustoffice.app';
@@ -547,6 +547,27 @@ export function CustomerDetailDialog({
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Grant Stats
+              </Button>
+            )}
+
+            {customerDetail.is_leads_user ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-rust hover:text-rust"
+                onClick={onRevokeLeads}
+              >
+                <Target className="w-4 h-4 mr-2" />
+                Revoke Leads
+              </Button>
+            ) : !customerDetail.is_admin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onGrantLeads}
+              >
+                <Target className="w-4 h-4 mr-2" />
+                Grant Leads
               </Button>
             )}
 

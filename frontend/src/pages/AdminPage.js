@@ -565,6 +565,49 @@ export default function AdminPage() {
     }
   };
 
+  // ─── Grant/revoke leads access handlers ──────────────────────────
+  const handleGrantLeads = async (userId) => {
+    try {
+      const response = await fetchWithAuth(`/admin/customers/${userId}/grant-leads`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      if (response.ok) {
+        toast.success('Leads access granted');
+        fetchCustomers();
+        if (customerDetail?.user_id === userId) {
+          fetchCustomerDetail(userId);
+        }
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to grant leads access');
+      }
+    } catch (error) {
+      toast.error('Failed to grant leads access');
+    }
+  };
+
+  const handleRevokeLeads = async (userId) => {
+    try {
+      const response = await fetchWithAuth(`/admin/customers/${userId}/revoke-leads`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      if (response.ok) {
+        toast.success('Leads access revoked');
+        fetchCustomers();
+        if (customerDetail?.user_id === userId) {
+          fetchCustomerDetail(userId);
+        }
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to revoke leads access');
+      }
+    } catch (error) {
+      toast.error('Failed to revoke leads access');
+    }
+  };
+
   // ─── Tab-change data fetching ────────────────────────────────────
   useEffect(() => {
     if (!isAdmin) return;
@@ -1143,6 +1186,8 @@ export default function AdminPage() {
               onRemoveAdmin={handleRemoveAdmin}
               onGrantStats={handleGrantStats}
               onRevokeStats={handleRevokeStats}
+              onGrantLeads={handleGrantLeads}
+              onRevokeLeads={handleRevokeLeads}
               onDelete={handleDeleteFromCustomerDetail}
             />
 

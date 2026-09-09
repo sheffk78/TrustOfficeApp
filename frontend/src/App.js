@@ -38,6 +38,7 @@ import AuditTrailPage from "@/pages/AuditTrailPage";
 import BeneficiariesPage from "@/pages/BeneficiariesPage";
 import AffiliatePage from "@/pages/AffiliatePage";
 import AdminPage from "@/pages/AdminPage";
+import LeadsAccessPage from "@/pages/LeadsAccessPage";
 import StatsPage from "@/pages/StatsPage";
 import StateCompliancePage from "@/pages/StateCompliancePage";
 import MeetingAgenda from "@/pages/MeetingAgenda";
@@ -505,6 +506,12 @@ const AppRouter = () => {
       <Route path="/admin" element={
         <ProtectedRoute>
           <AdminPage />
+        </ProtectedRoute>
+      } />
+      {/* Leads area - accessible to leads users and admins */}
+      <Route path="/leads" element={
+        <ProtectedRoute>
+          <LeadsAccessPage />
         </ProtectedRoute>
       } />
       {/* Stats dashboard - accessible to stats users and admins */}

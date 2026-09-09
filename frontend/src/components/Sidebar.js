@@ -43,7 +43,8 @@ import {
   UsersRound,
   ScrollText,
   FilePlus,
-  FileText
+  FileText,
+  Target
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -473,6 +474,19 @@ const NavList = ({
         pathname={pathname}
         onClick={onLinkClick}
         testId="nav-stats"
+      />
+    )}
+
+    {/* Leads link - visible to leads users. Appears next to Admin/Stats */}
+    {user?.is_leads_user && (
+      <StaffLink
+        to="/leads"
+        label="Leads"
+        badge="staff"
+        icon={Target}
+        pathname={pathname}
+        onClick={onLinkClick}
+        testId="nav-leads"
       />
     )}
   </>

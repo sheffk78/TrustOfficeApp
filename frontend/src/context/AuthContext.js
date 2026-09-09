@@ -720,6 +720,7 @@ export const AuthProvider = ({ children }) => {
     exchangeAuthCode,
     seedDemoData,
     isStatsUser: user?.is_stats_user || false,
+    isLeadsUser: user?.is_leads_user || user?.is_admin || false,
   };
 
   return (
