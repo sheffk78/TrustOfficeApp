@@ -613,9 +613,14 @@ async def log_marketing_activity(body: MarketingActivityIn):
 @router.post("/tidycal-webhook", include_in_schema=False)
 async def tidycal_webhook(request: Request):
     """
-    Webhook endpoint for TidyCal booking notifications.
-    Called when someone books a TrustOffice Discovery Call.
-    Creates/updates a lead with source="booked-call" and flags them.
+    Webhook endpoint for booking-system notifications (TidyCal AND the
+    per-brand booking app's lead_push — same contract).
+
+    Booking-time push (booking_confirmed absent/False): captures the lead with
+    source="booking-trustoffice-direct" and booked_call=true.
+    Confirmed push (booking_confirmed=true): bumps the lead score (+15, the
+    same weight calculate_lead_score already gives booked_call) and logs the
+    confirmation as an activity. Idempotent on (email, start).
     """
     try:
         body = await request.json()
@@ -639,24 +644,42 @@ async def tidycal_webhook(request: Request):
         return {"success": False, "error": "No email provided"}
 
     email = email.strip().lower()
-    booked_at = body.get("starts_at") or body.get("start_time") or datetime.now(timezone.utc).isoformat()
+    booked_at = body.get("starts_at") or body.get("start_time") or body.get("start") or datetime.now(timezone.utc).isoformat()
+    booking_confirmed = bool(body.get("booking_confirmed"))
+    event_id = body.get("event_id")
+    event_type = body.get("event_type") or "governance-consultation"
+    phone_in = body.get("phone")
+    notes_in = body.get("notes")
 
     # Check if lead already exists
     existing = await db.leads.find_one({"email": email})
     if existing:
-        await db.leads.update_one(
-            {"email": email},
-            {"$set": {
-                "name": name,
-                "source": "booked-call",
-                "booked_call": True,
-                "booked_call_at": booked_at,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }}
-        )
+        update_fields = {
+            "name": name,
+            "booked_call": True,
+            "booked_call_at": booked_at,
+            "meeting_date": booked_at,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if booking_confirmed:
+            # Kenneth directive 2026-09-09: confirm click = lead-score bump
+            update_fields["booking_confirmed"] = True
+            update_fields["booking_confirmed_at"] = datetime.now(timezone.utc).isoformat()
+            try:
+                update_fields["score"] = min(100, int(existing.get("score") or 0) + 15)
+            except (TypeError, ValueError):
+                update_fields["score"] = 70
+        if phone_in:
+            update_fields["phone"] = str(phone_in)[:40]
+        await db.leads.update_one({"email": email}, {"$set": update_fields})
         lead_id = existing["lead_id"]
-        await _log_activity(lead_id, "booked_call", f"Booked a TrustOffice Discovery Call at {booked_at}")
-        logger.info(f"Lead {lead_id} booked a call — {email}")
+        action = (
+            f"Booking confirmed by visitor (email click) for {booked_at} — lead score bumped"
+            if booking_confirmed
+            else f"Booked a TrustOffice Governance Consultation at {booked_at}"
+        )
+        await _log_activity(lead_id, "booked_call", action)
+        logger.info(f"Lead {lead_id} booked call (confirmed={booking_confirmed}) — {email}")
         return {"success": True, "lead_id": lead_id, "is_returning": True}
 
     # Create new lead
@@ -667,26 +690,40 @@ async def tidycal_webhook(request: Request):
         "lead_id": lead_id,
         "email": email,
         "name": name,
-        "source": "booked-call",
-        "lead_type": "email_capture",
-        "stage": "new",
+        "source": "booking-trustoffice-direct",
+        "lead_type": "booking",
+        "stage": "booked",
         "manual_stage_override": False,
         "booked_call": True,
         "booked_call_at": booked_at,
+        "meeting_date": booked_at,
+        "booking_confirmed": booking_confirmed,
+        "event_id": event_id,
+        "event_type": event_type,
         "nurture_step_sent": 12,  # booked-call leads skip the nurture drip entirely
         "lessons_watched": 0,
         "subscription_status": None,
         "last_login": None,
-        "notes": "",
-        "next_action": "Prepare for upcoming discovery call",
+        "notes": (str(notes_in)[:500] if notes_in else ""),
+        "next_action": "Prepare for upcoming governance consultation",
         "score": 70,  # High score — booked a call is strong intent
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
     }
+    if phone_in:
+        lead_doc["phone"] = str(phone_in)[:40]
 
     await db.leads.insert_one(lead_doc)
-    await _log_activity(lead_id, "created", "Lead captured via TidyCal booking")
-    await _log_activity(lead_id, "booked_call", f"Booked a TrustOffice Discovery Call at {booked_at}")
+    await _log_activity(
+        lead_id, "created",
+        f"Lead captured via booking app ({event_type}) at {booked_at}"
+        + (" — confirmed by visitor" if booking_confirmed else ""),
+    )
+    await _log_activity(
+        lead_id, "booked_call",
+        f"Booked a TrustOffice Governance Consultation at {booked_at}"
+        + (" — confirmed by visitor, score bumped" if booking_confirmed else ""),
+    )
 
     await notify_new_lead(
         name=name,
