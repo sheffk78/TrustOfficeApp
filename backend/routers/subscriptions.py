@@ -227,6 +227,13 @@ def calculate_subscription_status(sub: dict) -> dict:
                     result["plan_type"] = legacy_info[0]
                     result["billing_period"] = legacy_info[1]
                     result["legacy_trust_limit"] = legacy_info[2]
+                    # 2026-09-08 FIX: these are the SAME $79/$790 price objects
+                    # the legacy-trustee guard above covers — subscribers holding
+                    # them are grandfathered at the legacy rate too. Without this
+                    # the billing UI showed them the new $99/$948 rate instead of
+                    # their locked price, hiding the grandfathering notice.
+                    result["is_legacy_price"] = True
+                    result["price_amount"] = (79.00 if legacy_info[1] == "monthly" else 790.00)
                 # If price_id doesn't match anything, leave plan_type as-is from DB
             
             return result
