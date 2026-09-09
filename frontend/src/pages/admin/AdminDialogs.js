@@ -22,7 +22,14 @@ export function LeadDetailDialog({
             <Target className="w-5 h-5 text-gold" />
             {selectedLead?.name || 'Lead Details'}
           </DialogTitle>
-          <DialogDescription>{selectedLead?.email}</DialogDescription>
+          <DialogDescription>
+            {selectedLead?.email}
+            {selectedLead?.phone && (
+              <span className="ml-2">
+                · <a href={`tel:${selectedLead.phone}`} className="underline hover:text-navy dark:hover:text-white" title="Click to call">{selectedLead.phone}</a>
+              </span>
+            )}
+          </DialogDescription>
         </DialogHeader>
 
         {leadDetailLoading ? (
@@ -75,6 +82,11 @@ export function LeadDetailDialog({
                       })
                     : 'Date not available'}
                 </p>
+                {selectedLead.phone && (
+                  <p className="text-sm mt-1">
+                    <a href={`tel:${selectedLead.phone}`} className="font-medium text-navy dark:text-white underline hover:text-gold transition-colors" title="Click to call">📞 {selectedLead.phone}</a>
+                  </p>
+                )}
                 {onUpdateCallOutcome && (
                   <div className="flex items-center gap-2 mt-3">
                     <span className="text-xs text-muted-foreground">Mark as:</span>

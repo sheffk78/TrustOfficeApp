@@ -91,6 +91,11 @@ export default function LeadTriageView({ onViewLead, onFollowUp }) {
           <StageBadge stage={lead.stage} />
         </div>
         <p className="text-xs text-navy/60 truncate mt-0.5">{lead.email}</p>
+        {lead.phone && (
+          <p className="text-xs text-navy/70 truncate mt-0.5 font-mono">
+            <a href={`tel:${lead.phone}`} className="hover:text-navy hover:underline" title="Click to call">{lead.phone}</a>
+          </p>
+        )}
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[10px] text-navy/40 font-mono">{lead.source || '—'}</span>
           <ScoreBar score={lead.score || 0} />

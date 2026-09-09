@@ -1427,10 +1427,17 @@ async def list_leads(
 
     if search:
         escaped = re.escape(search)
-        query["$or"] = [
+        digits = re.sub(r"\D", "", search)
+        ors = [
             {"email": {"$regex": escaped, "$options": "i"}},
-            {"name": {"$regex": escaped, "$options": "i"}}
+            {"name": {"$regex": escaped, "$options": "i"}},
         ]
+        # Phone search: match raw value + stripped-digit form so "(812) 801-5542"
+        # finds "8128015542" and "812801" finds "+1812...". Stored phones may be
+        # masked (+184****4495) or plain (8128015542) — both are string matches.
+        if len(digits) >= 4:
+            ors.append({"phone": {"$regex": digits}})
+        query["$or"] = ors
 
     total = await db.leads.count_documents(query)
     sort_dir = -1 if sort_order == "desc" else 1

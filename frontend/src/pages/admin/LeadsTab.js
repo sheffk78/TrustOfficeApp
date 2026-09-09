@@ -68,7 +68,7 @@ export function LeadsTab({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search leads by name or email..."
+              placeholder="Search leads by name, email, or phone..."
               value={leadsSearch}
               onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') onSearchSubmit(); }}
@@ -109,7 +109,7 @@ export function LeadsTab({
               )}
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1000px]">
+                <table className="w-full min-w-[1100px]">
                   <thead>
                     <tr className="border-b border-navy/10 dark:border-white/10">
                       <th className="w-8 py-3 px-2">
@@ -121,6 +121,7 @@ export function LeadsTab({
                       </th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Name</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Email</th>
+                      <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Phone</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Stage</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Score</th>
                       <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Next Action</th>
@@ -150,6 +151,13 @@ export function LeadsTab({
                           </div>
                         </td>
                         <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap max-w-[200px] truncate">{lead.email}</td>
+                        <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">
+                          {lead.phone ? (
+                            <a href={`tel:${lead.phone}`} className="hover:text-navy dark:hover:text-white transition-colors" title="Click to call">{lead.phone}</a>
+                          ) : (
+                            <span>—</span>
+                          )}
+                        </td>
                         <td className="py-3 px-3">
                           <Badge className={getLeadStageBadgeClass(lead.stage)}>
                             {lead.stage_label || lead.stage}
