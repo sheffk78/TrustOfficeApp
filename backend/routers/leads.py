@@ -1583,17 +1583,6 @@ async def update_lead(
                 title=f"Lead stage changed: {lead.get('name', '')}",
                 body=f"{old_stage} → {update.stage}",
                 lead_id=lead_id,
-                lead_email=lead.get("email", ""),
-                lead_name=lead.get("name", ""),
-            )
-
-            # Create in-app notification for stage change
-            from routers.notifications import create_notification
-            await create_notification(
-                type="lead_stage_change",
-                title=f"Lead stage changed: {lead.get('name', '')}",
-                body=f"{old_stage} → {update.stage}",
-                lead_id=lead_id,
                 lead_email=lead.get("email"),
                 lead_name=lead.get("name"),
             )
