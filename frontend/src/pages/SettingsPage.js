@@ -223,6 +223,13 @@ export default function SettingsPage() {
       scope_classifications: st?.scope_classifications || ['Operational Expense', 'Other'],
     };
   });
+  // Show the threshold amount with thousands separators (e.g. "10,000").
+  // Kept as raw number in state; formatted only while the field isn't focused.
+  const [thresholdFocused, setThresholdFocused] = useState(false);
+  const [thresholdRaw, setThresholdRaw] = useState(null);
+  const thresholdDisplayValue = thresholdFocused
+    ? (thresholdRaw !== null ? thresholdRaw : (spendingThreshold.amount === '' || spendingThreshold.amount == null ? '' : String(spendingThreshold.amount)))
+    : (spendingThreshold.amount === '' || spendingThreshold.amount == null ? '' : spendingThreshold.amount.toLocaleString('en-US'));
 
   const updateSpendingThreshold = (field, value) => {
     setSpendingThreshold(prev => ({ ...prev, [field]: value }));
@@ -1653,12 +1660,22 @@ export default function SettingsPage() {
                       <div>
                         <Label className="text-xs text-muted-foreground">Spending Threshold Amount ($)</Label>
                         <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="e.g., 10000"
-                          value={spendingThreshold.amount ?? ''}
-                          onChange={(e) => updateSpendingThreshold('amount', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="e.g., 10,000"
+                          value={thresholdDisplayValue}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/[^0-9.]/g, '');
+                            setThresholdRaw(e.target.value);
+                            updateSpendingThreshold('amount', digits === '' ? '' : parseFloat(digits));
+                          }}
+                          onFocus={(e) => { setThresholdRaw(e.target.value.replace(/[^0-9.]/g, '')); setThresholdFocused(true); }}
+                          onBlur={(e) => {
+                            setThresholdRaw(null);
+                            const digits = e.target.value.replace(/[^0-9.]/g, '');
+                            updateSpendingThreshold('amount', digits === '' ? '' : parseFloat(digits));
+                            setThresholdFocused(false);
+                          }}
                           className="mt-1 input-trust"
                           data-testid="spending-threshold-amount"
                         />
