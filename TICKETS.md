@@ -175,3 +175,8 @@ Health checks: api 200, app 200 post-deploy.
 - Railway deploy `3ecb7707-0fc6-413e-9d7f-ecf941cfb35f` → SUCCESS
 - Backend health: `https://api.trustoffice.app/health` → 200 `{"status":"ok","service":"trustoffice-api","db":"connected"}`
 - Fix logic unit-tested locally: int-key list access returns indexed element; empty list returns None; None-safe.
+
+## TO-2026-09-10-01 — UnboundLocalError on lead stage change (FIXED 2026-09-10)
+**Symptom:** 2 Discord alerts 🚨 Server Error: UnboundLocalError at 21:37 UTC on PATCH /api/admin/leads/{lead_id} (stage changes by Kenneth: Natalie Sullivan, Deborah Geyman). Lead update saved + Discord ping fired, but API returned 500.
+**Root cause:** duplicate stage-change notification block in leads.py (second copy had function-local `from routers.notifications import create_notification`) — Python treats the name as function-local for the whole function, so the FIRST `await create_notification(...)` hit UnboundLocalError before the local import line ran.
+**Fix:** commit 7fe62b6 — removed duplicate block, kept single notification. Verified: live PATCH probe with admin auth → 200. Backend-wide AST scan: zero use-before-import bugs remain.
