@@ -27,6 +27,8 @@ import {
   Calendar,
   ClipboardList,
   Scale,
+  Target,
+  Shield,
   Activity,
   MapPin,
   Gavel,
@@ -63,7 +65,8 @@ const primaryNav = [
 ];
 
 // ═══ Secondary items shown in the 'More' slide-up panel (grouped) ═══
-const moreNavGroups = [
+// Admin-only group is appended inside the component (needs auth state)
+const BASE_MORE_NAV_GROUPS = [
   {
     groupLabel: 'Trust Structure',
     items: [
@@ -121,12 +124,21 @@ const moreNavGroups = [
   },
 ];
 
-// Flatten all moreNav items for active-state checking
-const allMoreItems = moreNavGroups.flatMap(g => g.items);
+// Admin-only group — Kenneth needs one-tap access to the leads area from his phone
+// (appended at render time; isAdmin comes from auth state inside the component)
+const ADMIN_NAV_GROUP = {
+  groupLabel: 'Admin',
+  items: [
+    { path: '/leads', icon: Target, label: 'Leads' },
+    { path: '/admin', icon: Shield, label: 'Admin Panel' },
+  ],
+};
 
 export const MobileBottomNav = () => {
   const location = useLocation();
-  const { selectedTrust } = useAuth();
+  const { selectedTrust, user } = useAuth();
+  const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
+  const moreNavGroups = isAdmin ? [...BASE_MORE_NAV_GROUPS, ADMIN_NAV_GROUP] : BASE_MORE_NAV_GROUPS;
   const [openMenu, setOpenMenu] = useState(null); // 'Money' | '__more__' | null
   const menuRef = useRef(null);
   const moreSheetRef = useRef(null);
@@ -164,7 +176,7 @@ export const MobileBottomNav = () => {
       return item.subMenu.some((s) => location.pathname === s.path);
     }
     if (item.isMore) {
-      return allMoreItems.some((s) => location.pathname === s.path);
+      return moreNavGroups.flatMap(g => g.items).some((s) => location.pathname === s.path);
     }
     return false;
   };

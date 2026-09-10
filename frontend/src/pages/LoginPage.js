@@ -314,6 +314,8 @@ export default function LoginPage() {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type="email"
+                      autoComplete="username"
+                      inputMode="email"
                       value={email}
                       onChange={(e) => { setEmail(e.target.value); if (loginError) setLoginError(''); }}
                       className={`pl-10 input-trust ${loginError ? 'border-error/40' : ''}`}
@@ -342,6 +344,7 @@ export default function LoginPage() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
                       value={password}
                       onChange={(e) => { setPassword(e.target.value); if (loginError) setLoginError(''); }}
                       className={`pl-10 pr-10 input-trust ${loginError ? 'border-error/40' : ''}`}
