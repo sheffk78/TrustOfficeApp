@@ -118,7 +118,7 @@ export function SupportWidget() {
         onClick={toggleOpen}
         aria-label={open ? 'Close support panel' : 'Open support & feedback'}
         data-testid="support-widget-bubble"
-        className={`fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-navy text-white shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 ${pulse ? 'to-support-pulse' : ''}`}
+        className={`fixed bottom-5 right-2 z-50 w-14 h-14 rounded-full bg-navy text-white shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 ${pulse ? 'to-support-pulse' : ''}`}
       >
         {open ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
       </button>
@@ -128,7 +128,7 @@ export function SupportWidget() {
         <div
           ref={panelRef}
           data-testid="support-widget-panel"
-          className="fixed bottom-24 right-5 z-50 w-[320px] max-w-[calc(100vw-2.5rem)] bg-white rounded-lg shadow-2xl border border-navy/10 overflow-hidden animate-fade-in flex flex-col"
+          className="fixed bottom-24 right-2 z-50 w-[320px] max-w-[calc(100vw-1.5rem)] bg-white rounded-lg shadow-2xl border border-navy/10 overflow-hidden animate-fade-in flex flex-col"
           style={{ maxHeight: '75vh' }}
         >
           {/* Header */}
