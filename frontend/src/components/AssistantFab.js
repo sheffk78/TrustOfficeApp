@@ -56,7 +56,7 @@ export function AssistantFab() {
     <Popover open={open} onOpenChange={handleOpen}>
       <PopoverTrigger asChild>
         <button
-          className="fixed bottom-24 md:bottom-24 right-5 z-40 w-14 h-14 rounded-full bg-gold text-navy shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2"
+          className="fixed bottom-24 md:bottom-24 right-2 z-40 w-14 h-14 rounded-full bg-gold text-navy shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2"
           aria-label="Ask Trust Assistant"
           data-testid="assistant-fab"
         >

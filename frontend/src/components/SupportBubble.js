@@ -91,7 +91,7 @@ const SupportBubble = () => {
       {/* Floating button — bottom right */}
       <button
         onClick={() => setOpen(!open)}
-        className={`fixed bottom-6 right-6 z-50 flex items-center justify-center w-12 h-12 rounded-full shadow-lg transition-all duration-200 ${
+        className={`fixed bottom-6 right-2 z-50 flex items-center justify-center w-12 h-12 rounded-full shadow-lg transition-all duration-200 ${
           open
             ? 'bg-navy text-white rotate-90'
             : 'bg-navy text-white hover:bg-navy/90 hover:scale-105'
@@ -104,7 +104,7 @@ const SupportBubble = () => {
 
       {/* Panel — slides up from the button */}
       {open && (
-        <div className="fixed bottom-20 right-6 z-50 w-[calc(100vw-3rem)] max-w-sm bg-white dark:bg-slate-800 border border-navy/15 dark:border-white/10 shadow-xl rounded-lg overflow-hidden flex flex-col"
+        <div className="fixed bottom-20 right-2 z-50 w-[calc(100vw-1.5rem)] max-w-sm bg-white dark:bg-slate-800 border border-navy/15 dark:border-white/10 shadow-xl rounded-lg overflow-hidden flex flex-col"
              style={{ maxHeight: '70vh' }}>
           {/* Header */}
           <div className="px-4 py-3 border-b border-navy/10 dark:border-white/10 bg-navy/5 dark:bg-white/5">
