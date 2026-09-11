@@ -387,12 +387,18 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         
         return await call_next(request)
 
+# Import SSN intake-guard middleware (NOW-phase security package)
+from security import SSNGuardMiddleware
+
 # ==================== MIDDLEWARE & ROUTER REGISTRATION ====================
 # NOTE: In FastAPI/Starlette, middleware is LIFO — the LAST added executes FIRST.
 # CORS must be outermost (added last) so it handles preflight before other middleware.
 
 # Security headers middleware (OWASP recommendations)
 app.add_middleware(SecurityHeadersMiddleware)
+
+# NOW-phase SSN intake guard: reject SSN-shaped JSON body input with HTTP 422
+app.add_middleware(SSNGuardMiddleware)
 
 # Rate limiting middleware
 app.add_middleware(RateLimitMiddleware, config=RateLimitConfig())
