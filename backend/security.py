@@ -383,8 +383,26 @@ class SSNGuardMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Re-inject the (unchanged) body so downstream handlers still see it.
+        # Wrapping the ORIGINAL receive (not replacing it) keeps 'http.disconnect'
+        # flowing, which BaseHTTPMiddleware downstream requires.
+        original_receive = request._receive
+
         async def _receive():
-            return {"type": "http.request", "body": body_bytes, "more_body": False}
+            body_msg = await original_receive()
+            if body_msg.get("more_body", False):
+                # Drain any remaining chunks, then hand back the whole body.
+                chunks = [body_msg.get("body", b"")]
+                while True:
+                    msg = await original_receive()
+                    chunks.append(msg.get("body", b""))
+                    if not msg.get("more_body", False):
+                        break
+                return {
+                    "type": "http.request",
+                    "body": b"".join(chunks),
+                    "more_body": False,
+                }
+            return body_msg
 
         request._receive = _receive
         return await call_next(request)

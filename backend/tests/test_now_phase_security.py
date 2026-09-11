@@ -138,8 +138,11 @@ class _FakeRequest:
         self._receive = _FakeReceive(body)
 
     async def body(self):
-        msg = await self._receive()
-        return msg["body"]
+        # Cache like real Starlette's request.body(); unwrap the ASGI message.
+        if not hasattr(self, "_body_cache"):
+            msg = await self._receive()
+            self._body_cache = msg["body"] if isinstance(msg, dict) else msg
+        return self._body_cache
 
 
 class _Collector:
