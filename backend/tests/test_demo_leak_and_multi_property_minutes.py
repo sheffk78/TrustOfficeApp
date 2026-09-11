@@ -29,6 +29,7 @@ generator function — no live server, no DB, no fastapi import), following
 the pattern of test_checkout_first.py.
 """
 import ast
+import re
 import sys
 from pathlib import Path
 
@@ -151,6 +152,22 @@ class TestSharedDemoCleanupService:
         # Demo trusts must not consume plan trust limits
         assert body.count('"is_demo": {"$ne": True}') >= 1, (
             "existing_count for trust limits must exclude demo trusts"
+        )
+
+    def test_trust_response_exposes_is_demo_flag(self):
+        """2026-09-11 demo-remnant fix (part 1).
+
+        The frontend reconciles its active-trust selection against the fresh
+        GET /trusts list and prefers real trusts over demo trusts. That check
+        needs the demo flag on every returned trust; pydantic strips fields
+        not declared on TrustResponse.
+        """
+        src = (BACKEND_DIR / "models.py").read_text()
+        start = src.index("class TrustResponse(BaseModel):")
+        end = src.index("# ==================== ENTITY MODELS")
+        body = src[start:end]
+        assert re.search(r"is_demo\s*:\s*Optional\[bool\]", body), (
+            "TrustResponse must expose is_demo so the client can prefer real trusts"
         )
 
 

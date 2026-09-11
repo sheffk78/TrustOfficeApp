@@ -475,6 +475,9 @@ class TrustResponse(BaseModel):
     review_cadence: Optional[str] = "quarterly"
     benevolence_mission: Optional[str] = None
     determination_letter_date: Optional[str] = None
+    # Demo flag exposed to the frontend so trust selection can prefer real
+    # trusts over demo trusts (2026-09-11 demo-remnant fix).
+    is_demo: Optional[bool] = None
 
 
 # ==================== ENTITY MODELS ====================
