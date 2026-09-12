@@ -31,6 +31,12 @@ from dependencies import (
     revoke_all_user_refresh_tokens,
     revoke_all_user_access_tokens,
     revoke_refresh_token_by_hash,
+    record_session_for_token,
+    get_active_sessions,
+    revoke_user_session,
+    revoke_all_other_sessions,
+    touch_session,
+    _extract_token,
 )
 from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, PasswordChange, ProfileUpdate
 from email_service import email_service
@@ -231,6 +237,13 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
     
     token = create_jwt_token(user_doc["user_id"], user_doc["email"])
 
+    # FEATURE 5 item 2: track this session (device/IP/last-seen) by its jti.
+    try:
+        token_payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+        await record_session_for_token(user_doc["user_id"], token_payload.get("jti"), request, email=user_doc.get("email"))
+    except Exception as sess_exc:  # pragma: no cover - non-fatal
+        logger.warning(f"Session tracking on login failed (non-fatal): {sess_exc}")
+
     # Issue an opaque refresh token (SHA-256 hashed in the refresh_tokens collection)
     refresh_raw = await create_refresh_token_record(user_doc["user_id"])
 
@@ -394,6 +407,13 @@ async def refresh_token(request: Request, response: Response):
 
     new_access = create_jwt_token(user_id, user_doc.get("email", ""))
     new_refresh_raw = await create_refresh_token_record(user_id, rotated_from=token_hash)
+
+    # FEATURE 5 item 2: record the newly issued access token as a session.
+    try:
+        token_payload = jwt.decode(new_access, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+        await record_session_for_token(user_id, token_payload.get("jti"), request, email=user_doc.get("email"))
+    except Exception as sess_exc:  # pragma: no cover - non-fatal
+        logger.warning(f"Session tracking on refresh failed (non-fatal): {sess_exc}")
 
     # Set the new access token cookie (mirrors login)
     response.set_cookie(
@@ -793,6 +813,98 @@ async def logout(request: Request, response: Response):
     return {"message": "Logged out"}
 
 
+# ---------------------------------------------------------------------------
+# FEATURE 5 item 2: device/session management endpoints
+# ---------------------------------------------------------------------------
+
+def _current_jti(user: dict, request: Request) -> Optional[str]:
+    """Resolve the jti of the access token used for the current request."""
+    token = _extract_token(request)
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+        return payload.get("jti")
+    except Exception:
+        return None
+
+
+# Dependency-level hook: throttled last_seen_at update on authenticated requests.
+async def touch_current_session(request: Request, user: dict = Depends(get_current_user)) -> dict:
+    """Record activity for the requesting session (throttled to 1 write / 5 min).
+
+    Returns the user unchanged so it can be used in place of get_current_user.
+    """
+    jti = _current_jti(user, request)
+    await touch_session(user.get("user_id"), jti, request)
+    return user
+
+
+@router.get("/auth/sessions")
+async def list_sessions(request: Request, user: dict = Depends(get_current_user)):
+    """List the user's active (non-revoked, non-expired) sessions, newest first.
+
+    Marks which session is the caller's current session (is_current).
+    """
+    # Keep the current session's last_seen fresh (throttled) on list view.
+    await touch_session(user.get("user_id"), _current_jti(user, request), request)
+    sessions = await get_active_sessions(user["user_id"], _current_jti(user, request))
+    return {"sessions": sessions}
+
+
+@router.delete("/auth/sessions/{jti}")
+async def revoke_session(request: Request, jti: str, user: dict = Depends(get_current_user)):
+    """Revoke a single session by jti.
+
+    Rejects (400) when the caller targets the session of the request itself.
+    """
+    current_jti = _current_jti(user, request)
+    if jti == current_jti:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot sign out your current session from this view. Use 'Sign out' to end this session.",
+        )
+    revoked = await revoke_user_session(user["user_id"], jti)
+    if not revoked:
+        raise HTTPException(status_code=404, detail="Session not found or already revoked")
+
+    # Security event logging (best-effort).
+    try:
+        ip = _client_ip(request)
+        ua = request.headers.get("User-Agent")
+        await record_security_event(
+            user["user_id"], "remote_session_sign_out",
+            ip=ip, user_agent=ua, details={"revoked_jti": jti},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for remote_session_sign_out failed (non-fatal): {sec_exc}")
+
+    return {"message": "Session revoked", "jti": jti}
+
+
+@router.post("/auth/sessions/revoke-all")
+async def revoke_all_sessions(request: Request, user: dict = Depends(get_current_user)):
+    """Revoke every session except the caller's current one.
+
+    Reuses the session revocation helpers. Returns the count revoked.
+    """
+    current_jti = _current_jti(user, request)
+    count = await revoke_all_other_sessions(user["user_id"], current_jti)
+
+    # Security event logging (best-effort).
+    try:
+        ip = _client_ip(request)
+        ua = request.headers.get("User-Agent")
+        await record_security_event(
+            user["user_id"], "sessions_revoked_all",
+            ip=ip, user_agent=ua, details={"revoked_count": count},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for sessions_revoked_all failed (non-fatal): {sec_exc}")
+
+    return {"revoked_count": count, "message": f"Revoked {count} other session(s)"}
+
+
 @router.post("/auth/password/change")
 async def change_password(body: PasswordChange, request: Request, response: Response, user: dict = Depends(get_current_user)):
     """Authenticated in-session password change.
@@ -831,6 +943,13 @@ async def change_password(body: PasswordChange, request: Request, response: Resp
     # user isn't immediately logged out by the access-token revocation above.
     new_access = create_jwt_token(user_id, user.get("email", ""))
     new_refresh_raw = await create_refresh_token_record(user_id)
+
+    # FEATURE 5 item 2: record the reissued access token as a session.
+    try:
+        token_payload = jwt.decode(new_access, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+        await record_session_for_token(user_id, token_payload.get("jti"), request, email=user.get("email"))
+    except Exception as sess_exc:  # pragma: no cover - non-fatal
+        logger.warning(f"Session tracking on password change failed (non-fatal): {sess_exc}")
 
     response.set_cookie(
         key="session_token",
