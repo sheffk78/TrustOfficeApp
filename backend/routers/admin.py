@@ -912,8 +912,8 @@ from dependencies import create_jwt_token
 @router.post("/impersonate/{user_id}")
 async def impersonate_user(
     user_id: str,
+    request: Request,
     admin: dict = Depends(require_admin),
-    request: Optional[Request] = None,
 ):
     """
     Generate a token to impersonate a user.

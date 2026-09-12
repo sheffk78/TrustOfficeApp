@@ -411,9 +411,9 @@ async def upload_document(
 @router.get("/vault/documents/{doc_id}/download")
 async def download_document(
     doc_id: str,
+    request: Request,
     inline: bool = Query(False, description="Serve with Content-Disposition: inline for in-app preview"),
     user: dict = Depends(get_current_user),
-    request: Optional[Request] = None,
 ):
     """Download a file from the vault."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
