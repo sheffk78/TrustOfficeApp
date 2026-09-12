@@ -20,6 +20,7 @@ export default function VaultDocumentCard({
   onCopyLink,
   onDelete,
   onDownload,
+  onStepUpRequired,
 }) {
   const isUploadedFile = doc.storage_provider === 'trustoffice';
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -130,7 +131,12 @@ export default function VaultDocumentCard({
         </div>
       )}
 
-      <VaultPreviewModal doc={doc} open={previewOpen} onOpenChange={setPreviewOpen} />
+      <VaultPreviewModal
+        doc={doc}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        onStepUpRequired={(requestFn, docArg) => onStepUpRequired && onStepUpRequired(requestFn, docArg)}
+      />
     </div>
   );
 }

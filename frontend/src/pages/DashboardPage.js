@@ -7,10 +7,12 @@ import PageHelpButton from '@/components/PageHelpButton';
 import { TrustManager } from '@/components/TrustManager';
 import BankingSummaryCard from '@/components/BankingSummaryCard';
 import SpendingThresholdCard from '@/components/SpendingThresholdCard';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { useDashboardData } from './dashboard/useDashboardData';
 import { DashboardBanners } from './dashboard/DashboardBanners';
+import { get2faStatus } from '@/utils/twoFactor';
+import { useTwoFactorEnrollmentNag } from '@/hooks/use2faEnrollmentNag';
 import { DashboardWpWelcome } from './dashboard/DashboardWpWelcome';
 import { DashboardNextActionHero } from './dashboard/DashboardNextActionHero';
 import { DashboardOnboardingChecklist } from './dashboard/DashboardOnboardingChecklist';
@@ -63,6 +65,35 @@ export default function DashboardPage() {
   const stats = dashboard?.stats;
   const activities = dashboard?.recent_activity || [];
   const nextAction = computeNextAction(taxDeadlines, onboardingProgress, insights);
+
+  // 2FA admin nag: show while an enforced-but-unenrolled account opens the
+  // dashboard. Two triggers per the contract: login/me payload flags
+  // needs_2fa_enrollment, or /auth/2fa/status reports enforced + not enabled.
+  const [twoFaBannerVisible, setTwoFaBannerVisible] = useState(
+    Boolean(user?.needs_2fa_enrollment)
+  );
+  useEffect(() => {
+    if (user?.needs_2fa_enrollment) {
+      setTwoFaBannerVisible(true);
+      return;
+    }
+    let cancelled = false;
+    get2faStatus()
+      .then((status) => {
+        if (!cancelled && status?.enforced && !status?.enabled) {
+          setTwoFaBannerVisible(true);
+        }
+      })
+      .catch(() => {
+        // No 2FA endpoints available (or not logged in): never show the nag.
+      });
+    return () => { cancelled = true; };
+  }, [user?.needs_2fa_enrollment, user?.user_id]);
+
+  // Enrollment nag: shown to EVERY non-enrolled user (admins who are enforced
+  // already get the persistent admin nag above, which keeps priority).
+  const { visible: enrollmentNagVisible, dismiss: dismissEnrollmentNag } =
+    useTwoFactorEnrollmentNag(twoFaBannerVisible);
 
   // Progressive disclosure gate — recommendation sections (Today's Focus,
   // Weekly Briefing, Tax Calendar) are noise for new users who haven't
@@ -125,6 +156,9 @@ export default function DashboardPage() {
       <main className="main-content dot-grid">
         <DashboardBanners
           wpBannerVisible={wpBannerVisible}
+          twoFaBannerVisible={twoFaBannerVisible}
+          enrollmentNagVisible={enrollmentNagVisible}
+          onEnrollmentNagDismiss={dismissEnrollmentNag}
         />
 
         <div className="page-container">

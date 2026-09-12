@@ -9,6 +9,7 @@ import PageHelpButton from '@/components/PageHelpButton';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Printer, FileText, Users, Building2, Landmark, Phone, Mail, ClipboardList, Calendar, Shield, BookOpen } from 'lucide-react';
+import use2faStepUp from '@/hooks/use2faStepUp';
 
 const PRINT_STYLES = `
 @media print {
@@ -102,6 +103,11 @@ const SuccessorPacketPage = () => {
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
 
+  // 2FA step-up: successor-grant creation (sending the secure link) is a
+  // protected action. A 403 2fa_stepup_required opens the code modal and the
+  // original send is replayed with the X-2FA-Code header.
+  const { stepUpOpen, runWithStepUp, handleStepUpSubmit, closeStepUp, TwoFactorStepUpModal } = use2faStepUp();
+
   useEffect(() => {
     if (!selectedTrust?.trust_id) return;
     const tid = selectedTrust.trust_id;
@@ -184,11 +190,11 @@ const SuccessorPacketPage = () => {
     const tid = selectedTrust.trust_id;
     setSending(true);
     try {
-      const res = await fetchWithAuth(`/trusts/${tid}/successor/send`, {
+      const res = await runWithStepUp((extraHeaders) => fetchWithAuth(`/trusts/${tid}/successor/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) },
         body: JSON.stringify({}),
-      });
+      }));
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to send');
       if (data.status === 'sent') {
@@ -209,6 +215,11 @@ const SuccessorPacketPage = () => {
   return (
     <>
       <style>{PRINT_STYLES}</style>
+      <TwoFactorStepUpModal
+        open={stepUpOpen}
+        onSubmit={handleStepUpSubmit}
+        onCancel={closeStepUp}
+      />
       <div className="main-layout">
         <Sidebar />
         <main className="main-content no-print">
