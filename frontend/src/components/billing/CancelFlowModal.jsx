@@ -24,9 +24,9 @@ import {
 
 // CancelFlowModal — replaces the bare window.confirm on subscription cancel.
 // Flow:
-//   step 'ask'     — "Is your trust complete?" Keep / Leave
-//   step 'keep'    — Records Repository (one-time purchase) + archive-to-read-only
-//   step 'leave'   — backup verification + export, bulk delete (typed confirm), final cancel
+//   step 'ask'     → "Is your trust complete?" Keep / Leave
+//   step 'keep'    → Records Repository (one-time purchase) + archive-to-read-only
+//   step 'leave'   → backup verification + export, bulk delete (typed confirm), final cancel
 //
 // Props:
 //   open                          – boolean
@@ -105,7 +105,7 @@ export default function CancelFlowModal({
     loadExitSummary();
   };
 
-  // —— Archive export (GET /trusts/{id}/archive-export — zip stream) ——
+  // —— Archive export (GET /trusts/{id}/archive-export → zip stream) ——
   const handleExport = async () => {
     if (!trustId) {
       toast.error('Select a trust before exporting.');
@@ -133,7 +133,7 @@ export default function CancelFlowModal({
     }
   };
 
-  // —— Keep path: Records Repository purchase (annual subscription OR lifetime one-time) ——
+  // —— Keep path: Records Repository purchase (annual subscription OR lifetime one-time) ——
   const handlePurchaseRepo = async (plan) => {
     setLoading(true);
     setRepoPlan(plan);
@@ -163,7 +163,7 @@ export default function CancelFlowModal({
     }
   };
 
-  // —— Keep path: archive trust read-only (free, no purchase) ——
+  // —— Keep path: archive trust read-only (free, no purchase) ——
   const handleDissolve = async () => {
     if (!trustId) {
       toast.error('Select a trust before archiving.');
@@ -191,7 +191,7 @@ export default function CancelFlowModal({
     }
   };
 
-  // —— Leave path: bulk delete vault documents (typed confirmation) ——
+  // —— Leave path: bulk delete vault documents (typed confirmation) ——
   const handleBulkDelete = async () => {
     if (deleteConfirmText !== DELETE_PHRASE) {
       setError(`Type "${DELETE_PHRASE}" to confirm deletion.`);
@@ -222,7 +222,7 @@ export default function CancelFlowModal({
     }
   };
 
-  // —— Final cancel (existing endpoint) ——
+  // —— Final cancel (existing endpoint) ——
   const handleFinalCancel = async () => {
     setLoading(true);
     setError(null);
