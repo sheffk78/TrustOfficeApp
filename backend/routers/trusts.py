@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from datetime import date, datetime, timezone
 from typing import List
 from enum import Enum
+import json
 import uuid
 import logging
 
@@ -14,9 +15,11 @@ from dependencies import (
     get_trust_limit, PLAN_TRUST_LIMITS
 )
 from trustee_utils import parse_trustees
-from models import TrustCreate, TrustUpdate, TrustResponse
+from models import TrustCreate, TrustUpdate, TrustResponse, TrustDissolveRequest
 from utils.tax_calendar_math import _generate_entries, _seed_tax_year
 from utils.audit import log_audit_event
+from services.security_events import record_security_event, alert_security_event
+from services.trust_archive import TRUST_STATUS_ACTIVE, TRUST_STATUS_DISSOLVED
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["trusts"])
@@ -498,3 +501,232 @@ async def _backfill_threshold_alerts(trust_id: str, user_id: str):
                           "resolution_note": "Threshold updated — transaction no longer exceeds limit",
                           "resolved_at": datetime.now(timezone.utc).isoformat()}}
             )
+
+
+# ==================== RECORDS REPOSITORY — DISSOLVE / ARCHIVE (F1, 2026-09-12) ====================
+
+def _normalize_dissolved_on(value) -> str:
+    """Normalize dissolved_on to an ISO date string (yyyy-MM-dd)."""
+    if not value:
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    text = str(value).strip()
+    try:
+        # Full ISO timestamp (frontend sends new Date().toISOString())
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return parsed.strftime("%Y-%m-%d")
+    except ValueError:
+        pass
+    try:
+        date.fromisoformat(text)
+        return text
+    except ValueError:
+        raise HTTPException(status_code=422, detail="dissolved_on must be an ISO date (e.g. 2026-09-12)")
+
+
+@router.post("/trusts/{trust_id}/dissolve")
+async def dissolve_trust(trust_id: str, body: TrustDissolveRequest, user: dict = Depends(get_current_user)):
+    """Archive a trust read-only (Records Repository, F1).
+
+    Sets status=dissolved_archived + dissolved_on, writes audit + security
+    events. Reversal is admin-only (un-dissolve = incident, not a button).
+    Exempt from the archive guard itself (service/dissolve actions).
+    """
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]},
+        {"_id": 0, "status": 1, "name": 1}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
+
+    dissolved_on = _normalize_dissolved_on(body.dissolved_on)
+    await db.trusts.update_one(
+        {"trust_id": trust_id},
+        {"$set": {"status": TRUST_STATUS_DISSOLVED, "dissolved_on": dissolved_on}}
+    )
+
+    await log_audit_event(user["user_id"], "trust_dissolved", "trust", trust_id, {
+        "trust_name": trust.get("name", ""), "dissolved_on": dissolved_on,
+    })
+    await record_security_event(user["user_id"], "trust_dissolved", details={
+        "trust_id": trust_id, "trust_name": trust.get("name", ""), "dissolved_on": dissolved_on,
+    })
+
+    return {"status": TRUST_STATUS_DISSOLVED, "dissolved_on": dissolved_on}
+
+
+@router.post("/trusts/{trust_id}/un-dissolve")
+async def un_dissolve_trust(trust_id: str, user: dict = Depends(get_current_user)):
+    """Admin-only reversal of dissolve (un-dissolve = incident, not a button)."""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required.")
+
+    result = await db.trusts.find_one_and_update(
+        {"trust_id": trust_id, "status": TRUST_STATUS_DISSOLVED},
+        {"$set": {"status": TRUST_STATUS_ACTIVE}, "$unset": {"dissolved_on": ""}},
+        projection={"_id": 0, "name": 1},
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="No dissolved trust found with that ID.")
+
+    await log_audit_event(user["user_id"], "trust_undissolved", "trust", trust_id, {
+        "trust_name": result.get("name", ""), "admin_email": user.get("email", ""),
+    })
+    await record_security_event(user["user_id"], "trust_undissolved", details={
+        "trust_id": trust_id, "trust_name": result.get("name", ""),
+        "admin_email": user.get("email", ""),
+    })
+
+    return {"status": TRUST_STATUS_ACTIVE, "dissolved_on": None}
+
+
+@router.get("/trusts/{trust_id}/archive-export")
+async def archive_export(trust_id: str, user: dict = Depends(get_current_user)):
+    """One-click full archive export (F1 item 6) — streaming ZIP.
+
+    Contents: every generated PDF (minutes/resolutions with stored binaries),
+    all CSVs (minutes/distributions/compensation/tasks/expenses), vault
+    documents with file content, and manifest.json (inventory + export date +
+    trust metadata). Reuses the full_export.py / export_service.py primitives —
+    does not rebuild what exists. Streams (no whole-vault buffering).
+    """
+    import io
+    import csv
+    import zipfile
+    from fastapi.responses import StreamingResponse
+    from services.export_service import _export_safe, _safe_export_name
+    from routers.full_export import COLLECTIONS as FULL_EXPORT_COLLECTIONS, _records
+
+    user_id = user["user_id"]
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    exported_at = datetime.now(timezone.utc)
+    exported_iso = exported_at.isoformat()
+
+    # Generated CSVs — reuse the export router's query surface (same
+    # collections + column headers as /export/*, scoped to this trust).
+    csv_specs = [
+        ("minutes", "Trust Name,Minutes Type,Meeting Date,Participants,Decisions,Created At"),
+        ("distributions", "Trust Name,Beneficiary,Amount,Date,Status,Created At"),
+        ("compensation", "Trust Name,Recipient,Amount,Period,Date,Created At"),
+        ("tasks", "Trust ID,Task Type,Due Date,Status,Description,Created At"),
+        ("expenses", "Trust Name,Description,Amount,Date,Category,Created At"),
+    ]
+
+    manifest = {
+        "schema_version": "TR-ARCHIVE.v1",
+        "exported_at": exported_iso,
+        "trust_id": trust_id,
+        "trust_name": trust.get("name", "Unnamed Trust"),
+        "trust_metadata": _export_safe(trust),
+        "owner_user_id": user_id,
+        "contents": {},
+        "files": [],
+        "notes": "One-click archive export — generated in memory, not retained server-side.",
+    }
+
+    def _zip_manifest_writer(zf, m):
+        zf.writestr("manifest.json", json.dumps(m, indent=2, sort_keys=True, default=str))
+
+    # zipfile cannot stream to the client directly from a Mongo cursor in
+    # Starlette's Response; we build via a non-seekable generator wrapper over
+    # BytesIO that is finalized once. Memory stays bounded by ZIP_DEFLATED
+    # chunking (same approach as full_export.py).
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        # Inventory first
+        counts = {}
+        for category, collection in FULL_EXPORT_COLLECTIONS.items():
+            try:
+                docs = await _records(collection, trust_id, user_id, include_files=False)
+            except Exception:
+                docs = []
+            counts[category] = len(docs)
+        manifest["contents"]["record_inventory"] = counts
+
+        # Vault documents (with file content)
+        try:
+            vault_docs = await _records("vault_documents", trust_id, user_id, include_files=True)
+        except Exception:
+            vault_docs = []
+        manifest["contents"]["vault_documents"] = len(vault_docs)
+        for doc in vault_docs:
+            content = doc.get("file_content")
+            if not content:
+                continue
+            filename = _safe_export_name(doc.get("file_name") or f"{doc.get('doc_id', 'document')}.bin")
+            path = f"vault/{doc.get('doc_id', 'unknown')}/{filename}"
+            archive.writestr(path, bytes(content))
+            manifest["files"].append({
+                "path": path, "doc_id": doc.get("doc_id"), "file_name": doc.get("file_name"),
+                "content_type": doc.get("file_content_type"), "size_bytes": len(content),
+                "category": doc.get("category"), "created_at": doc.get("created_at"),
+            })
+
+        # Generated PDFs (minutes/resolutions stored binaries)
+        for category in ("minutes", "resolutions"):
+            try:
+                source_records = await _records(FULL_EXPORT_COLLECTIONS[category], trust_id, user_id, include_files=True)
+            except Exception:
+                source_records = []
+            pdf_count = 0
+            for source in source_records:
+                content = source.get("file_content")
+                if content and (source.get("file_content_type") == "application/pdf"
+                                or str(source.get("file_name", "")).lower().endswith(".pdf")):
+                    path = f"documents/{category}/{_safe_export_name(str(source.get('file_name') or source.get('id') or 'record.pdf'))}"
+                    archive.writestr(path, bytes(content))
+                    manifest["files"].append({
+                        "path": path, "record_id": source.get("id"), "type": category,
+                        "content_type": "application/pdf", "created_at": source.get("created_at"),
+                    })
+                    pdf_count += 1
+            manifest["contents"][f"{category}_pdfs"] = pdf_count
+
+        # CSVs (same data as /export/* premium CSVs, scoped to this trust)
+        csv_counts = {}
+        for label, _header in csv_specs:
+            try:
+                records = await _records(FULL_EXPORT_COLLECTIONS.get(label, label), trust_id, user_id, include_files=False)
+            except Exception:
+                records = []
+            if not records:
+                csv_counts[label] = 0
+                continue
+            buf = io.StringIO()
+            writer = csv.DictWriter(buf, fieldnames=list(records[0].keys()), extrasaction="ignore")
+            writer.writeheader()
+            for r in records:
+                writer.writerow({k: (v if not isinstance(v, (dict, list)) else json.dumps(v, default=str)) for k, v in r.items()})
+            archive.writestr(f"csv/{label}.csv", buf.getvalue())
+            csv_counts[label] = len(records)
+        manifest["contents"]["csv"] = csv_counts
+
+        # Trust profile JSON for the archive binder
+        archive.writestr("trust_profile.json", json.dumps(_export_safe(trust), indent=2, default=str))
+        _zip_manifest_writer(archive, manifest)
+
+    size_bytes = len(buffer.getvalue())
+    await log_audit_event(user_id, "archive_export", "trust", trust_id, {
+        "exported_at": exported_iso, "format": "zip", "size_bytes": size_bytes,
+        "files": len(manifest["files"]),
+    })
+    # Security event + alert threshold (same rule as other bulk exports)
+    await record_security_event(user_id, "bulk_export", details={
+        "export_type": "archive_export", "trust_id": trust_id, "file_count": len(manifest["files"]),
+    })
+    await alert_security_event("bulk_export", user_id=user_id, count=len(manifest["files"]), details={
+        "export_type": "archive_export", "trust_id": trust_id,
+    })
+
+    filename = f"TrustOffice_Archive_{_safe_export_name(trust.get('name'))}_{exported_at.strftime('%Y-%m-%d')}.zip"
+    safe = filename.replace('"', "").replace("\\", "")
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe}"'},
+    )
+

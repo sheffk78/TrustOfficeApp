@@ -1403,7 +1403,16 @@ async def _webhook_checkout_session_completed(event) -> None:
     await _add_to_mailercloud_safe(user)
 
     # ========== SUBSCRIPTION UPDATED ==========
-    
+
+    # Records Repository entitlement (F1 Delta, 2026-09-12): when this checkout
+    # is for the repository SKU (metadata.purchase_type == "repository"), stamp
+    # repository_entitled + plan on the account. Runs after the normal sub
+    # grant so a customer who buys both flows in one session resolves cleanly.
+    try:
+        from routers.repository import handle_repository_checkout_completed
+        await handle_repository_checkout_completed(metadata, session)
+    except Exception as e:
+        logger.error(f"repository entitlement webhook failed: {e}")    
 
 
 def _resolve_plan_from_price(price_id: str) -> tuple:

@@ -131,6 +131,10 @@ from routers.error_log import admin_router as error_log_admin_router
 from routers.cloud_backup import router as cloud_backup_router
 from cloud_backup_scheduler import init_backup_scheduler, shutdown_backup_scheduler
 
+# Records Repository (F1 Delta, 2026-09-12): account exit-summary + repository checkout
+from routers.account_summary import router as account_summary_router
+from routers.repository import router as repository_router
+
 # Import security middleware
 from security import (
     RateLimitMiddleware,
@@ -522,6 +526,9 @@ app.include_router(analytics_router, prefix="/api")
 app.include_router(feedback_router, prefix="/api")
 app.include_router(support_tickets_router, prefix="/api")
 app.include_router(cloud_backup_router, prefix="/api")
+# Records Repository checkouts + account exit-summary (F1 Delta, 2026-09-12)
+app.include_router(repository_router, prefix="/api")
+app.include_router(account_summary_router, prefix="/api")
 
 # Serve static files (PDF checklists, etc.)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -846,6 +853,17 @@ async def startup_event():
     
     if startup_errors:
         logger.warning(f"App started with {len(startup_errors)} errors: {startup_errors}")
+
+    # ===== Records Repository wiring (F1 Delta, 2026-09-12) =====
+    # Explicit one-time backfill: stamp status="active" on legacy trusts that
+    # predate the dissolve model (no per-read collection-scan defaults).
+    try:
+        from services.trust_archive import backfill_trust_status, apply_archive_guard
+        await backfill_trust_status()
+        apply_archive_guard(app)
+    except Exception as e:
+        logger.error(f"Failed to wire Records Repository archive state: {e}")
+        startup_errors.append(f"trust_archive: {e}")
 
 
 async def ensure_primary_admin():

@@ -17,6 +17,11 @@ from dependencies import get_current_user, require_write_access
 from routers.compensation import auto_update_onboarding
 from utils.audit import log_audit_event
 from services.security_events import record_security_event, check_security_alert
+from models import BulkDeleteRequest
+
+# Typed confirmation required by DELETE /vault/documents/bulk (frontend types
+# exactly this phrase — see CancelFlowModal DELETE_PHRASE).
+BULK_DELETE_CONFIRM_PHRASE = "DELETE"
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["vault"])
@@ -533,6 +538,35 @@ async def update_document(doc_id: str, update: DocumentUpdate, user: dict = Depe
     return {"message": "Document updated"}
 
 
+@router.delete("/vault/documents/bulk")
+async def bulk_delete_documents(
+    body: BulkDeleteRequest,
+    user: dict = Depends(require_write_access),
+):
+    """Bulk-delete ALL vault documents for the account (Leave path, Delta 1).
+
+    Requires the typed confirmation string ("DELETE") in the body — any other
+    value is rejected with 400 and nothing is deleted. Writes an audit event +
+    security event (bulk destruction is a security-relevant action).
+    """
+    if body.confirm != BULK_DELETE_CONFIRM_PHRASE:
+        raise HTTPException(status_code=400, detail="Confirmation text did not match. Nothing was deleted.")
+
+    result = await db.vault_documents.delete_many({"user_id": user["user_id"]})
+    deleted = result.deleted_count or 0
+
+    await log_audit_event(user["user_id"], "vault_bulk_delete", "vault_document", "bulk", {
+        "deleted": deleted, "confirm": "typed",
+    })
+    await record_security_event(user["user_id"], "vault_bulk_delete", details={
+        "deleted_count": deleted, "confirm": "typed",
+    })
+
+    return {"deleted": deleted}
+
+
+# NOTE: this {doc_id} route must stay AFTER the literal /vault/documents/bulk
+# route so "bulk" is matched as a literal segment, not captured as a doc_id.
 @router.delete("/vault/documents/{doc_id}")
 async def delete_document(doc_id: str, user: dict = Depends(require_write_access)):
     """Remove a document from vault (and its file content)."""

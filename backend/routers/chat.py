@@ -214,6 +214,25 @@ async def chat(
     user_id = user["user_id"]
     start_time = datetime.now(timezone.utc)
 
+    trust_id, trust_name = await _get_active_trust(user_id, request.trust_id)
+    if not trust_id:
+        raise HTTPException(status_code=404, detail="No trust found. Create a trust first to use the Trust Assistant.")
+
+    # AI fair-use meter (Records Repository, 2026-09-12): queries answered
+    # against a dissolved_archived trust count against a monthly per-account
+    # quota (429 when exceeded, resets on the first of the month, lazy — no cron).
+    try:
+        trust_doc_for_quota = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id}, {"_id": 0, "status": 1}
+        )
+        if (trust_doc_for_quota or {}).get("status") == "dissolved_archived":
+            from dependencies import check_repository_ai_quota
+            await check_repository_ai_quota(user_id)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.warning("Repository AI quota check failed (non-fatal)", exc_info=True)
+
     # 1. Get active trust
     trust_id, trust_name = await _get_active_trust(user_id, request.trust_id)
     if not trust_id:

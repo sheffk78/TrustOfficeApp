@@ -1096,3 +1096,152 @@ async def create_initial_governance_tasks(trust_id: str, user_id: str):
 async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: bool = True) -> dict:
     from routers.governance import calculate_health_score as _calc
     return await _calc(trust_id, user_id, save_snapshot=save_snapshot)
+
+
+# ==================== TRUST ARCHIVE GUARD (Records Repository F1, 2026-09-12) ====================
+# One dependency-level enforcement point: when a trust is dissolved_archived,
+# every mutating trust-scoped route raises 409 trust_dissolved. Routes opt in
+# by depending on guard_trust_archive(trust_id) (path param) or
+# guard_trust_archive_body(request) (body/other param). READ endpoints are
+# unaffected — dissolved archives stay fully viewable/exportable.
+
+TRUST_DISSOLVED_ERROR_CODE = 409
+TRUST_DISSOLVED_ERROR_DETAIL = (
+    "This trust is dissolved and archived read-only. Records are preserved — "
+    "export them anytime, but changes are no longer possible."
+)
+
+
+async def get_trust_status_for_guard(trust_id: str, user_id: str) -> str:
+    """Fetch a trust's lifecycle status for the archive guard.
+
+    Returns "active" for missing trusts — ownership is enforced by the route's
+    own trust lookup (404 there), never here.
+    """
+    try:
+        from database import db
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"_id": 0, "status": 1}
+        )
+    except Exception:
+        return "active"  # never break the request path on guard lookup failure
+    if not trust:
+        return "active"
+    return trust.get("status") or "active"
+
+
+def _dissolved_guard_exception() -> HTTPException:
+    return HTTPException(
+        status_code=TRUST_DISSOLVED_ERROR_CODE,
+        detail={"code": "trust_dissolved", "message": TRUST_DISSOLVED_ERROR_DETAIL},
+    )
+
+
+async def guard_trust_archive(
+    trust_id: str,
+    request: Request,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Dependency-level read-only archive guard (path-param form).
+
+    Usage: user: dict = Depends(guard_trust_archive)
+    The route MUST have a {trust_id} path param; the shared trust_id value is
+    resolved by FastAPI dependency caching. Body params are read from the
+    cached request body so one enforcement point covers both forms.
+    """
+    status = await get_trust_status_for_guard(trust_id, user["user_id"])
+    if status == "dissolved_archived":
+        raise _dissolved_guard_exception()
+    return user
+
+
+async def guard_trust_archive_body(
+    request: Request,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Dependency-level read-only archive guard (body/other-param form).
+
+    Usage on routes that take trust_id in the body or as a non-path param:
+        user: dict = Depends(guard_trust_archive_body)
+    Reads trust_id from the request body (also honors ?trust_id= query) and
+    applies the same 409 trust_dissolved contract as guard_trust_archive.
+    Routes with no trust scoping (e.g. bare DELETE /vault/documents/bulk)
+    pass through — their scope is account-wide, not trust-scoped.
+    """
+    trust_id = None
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            trust_id = body.get("trust_id")
+    except Exception:
+        pass
+    if not trust_id:
+        trust_id = request.query_params.get("trust_id")
+    if not trust_id:
+        return user
+    status = await get_trust_status_for_guard(trust_id, user["user_id"])
+    if status == "dissolved_archived":
+        raise _dissolved_guard_exception()
+    return user
+
+
+# Legacy alias (kept so the frontend contract name reads cleanly in imports).
+guard_trust_not_dissolved = guard_trust_archive
+
+
+# ==================== AI FAIR-USE METER (Records Repository, 2026-09-12) ====================
+# Monthly per-account counter for Trust Assistant queries answered against a
+# dissolved_archived trust. Stored in Mongo (repository_ai_quota), keyed by
+# user + "YYYY-MM" month key. Reset is lazy: the month key changes on rollover,
+# so the counter starts fresh with no cron. Checked BEFORE the query runs.
+
+REPOSITORY_AI_MONTHLY_QUOTA = int(os.environ.get("REPOSITORY_AI_MONTHLY_QUOTA", "20"))
+
+
+def _quota_month_key(now: Optional[datetime] = None) -> str:
+    """Month key for the fair-use counter, UTC — 'YYYY-MM'."""
+    now = now or datetime.now(timezone.utc)
+    return f"{now.year:04d}-{now.month:02d}"
+
+
+def _quota_reset_date(now: Optional[datetime] = None) -> str:
+    """First day of the NEXT month (UTC, yyyy-MM-dd) for the quota message."""
+    now = now or datetime.now(timezone.utc)
+    if now.month == 12:
+        return f"{now.year + 1:04d}-01-01"
+    return f"{now.year:04d}-{now.month + 1:02d}-01"
+
+
+async def check_repository_ai_quota(user_id: str) -> dict:
+    """Check + increment the monthly AI fair-use counter for this account.
+
+    Returns {"allowed": True, "count": int, "quota": int} when within quota.
+    Raises HTTPException(429) once count > REPOSITORY_AI_MONTHLY_QUOTA; the
+    message carries the reset date (first of next month). The check-and-increment
+    is one Mongo find_and_modify-style update: the incremented value is the
+    authoritative count, so concurrent requests stay bounded by quota + in-flight.
+    """
+    from database import db
+
+    month_key = _quota_month_key()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    updated = await db.repository_ai_quota.find_one_and_update(
+        {"user_id": user_id, "month_key": month_key},
+        {"$inc": {"count": 1}, "$set": {"updated_at": now_iso}},
+        upsert=True,
+        return_document=True,  # pymongo.ReturnDocument.AFTER
+        projection={"_id": 0},
+    )
+    count = int((updated or {}).get("count", 1))
+
+    if count > REPOSITORY_AI_MONTHLY_QUOTA:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Your monthly archive search allowance has been reached — "
+                f"it resets on {_quota_reset_date()}."
+            ),
+        )
+    return {"allowed": True, "count": count, "quota": REPOSITORY_AI_MONTHLY_QUOTA}

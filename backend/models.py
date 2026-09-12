@@ -295,6 +295,16 @@ class PasswordChange(BaseModel):
 
 # ==================== TRUST MODELS ====================
 
+class TrustStatus(str, Enum):
+    """Trust lifecycle status (Records Repository, F1 2026-09-12).
+
+    - active: normal read/write trust
+    - dissolved_archived: read-only archive mode (Records Repository)
+    """
+    active = "active"
+    dissolved_archived = "dissolved_archived"
+
+
 class TrustCreate(BaseModel):
     name: str
     trust_type: TrustType = TrustType.family
@@ -484,6 +494,10 @@ class TrustResponse(BaseModel):
     # Demo flag exposed to the frontend so trust selection can prefer real
     # trusts over demo trusts (2026-09-11 demo-remnant fix).
     is_demo: Optional[bool] = None
+    # Trust lifecycle status (Records Repository F1, 2026-09-12).
+    # "active" (default) | "dissolved_archived" — the latter is read-only.
+    status: Optional[str] = "active"
+    dissolved_on: Optional[str] = None
 
 
 # ==================== ENTITY MODELS ====================
@@ -1438,10 +1452,35 @@ class CheckoutRequest(BaseModel):
     promotion_code: Optional[str] = None
     coupon: Optional[str] = None  # Direct Stripe coupon ID (e.g., TRUST49)
     referral_id: Optional[str] = None  # Rewardful affiliate referral ID
-    utm_source: Optional[str] = None  # Marketing attribution carried to Stripe metadata
+    utm_source: Optional[str] = None
     utm_campaign: Optional[str] = None
     utm_medium: Optional[str] = None
     referrer: Optional[str] = None
+
+
+# ==================== RECORDS REPOSITORY (F1, 2026-09-12) ====================
+
+class TrustDissolveRequest(BaseModel):
+    """Body for POST /trusts/{id}/dissolve. dissolved_on is an ISO date."""
+    dissolved_on: Optional[str] = None  # ISO date string (yyyy-MM-dd or full ISO timestamp)
+    confirm: bool = False  # kept for F1 spec parity ("confirm flag"); not required
+
+class BulkDeleteRequest(BaseModel):
+    """Body for DELETE /vault/documents/bulk — typed confirmation required."""
+    confirm: str
+
+class RepositoryPurchaseRequest(BaseModel):
+    """Body for POST /repository/purchase."""
+    plan: str  # "annual" | "lifetime"
+
+class RepositoryPurchaseResponse(BaseModel):
+    checkout_url: str
+
+class ExitSummaryResponse(BaseModel):
+    """GET /account/exit-summary — drives the cancel-flow modal (API contract 2026-09-12)."""
+    backup: dict
+    counts: dict
+    subscription: dict
 
 
 class GuestCheckoutRequest(BaseModel):
