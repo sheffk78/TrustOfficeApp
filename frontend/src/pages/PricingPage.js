@@ -624,6 +624,22 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* Records Repository discoverability note (pre-cancel visibility) */}
+      <section className="pb-12 px-8">
+        <div className="max-w-6xl mx-auto">
+          <div
+            className="p-4 border border-navy/15 bg-navy/5 rounded-lg"
+            data-testid="records-repository-note"
+          >
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-navy">Records Repository</span> â keep your trust records
+              archived, searchable, and exportable even after your trust dissolves. This option becomes
+              available when you cancel your subscription.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Feature Comparison Table */}
       <section className="pb-20 px-8">
         <div className="max-w-5xl mx-auto">

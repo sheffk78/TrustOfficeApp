@@ -22,15 +22,34 @@ import WingPointBanners from './billing/WingPointBanners';
 import SubscriptionStatusCard from './billing/SubscriptionStatusCard';
 import TierChangeSection from './billing/TierChangeSection';
 import BillingFAQ from './billing/BillingFAQ';
+import CancelFlowModal from '@/components/billing/CancelFlowModal';
+
+// Pre-cancel discoverability note â informational only, no purchase button.
+// Placed in the billing info area per Jeff's visibility requirement.
+function RecordsRepositoryNote() {
+  return (
+    <div
+      className="mt-6 p-4 border border-navy/15 bg-navy/5 rounded-lg"
+      data-testid="records-repository-note"
+    >
+      <p className="text-sm text-muted-foreground">
+        <span className="font-medium text-navy">Records Repository</span> â keep your trust records
+        archived, searchable, and exportable even after your trust dissolves. This option becomes
+        available when you cancel your subscription.
+      </p>
+    </div>
+  );
+}
 
 export default function BillingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loadSubscriptionState } = useAuth();
+  const { user, loadSubscriptionState, selectedTrust } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
   // Phase 3: billing period toggle for the no-subscription plan picker
   // Default to 'annual' — shows the cheapest monthly amount with total annual savings.
   const [pickerBillingPeriod, setPickerBillingPeriod] = useState('annual');
@@ -173,27 +192,16 @@ export default function BillingPage() {
     }
   };
 
-  const handleCancel = async () => {
-    if (!window.confirm('Are you sure you want to cancel your subscription? You will retain access until the end of your current billing period.')) {
-      return;
-    }
-    
-    setActionLoading('cancel');
+  const handleCancelClick = () => {
+    setCancelModalOpen(true);
+  };
+
+  const handleCancelComplete = async () => {
+    // Reload subscription state after the modal drives the final cancel.
     try {
-      const response = await fetchWithAuth('/subscription/cancel', { method: 'POST' });
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(data.message);
-        await loadSubscriptionState(user?.email);
-        await loadSubscription();
-      } else {
-        const error = await response.json();
-        showError(toast, new Error(error.detail || 'Could not cancel subscription. Please try again or contact support@trustoffice.app.'), { operation: 'cancel_subscription', page: 'Billing' });
-      }
-    } catch (error) {
-      showError(toast, error, { operation: 'cancel_subscription', page: 'Billing' });
-    } finally {
-      setActionLoading(null);
+      await loadSubscription();
+    } catch {
+      // loadSubscription handles its own errors.
     }
   };
 
@@ -401,8 +409,11 @@ export default function BillingPage() {
                 actionLoading={actionLoading}
                 onReactivate={handleReactivate}
                 onManageBilling={handleManageBilling}
-                onCancel={handleCancel}
+                onCancel={handleCancelClick}
               />
+
+              {/* Records Repository discoverability note (pre-cancel visibility) */}
+              <RecordsRepositoryNote />
 
               {/* Phase 3: Tier change section for active paid subscriptions. */}
               {isActivePaidSubscription && !isCanceling && (
@@ -460,6 +471,14 @@ export default function BillingPage() {
         </div>
       </main>
       <MobileBottomNav />
+      <CancelFlowModal
+        open={cancelModalOpen}
+        onOpenChange={setCancelModalOpen}
+        trustId={selectedTrust?.trust_id}
+        userEmail={user?.email}
+        loadSubscriptionState={loadSubscriptionState}
+        onComplete={handleCancelComplete}
+      />
     </div>
   );
 }

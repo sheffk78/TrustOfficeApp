@@ -4,17 +4,21 @@
  * Route: /vault (the existing route, now with tabs)
  */
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import VaultPage from '@/pages/VaultPage';
 import TrustAdminKitsPage from '@/pages/TrustAdminKitsPage';
 import PrintableBinderPage from '@/pages/PrintableBinderPage';
+import DocumentsTierBanner from '@/components/documents/DocumentsTierBanner';
+import DissolvedTrustBanner from '@/components/trust/DissolvedTrustBanner';
 import { FolderOpen, Briefcase, NotebookTabs } from 'lucide-react';
 
 export default function DocumentsTabbed() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || 'vault';
+  const { selectedTrust } = useAuth();
 
   const handleTabChange = (newTab) => {
     setSearchParams({ tab: newTab });
@@ -25,6 +29,8 @@ export default function DocumentsTabbed() {
       <Sidebar />
       <div className="main-content dot-dot">
         <div className="page-container">
+          <DissolvedTrustBanner trust={selectedTrust} />
+          <DocumentsTierBanner />
           <Tabs value={tab} onValueChange={handleTabChange}>
               <TabsList className="mb-6">
                 <TabsTrigger value="vault" className="flex items-center gap-2">
