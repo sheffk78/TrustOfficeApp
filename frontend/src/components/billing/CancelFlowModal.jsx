@@ -22,19 +22,19 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-// CancelFlowModal â replaces the bare window.confirm on subscription cancel.
+// CancelFlowModal — replaces the bare window.confirm on subscription cancel.
 // Flow:
-//   step 'ask'     â "Is your trust complete?" Keep / Leave
-//   step 'keep'    â Records Repository (one-time purchase) + archive-to-read-only
-//   step 'leave'   â backup verification + export, bulk delete (typed confirm), final cancel
+//   step 'ask'     — "Is your trust complete?" Keep / Leave
+//   step 'keep'    — Records Repository (one-time purchase) + archive-to-read-only
+//   step 'leave'   — backup verification + export, bulk delete (typed confirm), final cancel
 //
 // Props:
-//   open                          â boolean
-//   onOpenChange(open)            â () => void
-//   trustId                       â string (selected trust id for dissolve/export/bulk-delete)
-//   userEmail                     â string (for reloading subscription state)
-//   loadSubscriptionState         â fn(email) reload auth subscription
-//   onComplete                    â optional fn called after successful final cancel
+//   open                          – boolean
+//   onOpenChange(open)            – () => void
+//   trustId                       – string (selected trust id for dissolve/export/bulk-delete)
+//   userEmail                     – string (for reloading subscription state)
+//   loadSubscriptionState         – fn(email) reload auth subscription
+//   onComplete                    – optional fn called after successful final cancel
 export default function CancelFlowModal({
   open,
   onOpenChange,
@@ -47,7 +47,7 @@ export default function CancelFlowModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Backup / export state (shared by both Keep and Leave paths â both verify backup first).
+  // Backup / export state (shared by both Keep and Leave paths — both verify backup first).
   const [exitSummary, setExitSummary] = useState(null); // { backup: {connected, last_backup_at}, ... }
   const [summaryLoaded, setSummaryLoaded] = useState(false);
   const [exported, setExported] = useState(false);
@@ -105,7 +105,7 @@ export default function CancelFlowModal({
     loadExitSummary();
   };
 
-  // ââ Archive export (GET /trusts/{id}/archive-export â zip stream) ââ
+  // —— Archive export (GET /trusts/{id}/archive-export — zip stream) ——
   const handleExport = async () => {
     if (!trustId) {
       toast.error('Select a trust before exporting.');
@@ -133,7 +133,7 @@ export default function CancelFlowModal({
     }
   };
 
-  // ââ Keep path: Records Repository purchase (annual subscription OR lifetime one-time) ââ
+  // —— Keep path: Records Repository purchase (annual subscription OR lifetime one-time) ——
   const handlePurchaseRepo = async (plan) => {
     setLoading(true);
     setRepoPlan(plan);
@@ -163,7 +163,7 @@ export default function CancelFlowModal({
     }
   };
 
-  // ââ Keep path: archive trust read-only (free, no purchase) ââ
+  // —— Keep path: archive trust read-only (free, no purchase) ——
   const handleDissolve = async () => {
     if (!trustId) {
       toast.error('Select a trust before archiving.');
@@ -191,7 +191,7 @@ export default function CancelFlowModal({
     }
   };
 
-  // ââ Leave path: bulk delete vault documents (typed confirmation) ââ
+  // —— Leave path: bulk delete vault documents (typed confirmation) ——
   const handleBulkDelete = async () => {
     if (deleteConfirmText !== DELETE_PHRASE) {
       setError(`Type "${DELETE_PHRASE}" to confirm deletion.`);
@@ -222,7 +222,7 @@ export default function CancelFlowModal({
     }
   };
 
-  // ââ Final cancel (existing endpoint) ââ
+  // —— Final cancel (existing endpoint) ——
   const handleFinalCancel = async () => {
     setLoading(true);
     setError(null);
@@ -278,7 +278,7 @@ export default function CancelFlowModal({
                   <span className="font-medium text-navy">Keep my records</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Preserve everything read-only in the Records Repository. Downloadable anytime â nothing is lost.
+                  Preserve everything read-only in the Records Repository. Downloadable anytime — nothing is lost.
                 </p>
               </button>
 
@@ -327,7 +327,7 @@ export default function CancelFlowModal({
               <div className="p-4 border border-gold/30 bg-gold/5 rounded-lg">
                 <div className="flex items-center gap-2 mb-1">
                   <ShoppingCart className="w-4 h-4 text-navy" />
-                  <span className="font-medium text-navy">Records Repository Ã¢ÂÂ $49/year</span>
+                  <span className="font-medium text-navy">Records Repository — $49/year</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
                   A read-only archive of all your trust records, preserved and downloadable anytime. Billed annually.
@@ -339,14 +339,14 @@ export default function CancelFlowModal({
                   data-testid="purchase-repo-annual-btn"
                 >
                   <ShoppingCart className="w-4 h-4 mr-2" />
-                  {repoPlan === 'annual' ? 'Redirecting to checkoutÃ¢ÂÂ¦' : 'Buy Records Repository Ã¢ÂÂ $49/yr'}
+                  {repoPlan === 'annual' ? 'Redirecting to checkout…' : 'Buy Records Repository — $49/yr'}
                 </Button>
               </div>
 
               <div className="p-4 border border-gold/30 bg-gold/5 rounded-lg">
                 <div className="flex items-center gap-2 mb-1">
                   <ShoppingCart className="w-4 h-4 text-navy" />
-                  <span className="font-medium text-navy">Lifetime Ã¢ÂÂ $199 one-time</span>
+                  <span className="font-medium text-navy">Lifetime — $199 one-time</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
                   The same read-only archive, yours forever with a single one-time purchase.
@@ -358,7 +358,7 @@ export default function CancelFlowModal({
                   data-testid="purchase-repo-lifetime-btn"
                 >
                   <ShoppingCart className="w-4 h-4 mr-2" />
-                  {repoPlan === 'lifetime' ? 'Redirecting to checkoutÃ¢ÂÂ¦' : 'Buy Lifetime Ã¢ÂÂ $199'}
+                  {repoPlan === 'lifetime' ? 'Redirecting to checkout…' : 'Buy Lifetime — $199'}
                 </Button>
               </div>
 
@@ -497,17 +497,17 @@ function BackupStatusBlock({ loading, connected, lastBackup, exported, onExport 
       </div>
       {loading ? (
         <p className="text-sm text-muted-foreground" data-testid="backup-status-loading">
-          Checking backup statusâ¦
+          Checking backup status…
         </p>
       ) : (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground" data-testid="backup-status-text">
             {connected ? (
               <>
-                Connected Â· last backup {formatDate(lastBackup)}
+                Connected · last backup {formatDate(lastBackup)}
               </>
             ) : (
-              <>Not connected â your export below is your only copy.</>
+              <>Not connected — your export below is your only copy.</>
             )}
           </span>
           <Button

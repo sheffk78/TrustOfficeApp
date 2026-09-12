@@ -854,11 +854,11 @@ export default function SettingsPage() {
               <p className="page-subtitle">
               {rolePage
                 ? 'Keep every trustee, successor, protector, and handoff instruction in one place.'
-                : 'Configure trust settings, preferences, and account details â manage notifications, security, and trust profile information'}
+                : 'Configure trust settings, preferences, and account details — manage notifications, security, and trust profile information'}
               </p>
               {/* NOW-phase security package: explicit SSN-intake warning. */}
               <p className="text-xs text-muted-foreground mt-2">
-                Never enter SSNs â TrustOffice does not support SSN storage. EIN fields accept the 9-digit Tax ID format (XX-XXXXXXX).
+                Never enter SSNs — TrustOffice does not support SSN storage. EIN fields accept the 9-digit Tax ID format (XX-XXXXXXX).
               </p>
             </div>
             <PageHelpButton

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { getOnboardingProgress } from '@/pages/dashboard/constants';
 
-describe('getOnboardingProgress â backup_connect step', () => {
+describe('getOnboardingProgress — backup_connect step', () => {
   const base = {
     trust_doc_uploaded: true,
     beneficiaries_added: true,

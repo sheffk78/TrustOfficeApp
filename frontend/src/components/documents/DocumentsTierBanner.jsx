@@ -1,11 +1,11 @@
 import { useSearchParams } from 'react-router-dom';
 import { FolderOpen, NotebookTabs, Cloud } from 'lucide-react';
 
-// DocumentsTierBanner Ã¢ÂÂ three-tier structure strip shown at the top of the
+// DocumentsTierBanner — three-tier structure strip shown at the top of the
 // Documents section (above the Vault/Templates/Record Book tabs).
-//   1. TrustOffice (this vault)        Ã¢ÂÂ current view
-//   2. Printed Record Book (binder)    Ã¢ÂÂ links to the Record Book tab
-//   3. Your own cloud backup           Ã¢ÂÂ jumps to the backup section in the vault
+//   1. TrustOffice (this vault)        — current view
+//   2. Printed Record Book (binder)    — links to the Record Book tab
+//   3. Your own cloud backup           — jumps to the backup section in the vault
 export default function DocumentsTierBanner() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || 'vault';
@@ -51,7 +51,7 @@ export default function DocumentsTierBanner() {
         active={tab === 'vault'}
         onClick={() => goToTab('vault')}
       />
-      <span className="text-navy/30 mx-1">ÃÂ·</span>
+      <span className="text-navy/30 mx-1">·</span>
       <Item
         index={2}
         icon={NotebookTabs}
@@ -59,7 +59,7 @@ export default function DocumentsTierBanner() {
         active={tab === 'binder'}
         onClick={() => goToTab('binder')}
       />
-      <span className="text-navy/30 mx-1">ÃÂ·</span>
+      <span className="text-navy/30 mx-1">·</span>
       <Item
         index={3}
         icon={Cloud}

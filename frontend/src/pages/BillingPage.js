@@ -24,7 +24,7 @@ import TierChangeSection from './billing/TierChangeSection';
 import BillingFAQ from './billing/BillingFAQ';
 import CancelFlowModal from '@/components/billing/CancelFlowModal';
 
-// Pre-cancel discoverability note â informational only, no purchase button.
+// Pre-cancel discoverability note — informational only, no purchase button.
 // Placed in the billing info area per Jeff's visibility requirement.
 function RecordsRepositoryNote() {
   return (
@@ -33,7 +33,7 @@ function RecordsRepositoryNote() {
       data-testid="records-repository-note"
     >
       <p className="text-sm text-muted-foreground">
-        <span className="font-medium text-navy">Records Repository</span> â keep your trust records
+        <span className="font-medium text-navy">Records Repository</span> — keep your trust records
         archived, searchable, and exportable even after your trust dissolves. This option becomes
         available when you cancel your subscription.
       </p>

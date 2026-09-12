@@ -34,7 +34,7 @@ const EINInput = React.forwardRef(({ className, value, onChange, placeholder, di
 })
 
 // NOTE (NOW-phase security package): EIN is a legitimate 9-digit identifier.
-// TrustOffice never accepts SSNs â this component explicitly scopes input to
+// TrustOffice never accepts SSNs — this component explicitly scopes input to
 // EIN-shaped values and serves as the visible "never enter SSNs" reminder.
 EINInput.displayName = "EINInput"
 

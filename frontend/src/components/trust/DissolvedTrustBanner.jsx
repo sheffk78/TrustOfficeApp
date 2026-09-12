@@ -1,6 +1,6 @@
 import { ShieldCheck } from 'lucide-react';
 
-// DissolvedTrustBanner ÃÂ¢ÃÂÃÂ persistent banner shown on trust-scoped pages when the
+// DissolvedTrustBanner — persistent banner shown on trust-scoped pages when the
 // selected trust has been dissolved and archived (read-only records preserved).
 //
 // Reads `trust.status === 'dissolved_archived'` and `trust.dissolved_on`.
@@ -35,8 +35,8 @@ export default function DissolvedTrustBanner({ trust }) {
       <div>
         <p className="font-medium text-navy">
           {dateLabel
-            ? `Dissolved ${dateLabel} ÃÂ¢ÃÂÃÂ records preserved read-only`
-            : 'Dissolved ÃÂ¢ÃÂÃÂ records preserved read-only'}
+            ? `Dissolved ${dateLabel} — records preserved read-only`
+            : 'Dissolved — records preserved read-only'}
         </p>
         <p className="text-sm text-muted-foreground mt-0.5">
           This trust has been dissolved and archived. Its records are preserved and viewable, but

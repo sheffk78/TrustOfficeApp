@@ -632,7 +632,7 @@ export default function PricingPage() {
             data-testid="records-repository-note"
           >
             <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-navy">Records Repository</span> â keep your trust records
+              <span className="font-medium text-navy">Records Repository</span> — keep your trust records
               archived, searchable, and exportable even after your trust dissolves. This option becomes
               available when you cancel your subscription.
             </p>
