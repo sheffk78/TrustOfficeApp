@@ -40,11 +40,10 @@ jobs:
       - name: Audit frontend dependencies
         working-directory: frontend
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci --no-audit --fund=false
-          else
-            npm install --no-audit --fund=false
-          fi
+          # Repo has a known peer conflict (date-fns 4 vs react-day-picker peer
+          # ^2||^3) that predates this workflow — install with legacy-peer-deps
+          # (matches the dev setup) so the audit still runs.
+          npm install --no-audit --fund=false --legacy-peer-deps
           npm audit --audit-level=high
 
   tenant-isolation:
