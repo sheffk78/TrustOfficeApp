@@ -17,6 +17,7 @@ from dependencies import get_current_user, require_write_access
 from routers.compensation import auto_update_onboarding
 from utils.audit import log_audit_event
 from services.security_events import record_security_event, check_security_alert
+from utils.stepup_2fa import require_2fa_stepup
 from models import BulkDeleteRequest
 
 # Typed confirmation required by DELETE /vault/documents/bulk (frontend types
@@ -419,6 +420,7 @@ async def download_document(
     request: Request,
     inline: bool = Query(False, description="Serve with Content-Disposition: inline for in-app preview"),
     user: dict = Depends(get_current_user),
+    _stepup: None = Depends(require_2fa_stepup),
 ):
     """Download a file from the vault."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})

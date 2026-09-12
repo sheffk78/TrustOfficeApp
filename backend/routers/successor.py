@@ -13,6 +13,7 @@ from database import db
 from dependencies import require_write_access
 from email_service import email_service
 from utils.audit import log_audit_event
+from utils.stepup_2fa import require_2fa_stepup
 from utils.tax_calendar_math import filter_income_tax_entries
 
 logger = logging.getLogger(__name__)
@@ -150,7 +151,8 @@ async def get_successor_packet(token: str):
 # Existing send flow follows.
 
 @router.post("/trusts/{trust_id}/successor/send")
-async def send_successor_packet(trust_id: str, user: dict = Depends(require_write_access)):
+async def send_successor_packet(trust_id: str, user: dict = Depends(require_write_access),
+                                _stepup: None = Depends(require_2fa_stepup)):
     """Generate a one-time, expiring access token and email the successor a secure packet link.
 
     Requires a designated successor with an email on the trust record. The email

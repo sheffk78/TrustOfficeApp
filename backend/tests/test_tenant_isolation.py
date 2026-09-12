@@ -100,7 +100,7 @@ NON_DATA_ROUTERS = {
     "expenses", "external", "external_trust_docs", "guided_minutes",
     "investments", "meetings", "trust_admin_kits", "trust_doc_analysis",
     "marketing_expenses", "error_reports", "trust_admin_service",
-    "account_summary", "repository", "trust_archive",
+    "account_summary", "repository", "trust_archive", "totp_2fa",
 }
 
 # Data routers not yet in ROUTE_MAP — explicit, visible debt (not silent gaps).

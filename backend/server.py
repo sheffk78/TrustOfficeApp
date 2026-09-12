@@ -71,6 +71,7 @@ from routers.successor import router as successor_router
 from routers.entities import router as entities_router
 from routers.tasks import router as tasks_router
 from routers.auth import router as auth_router
+from routers.totp_2fa import router as totp_2fa_router
 from routers.preferences import router as preferences_router
 from routers.email import router as email_router
 from routers.background_jobs import router as background_jobs_router
@@ -202,6 +203,13 @@ SUBSCRIPTION_EXEMPT_PATHS = {
     "/api/auth/reset-password",
     "/api/auth/verify-reset-token",
     "/api/auth/connect/wingpoint/confirm",
+    # 2FA: enrollment/status are account-security work; 2fa/login is part of
+    # the login flow (user may not hold a paid session mid-login).
+    "/api/auth/2fa/enroll",
+    "/api/auth/2fa/verify",
+    "/api/auth/2fa/disable",
+    "/api/auth/2fa/status",
+    "/api/auth/2fa/login",
     "/api/subscription",
     "/api/subscription/create-checkout",
     "/api/subscription/verify-payment",
@@ -258,6 +266,8 @@ WRITE_EXEMPT_PATHS = {
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
     "/api/auth/connect/wingpoint/confirm",
+    # 2FA login step is part of the login flow (write-exempt mid-login)
+    "/api/auth/2fa/login",
     # Contact Memory — inbound email flow + interaction logging are write operations
     "/api/contact-memory/email-flow",
     "/api/contact-memory/interactions",
@@ -433,6 +443,7 @@ app.add_middleware(
 
 # Register all routers
 app.include_router(auth_router, prefix="/api")
+app.include_router(totp_2fa_router, prefix="/api")
 app.include_router(trusts_router, prefix="/api")
 app.include_router(successor_router, prefix="/api")
 app.include_router(entities_router, prefix="/api")

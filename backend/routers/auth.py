@@ -36,6 +36,7 @@ from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, Pa
 from email_service import email_service
 from security import InputSanitizer
 from services.security_events import record_security_event, check_security_alert
+from services import totp_service as totps
 
 
 def _clean_utm(value: Optional[str], max_len: int = 200) -> Optional[str]:
@@ -195,7 +196,31 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         except Exception as sec_exc:
             logger.warning(f"Security event logging for login_failed failed (non-fatal): {sec_exc}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
+    # ==================== 2FA GATE ====================
+    # Password OK but 2FA enabled -> NO session yet. Issue a short-lived
+    # (5-min) challenge JWT scoped to the 2FA step only (type='2fa_challenge'
+    # — get_current_user enforces type=='access', so this token is
+    # session-inert and cannot be replayed as a session). The client completes
+    # login via POST /auth/2fa/login.
+    if totps.is_2fa_enabled(user_doc):
+        challenge_token = totps.create_challenge_token(user_doc["user_id"], user_doc["email"])
+        try:
+            ip = _client_ip(request)
+            ua = request.headers.get("User-Agent")
+            await record_security_event(
+                user_doc["user_id"], "login_2fa_required",
+                ip=ip, user_agent=ua, details={"email": email},
+            )
+        except Exception as sec_exc:
+            logger.warning(f"Security event logging for 2fa challenge failed (non-fatal): {sec_exc}")
+        # 401 (no session issued) + machine-readable flag for the frontend.
+        raise HTTPException(
+            status_code=401,
+            detail="2fa_required",
+            headers={"X-2FA-Challenge-Token": challenge_token, "X-2FA-Required": "true"},
+        )
+
     # Auto-grant admin status for primary admin email
     PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
     if email == PRIMARY_ADMIN_EMAIL:
@@ -287,7 +312,7 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         path="/auth"
     )
 
-    return {
+    login_payload = {
         "token": token,
         "user": {
             "user_id": user_doc["user_id"],
@@ -305,6 +330,12 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
             )
         }
     }
+
+    # Admin 2FA enforcement: flag (never lock out) so the frontend can nag.
+    if login_payload["user"]["is_admin"] and not totps.is_2fa_enabled(user_doc):
+        login_payload["needs_2fa_enrollment"] = True
+
+    return login_payload
 
 
 # ==================== REFRESH TOKEN SYSTEM ====================
