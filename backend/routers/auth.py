@@ -295,8 +295,8 @@ async def _consume_refresh_token(raw_token: str, user_id: str) -> dict:
             user_id, "refresh_token_reuse_detected", "user", user_id,
             {"reason": "unknown_refresh_token"},
         )
-        logger.warning(f"Refresh token reuse (unknown token) for user {user_id} Ã¢ÂÂ revoked all refresh tokens")
-        raise HTTPException(status_code=401, detail="Refresh token invalid Ã¢ÂÂ all sessions revoked for security")
+        logger.warning(f"Refresh token reuse (unknown token) for user {user_id} — revoked all refresh tokens")
+        raise HTTPException(status_code=401, detail="Refresh token invalid — all sessions revoked for security")
 
     if record.get("revoked") or record.get("rotated_from") is not None:
         # Presented a token that was already rotated (single-use chain) or revoked.
@@ -306,10 +306,10 @@ async def _consume_refresh_token(raw_token: str, user_id: str) -> dict:
             user_id, "refresh_token_reuse_detected", "user", user_id,
             {"reason": "revoked_or_rotated_refresh_token", "token_id": str(record.get("_id"))},
         )
-        logger.warning(f"Refresh token reuse (revoked/rotated) for user {user_id} Ã¢ÂÂ revoked all refresh tokens")
-        raise HTTPException(status_code=401, detail="Refresh token reuse detected Ã¢ÂÂ all sessions revoked for security")
+        logger.warning(f"Refresh token reuse (revoked/rotated) for user {user_id} — revoked all refresh tokens")
+        raise HTTPException(status_code=401, detail="Refresh token reuse detected — all sessions revoked for security")
 
-    # Expiry check (defensive Ã¢ÂÂ also enforced by cookie max_age)
+    # Expiry check (defensive — also enforced by cookie max_age)
     expires_at = record.get("expires_at")
     if expires_at:
         exp = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
@@ -321,7 +321,7 @@ async def _consume_refresh_token(raw_token: str, user_id: str) -> dict:
                 user_id, "refresh_token_reuse_detected", "user", user_id,
                 {"reason": "expired_refresh_token"},
             )
-            raise HTTPException(status_code=401, detail="Refresh token expired Ã¢ÂÂ all sessions revoked for security")
+            raise HTTPException(status_code=401, detail="Refresh token expired — all sessions revoked for security")
 
     return record
 
@@ -344,7 +344,7 @@ async def refresh_token(request: Request, response: Response):
     token_hash = hash_refresh_token(raw)
     probe = await db.refresh_tokens.find_one({"token_hash": token_hash}, {"_id": 0, "user_id": 1})
     if not probe:
-        # Unknown token â cannot attribute to a user reliably. Reject.
+        # Unknown token — cannot attribute to a user reliably. Reject.
         logger.warning("Refresh attempt with unknown refresh token")
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 

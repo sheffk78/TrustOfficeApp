@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 # JWT Config
 JWT_SECRET = os.environ.get('JWT_SECRET')
 if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET environment variable is required â app will not start without it")
+    raise RuntimeError("JWT_SECRET environment variable is required — app will not start without it")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24 * 7  # 7 days â retained for backward compatibility (admin impersonation/etc.)
+JWT_EXPIRATION_HOURS = 24 * 7  # 7 days — retained for backward compatibility (admin impersonation/etc.)
 ACCESS_TOKEN_EXPIRATION_MINUTES = 30  # Session-hardening: short-lived access tokens
 REFRESH_TOKEN_EXPIRATION_DAYS = 30    # Refresh-token lifetime
 REFRESH_TOKEN_LENGTH = 48            # secrets.token_urlsafe(48) -> opaque random string
@@ -795,7 +795,7 @@ async def get_current_user(request: Request) -> dict:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         # Session-hardening: only 'access' tokens are valid for authorization.
         # Impersonation/admin tokens that predate the change lack this claim
-        # and are rejected â newly minted ones must carry type=='access'.
+        # and are rejected — newly minted ones must carry type=='access'.
         if payload.get("type") != "access":
             raise jwt.InvalidTokenError("Token is not an access token")
         await _check_jwt_revocation(payload.get("jti"), payload.get("user_id"), payload)
