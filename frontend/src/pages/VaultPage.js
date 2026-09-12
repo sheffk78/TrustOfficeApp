@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,10 +17,15 @@ import VaultAddForm from '@/components/vault/VaultAddForm';
 import VaultCategorySection from '@/components/vault/VaultCategorySection';
 import CriticalDocumentsAlert from '@/components/vault/CriticalDocumentsAlert';
 import CloudBackupSection from '@/components/vault/CloudBackupSection';
+import DissolvedTrustBanner, { isTrustDissolved } from '@/components/trust/DissolvedTrustBanner';
 import { deleteDocument, downloadDocument } from '@/components/vault/vaultOperations';
 
 export default function VaultPage() {
   const { selectedTrust } = useAuth();
+  const [searchParams] = useSearchParams();
+  const focusBackup = searchParams.get('focus') === 'backup';
+  const backupCardRef = useRef(null);
+  const [backupHighlight, setBackupHighlight] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [byCategory, setByCategory] = useState({});
   const [summary, setSummary] = useState(null);
@@ -71,6 +77,22 @@ export default function VaultPage() {
 
   const upload = useVaultUpload(selectedTrust, loadData);
 
+  // Honor ?focus=backup: scroll to + visually highlight the cloud-backup card.
+  useEffect(() => {
+    if (!focusBackup) return;
+    // Wait for data + the backup card to render.
+    const t = setTimeout(() => {
+      const el = backupCardRef.current;
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setBackupHighlight(true);
+        const clear = setTimeout(() => setBackupHighlight(false), 2400);
+        return () => clearTimeout(clear);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [focusBackup, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /** Copy a doc's external storage URL to the clipboard. */
   const handleCopyLink = useCallback((doc) => {
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
@@ -98,6 +120,7 @@ export default function VaultPage() {
 
   const categories = summary?.categories || DOC_CATEGORIES;
   const hasDocuments = Object.keys(byCategory).length > 0;
+  const dissolved = isTrustDissolved(selectedTrust);
 
   return (
     <>
@@ -115,12 +138,14 @@ export default function VaultPage() {
                 ]}
                 taPrompt="Help me understand the Document Vault and how to upload files"
               />
-              <Button className="btn-primary" onClick={() => { upload.setShowAdd(!upload.showAdd); upload.setAddMode('upload'); }}>
+              <Button className="btn-primary" onClick={() => { upload.setShowAdd(!upload.showAdd); upload.setAddMode('upload'); }} disabled={dissolved} title={dissolved ? 'This trust is dissolved and read-only' : undefined}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Document
               </Button>
             </div>
           </div>
+
+          <DissolvedTrustBanner trust={selectedTrust} />
 
           {/* Missing Critical Alert */}
           <CriticalDocumentsAlert
@@ -129,7 +154,13 @@ export default function VaultPage() {
           />
 
           {/* Cloud Backup */}
-          <CloudBackupSection selectedTrust={selectedTrust} />
+          <div
+            ref={backupCardRef}
+            className={backupHighlight ? 'rounded-lg ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg transition-all' : ''}
+            data-testid="cloud-backup-focus-target"
+          >
+            <CloudBackupSection selectedTrust={selectedTrust} />
+          </div>
 
           {/* Search + Category Filter */}
           <div className="flex gap-2 mb-6">

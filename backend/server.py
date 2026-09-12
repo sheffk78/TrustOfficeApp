@@ -81,6 +81,7 @@ from routers.ai import router as ai_router
 from routers.guided_minutes import router as guided_minutes_router
 from routers.referrals import router as referrals_router
 from routers.admin import router as admin_router
+from routers.trust_admin_service import router as trust_admin_service_router
 from routers.contact import router as contact_router
 from routers.admin_api import router as admin_api_router
 from routers.stats import router as stats_router
@@ -462,6 +463,7 @@ app.include_router(ai_router, prefix="/api")
 app.include_router(guided_minutes_router, prefix="/api")
 app.include_router(referrals_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(trust_admin_service_router, prefix="/api")
 app.include_router(contact_router, prefix="/api")
 app.include_router(admin_api_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")

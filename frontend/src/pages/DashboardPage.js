@@ -19,6 +19,7 @@ import { DashboardTodaysFocus } from './dashboard/DashboardTodaysFocus';
 import { DashboardTaxCalendar } from './dashboard/DashboardTaxCalendar';
 import { DashboardHealthScoreCard } from './dashboard/DashboardHealthScoreCard';
 import { DashboardQuickActionsCard } from './dashboard/DashboardQuickActionsCard';
+import { DashboardTrustAdminCard } from './dashboard/DashboardTrustAdminCard';
 import { DashboardRecentActivity } from './dashboard/DashboardRecentActivity';
 import { ReviewPromptModal } from '@/components/ReviewPromptModal';
 import { FeedbackPromptModal } from '@/components/FeedbackPromptModal';
@@ -265,6 +266,7 @@ export default function DashboardPage() {
                   isNewTrust={isNewTrust}
                 />
                 <DashboardQuickActionsCard stats={stats} navigate={navigate} />
+                <DashboardTrustAdminCard />
               </div>
 
               <DashboardRecentActivity activities={activities} stats={stats} />

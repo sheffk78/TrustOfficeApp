@@ -119,6 +119,7 @@ export function getOnboardingProgress(onboarding, selectedTrust) {
     { id: 'minutes', label: 'Hold your first trustee meeting', done: onboarding.minutes_generated, action: '/minutes/create?type=initial_trustee_meeting', priority: 5, field: 'minutes_generated' },
     { id: 'ein_doc', label: 'Add EIN letter to vault', done: onboarding.ein_doc_uploaded, action: '/vault', priority: 6, field: 'ein_doc_uploaded' },
     { id: 'formation_date', label: 'Add formation date', done: onboarding.formation_date_added, action: '/settings#formation-date', priority: 7, field: 'formation_date_added' },
+    { id: 'backup_connect', label: 'Connect your off-site backup', done: onboarding.backup_connected, action: '/vault?tab=vault&focus=backup', priority: 7, field: 'backup_connected' },
     { id: 'ein', label: 'Enter your EIN', done: onboarding.ein_entered, action: '/settings#ein', priority: 8, field: 'ein_entered' },
     { id: 'calendar', label: 'Review your tax calendar', done: onboarding.calendar_set || selectedTrust?.benevolence_enabled, action: '/calendar', priority: 9, field: 'calendar_set' },
   ];
