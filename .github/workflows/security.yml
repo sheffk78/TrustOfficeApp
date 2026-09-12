@@ -1,0 +1,58 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  deps:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: pip-audit (backend)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit and scan backend requirements
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit -r backend/requirements.txt --strict --desc off || exit 1
+
+      - name: npm audit (frontend)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --fund=false
+          else
+            npm install --no-audit --fund=false
+          fi
+          npm audit --audit-level=high
+
+  tenant-isolation:
+    name: Tenant isolation suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend deps (minimal for tests)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Run tenant-isolation tests ONLY (full suite has pre-existing env failures)
+        working-directory: backend
+        env:
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: trustoffice_ci
+          JWT_SECRET: ci-only-not-a-real-secret
+          CORS_ORIGINS: https://app.trustoffice.app
+        run: python -m pytest tests/test_tenant_isolation.py -q
