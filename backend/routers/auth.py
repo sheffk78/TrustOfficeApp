@@ -1,6 +1,6 @@
 # Auth router - handles authentication, registration, password reset, and OAuth
 from fastapi import APIRouter, HTTPException, Depends, Response, Request, BackgroundTasks
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from pydantic import BaseModel
@@ -28,6 +28,8 @@ from dependencies import (
 from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, ProfileUpdate
 from email_service import email_service
 from security import InputSanitizer
+from services import totp_service as totps
+from services.security_events import record_security_event, check_security_alert
 
 
 def _clean_utm(value: Optional[str], max_len: int = 200) -> Optional[str]:
@@ -144,7 +146,7 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
 
 
 @router.post("/auth/login")
-async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(10, 60))):
+async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks, request: Request, _rl: None = Depends(rate_limit(10, 60))):
     """Login with email/password"""
     # Validate email format
     if not validate_email_format(user.email):
@@ -166,7 +168,43 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         # Log failed login attempt (for security monitoring)
         logger.warning(f"Failed login attempt for email: {email}")
         await log_audit_event(user_doc["user_id"], "login_failed", "user", user_doc["user_id"], {"email": email})
+        # Security event + anomaly alert (best-effort — never breaks login)
+        try:
+            ip = request.headers.get("X-Forwarded-For", "").split(",")[-1].strip() or (request.client.host if request.client else None)
+            await record_security_event(
+                user_doc["user_id"], "login_failed",
+                ip=ip, user_agent=request.headers.get("User-Agent"), details={"email": email},
+            )
+            await check_security_alert("login_failed", user_id=user_doc["user_id"], email=email)
+        except Exception as sec_exc:
+            logger.warning(f"Security event logging for login_failed failed (non-fatal): {sec_exc}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # ==================== 2FA GATE ====================
+    # Password OK but 2FA enabled -> NO session yet. Issue a short-lived
+    # (5-min) challenge JWT scoped to the 2FA step only (type='2fa_challenge'
+    # — get_current_user rejects anything that is not type='access', so this
+    # token is session-inert). The client completes login via /auth/2fa/login.
+    if totps.is_2fa_enabled(user_doc):
+        challenge_token = totps.create_challenge_token(user_doc["user_id"], user_doc["email"])
+        try:
+            ip = request.headers.get("X-Forwarded-For", "").split(",")[-1].strip() or (request.client.host if request.client else None)
+            await record_security_event(
+                user_doc["user_id"], "login_2fa_required",
+                ip=ip, user_agent=request.headers.get("User-Agent"), details={"email": email},
+            )
+        except Exception as sec_exc:
+            logger.warning(f"Security event logging for 2fa challenge failed (non-fatal): {sec_exc}")
+        # 401 (no session issued) + machine-readable flag for the frontend.
+        raise HTTPException(
+            status_code=401,
+            detail="2fa_required",
+            headers={"X-2FA-Challenge-Token": challenge_token, "X-2FA-Required": "true"},
+        )
+
+    # Admin enforcement (nag-only): admins without enrolled 2FA get a flag in
+    # the login payload so the frontend can force the enrollment nag. Never
+    # locks admins out in this version.
     
     # Auto-grant admin status for primary admin email
     PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
@@ -234,8 +272,8 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         max_age=JWT_EXPIRATION_HOURS * 3600,
         path="/"
     )
-    
-    return {
+
+    login_payload = {
         "token": token,
         "user": {
             "user_id": user_doc["user_id"],
@@ -253,6 +291,12 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
             )
         }
     }
+
+    # Admin 2FA enforcement: flag (never lock out) so the frontend can nag.
+    if login_payload["user"]["is_admin"] and not totps.is_2fa_enabled(user_doc):
+        login_payload["needs_2fa_enrollment"] = True
+
+    return login_payload
 
 
 # ==================== PASSWORD RESET ====================
@@ -500,22 +544,33 @@ async def get_me(user: dict = Depends(get_current_user)):
     is_admin = user.get("is_admin", False) or user.get("email", "").lower() == PRIMARY_ADMIN_EMAIL
     is_stats_user = user.get("is_stats_user", False)
     is_leads_user = user.get("is_leads_user", False)
-    
-    return UserResponse(
-        user_id=user["user_id"],
-        email=user["email"],
-        name=user["name"],
-        picture=user.get("picture"),
-        created_at=user.get("created_at", ""),
-        is_admin=is_admin,
-        is_stats_user=is_stats_user,
-        is_leads_user=is_leads_user,
-        wp_ref=user.get("wp_ref"),
-        is_wingpoint=bool(
-            user.get("wp_ref")
-            or user.get("source") == "wingpoint"
-            or user.get("created_via") == "wingpoint_provision"
-        ),
+
+    # Admin 2FA enforcement (nag-only): flag surfaced via response header so
+    # the UserResponse model shape is unchanged for the frontend client.
+    if is_admin and not totps.is_2fa_enabled(user):
+        headers = {"X-Needs-2FA-Enrollment": "true"}
+    else:
+        headers = None
+
+    return JSONResponse(
+        content={
+            "user_id": user["user_id"],
+            "email": user["email"],
+            "name": user["name"],
+            "picture": user.get("picture"),
+            "created_at": user.get("created_at", ""),
+            "is_admin": is_admin,
+            "is_stats_user": is_stats_user,
+            "is_leads_user": is_leads_user,
+            "wp_ref": user.get("wp_ref"),
+            "is_wingpoint": bool(
+                user.get("wp_ref")
+                or user.get("source") == "wingpoint"
+                or user.get("created_via") == "wingpoint_provision"
+            ),
+            "needs_2fa_enrollment": bool(is_admin and not totps.is_2fa_enabled(user)),
+        },
+        headers=headers,
     )
 
 

@@ -1,6 +1,6 @@
 # Vault router — trust document organization, reference tracking, and file upload
 # File uploads stored as BSON binary in vault_documents (max 16MB per file)
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query, Request
 from fastapi.responses import Response
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -16,6 +16,7 @@ from database import db
 from dependencies import get_current_user, require_write_access
 from routers.compensation import auto_update_onboarding
 from utils.audit import log_audit_event
+from utils.stepup_2fa import require_2fa_stepup
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["vault"])
@@ -409,11 +410,18 @@ async def upload_document(
 
 @router.get("/vault/documents/{doc_id}/download")
 async def download_document(
+    request: Request,
     doc_id: str,
     inline: bool = Query(False, description="Serve with Content-Disposition: inline for in-app preview"),
     user: dict = Depends(get_current_user),
+    _stepup: None = Depends(require_2fa_stepup),
 ):
-    """Download a file from the vault."""
+    """Download a file from the vault.
+
+    Step-up 2FA: users with 2FA enabled must send a valid current TOTP code
+    in the X-2FA-Code header (403 '2fa_stepup_required' otherwise). Users
+    without 2FA are unaffected.
+    """
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found. It may have been deleted. Please refresh the vault and try again.")

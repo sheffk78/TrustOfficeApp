@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Download } from 'lucide-react';
 import { API, getAuthHeaders } from '@/utils/api';
+import { isStepUpRequired } from '@/utils/twoFactor';
 
 /**
  * VaultPreviewModal — in-app first-page preview of an uploaded vault document.
@@ -9,8 +10,12 @@ import { API, getAuthHeaders } from '@/utils/api';
  * The backend download endpoint requires authentication (Bearer token), which
  * native <embed>/<img> tags cannot send. So we fetch the file with auth
  * headers, create a blob URL, and use that as the embed/img src instead.
+ *
+ * 2FA step-up: with 2FA enabled the download can answer 403
+ * {detail:'2fa_stepup_required'}. onStepUpRequired lets the parent VaultPage
+ * open the step-up modal and replay the download with the X-2FA-Code header.
  */
-export default function VaultPreviewModal({ doc, open, onOpenChange }) {
+export default function VaultPreviewModal({ doc, open, onOpenChange, onStepUpRequired }) {
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [blobUrl, setBlobUrl] = useState(null);
@@ -21,6 +26,26 @@ export default function VaultPreviewModal({ doc, open, onOpenChange }) {
     /\.(png|jpe?g|gif|webp)$/i.test(doc?.file_name || '');
   const previewable = Boolean(doc && doc.storage_provider === 'trustoffice' && (isPdf || isImage));
   const downloadUrl = `${API}/vault/documents/${doc?.doc_id}/download`;
+
+  // Shared download implementation (preview + save both use it).
+  // Returns the raw fetch Response so callers can inspect the status.
+  const doDownload = (inline) => {
+    const token = localStorage.getItem('auth_token');
+    return fetch(`${downloadUrl}${inline ? '?inline=true' : ''}`, {
+      credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  };
+
+  const isStepUp403 = async (response) => {
+    if (!response || response.status !== 403) return false;
+    try {
+      const body = await response.clone().json();
+      return isStepUpRequired(body.detail);
+    } catch {
+      return false;
+    }
+  };
 
   // Fetch the file with auth and create an object URL for the embed/img.
   useEffect(() => {
@@ -34,11 +59,13 @@ export default function VaultPreviewModal({ doc, open, onOpenChange }) {
       setFailed(false);
       try {
         // fetchWithAuth forces JSON content-type; use raw fetch with auth headers.
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${API}/vault/documents/${doc.doc_id}/download?inline=true`, {
-          credentials: 'include',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const response = await doDownload(true);
+        if (await isStepUp403(response)) {
+          // Protected action needs a fresh code; the parent's step-up modal
+          // handles the retry, so skip the preview rather than erroring.
+          if (!cancelled) setFailed(true);
+          return;
+        }
         if (!response.ok) throw new Error(`Preview request failed (${response.status})`);
         const blob = await response.blob();
         if (cancelled) return;
@@ -67,7 +94,44 @@ export default function VaultPreviewModal({ doc, open, onOpenChange }) {
     });
   }, []);
 
+  // Client-side download with 2FA step-up support: on 403 2fa_stepup_required
+  // hand the original request to the parent (step-up modal) via onStepUpRequired.
+  const handleDownloadClick = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await doDownload(false);
+      if (await isStepUp403(response)) {
+        if (onStepUpRequired) onStepUpRequired(() => doDownload(false), doc);
+        return;
+      }
+      if (!response.ok) throw new Error(response.status);
+      const b = await response.blob();
+      const url = URL.createObjectURL(b);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.file_name || 'document';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  };
+
   if (!doc) return null;
+
+  const downloadLink = (label, testid, className) => (
+    <a
+      href={downloadUrl}
+      download={doc.file_name}
+      onClick={handleDownloadClick}
+      data-testid={testid}
+      className={className}
+    >
+      <Download className="w-3.5 h-3.5" /> {label}
+    </a>
+  );
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) { setFailed(false); setBlobUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); } onOpenChange(o); }}>
@@ -80,35 +144,7 @@ export default function VaultPreviewModal({ doc, open, onOpenChange }) {
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <Dialog.Title className="font-serif text-navy text-base truncate pr-4">{doc.title}</Dialog.Title>
             <div className="flex items-center gap-3 flex-shrink-0">
-              <a
-                href={downloadUrl}
-                download={doc.file_name}
-                onClick={(e) => {
-                  // Native anchor can't carry the Bearer header — do an
-                  // authenticated fetch and trigger a client-side download.
-                  e.preventDefault();
-                  const token = localStorage.getItem('auth_token');
-                  fetch(downloadUrl, {
-                    credentials: 'include',
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
-                  })
-                    .then((r) => { if (!r.ok) throw new Error(r.status); return r.blob(); })
-                    .then((b) => {
-                      const url = URL.createObjectURL(b);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = doc.file_name || 'document';
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      setTimeout(() => URL.revokeObjectURL(url), 5000);
-                    })
-                    .catch((err) => console.error('Download failed:', err));
-                }}
-                className="text-xs text-navy hover:text-navy/70 flex items-center gap-1"
-              >
-                <Download className="w-3.5 h-3.5" /> Download
-              </a>
+              {downloadLink('Download', 'vault-preview-download-btn', 'text-xs text-navy hover:text-navy/70 flex items-center gap-1')}
               <Dialog.Close asChild>
                 <button aria-label="Close preview" className="text-muted-foreground hover:text-navy">
                   <X className="w-4 h-4" />
@@ -123,32 +159,11 @@ export default function VaultPreviewModal({ doc, open, onOpenChange }) {
                 <p className="text-sm text-muted-foreground">
                   No inline preview available for this file type{failed ? ' (preview failed to load)' : ''}.
                 </p>
-                <a href={downloadUrl} download={doc.file_name} onClick={(e) => {
-                  e.preventDefault();
-                  const token = localStorage.getItem('auth_token');
-                  fetch(downloadUrl, {
-                    credentials: 'include',
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
-                  })
-                    .then((r) => { if (!r.ok) throw new Error(r.status); return r.blob(); })
-                    .then((b) => {
-                      const url = URL.createObjectURL(b);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = doc.file_name || 'document';
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      setTimeout(() => URL.revokeObjectURL(url), 5000);
-                    })
-                    .catch((err) => console.error('Download failed:', err));
-                }} className="btn btn-primary btn-sm">
-                  <Download className="w-3.5 h-3.5 mr-1" /> Download to view
-                </a>
+                {downloadLink('Download to view', 'vault-preview-download-alt-btn', 'btn btn-primary btn-sm')}
               </div>
             ) : loading ? (
               <div className="h-full flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">Loading preview…</p>
+                <p className="text-sm text-muted-foreground">Loading preview...</p>
               </div>
             ) : isPdf && blobUrl ? (
               <embed
@@ -161,7 +176,7 @@ export default function VaultPreviewModal({ doc, open, onOpenChange }) {
               <img src={blobUrl} alt={`Preview of ${doc.title}`} className="max-w-full max-h-full mx-auto" />
             ) : (
               <div className="h-full flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">Loading preview…</p>
+                <p className="text-sm text-muted-foreground">Loading preview...</p>
               </div>
             )}
           </div>

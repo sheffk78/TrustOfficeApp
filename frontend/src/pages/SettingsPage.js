@@ -50,6 +50,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TRUST_PROTECTOR_POWERS } from './trustProtectorPowers';
 import { formatEIN } from '@/utils/formatters';
+import TwoFactorCard from '@/components/TwoFactorCard';
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -2502,18 +2503,8 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {/* Two-factor info */}
-              <div className="flex items-center justify-between p-4 border border-navy/10">
-                <div>
-                  <p className="font-medium text-navy">Two-Factor Authentication</p>
-                  <p className="text-sm text-muted-foreground">
-                    Add an extra layer of security to your account with TOTP authentication.
-                  </p>
-                </div>
-                <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                  Not Enabled
-                </div>
-              </div>
+              {/* Two-factor management (enrollment / recovery codes / disable) */}
+              <TwoFactorCard />
 
               {/* Session management */}
               <div className="flex items-center justify-between p-4 border border-navy/10">

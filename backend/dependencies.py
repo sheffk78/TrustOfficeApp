@@ -725,6 +725,13 @@ async def get_current_user(request: Request) -> dict:
     # Try JWT token first
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        # Session-scope enforcement: only 'access' JWTs authenticate a session.
+        # The 2FA challenge token (type='2fa_challenge') and refresh tokens
+        # (type='refresh') are NOT valid for get_current_user â they must be
+        # handled by their dedicated flows. Without this, a challenge token
+        # could be replayed as a session token.
+        if payload.get("type") not in (None, "access"):
+            raise jwt.InvalidTokenError(f"token type '{payload.get('type')}' cannot start a session")
         await _check_jwt_revocation(payload.get("jti"), payload.get("user_id"), payload)
         user = await db.users.find_one({"user_id": payload["user_id"]}, {"_id": 0})
         if user:

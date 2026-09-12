@@ -16,7 +16,8 @@ import VaultAddForm from '@/components/vault/VaultAddForm';
 import VaultCategorySection from '@/components/vault/VaultCategorySection';
 import CriticalDocumentsAlert from '@/components/vault/CriticalDocumentsAlert';
 import CloudBackupSection from '@/components/vault/CloudBackupSection';
-import { deleteDocument, downloadDocument } from '@/components/vault/vaultOperations';
+import { deleteDocument, downloadDocument, register2faStepUpRunner } from '@/components/vault/vaultOperations';
+import use2faStepUp from '@/hooks/use2faStepUp';
 
 export default function VaultPage() {
   const { selectedTrust } = useAuth();
@@ -29,6 +30,20 @@ export default function VaultPage() {
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [criticalDismissed, setCriticalDismissed] = useState(false);
   const copyTimeoutRef = useRef(null);
+
+  // 2FA step-up: vault downloads are a protected action. When the backend
+  // answers 403 2fa_stepup_required, the modal collects a fresh code and the
+  // original download is replayed with the X-2FA-Code header.
+  const { stepUpOpen: listStepUpOpen, runWithStepUp, handleStepUpSubmit, closeStepUp, TwoFactorStepUpModal } = use2faStepUp();
+  useEffect(() => {
+    register2faStepUpRunner(runWithStepUp);
+    return () => register2faStepUpRunner(null);
+  }, [runWithStepUp]);
+
+  // Shared modal open state: the list-download path (use2faStepUp) and the
+  // preview-download path (below) both render the same single modal.
+  const [previewStepUp, setPreviewStepUp] = useState(null);
+  const stepUpOpen = listStepUpOpen || Boolean(previewStepUp);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -86,16 +101,42 @@ export default function VaultPage() {
   const handleDelete = useCallback((id) => deleteDocument(id, loadData), [loadData]);
   const handleDownload = useCallback((docId, fileName) => downloadDocument(docId, fileName), []);
 
+  // 2FA step-up from the preview modal: park the original (download) request
+  // in state, open the step-up modal, replay it with the X-2FA-Code header on
+  // submit, and trigger the browser save with the resulting blob.
+  const handlePreviewStepUp = useCallback((requestFn) => {
+    setPreviewStepUp(() => requestFn);
+  }, []);
+  const handlePreviewStepUpSubmit = useCallback(async (code) => {
+    const requestFn = previewStepUp;
+    setPreviewStepUp(null);
+    const response = await requestFn({ 'X-2FA-Code': code });
+    if (!response.ok) throw new Error('That code was not valid. Please try again.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'document';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }, [previewStepUp]);
+
   if (!selectedTrust) {
     return (
       <div className="card-trust p-12 flex flex-col items-center justify-center">
         <FolderOpen className="w-12 h-12 text-muted-foreground/40 mb-3" />
         <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
         <p className="text-sm text-muted-foreground">Choose a trust to view document vault.</p>
+        <TwoFactorStepUpModal
+          open={stepUpOpen}
+          onSubmit={handleStepUpSubmit}
+          onCancel={closeStepUp}
+        />
       </div>
     );
   }
-
   const categories = summary?.categories || DOC_CATEGORIES;
   const hasDocuments = Object.keys(byCategory).length > 0;
 
@@ -200,11 +241,21 @@ export default function VaultPage() {
                   onCopyLink={handleCopyLink}
                   onDelete={handleDelete}
                   onDownload={handleDownload}
+                  onStepUpRequired={handlePreviewStepUp}
                   categoryIcons={CATEGORY_ICONS}
                 />
               ))}
             </div>
           )}
-        </>
+      {/* 2FA step-up modal: appears only when the backend demands a fresh
+          code for a protected download (2fa_stepup_required). Handles both
+          the list-download path (use2faStepUp) and the preview-download
+          replay path (handlePreviewStepUpSubmit). */}
+      <TwoFactorStepUpModal
+        open={stepUpOpen}
+        onSubmit={previewStepUp ? handlePreviewStepUpSubmit : handleStepUpSubmit}
+        onCancel={() => { setPreviewStepUp(null); closeStepUp(); }}
+      />
+    </>
   );
 }

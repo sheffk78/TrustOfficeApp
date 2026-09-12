@@ -4,7 +4,7 @@ import uuid
 import logging
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pymongo import ReturnDocument
 
 from fastapi.encoders import jsonable_encoder
@@ -13,6 +13,7 @@ from database import db
 from dependencies import require_write_access
 from email_service import email_service
 from utils.audit import log_audit_event
+from utils.stepup_2fa import require_2fa_stepup
 from utils.tax_calendar_math import filter_income_tax_entries
 
 logger = logging.getLogger(__name__)
@@ -150,12 +151,21 @@ async def get_successor_packet(token: str):
 # Existing send flow follows.
 
 @router.post("/trusts/{trust_id}/successor/send")
-async def send_successor_packet(trust_id: str, user: dict = Depends(require_write_access)):
+async def send_successor_packet(
+    request: Request,
+    trust_id: str,
+    user: dict = Depends(require_write_access),
+    _stepup: None = Depends(require_2fa_stepup),
+):
     """Generate a one-time, expiring access token and email the successor a secure packet link.
 
     Requires a designated successor with an email on the trust record. The email
     link is valid for 30 days and can be used once (M1: send only; the access
     view is delivered in M2).
+
+    Step-up 2FA: users with 2FA enabled must send a valid current TOTP code
+    in the X-2FA-Code header (403 '2fa_stepup_required' otherwise). Users
+    without 2FA are unaffected.
     """
     trust = await db.trusts.find_one(
         {"trust_id": trust_id, "user_id": user["user_id"]},

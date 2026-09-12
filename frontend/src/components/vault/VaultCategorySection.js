@@ -12,6 +12,7 @@ export default function VaultCategorySection({
   onCopyLink,
   onDelete,
   onDownload,
+  onStepUpRequired,
   categoryIcons,
 }) {
   const Icon = categoryIcons[categoryKey] || FileText;
@@ -31,6 +32,7 @@ export default function VaultCategorySection({
             onCopyLink={onCopyLink}
             onDelete={onDelete}
             onDownload={onDownload}
+            onStepUpRequired={onStepUpRequired}
           />
         ))}
       </div>
