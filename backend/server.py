@@ -388,12 +388,18 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         
         return await call_next(request)
 
+# Import SSN intake-guard middleware (NOW-phase security package)
+from security import SSNGuardMiddleware
+
 # ==================== MIDDLEWARE & ROUTER REGISTRATION ====================
 # NOTE: In FastAPI/Starlette, middleware is LIFO — the LAST added executes FIRST.
 # CORS must be outermost (added last) so it handles preflight before other middleware.
 
 # Security headers middleware (OWASP recommendations)
 app.add_middleware(SecurityHeadersMiddleware)
+
+# NOW-phase SSN intake guard: reject SSN-shaped JSON body input with HTTP 422
+app.add_middleware(SSNGuardMiddleware)
 
 # Rate limiting middleware
 app.add_middleware(RateLimitMiddleware, config=RateLimitConfig())
@@ -660,6 +666,11 @@ async def startup_event():
         await db.jwt_revocations.create_index("jti")
         await db.jwt_revocations.create_index("user_id")
         await db.jwt_revocations.create_index("expires_at", expireAfterSeconds=0)  # Auto-delete expired revocations
+
+        # Refresh tokens (session-hardening): opaque tokens, SHA-256 hashed
+        await db.refresh_tokens.create_index("token_hash", unique=True)
+        await db.refresh_tokens.create_index("user_id")
+        await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)  # Auto-delete expired
         
         # Admin audit log with TTL (90 days)
         await db.admin_audit_log.create_index([("user_id", 1), ("timestamp", -1)])

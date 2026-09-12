@@ -17,9 +17,21 @@ Environment variables:
 """
 import os
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# Dedicated logger for the NOW-phase LLM PII redaction gate. Per-call redaction
+# events are emitted here (document id if applicable, redaction counts, ts).
+redaction_logger = logging.getLogger("trustoffice.security.redaction")
+
+# Redaction helpers live in security.py (single source of truth for SSN/EIN
+# pattern definitions, shared with the intake ban).
+try:
+    from security import redact_pii_for_llm
+except ImportError:  # pragma: no cover - defensive
+    redact_pii_for_llm = None
 
 # Primary: OpenRouter
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
@@ -155,16 +167,43 @@ async def _try_claude(
     return None
 
 
+def _apply_llm_redaction(user_content: str, document_id: Optional[str] = None) -> str:
+    """
+    NOW-phase gate: strip SSN/EIN patterns from outbound LLM text and log the
+    redaction event. Returns the redacted text. No-op if the helper is missing.
+    """
+    if redact_pii_for_llm is None:
+        return user_content
+    redacted, counts = redact_pii_for_llm(user_content)
+    if counts["ssn"] or counts["ein"]:
+        redaction_logger.info(
+            "LLM outbound PII redacted",
+            extra={
+                "event": "llm_pii_redaction",
+                "document_id": document_id,
+                "redacted_ssn": counts["ssn"],
+                "redacted_ein": counts["ein"],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    return redacted
+
+
 async def ai_sonnet(
     system_prompt: str,
     user_content: str,
     max_tokens: int = 1200,
-    temperature: float = 0.2
+    temperature: float = 0.2,
+    document_id: Optional[str] = None
 ) -> str:
     """
     Unified AI call for complex drafting tasks.
     Tries OpenRouter (Gemini) first, falls back to Claude.
+
+    document_id (optional): propagated to the redaction log so redaction events
+    can be tied to a specific vault/document when sending document content.
     """
+    user_content = _apply_llm_redaction(user_content, document_id)
     errors = []
 
     # Try OpenRouter primary
@@ -192,12 +231,14 @@ async def ai_haiku(
     system_prompt: str,
     user_content: str,
     max_tokens: int = 400,
-    temperature: float = 0.3
+    temperature: float = 0.3,
+    document_id: Optional[str] = None
 ) -> str:
     """
     Unified AI call for quick suggestion tasks.
     Tries OpenRouter (Gemini) first, falls back to Claude.
     """
+    user_content = _apply_llm_redaction(user_content, document_id)
     errors = []
 
     result = await _try_openrouter(
@@ -224,18 +265,20 @@ async def ai_draft_stream(
     user_content: str,
     max_tokens: int = 2000,
     temperature: float = 0.3,
+    document_id: Optional[str] = None,
 ):
     """
     Streaming version of ai_draft.
     Yields content text chunks as they arrive from the AI model.
     Tries OpenRouter (Gemini) first, falls back to non-streaming if needed.
 
-    Raises AIClientError if ALL providers fail — does NOT yield a soft
+    Raises AIClientError if ALL providers fail â does NOT yield a soft
     error string as a token chunk (that would be indistinguishable from
     a real AI response and cause the stream to end without a proper
     'error' event, resulting in "The connection was interrupted" on the
     frontend).
     """
+    user_content = _apply_llm_redaction(user_content, document_id)
     if OPENROUTER_AVAILABLE and OPENROUTER_API_KEY:
         try:
             from openrouter_client import call_openrouter_sonnet_stream

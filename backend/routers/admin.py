@@ -18,7 +18,7 @@ FEATURES:
 - View revenue data from Stripe
 - Grant/revoke stats access
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from typing import Optional, List
 import re
 import os
@@ -34,6 +34,7 @@ import stripe
 from database import db
 from dependencies import get_current_user, hash_password, TRIAL_DAYS
 from email_service import email_service
+from services.security_events import record_security_event, alert_security_event
 
 logger = logging.getLogger(__name__)
 
@@ -911,7 +912,8 @@ from dependencies import create_jwt_token
 @router.post("/impersonate/{user_id}")
 async def impersonate_user(
     user_id: str,
-    admin: dict = Depends(require_admin)
+    request: Request,
+    admin: dict = Depends(require_admin),
 ):
     """
     Generate a token to impersonate a user.
@@ -958,7 +960,33 @@ async def impersonate_user(
         "target_email": target_user["email"],
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
-    
+
+    # Security event logging + immediate anomaly alert (best-effort)
+    try:
+        ip = request.headers.get("X-Forwarded-For", "").split(",")[-1].strip() if request else None
+        ua = request.headers.get("User-Agent") if request else None
+        await record_security_event(
+            admin["user_id"], "admin_impersonation",
+            ip=ip, user_agent=ua,
+            details={
+                "target_user_id": target_user["user_id"],
+                "target_email": target_user["email"],
+                "admin_user_id": admin["user_id"],
+                "admin_email": admin["email"],
+            },
+        )
+        await alert_security_event(
+            "admin_impersonation",
+            user_id=admin["user_id"],
+            details={
+                "target_user_id": target_user["user_id"],
+                "target_email": target_user["email"],
+                "admin_email": admin["email"],
+            },
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for admin_impersonation failed (non-fatal): {sec_exc}")
+
     logger.info(f"Admin {admin['email']} started impersonating user {target_user['email']}")
     
     return {

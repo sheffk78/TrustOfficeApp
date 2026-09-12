@@ -8,6 +8,7 @@ import jwt
 import bcrypt
 import os
 import uuid
+import secrets
 import logging
 
 from database import db
@@ -19,7 +20,10 @@ JWT_SECRET = os.environ.get('JWT_SECRET')
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET environment variable is required — app will not start without it")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
+JWT_EXPIRATION_HOURS = 24 * 7  # 7 days — retained for backward compatibility (admin impersonation/etc.)
+ACCESS_TOKEN_EXPIRATION_MINUTES = 30  # Session-hardening: short-lived access tokens
+REFRESH_TOKEN_EXPIRATION_DAYS = 30    # Refresh-token lifetime
+REFRESH_TOKEN_LENGTH = 48            # secrets.token_urlsafe(48) -> opaque random string
 
 TRIAL_DAYS = 14  # Legacy — existing trial users still have this period. New signups go straight to paid.
 
@@ -647,14 +651,78 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def create_jwt_token(user_id: str, email: str) -> str:
+    """Mint a short-lived access token (type=='access', 30-min expiry)."""
+    now = datetime.now(timezone.utc)
     payload = {
         "user_id": user_id,
         "email": email,
+        "type": "access",  # Session-hardening: token validation rejects tokens without this
         "jti": str(uuid.uuid4()),  # Unique token ID for revocation support
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
-        "iat": datetime.now(timezone.utc)
+        "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRATION_MINUTES),
+        "iat": now
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def hash_refresh_token(raw_token: str) -> str:
+    """Return the SHA-256 hex digest of an opaque refresh token for storage."""
+    import hashlib
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def generate_refresh_token() -> str:
+    """Generate a cryptographically-random opaque refresh token."""
+    return secrets.token_urlsafe(REFRESH_TOKEN_LENGTH)
+
+
+async def create_refresh_token_record(user_id: str, rotated_from: Optional[str] = None) -> str:
+    """Persist a new refresh-token record (SHA-256 hashed) and return the raw token."""
+    now = datetime.now(timezone.utc)
+    raw = generate_refresh_token()
+    record = {
+        "user_id": user_id,
+        "token_hash": hash_refresh_token(raw),
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(days=REFRESH_TOKEN_EXPIRATION_DAYS)).isoformat(),
+        "rotated_from": rotated_from,
+        "revoked": False,
+    }
+    await db.refresh_tokens.insert_one(record)
+    return raw
+
+
+async def _revoke_all_refresh_tokens(user_id: str) -> int:
+    """Revoke every outstanding refresh token for a user. Returns count revoked."""
+    result = await db.refresh_tokens.update_many(
+        {"user_id": user_id, "revoked": False},
+        {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return getattr(result, "modified_count", 0) or 0
+
+
+async def revoke_all_user_refresh_tokens(user_id: str, reason: str = "revoked") -> int:
+    """Public revocation of all a user's refresh tokens (password change/reset, logout-all)."""
+    return await _revoke_all_refresh_tokens(user_id)
+
+
+async def revoke_all_user_access_tokens(user_id: str) -> None:
+    """Revoke all outstanding access tokens via the jti revocation list ('all' marker)."""
+    await db.jwt_revocations.insert_one({
+        "user_id": user_id,
+        "jti": "all",  # Special marker: revoke ALL access tokens for this user
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (
+            datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+        ).isoformat(),  # Auto-cleanup after max legacy token lifetime
+    })
+
+
+async def revoke_refresh_token_by_hash(token_hash: str, user_id: str) -> None:
+    """Mark a single refresh-token record revoked."""
+    await db.refresh_tokens.update_one(
+        {"token_hash": token_hash, "user_id": user_id},
+        {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc).isoformat()}},
+    )
 
 
 async def _check_jwt_revocation(jti: Optional[str], user_id: Optional[str], payload: dict):
@@ -725,6 +793,11 @@ async def get_current_user(request: Request) -> dict:
     # Try JWT token first
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        # Session-hardening: only 'access' tokens are valid for authorization.
+        # Impersonation/admin tokens that predate the change lack this claim
+        # and are rejected — newly minted ones must carry type=='access'.
+        if payload.get("type") != "access":
+            raise jwt.InvalidTokenError("Token is not an access token")
         await _check_jwt_revocation(payload.get("jti"), payload.get("user_id"), payload)
         user = await db.users.find_one({"user_id": payload["user_id"]}, {"_id": 0})
         if user:

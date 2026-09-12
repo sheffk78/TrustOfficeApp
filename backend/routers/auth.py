@@ -22,12 +22,20 @@ from dependencies import (
     verify_password,
     create_jwt_token,
     JWT_EXPIRATION_HOURS,
+    ACCESS_TOKEN_EXPIRATION_MINUTES,
+    REFRESH_TOKEN_EXPIRATION_DAYS,
     JWT_SECRET,
     JWT_ALGORITHM,
+    create_refresh_token_record,
+    hash_refresh_token,
+    revoke_all_user_refresh_tokens,
+    revoke_all_user_access_tokens,
+    revoke_refresh_token_by_hash,
 )
-from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, ProfileUpdate
+from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, PasswordChange, ProfileUpdate
 from email_service import email_service
 from security import InputSanitizer
+from services.security_events import record_security_event, check_security_alert
 
 
 def _clean_utm(value: Optional[str], max_len: int = 200) -> Optional[str]:
@@ -38,6 +46,15 @@ def _clean_utm(value: Optional[str], max_len: int = 200) -> Optional[str]:
     if not value or len(value) > max_len:
         return value[:max_len] if value else None
     return value
+
+
+def _client_ip(request: Request) -> Optional[str]:
+    """Best-effort client IP honoring X-Forwarded-For for proxied requests."""
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return request.client.host if request.client else None
+
 from mailercloud_service import add_to_trial_list
 from utils.audit import log_audit_event
 
@@ -144,7 +161,7 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
 
 
 @router.post("/auth/login")
-async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(10, 60))):
+async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks, request: Request, _rl: None = Depends(rate_limit(10, 60))):
     """Login with email/password"""
     # Validate email format
     if not validate_email_format(user.email):
@@ -166,6 +183,17 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         # Log failed login attempt (for security monitoring)
         logger.warning(f"Failed login attempt for email: {email}")
         await log_audit_event(user_doc["user_id"], "login_failed", "user", user_doc["user_id"], {"email": email})
+        # Security event logging + anomaly alerting (best-effort, never breaks login)
+        try:
+            ip = _client_ip(request)
+            ua = request.headers.get("User-Agent")
+            await record_security_event(
+                user_doc["user_id"], "login_failed",
+                ip=ip, user_agent=ua, details={"email": email},
+            )
+            await check_security_alert("login_failed", user_id=user_doc["user_id"], email=email)
+        except Exception as sec_exc:
+            logger.warning(f"Security event logging for login_failed failed (non-fatal): {sec_exc}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Auto-grant admin status for primary admin email
@@ -202,19 +230,32 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         logger.info(f"Ensured admin status and subscription for {email}")
     
     token = create_jwt_token(user_doc["user_id"], user_doc["email"])
-    
+
+    # Issue an opaque refresh token (SHA-256 hashed in the refresh_tokens collection)
+    refresh_raw = await create_refresh_token_record(user_doc["user_id"])
+
     # Track last login and check if this is the first login (for WingPoint webhook)
     now_iso = datetime.now(timezone.utc).isoformat()
     previous_login = user_doc.get("last_login")
-    
+
     # Update last_login timestamp
     await db.users.update_one(
         {"user_id": user_doc["user_id"]},
         {"$set": {"last_login": now_iso}}
     )
-    
+
     # Log successful login for audit trail
     await log_audit_event(user_doc["user_id"], "login", "user", user_doc["user_id"], {"email": email, "first_login": not previous_login})
+    # Security event logging (best-effort, never breaks login)
+    try:
+        ip = _client_ip(request)
+        ua = request.headers.get("User-Agent")
+        await record_security_event(
+            user_doc["user_id"], "login_success",
+            ip=ip, user_agent=ua, details={"email": email, "first_login": not previous_login},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for login_success failed (non-fatal): {sec_exc}")
     
     # Fire first_login webhook for WingPoint-provisioned users (only on first login)
     # A first login = no previous last_login timestamp
@@ -224,17 +265,28 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
             background_tasks.add_task(fire_activation_webhook, user_doc["user_id"], "first_login")
         except Exception as e:
             logger.warning(f"Failed to queue first_login webhook for {user_doc['user_id']}: {e}")
-    
+
+    # Access token cookie (30-min, httponly)
     response.set_cookie(
         key="session_token",
         value=token,
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=JWT_EXPIRATION_HOURS * 3600,
+        max_age=ACCESS_TOKEN_EXPIRATION_MINUTES * 60,
         path="/"
     )
-    
+    # Refresh token cookie (30d, httponly, secure, samesite=lax, scoped to /auth)
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_raw,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 3600,
+        path="/auth"
+    )
+
     return {
         "token": token,
         "user": {
@@ -255,10 +307,140 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
     }
 
 
-# ==================== PASSWORD RESET ====================
+# ==================== REFRESH TOKEN SYSTEM ====================
+
+async def _consume_refresh_token(raw_token: str, user_id: str) -> dict:
+    """Validate and consume a refresh token.
+
+    Returns the stored refresh-token doc. On a revoked/rotated/expired token,
+    triggers reuse detection: revokes ALL of the user's refresh tokens, records
+    a security event, and raises 401.
+    """
+    token_hash = hash_refresh_token(raw_token)
+    record = await db.refresh_tokens.find_one({"token_hash": token_hash, "user_id": user_id})
+
+    if record is None:
+        # Unknown token (never issued or already fully deleted). Treat as reuse.
+        await revoke_all_user_refresh_tokens(user_id)
+        await log_audit_event(
+            user_id, "refresh_token_reuse_detected", "user", user_id,
+            {"reason": "unknown_refresh_token"},
+        )
+        logger.warning(f"Refresh token reuse (unknown token) for user {user_id} — revoked all refresh tokens")
+        raise HTTPException(status_code=401, detail="Refresh token invalid — all sessions revoked for security")
+
+    if record.get("revoked") or record.get("rotated_from") is not None:
+        # Presented a token that was already rotated (single-use chain) or revoked.
+        # This is the classic token-reuse signal: revoke everything + log it.
+        await revoke_all_user_refresh_tokens(user_id)
+        await log_audit_event(
+            user_id, "refresh_token_reuse_detected", "user", user_id,
+            {"reason": "revoked_or_rotated_refresh_token", "token_id": str(record.get("_id"))},
+        )
+        logger.warning(f"Refresh token reuse (revoked/rotated) for user {user_id} — revoked all refresh tokens")
+        raise HTTPException(status_code=401, detail="Refresh token reuse detected — all sessions revoked for security")
+
+    # Expiry check (defensive — also enforced by cookie max_age)
+    expires_at = record.get("expires_at")
+    if expires_at:
+        exp = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            await revoke_all_user_refresh_tokens(user_id)
+            await log_audit_event(
+                user_id, "refresh_token_reuse_detected", "user", user_id,
+                {"reason": "expired_refresh_token"},
+            )
+            raise HTTPException(status_code=401, detail="Refresh token expired — all sessions revoked for security")
+
+    return record
+
+
+@router.post("/auth/refresh")
+async def refresh_token(request: Request, response: Response):
+    """Rotate the refresh token: old invalidated, new issued + new access token returned.
+
+    Reads the refresh_token cookie. On a reused (revoked/rotated/expired) token,
+    revokes all of the user's refresh tokens and records a security event.
+    """
+    raw = request.cookies.get("refresh_token")
+    if not raw:
+        raise HTTPException(status_code=401, detail="No refresh token")
+
+    # Identify the user from the (still-valid) access token if present, else
+    # from the refresh record itself after lookup. We must find the record first
+    # to know the user, but reuse detection needs the user_id. Use the cookie
+    # payload's hash to locate; for the user_id we trust the record match.
+    token_hash = hash_refresh_token(raw)
+    probe = await db.refresh_tokens.find_one({"token_hash": token_hash}, {"_id": 0, "user_id": 1})
+    if not probe:
+        # Unknown token — cannot attribute to a user reliably. Reject.
+        logger.warning("Refresh attempt with unknown refresh token")
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    user_id = probe["user_id"]
+    record = await _consume_refresh_token(raw, user_id)
+
+    # Rotate: mark the old token rotated, issue a brand-new one chained from it.
+    await db.refresh_tokens.update_one(
+        {"token_hash": token_hash, "user_id": user_id},
+        {"$set": {"revoked": True, "rotated_from": record.get("rotated_from"), "rotated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    new_access = create_jwt_token(user_id, user_doc.get("email", ""))
+    new_refresh_raw = await create_refresh_token_record(user_id, rotated_from=token_hash)
+
+    # Set the new access token cookie (mirrors login)
+    response.set_cookie(
+        key="session_token",
+        value=new_access,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRATION_MINUTES * 60,
+        path="/"
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_raw,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 3600,
+        path="/auth"
+    )
+
+    return {
+        "token": new_access,
+        "user": {
+            "user_id": user_doc["user_id"],
+            "email": user_doc["email"],
+            "name": user_doc.get("name"),
+            "picture": user_doc.get("picture"),
+            "is_admin": user_doc.get("is_admin", False),
+        }
+    }
+
+
+@router.post("/auth/logout-all")
+async def logout_all(request: Request, response: Response, user: dict = Depends(get_current_user)):
+    """Revoke all refresh tokens for the user and clear auth cookies."""
+    user_id = user["user_id"]
+    await revoke_all_user_refresh_tokens(user_id, reason="logout_all")
+    response.delete_cookie(key="session_token", path="/")
+    response.delete_cookie(key="refresh_token", path="/auth")
+    return {"message": "Logged out of all sessions"}
+
+
+
 
 @router.post("/auth/forgot-password")
-async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(3, 60))):
+async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks, req: Request, _rl: None = Depends(rate_limit(3, 60))):
     """Request a password reset email"""
     user = await db.users.find_one({"email": request.email}, {"_id": 0})
     
@@ -323,11 +505,22 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
         reset_url=reset_url
     )
     
+    # Security event logging for password reset request (best-effort)
+    try:
+        ip = _client_ip(req)
+        ua = req.headers.get("User-Agent")
+        await record_security_event(
+            user["user_id"], "password_reset_requested",
+            ip=ip, user_agent=ua, details={"email": user["email"]},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for password_reset_requested failed (non-fatal): {sec_exc}")
+
     return {"message": "If an account exists with this email, you will receive a password reset link."}
 
 
 @router.post("/auth/reset-password")
-async def reset_password(request: PasswordResetConfirm, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(5, 60))):
+async def reset_password(request: PasswordResetConfirm, background_tasks: BackgroundTasks, req: Request, _rl: None = Depends(rate_limit(5, 60))):
     """Reset password using token"""
     # Find valid reset token
     reset_record = await db.password_resets.find_one(
@@ -369,13 +562,29 @@ async def reset_password(request: PasswordResetConfirm, background_tasks: Backgr
     
     # Delete used token
     await db.password_resets.delete_one({"token": request.token})
-    
+
     # Log password reset for audit trail
     await log_audit_event(reset_record["user_id"], "password_reset", "user", reset_record["user_id"], {})
+
+    # Security event logging for password reset/change (best-effort)
+    try:
+        ip = _client_ip(req)
+        ua = req.headers.get("User-Agent")
+        await record_security_event(
+            reset_record["user_id"], "password_changed",
+            ip=ip, user_agent=ua, details={"first_set": not _had_password},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for password_changed failed (non-fatal): {sec_exc}")
+
     
     # Invalidate all sessions for this user
     await db.user_sessions.delete_many({"user_id": reset_record["user_id"]})
-    
+
+    # Security (session-hardening): revoke all refresh tokens AND all outstanding
+    # access tokens so a reset fully locks out prior sessions.
+    await revoke_all_user_refresh_tokens(reset_record["user_id"], reason="password_reset")
+
     # Revoke all existing JWT tokens for this user
     await db.jwt_revocations.insert_one({
         "user_id": reset_record["user_id"],
@@ -561,11 +770,88 @@ async def update_profile(profile: ProfileUpdate, user: dict = Depends(get_curren
 async def logout(request: Request, response: Response):
     """Logout and clear session"""
     session_token = request.cookies.get("session_token")
+    user_id = None
     if session_token:
         await db.user_sessions.delete_one({"session_token": session_token})
-    
+        # Best-effort: resolve the user for the security event
+        sess = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0, "user_id": 1})
+        if sess:
+            user_id = sess.get("user_id")
+
+    # Security event logging (best-effort, never breaks logout)
+    try:
+        ip = _client_ip(request)
+        ua = request.headers.get("User-Agent")
+        await record_security_event(
+            user_id, "logout", ip=ip, user_agent=ua,
+            details={"session_token_present": bool(session_token)},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for logout failed (non-fatal): {sec_exc}")
+
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out"}
+
+
+@router.post("/auth/password/change")
+async def change_password(body: PasswordChange, request: Request, response: Response, user: dict = Depends(get_current_user)):
+    """Authenticated in-session password change.
+
+    Requires the current password, updates the hash, and (session-hardening)
+    revokes ALL of the user's refresh tokens AND all outstanding access tokens
+    so a changed password locks out every other active session.
+    """
+    user_id = user["user_id"]
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 1})
+    if not user_doc or not user_doc.get("password_hash"):
+        raise HTTPException(status_code=400, detail="No password set on this account. Use 'Forgot password' to set one.")
+
+    if not verify_password(body.current_password, user_doc["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    is_valid, error_msg = validate_password_strength(body.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"password_hash": hash_password(body.new_password)}}
+    )
+
+    # Invalidate all sessions for this user
+    await db.user_sessions.delete_many({"user_id": user_id})
+
+    # Session-hardening: revoke refresh tokens + all outstanding access tokens.
+    await revoke_all_user_refresh_tokens(user_id, reason="password_change")
+    await revoke_all_user_access_tokens(user_id)
+
+    await log_audit_event(user_id, "password_change", "user", user_id, {})
+
+    # Re-issue a fresh access + refresh token pair for the current session so the
+    # user isn't immediately logged out by the access-token revocation above.
+    new_access = create_jwt_token(user_id, user.get("email", ""))
+    new_refresh_raw = await create_refresh_token_record(user_id)
+
+    response.set_cookie(
+        key="session_token",
+        value=new_access,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRATION_MINUTES * 60,
+        path="/"
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_raw,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 3600,
+        path="/auth"
+    )
+
+    return {"message": "Password changed successfully", "token": new_access}
 
 
 

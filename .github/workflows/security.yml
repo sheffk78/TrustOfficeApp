@@ -1,0 +1,74 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  deps:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: pip-audit (backend)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit and scan backend requirements
+        # Starlette vulns (PYSEC-2026-1943/1941/161/2281/2280/249/248) require
+        # FastAPI >= 0.115 / starlette >= 1.x — a framework upgrade with real
+        # regression risk, tracked as a pending_review task. Ignored explicitly
+        # (never silently): re-audit when the upgrade lands.
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit -r backend/requirements.txt --strict --desc off \
+            --ignore-vuln PYSEC-2026-1943 \
+            --ignore-vuln PYSEC-2026-1941 \
+            --ignore-vuln PYSEC-2026-161 \
+            --ignore-vuln PYSEC-2026-2281 \
+            --ignore-vuln PYSEC-2026-2280 \
+            --ignore-vuln PYSEC-2026-249 \
+            --ignore-vuln PYSEC-2026-248 || exit 1
+
+      - name: npm audit (frontend)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: |
+          # Repo has a known peer conflict (date-fns 4 vs react-day-picker peer
+          # ^2||^3) that predates this workflow — install with legacy-peer-deps
+          # (matches the dev setup) so the audit still runs.
+          #
+          # Gate is CRITICAL, not high: 14 remaining highs (postcss, nth-check,
+          # serialize-javascript, underscore) sit in CRA's BUILD-TIME chain, are
+          # not bundled into shipped JS, and have no fixes without a react-scripts
+          # migration (tracked as pending_review). Re-tighten to high after the
+          # frontend migrates off CRA.
+          npm install --no-audit --fund=false --legacy-peer-deps
+          npm audit --audit-level=critical
+
+  tenant-isolation:
+    name: Tenant isolation suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend deps (minimal for tests)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Run tenant-isolation tests ONLY (full suite has pre-existing env failures)
+        working-directory: backend
+        env:
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: trustoffice_ci
+          JWT_SECRET: ci-only-not-a-real-secret
+          CORS_ORIGINS: https://app.trustoffice.app
+        run: python -m pytest tests/test_tenant_isolation.py -q
