@@ -2,11 +2,33 @@
 from fastapi import APIRouter, Depends, Response
 from datetime import datetime, timezone
 from typing import Optional
+import logging
 
 from database import db
 from dependencies import get_current_user, get_task_status
+from services.security_events import record_security_event, alert_security_event
 
 router = APIRouter(tags=["exports"])
+
+
+async def _record_bulk_export(user_id: str, export_type: str, record_count: int) -> None:
+    """Record a bulk export security event and fire an alert if over threshold.
+
+    Best-effort: failures are swallowed so they never break the export response.
+    """
+    try:
+        await record_security_event(
+            user_id, "bulk_export",
+            details={"export_type": export_type, "record_count": record_count},
+        )
+        await alert_security_event(
+            "bulk_export", user_id=user_id,
+            count=record_count,
+            details={"export_type": export_type},
+        )
+    except Exception as exc:
+        logging.warning(f"Security event logging for bulk_export failed (non-fatal): {exc}")
+
 
 
 # ==================== CSV EXPORT ENDPOINTS (Premium Feature) ====================
@@ -41,7 +63,10 @@ async def export_minutes_csv(
         csv_lines.append(f'"{trust_name}","{minutes_type}","{meeting_date}","{participants}","{decisions}","{created_at}"')
     
     csv_content = "\n".join(csv_lines)
-    
+
+    # Security event logging for bulk export (best-effort)
+    await _record_bulk_export(user["user_id"], "minutes", len(minutes))
+
     return Response(
         content=csv_content,
         media_type="text/csv",
@@ -84,6 +109,9 @@ async def export_distributions_csv(
     
     csv_content = "\n".join(csv_lines)
     
+    # Security event logging for bulk export (best-effort)
+    await _record_bulk_export(user["user_id"], "distributions", len(dists))
+
     return Response(
         content=csv_content,
         media_type="text/csv",
@@ -122,6 +150,9 @@ async def export_compensation_csv(
     
     csv_content = "\n".join(csv_lines)
     
+    # Security event logging for bulk export (best-effort)
+    await _record_bulk_export(user["user_id"], "compensation", len(payments))
+
     return Response(
         content=csv_content,
         media_type="text/csv",
@@ -160,6 +191,9 @@ async def export_tasks_csv(
     
     csv_content = "\n".join(csv_lines)
     
+    # Security event logging for bulk export (best-effort)
+    await _record_bulk_export(user["user_id"], "tasks", len(tasks))
+
     return Response(
         content=csv_content,
         media_type="text/csv",
@@ -199,6 +233,9 @@ async def export_expenses_csv(
     
     csv_content = "\n".join(csv_lines)
     
+    # Security event logging for bulk export (best-effort)
+    await _record_bulk_export(user["user_id"], "expenses", len(expenses))
+
     return Response(
         content=csv_content,
         media_type="text/csv",
