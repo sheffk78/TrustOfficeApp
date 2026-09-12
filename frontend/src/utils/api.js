@@ -107,7 +107,7 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
       const retry = await doFetch();
       if (retry.status !== 401) return retry;
     } catch (_e) {
-      // refresh failed â fall through to session-expired handling
+      // refresh failed — fall through to session-expired handling
     }
     // Refresh failed or retry still 401: clear session and redirect to login.
     if (hadToken || localStorage.getItem('auth_token')) {

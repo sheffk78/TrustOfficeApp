@@ -9,7 +9,7 @@ Covers:
      refresh tokens + records a security event.
   5. Revoke-on-password-change: old refresh tokens + outstanding access tokens gone.
 
-Pure-unit / in-process FastAPI TestClient with a FakeDB â never hits a real
+Pure-unit / in-process FastAPI TestClient with a FakeDB — never hits a real
 MongoDB, never hits prod. Run:
   python3 -m pytest backend/tests/test_session_hardening.py -q
 """
@@ -24,7 +24,7 @@ import pytest
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
-# database.py / dependencies.py read these at import time â set dummies first.
+# database.py / dependencies.py read these at import time — set dummies first.
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "trustoffice_test")
 os.environ.setdefault("JWT_SECRET", "test-secret-session-hardening")
@@ -137,7 +137,7 @@ def fake_db(monkeypatch):
     monkeypatch.setattr(database, "db", db)
     monkeypatch.setattr(dependencies, "db", db)
 
-    # Audit logging writes to db.audit_logs (FakeDB) ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ let it run so the
+    # Audit logging writes to db.audit_logs (FakeDB) — let it run so the
     # reuse-detection security event is observable in the test.
     import routers.auth as auth_router
     import utils.audit as audit
