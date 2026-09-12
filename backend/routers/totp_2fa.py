@@ -30,12 +30,17 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from database import db
+import jwt
+
 from dependencies import (
     ACCESS_TOKEN_EXPIRATION_MINUTES,
     REFRESH_TOKEN_EXPIRATION_DAYS,
+    JWT_ALGORITHM,
+    JWT_SECRET,
     create_jwt_token,
     create_refresh_token_record,
     get_current_user,
+    record_session_for_token,
     verify_password,
 )
 from services.security_events import check_security_alert, record_security_event
@@ -300,6 +305,15 @@ async def login_2fa(request: Request, body: TwoFactorLoginRequest, response: Res
         # Recovery-code use is a security event (lost-device path in action).
         await _sec_event(user_doc["user_id"], "2fa_recovery_code_used", request)
         await log_audit_event(user_doc["user_id"], "2fa_recovery_code_used", "user", user_doc["user_id"], {})
+
+    # FEATURE 5 item 2: track this session (device/IP/last-seen) by its jti —
+    # same as POST /auth/login. Without this, every 2FA login is invisible on
+    # the Devices & sessions card.
+    try:
+        token_payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+        await record_session_for_token(user_doc["user_id"], token_payload.get("jti"), request, email=user_doc.get("email"))
+    except Exception as sess_exc:  # pragma: no cover - non-fatal
+        logger.warning(f"Session tracking on 2FA login failed (non-fatal): {sess_exc}")
 
     # Access token cookie (30-min, httponly)
     response.set_cookie(
