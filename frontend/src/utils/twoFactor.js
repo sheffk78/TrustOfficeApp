@@ -20,6 +20,32 @@ import { fetchWithAuth } from './api';
 export const is2faChallenge = (payload) =>
   Boolean(payload && payload.detail === '2fa_required' && payload.challenge_token);
 
+// Named predicate: did the API reject this request with a 2FA rate-limit (429)?
+// Contract: {detail:'2fa_rate_limited', retry_after, message}.
+export const is2faRateLimited = (body) =>
+  Boolean(body && (body.detail === '2fa_rate_limited' || body.detail === '2fa_rate_limited'));
+
+// Pull the rate-limit message from a rejected error, preferring the backend's
+// `message` field. Returns null when the error is not a 2FA rate-limit.
+export const get2faRateLimitMessage = (err) => {
+  if (!err) return null;
+  const body = err?.body || err?.payload || err;
+  if (body && body.detail === '2fa_rate_limited') {
+    return body.message || null;
+  }
+  return null;
+};
+
+// Extract the backend's attempts_remaining from an invalid-code error body.
+export const get2faAttemptsRemaining = (err) => {
+  if (!err) return null;
+  const body = err?.body || err?.payload || err;
+  if (body && typeof body.attempts_remaining === 'number') {
+    return body.attempts_remaining;
+  }
+  return null;
+};
+
 // Named predicate: did the API reject this request with a step-up requirement?
 // detail may be the bare string '2fa_stepup_required' or a FastAPI-style
 // object { msg: '2fa_stepup_required' } depending on the error path.
@@ -63,7 +89,9 @@ export const verify2fa = async (code) => {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Verification failed (${response.status})`);
+    const err = new Error(body.detail || `Verification failed (${response.status})`);
+    err.body = body; // surfaced to callers for rate-limit/attempts inspection
+    throw err;
   }
   return response.json();
 };
@@ -91,7 +119,9 @@ export const login2fa = async (challengeToken, code) => {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(body.detail || `Verification failed (${response.status})`);
+    const err = new Error(body.detail || `Verification failed (${response.status})`);
+    err.body = body; // surfaced to callers for rate-limit/attempts inspection
+    throw err;
   }
   return body;
 };

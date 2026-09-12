@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react';
 import { useDashboardData } from './dashboard/useDashboardData';
 import { DashboardBanners } from './dashboard/DashboardBanners';
 import { get2faStatus } from '@/utils/twoFactor';
+import { useTwoFactorEnrollmentNag } from '@/hooks/use2faEnrollmentNag';
 import { DashboardWpWelcome } from './dashboard/DashboardWpWelcome';
 import { DashboardNextActionHero } from './dashboard/DashboardNextActionHero';
 import { DashboardOnboardingChecklist } from './dashboard/DashboardOnboardingChecklist';
@@ -88,6 +89,11 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [user?.needs_2fa_enrollment, user?.user_id]);
 
+  // Enrollment nag: shown to EVERY non-enrolled user (admins who are enforced
+  // already get the persistent admin nag above, which keeps priority).
+  const { visible: enrollmentNagVisible, dismiss: dismissEnrollmentNag } =
+    useTwoFactorEnrollmentNag(twoFaBannerVisible);
+
   // Progressive disclosure gate — recommendation sections (Today's Focus,
   // Weekly Briefing, Tax Calendar) are noise for new users who haven't
   // finished Getting Started. They only appear once onboarding is complete
@@ -150,6 +156,8 @@ export default function DashboardPage() {
         <DashboardBanners
           wpBannerVisible={wpBannerVisible}
           twoFaBannerVisible={twoFaBannerVisible}
+          enrollmentNagVisible={enrollmentNagVisible}
+          onEnrollmentNagDismiss={dismissEnrollmentNag}
         />
 
         <div className="page-container">

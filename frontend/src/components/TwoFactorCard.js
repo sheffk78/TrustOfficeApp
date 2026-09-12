@@ -20,7 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { showError } from '@/utils/errors';
-import { get2faStatus, enroll2fa, verify2fa, disable2fa } from '@/utils/twoFactor';
+import { get2faStatus, enroll2fa, verify2fa, disable2fa, get2faRateLimitMessage, get2faAttemptsRemaining } from '@/utils/twoFactor';
+import { use2faLockout, formatLockout } from '@/hooks/use2faLockout';
 import {
   Shield, Copy, Check, Loader2, AlertCircle, KeyRound, Printer, Download,
 } from 'lucide-react';
@@ -47,6 +48,8 @@ export default function TwoFactorCard() {
   const [provisioningUri, setProvisioningUri] = useState('');
   const [code, setCode] = useState('');
   const [verifyError, setVerifyError] = useState('');
+  const [verifyAttemptsLeft, setVerifyAttemptsLeft] = useState(null);
+  const verifyLockout = use2faLockout();
   const [recoveryCodes, setRecoveryCodes] = useState([]);
 
   // Disable flow state
@@ -124,6 +127,7 @@ export default function TwoFactorCard() {
       return;
     }
     setVerifyError('');
+    setVerifyAttemptsLeft(null);
     try {
       const data = await verify2fa(trimmed);
       setRecoveryCodes(data.recovery_codes || []);
@@ -131,7 +135,16 @@ export default function TwoFactorCard() {
     } catch (err) {
       // Wrong code or transient failure: keep the QR on screen, show inline
       // error, let the user retry with a fresh code.
-      setVerifyError(err?.message || 'That code was not valid. Please try again.');
+      const rateMsg = get2faRateLimitMessage(err);
+      const attemptsLeft = get2faAttemptsRemaining(err);
+      if (rateMsg) {
+        const retryAfter = Number(err?.body?.retry_after || err?.payload?.retry_after || 0);
+        verifyLockout.trigger(retryAfter);
+        setVerifyError(rateMsg);
+      } else {
+        setVerifyError(err?.message || 'That code was not valid. Please try again.');
+      }
+      setVerifyAttemptsLeft(attemptsLeft);
     }
   };
 
@@ -372,8 +385,18 @@ export default function TwoFactorCard() {
               {verifyError && (
                 <p className="text-xs text-error" data-testid="twofa-verify-error" role="alert">{verifyError}</p>
               )}
+              {verifyLockout.active && (
+                <p className="text-xs text-navy mt-2" data-testid="twofa-verify-countdown" role="status">
+                  You can try again in {formatLockout(verifyLockout.secondsLeft)}
+                </p>
+              )}
+              {verifyAttemptsLeft != null && (
+                <p className="text-xs text-muted-foreground mt-2" data-testid="twofa-verify-attempts-left">
+                  {verifyAttemptsLeft} attempts left before a short cooldown
+                </p>
+              )}
               <div>
-                <Button type="submit" data-testid="twofa-verify-btn">Verify and Enable</Button>
+                <Button type="submit" data-testid="twofa-verify-btn" disabled={verifyLockout.active}>Verify and Enable</Button>
               </div>
             </form>
           </div>

@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { showError, reportErrorToBackend } from '@/utils/errors';
-import { is2faChallenge, login2fa } from '@/utils/twoFactor';
+import { is2faChallenge, login2fa, get2faRateLimitMessage, get2faAttemptsRemaining } from '@/utils/twoFactor';
+import { use2faLockout, formatLockout } from '@/hooks/use2faLockout';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, X, Shield } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -86,6 +87,8 @@ export default function LoginPage() {
   const [challengeToken, setChallengeToken] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorError, setTwoFactorError] = useState('');
+  const [twoFactorAttemptsLeft, setTwoFactorAttemptsLeft] = useState(null);
+  const lockout = use2faLockout();
 
   // Redirect if already logged in -- use wp-aware routing so params are preserved
   useEffect(() => {
@@ -260,19 +263,30 @@ export default function LoginPage() {
     }
     setLoading(true);
     setTwoFactorError('');
+    setTwoFactorAttemptsLeft(null);
     try {
       const data = await login2fa(challengeToken, trimmed);
       setTwoFactorCode('');
+      lockout.clear();
+      setTwoFactorAttemptsLeft(null);
       await completeLogin(data);
     } catch (error) {
       const rawMsg = error.message || 'Verification failed';
+      const rateMsg = get2faRateLimitMessage(error);
+      const attemptsLeft = get2faAttemptsRemaining(error);
       let friendlyMsg = rawMsg;
-      if (rawMsg.includes('Network error')) {
+      if (rateMsg) {
+        // Backend rate-limit: show its message verbatim and start the countdown.
+        const retryAfter = Number(error?.body?.retry_after || error?.payload?.retry_after || 0);
+        lockout.trigger(retryAfter);
+        friendlyMsg = rateMsg;
+      } else if (rawMsg.includes('Network error')) {
         friendlyMsg = 'Unable to connect to the server. Please check your internet connection and try again.';
       } else if (rawMsg.includes('401') || rawMsg.toLowerCase().includes('invalid') || rawMsg.toLowerCase().includes('expired')) {
         friendlyMsg = 'That code was not valid or has expired. Please check your authenticator app and try again.';
       }
       setTwoFactorError(friendlyMsg);
+      setTwoFactorAttemptsLeft(attemptsLeft);
     } finally {
       setLoading(false);
     }
@@ -339,6 +353,14 @@ export default function LoginPage() {
                         </div>
                       </div>
                     )}
+                    {lockout.active && (
+                      <div className="p-3 bg-navy/5 border border-navy/20 flex items-center gap-2" data-testid="twofa-login-countdown" role="status">
+                        <AlertCircle className="w-4 h-4 text-navy flex-shrink-0" />
+                        <p className="text-sm text-navy">
+                          You can try again in {formatLockout(lockout.secondsLeft)}
+                        </p>
+                      </div>
+                    )}
                     <div className="flex items-start gap-3 p-3 bg-navy/5">
                       <Shield className="w-4 h-4 text-navy mt-0.5 flex-shrink-0" />
                       <p className="text-sm text-navy">
@@ -363,12 +385,18 @@ export default function LoginPage() {
                         className="input-trust mt-1 tracking-widest text-center text-lg"
                         aria-label="6-digit authentication code or recovery code"
                         data-testid="twofa-login-code-input"
+                        disabled={lockout.active}
                       />
                     </div>
+                    {twoFactorAttemptsLeft != null && (
+                      <p className="text-xs text-muted-foreground" data-testid="twofa-login-attempts-left">
+                        {twoFactorAttemptsLeft} attempts left before a short cooldown
+                      </p>
+                    )}
                     <Button
                       type="submit"
                       className="w-full btn-primary h-12"
-                      disabled={loading}
+                      disabled={loading || lockout.active}
                       data-testid="twofa-login-submit-btn"
                     >
                       {loading ? 'Verifying...' : 'Verify Code'}

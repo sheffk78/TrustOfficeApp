@@ -20,6 +20,12 @@ import '@testing-library/jest-dom';
 import { is2faChallenge, isStepUpRequired } from '../utils/twoFactor';
 import TwoFactorStepUpModal from '../components/TwoFactorStepUpModal';
 import TwoFactorCard from '../components/TwoFactorCard';
+import { formatLockout, use2faLockout } from '../hooks/use2faLockout';
+import { shouldShowEnrollmentNag } from '../hooks/use2faEnrollmentNag';
+
+// userEvent must drive Jest's fake timers when a test calls jest.useFakeTimers().
+const setupUser = () =>
+  userEvent.setup({ advanceTimers: (ms) => jest.advanceTimersByTime(ms) });
 
 // ---------------------------------------------------------------------------
 // fetch mock plumbing
@@ -480,5 +486,290 @@ describe('admin 2FA nag banner', () => {
   test('enabled accounts never see the nag', () => {
     renderBanners({ status: { enabled: true, recovery_codes_remaining: 5, enforced: true } });
     expect(screen.queryByTestId('twofa-admin-nag-banner')).not.toBeInTheDocument();
+  });
+});
+
+// ===========================================================================
+// 5. Enrollment nag banner (every non-enrolled user, dismissible)
+// ===========================================================================
+
+describe('enrollment 2FA nag banner', () => {
+  const renderEnrollmentBanners = (props) => render(<EnrollmentHarness {...props} />);
+
+  // Real hook driving the real DashboardBanners banner. The hook imports
+  // get2faStatus via the '@/utils/twoFactor' alias; we spy on that alias entry
+  // and seed its resolved value per test. Use spyOn (not jest.mock) so the rest
+  // of the module's real exports stay intact for siblings that import it.
+  const EnrollmentHarness = ({ status, adminNagShown }) => {
+    const { DashboardBanners } = require('../pages/dashboard/DashboardBanners');
+    const { useTwoFactorEnrollmentNag } = require('../hooks/use2faEnrollmentNag');
+    const twoFactor = require('@/utils/twoFactor');
+    twoFactor.get2faStatus.mockResolvedValue(
+      status || { enabled: false, recovery_codes_remaining: 0, enforced: false }
+    );
+    const RealNag = () => {
+      const { visible, dismiss } = useTwoFactorEnrollmentNag(Boolean(adminNagShown));
+      return (
+        <DashboardBanners
+          wpBannerVisible={false}
+          twoFaBannerVisible={Boolean(adminNagShown)}
+          enrollmentNagVisible={visible}
+          onEnrollmentNagDismiss={dismiss}
+        />
+      );
+    };
+    return <RealNag />;
+  };
+
+  beforeEach(() => {
+    const twoFactor = require('@/utils/twoFactor');
+    jest.spyOn(twoFactor, 'get2faStatus').mockResolvedValue({ enabled: false, recovery_codes_remaining: 0, enforced: false });
+  });
+  afterEach(() => {
+    const twoFactor = require('@/utils/twoFactor');
+    if (twoFactor.get2faStatus.mockRestore) twoFactor.get2faStatus.mockRestore();
+  });
+
+  test('renders for a non-enrolled user with Enable now + Settings link', async () => {
+    renderEnrollmentBanners({ status: { enabled: false, recovery_codes_remaining: 0, enforced: false } });
+    expect(await screen.findByTestId('twofa-enrollment-nag-banner')).toBeInTheDocument();
+    expect(screen.getByText(/New: add two-factor authentication to your account/i)).toBeInTheDocument();
+    const link = screen.getByTestId('twofa-enrollment-nag-settings-link');
+    expect(link).toHaveAttribute('href', '/settings');
+    expect(link).toHaveTextContent('Enable now');
+  });
+
+  test('hides for an enrolled user', () => {
+    renderEnrollmentBanners({ status: { enabled: true, recovery_codes_remaining: 5, enforced: true } });
+    expect(screen.queryByTestId('twofa-enrollment-nag-banner')).not.toBeInTheDocument();
+  });
+
+  test('hides immediately after dismiss (X) within the session', async () => {
+    // Real hook + mocked status fetch (disabled). Dismiss writes to
+    // localStorage and flips the in-session flag.
+    const status = { enabled: false, recovery_codes_remaining: 0, enforced: false };
+    renderEnrollmentBanners({ status });
+    const banner = await screen.findByTestId('twofa-enrollment-nag-banner');
+    expect(banner).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('twofa-enrollment-nag-dismiss'));
+    expect(screen.queryByTestId('twofa-enrollment-nag-banner')).not.toBeInTheDocument();
+  });
+
+  test('resurfaces once after the 7-day dismissal window elapses', async () => {
+    // Seed a dismissal that happened 8 days ago -> past the 7-day window, so
+    // the nag should resurface even though it was previously dismissed.
+    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+    const dismissedAt = Date.now() - eightDaysMs;
+    localStorage.setItem('twofa_nag_dismissed_at', String(dismissedAt));
+    const status = { enabled: false, recovery_codes_remaining: 0, enforced: false };
+    renderEnrollmentBanners({ status });
+    expect(await screen.findByTestId('twofa-enrollment-nag-banner')).toBeInTheDocument();
+    expect(localStorage.getItem('twofa_nag_dismissed_at')).toBe(String(dismissedAt));
+  });
+
+  test('admin enforcement nag keeps priority - only one 2FA banner shows', () => {
+    renderEnrollmentBanners({
+      status: { enabled: false, recovery_codes_remaining: 0, enforced: true },
+      adminNagShown: true,
+    });
+    expect(screen.getByTestId('twofa-admin-nag-banner')).toBeInTheDocument();
+    expect(screen.queryByTestId('twofa-enrollment-nag-banner')).not.toBeInTheDocument();
+  });
+});
+
+// ===========================================================================
+// 6. Rate-limit (429) lockout countdown + attempts_remaining
+// ===========================================================================
+
+describe('2FA lockout countdown (429 2fa_rate_limited)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const rateLimitedError = (retryAfter, message) => {
+    const body = { detail: '2fa_rate_limited', retry_after: retryAfter, message };
+    const err = new Error(message);
+    err.body = body;
+    return err;
+  };
+
+  test('login second step: 429 shows countdown, disables submit, re-enables at zero', async () => {
+    const user = setupUser();
+    const xhrMock = (status, body) => {
+      class FakeXHR {
+        open() {}
+        setRequestHeader() {}
+        send() {
+          this.readyState = 4;
+          this.status = status;
+          this.responseText = JSON.stringify(body);
+          if (this.onreadystatechange) this.onreadystatechange();
+        }
+      }
+      return FakeXHR;
+    };
+    global.XMLHttpRequest = xhrMock(401, { detail: '2fa_required', challenge_token: 'ch-lock' });
+
+    const { default: LoginPage } = await import('../pages/LoginPage');
+    render(<LoginPage />);
+    await user.type(screen.getByTestId('email-input'), 'a@b.com');
+    await user.type(screen.getByTestId('password-input'), 'pw');
+    await user.click(screen.getByTestId('login-submit-btn'));
+    await screen.findByTestId('twofa-login-step');
+
+    // 429 with a 4:32 (272s) cooldown
+    fetchMock.mockImplementationOnce(() =>
+      Promise.reject(rateLimitedError(272, 'Too many attempts. Wait before trying again.')));
+    await user.type(screen.getByTestId('twofa-login-code-input'), '111111');
+    await user.click(screen.getByTestId('twofa-login-submit-btn'));
+
+    // Flush the rejected promise microtasks.
+    await act(async () => { await Promise.resolve(); });
+    await waitFor(() => {
+      expect(screen.getByTestId('twofa-login-countdown')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('twofa-login-countdown')).toHaveTextContent('You can try again in 4:32');
+    expect(screen.getByTestId('twofa-login-submit-btn')).toBeDisabled();
+
+    // Advance timers to just before expiry -> still disabled.
+    await act(async () => { jest.advanceTimersByTime(271_000); });
+    expect(screen.getByTestId('twofa-login-submit-btn')).toBeDisabled();
+    expect(screen.getByTestId('twofa-login-countdown')).toHaveTextContent('You can try again in 1s');
+
+    // Reach zero -> re-enabled and countdown gone.
+    await act(async () => { jest.advanceTimersByTime(2_000); });
+    expect(screen.getByTestId('twofa-login-submit-btn')).not.toBeDisabled();
+    expect(screen.queryByTestId('twofa-login-countdown')).not.toBeInTheDocument();
+  });
+
+  test('login second step: invalid code with attempts_remaining shows the count', async () => {
+    const user = setupUser();
+    const xhrMock = (status, body) => {
+      class FakeXHR {
+        open() {}
+        setRequestHeader() {}
+        send() {
+          this.readyState = 4;
+          this.status = status;
+          this.responseText = JSON.stringify(body);
+          if (this.onreadystatechange) this.onreadystatechange();
+        }
+      }
+      return FakeXHR;
+    };
+    global.XMLHttpRequest = xhrMock(401, { detail: '2fa_required', challenge_token: 'ch-att' });
+
+    const { default: LoginPage } = await import('../pages/LoginPage');
+    render(<LoginPage />);
+    await user.type(screen.getByTestId('email-input'), 'a@b.com');
+    await user.type(screen.getByTestId('password-input'), 'pw');
+    await user.click(screen.getByTestId('login-submit-btn'));
+    await screen.findByTestId('twofa-login-step');
+
+    // 400 invalid code carrying attempts_remaining
+    const body = { detail: 'Invalid verification code', attempts_remaining: 3 };
+    const err = new Error(body.detail);
+    err.body = body;
+    fetchMock.mockImplementationOnce(() => Promise.reject(err));
+    await user.type(screen.getByTestId('twofa-login-code-input'), '222222');
+    await user.click(screen.getByTestId('twofa-login-submit-btn'));
+
+    await act(async () => { await Promise.resolve(); });
+    await waitFor(() => {
+      expect(screen.getByTestId('twofa-login-attempts-left')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('twofa-login-attempts-left')).toHaveTextContent('3 attempts left before a short cooldown');
+    expect(screen.getByTestId('twofa-login-submit-btn')).not.toBeDisabled();
+  });
+
+  test('step-up modal: 429 shows its message + countdown, disables Verify', async () => {
+    const user = setupUser();
+    render(<TwoFactorStepUpModal open onSubmit={() => Promise.reject(rateLimitedError(45, 'Rate limited. Please wait.'))} onCancel={() => {}} />);
+    await user.type(screen.getByTestId('stepup-code-input'), '135790');
+    await user.click(screen.getByTestId('stepup-submit-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stepup-countdown')).toBeInTheDocument();
+    });
+    // <= 60s -> plain seconds format ("45s")
+    expect(screen.getByTestId('stepup-countdown')).toHaveTextContent('You can try again in 45s');
+    expect(screen.getByTestId('stepup-submit-btn')).toBeDisabled();
+
+    await act(async () => { jest.advanceTimersByTime(46_000); });
+    expect(screen.getByTestId('stepup-submit-btn')).not.toBeDisabled();
+    expect(screen.queryByTestId('stepup-countdown')).not.toBeInTheDocument();
+  });
+
+  test('TwoFactorCard verify step: 429 shows countdown and disables Verify and Enable', async () => {
+    const user = setupUser();
+    // initial GET /auth/2fa/status -> disabled, then enroll + verify attempt 429
+    fetchMock.mockImplementationOnce(() => Promise.resolve(jsonResponse(200, STATUS_DISABLED)));
+    renderCard();
+    await screen.findByTestId('twofa-card');
+    await screen.findByText('Not Enabled');
+
+    await user.click(screen.getByTestId('twofa-enable-btn'));
+    await screen.findByTestId('twofa-password-step');
+    await user.type(screen.getByTestId('twofa-enroll-password-input'), 'hunter2');
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve(jsonResponse(200, { secret: 'JBSWY3DPEHPK3PXP', provisioning_uri: 'otpauth://totp/x?secret=JBSWY3DPEHPK3PXP' })));
+    await user.click(screen.getByTestId('twofa-enroll-start-btn'));
+    await screen.findByTestId('twofa-qr-step');
+
+    fetchMock.mockImplementationOnce(() => Promise.reject(rateLimitedError(120, 'Locked out briefly.')));
+    await user.type(screen.getByTestId('twofa-verify-code-input'), '123456');
+    await user.click(screen.getByTestId('twofa-verify-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('twofa-verify-countdown')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('twofa-verify-countdown')).toHaveTextContent('You can try again in 2:00');
+    expect(screen.getByTestId('twofa-verify-btn')).toBeDisabled();
+
+    await act(async () => { jest.advanceTimersByTime(121_000); });
+    expect(screen.getByTestId('twofa-verify-btn')).not.toBeDisabled();
+    expect(screen.queryByTestId('twofa-verify-countdown')).not.toBeInTheDocument();
+  });
+});
+
+// ===========================================================================
+// 7. Lockout helpers + enrollment-nag predicate (pure, no timers)
+// ===========================================================================
+
+describe('lockout helpers', () => {
+  test('formatLockout renders plain seconds under a minute', () => {
+    expect(formatLockout(45)).toBe('45s');
+    expect(formatLockout(0)).toBe('0s');
+    expect(formatLockout(60)).toBe('60s');
+  });
+  test('formatLockout renders m:ss above a minute', () => {
+    expect(formatLockout(61)).toBe('1:01');
+    expect(formatLockout(272)).toBe('4:32');
+    expect(formatLockout(600)).toBe('10:00');
+  });
+});
+
+describe('shouldShowEnrollmentNag predicate', () => {
+  const base = { enabled: false, enforced: false, dismissedAt: null, now: 1_000, sessionDismissed: false, adminNagShown: false };
+
+  test('shows to a non-enrolled user with no prior dismissal', () => {
+    expect(shouldShowEnrollmentNag(base)).toBe(true);
+  });
+  test('never shows to an enrolled user', () => {
+    expect(shouldShowEnrollmentNag({ ...base, enabled: true })).toBe(false);
+  });
+  test('hidden right after dismissal, resurfaces past 7 days', () => {
+    const dismissedAt = 0;
+    expect(shouldShowEnrollmentNag({ ...base, dismissedAt, now: 6 * 86400 * 1000 })).toBe(false);
+    expect(shouldShowEnrollmentNag({ ...base, dismissedAt, now: 8 * 86400 * 1000 })).toBe(true);
+  });
+  test('never twice in one session', () => {
+    expect(shouldShowEnrollmentNag({ ...base, sessionDismissed: true })).toBe(false);
+  });
+  test('admin nag keeps priority', () => {
+    expect(shouldShowEnrollmentNag({ ...base, adminNagShown: true })).toBe(false);
   });
 });
