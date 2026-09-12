@@ -50,7 +50,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TRUST_PROTECTOR_POWERS } from './trustProtectorPowers';
 import { formatEIN } from '@/utils/formatters';
-import { DevicesSessionsCard } from '@/components/DevicesSessionsCard';
+import DevicesSessionsCard from '@/components/DevicesSessionsCard';
 import TwoFactorCard from '@/components/TwoFactorCard';
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
