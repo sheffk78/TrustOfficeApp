@@ -158,6 +158,8 @@ def fake_db(monkeypatch):
     monkeypatch.setattr(database, "db", db)
     monkeypatch.setattr(dependencies, "db", db)
     monkeypatch.setattr(auth_router, "db", db)
+    import routers.totp_2fa as _totp_router
+    monkeypatch.setattr(_totp_router, "db", db)
     monkeypatch.setattr(audit, "db", db)
 
     # Seed two known users (tenant isolation test).
@@ -185,6 +187,8 @@ def _make_client(fake_db, user_id, email):
 
     app = FastAPI()
     app.include_router(auth_router.router, prefix="/api")
+    import routers.totp_2fa as totp_router
+    app.include_router(totp_router.router, prefix="/api")
     app.dependency_overrides[dependencies.get_current_user] = fake_get_current_user
     return TestClient(app)
 
@@ -456,3 +460,62 @@ def test_heartbeat_middleware_updates_last_seen(fake_db, client_a):
 
     after = asyncio.run(fake_db.user_sessions.find_one({"user_id": "user_a", "jti": current_jti}))
     assert after["last_seen_at"] > (now - timedelta(minutes=10)).isoformat()
+
+
+def test_2fa_login_records_session(client_a, fake_db):
+    """Regression (Sep 12 2026): the 2FA login step must record a session row.
+
+    The Devices & sessions card showed 'No active sessions found' forever for
+    2FA users: login_2fa never called record_session_for_token, and in
+    production a stale unique index on session_token rejected every write.
+    """
+    import asyncio
+    import base64, json as jsonlib
+    import services.totp_service as totps
+
+    # Cross-test pollution guard: clear module-level failure/rate-limit state.
+    totps._totp_failures.clear()
+
+    # Seed 2FA state directly on the user doc (same shape the enroll path sets).
+    secret = totps.pyotp.random_base32()
+    u = asyncio.run(fake_db.users.find_one({"user_id": "user_a"}))
+    u["totp"] = {
+        "enabled": True,
+        "secret": secret,
+        "recovery_codes": [{"code_hash": "x", "used_at": None, "used_ip": None}],
+    }
+    fake_db.users.docs = [d for d in fake_db.users.docs if d["user_id"] != "user_a"] + [u]
+
+    # get_current_user override must return the doc WITH totp state (login_2fa
+    # reads state from it) — fetch fresh at call time.
+    import dependencies
+    def fake_user():
+        return asyncio.run(fake_db.users.find_one({"user_id": "user_a"}))
+    client_a.app.dependency_overrides[dependencies.get_current_user] = fake_user
+
+    # Password step -> 401 with flat challenge body (header + body parity)
+    r = client_a.post(
+        "/api/auth/login",
+        json={"email": "a@trustoffice.app", "password": "CurrentPass123"},
+        headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0 Safari/537.36"},
+    )
+    assert r.status_code == 401
+    body = r.json()
+    assert body["detail"] == "2fa_required"
+    challenge = body["challenge_token"]
+    assert challenge == r.headers["X-2FA-Challenge-Token"]
+
+    # Complete 2FA login -> session row must exist for the NEW token's jti
+    code = totps.pyotp.TOTP(secret).now()
+    fin = client_a.post(
+        "/api/auth/2fa/login",
+        json={"challenge_token": challenge, "code": code},
+        headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0 Safari/537.36"},
+    )
+    assert fin.status_code == 200, fin.text
+    tok = fin.json()["token"]
+    payload = jsonlib.loads(base64.urlsafe_b64decode(tok.split(".")[1] + "=="))
+    sess = asyncio.run(fake_db.user_sessions.find_one({"user_id": "user_a", "jti": payload["jti"]}))
+    assert sess is not None, "2FA login must record a session row (Devices & sessions card)"
+    assert sess["revoked"] is False
+
