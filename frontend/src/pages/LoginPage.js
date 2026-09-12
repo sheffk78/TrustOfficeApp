@@ -19,7 +19,7 @@ const xhrPost = (url, data) => {
     const send = () => {
       let failureHandled = false;
       // Status 0 / onerror = network-level failure (connection drop,
-      // transient DNS/CORS hiccup, ad-blocker). Often transient — retry once.
+      // transient DNS/CORS hiccup, ad-blocker). Often transient -- retry once.
       // Browsers fire BOTH onerror and a final readystatechange(status 0)
       // for one failure, so only handle the first signal.
       const retryOrFail = (detail) => {
@@ -87,7 +87,7 @@ export default function LoginPage() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorError, setTwoFactorError] = useState('');
 
-  // Redirect if already logged in — use wp-aware routing so params are preserved
+  // Redirect if already logged in -- use wp-aware routing so params are preserved
   useEffect(() => {
     if (!user) return;
     const wp = searchParams.get('wp');
@@ -194,7 +194,7 @@ export default function LoginPage() {
       if (is2faChallenge(data)) {
         // Password accepted; backend wants the TOTP (or recovery) code next.
         // NOTE: xhrPost rejects on non-2xx, so reaching here means the backend
-        // answered 200 with a challenge payload (defensive — the primary
+        // answered 200 with a challenge payload (defensive -- the primary
         // detection for 401 bodies happens in the catch below).
         setChallengeToken(data.challenge_token);
         setTwoFactorStage(true);
@@ -238,7 +238,7 @@ export default function LoginPage() {
       }
       setLoginError(friendlyMsg);
       toast.error(friendlyMsg);
-      // Report login errors to backend (except invalid credentials — too noisy)
+      // Report login errors to backend (except invalid credentials -- too noisy)
       if (!rawMsg.includes('401') && !rawMsg.toLowerCase().includes('invalid credentials')) {
         reportErrorToBackend(error, { operation: 'login', page: 'Login' });
       }
@@ -357,7 +357,7 @@ export default function LoginPage() {
                         autoComplete="one-time-code"
                         autoFocus
                         placeholder="123456"
-                        maxLength={9}
+                        maxLength={40}
                         value={twoFactorCode}
                         onChange={(e) => { setTwoFactorCode(e.target.value); if (twoFactorError) setTwoFactorError(''); }}
                         className="input-trust mt-1 tracking-widest text-center text-lg"
@@ -383,7 +383,7 @@ export default function LoginPage() {
                   Sign in to your account
                 </p>
 
-                {/* Session expired banner — when redirected from a 401 mid-session */}
+                {/* Session expired banner -- when redirected from a 401 mid-session */}
                 {searchParams.get('reason') === 'session-expired' && (
                   <div className="mb-6 bg-gold/10 border border-gold/30 rounded-lg p-4 text-navy" data-testid="session-expired-banner">
                     <p className="text-sm">
@@ -392,7 +392,7 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                {/* WingPoint welcome-back banner — only when ?wp=1 present */}
+                {/* WingPoint welcome-back banner -- only when ?wp=1 present */}
                 {searchParams.get('wp') === '1' && (
                   <div className="mb-6 bg-gold/10 border border-gold/30 rounded-lg p-4 text-navy" data-testid="wp-welcome-banner">
                     <p className="text-sm">

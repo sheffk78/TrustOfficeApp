@@ -5,13 +5,13 @@ import { Sparkles, ShieldAlert } from 'lucide-react';
  * Dashboard-level banners.
  *
  * The subscription upgrade banner ("Your current plan supports N trusts but
- * you have M...") has been REMOVED — all upgrade/subscription/purchase
+ * you have M...") has been REMOVED -- all upgrade/subscription/purchase
  * messaging is now consolidated into the single <UpgradeBar /> rendered at
  * the app root (App.js). This avoids two competing upgrade messages on the
  * dashboard.
  *
  * What remains here is the WingPoint persistent banner, which is NOT an
- * upgrade message — it notifies the user that their WingPoint trust
+ * upgrade message -- it notifies the user that their WingPoint trust
  * documents are ready for review.
  *
  * The 2FA admin nag banner is persistent (non-dismissible): admin accounts
@@ -22,7 +22,7 @@ import { Sparkles, ShieldAlert } from 'lucide-react';
 export function DashboardBanners({ wpBannerVisible, twoFaBannerVisible }) {
   return (
     <>
-      {/* WingPoint persistent banner — shows after welcome modal dismissal */}
+      {/* WingPoint persistent banner -- shows after welcome modal dismissal */}
       {wpBannerVisible && (
         <div
           className="mx-auto max-w-4xl mt-4 mb-2 border border-gold/30 bg-gold/10"

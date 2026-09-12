@@ -133,11 +133,6 @@ const mockStatusOnce = (body) => {
 describe('TwoFactorCard - enroll flow', () => {
   test('happy path: enable -> QR + secret -> verify -> recovery codes shown once', async () => {
     mockStatusOnce(STATUS_DISABLED);            // initial GET /auth/2fa/status
-    fetchMock.mockImplementationOnce(() =>     // POST /auth/2fa/enroll
-      Promise.resolve(jsonResponse(200, {
-        secret: 'JBSWY3DPEHPK3PXP',
-        provisioning_uri: 'otpauth://totp/TrustOffice:admin@trustoffice.app?secret=JBSWY3DPEHPK3PXP&issuer=TrustOffice',
-      })));
 
     renderCard();
     expect(await screen.findByTestId('twofa-card')).toBeInTheDocument();
@@ -198,6 +193,8 @@ describe('TwoFactorCard - enroll flow', () => {
     mockStatusOnce(STATUS_DISABLED);
     renderCard();
     await screen.findByTestId('twofa-card');
+    // Wait for the status to resolve before the Enable button exists.
+    await screen.findByText('Not Enabled');
 
     await userEvent.click(screen.getByTestId('twofa-enable-btn'));
     await screen.findByTestId('twofa-password-step');
@@ -252,16 +249,11 @@ describe('login 2FA second step - challenge detection and exchange', () => {
   };
 
   test('correct code: 401 challenge -> code entry -> session proceeds as normal login', async () => {
-    // First POST /auth/login -> 401 2fa_required challenge
-    fetchMock.mockImplementationOnce(() =>
-      Promise.resolve({
-        ok: false,
-        status: 401,
-        text: () => Promise.resolve(JSON.stringify({
-          detail: '2fa_required',
-          challenge_token: 'ch-tok-1',
-        })),
-      }));
+    // NOTE: the initial POST /auth/login is dispatched via XMLHttpRequest
+    // (LoginPage's xhrPost), NOT fetch -- so the 401 challenge below is served
+    // entirely by the FakeXHR shim and we must NOT register a fetch mock for
+    // it (a dangling fetch mock here would be consumed by the later
+    // /auth/2fa/login fetch and break the flow).
 
     // Mock the XHR used by LoginPage's xhrPost: jsdom XHR cannot hit our
     // fetch mock, so shim XMLHttpRequest per test.
