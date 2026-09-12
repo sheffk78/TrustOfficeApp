@@ -725,6 +725,204 @@ async def revoke_refresh_token_by_hash(token_hash: str, user_id: str) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# User session tracking (device/session manager, FEATURE 5 item 2)
+# ---------------------------------------------------------------------------
+# A "session" is one issued access token (identified by its jti). We keep a
+# lightweight record per jti so the user can see their active devices and
+# remotely sign them out. Sessions expire on a sliding window that is bumped
+# whenever the session is touched (throttled).
+
+SESSION_IDLE_TTL_DAYS = 30  # sliding expiry: refreshed on each throttled touch
+SESSION_TOUCH_THROTTLE_SECONDS = 5 * 60  # at most one last_seen write / 5 min
+
+# In-memory throttle map: jti -> last successful write epoch seconds.
+_session_touch_log: dict = {}
+
+
+def parse_device_label(user_agent: Optional[str]) -> str:
+    """Best-effort human label from a User-Agent, e.g. 'Chrome on macOS'."""
+    if not user_agent:
+        return "Unknown device"
+    ua = user_agent
+
+    # Browser
+    browser = "Unknown browser"
+    if "Edg/" in ua or "Edge/" in ua:
+        browser = "Edge"
+    elif "OPR/" in ua or "Opera" in ua:
+        browser = "Opera"
+    elif "Firefox/" in ua:
+        browser = "Firefox"
+    elif "Chrome/" in ua and "Chromium" not in ua:
+        browser = "Chrome"
+    elif "Chromium" in ua:
+        browser = "Chromium"
+    elif "Safari/" in ua and "Chrome" not in ua:
+        browser = "Safari"
+
+    # OS
+    os_name = "Unknown OS"
+    if "iPhone" in ua or "iPad" in ua or "iPod" in ua:
+        os_name = "iOS"
+    elif "Mac OS X" in ua or "Macintosh" in ua:
+        os_name = "macOS"
+    elif "Windows NT" in ua:
+        os_name = "Windows"
+    elif "Android" in ua:
+        os_name = "Android"
+    elif "Linux" in ua:
+        os_name = "Linux"
+
+    return f"{browser} on {os_name}"
+
+
+def _client_ip_from_request(request: "Request") -> Optional[str]:
+    """Best-effort client IP honoring X-Forwarded-For for proxied requests."""
+    forwarded = request.headers.get("X-Forwarded-For", "") if request else ""
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return request.client.host if (request and request.client) else None
+
+
+async def record_session_for_token(
+    user_id: str, jti: str, request: "Request", email: Optional[str] = None
+) -> None:
+    """Upsert a user_sessions record for a freshly issued access token.
+
+    Stores user_id, jti, device_label (parsed from User-Agent), ip, created_at
+    (insert only), last_seen_at and a sliding expires_at. Never raises -
+    session tracking must not break the auth path.
+    """
+    try:
+        if not jti:
+            return
+        now = datetime.now(timezone.utc)
+        ua = request.headers.get("User-Agent") if request else None
+        ip = _client_ip_from_request(request)
+        device_label = parse_device_label(ua)
+        expires_at = (now + timedelta(days=SESSION_IDLE_TTL_DAYS)).isoformat()
+        await db.user_sessions.update_one(
+            {"user_id": user_id, "jti": jti},
+            {
+                "$set": {
+                    "user_id": user_id,
+                    "jti": jti,
+                    "device_label": device_label,
+                    "ip": ip,
+                    "email": email,
+                    "last_seen_at": now.isoformat(),
+                    "expires_at": expires_at,
+                    "revoked": False,
+                },
+                "$setOnInsert": {
+                    "created_at": now.isoformat(),
+                },
+            },
+            upsert=True,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(f"record_session_for_token failed (non-fatal): {exc}")
+
+
+async def touch_session(user_id: Optional[str], jti: Optional[str], request: "Request") -> None:
+    """Throttled last_seen_at update for an authenticated session.
+
+    Writes at most once per SESSION_TOUCH_THROTTLE_SECONDS per jti to avoid a
+    DB write on every request. Never raises.
+    """
+    try:
+        if not jti or not user_id:
+            return
+        now = datetime.now(timezone.utc)
+        last = _session_touch_log.get(jti)
+        if last is not None and (now.timestamp() - last) < SESSION_TOUCH_THROTTLE_SECONDS:
+            return
+        _session_touch_log[jti] = now.timestamp()
+        expires_at = (now + timedelta(days=SESSION_IDLE_TTL_DAYS)).isoformat()
+        await db.user_sessions.update_one(
+            {"user_id": user_id, "jti": jti, "revoked": False},
+            {"$set": {"last_seen_at": now.isoformat(), "expires_at": expires_at}},
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(f"touch_session failed (non-fatal): {exc}")
+
+
+async def get_active_sessions(user_id: str, current_jti: Optional[str]) -> list:
+    """List active (non-revoked, non-expired) sessions for a user, newest first."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cursor = db.user_sessions.find(
+        {
+            "user_id": user_id,
+            "revoked": False,
+            "expires_at": {"$gt": now_iso},
+        },
+        {"_id": 0},
+    )
+    docs = await cursor.to_list(length=None)
+    sessions = []
+    for d in docs:
+        sessions.append({
+            "jti": d.get("jti"),
+            "device_label": d.get("device_label") or "Unknown device",
+            "ip": d.get("ip"),
+            "created_at": d.get("created_at"),
+            "last_seen_at": d.get("last_seen_at"),
+            "is_current": d.get("jti") == current_jti,
+        })
+    # Most recent first by last_seen_at (fallback created_at)
+    def _sort_key(s):
+        return s.get("last_seen_at") or s.get("created_at") or ""
+    sessions.sort(key=_sort_key, reverse=True)
+    return sessions
+
+
+async def revoke_user_session(user_id: str, jti: str) -> bool:
+    """Revoke a single session by jti. Returns True if a record was revoked."""
+    result = await db.user_sessions.update_one(
+        {"user_id": user_id, "jti": jti, "revoked": False},
+        {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    revoked = getattr(result, "modified_count", 0) or 0
+    if revoked:
+        # Invalidate the outstanding access token too.
+        await db.jwt_revocations.insert_one({
+            "user_id": user_id,
+            "jti": jti,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)).isoformat(),
+        })
+    return bool(revoked)
+
+
+async def revoke_all_other_sessions(user_id: str, current_jti: Optional[str]) -> int:
+    """Revoke every session except the current one. Returns count revoked."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    query = {"user_id": user_id, "revoked": False}
+    if current_jti:
+        query["jti"] = {"$ne": current_jti}
+    others = await db.user_sessions.find(query, {"_id": 0, "jti": 1}).to_list(length=None)
+    count = 0
+    for s in others:
+        jti = s.get("jti")
+        if not jti:
+            continue
+        # Invalidate the outstanding access token.
+        await db.jwt_revocations.insert_one({
+            "user_id": user_id,
+            "jti": jti,
+            "created_at": now_iso,
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)).isoformat(),
+        })
+        count += 1
+    if count:
+        await db.user_sessions.update_many(
+            query,
+            {"$set": {"revoked": True, "revoked_at": now_iso}},
+        )
+    return count
+
+
 async def _check_jwt_revocation(jti: Optional[str], user_id: Optional[str], payload: dict):
     """Check if a JWT has been revoked via jti or user-wide revocation. Raises 401 if revoked."""
     if jti:

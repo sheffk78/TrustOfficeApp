@@ -50,6 +50,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TRUST_PROTECTOR_POWERS } from './trustProtectorPowers';
 import { formatEIN } from '@/utils/formatters';
+import { DevicesSessionsCard } from '@/components/DevicesSessionsCard';
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -2519,18 +2520,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Session management */}
-              <div className="flex items-center justify-between p-4 border border-navy/10">
-                <div>
-                  <p className="font-medium text-navy">Active Sessions</p>
-                  <p className="text-sm text-muted-foreground">
-                    Your authentication session is managed securely via HTTP-only cookies and JWT tokens.
-                  </p>
-                </div>
-                <div className="font-mono text-xs uppercase tracking-widest text-success">
-                  Active
-                </div>
-              </div>
+              {/* Devices & sessions (FEATURE 5 item 2) */}
+              <DevicesSessionsCard />
 
               {/* Data retention */}
               <div className="flex items-center justify-between p-4 border border-navy/10">

@@ -42,6 +42,10 @@ from dependencies import (
     get_subscription_state,
     READ_ONLY_ERROR_MESSAGE,
     READ_ONLY_ERROR_CODE,
+    _extract_token,
+    JWT_SECRET,
+    JWT_ALGORITHM,
+    touch_session,
 )
 
 # Import all routers
@@ -392,6 +396,36 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         
         return await call_next(request)
 
+class SessionHeartbeatMiddleware(BaseHTTPMiddleware):
+    """Throttled session last_seen_at heartbeat for authenticated API requests.
+
+    For requests carrying a valid access token, bump the corresponding
+    user_sessions.last_seen_at (at most once per 5 min per jti) so the
+    device/session manager shows accurate 'last active' times without writing to
+    the DB on every request. Never inspects the body and never blocks requests.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        # Only operate on /api/ routes; skip preflight + static.
+        path = request.url.path
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
+        # Fire-and-forget: tracking failure must never break the request.
+        try:
+            token = _extract_token(request)
+            if token:
+                payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+                jti = payload.get("jti")
+                user_id = payload.get("user_id")
+                if jti and user_id:
+                    await touch_session(user_id, jti, request)
+        except Exception:
+            # Tracking is strictly best-effort.
+            pass
+
+        return await call_next(request)
+
 # Import SSN intake-guard middleware (NOW-phase security package)
 from security import SSNGuardMiddleware
 
@@ -404,6 +438,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # NOW-phase SSN intake guard: reject SSN-shaped JSON body input with HTTP 422
 app.add_middleware(SSNGuardMiddleware)
+
+# FEATURE 5 item 2: throttled session heartbeat (updates last_seen_at, never blocks)
+app.add_middleware(SessionHeartbeatMiddleware)
 
 # Rate limiting middleware
 app.add_middleware(RateLimitMiddleware, config=RateLimitConfig())
