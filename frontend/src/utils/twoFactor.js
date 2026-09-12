@@ -17,6 +17,9 @@
 import { fetchWithAuth } from './api';
 
 // Named predicate: did the API reject this login with a 2FA challenge?
+// The backend sends detail either as the bare string '2fa_required' with the
+// token ONLY in the X-2FA-Challenge-Token header (legacy API-only shape), or
+// as an object {detail:'2fa_required', challenge_token} (contract shape).
 export const is2faChallenge = (payload) =>
   Boolean(payload && payload.detail === '2fa_required' && payload.challenge_token);
 
@@ -56,6 +59,25 @@ export const isStepUpRequired = (detail) => {
   return false;
 };
 
+// Build an Error from a structured 2FA error body. The backend's flat body
+// contract is {detail: '2fa_<machine_code>', message?: '<human text>', ...}.
+// Machine codes (2fa_invalid_code, 2fa_rate_limited, ...) must never be shown
+// verbatim: prefer the backend's human `message`, fall back to a plain-string
+// detail (real sentences from plain HTTPExceptions), else the fallback text.
+// The parsed body rides on err.body for callers reading retry_after /
+// attempts_remaining.
+const to2faError = (body, fallback) => {
+  const detail = body && body.detail;
+  const machineCoded = typeof detail === 'string' && /^2fa_[a-z_]+$/.test(detail);
+  const human =
+    (body && typeof body.message === 'string' && body.message) ||
+    (typeof detail === 'string' && !machineCoded && detail) ||
+    fallback;
+  const err = new Error(human);
+  err.body = body;
+  return err;
+};
+
 // GET /auth/2fa/status -> { enabled, recovery_codes_remaining, enforced }
 export const get2faStatus = async () => {
   const response = await fetchWithAuth('/auth/2fa/status');
@@ -75,7 +97,7 @@ export const enroll2fa = async (password) => {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Failed to start two-factor enrollment (${response.status})`);
+    throw to2faError(body, `Failed to start two-factor enrollment (${response.status})`);
   }
   return response.json();
 };
@@ -89,9 +111,7 @@ export const verify2fa = async (code) => {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const err = new Error(body.detail || `Verification failed (${response.status})`);
-    err.body = body; // surfaced to callers for rate-limit/attempts inspection
-    throw err;
+    throw to2faError(body, `Verification failed (${response.status})`);
   }
   return response.json();
 };
@@ -105,7 +125,7 @@ export const disable2fa = async (totpCode, password) => {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Failed to disable two-factor authentication (${response.status})`);
+    throw to2faError(body, `Failed to disable two-factor authentication (${response.status})`);
   }
   return true;
 };
@@ -119,9 +139,7 @@ export const login2fa = async (challengeToken, code) => {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const err = new Error(body.detail || `Verification failed (${response.status})`);
-    err.body = body; // surfaced to callers for rate-limit/attempts inspection
-    throw err;
+    throw to2faError(body, `Verification failed (${response.status})`);
   }
   return body;
 };

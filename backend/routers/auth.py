@@ -1,6 +1,6 @@
 # Auth router - handles authentication, registration, password reset, and OAuth
 from fastapi import APIRouter, HTTPException, Depends, Response, Request, BackgroundTasks
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from pydantic import BaseModel
@@ -221,9 +221,14 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         except Exception as sec_exc:
             logger.warning(f"Security event logging for 2fa challenge failed (non-fatal): {sec_exc}")
         # 401 (no session issued) + machine-readable flag for the frontend.
-        raise HTTPException(
+        # Flat JSON body is the cross-client contract: {"detail":"2fa_required",
+        # "challenge_token": ...}. The token ALSO rides in a response header for
+        # API clients (and our tests); body is authoritative because the browser
+        # frontend parses only the body on non-2xx, and cross-origin JS cannot
+        # read arbitrary response headers without CORS expose-headers.
+        return JSONResponse(
             status_code=401,
-            detail="2fa_required",
+            content={"detail": "2fa_required", "challenge_token": challenge_token},
             headers={"X-2FA-Challenge-Token": challenge_token, "X-2FA-Required": "true"},
         )
 

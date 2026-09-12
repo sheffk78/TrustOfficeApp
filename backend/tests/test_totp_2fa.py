@@ -321,7 +321,8 @@ def _token_for(client, email, password="Password123", secret=None):
         return r.json()["token"]
     # 2FA required -> finish the 2FA step with the current TOTP for `secret`.
     assert r.status_code == 401 and r.json()["detail"] == "2fa_required"
-    ct = r.headers["X-2FA-Challenge-Token"]
+    ct = r.json()["challenge_token"]  # flat body contract (header also present)
+    assert ct == r.headers["X-2FA-Challenge-Token"]
     fin = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": _current_totp(secret)})
     assert fin.status_code == 200, fin.text
     return fin.json()["token"]
@@ -397,8 +398,8 @@ class TestEnrollVerifyLogin:
         r = _login_password(client, "a@b.com", "Password123")
         assert r.status_code == 401
         assert r.json()["detail"] == "2fa_required"
-        ct = r.headers.get("X-2FA-Challenge-Token")
-        assert ct
+        ct = r.json()["challenge_token"]  # flat body contract
+        assert ct and ct == r.headers.get("X-2FA-Challenge-Token")
 
         # Complete 2FA login with correct code
         fin = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": _current_totp(secret)})
@@ -605,7 +606,7 @@ class TestRateLimit:
             assert last.status_code == 401
         blocked = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
         assert blocked.status_code == 429
-        body = blocked.json()["detail"]
+        body = blocked.json()  # flat body contract
         assert isinstance(body, dict)
         assert body["detail"] == "2fa_rate_limited"
         assert isinstance(body["retry_after"], int) and body["retry_after"] > 0
@@ -630,7 +631,7 @@ class TestRateLimit:
             assert f.status_code == 401
         blocked = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
         assert blocked.status_code == 429
-        body = blocked.json()["detail"]
+        body = blocked.json()  # flat body contract
         assert body["detail"] == "2fa_rate_limited"
         # retry_after is a positive integer (seconds until window clears).
         assert isinstance(body["retry_after"], int)
@@ -650,7 +651,7 @@ class TestRateLimit:
         for _ in range(totps.TOTP_FAIL_LIMIT):
             f = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
             assert f.status_code == 401
-            body = f.json()["detail"]
+            body = f.json()  # flat body contract
             assert body["detail"] == "2fa_invalid_code"
             assert "attempts_remaining" in body
             assert isinstance(body["attempts_remaining"], int)
@@ -662,7 +663,7 @@ class TestRateLimit:
         # The next (6th) attempt is blocked -> 429 with retry_after.
         final = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
         assert final.status_code == 429
-        fb = final.json()["detail"]
+        fb = final.json()  # flat body contract
         assert fb["detail"] == "2fa_rate_limited"
         assert isinstance(fb["retry_after"], int) and fb["retry_after"] > 0
 

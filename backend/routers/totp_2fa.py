@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from database import db
@@ -138,7 +139,9 @@ async def verify_enrollment(request: Request, body: VerifyRequest, user: dict = 
         totps.record_totp_failure(user["user_id"])
         await _sec_event(user["user_id"], "2fa_verify_failed", request)
         err_body = totps.build_invalid_code_body(user["user_id"])
-        raise HTTPException(status_code=401, detail=err_body)
+        # Flat body contract: {detail, attempts_remaining, message} at top level
+        # (the frontend reads flat keys; FastAPI would nest a dict detail).
+        return JSONResponse(status_code=401, content=err_body)
 
     recovery_plain, recovery_hashed = totps.generate_recovery_codes()
 
@@ -177,7 +180,8 @@ async def disable(request: Request, body: DisableRequest, user: dict = Depends(g
         totps.record_totp_failure(user["user_id"])
         await _sec_event(user["user_id"], "2fa_disable_failed", request, {"reason": "invalid_totp_code"})
         err_body = totps.build_invalid_code_body(user["user_id"])
-        raise HTTPException(status_code=401, detail=err_body)
+        # Flat body contract (see verify_enrollment).
+        return JSONResponse(status_code=401, content=err_body)
 
     await db.users.update_one(
         {"user_id": user["user_id"]},
@@ -258,14 +262,15 @@ async def login_2fa(request: Request, body: TwoFactorLoginRequest, response: Res
     if totps.is_totp_rate_limited(user_id):
         await _sec_event(user_id, "2fa_login_rate_limited", request)
         err_body = totps.build_rate_limited_body(user_id)
-        raise HTTPException(status_code=429, detail=err_body)
+        # Flat body contract: {detail:'2fa_rate_limited', retry_after, message}
+        return JSONResponse(status_code=429, content=err_body)
 
     ok, method = await totps.consume_login_code(user_doc, body.code)
     if not ok:
         if method == "rate_limited":
             await _sec_event(user_id, "2fa_login_rate_limited", request)
             err_body = totps.build_rate_limited_body(user_id)
-            raise HTTPException(status_code=429, detail=err_body)
+            return JSONResponse(status_code=429, content=err_body)
         fail_count = totps.record_totp_failure(user_id)
         await _sec_event(user_id, "2fa_login_failed", request, {
             "reason": method,  # 'invalid' | 'recovery_code' (race) â never the code itself
@@ -276,7 +281,8 @@ async def login_2fa(request: Request, body: TwoFactorLoginRequest, response: Res
         except Exception as exc:
             logger.warning(f"2FA anomaly alert check failed (non-fatal): {exc}")
         err_body = totps.build_invalid_code_body(user_id)
-        raise HTTPException(status_code=401, detail=err_body)
+        # Flat body contract: {detail:'2fa_invalid_code', attempts_remaining, message}
+        return JSONResponse(status_code=401, content=err_body)
 
     # Success: issue the normal session (same shape as POST /auth/login).
     token = create_jwt_token(user_doc["user_id"], user_doc["email"])

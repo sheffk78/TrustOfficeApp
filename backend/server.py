@@ -476,6 +476,9 @@ app.add_middleware(
     allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Make non-standard auth response headers readable by JS cross-origin
+    # (fetch/XHR can only see simple + explicitly-exposed headers).
+    expose_headers=["X-2FA-Challenge-Token", "X-2FA-Required"],
 )
 
 # Register all routers
