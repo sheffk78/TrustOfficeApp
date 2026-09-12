@@ -28,6 +28,7 @@ from dependencies import (
 from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, ProfileUpdate
 from email_service import email_service
 from security import InputSanitizer
+from services.security_events import record_security_event, check_security_alert
 
 
 def _clean_utm(value: Optional[str], max_len: int = 200) -> Optional[str]:
@@ -38,6 +39,15 @@ def _clean_utm(value: Optional[str], max_len: int = 200) -> Optional[str]:
     if not value or len(value) > max_len:
         return value[:max_len] if value else None
     return value
+
+
+def _client_ip(request: Request) -> Optional[str]:
+    """Best-effort client IP honoring X-Forwarded-For for proxied requests."""
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return request.client.host if request.client else None
+
 from mailercloud_service import add_to_trial_list
 from utils.audit import log_audit_event
 
@@ -144,7 +154,7 @@ async def register(user: UserCreate, background_tasks: BackgroundTasks, _rl: Non
 
 
 @router.post("/auth/login")
-async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(10, 60))):
+async def login(user: UserLogin, response: Response, background_tasks: BackgroundTasks, request: Request, _rl: None = Depends(rate_limit(10, 60))):
     """Login with email/password"""
     # Validate email format
     if not validate_email_format(user.email):
@@ -166,6 +176,17 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         # Log failed login attempt (for security monitoring)
         logger.warning(f"Failed login attempt for email: {email}")
         await log_audit_event(user_doc["user_id"], "login_failed", "user", user_doc["user_id"], {"email": email})
+        # Security event logging + anomaly alerting (best-effort, never breaks login)
+        try:
+            ip = _client_ip(request)
+            ua = request.headers.get("User-Agent")
+            await record_security_event(
+                user_doc["user_id"], "login_failed",
+                ip=ip, user_agent=ua, details={"email": email},
+            )
+            await check_security_alert("login_failed", user_id=user_doc["user_id"], email=email)
+        except Exception as sec_exc:
+            logger.warning(f"Security event logging for login_failed failed (non-fatal): {sec_exc}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Auto-grant admin status for primary admin email
@@ -215,6 +236,16 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
     
     # Log successful login for audit trail
     await log_audit_event(user_doc["user_id"], "login", "user", user_doc["user_id"], {"email": email, "first_login": not previous_login})
+    # Security event logging (best-effort, never breaks login)
+    try:
+        ip = _client_ip(request)
+        ua = request.headers.get("User-Agent")
+        await record_security_event(
+            user_doc["user_id"], "login_success",
+            ip=ip, user_agent=ua, details={"email": email, "first_login": not previous_login},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for login_success failed (non-fatal): {sec_exc}")
     
     # Fire first_login webhook for WingPoint-provisioned users (only on first login)
     # A first login = no previous last_login timestamp
@@ -258,7 +289,7 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
 # ==================== PASSWORD RESET ====================
 
 @router.post("/auth/forgot-password")
-async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(3, 60))):
+async def forgot_password(request: PasswordResetRequest, background_tasks: BackgroundTasks, req: Request, _rl: None = Depends(rate_limit(3, 60))):
     """Request a password reset email"""
     user = await db.users.find_one({"email": request.email}, {"_id": 0})
     
@@ -323,11 +354,22 @@ async def forgot_password(request: PasswordResetRequest, background_tasks: Backg
         reset_url=reset_url
     )
     
+    # Security event logging for password reset request (best-effort)
+    try:
+        ip = _client_ip(req)
+        ua = req.headers.get("User-Agent")
+        await record_security_event(
+            user["user_id"], "password_reset_requested",
+            ip=ip, user_agent=ua, details={"email": user["email"]},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for password_reset_requested failed (non-fatal): {sec_exc}")
+
     return {"message": "If an account exists with this email, you will receive a password reset link."}
 
 
 @router.post("/auth/reset-password")
-async def reset_password(request: PasswordResetConfirm, background_tasks: BackgroundTasks, _rl: None = Depends(rate_limit(5, 60))):
+async def reset_password(request: PasswordResetConfirm, background_tasks: BackgroundTasks, req: Request, _rl: None = Depends(rate_limit(5, 60))):
     """Reset password using token"""
     # Find valid reset token
     reset_record = await db.password_resets.find_one(
@@ -372,6 +414,18 @@ async def reset_password(request: PasswordResetConfirm, background_tasks: Backgr
     
     # Log password reset for audit trail
     await log_audit_event(reset_record["user_id"], "password_reset", "user", reset_record["user_id"], {})
+
+    # Security event logging for password reset/change (best-effort)
+    try:
+        ip = _client_ip(req)
+        ua = req.headers.get("User-Agent")
+        await record_security_event(
+            reset_record["user_id"], "password_changed",
+            ip=ip, user_agent=ua, details={"first_set": not _had_password},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for password_changed failed (non-fatal): {sec_exc}")
+
     
     # Invalidate all sessions for this user
     await db.user_sessions.delete_many({"user_id": reset_record["user_id"]})
@@ -561,9 +615,25 @@ async def update_profile(profile: ProfileUpdate, user: dict = Depends(get_curren
 async def logout(request: Request, response: Response):
     """Logout and clear session"""
     session_token = request.cookies.get("session_token")
+    user_id = None
     if session_token:
         await db.user_sessions.delete_one({"session_token": session_token})
-    
+        # Best-effort: resolve the user for the security event
+        sess = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0, "user_id": 1})
+        if sess:
+            user_id = sess.get("user_id")
+
+    # Security event logging (best-effort, never breaks logout)
+    try:
+        ip = _client_ip(request)
+        ua = request.headers.get("User-Agent")
+        await record_security_event(
+            user_id, "logout", ip=ip, user_agent=ua,
+            details={"session_token_present": bool(session_token)},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for logout failed (non-fatal): {sec_exc}")
+
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out"}
 

@@ -1,5 +1,6 @@
-# Audit Defense PDF Export — court-ready separation evidence report
+# Audit Defense PDF Export â court-ready separation evidence report
 import io
+import logging
 import uuid
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
@@ -12,10 +13,13 @@ from reportlab.lib import colors
 
 from database import db
 from dependencies import get_current_user, is_white_label
+from services.security_events import record_security_event
 from pdf_utils import (
     NAVY, GOLD, GRAY, LIGHT_GRAY, RED, AMBER, GREEN,
     build_styles, separator_line, info_table, data_table, pdf_response,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["audit-defense"])
 
@@ -351,5 +355,14 @@ async def get_user_audit_logs(
         {"_id": 0}
     ).sort("timestamp", -1).skip(offset).limit(min(limit, 200))
     
+    # Security event logging for token/session refresh (best-effort)
+    try:
+        await record_security_event(
+            user["user_id"], "token_refresh",
+            details={"endpoint": "/audit-logs"},
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for token_refresh failed (non-fatal): {sec_exc}")
+
     logs = await cursor.to_list(length=min(limit, 200))
     return {"audit_logs": logs}

@@ -1,6 +1,6 @@
 # Vault router — trust document organization, reference tracking, and file upload
 # File uploads stored as BSON binary in vault_documents (max 16MB per file)
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query, Request
 from fastapi.responses import Response
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -16,6 +16,7 @@ from database import db
 from dependencies import get_current_user, require_write_access
 from routers.compensation import auto_update_onboarding
 from utils.audit import log_audit_event
+from services.security_events import record_security_event, check_security_alert
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["vault"])
@@ -412,6 +413,7 @@ async def download_document(
     doc_id: str,
     inline: bool = Query(False, description="Serve with Content-Disposition: inline for in-app preview"),
     user: dict = Depends(get_current_user),
+    request: Optional[Request] = None,
 ):
     """Download a file from the vault."""
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
@@ -440,6 +442,18 @@ async def download_document(
 
     # Log vault download for audit trail
     await log_audit_event(user["user_id"], "vault_download", "vault_document", doc_id, {"file_name": safe_filename, "trust_id": doc.get("trust_id", "")})
+
+    # Security event logging + anomaly alerting (best-effort, never breaks download)
+    try:
+        ip = request.headers.get("X-Forwarded-For", "").split(",")[-1].strip() if request else None
+        ua = request.headers.get("User-Agent") if request else None
+        await record_security_event(
+            user["user_id"], "vault_download",
+            ip=ip, user_agent=ua, details={"doc_id": doc_id, "file_name": safe_filename},
+        )
+        await check_security_alert("vault_download", user_id=user["user_id"])
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for vault_download failed (non-fatal): {sec_exc}")
 
     disposition = "inline" if inline else "attachment"
     return Response(
