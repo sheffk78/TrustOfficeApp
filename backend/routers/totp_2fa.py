@@ -137,7 +137,8 @@ async def verify_enrollment(request: Request, body: VerifyRequest, user: dict = 
     if not totps.verify_totp_code(secret, body.code):
         totps.record_totp_failure(user["user_id"])
         await _sec_event(user["user_id"], "2fa_verify_failed", request)
-        raise HTTPException(status_code=401, detail="That code didn't match. Check your authenticator app and try again.")
+        err_body = totps.build_invalid_code_body(user["user_id"])
+        raise HTTPException(status_code=401, detail=err_body)
 
     recovery_plain, recovery_hashed = totps.generate_recovery_codes()
 
@@ -175,7 +176,8 @@ async def disable(request: Request, body: DisableRequest, user: dict = Depends(g
     if not totps.verify_totp_code(state.get("secret"), body.totp_code):
         totps.record_totp_failure(user["user_id"])
         await _sec_event(user["user_id"], "2fa_disable_failed", request, {"reason": "invalid_totp_code"})
-        raise HTTPException(status_code=401, detail="That code didn't match. Check your authenticator app and try again.")
+        err_body = totps.build_invalid_code_body(user["user_id"])
+        raise HTTPException(status_code=401, detail=err_body)
 
     await db.users.update_one(
         {"user_id": user["user_id"]},
@@ -255,29 +257,26 @@ async def login_2fa(request: Request, body: TwoFactorLoginRequest, response: Res
 
     if totps.is_totp_rate_limited(user_id):
         await _sec_event(user_id, "2fa_login_rate_limited", request)
-        raise HTTPException(
-            status_code=429,
-            detail="Too many incorrect codes. Please wait a few minutes and try again — your account is not locked.",
-        )
+        err_body = totps.build_rate_limited_body(user_id)
+        raise HTTPException(status_code=429, detail=err_body)
 
     ok, method = await totps.consume_login_code(user_doc, body.code)
     if not ok:
         if method == "rate_limited":
             await _sec_event(user_id, "2fa_login_rate_limited", request)
-            raise HTTPException(
-                status_code=429,
-                detail="Too many incorrect codes. Please wait a few minutes and try again — your account is not locked.",
-            )
+            err_body = totps.build_rate_limited_body(user_id)
+            raise HTTPException(status_code=429, detail=err_body)
         fail_count = totps.record_totp_failure(user_id)
         await _sec_event(user_id, "2fa_login_failed", request, {
-            "reason": method,  # 'invalid' | 'recovery_code' (race) — never the code itself
+            "reason": method,  # 'invalid' | 'recovery_code' (race) â never the code itself
             "attempt_count_in_window": fail_count,
         })
         try:
             await check_security_alert("2fa_login_failed", user_id=user_id, email=user_doc.get("email", ""))
         except Exception as exc:
             logger.warning(f"2FA anomaly alert check failed (non-fatal): {exc}")
-        raise HTTPException(status_code=401, detail="That code didn't match. Try again or use a recovery code.")
+        err_body = totps.build_invalid_code_body(user_id)
+        raise HTTPException(status_code=401, detail=err_body)
 
     # Success: issue the normal session (same shape as POST /auth/login).
     token = create_jwt_token(user_doc["user_id"], user_doc["email"])

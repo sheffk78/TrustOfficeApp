@@ -605,7 +605,12 @@ class TestRateLimit:
             assert last.status_code == 401
         blocked = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
         assert blocked.status_code == 429
-        assert "not locked" in blocked.json()["detail"].lower()
+        body = blocked.json()["detail"]
+        assert isinstance(body, dict)
+        assert body["detail"] == "2fa_rate_limited"
+        assert isinstance(body["retry_after"], int) and body["retry_after"] > 0
+        assert isinstance(body["message"], str) and body["message"]
+        assert "not locked" in body["message"].lower()
         # The correct code is NOT accepted while rate-limited (forgiving, but enforced).
         during = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": _current_totp(secret)})
         assert during.status_code == 429
@@ -613,6 +618,53 @@ class TestRateLimit:
         totps._totp_failures.clear()
         after = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": _current_totp(secret)})
         assert after.status_code == 200
+
+    def test_429_body_has_retry_after_and_message(self, client, fake_db):
+        secret = _seed_user(fake_db, user_id="u1", email="a@b.com", with_2fa=True)
+        r = _login_password(client, "a@b.com", "Password123")
+        ct = r.headers["X-2FA-Challenge-Token"]
+        # Drive the window to the limit: limit invalid codes (still 401, recorded),
+        # then the next attempt is blocked with 429.
+        for _ in range(totps.TOTP_FAIL_LIMIT):
+            f = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
+            assert f.status_code == 401
+        blocked = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
+        assert blocked.status_code == 429
+        body = blocked.json()["detail"]
+        assert body["detail"] == "2fa_rate_limited"
+        # retry_after is a positive integer (seconds until window clears).
+        assert isinstance(body["retry_after"], int)
+        assert body["retry_after"] > 0
+        # message is non-empty and mentions a whole-minute wait.
+        assert isinstance(body["message"], str) and len(body["message"]) > 0
+        assert "minute" in body["message"].lower()
+        assert "recovery code" in body["message"].lower()
+
+    def test_invalid_code_body_decrements_attempts_remaining(self, client, fake_db):
+        secret = _seed_user(fake_db, user_id="u1", email="a@b.com", with_2fa=True)
+        r = _login_password(client, "a@b.com", "Password123")
+        ct = r.headers["X-2FA-Challenge-Token"]
+        seen = []
+        # All TOTP_FAIL_LIMIT failures return 401 with a decreasing attempts_remaining
+        # (the limit check passes on the 5th attempt, which is then recorded).
+        for _ in range(totps.TOTP_FAIL_LIMIT):
+            f = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
+            assert f.status_code == 401
+            body = f.json()["detail"]
+            assert body["detail"] == "2fa_invalid_code"
+            assert "attempts_remaining" in body
+            assert isinstance(body["attempts_remaining"], int)
+            seen.append(body["attempts_remaining"])
+        # Strictly decreasing as failures accumulate (4, 3, 2, 1, 0).
+        assert seen == sorted(seen, reverse=True)
+        assert seen[0] == totps.TOTP_FAIL_LIMIT - 1  # 4 left at first failure
+        assert seen[-1] == 0  # 0 left after the limit is reached
+        # The next (6th) attempt is blocked -> 429 with retry_after.
+        final = client.post("/api/auth/2fa/login", json={"challenge_token": ct, "code": "000000"})
+        assert final.status_code == 429
+        fb = final.json()["detail"]
+        assert fb["detail"] == "2fa_rate_limited"
+        assert isinstance(fb["retry_after"], int) and fb["retry_after"] > 0
 
 
 class TestSecurityEvents:

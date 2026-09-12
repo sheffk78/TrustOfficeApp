@@ -30,6 +30,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import math
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -97,9 +98,66 @@ def record_totp_failure(user_id: str) -> int:
 
 
 def clear_totp_failures(user_id: str) -> None:
-    """Called after a successful verification — fumbling then getting it right
+    """Called after a successful verification â fumbling then getting it right
     must not leave the user near the limit."""
     _totp_failures.pop(user_id, None)
+
+
+def seconds_until_window_clears(user_id: str) -> int:
+    """Integer seconds until the oldest recorded failure rolls out of the
+    window (0 when there are no recorded failures for the user)."""
+    prune_totp_failures()
+    stamps = _totp_failures.get(user_id, [])
+    if not stamps:
+        return 0
+    oldest = min(stamps)
+    remaining = (oldest + TOTP_FAIL_WINDOW_SECONDS) - time.time()
+    return max(0, int(math.ceil(remaining)))
+
+
+def attempts_remaining(user_id: str) -> int:
+    """How many more failed codes are accepted before the cooldown kicks in.
+
+    Forgiving backoff: TOTP_FAIL_LIMIT failures within the window -> block.
+    So before the limit is reached, (limit - current_count) attempts remain.
+    """
+    prune_totp_failures()
+    count = len(_totp_failures.get(user_id, []))
+    return max(0, TOTP_FAIL_LIMIT - count)
+
+
+def build_rate_limited_body(user_id: str) -> dict:
+    """Structured 429 body so clients can render an exact countdown.
+
+    Keys (required by the frontend contract):
+      detail      -> "2fa_rate_limited"
+      retry_after -> integer seconds until the window clears (positive)
+      message     -> plain human string mentioning the wait in whole minutes
+    """
+    seconds = seconds_until_window_clears(user_id)
+    seconds = max(1, seconds)  # guaranteed positive while actually rate-limited
+    minutes = max(1, math.ceil(seconds / 60))
+    return {
+        "detail": "2fa_rate_limited",
+        "retry_after": int(seconds),
+        "message": (
+            f"Too many incorrect codes. You can try again in {minutes} minutes. "
+            "Your account is not locked - you can also sign in with a recovery code."
+        ),
+    }
+
+
+def build_invalid_code_body(user_id: str) -> dict:
+    """Structured invalid-code body with remaining-attempt info.
+
+    detail stays exactly "2fa_invalid_code" (the frontend keys off it);
+    attempts_remaining tells the client how many more fails are tolerated.
+    """
+    return {
+        "detail": "2fa_invalid_code",
+        "attempts_remaining": int(attempts_remaining(user_id)),
+        "message": "That code didn't match. Try again or use a recovery code.",
+    }
 
 
 # ---------------------------------------------------------------------------
