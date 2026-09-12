@@ -55,6 +55,30 @@ export const authPost = async (endpoint, data) => {
   }
 };
 
+// Single 401 interceptor: on an access-token failure, attempt exactly ONE
+// refresh (POST /auth/refresh using the httpOnly refresh cookie), then retry
+// the original request once. If refresh fails or is absent, clear the session
+// token and dispatch `session-expired` so AuthContext redirects to login.
+let _refreshInFlight = null;
+
+const _attemptRefresh = async () => {
+  if (!_refreshInFlight) {
+    _refreshInFlight = fetch(`${API}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('refresh failed');
+        const data = await r.json().catch(() => ({}));
+        if (data.token) localStorage.setItem('auth_token', data.token);
+        return true;
+      })
+      .finally(() => { _refreshInFlight = null; });
+  }
+  return _refreshInFlight;
+};
+
 // Generic fetch with auth
 export const fetchWithAuth = async (endpoint, options = {}) => {
   const defaultOptions = {
@@ -62,24 +86,35 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
     headers: getAuthHeaders()
   };
   
-  const response = await fetch(`${API}${endpoint}`, {
-    ...defaultOptions,
-    ...options,
-    headers: {
-      ...defaultOptions.headers,
-      ...options.headers
-    }
-  });
+  const doFetch = () =>
+    fetch(`${API}${endpoint}`, {
+      ...defaultOptions,
+      ...options,
+      headers: {
+        ...defaultOptions.headers,
+        ...options.headers
+      }
+    });
+
+  const response = await doFetch();
   
   // Handle 401 Unauthorized (session expired - token invalid or missing)
-  // Dispatch a global event so AuthContext can clear the session and redirect
-  // to login. This prevents callers from showing generic "Failed to update trust"
-  // errors when the real issue is an expired JWT.
   if (response.status === 401) {
-    // Only dispatch if we actually had a token (otherwise it's just an unauthenticated request)
-    if (localStorage.getItem('auth_token')) {
+    const hadToken = Boolean(localStorage.getItem('auth_token'));
+    // Attempt exactly one refresh + retry of the original request.
+    try {
+      await _attemptRefresh();
+      const retry = await doFetch();
+      if (retry.status !== 401) return retry;
+    } catch (_e) {
+      // refresh failed â fall through to session-expired handling
+    }
+    // Refresh failed or retry still 401: clear session and redirect to login.
+    if (hadToken || localStorage.getItem('auth_token')) {
+      localStorage.removeItem('auth_token');
       window.dispatchEvent(new CustomEvent('session-expired'));
     }
+    return response;
   }
 
   // Handle 402 Payment Required (subscription expired - blocks all access)
@@ -87,16 +122,6 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
     window.dispatchEvent(new CustomEvent('subscription-expired'));
   }
 
-  // Handle 401 Unauthorized (session expired - token invalid or missing)
-  if (response.status === 401) {
-    // Only dispatch if we had a token (avoid firing on public endpoints)
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      localStorage.removeItem('auth_token');
-      window.dispatchEvent(new CustomEvent('session-expired'));
-    }
-  }
-  
   // Handle 403 Forbidden (read-only mode - blocks write operations)
   // We check the X-Subscription-Status header to avoid consuming the body
   if (response.status === 403) {

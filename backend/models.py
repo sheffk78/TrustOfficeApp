@@ -287,6 +287,12 @@ class PasswordResetConfirm(BaseModel):
     new_password: str
 
 
+class PasswordChange(BaseModel):
+    """Authenticated in-session password change (current password required)."""
+    current_password: str
+    new_password: str
+
+
 # ==================== TRUST MODELS ====================
 
 class TrustCreate(BaseModel):

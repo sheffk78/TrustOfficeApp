@@ -658,6 +658,11 @@ async def startup_event():
         await db.jwt_revocations.create_index("jti")
         await db.jwt_revocations.create_index("user_id")
         await db.jwt_revocations.create_index("expires_at", expireAfterSeconds=0)  # Auto-delete expired revocations
+
+        # Refresh tokens (session-hardening): opaque tokens, SHA-256 hashed
+        await db.refresh_tokens.create_index("token_hash", unique=True)
+        await db.refresh_tokens.create_index("user_id")
+        await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)  # Auto-delete expired
         
         # Admin audit log with TTL (90 days)
         await db.admin_audit_log.create_index([("user_id", 1), ("timestamp", -1)])
