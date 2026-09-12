@@ -1221,10 +1221,15 @@
 
 body.impersonating .sidebar-trust {
   top: 48px;
+  /* Shrink the sidebar by the banner height so the bottom user/logout
+     section stays inside the viewport (h-full alone pushed it offscreen). */
+  height: calc(100vh - 48px);
 }
 
 body.impersonating .main-content {
   margin-top: 48px;
+  /* Match the sidebar shrink so total page height stays 100vh (no phantom scroll). */
+  min-height: calc(100vh - 48px);
 }
 
 /* Pages using the lg:ml-64 pt-16 lg:pt-0 pattern */

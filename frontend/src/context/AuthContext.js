@@ -431,12 +431,27 @@ const useTrustsLoader = ({ setTrusts, setTrustsLoading, setSelectedTrust, select
         const data = await response.json();
         setTrusts(data);
 
-        // Select first trust if none selected, or if forced
-        if (data.length > 0 && (!selectedTrust || forceSelectNew)) {
-          const storedTrustId = localStorage.getItem('selected_trust_id');
-          const storedTrust = data.find(t => t.trust_id === storedTrustId);
-          if (!selectedTrust) {
-            setSelectedTrust(storedTrust || data[0]);
+        // Reconcile selection against the fresh list (2026-09-11 demo-remnant fix):
+        // a previously-selected trust that no longer exists in the returned list
+        // (e.g. a demo trust deleted since the last session, or demo data cleaned
+        // server-side) must NEVER keep rendering as the active trust in the
+        // sidebar dropdown. Validate current selection first, then fall back to
+        // the stored id, then the first real (non-demo) trust, then the first
+        // trust (demo-only accounts still need a selection for the demo
+        // experience).
+        const isSelectedValid = selectedTrust && data.some(t => t.trust_id === selectedTrust.trust_id);
+        if (forceSelectNew || !isSelectedValid) {
+          if (selectedTrust && !isSelectedValid) {
+            // Stale selection pointing at a deleted/filtered trust — clear it.
+            setSelectedTrust(null);
+            localStorage.removeItem('selected_trust_id');
+          }
+          if (data.length > 0) {
+            const storedTrustId = localStorage.getItem('selected_trust_id');
+            const storedTrust = data.find(t => t.trust_id === storedTrustId);
+            const firstReal = data.find(t => t.is_demo !== true && t.isDemo !== true);
+            setSelectedTrust(storedTrust || firstReal || data[0]);
+            if (storedTrust) localStorage.setItem('selected_trust_id', storedTrust.trust_id);
           }
         }
       } else {

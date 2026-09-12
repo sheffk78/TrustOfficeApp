@@ -383,7 +383,8 @@ async def analyze_trust_document(
             system_prompt=ANALYSIS_PROMPT,
             user_content=text_for_ai,
             max_tokens=4000,
-            temperature=0.1
+            temperature=0.1,
+            document_id=doc_id
         )
 
         # Step 4: Parse JSON response
