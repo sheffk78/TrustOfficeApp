@@ -138,6 +138,25 @@ async def _get_or_create_conversation(
             "user_id": user_id,
         })
         if existing:
+            # Trust-pinning (2026-09-14, council-approved architecture): a
+            # conversation belongs to the trust it started in. If the active
+            # trust differs, auto-thread a new conversation — never inject
+            # Trust B's context into a Trust A thread.
+            conv_trust = existing.get("trust_id")
+            if conv_trust and conv_trust != trust_id:
+                new_id = f"conv_{uuid.uuid4().hex[:12]}"
+                title = await _generate_conversation_title(None, first_message)
+                now = datetime.now(timezone.utc).isoformat()
+                await db.chat_conversations.insert_one({
+                    "conversation_id": new_id,
+                    "user_id": user_id,
+                    "trust_id": trust_id,
+                    "title": title,
+                    "messages": [],
+                    "created_at": now,
+                    "updated_at": now,
+                })
+                return new_id, True
             # Check if conversation has timed out (2 hours of inactivity = auto-thread)
             last_update = existing.get("updated_at", "")
             if last_update:
@@ -328,10 +347,15 @@ async def chat(
     trust_context = await build_trust_context(user_id, trust_id, intent=intent)
 
     # 6. Generate response
+    # On-demand retrieval (Layer 2, council-approved 2026-09-14): minutes
+    # search / vault doc detail fetched only when this message needs it.
+    from trust_retrieval import retrieve_for_message, inject_into_user_content
+    retrieval_block = await retrieve_for_message(db, trust_id, user_id, intent, request.message)
+
     ai_response = await generate_response(
         intent=intent,
         entities=entities,
-        user_message=request.message,
+        user_message=inject_into_user_content(request.message, retrieval_block),
         trust_context=trust_context,
         conversation_history=history_for_ai,
         ai_client_module=None,
@@ -2274,15 +2298,19 @@ async def _chat_stream_generator(
 
         # 6. Stream the response tokens
         full_response_text = ""
+        # On-demand retrieval (Layer 2): fetch before streaming starts so the
+        # injected detail rides in the user content for this turn only.
+        from trust_retrieval import retrieve_for_message, inject_into_user_content
+        retrieval_block = await retrieve_for_message(db, trust_id, user_id, intent, message)
+        stream_gen = generate_response_stream(
+            intent=intent,
+            entities=entities,
+            user_message=inject_into_user_content(message, retrieval_block),
+            trust_context=trust_context,
+            conversation_history=history_for_ai,
+            ai_client_module=None,
+        )
         try:
-            stream_gen = generate_response_stream(
-                intent=intent,
-                entities=entities,
-                user_message=message,
-                trust_context=trust_context,
-                conversation_history=history_for_ai,
-                ai_client_module=None,
-            )
             stream_ait = stream_gen.__aiter__()
             # Race the next chunk against a 5s timer. On timeout, emit an
             # SSE heartbeat comment and re-race the SAME pending task (do
