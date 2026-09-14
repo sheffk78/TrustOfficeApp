@@ -1350,17 +1350,18 @@ def _build_system_prompt(
     action_type_value = action_def.get("type", f"{intent}_preview")
 
     ctx = trust_context
-    trust_info = ctx.get("trust", {})
-
-    _money = ctx.get("money_summary", {})
-    _struct = ctx.get("structure_summary", {})
-    _entity_types = ", ".join(f"{v} {k}" for k, v in _struct.get("entity_type_counts", {}).items()) or "None"
 
     knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
-    vault_section = _build_vault_section(ctx, intent, user_message)
-    trust_type_guidance = _build_trust_type_guidance(trust_info.get("type", ""))
+    trust_type_guidance = _build_trust_type_guidance((ctx.get("trust", {}) or {}).get("type", ""))
 
-    health = ctx.get("health_score", {})
+    # Trust Brief (council-approved two-layer architecture, 2026-09-14):
+    # one flat-cost structured block replaces the per-section context dump.
+    # Layer 2 (on-demand retrieval) rides in the user content, not here.
+    from trust_brief import build_trust_brief
+    brief = build_trust_brief(ctx)
+    benevolence_line = _fmt_benevolence_policy(
+        ctx.get("benevolence_policy", None), ctx.get("benevolence_summary", None)
+    )
 
     # --- Assemble system prompt from split constitution ---
     # Core is always loaded (~3K chars).
@@ -1406,55 +1407,12 @@ When evaluating, always cite the specific trust document language and article re
 
     shared_header = f"""{system_prompt_base}
 
-## Current Trust Context
-Trust: {trust_info.get('name', 'Unknown')}
-Type: {trust_info.get('type', 'Not specified')}
-Jurisdiction: {trust_info.get('jurisdiction', 'Not specified')}
-State: {trust_info.get('state_code', 'Not specified')}
-Establishment Date: {trust_info.get('start_date', 'Not specified')}
-Beneficiary Standard: {trust_info.get('beneficiary_standard', 'Not specified')}
-Trustees: {trust_info.get('trustees', 'Not specified')}
-Defensibility Score: {health.get('total', 0)}/{health.get('max_score', 100)} ({health.get('color', 'red')})
-
-{vault_section}
-
-{trust_type_guidance}
-
-## Upcoming Deadlines (next 14 days)
-{_fmt_deadlines(ctx.get('upcoming_deadlines', []))}
-
-## Pending Items
-{_fmt_pending(ctx.get('pending_items', []))}
-
-## Recent Activity (last 30 days)
-{_fmt_activity(ctx.get('recent_activity', []))}
-
-## Active Beneficiaries
-{_fmt_beneficiaries(ctx.get('beneficiaries', []))}
-
-## Class Beneficiaries
-{_fmt_class_beneficiaries(ctx.get('class_beneficiaries', []))}
+{brief['text']}
 
 ## Benevolence Policy
-{_fmt_benevolence_policy(ctx.get('benevolence_policy', None), ctx.get('benevolence_summary', None))}
+{benevolence_line}
 
-## Entities (Structures)
-{_fmt_entities(ctx.get('entities', []))}
-
-## Tax Deadlines
-{_fmt_tax_deadlines(ctx.get('tax_deadlines', []))}
-
-## Money Summary
-Distributions: {_money.get('distributions_total', 0)} total, ${_money.get('distributions_ytd_amount', 0):,.2f} this year
-Compensation: {_money.get('compensation_active_plans', 0)} active plans, ${_money.get('compensation_ytd_paid', 0):,.2f} paid YTD
-Investments: {_money.get('investments_count', 0)} assets, ${_money.get('investments_total_value', 0):,.2f} total value
-Recent transactions: {_money.get('recent_transactions_30d', 0)} in last 30 days
-
-## Structure Summary
-Entities: {_struct.get('entity_count', 0)} ({_entity_types})
-Beneficiaries: {_struct.get('beneficiary_count', 0)}
-Schedule A: {_struct.get('schedule_a_asset_count', 0)} assets, ${_struct.get('schedule_a_total_value', 0):,.2f} total
-Communications: {_struct.get('communications_total', 0)} recorded, {_struct.get('communications_pending_action', 0)} pending action
+{trust_type_guidance}
 
 ## Knowledge Base
 {knowledge_context[:4500] if knowledge_context else "No knowledge base available."}
@@ -1465,6 +1423,7 @@ Communications: {_struct.get('communications_total', 0)} recorded, {_struct.get(
 ## Current Intent
 Intent: {intent}
 Requires write: {requires_write}
+Brief size: {brief['stats']['total_tokens']} tokens (budget {brief['stats']['budget_tokens']})
 """
 
     if stream_mode:
