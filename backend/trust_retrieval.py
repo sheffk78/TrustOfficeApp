@@ -28,11 +28,15 @@ MAX_RETRIEVAL_CHARS = 3500  # per-turn cap on all injected retrieval blocks
 class RetrievalBlock:
     """Retrieved detail injected into the user content for this turn only."""
     minutes_matches: list = field(default_factory=list)
+    asset_history: list = field(default_factory=list)
     vault_doc_detail: Optional[dict] = None
     extra: list = field(default_factory=list)
 
     def to_text(self) -> str:
         parts = []
+        asset_text = _render_asset_timeline(self.asset_history)
+        if asset_text:
+            parts.append(asset_text)
         if self.minutes_matches:
             lines = ["## Retrieved Minutes (from search — cite meeting date)"]
             for m in self.minutes_matches[:5]:
@@ -75,7 +79,7 @@ class RetrievalBlock:
         return text
 
     def is_empty(self) -> bool:
-        return not (self.minutes_matches or self.vault_doc_detail or self.extra)
+        return not (self.minutes_matches or self.asset_history or self.vault_doc_detail or self.extra)
 
 
 # ------------------------------------------------------------ trigger patterns ---
@@ -88,6 +92,13 @@ MINUTES_SEARCH_TRIGGERS = [
     r"\b(all|past|previous|prior|every)\b.{0,20}\bminutes\b",
     r"\b(minutes|resolutions?)\b.{0,20}\b(for|about|on|regarding)\b.{0,40}\b(sale|sale of|distribut|loan|compensation|trustee|beneficiar|property|real estate|vehicle|tuition|education|purchase|truck)",
     r"\bminutes\b.{0,30}\b(approved?|authoriz|distribut|loan|tuition)\b",
+    # Generic "what happened in our records" phrasings (2026-09-14 member
+    # recall use case: "what did we say in our minutes", "what did we decide")
+    r"\bwhat\s+(did|do)\s+we\s+(say|said|decide|decided|agree|agreed|approve|approv|resolve|record|vote)\b",
+    r"\bwhat'?s\s+in\s+(the|our|my)\s+(minutes|meeting\s+records?)\b",
+    r"\b(remember|recall)\b.{0,40}\b(resolution|minutes|decision|meeting)\b",
+    r"\b(resolutions?|decisions?)\s+(did|have)\s+we\b",
+    r"\bwhen\s+(did|have)\s+we\b.{0,40}\b(add|sold|sell|bought|buy|purchas|transfer|convey|contribut)",
 ]
 
 VAULT_DOC_TRIGGERS = [
@@ -125,6 +136,96 @@ def vault_detail_needed(intent: str, message: str) -> bool:
 
 # ------------------------------------------------------------ DB fetchers ---
 
+# Asset-history questions ("when did we add the property", "when did we sell
+# the truck") — Schedule A carries date_conveyed / disposition_date and a
+# minutes_ref that links the asset to the resolution that created it.
+ASSET_TIMELINE_TRIGGERS = [
+    r"\bwhen\s+(did|have)\s+we\b.{0,50}\b(add|added|buy|bought|purchase[d]?|contribut|convey|transfer|put\s+in|sell|sold|dispose[d]?|acquire[d]?)",
+    r"\bwhen\s+(did|was)\b.{0,50}\b(property|house|car|truck|vehicle|asset|real\s+estate|land|parcel|rental|condo|cabin|account|brokerage)\b.{0,30}\b(add|buy|purchas|convey|transfer|contribut|sold|sell|acquir|dispos)",
+    r"\bwhen\s+did\s+(the|that|this|our|my)\b.{0,40}\b(property|house|car|truck|vehicle|asset|land|account)\b.{0,20}\b(come|go|get)\b.{0,20}\b(into|in(to)?\s+the\s+trust)",
+    r"\bwhat\s+assets?\b.{0,30}\b(did|have)\s+we\b",
+    r"\b(how\s+long|what\s+date|which\s+date)\b.{0,40}\b(owned|held|in\s+the\s+trust)\b",
+]
+
+
+def asset_history_needed(intent: str, message: str) -> bool:
+    if intent in ("add_asset", "contribute_asset", "update_asset", "add_investment"):
+        return False  # write intents handle themselves
+    m = message.lower()
+    return any(re.search(p, m) for p in ASSET_TIMELINE_TRIGGERS)
+
+
+async def search_asset_history(
+    db,
+    trust_id: str,
+    user_id: str,
+    message: str,
+    limit: int = 5,
+) -> list:
+    """Schedule A timeline search for 'when did we...' questions. Returns
+    assets whose description/identifier match extracted terms, with the
+    conveyed/disposition dates and the minutes reference for citation.
+    Falls back to the most recent assets when nothing matches the terms."""
+    def _run(query: dict):
+        return db.schedule_a_items.find(
+            query,
+            {"_id": 0, "item_id": 1, "category": 1, "description": 1, "identifier": 1,
+             "approximate_value": 1, "date_conveyed": 1, "status": 1,
+             "disposition_date": 1, "disposition_notes": 1, "minutes_ref": 1,
+             "disposition_minutes_ref": 1, "created_at": 1},
+        ).sort("created_at", -1).limit(limit).to_list(limit)
+
+    terms = _extract_search_terms(message)
+    query: dict = {"trust_id": trust_id, "user_id": user_id, "status": {"$ne": "deleted"}}
+    if terms:
+        # All-terms lookahead (same semantics as minutes search): every word
+        # present anywhere in the field, any order. (?s) for .* across newlines.
+        all_terms = "(?s)" + "".join(f"(?=.*{re.escape(w)})" for w in terms.split())
+        query["$or"] = [
+            {"description": {"$regex": all_terms, "$options": "i"}},
+            {"identifier": {"$regex": all_terms, "$options": "i"}},
+            {"category": {"$regex": all_terms, "$options": "i"}},
+            {"notes": {"$regex": all_terms, "$options": "i"}},
+        ]
+    docs = await _run(query)
+    if not docs and terms:
+        base = {"trust_id": trust_id, "user_id": user_id, "status": {"$ne": "deleted"}}
+        docs = await _run(base)
+    return docs
+
+
+def _render_asset_timeline(assets: list) -> str:
+    if not assets:
+        return ""
+    lines = ["## Retrieved Asset History (from Schedule A — cite date + minutes reference)"]
+    for a in assets[:5]:
+        desc = (a.get("description") or "Unnamed asset").strip()
+        cat = (a.get("category") or "").replace("_", " ").title()
+        ident = (a.get("identifier") or "").strip()
+        conveyed = (a.get("date_conveyed") or "")[:10]
+        added = (a.get("created_at") or "")[:10]
+        status = a.get("status") or "active"
+        value = a.get("approximate_value")
+        line = f"- {desc}" + (f" ({ident})" if ident else "")
+        if status == "disposed":
+            disp = (a.get("disposition_date") or "")[:10]
+            line += f" — DISPOSED {disp}" if disp else " — disposed"
+            dn = (a.get("disposition_notes") or "").strip()
+            if dn:
+                line += f": {dn[:150]}"
+        elif conveyed:
+            line += f" — conveyed into trust {conveyed}"
+        elif added:
+            line += f" — recorded {added}"
+        if value:
+            line += f", ~${value:,.0f}"
+        mref = a.get("minutes_ref") or a.get("disposition_minutes_ref")
+        if mref:
+            line += f" [minutes ref: {mref}]"
+        lines.append(line)
+    return "\n".join(lines)
+
+
 async def search_minutes(
     db,
     trust_id: str,
@@ -132,22 +233,31 @@ async def search_minutes(
     message: str,
     limit: int = 5,
 ) -> list:
-    """Full-text minutes search scoped to the trust. Uses the same regex
-    semantics as the guided-minutes attachment dialog; extracts candidate
-    search terms from the user's message."""
+    """Full-text minutes search scoped to the trust. Extracts candidate
+    search terms from the user's message; when nothing matches, falls back
+    to the most recent minutes so the assistant can still answer from the
+    record roster instead of 'I found nothing'."""
+    def _run(query: dict):
+        return db.minutes_records.find(
+            query,
+            {"_id": 0, "minutes_id": 1, "minutes_type": 1, "meeting_date": 1,
+             "decisions_text": 1, "participants_text": 1},
+        ).sort("meeting_date", -1).limit(limit).to_list(limit)
+
     query_text = _extract_search_terms(message)
     search_query: dict = {"trust_id": trust_id, "user_id": user_id}
     if query_text:
-        esc = re.escape(query_text)
+        # All-terms lookahead: every word present anywhere in the field, any
+        # order — exact-phrase regex missed "pickup truck (blue)"-style text.
+        # (?s) so .* spans newlines in multi-line decisions text.
+        all_terms = "(?s)" + "".join(f"(?=.*{re.escape(w)})" for w in query_text.split())
         search_query["$or"] = [
-            {"decisions_text": {"$regex": esc, "$options": "i"}},
-            {"participants_text": {"$regex": esc, "$options": "i"}},
+            {"decisions_text": {"$regex": all_terms, "$options": "i"}},
+            {"participants_text": {"$regex": all_terms, "$options": "i"}},
         ]
-    docs = await db.minutes_records.find(
-        search_query,
-        {"_id": 0, "minutes_id": 1, "minutes_type": 1, "meeting_date": 1,
-         "decisions_text": 1, "participants_text": 1},
-    ).sort("meeting_date", -1).limit(limit).to_list(limit)
+    docs = await _run(search_query)
+    if not docs and query_text:
+        docs = await _run({"trust_id": trust_id, "user_id": user_id})
     return docs
 
 
@@ -158,6 +268,12 @@ _TERM_STOP = {
     "are", "for", "about", "on", "in", "of", "to", "that", "which", "what",
     "where", "all", "past", "previous", "every", "any", "did", "approved",
     "approve", "approving", "trust", "trustee", "trustees", "and", "or",
+    # Asking/action verbs — they describe the question, not the record text
+    "say", "said", "decide", "decided", "agree", "agreed", "record", "vote",
+    "remember", "recall", "talk", "talked", "mention", "mentioned",
+    "discuss", "discussed", "add", "added", "buy", "bought", "sell", "sold",
+    "purchase", "purchased", "transfer", "transferred", "convey", "conveyed",
+    "contribute", "contributed", "into", "get", "got", "came", "went",
 }
 
 
@@ -168,8 +284,9 @@ def _extract_search_terms(message: str) -> str:
     terms = [w for w in words if w not in _TERM_STOP and len(w) > 2]
     if not terms:
         return ""
-    # Use the two most content-bearing words — keeps the regex targeted.
-    return " ".join(terms[:2])
+    # Up to four content-bearing words — two is too brittle for real
+    # questions ("when did we buy the blue pickup truck" loses "pickup truck").
+    return " ".join(terms[:4])
 
 
 async def get_vault_doc_detail(
@@ -242,6 +359,12 @@ async def retrieve_for_message(
     except Exception as e:  # retrieval must never break the chat
         from logging import getLogger
         getLogger(__name__).warning(f"minutes retrieval failed: {type(e).__name__}: {e}")
+    try:
+        if asset_history_needed(intent, message):
+            block.asset_history = await search_asset_history(db, trust_id, user_id, message)
+    except Exception as e:  # retrieval must never break the chat
+        from logging import getLogger
+        getLogger(__name__).warning(f"asset retrieval failed: {type(e).__name__}: {e}")
     if block.is_empty():
         try:
             if vault_detail_needed(intent, message):
@@ -270,8 +393,10 @@ __all__ = [
     "RetrievalBlock",
     "retrieve_for_message",
     "minutes_search_needed",
+    "asset_history_needed",
     "vault_detail_needed",
     "search_minutes",
+    "search_asset_history",
     "get_vault_doc_detail",
     "inject_into_user_content",
     "MAX_RETRIEVAL_CHARS",

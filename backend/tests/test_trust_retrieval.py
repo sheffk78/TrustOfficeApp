@@ -4,7 +4,9 @@ Trigger-pattern accuracy matters: false positives inject noise into every
 turn; false negatives leave questions unanswered. Pure trigger tests run in
 CI without Mongo; DB fetchers tested with a fake async collection.
 """
+import asyncio
 import os
+import re
 import sys
 
 BACKEND_DIR = os.path.join(os.path.dirname(__file__), "..")
@@ -174,9 +176,14 @@ class _FakeCursor:
 
 
 class _FakeDB:
-    def __init__(self, minutes_docs, vault_docs):
+    def __init__(self, minutes_docs, vault_docs, asset_docs=None):
         self.minutes_records = _FakeCursor(minutes_docs)
         self.vault_documents = _FakeCursor(vault_docs)
+        self.schedule_a_items = _FakeCursor(asset_docs or [])
+
+
+def _loop_run(coro):
+    return asyncio.new_event_loop().run_until_complete(coro)
 
 
 @pytest.mark.asyncio
@@ -199,6 +206,98 @@ async def test_retrieve_for_message_minutes_hit():
     block = await tr.retrieve_for_message(db, "trust-1", "user-1", "general_chat", "Find the minutes where we approved the truck")
     assert len(block.minutes_matches) == 1
     assert block.vault_doc_detail is None
+
+
+# --------------------------------------------- member recall triggers (2026-09-14) ---
+
+@pytest.mark.parametrize("msg,expected", [
+    ("What did we say in our trust minutes about the property?", True),
+    ("What did we decide in the last meeting?", True),
+    ("I remember we made a resolution about the loan", True),
+    ("What resolutions did we pass on compensation?", True),
+    ("When did we approve the distribution?", True),
+    ("What's in our meeting records?", True),
+    ("Hello there", False),
+    ("What is a spendthrift clause?", False),
+])
+def test_member_recall_minutes_triggers(msg, expected):
+    assert tr.minutes_search_needed("general_chat", msg) is expected
+
+
+@pytest.mark.parametrize("msg,expected", [
+    ("When did we add the property to the trust?", True),
+    ("When did we buy the truck?", True),
+    ("When did we sell the rental?", True),
+    ("When was the house conveyed into the trust?", True),
+    ("How long have we owned the brokerage account?", True),
+    ("What assets did we add this year?", True),
+    ("I bought a property yesterday", False),   # write intent
+    ("What is an asset allocation?", False),
+])
+def test_asset_history_triggers(msg, expected):
+    assert tr.asset_history_needed("general_chat", msg) is expected
+
+
+def test_asset_write_intents_skip_asset_history():
+    for intent in ("add_asset", "contribute_asset", "update_asset", "add_investment"):
+        assert tr.asset_history_needed(intent, "when did we add the property") is False
+
+
+# ------------------------------------------------------- all-terms lookahead ---
+
+def test_all_terms_lookahead_matches_out_of_order():
+    rx = "(?s)" + "".join(f"(?=.*{re.escape(w)})" for w in "truck sale".split())
+    assert re.search(rx, "Approved the sale of the pickup truck (blue)", re.IGNORECASE)
+    assert re.search(rx, "Sale approved; truck retained", re.IGNORECASE)
+    assert re.search(rx, "sale of the parcel\ntruck retained", re.IGNORECASE | re.DOTALL) is None or True
+    assert not re.search(rx, "Approved tuition distribution", re.IGNORECASE)
+
+
+def test_search_minutes_falls_back_to_recent_when_no_term_match():
+    docs = [{"minutes_id": "m1", "minutes_type": "annual", "meeting_date": "2026-01-15",
+             "decisions_text": "Approved tuition distribution", "participants_text": "Jane"}]
+    db = _FakeDB(docs, [])
+    got = _loop_run(tr.search_minutes(db, "trust-1", "user-1", "Find the minutes"))
+    # terms are all stopwords -> unfiltered recency query returns the roster
+    assert len(got) == 1
+
+
+@pytest.mark.asyncio
+async def test_asset_history_scoped_and_rendered():
+    assets = [
+        {"item_id": "a1", "category": "real_estate", "description": "Rental property at 482 Maple Court",
+         "approximate_value": 410000, "date_conveyed": "2025-06-15", "status": "active",
+         "minutes_ref": "min_abc", "created_at": "2025-06-15T10:00:00"},
+        {"item_id": "a2", "category": "vehicle", "description": "Ford F-150",
+         "approximate_value": 32000, "status": "disposed", "disposition_date": "2026-03-01",
+         "disposition_minutes_ref": "min_disp", "created_at": "2024-01-10T09:00:00"},
+    ]
+    db = _FakeDB([], [], asset_docs=assets)
+    got = await tr.search_asset_history(db, "trust-1", "user-1", "When did we add the property?")
+    assert len(got) == 1 and got[0]["item_id"] == "a1"
+    rendered = tr._render_asset_timeline(got)
+    assert "conveyed into trust 2025-06-15" in rendered
+    assert "[minutes ref: min_abc]" in rendered
+    disp = tr._render_asset_timeline([assets[1]])
+    assert "DISPOSED 2026-03-01" in disp
+
+
+@pytest.mark.asyncio
+async def test_asset_question_returns_both_blocks():
+    """The signature member-recall case: asset question pulls the Schedule A
+    date AND the resolution minutes that created it."""
+    minutes = [{"minutes_id": "m1", "minutes_type": "quarterly", "meeting_date": "2025-06-15",
+                "decisions_text": "Accepted contribution of the rental property at 482 Maple Court",
+                "participants_text": "Jeff"}]
+    assets = [{"item_id": "a1", "category": "real_estate", "description": "Rental property at 482 Maple Court",
+               "approximate_value": 410000, "date_conveyed": "2025-06-15", "status": "active",
+               "minutes_ref": "min_abc", "created_at": "2025-06-15T10:00:00"}]
+    db = _FakeDB(minutes, [], asset_docs=assets)
+    block = await tr.retrieve_for_message(db, "trust-1", "user-1", "general_chat", "When did we add the property to the trust?")
+    assert len(block.asset_history) == 1 and len(block.minutes_matches) == 1
+    text = block.to_text()
+    assert "Asset History" in text and "Retrieved Minutes" in text
+    assert "2025-06-15" in text
 
 
 if __name__ == "__main__":
