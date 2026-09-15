@@ -326,7 +326,13 @@ async def list_customers(
     """
     List all customers with filtering, search, and pagination.
     """
-    query = await _build_customer_query_async(search, is_admin_filter, status)
+    query = _build_customer_query(search, is_admin_filter)
+    if status and status != "all":
+        # Status lives on subscriptions, not users — resolve matching user_ids
+        # BEFORE pagination (the old Python post-page filter was the 2026-09-15
+        # bug: 'active' matched only rows already on the current page).
+        sub_user_ids = await db.subscriptions.distinct("user_id", {"status": status})
+        query["user_id"] = {"$in": sub_user_ids}
 
     total = await db.users.count_documents(query)
     logger.info(f"Admin list_customers: query={query}, total={total}")
@@ -363,44 +369,6 @@ def _build_customer_query(search: Optional[str], is_admin_filter: Optional[bool]
         else:
             query["is_admin"] = {"$ne": True}
     return query
-
-
-async def _apply_status_filter(query: dict, status: Optional[str]) -> dict:
-    """
-    Push the subscription-status filter into the Mongo query so it applies
-    BEFORE pagination. Status lives on the subscriptions collection, so this
-    resolves the matching user_ids there and constrains users.user_id to them.
-
-    Without this, pagination happened first and the status filter only ran
-    over the current page in Python — so a filtered view showed matches from
-    just that page instead of the full customer set.
-    """
-    if not status or status == "all":
-        return query
-    sub_user_ids = await db.subscriptions.distinct(
-        "user_id", {"status": status}
-    )
-    # Preserve any user_id constraint already in the query (currently none).
-    existing = query.get("user_id")
-    if existing is not None:
-        if isinstance(existing, dict) and "$in" in existing:
-            existing["$in"] = list(set(existing["$in"]) & set(sub_user_ids))
-        else:
-            existing_list = existing if isinstance(existing, list) else [existing]
-            query["user_id"] = {"$in": list(set(existing_list) & set(sub_user_ids))}
-    else:
-        query["user_id"] = {"$in": sub_user_ids}
-    return query
-
-
-async def _build_customer_query_async(
-    search: Optional[str],
-    is_admin_filter: Optional[bool],
-    status: Optional[str],
-) -> dict:
-    """Async wrapper: base query + subscription-status filter resolved in Mongo."""
-    query = _build_customer_query(search, is_admin_filter)
-    return await _apply_status_filter(query, status)
 
 
 async def _enrich_customers(users: list, status_filter: Optional[str]) -> list:
