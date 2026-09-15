@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import PageHelpButton from '@/components/PageHelpButton';
 import NotificationCenter from '@/components/NotificationCenter';
 import LeadFollowUpModal from '@/components/LeadFollowUpModal';
+import LeadBookingEmailPreviewModal from '@/components/LeadBookingEmailPreviewModal';
 import {
   Users, Shield, Crown, Link2, Target,
   TrendingUp, Gift, DollarSign, CheckCircle,
@@ -114,7 +115,7 @@ export default function AdminPage() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [leadDetailLoading, setLeadDetailLoading] = useState(false);
   const [leadNoteText, setLeadNoteText] = useState('');
-  const [bookingEmailSending, setBookingEmailSending] = useState(false);
+  const [bookingPreviewLead, setBookingPreviewLead] = useState(null);
 
   // Lead analytics state
   const [leadAnalytics, setLeadAnalytics] = useState(null);
@@ -438,31 +439,21 @@ export default function AdminPage() {
     }
   };
 
-  // ─── Send booking email (one-click, derived from notes) ──────────
-  // 2026-09-15 (Jeff): no preview step — button sends immediately.
-  const handleSendBookingEmail = async (lead) => {
-    if (!lead?.lead_id || bookingEmailSending) return;
-    setBookingEmailSending(true);
-    try {
-      const response = await fetchWithAuth(
-        `/admin/notifications/${lead.lead_id}/send-booking-email-auto`,
-        { method: 'POST' }
-      );
-      const data = await response.json().catch(() => ({}));
-      if (response.ok) {
-        toast.success(`Booking email sent to ${lead.name || lead.email}`);
-        fetchLeads();
-        fetchLeadDetail(lead.lead_id);
-      } else if (response.status === 429) {
-        toast.error(data.detail || 'Email already sent to this lead recently — wait 5 minutes');
-      } else {
-        toast.error(data.detail || 'Failed to send booking email');
-      }
-    } catch (error) {
-      console.error('Failed to send booking email:', error);
-      toast.error('Failed to send booking email');
+  // ─── Booking email preview modal (2026-09-15, Jeff: preview before send + CC) ──
+  // State declared with the other lead state above.
+
+  // Open the designed preview instead of sending blind (was send-booking-email-auto).
+  const handleSendBookingEmail = (lead) => {
+    if (!lead?.lead_id) return;
+    setBookingPreviewLead(lead);
+  };
+
+  const handleBookingEmailSent = () => {
+    if (bookingPreviewLead?.lead_id) {
+      fetchLeads();
+      fetchLeadDetail(bookingPreviewLead.lead_id);
     }
-    setBookingEmailSending(false);
+    setBookingPreviewLead(null);
   };
 
   // ─── Update lead stage ───────────────────────────────────────────
@@ -1194,7 +1185,14 @@ export default function AdminPage() {
               onNoteChange={setLeadNoteText}
               leadNoteText={leadNoteText}
               onSendBookingEmail={handleSendBookingEmail}
-              bookingEmailSending={bookingEmailSending}
+              bookingEmailSending={false}
+            />
+
+            <LeadBookingEmailPreviewModal
+              lead={bookingPreviewLead}
+              open={!!bookingPreviewLead}
+              onClose={() => setBookingPreviewLead(null)}
+              onSent={handleBookingEmailSent}
             />
 
             <BulkLeadStageDialog

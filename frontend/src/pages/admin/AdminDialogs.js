@@ -208,32 +208,22 @@ export function LeadDetailDialog({
               </div>
             </div>
 
-            {/* Booking Email — one-click, derived from notes (2026-09-15, Jeff) */}
+            {/* Booking Email — designed preview before send (2026-09-15, Jeff) */}
             {onSendBookingEmail && selectedLead.email && (
               <div className="flex items-center gap-3 p-3 border border-gold/30 bg-gold/5 rounded">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-navy dark:text-white">Send booking email</p>
                   <p className="text-xs text-muted-foreground">
-                    One click. Reads the notes above (voicemail, call recap) and sends a booking-link email from you — source attribution included.
+                    Reads the notes above (voicemail, call recap) and drafts a booking-link email from you — preview it exactly as they'll receive it, edit anything, optionally CC someone, then send.
                   </p>
                 </div>
                 <Button
                   size="sm"
                   className="shrink-0 bg-navy text-white hover:bg-navy/90 dark:bg-gold dark:text-navy"
-                  disabled={bookingEmailSending}
                   onClick={() => onSendBookingEmail(selectedLead)}
                 >
-                  {bookingEmailSending ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
-                      Sending…
-                    </>
-                  ) : (
-                    <>
-                      <Calendar className="w-4 h-4 mr-1.5" />
-                      Send Booking Email
-                    </>
-                  )}
+                  <Calendar className="w-4 h-4 mr-1.5" />
+                  Preview &amp; Send
                 </Button>
               </div>
             )}

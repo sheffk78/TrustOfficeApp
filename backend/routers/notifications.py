@@ -5,6 +5,7 @@ and provides a lightweight polling endpoint for the frontend bell icon.
 """
 import uuid
 import logging
+import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -350,15 +351,36 @@ class DraftEmailRequest(BaseModel):
     """Request body for sending a note-derived booking-link draft."""
     subject: str
     body_html: str
+    cc_email: Optional[str] = None
 
 
 # 2026-09-15 (Jeff, #trustoffice-main): shared send path for both follow-up
 # flows. Rate limit + activity log live here so both endpoints stay identical.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _normalize_cc(cc_email: Optional[str]) -> Optional[str]:
+    """Validate + normalize a comma/semicolon CC list. Returns None when empty."""
+    if not cc_email or not cc_email.strip():
+        return None
+    parts = [p.strip() for p in cc_email.replace(";", ",").split(",") if p.strip()]
+    if not parts:
+        return None
+    for p in parts:
+        if not _EMAIL_RE.match(p):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid CC email address: {p}",
+            )
+    return ", ".join(parts)
+
+
 async def _send_and_log_followup(
     lead: dict,
     subject: str,
     body_html: str,
     log_note: str,
+    cc_email: str = None,
 ):
     to_email = lead.get("email")
     if not to_email:
@@ -386,10 +408,12 @@ async def _send_and_log_followup(
             to_email=to_email,
             subject=subject,
             html_body=body_html,
+            cc_email=cc_email,
         )
         from routers.leads import _log_activity
-        await _log_activity(lead["lead_id"], "email", log_note)
-        logger.info(f"Follow-up email sent to {to_email}: {log_note}")
+        note = log_note + (" (cc: %s)" % cc_email if cc_email else "")
+        await _log_activity(lead["lead_id"], "email", note)
+        logger.info(f"Follow-up email sent to {to_email}: {note}")
         return {"success": True, "message": f"Follow-up sent to {to_email}"}
     except Exception as e:
         logger.error(f"Failed to send follow-up email to {to_email}: {e}")
@@ -493,6 +517,8 @@ async def send_booking_email(
     if not subject or not body_html:
         raise HTTPException(status_code=400, detail="Subject and body are required")
 
+    cc_email = _normalize_cc(req.cc_email)
+
     # Guardrail: the booking link must be present (this is the booking-link email).
     if _BOOKING_URL not in body_html:
         raise HTTPException(
@@ -501,7 +527,7 @@ async def send_booking_email(
         )
 
     return await _send_and_log_followup(
-        lead, subject, body_html, "Sent booking-link follow-up"
+        lead, subject, body_html, "Sent booking-link follow-up", cc_email=cc_email
     )
 
 

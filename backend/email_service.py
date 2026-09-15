@@ -57,7 +57,8 @@ class EmailService:
         to_name: str = None,
         tag: str = None,
         metadata: Dict[str, str] = None,
-        track_opens: bool = True
+        track_opens: bool = True,
+        cc_email: str = None
     ) -> Dict[str, Any]:
         """
         Send a single email via Postmark.
@@ -71,6 +72,7 @@ class EmailService:
             tag: Tag for tracking/filtering in Postmark
             metadata: Custom metadata (max 10 fields)
             track_opens: Whether to track email opens
+            cc_email: Comma/semicolon-separated CC address(es) (optional)
             
         Returns:
             Dict with message_id and status
@@ -91,7 +93,11 @@ class EmailService:
                 "HtmlBody": html_body,
                 "TrackOpens": track_opens
             }
-            
+
+            if cc_email:
+                # Postmark accepts comma-separated Cc; normalize comma/semicolon lists.
+                parts = [p.strip() for p in cc_email.replace(";", ",").split(",") if p.strip()]
+                payload["Cc"] = ", ".join(parts)
             if text_body:
                 payload["TextBody"] = text_body
             
