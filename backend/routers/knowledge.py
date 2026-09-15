@@ -704,7 +704,7 @@ async def sync_from_marketing_site(
                     "category": article["category"],
                     "content": article["content"],
                     "summary": article["summary"],
-                    "author": "Kenneth Kohler",
+                    "author": "Kenneth (Jeff) Kohler",
                     "tags": [],
                     "published": True,
                     "views": 0,

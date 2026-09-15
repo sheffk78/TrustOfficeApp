@@ -35,9 +35,9 @@ export function DashboardTrustAdminCard() {
         <p className="label-trust">Trust Administration Service</p>
         <Calendar className="w-4 h-4 text-gold" />
       </div>
-      <h3 className="font-serif text-xl text-navy mb-2">Schedule with Kenneth</h3>
+      <h3 className="font-serif text-xl text-navy mb-2">Schedule with Kenneth (Jeff)</h3>
       <p className="text-sm text-muted-foreground mb-5">
-        Your service includes time with Kenneth to work through administration,
+        Your service includes time with Kenneth (everyone knows him as Jeff) to work through administration,
         records, and governance questions. Pick a time that suits you.
       </p>
       <a

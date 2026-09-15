@@ -29,7 +29,7 @@ describe('DashboardTrustAdminCard', () => {
         'https://book.trustoffice.app/'
       );
     });
-    expect(screen.getByText('Schedule with Kenneth')).toBeInTheDocument();
+    expect(screen.getByText('Schedule with Kenneth (Jeff)')).toBeInTheDocument();
   });
 
   it('renders NOTHING for users without the entitlement (never upsells)', async () => {

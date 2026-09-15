@@ -421,9 +421,9 @@ async def _seed_default_templates():
             "subject": "Quick question, {name}",
             "body": """<p>Hi {name},</p>
 <p>I noticed you recently signed up for the Trustee 101 course — welcome!</p>
-<p>Quick question: what brought you to TrustOffice? Are you a new trustee, or have you been managing a trust for a while?</p>
+<p>Quick question: what brought you to TrustOffice? Are you a new trustee, or have you been managing a trust for a while? (And a quick note in case we cross paths anywhere else: my legal name is Kenneth, but everyone knows me as Jeff — same person.)</p>
 <p>Either way, I'd love to hear your story. Just hit reply.</p>
-<p>— Kenneth</p>""",
+<p>— Kenneth (Jeff)</p>""",
             "trigger_stage": "new",
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
@@ -435,7 +435,7 @@ async def _seed_default_templates():
 <p>I noticed you've been working through Trustee 101 — great progress.</p>
 <p>Lesson 4 (HEMS Decoded) is where things get really practical. It covers the single most important rule for making trust distributions: Health, Education, Maintenance, and Support.</p>
 <p><a href="{course_url}">Continue where you left off →</a></p>
-<p>— Kenneth</p>""",
+<p>— Kenneth (Jeff)</p>""",
             "trigger_stage": "engaged",
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
@@ -451,7 +451,7 @@ async def _seed_default_templates():
 <li>Whether TrustOffice is the right fit for you</li>
 </ul>
 <p>No need to prepare anything — just bring your questions.</p>
-<p>— Kenneth</p>""",
+<p>— Kenneth (Jeff)</p>""",
             "trigger_stage": "new",
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
@@ -468,7 +468,7 @@ async def _seed_default_templates():
 </ul>
 <p>Your first month is <strong>$29</strong> with code WELCOME29. No commitment beyond that.</p>
 <p><a href="{app_url}/pricing">See plans →</a></p>
-<p>— Kenneth</p>""",
+<p>— Kenneth (Jeff)</p>""",
             "trigger_stage": "warm",
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
@@ -480,7 +480,7 @@ async def _seed_default_templates():
 <p>It's been a little while since you checked out TrustOffice. I wanted to check in.</p>
 <p>If the timing wasn't right, no pressure at all. But if you're still dealing with trust administration and wondering if there's a better way — we're here.</p>
 <p>Happy to hop on a quick call if that's easier.</p>
-<p>— Kenneth</p>""",
+<p>— Kenneth (Jeff)</p>""",
             "trigger_stage": "lost",
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
