@@ -19,7 +19,7 @@ import { fetchWithAuth } from '@/utils/api';
 export function LeadDetailDialog({
   selectedLead, leadDetailLoading,
   onClose, onUpdateLeadStage, onUpdateCallOutcome, onAddNote, onNoteChange, leadNoteText,
-  onSendBookingEmail,
+  onSendBookingEmail, bookingEmailSending,
 }) {
   return (
     <Dialog open={!!selectedLead} onOpenChange={onClose}>
@@ -208,22 +208,32 @@ export function LeadDetailDialog({
               </div>
             </div>
 
-            {/* Booking Email — note-aware draft (2026-09-15, Jeff) */}
+            {/* Booking Email — one-click, derived from notes (2026-09-15, Jeff) */}
             {onSendBookingEmail && selectedLead.email && (
               <div className="flex items-center gap-3 p-3 border border-gold/30 bg-gold/5 rounded">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-navy dark:text-white">Send booking email</p>
                   <p className="text-xs text-muted-foreground">
-                    Drafts a booking-link email shaped by the notes above — voicemail and call recaps are picked up automatically.
+                    One click. Reads the notes above (voicemail, call recap) and sends a booking-link email from you — source attribution included.
                   </p>
                 </div>
                 <Button
                   size="sm"
                   className="shrink-0 bg-navy text-white hover:bg-navy/90 dark:bg-gold dark:text-navy"
+                  disabled={bookingEmailSending}
                   onClick={() => onSendBookingEmail(selectedLead)}
                 >
-                  <Calendar className="w-4 h-4 mr-1.5" />
-                  Draft Email
+                  {bookingEmailSending ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-4 h-4 mr-1.5" />
+                      Send Booking Email
+                    </>
+                  )}
                 </Button>
               </div>
             )}

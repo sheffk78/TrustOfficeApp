@@ -191,3 +191,6 @@ credentials.json
 .railway/
 test_reports/
 backend/trust_knowledge.db
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

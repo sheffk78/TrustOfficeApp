@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 import PageHelpButton from '@/components/PageHelpButton';
 import NotificationCenter from '@/components/NotificationCenter';
 import LeadFollowUpModal from '@/components/LeadFollowUpModal';
-import LeadBookingEmailModal from '@/components/LeadBookingEmailModal';
 import {
   Users, Shield, Crown, Link2, Target,
   TrendingUp, Gift, DollarSign, CheckCircle,
@@ -115,7 +114,7 @@ export default function AdminPage() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [leadDetailLoading, setLeadDetailLoading] = useState(false);
   const [leadNoteText, setLeadNoteText] = useState('');
-  const [bookingEmailLead, setBookingEmailLead] = useState(null);
+  const [bookingEmailSending, setBookingEmailSending] = useState(false);
 
   // Lead analytics state
   const [leadAnalytics, setLeadAnalytics] = useState(null);
@@ -437,6 +436,33 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Failed to add lead note:', error);
     }
+  };
+
+  // ─── Send booking email (one-click, derived from notes) ──────────
+  // 2026-09-15 (Jeff): no preview step — button sends immediately.
+  const handleSendBookingEmail = async (lead) => {
+    if (!lead?.lead_id || bookingEmailSending) return;
+    setBookingEmailSending(true);
+    try {
+      const response = await fetchWithAuth(
+        `/admin/notifications/${lead.lead_id}/send-booking-email-auto`,
+        { method: 'POST' }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        toast.success(`Booking email sent to ${lead.name || lead.email}`);
+        fetchLeads();
+        fetchLeadDetail(lead.lead_id);
+      } else if (response.status === 429) {
+        toast.error(data.detail || 'Email already sent to this lead recently — wait 5 minutes');
+      } else {
+        toast.error(data.detail || 'Failed to send booking email');
+      }
+    } catch (error) {
+      console.error('Failed to send booking email:', error);
+      toast.error('Failed to send booking email');
+    }
+    setBookingEmailSending(false);
   };
 
   // ─── Update lead stage ───────────────────────────────────────────
@@ -1167,7 +1193,8 @@ export default function AdminPage() {
               onAddNote={addLeadNote}
               onNoteChange={setLeadNoteText}
               leadNoteText={leadNoteText}
-              onSendBookingEmail={(lead) => setBookingEmailLead(lead)}
+              onSendBookingEmail={handleSendBookingEmail}
+              bookingEmailSending={bookingEmailSending}
             />
 
             <BulkLeadStageDialog
@@ -1261,19 +1288,6 @@ export default function AdminPage() {
             }}
             onSent={() => {
               fetchLeads();
-            }}
-          />
-
-          {/* Booking email modal — note-aware draft (2026-09-15, Jeff) */}
-          <LeadBookingEmailModal
-            lead={bookingEmailLead}
-            open={!!bookingEmailLead}
-            onClose={() => setBookingEmailLead(null)}
-            onSent={() => {
-              fetchLeads();
-              if (selectedLead?.lead_id === bookingEmailLead?.lead_id) {
-                fetchLeadDetail(bookingEmailLead.lead_id);
-              }
             }}
           />
         </div>

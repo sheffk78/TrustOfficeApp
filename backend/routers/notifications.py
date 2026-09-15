@@ -505,6 +505,29 @@ async def send_booking_email(
     )
 
 
+@router.post("/{lead_id}/send-booking-email-auto")
+async def send_booking_email_auto(
+    lead_id: str,
+    admin: dict = Depends(_leads_guard()),
+):
+    """One-click booking email (2026-09-15 Jeff feedback: no preview step —
+    derive from notes + lead server-side and send immediately)."""
+    from followup_drafts import derive_draft
+
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    activities = await db.lead_activities.find(
+        {"lead_id": lead_id}, {"_id": 0, "content": 1, "action_type": 1, "created_at": 1}
+    ).to_list(100)
+
+    draft = derive_draft(lead, activities)
+    return await _send_and_log_followup(
+        lead, draft["subject"], draft["body_html"], "Sent booking-link follow-up"
+    )
+
+
 # ==================== DEFAULT TEMPLATES ====================
 
 # 2026-09-15 (Jeff): hoisted to module level so _migrate_signature_templates
