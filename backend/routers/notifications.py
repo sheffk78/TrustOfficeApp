@@ -381,6 +381,14 @@ async def send_followup_email(
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
+    # 2026-09-15 (Jeff): re-sync stored copies to current defaults (seeding used
+    # $setOnInsert, so pre-migration prod docs kept the old '— Kenneth' bodies).
+    # Runs after the lookup, before render — self-heals prod without a manual DB op.
+    await _migrate_signature_templates()
+    updated = await db.lead_email_templates.find_one({"template_id": req.template_id})
+    if updated:
+        template = updated
+
     # Build email body with variable substitution
     def _fill(text):
         return (text or "").replace("{name}", lead.get("name", "")) \
@@ -411,39 +419,38 @@ async def send_followup_email(
 
 # ==================== DEFAULT TEMPLATES ====================
 
-
-async def _seed_default_templates():
-    """Seed 5 default follow-up email templates."""
-    defaults = [
-        {
-            "template_id": "tpl_welcome_followup",
-            "name": "Welcome Follow-Up",
-            "subject": "Quick question, {name}",
-            "body": """<p>Hi {name},</p>
+# 2026-09-15 (Jeff): hoisted to module level so _migrate_signature_templates
+# can re-sync stored prod copies after the Kenneth (Jeff) name change.
+DEFAULT_FOLLOWUP_TEMPLATES = [
+    {
+        "template_id": "tpl_welcome_followup",
+        "name": "Welcome Follow-Up",
+        "subject": "Quick question, {name}",
+        "body": """<p>Hi {name},</p>
 <p>I noticed you recently signed up for the Trustee 101 course — welcome!</p>
 <p>Quick question: what brought you to TrustOffice? Are you a new trustee, or have you been managing a trust for a while? (And a quick note in case we cross paths anywhere else: my legal name is Kenneth, but everyone knows me as Jeff — same person.)</p>
 <p>Either way, I'd love to hear your story. Just hit reply.</p>
 <p>— Kenneth (Jeff)</p>""",
-            "trigger_stage": "new",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-        {
-            "template_id": "tpl_course_nudge",
-            "name": "Course Nudge",
-            "subject": "Lesson 4 is ready for you, {name}",
-            "body": """<p>Hi {name},</p>
+        "trigger_stage": "new",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    },
+    {
+        "template_id": "tpl_course_nudge",
+        "name": "Course Nudge",
+        "subject": "Lesson 4 is ready for you, {name}",
+        "body": """<p>Hi {name},</p>
 <p>I noticed you've been working through Trustee 101 — great progress.</p>
 <p>Lesson 4 (HEMS Decoded) is where things get really practical. It covers the single most important rule for making trust distributions: Health, Education, Maintenance, and Support.</p>
 <p><a href="{course_url}">Continue where you left off →</a></p>
 <p>— Kenneth (Jeff)</p>""",
-            "trigger_stage": "engaged",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-        {
-            "template_id": "tpl_call_prep",
-            "name": "Discovery Call Prep",
-            "subject": "Looking forward to our call, {name}",
-            "body": """<p>Hi {name},</p>
+        "trigger_stage": "engaged",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    },
+    {
+        "template_id": "tpl_call_prep",
+        "name": "Discovery Call Prep",
+        "subject": "Looking forward to our call, {name}",
+        "body": """<p>Hi {name},</p>
 <p>Looking forward to our discovery call. To make the most of our time, here's what we'll cover:</p>
 <ul>
 <li>Your current trust situation and what's working</li>
@@ -452,14 +459,14 @@ async def _seed_default_templates():
 </ul>
 <p>No need to prepare anything — just bring your questions.</p>
 <p>— Kenneth (Jeff)</p>""",
-            "trigger_stage": "new",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-        {
-            "template_id": "tpl_value_pitch",
-            "name": "Value Pitch",
-            "subject": "How trustees use TrustOffice — 3-minute tour",
-            "body": """<p>Hi {name},</p>
+        "trigger_stage": "new",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    },
+    {
+        "template_id": "tpl_value_pitch",
+        "name": "Value Pitch",
+        "subject": "How trustees use TrustOffice — 3-minute tour",
+        "body": """<p>Hi {name},</p>
 <p>You've been checking out TrustOffice — here's a quick look at what it does for trustees like you:</p>
 <ul>
 <li><strong>Minutes that write themselves</strong> — guided templates, no blank page</li>
@@ -469,22 +476,27 @@ async def _seed_default_templates():
 <p>Your first month is <strong>$29</strong> with code WELCOME29. No commitment beyond that.</p>
 <p><a href="{app_url}/pricing">See plans →</a></p>
 <p>— Kenneth (Jeff)</p>""",
-            "trigger_stage": "warm",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-        {
-            "template_id": "tpl_win_back",
-            "name": "Win-Back",
-            "subject": "Still thinking about your trust, {name}?",
-            "body": """<p>Hi {name},</p>
+        "trigger_stage": "warm",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    },
+    {
+        "template_id": "tpl_win_back",
+        "name": "Win-Back",
+        "subject": "Still thinking about your trust, {name}?",
+        "body": """<p>Hi {name},</p>
 <p>It's been a little while since you checked out TrustOffice. I wanted to check in.</p>
 <p>If the timing wasn't right, no pressure at all. But if you're still dealing with trust administration and wondering if there's a better way — we're here.</p>
 <p>Happy to hop on a quick call if that's easier.</p>
 <p>— Kenneth (Jeff)</p>""",
-            "trigger_stage": "lost",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-    ]
+        "trigger_stage": "lost",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    },
+]
+
+
+async def _seed_default_templates():
+    """Seed 5 default follow-up email templates."""
+    defaults = DEFAULT_FOLLOWUP_TEMPLATES
 
     for tpl in defaults:
         try:
@@ -498,3 +510,22 @@ async def _seed_default_templates():
 
     templates = await db.lead_email_templates.find({}, {"_id": 0}).to_list(50)
     return templates
+
+
+async def _migrate_signature_templates() -> None:
+    """2026-09-15 (Jeff): one-time migration for the Kenneth (Jeff) name clarity
+    change. Seeded templates use $setOnInsert, so pre-existing prod docs kept
+    the old '— Kenneth' bodies after the code changed. Update any stored copy
+    to match the current defaults (idempotent; safe on every send)."""
+    try:
+        for tpl in DEFAULT_FOLLOWUP_TEMPLATES:
+            await db.lead_email_templates.update_one(
+                {"template_id": tpl["template_id"]},
+                {"$set": {
+                    "name": tpl["name"],
+                    "subject": tpl["subject"],
+                    "body": tpl["body"],
+                }},
+            )
+    except Exception as e:
+        logger.warning(f"Follow-up template signature migration skipped: {e}")
