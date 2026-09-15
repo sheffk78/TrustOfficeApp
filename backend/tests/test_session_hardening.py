@@ -270,10 +270,11 @@ def test_refresh_sets_cookies(client):
     assert resp.status_code == 200
     assert "session_token" in resp.cookies
     assert "refresh_token" in resp.cookies
-    # The refresh cookie must be scoped to /auth (path attribute in Set-Cookie)
+    # The refresh cookie must be scoped to /api/auth (path attribute in Set-Cookie)
+    # — 2026-09-15: path="/auth" matched nothing, breaking silent renewal.
     set_cookie = resp.headers.get("set-cookie", "")
     assert "refresh_token" in set_cookie
-    assert "Path=/auth" in set_cookie
+    assert "Path=/api/auth" in set_cookie
 
 
 # ==================== 4. REUSE DETECTION REVOKES ALL ====================
@@ -354,3 +355,74 @@ def test_password_change_wrong_current_fails(client):
         "current_password": "wrongpass", "new_password": "BrandNewPass456",
     })
     assert resp.status_code == 401
+
+
+# ==================== 6. ROTATION GRACE WINDOW (2026-09-15) ====================
+
+def test_grace_window_tab_race_served_not_revoked(client):
+    """Presenting a JUST-rotated token (within 60s) serves a fresh chain instead
+    of revoking all sessions — multiple tabs share one refresh cookie and race
+    the single-use rotation when they expire together."""
+    import dependencies
+    import asyncio
+
+    raw = dependencies.generate_refresh_token()
+    now = datetime.now(timezone.utc)
+    from database import db
+    db.refresh_tokens.docs.append({
+        "user_id": "user_test", "token_hash": dependencies.hash_refresh_token(raw),
+        "created_at": now.isoformat(), "expires_at": (now + timedelta(days=30)).isoformat(),
+        "rotated_from": "older", "revoked": True,
+        "rotated_at": (now - timedelta(seconds=5)).isoformat(),  # rotated 5s ago
+    })
+    resp = client.post("/api/auth/refresh", cookies={"refresh_token": raw})
+    assert resp.status_code == 200, f"grace window must serve tab-race losers: {resp.status_code} {resp.text}"
+    assert "refresh_token" in resp.cookies
+    # No reuse event logged
+    events = [d for d in db.audit_logs.docs if d.get("action") == "refresh_token_reuse_detected"]
+    assert not events, "grace-window presentation must not count as reuse"
+
+
+def test_reuse_outside_grace_window_still_revokes_all(client):
+    """A rotated token presented AFTER the grace window is still reuse: revoke all."""
+    import dependencies
+    import asyncio
+
+    raw = dependencies.generate_refresh_token()
+    other = dependencies.generate_refresh_token()
+    now = datetime.now(timezone.utc)
+    from database import db
+    db.refresh_tokens.docs.append({
+        "user_id": "user_test", "token_hash": dependencies.hash_refresh_token(raw),
+        "created_at": now.isoformat(), "expires_at": (now + timedelta(days=30)).isoformat(),
+        "rotated_from": "older", "revoked": True,
+        "rotated_at": (now - timedelta(minutes=10)).isoformat(),  # 10 min ago — outside grace
+    })
+    db.refresh_tokens.docs.append({
+        "user_id": "user_test", "token_hash": dependencies.hash_refresh_token(other),
+        "created_at": now.isoformat(), "expires_at": (now + timedelta(days=30)).isoformat(),
+        "rotated_from": None, "revoked": False,
+    })
+    resp = client.post("/api/auth/refresh", cookies={"refresh_token": raw})
+    assert resp.status_code == 401
+    rec = asyncio.run(db.refresh_tokens.find_one({"token_hash": dependencies.hash_refresh_token(other)}))
+    assert rec["revoked"] is True, "reuse outside grace must still revoke ALL tokens"
+    events = [d for d in db.audit_logs.docs if d.get("action") == "refresh_token_reuse_detected"]
+    assert events, "reuse outside grace must record a security event"
+
+
+def test_never_rotated_token_revoked_still_full_reuse(client):
+    """A revoked token with NO rotated_at (e.g. admin revoke-all) gets no grace."""
+    import dependencies
+    import asyncio
+
+    raw = dependencies.generate_refresh_token()
+    now = datetime.now(timezone.utc)
+    from database import db
+    db.refresh_tokens.docs.append({
+        "user_id": "user_test", "token_hash": dependencies.hash_refresh_token(raw),
+        "created_at": now.isoformat(), "expires_at": (now + timedelta(days=30)).isoformat(),
+        "rotated_from": None, "revoked": True,  # no rotated_at
+    })
+    resp = client.post("/api/auth/refresh", cookies={"refresh_token": raw})
+    assert resp.status_code == 401, "revoked token without rotation context must not get grace"

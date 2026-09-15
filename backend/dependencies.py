@@ -24,6 +24,13 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days — retained for backward compatibility 
 ACCESS_TOKEN_EXPIRATION_MINUTES = 30  # Session-hardening: short-lived access tokens
 REFRESH_TOKEN_EXPIRATION_DAYS = 30    # Refresh-token lifetime
 REFRESH_TOKEN_LENGTH = 48            # secrets.token_urlsafe(48) -> opaque random string
+# Grace window for presenting a JUST-rotated refresh token. Multiple open tabs
+# share one refresh cookie; when several expire together they race the single-use
+# rotation and the losers would otherwise trigger reuse detection (revoke ALL),
+# i.e. a guaranteed mass logout. Legit overlap happens within seconds, so 60s of
+# re-presenting the previous link in the chain is safe: a real attacker replaying
+# a stolen token is not bounded to a 60s window. (2026-09-15 — 30-min kickout fix.)
+REFRESH_ROTATION_GRACE_SECONDS = 60
 
 TRIAL_DAYS = 14  # Legacy — existing trial users still have this period. New signups go straight to paid.
 

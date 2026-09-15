@@ -320,11 +320,15 @@ async def login_2fa(request: Request, body: TwoFactorLoginRequest, response: Res
         key="session_token", value=token, httponly=True, secure=True,
         samesite="lax", max_age=ACCESS_TOKEN_EXPIRATION_MINUTES * 60, path="/",
     )
-    # Refresh token cookie (30d, httponly, secure, samesite=lax, scoped to /auth)
+    # Refresh token cookie (30d, httponly, secure, samesite=lax).
+    # Path MUST match the endpoint's mounted path (/api/auth/*) so the browser
+    # sends it back to POST /api/auth/refresh (see auth.py login, 2026-09-15).
     response.set_cookie(
         key="refresh_token", value=refresh_raw, httponly=True, secure=True,
-        samesite="lax", max_age=REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 3600, path="/auth",
+        samesite="lax", max_age=REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 3600, path="/api/auth",
     )
+    # Purge any legacy cookie scoped to the old (never-matching) path.
+    response.delete_cookie(key="refresh_token", path="/auth")
 
     payload = _build_login_payload(user_doc, token)
     # Admin enforcement: nag (never lock out) — enrolled admins skip this.

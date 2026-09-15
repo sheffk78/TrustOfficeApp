@@ -24,6 +24,7 @@ from dependencies import (
     JWT_EXPIRATION_HOURS,
     ACCESS_TOKEN_EXPIRATION_MINUTES,
     REFRESH_TOKEN_EXPIRATION_DAYS,
+    REFRESH_ROTATION_GRACE_SECONDS,
     JWT_SECRET,
     JWT_ALGORITHM,
     create_refresh_token_record,
@@ -319,7 +320,11 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         max_age=ACCESS_TOKEN_EXPIRATION_MINUTES * 60,
         path="/"
     )
-    # Refresh token cookie (30d, httponly, secure, samesite=lax, scoped to /auth)
+    # Refresh token cookie (30d, httponly, secure, samesite=lax).
+    # Path MUST match the endpoint's mounted path (/api/auth/*) so the browser
+    # sends it back to POST /api/auth/refresh — a narrower path silently breaks
+    # the refresh flow (2026-09-15: path="/auth" matched nothing; users were
+    # hard-logged-out at access-token expiry).
     response.set_cookie(
         key="refresh_token",
         value=refresh_raw,
@@ -327,8 +332,10 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
         secure=True,
         samesite="lax",
         max_age=REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 3600,
-        path="/auth"
+        path="/api/auth"
     )
+    # Purge any legacy cookie scoped to the old (never-matching) path.
+    response.delete_cookie(key="refresh_token", path="/auth")
 
     login_payload = {
         "token": token,
@@ -380,14 +387,31 @@ async def _consume_refresh_token(raw_token: str, user_id: str) -> dict:
 
     if record.get("revoked") or record.get("rotated_from") is not None:
         # Presented a token that was already rotated (single-use chain) or revoked.
-        # This is the classic token-reuse signal: revoke everything + log it.
-        await revoke_all_user_refresh_tokens(user_id)
-        await log_audit_event(
-            user_id, "refresh_token_reuse_detected", "user", user_id,
-            {"reason": "revoked_or_rotated_refresh_token", "token_id": str(record.get("_id"))},
-        )
-        logger.warning(f"Refresh token reuse (revoked/rotated) for user {user_id} — revoked all refresh tokens")
-        raise HTTPException(status_code=401, detail="Refresh token reuse detected — all sessions revoked for security")
+        # This is the classic token-reuse signal: revoke everything + log it —
+        # UNLESS the rotation happened within the grace window (multiple tabs of
+        # the same browser race the single-use refresh; the losers present the
+        # just-rotated token seconds later). Within REFRESH_ROTATION_GRACE_SECONDS
+        # we serve a fresh token chain instead of nuking every session.
+        rotated_at = record.get("rotated_at")
+        in_grace = False
+        if rotated_at:
+            try:
+                ra = datetime.fromisoformat(rotated_at.replace('Z', '+00:00'))
+                if ra.tzinfo is None:
+                    ra = ra.replace(tzinfo=timezone.utc)
+                in_grace = (datetime.now(timezone.utc) - ra).total_seconds() <= REFRESH_ROTATION_GRACE_SECONDS
+            except (ValueError, TypeError):
+                in_grace = False
+        if not in_grace:
+            await revoke_all_user_refresh_tokens(user_id)
+            await log_audit_event(
+                user_id, "refresh_token_reuse_detected", "user", user_id,
+                {"reason": "revoked_or_rotated_refresh_token", "token_id": str(record.get("_id"))},
+            )
+            logger.warning(f"Refresh token reuse (revoked/rotated) for user {user_id} — revoked all refresh tokens")
+            raise HTTPException(status_code=401, detail="Refresh token reuse detected — all sessions revoked for security")
+        # In grace: fall through and serve a fresh chain (tab-race loser gets
+        # its own token instead of a mass logout).
 
     # Expiry check (defensive — also enforced by cookie max_age)
     expires_at = record.get("expires_at")
@@ -468,8 +492,10 @@ async def refresh_token(request: Request, response: Response):
         secure=True,
         samesite="lax",
         max_age=REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 3600,
-        path="/auth"
+        path="/api/auth"
     )
+    # Purge any legacy cookie scoped to the old (never-matching) path.
+    response.delete_cookie(key="refresh_token", path="/auth")
 
     return {
         "token": new_access,
@@ -489,6 +515,7 @@ async def logout_all(request: Request, response: Response, user: dict = Depends(
     user_id = user["user_id"]
     await revoke_all_user_refresh_tokens(user_id, reason="logout_all")
     response.delete_cookie(key="session_token", path="/")
+    response.delete_cookie(key="refresh_token", path="/api/auth")
     response.delete_cookie(key="refresh_token", path="/auth")
     return {"message": "Logged out of all sessions"}
 
@@ -846,6 +873,11 @@ async def logout(request: Request, response: Response):
         logger.warning(f"Security event logging for logout failed (non-fatal): {sec_exc}")
 
     response.delete_cookie(key="session_token", path="/")
+    # Clear the refresh cookie too (old sessions may carry it at the legacy
+    # path, current ones at the endpoint path). Belt-and-suspenders so logout
+    # never leaves a live refresh token in the browser.
+    response.delete_cookie(key="refresh_token", path="/api/auth")
+    response.delete_cookie(key="refresh_token", path="/auth")
     return {"message": "Logged out"}
 
 
@@ -1003,8 +1035,10 @@ async def change_password(body: PasswordChange, request: Request, response: Resp
         secure=True,
         samesite="lax",
         max_age=REFRESH_TOKEN_EXPIRATION_DAYS * 24 * 3600,
-        path="/auth"
+        path="/api/auth"
     )
+    # Purge any legacy cookie scoped to the old (never-matching) path.
+    response.delete_cookie(key="refresh_token", path="/auth")
 
     return {"message": "Password changed successfully", "token": new_access}
 
