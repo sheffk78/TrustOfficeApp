@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import PageHelpButton from '@/components/PageHelpButton';
 import NotificationCenter from '@/components/NotificationCenter';
 import LeadFollowUpModal from '@/components/LeadFollowUpModal';
+import LeadBookingEmailModal from '@/components/LeadBookingEmailModal';
 import {
   Users, Shield, Crown, Link2, Target,
   TrendingUp, Gift, DollarSign, CheckCircle,
@@ -114,6 +115,7 @@ export default function AdminPage() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [leadDetailLoading, setLeadDetailLoading] = useState(false);
   const [leadNoteText, setLeadNoteText] = useState('');
+  const [bookingEmailLead, setBookingEmailLead] = useState(null);
 
   // Lead analytics state
   const [leadAnalytics, setLeadAnalytics] = useState(null);
@@ -1165,6 +1167,7 @@ export default function AdminPage() {
               onAddNote={addLeadNote}
               onNoteChange={setLeadNoteText}
               leadNoteText={leadNoteText}
+              onSendBookingEmail={(lead) => setBookingEmailLead(lead)}
             />
 
             <BulkLeadStageDialog
@@ -1258,6 +1261,19 @@ export default function AdminPage() {
             }}
             onSent={() => {
               fetchLeads();
+            }}
+          />
+
+          {/* Booking email modal — note-aware draft (2026-09-15, Jeff) */}
+          <LeadBookingEmailModal
+            lead={bookingEmailLead}
+            open={!!bookingEmailLead}
+            onClose={() => setBookingEmailLead(null)}
+            onSent={() => {
+              fetchLeads();
+              if (selectedLead?.lead_id === bookingEmailLead?.lead_id) {
+                fetchLeadDetail(bookingEmailLead.lead_id);
+              }
             }}
           />
         </div>

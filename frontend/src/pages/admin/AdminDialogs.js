@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Target, Activity, RefreshCw, MessageSquare, Crown, BarChart3, Building2, FileText, DollarSign, LogIn, Gift, XCircle, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Target, Activity, RefreshCw, MessageSquare, Crown, BarChart3, Building2, FileText, DollarSign, LogIn, Gift, XCircle, Trash2, AlertTriangle, CheckCircle, Calendar } from 'lucide-react';
 const LinkedInIcon = ({ className = 'w-3.5 h-3.5' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
     <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.57-1.85-3.57-1.85-.53-3.09.53-3.66 1.6-.3.63-.37 1.52-.37 2.36v5.17H8.46s.05-9.65 0-10.65h3.55v1.51h.05c.49-.94 1.68-1.93 3.32-1.93 2.66 0 4.38 1.74 4.38 5.28v6.13zM4.69 4.19c0 1.06-.86 1.92-1.92 1.92S.86 5.25.86 4.19 1.71 2.28 2.77 2.28s1.92.85 1.92 1.91zM.86 9.77h3.56v10.68H.86V9.77z"/>
@@ -19,6 +19,7 @@ import { fetchWithAuth } from '@/utils/api';
 export function LeadDetailDialog({
   selectedLead, leadDetailLoading,
   onClose, onUpdateLeadStage, onUpdateCallOutcome, onAddNote, onNoteChange, leadNoteText,
+  onSendBookingEmail,
 }) {
   return (
     <Dialog open={!!selectedLead} onOpenChange={onClose}>
@@ -206,6 +207,26 @@ export function LeadDetailDialog({
                 </Button>
               </div>
             </div>
+
+            {/* Booking Email — note-aware draft (2026-09-15, Jeff) */}
+            {onSendBookingEmail && selectedLead.email && (
+              <div className="flex items-center gap-3 p-3 border border-gold/30 bg-gold/5 rounded">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-navy dark:text-white">Send booking email</p>
+                  <p className="text-xs text-muted-foreground">
+                    Drafts a booking-link email shaped by the notes above — voicemail and call recaps are picked up automatically.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="shrink-0 bg-navy text-white hover:bg-navy/90 dark:bg-gold dark:text-navy"
+                  onClick={() => onSendBookingEmail(selectedLead)}
+                >
+                  <Calendar className="w-4 h-4 mr-1.5" />
+                  Draft Email
+                </Button>
+              </div>
+            )}
 
             {/* Marketing Resource */}
             {getResourceWord(selectedLead.origin_source || selectedLead.source) && (

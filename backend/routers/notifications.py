@@ -346,19 +346,20 @@ class SendEmailRequest(BaseModel):
     custom_body: Optional[str] = None
 
 
-@router.post("/{lead_id}/send-email")
-async def send_followup_email(
-    lead_id: str,
-    req: SendEmailRequest,
-    admin: dict = Depends(_leads_guard()),
+class DraftEmailRequest(BaseModel):
+    """Request body for sending a note-derived booking-link draft."""
+    subject: str
+    body_html: str
+
+
+# 2026-09-15 (Jeff, #trustoffice-main): shared send path for both follow-up
+# flows. Rate limit + activity log live here so both endpoints stay identical.
+async def _send_and_log_followup(
+    lead: dict,
+    subject: str,
+    body_html: str,
+    log_note: str,
 ):
-    """Send a follow-up email to a lead using a template. Rate-limited: 1 per lead per 5 min."""
-    from routers.leads import _log_activity
-
-    lead = await db.leads.find_one({"lead_id": lead_id})
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
     to_email = lead.get("email")
     if not to_email:
         raise HTTPException(status_code=400, detail="Lead has no email address")
@@ -367,7 +368,7 @@ async def send_followup_email(
     now = datetime.now(timezone.utc)
     five_min_ago = (now - timedelta(minutes=5)).isoformat()
     recent = await db.lead_activities.find_one({
-        "lead_id": lead_id,
+        "lead_id": lead["lead_id"],
         "action_type": "email",
         "created_at": {"$gte": five_min_ago},
     })
@@ -376,6 +377,35 @@ async def send_followup_email(
             status_code=429,
             detail="Email already sent to this lead recently — please wait 5 minutes"
         )
+
+    # Send via Postmark
+    from email_service import email_service
+
+    try:
+        await email_service.send_email(
+            to_email=to_email,
+            subject=subject,
+            html_body=body_html,
+        )
+        from routers.leads import _log_activity
+        await _log_activity(lead["lead_id"], "email", log_note)
+        logger.info(f"Follow-up email sent to {to_email}: {log_note}")
+        return {"success": True, "message": f"Follow-up sent to {to_email}"}
+    except Exception as e:
+        logger.error(f"Failed to send follow-up email to {to_email}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+
+@router.post("/{lead_id}/send-email")
+async def send_followup_email(
+    lead_id: str,
+    req: SendEmailRequest,
+    admin: dict = Depends(_leads_guard()),
+):
+    """Send a follow-up email to a lead using a template. Rate-limited: 1 per lead per 5 min."""
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
 
     template = await db.lead_email_templates.find_one({"template_id": req.template_id})
     if not template:
@@ -400,21 +430,79 @@ async def send_followup_email(
     body = _fill(req.custom_body or template["body"])
     subject = _fill(req.custom_subject or template["subject"])
 
-    # Send via Postmark
-    from email_service import email_service
+    return await _send_and_log_followup(
+        lead, subject, body, f"Sent follow-up: {template['name']}"
+    )
 
-    try:
-        await email_service.send_email(
-            to_email=to_email,
-            subject=subject,
-            html_body=body,
+
+# ==================== NOTE-AWARE BOOKING DRAFT ====================
+# 2026-09-15 (Jeff, #trustoffice-main): button in the lead detail view.
+# Drafts a booking-link email shaped by the admin's notes on the lead
+# (voicemail / call recap / topics), always includes the booking link and
+# source attribution ("one of our ads on Facebook"). Raw note text never
+# enters the email — only whitelisted topic phrases from followup_drafts.py.
+
+
+@router.get("/{lead_id}/booking-draft")
+async def get_booking_draft(
+    lead_id: str,
+    admin: dict = Depends(_leads_guard()),
+):
+    """Build the note-derived booking-link email draft for a lead."""
+    from followup_drafts import derive_draft
+
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    activities = await db.lead_activities.find(
+        {"lead_id": lead_id}, {"_id": 0, "content": 1, "action_type": 1, "created_at": 1}
+    ).to_list(100)
+
+    draft = derive_draft(lead, activities)
+    from followup_drafts import SIGNAL_LABELS
+    return {
+        "lead_id": lead_id,
+        "email": lead.get("email"),
+        "subject": draft["subject"],
+        "body_html": draft["body_html"],
+        "signal": draft["signal"],
+        "signal_label": SIGNAL_LABELS.get(draft["signal"], "Follow-up"),
+        "topics": draft["topics"],
+        "objection": draft["objection"],
+        "notes_used": draft["notes_used"],
+        "booking_url": draft["booking_url"],
+    }
+
+
+@router.post("/{lead_id}/send-booking-email")
+async def send_booking_email(
+    lead_id: str,
+    req: DraftEmailRequest,
+    admin: dict = Depends(_leads_guard()),
+):
+    """Send the (admin-edited) booking-link draft. Subject/body must be non-empty."""
+    from followup_drafts import BOOKING_URL as _BOOKING_URL
+
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    subject = (req.subject or "").strip()
+    body_html = (req.body_html or "").strip()
+    if not subject or not body_html:
+        raise HTTPException(status_code=400, detail="Subject and body are required")
+
+    # Guardrail: the booking link must be present (this is the booking-link email).
+    if _BOOKING_URL not in body_html:
+        raise HTTPException(
+            status_code=422,
+            detail="Email body must include the booking link",
         )
-        await _log_activity(lead_id, "email", f"Sent follow-up: {template['name']}")
-        logger.info(f"Follow-up email sent to {to_email}: {template['name']}")
-        return {"success": True, "message": f"Follow-up sent to {to_email}"}
-    except Exception as e:
-        logger.error(f"Failed to send follow-up email to {to_email}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+    return await _send_and_log_followup(
+        lead, subject, body_html, "Sent booking-link follow-up"
+    )
 
 
 # ==================== DEFAULT TEMPLATES ====================
