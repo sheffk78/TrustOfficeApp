@@ -27,6 +27,14 @@ from typing import Any, Dict, List, Optional
 
 BOOKING_URL = "https://trustoffice.app/book-a-call"
 
+# Inline paragraph styles — 2026-09-15 (Jeff): "is the text being pushed together
+# as a jumble?" Outlook and some clients strip default <p> margins, collapsing
+# everything into a wall of text. Every paragraph carries its own spacing so the
+# email reads as clean, separated paragraphs in every client.
+_P_STYLE = 'style="margin:0 0 14px 0;color:#1a1a2e;font-size:15px;line-height:1.6;"'
+_P_MUTED = 'style="margin:16px 0 20px 0;color:#64748b;font-size:13px;line-height:1.5;"'
+_P_SIGN = 'style="margin:0;color:#1a1a2e;font-size:15px;"'
+
 # ── Note signal patterns ────────────────────────────────────────────────────
 # Order of checks matters; first hit wins for the primary signal.
 _VM_RE = re.compile(
@@ -159,7 +167,11 @@ def _name(lead: Dict[str, Any]) -> str:
 
 
 def _link_p(url: str) -> str:
-    return f'<p><a href="{url}">{url.replace("https://", "")}</a></p>'
+    return (
+        f'<p style="margin:0 0 14px 0;"><a href="{url}" '
+        f'style="color:#010079;font-weight:bold;text-decoration:underline;'
+        f'font-size:16px;">{url.replace("https://", "")}</a></p>'
+    )
 
 
 def derive_draft(lead: Dict[str, Any], notes: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -190,67 +202,67 @@ def derive_draft(lead: Dict[str, Any], notes: List[Dict[str, Any]]) -> Dict[str,
     else:
         subject = f"A quick walkthrough of TrustOffice, {name}?"
 
-    # ── Body ──
-    parts: List[str] = [f"<p>Hi {name},</p>"]
+    # ── Body ── (every <p> carries inline spacing — survives Outlook margin-stripping)
+    parts: List[str] = [f"<p {_P_STYLE}>Hi {name},</p>"]
 
     if signal == "voicemail":
         parts.append(
-            "<p>I just left you a voicemail a minute ago — no need to call back "
+            f"<p {_P_STYLE}>I just left you a voicemail a minute ago — no need to call back "
             "for the details. Easier to grab a time here:</p>"
         )
         parts.append(link_p)
     elif signal == "no_answer":
         parts.append(
-            "<p>I tried you by phone a little earlier — phone tag isn't anyone's "
+            f"<p {_P_STYLE}>I tried you by phone a little earlier — phone tag isn't anyone's "
             "favorite, so here's a direct way to lock in a time:</p>"
         )
         parts.append(link_p)
     elif signal == "call":
-        parts.append("<p>Good talking with you.</p>")
+        parts.append(f"<p {_P_STYLE}>Good talking with you.</p>")
         if topics:
-            parts.append(f"<p>Since {topics[0]} is on your mind, we'll start there.</p>")
+            parts.append(f"<p {_P_STYLE}>Since {topics[0]} is on your mind, we'll start there.</p>")
         parts.append(
-            "<p>Let's put a time on the calendar to go through TrustOffice together:</p>"
+            f"<p {_P_STYLE}>Let's put a time on the calendar to go through TrustOffice together:</p>"
         )
         parts.append(link_p)
-        parts.append("<p>About 20 minutes — no prep needed, just bring your questions.</p>")
+        parts.append(f"<p {_P_STYLE}>About 20 minutes — no prep needed, just bring your questions.</p>")
     elif signal == "text":
         parts.append(
-            "<p>Quick follow-up to my text — booking a time here is easier than "
+            f"<p {_P_STYLE}>Quick follow-up to my text — booking a time here is easier than "
             "playing calendar tag:</p>"
         )
         parts.append(link_p)
     elif signal == "email":
         parts.append(
-            "<p>Wanted to follow up on my earlier note — if a quick walkthrough "
+            f"<p {_P_STYLE}>Wanted to follow up on my earlier note — if a quick walkthrough "
             "would help, grab whatever time suits you:</p>"
         )
         parts.append(link_p)
     else:
         # general (no notes, or notes with no contact signal)
         parts.append(
-            "<p>I'd love to show you around TrustOffice personally — how it handles "
+            f"<p {_P_STYLE}>I'd love to show you around TrustOffice personally — how it handles "
             "minutes, distributions, and keeping every decision defensible.</p>"
         )
         if topics:
-            parts.append(f"<p>Since {topics[0]} is on your mind, we'll start there.</p>")
-        parts.append("Grab whatever time works for you:")
+            parts.append(f"<p {_P_STYLE}>Since {topics[0]} is on your mind, we'll start there.</p>")
+        parts.append(f"<p {_P_STYLE}>Grab whatever time works for you:</p>")
         parts.append(link_p)
-        parts.append("<p>About 20 minutes — bring your questions.</p>")
+        parts.append(f"<p {_P_STYLE}>About 20 minutes — bring your questions.</p>")
 
     if objection:
         parts.append(
-            "<p>And if cost is the sticking point: the first month is $29 with code "
+            f"<p {_P_STYLE}>And if cost is the sticking point: the first month is $29 with code "
             "WELCOME29 — see the value first, decide after.</p>"
         )
 
     # ── Source attribution (always) ──
     parts.append(
-        f"<p style=\"color:#64748b;font-size:13px;\">P.S. So you know how we "
+        f"<p {_P_MUTED}>P.S. So you know how we "
         f"connected — you reached us through {_source_phrase(lead)}.</p>"
     )
 
-    parts.append("<p>— Kenneth (Jeff)</p>")
+    parts.append(f"<p {_P_SIGN}>— Kenneth (Jeff)</p>")
     body_html = "\n".join(parts)
 
     return {
