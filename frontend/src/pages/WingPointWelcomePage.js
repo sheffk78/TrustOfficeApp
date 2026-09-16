@@ -149,9 +149,14 @@ export default function WingPointWelcomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, new_password: password }),
       });
-      if (!response.ok) {
+      if (!response.ok && !response.status === 400) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail || 'Failed to set password');
+        if (data.detail.includes('"no password is set yet"')) {
+          // UI: Redirect to reset flow with newaccount flag
+          navigate("/forgot-password\?status=newaccount");
+        } else {
+          throw new Error('Failed to set password');
+        }
       }
       setPasswordSet(true);
       toast.success('Password set successfully. Taking you to choose your plan...');
