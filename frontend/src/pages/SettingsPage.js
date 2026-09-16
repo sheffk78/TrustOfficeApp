@@ -52,6 +52,7 @@ import { TRUST_PROTECTOR_POWERS } from './trustProtectorPowers';
 import { formatEIN } from '@/utils/formatters';
 import DevicesSessionsCard from '@/components/DevicesSessionsCard';
 import TwoFactorCard from '@/components/TwoFactorCard';
+import KeyCustodySuggestionCard from '@/components/KeyCustodySuggestionCard';
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -1618,6 +1619,7 @@ export default function SettingsPage() {
                         placeholder="Where are the original paper documents stored? (safe deposit box, filing cabinet, etc.)"
                       />
                     </div>
+                    <KeyCustodySuggestionCard />
                   </div>
                 </div>
 
