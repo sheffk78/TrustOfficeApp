@@ -31,14 +31,16 @@ def _booking_cta_html(booking_url: str, phone_request: bool = True) -> str:
     """Render a 'Book a Call' CTA section if booking_url is provided."""
     if not booking_url:
         return ""
+    phone_line = '<p style="font-size: 13px; color: #444;">Prefer a phone call instead? Just reply with the best number to reach you and I\'ll call you.</p>' if phone_request else ""
     return f"""
             <div style="background-color: #f0f4ff; border-left: 4px solid #D5AD36; padding: 20px; margin: 25px 0;">
-              <h3 style="color: #010079; margin-top: 0;">Want to see how TrustOffice works for your trust?</h3>
-              <p>Book a free discovery call with Kenneth (Jeff) Kohler, founder of TrustOffice — Kenneth is his legal name, Jeff is what everyone calls him. He'll walk you through the platform and answer any questions about your specific situation.</p>
-              {f"<p>If you'd rather talk by phone, reply with the best number to reach you and Kenneth (Jeff) can call.</p>" if phone_request else ""}
+              <h3 style="color: #010079; margin-top: 0;">See TrustOffice on your own trust — book a free 30-minute call with me</h3>
+              <p>I'm Kenneth Kohler, founder of TrustOffice. On the call I'll pull up the platform live and walk through how it would run <em>your</em> trust — your questions, your situation, no slides and no pressure.</p>
+              <p>Pick any open time on my calendar:</p>
               <p style="text-align: center; margin: 20px 0;">
-                <a href="{booking_url}" class="button">Book a Call with Kenneth (Jeff)</a>
+                <a href="{booking_url}" class="button">Book a Time with Kenneth</a>
               </p>
+              {phone_line}
             </div>
     """
 
@@ -48,10 +50,13 @@ def _booking_cta_text(booking_url: str, phone_request: bool = True) -> str:
     if not booking_url:
         return ""
     return f"""
-Want to see how TrustOffice works for your trust?
-Book a free discovery call with Kenneth (Jeff) Kohler, founder of TrustOffice — Kenneth is his legal name, Jeff is what everyone calls him.
-Schedule here: {booking_url}
-{"If you'd rather talk by phone, reply with the best number to reach you and Kenneth (Jeff) can call." if phone_request else ""}
+See TrustOffice on your own trust — book a free 30-minute call with me.
+
+I'm Kenneth Kohler, founder of TrustOffice. On the call I'll pull up the platform live and walk through how it would run your trust — no slides, no pressure.
+
+Pick any open time on my calendar: {booking_url}
+
+{"Prefer a phone call? Reply with the best number to reach you and I'll call you." if phone_request else ""}
 """
 
 

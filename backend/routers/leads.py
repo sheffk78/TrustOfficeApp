@@ -994,15 +994,21 @@ async def _send_facebook_discord_notification(parsed: dict, name: str, email: st
 
         from discord_service import send_discord_message, DISCORD_LEADS_WEBHOOK_URL, NAVY
         if DISCORD_LEADS_WEBHOOK_URL:
+            BOOKING_LINK = "https://trustoffice.app/book-a-call/"
             # Kenneth calls phone leads immediately — ping him directly when a
             # lead has a phone number so the notification actually interrupts.
+            # Booking link inline so the invite to book is one click away.
             if parsed["phone"]:
                 content = (
                     f"<@1479298864539373702> **📞 Call now** — {name} · "
-                    f"{parsed['phone']} · {email}"
+                    f"{parsed['phone']} · {email}\n"
+                    f"After the call, send them here to lock a time: {BOOKING_LINK}"
                 )
             else:
-                content = f"**NEW FACEBOOK LEAD** — {name} | no phone | {email}"
+                content = (
+                    f"**NEW FACEBOOK LEAD** — {name} | no phone | {email}\n"
+                    f"Booking link to send them: {BOOKING_LINK}"
+                )
             await send_discord_message(
                 webhook_url=DISCORD_LEADS_WEBHOOK_URL,
                 content=content,
