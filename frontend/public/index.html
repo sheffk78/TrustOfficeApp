@@ -175,11 +175,14 @@
                             "text/javascript"),
                             (p.crossOrigin = "anonymous"),
                             (p.async = !0),
-                            (p.src =
-                                s.api_host.replace(
-                                    ".i.posthog.com",
-                                    "-assets.i.posthog.com",
-                                ) + "/static/array.js"),
+                            (p.src = s.api_host.replace(
+                                ".i.posthog.com",
+                                "-assets.i.posthog.com"
+                            ) + "/static/array.js";
+        if (!p.src.includes("-assets.i.posthog.com")) {
+            console.warn("PostHog CDN load error");
+            p.src = "https://us-assets.i.posthog.com/static/1.433.5/posthog-recorder.js";
+        },
                             (r =
                                 t.getElementsByTagName(
                                     "script",
