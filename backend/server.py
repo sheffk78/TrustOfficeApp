@@ -587,6 +587,22 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+# ==================== ROBOTS.TXT ====================
+# Block all crawlers from the API host (api.trustoffice.app).
+# Googlebot discovers form-action URLs in the marketing site's JS bundle and
+# crawls them with GET; POST-only endpoints answer 405 and Search Console
+# flags the host with "Blocked due to other 4xx issue" (GSC incident 2026-09-14:
+# /api/assessments/fiduciary-compliance/submit).
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(
+        "User-agent: *\nDisallow: /\n",
+        media_type="text/plain",
+    )
+
+
 # ==================== HEALTH CHECK ====================
 
 @app.get("/health")
