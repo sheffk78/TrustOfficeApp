@@ -879,10 +879,19 @@ export default function SettingsPage() {
               taPrompt="Walk me through the Settings page and what I can configure"
             />
             {rolePage && (
-              <Button type="button" className="btn-secondary" onClick={() => navigate('/successor-packet')}>
-                <FileText className="w-4 h-4 mr-2" />
-                View Successor Packet
-              </Button>
+              <div className="flex flex-col items-end gap-2">
+                <Button type="button" className="btn-secondary" onClick={() => navigate('/successor-packet')}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  View Successor Packet
+                </Button>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-navy underline underline-offset-2"
+                  onClick={() => navigate('/authority')}
+                >
+                  View recorded trustee powers (Legal Powers page)
+                </button>
+              </div>
             )}
           </div>
 
@@ -1242,6 +1251,31 @@ export default function SettingsPage() {
 
           {/* ============ PEOPLE TAB ============ */}
           <TabsContent value="people">
+                {/* Grantor */}
+                <div className="card-trust mb-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Users className="w-5 h-5 text-navy" />
+                    <h2 className="font-serif text-xl text-navy">Grantor</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    The person who created the trust.
+                  </p>
+
+                  <div data-section="grantor" className="space-y-6">
+                    <div>
+                      <Label className="label-trust">Grantor Name</Label>
+                      <Input
+                        type="text"
+                        value={trustData.grantor_name}
+                        onChange={(e) => setTrustData({ ...trustData, grantor_name: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Who created the trust?"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">The person who established the trust</p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Successor Trustee */}
                 <div className="card-trust mb-8">
                   <div className="flex items-center gap-2 mb-6">
@@ -1365,6 +1399,41 @@ export default function SettingsPage() {
                         placeholder="Spouse, adult child, sibling, etc."
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Successor Instructions */}
+                <div className="card-trust mb-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <FileText className="w-5 h-5 text-navy" />
+                    <h2 className="font-serif text-xl text-navy">Successor Instructions</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    A letter of guidance and document location for your successor trustee.
+                  </p>
+
+                  <div data-section="successor-instructions" className="space-y-6">
+                    <div>
+                      <Label className="label-trust">Letter of Guidance for Successor Trustee</Label>
+                      <textarea
+                        value={trustData.successor_instructions}
+                        onChange={(e) => setTrustData({ ...trustData, successor_instructions: e.target.value })}
+                        className="mt-1 w-full rounded border border-input bg-background px-3 py-2 text-sm min-h-[120px]"
+                        placeholder="Personal wishes, priorities, values, and guidance for your successor trustee. This is your voice to them."
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">This will be included in the Successor Trustee Packet</p>
+                    </div>
+                    <div>
+                      <Label className="label-trust">Physical Document Location</Label>
+                      <Input
+                        type="text"
+                        value={trustData.document_location}
+                        onChange={(e) => setTrustData({ ...trustData, document_location: e.target.value })}
+                        className="mt-1 input-trust"
+                        placeholder="Where are the original paper documents stored? (safe deposit box, filing cabinet, etc.)"
+                      />
+                    </div>
+                    <KeyCustodySuggestionCard />
                   </div>
                 </div>
 
@@ -1525,31 +1594,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Grantor */}
-                <div className="card-trust mb-8">
-                  <div className="flex items-center gap-2 mb-6">
-                    <Users className="w-5 h-5 text-navy" />
-                    <h2 className="font-serif text-xl text-navy">Grantor</h2>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    The person who created the trust.
-                  </p>
-
-                  <div data-section="grantor" className="space-y-6">
-                    <div>
-                      <Label className="label-trust">Grantor Name</Label>
-                      <Input
-                        type="text"
-                        value={trustData.grantor_name}
-                        onChange={(e) => setTrustData({ ...trustData, grantor_name: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="Who created the trust?"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">The person who established the trust</p>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Key Contacts */}
                 <div className="card-trust mb-8">
                   <div className="flex items-center gap-2 mb-6">
@@ -1585,41 +1629,6 @@ export default function SettingsPage() {
                         <Input type="email" value={trustData.financial_advisor_email} onChange={(e) => setTrustData({ ...trustData, financial_advisor_email: e.target.value })} className="input-trust" placeholder="Email" />
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Successor Instructions */}
-                <div className="card-trust mb-8">
-                  <div className="flex items-center gap-2 mb-6">
-                    <FileText className="w-5 h-5 text-navy" />
-                    <h2 className="font-serif text-xl text-navy">Successor Instructions</h2>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    A letter of guidance and document location for your successor trustee.
-                  </p>
-
-                  <div data-section="successor-instructions" className="space-y-6">
-                    <div>
-                      <Label className="label-trust">Letter of Guidance for Successor Trustee</Label>
-                      <textarea
-                        value={trustData.successor_instructions}
-                        onChange={(e) => setTrustData({ ...trustData, successor_instructions: e.target.value })}
-                        className="mt-1 w-full rounded border border-input bg-background px-3 py-2 text-sm min-h-[120px]"
-                        placeholder="Personal wishes, priorities, values, and guidance for your successor trustee. This is your voice to them."
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">This will be included in the Successor Trustee Packet</p>
-                    </div>
-                    <div>
-                      <Label className="label-trust">Physical Document Location</Label>
-                      <Input
-                        type="text"
-                        value={trustData.document_location}
-                        onChange={(e) => setTrustData({ ...trustData, document_location: e.target.value })}
-                        className="mt-1 input-trust"
-                        placeholder="Where are the original paper documents stored? (safe deposit box, filing cabinet, etc.)"
-                      />
-                    </div>
-                    <KeyCustodySuggestionCard />
                   </div>
                 </div>
 

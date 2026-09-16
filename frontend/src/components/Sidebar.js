@@ -83,6 +83,7 @@ const NAV_GROUPS = [
 
   // ═══ TRUST STRUCTURE — legal architecture ═══
   { key: 'trust-structure', icon: Network, label: 'Trust Structure', items: [
+    { path: '/trust-roles', icon: UsersRound, label: 'Trust Roles', tooltip: 'Trustee, successor, protector, and handoff instructions' },
     { path: '/structures', icon: Layers, label: 'Trust & Entities' },
     { path: '/beneficiaries', icon: Users, label: 'Beneficiaries' },
   ]},
