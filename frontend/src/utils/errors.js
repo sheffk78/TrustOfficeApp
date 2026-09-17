@@ -161,6 +161,12 @@ export function extractErrorMessage(error) {
  */
 export async function reportErrorToBackend(error, context = {}) {
   try {
+    // Never report to the production backend from dev/test — test fixtures
+    // (e.g. "network down", "boom") would otherwise leak into the live
+    // error log and trigger false Discord alerts.  reportToErrorLog already
+    // has this guard; this closes the same gap on the alert pipeline.
+    if (_isDev()) return;
+
     // Get user context from localStorage (best-effort)
     let userId = null;
     let email = null;

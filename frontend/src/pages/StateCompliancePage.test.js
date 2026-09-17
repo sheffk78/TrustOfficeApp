@@ -28,6 +28,18 @@ jest.mock('@/components/MobileBottomNav', () => ({ MobileBottomNav: () => <nav d
 jest.mock('@/components/PageHelpButton', () => () => <div data-testid="page-help" />);
 jest.mock('@/components/InfoTooltip', () => () => <span data-testid="info-tooltip" />);
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+// Mock the error-reporting util so test-triggered showError() calls never
+// fire real fetch/sendBeacon against the production error-log endpoint.
+// The real reportErrorToBackend now also self-guards with _isDev(), but
+// mocking here is defense-in-depth and keeps the test hermetic.
+jest.mock('@/utils/errors', () => ({
+  showError: jest.fn(),
+  reportErrorToBackend: jest.fn(),
+  reportToErrorLog: jest.fn(),
+  extractErrorMessage: (e) => (e && e.message) ? e.message : String(e || 'error'),
+  SUPPORT_EMAIL: 'support@trustoffice.app',
+  installGlobalErrorHandlers: jest.fn(),
+}));
 // react-markdown / remark-gfm are ESM-only in Jest (same mock pattern as
 // frontend_smoke.test.js — the page renders them behind the expand toggle).
 jest.mock('react-markdown', () => () => null);
