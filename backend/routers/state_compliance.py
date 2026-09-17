@@ -118,6 +118,12 @@ async def update_trust_state_compliance(
         raise HTTPException(status_code=404, detail="Trust not found")
 
     update_data = {k: v for k, v in update.items() if v is not None}
+    # Explicit deadline resets: {field: "null"} clears a stored value
+    # (plain JSON null is indistinguishable from "field absent" upstream, so
+    # this sentinel exists so callers can restore/clear a deadline).
+    for key in ("notice_last_sent", "notice_next_due", "accounting_last_sent", "accounting_next_due"):
+        if update.get(key) == "null":
+            update_data[key] = None
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     state_code = trust.get("state_code", "").upper()

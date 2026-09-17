@@ -326,3 +326,25 @@ class TestPatchComputesNextDue:
         )
 
         assert result["notice_next_due"] == "2027-01-01"  # Jan 1 + 365 days (fallback)
+
+    @pytest.mark.asyncio
+    async def test_null_sentinel_resets_deadline(self, fake_db):
+        """PATCH with {field: 'null'} explicitly clears a stored deadline."""
+        await _seed_state_profiles(fake_db)
+        await _seed_trust(fake_db, "trust_ca", "CA")
+
+        await fake_db.trust_state_compliance.insert_one({
+            "trust_id": "trust_ca",
+            "state_code": "CA",
+            "notice_last_sent": "2026-01-01T00:00:00+00:00",
+            "notice_next_due": "2026-03-02",
+        })
+
+        result = await sc.update_trust_state_compliance(
+            "trust_ca",
+            {"notice_last_sent": "null", "notice_next_due": "null"},
+            {"user_id": "user_1", "is_admin": False},
+        )
+
+        assert result["notice_last_sent"] is None
+        assert result["notice_next_due"] is None
