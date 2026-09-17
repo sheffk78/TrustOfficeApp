@@ -58,9 +58,9 @@ const GROUP_OPTIONS = [
 ];
 
 const STATUS_TIERS = [
-  { key: 'healthy', label: 'Healthy (96+)', min: 96, color: 'success' },
-  { key: 'attention', label: 'Needs Attention (72–95)', min: 72, max: 95, color: 'warning' },
-  { key: 'critical', label: 'Critical (<72)', min: 0, max: 71, color: 'error' },
+  { key: 'healthy', label: 'Healthy (85+)', min: 85, color: 'success' },
+  { key: 'attention', label: 'Needs Attention (65–84)', min: 65, max: 84, color: 'warning' },
+  { key: 'critical', label: 'Critical (<65)', min: 0, max: 64, color: 'error' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -76,20 +76,20 @@ const getTrustTypeLabel = (type) => {
 };
 
 const getScoreTier = (score) => {
-  if (score >= 96) return STATUS_TIERS[0];
-  if (score >= 72) return STATUS_TIERS[1];
+  if (score >= 85) return STATUS_TIERS[0];
+  if (score >= 65) return STATUS_TIERS[1];
   return STATUS_TIERS[2];
 };
 
 const getScoreColorClass = (score) => {
-  if (score >= 96) return 'text-success';
-  if (score >= 72) return 'text-warning';
+  if (score >= 85) return 'text-success';
+  if (score >= 65) return 'text-warning';
   return 'text-error';
 };
 
 const getScoreBgClass = (score) => {
-  if (score >= 96) return 'bg-success/10 text-success';
-  if (score >= 72) return 'bg-warning/10 text-warning';
+  if (score >= 85) return 'bg-success/10 text-success';
+  if (score >= 65) return 'bg-warning/10 text-warning';
   return 'bg-error/10 text-error';
 };
 

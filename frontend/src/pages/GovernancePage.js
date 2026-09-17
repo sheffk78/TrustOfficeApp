@@ -69,14 +69,14 @@ export default function GovernancePage() {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 96) return 'text-success';
-    if (score >= 72) return 'text-warning';
+    if (score >= 85) return 'text-success';
+    if (score >= 65) return 'text-warning';
     return 'text-error';
   };
 
   const getScoreBgColor = (score) => {
-    if (score >= 96) return 'bg-success';
-    if (score >= 72) return 'bg-warning';
+    if (score >= 85) return 'bg-success';
+    if (score >= 65) return 'bg-warning';
     return 'bg-error';
   };
 
@@ -103,7 +103,7 @@ export default function GovernancePage() {
   // Calculate chart dimensions
   const chartHeight = 120;
   const chartWidth = 100;
-  const maxScore = governance?.max_score || 115;
+  const maxScore = governance?.max_score || 100;
 
   // Generate chart points
   const getChartPoints = () => {
@@ -201,7 +201,7 @@ export default function GovernancePage() {
                           {governance?.total_score || 0}
                         </span>
                         <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
-                          / 115
+                          / 100
                         </span>
                       </div>
                       <div className="mt-4 flex items-center justify-center gap-2">
@@ -220,7 +220,7 @@ export default function GovernancePage() {
                       </div>
                       {governance?.risk_penalty < 0 && (
                         <div className="text-xs text-muted-foreground mt-2 text-center">
-                          Governance: {governance?.base_score}/{governance?.max_score || 115}
+                          Governance: {governance?.base_score}/{governance?.applicable_max || governance?.max_score || 100}
                           {governance?.has_critical_risk && (
                             <span className="text-error font-medium block mt-1">
                               Critical risk found, score capped at 50
@@ -663,15 +663,15 @@ export default function GovernancePage() {
                   <div className="flex gap-6">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-success"></div>
-                      <span className="text-sm">96-115: Excellent</span>
+                      <span className="text-sm">85-100: Excellent</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-warning"></div>
-                      <span className="text-sm">72-95: Needs Attention</span>
+                      <span className="text-sm">65-84: Needs Attention</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-error"></div>
-                      <span className="text-sm">Below 72: Critical</span>
+                      <span className="text-sm">Below 65: Critical</span>
                     </div>
                   </div>
                 </div>

@@ -89,9 +89,11 @@ export function getActivityIcon(type) {
   return ACTIVITY_ICONS[type] || <FileText className="w-4 h-4" />;
 }
 
+// v4 score color thresholds — mirrors backend SCORE_GREEN_THRESHOLD (85) /
+// SCORE_YELLOW_THRESHOLD (65) in backend/routers/governance.py.
 export function getScoreColor(score) {
-  if (score >= 96) return 'score-good';
-  if (score >= 72) return 'score-warning';
+  if (score >= 85) return 'score-good';
+  if (score >= 65) return 'score-warning';
   return 'score-critical';
 }
 

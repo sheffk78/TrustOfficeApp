@@ -14,7 +14,7 @@ export default function HealthTrendChart({
   data = [],
   height = 200,
   width = 600,
-  maxScore = 115,
+  maxScore = 100,
 }) {
   const [hover, setHover] = useState(null); // {index, x, y, date, score}
 
@@ -110,9 +110,9 @@ export default function HealthTrendChart({
     }
   };
 
-  // Zone band Y positions
-  const y96 = yFor(96);
-  const y72 = yFor(72);
+  // Zone band Y positions (v4 thresholds: green >=85, yellow 65+)
+  const y96 = yFor(85);
+  const y72 = yFor(65);
   const y0 = yFor(0);
   const yTop = yFor(maxScore);
 

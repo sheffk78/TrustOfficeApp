@@ -5,20 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Shield, FileText, CalendarDays, ChevronRight, MapPin } from 'lucide-react';
 
 const getScoreColor = (score) => {
-  if (score >= 96) return 'text-success';
-  if (score >= 72) return 'text-warning';
+  if (score >= 85) return 'text-success';
+  if (score >= 65) return 'text-warning';
   return 'text-error';
 };
 
 const getScoreBadgeStyle = (score) => {
-  if (score >= 96) return 'bg-success/10 text-success border-success/20';
-  if (score >= 72) return 'bg-warning/10 text-warning border-warning/20';
+  if (score >= 85) return 'bg-success/10 text-success border-success/20';
+  if (score >= 65) return 'bg-warning/10 text-warning border-warning/20';
   return 'bg-error/10 text-error border-error/20';
 };
 
 const getHealthLabel = (score) => {
-  if (score >= 96) return 'Healthy';
-  if (score >= 72) return 'Needs Attention';
+  if (score >= 85) return 'Healthy';
+  if (score >= 65) return 'Needs Attention';
   return 'At Risk';
 };
 

@@ -83,21 +83,27 @@ export function DashboardHealthScoreCard({ dashboard, selectedTrust, healthScore
 
 function ScoreBanners({ healthScore, isNewTrust }) {
   const score = healthScore?.total_score;
-  const needsAttention = score < 96 && score >= 72 && !isNewTrust;
-  const isUrgent = score < 72 && !isNewTrust;
-  const isNewAndLowScore = score < 72 && isNewTrust;
+  // v4 thresholds (mirrors backend SCORE_GREEN/YELLOW_THRESHOLD): green >=85,
+  // yellow 65-84, red <65. Amber banner only for the yellow band; red "Urgent"
+  // only when the score is actually critical.
+  const needsAttention = score < 85 && score >= 65 && !isNewTrust;
+  const isUrgent = score < 65 && !isNewTrust;
+  const isNewAndLowScore = score < 65 && isNewTrust;
 
   // Risk findings (API: health_score.risk_findings) are the concrete items
   // dragging the score down — each carries title/action/deeplink/penalty.
   // Show them so the warning always names WHAT to fix, never a vague
   // "complete pending tasks" with nothing listed (Kenneth, 2026-09-05).
+  // v4: cap at 3 + a summary line so the banner can't become a wall of red.
   const riskFindings = (healthScore?.risk_findings || [])
     .filter((r) => r?.title)
     .sort((a, b) => {
       const order = { critical: 0, high: 1, medium: 2, low: 3 };
       return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
     });
-  const showRiskList = riskFindings.length > 0;
+  const visibleFindings = riskFindings.slice(0, 3);
+  const extraCount = riskFindings.length - visibleFindings.length;
+  const showRiskList = visibleFindings.length > 0;
 
   if (needsAttention) {
     return (
@@ -110,7 +116,12 @@ function ScoreBanners({ healthScore, isNewTrust }) {
               : 'Your governance score needs attention. Consider completing the suggested actions above.'}
           </p>
         </div>
-        {showRiskList && <RiskFindingList findings={riskFindings} />}
+        {showRiskList && <RiskFindingList findings={visibleFindings} />}
+        {extraCount > 0 && (
+          <p className="text-xs text-muted-foreground mt-2">
+            And {extraCount} more item{extraCount > 1 ? 's' : ''} — <Link to="/governance" className="underline">see the full list</Link>.
+          </p>
+        )}
       </div>
     );
   }
@@ -126,7 +137,12 @@ function ScoreBanners({ healthScore, isNewTrust }) {
               : 'Urgent: Your trust requires immediate attention. Complete pending tasks to improve your score.'}
           </p>
         </div>
-        {showRiskList && <RiskFindingList findings={riskFindings} error />}
+        {showRiskList && <RiskFindingList findings={visibleFindings} error />}
+        {extraCount > 0 && (
+          <p className="text-xs text-muted-foreground mt-2">
+            And {extraCount} more item{extraCount > 1 ? 's' : ''} — <Link to="/governance" className="underline">see the full list</Link>.
+          </p>
+        )}
       </div>
     );
   }

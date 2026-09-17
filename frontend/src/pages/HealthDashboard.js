@@ -34,8 +34,8 @@ const severityBadge = (severity) => {
 };
 
 const getScoreTextClass = (score) => {
-  if (score >= 96) return 'text-success';
-  if (score >= 72) return 'text-warning';
+  if (score >= 85) return 'text-success';
+  if (score >= 65) return 'text-warning';
   return 'text-error';
 };
 
@@ -103,7 +103,7 @@ export default function HealthDashboard() {
   }, [loadHealth]);
 
   const score = health?.total_score ?? health?.health_score ?? 0;
-  const maxScore = health?.max_score || 115;
+  const maxScore = health?.max_score || 100;
   const criteria = health?.criteria || [];
   const riskFindings = alerts.length > 0 ? alerts : (health?.risk_findings || []);
 
@@ -265,7 +265,7 @@ export default function HealthDashboard() {
                     <span>
                       Zone:{' '}
                       <span className={`font-medium ${getScoreTextClass(score)}`}>
-                        {score >= 96 ? 'Healthy' : score >= 72 ? 'At Risk' : 'Critical'}
+                        {score >= 85 ? 'Healthy' : score >= 65 ? 'At Risk' : 'Critical'}
                       </span>
                     </span>
                     <span className="font-mono">{trend.length} data points</span>
