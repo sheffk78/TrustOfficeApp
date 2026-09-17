@@ -27,6 +27,8 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from database import db as real_db
 import routers.state_compliance as sc  # noqa: E402
+import routers.minutes as minutes_router  # noqa: E402
+import routers.beneficiary_reports as beneficiary_reports  # noqa: E402
 
 
 class FakeCollection:
@@ -118,9 +120,13 @@ def fake_db(monkeypatch):
     db.state_compliance_profiles = FakeCollection()
     db.trusts = FakeCollection()
     db.trust_state_compliance = FakeCollection()
+    db.minutes_templates = FakeCollection()
+    db.vault_documents = FakeCollection()
 
     monkeypatch.setattr("database.db", db)
     monkeypatch.setattr(sc, "db", db)
+    monkeypatch.setattr(minutes_router, "db", db)
+    monkeypatch.setattr(beneficiary_reports, "db", db)
     return db
 
 
@@ -348,3 +354,239 @@ class TestPatchComputesNextDue:
 
         assert result["notice_last_sent"] is None
         assert result["notice_next_due"] is None
+
+
+# ==================== DOC-GENERATION AUTO-RECORD (2026-09-16) ====================
+
+async def _seed_full_ca_state(db):
+    """Seed the CA profile with full compliance fields (as in production seed)."""
+    await db.state_compliance_profiles.insert_one({
+        "_id": "CA", "state_code": "CA", "state_name": "California",
+        "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60,
+        "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust",
+        "spendthrift_default": True,
+    })
+
+
+def _seed_trust_obj(trust_id, state_code="CA"):
+    return {
+        "trust_id": trust_id,
+        "user_id": "user_1",
+        "name": "Smith Family Trust",
+        "state_code": state_code,
+        "trustees": "John Smith",
+    }
+
+
+class TestRecordComplianceActHelper:
+    """record_compliance_act: shared helper marking last_sent + computing next_due."""
+
+    @pytest.mark.asyncio
+    async def test_notice_act_marks_notice_deadlines(self, fake_db):
+        await _seed_full_ca_state(fake_db)
+        trust = _seed_trust_obj("trust_ca")
+        await fake_db.trusts.insert_one(dict(trust))
+
+        sent_dt = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+        update = await minutes_router.record_compliance_act(trust, "notice", sent_dt)
+
+        assert update is not None
+        assert update["notice_next_due"] == "2026-11-15"  # Sep 16 2026 + 60 days
+        stored = await fake_db.trust_state_compliance.find_one({"trust_id": "trust_ca", "state_code": "CA"})
+        assert stored["notice_last_sent"] == sent_dt.isoformat()
+        assert stored["notice_next_due"] == "2026-11-15"
+
+    @pytest.mark.asyncio
+    async def test_accounting_act_marks_accounting_deadlines(self, fake_db):
+        await _seed_full_ca_state(fake_db)
+        trust = _seed_trust_obj("trust_ca")
+        await fake_db.trusts.insert_one(dict(trust))
+
+        sent_dt = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+        update = await minutes_router.record_compliance_act(trust, "accounting", sent_dt)
+
+        assert update is not None
+        assert update["accounting_next_due"] == "2027-09-16"  # annual = +365 days
+        stored = await fake_db.trust_state_compliance.find_one({"trust_id": "trust_ca", "state_code": "CA"})
+        assert stored["accounting_last_sent"] == sent_dt.isoformat()
+        assert stored["accounting_next_due"] == "2027-09-16"
+
+    @pytest.mark.asyncio
+    async def test_unseeded_state_skips_silently(self, fake_db):
+        """No seeded profile for the trust's state -> no-op, returns None."""
+        await fake_db.trusts.insert_one({"trust_id": "trust_xx", "user_id": "user_1", "state_code": "XX"})
+        trust = _seed_trust_obj("trust_xx", state_code="XX")
+
+        update = await minutes_router.record_compliance_act(trust, "notice")
+
+        assert update is None
+        assert len(fake_db.trust_state_compliance.docs) == 0
+
+    @pytest.mark.asyncio
+    async def test_missing_state_code_skips_silently(self, fake_db):
+        trust = _seed_trust_obj("trust_nostate", state_code="")
+        update = await minutes_router.record_compliance_act(trust, "notice")
+        assert update is None
+        assert len(fake_db.trust_state_compliance.docs) == 0
+
+    @pytest.mark.asyncio
+    async def test_quarterly_frequency_computes_90_days(self, fake_db):
+        await _seed_full_ca_state(fake_db)
+        await fake_db.state_compliance_profiles.update_one(
+            {"_id": "CA"}, {"$set": {"accounting_frequency": "quarterly"}}
+        )
+        trust = _seed_trust_obj("trust_ca")
+        await fake_db.trusts.insert_one(dict(trust))
+
+        sent_dt = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        update = await minutes_router.record_compliance_act(trust, "accounting", sent_dt)
+        assert update["accounting_next_due"] == "2026-04-01"
+
+
+class TestPeriodicNoticeTemplate:
+    """The beneficiary_periodic_notice template + its generator."""
+
+    def test_template_registered(self):
+        from routers.template_registry import TEMPLATE_REGISTRY, get_template_registry
+        assert "beneficiary_periodic_notice" in TEMPLATE_REGISTRY
+        opts = get_template_registry()
+        types = [t["type"] for t in opts]
+        assert "beneficiary_periodic_notice" in types
+
+    def test_generator_letter_content(self):
+        out = minutes_router.generate_beneficiary_periodic_notice_content({
+            "trust_name": "Smith Family Trust",
+            "trustee_name": "John Smith",
+            "state_name": "California",
+            "notice_days": 60,
+            "notice_date": "2026-09-16",
+            "trustee_contact": "john@example.com",
+        })
+        assert "Smith Family Trust" in out
+        assert "California" in out
+        assert "60 days" in out
+        assert "Dear Beneficiaries" in out
+        assert "John Smith" in out
+        assert "September 16, 2026" in out  # ISO date formatted for the letter
+        assert "objection" in out
+
+    def test_generator_defaults_without_state_context(self):
+        out = minutes_router.generate_beneficiary_periodic_notice_content({})
+        assert "the period required by applicable law" in out
+        assert "[Trust Name]" in out
+
+    def test_compute_helpers_deterministic(self):
+        sent = datetime(2026, 9, 16, tzinfo=timezone.utc)
+        assert minutes_router.compute_notice_next_due(sent, {"notice_timing_days": 60}) == "2026-11-15"
+        assert minutes_router.compute_notice_next_due(sent, None) == "2027-09-16"  # fallback 365
+        assert minutes_router.compute_accounting_next_due(sent, {"accounting_frequency": "annual"}) == "2027-09-16"
+        assert minutes_router.compute_accounting_next_due(sent, {"accounting_frequency": "quarterly"}) == "2026-12-15"
+
+
+class TestCreateMinutesAutoRecord:
+    """POST /minutes-templates with beneficiary_periodic_notice records the notice."""
+
+    @pytest.mark.asyncio
+    async def test_creating_notice_marks_notice_last_sent(self, fake_db):
+        await _seed_full_ca_state(fake_db)
+        await fake_db.trusts.insert_one(dict(_seed_trust_obj("trust_ca")))
+
+        template = MagicMock()
+        template.trust_id = "trust_ca"
+        template.template_type.value = "beneficiary_periodic_notice"
+        template.template_data = {"notice_date": "2026-09-16"}
+
+        result = await minutes_router.create_minutes_from_template(
+            template, {"user_id": "user_1"}
+        )
+
+        assert result["template_type"] == "beneficiary_periodic_notice"
+        assert "Dear Beneficiaries" in result["generated_document"]
+        assert "California" in result["generated_document"]
+
+        stored = await fake_db.trust_state_compliance.find_one({"trust_id": "trust_ca", "state_code": "CA"})
+        assert stored is not None
+        assert stored["notice_last_sent"] is not None
+        assert stored["notice_next_due"] is not None
+        # Deterministic: next_due is last_sent + 60 days
+        sent = datetime.fromisoformat(stored["notice_last_sent"])
+        if sent.tzinfo is None:
+            sent = sent.replace(tzinfo=timezone.utc)
+        else:
+            sent = sent.astimezone(timezone.utc).replace(tzinfo=None)
+        due = datetime.fromisoformat(stored["notice_next_due"])
+        assert 59 <= (due - sent).days <= 60
+
+    @pytest.mark.asyncio
+    async def test_other_templates_do_not_record(self, fake_db):
+        await _seed_full_ca_state(fake_db)
+        await fake_db.trusts.insert_one(dict(_seed_trust_obj("trust_ca")))
+
+        template = MagicMock()
+        template.trust_id = "trust_ca"
+        template.template_type.value = "general_meeting"
+        template.template_data = {}
+
+        await minutes_router.create_minutes_from_template(template, {"user_id": "user_1"})
+
+        assert len(fake_db.trust_state_compliance.docs) == 0
+
+
+class TestBeneficiaryReportAutoRecord:
+    """POST /beneficiary-reports/[trust_id]/generate records the accounting."""
+
+    @pytest.mark.asyncio
+    async def test_generating_report_marks_accounting_last_sent(self, fake_db):
+        await _seed_full_ca_state(fake_db)
+        await fake_db.trusts.insert_one(dict(_seed_trust_obj("trust_ca")))
+
+        async def fake_generate(trust_id, user_id):
+            return {"report_id": "rpt_test", "doc_id": "doc_test", "generated_at": "now",
+                    "trust_name": "Smith Family Trust", "beneficiary_count": 0}
+
+        async def fake_owned_trust(t_id, u_id):
+            return _seed_trust_obj(t_id)
+
+        service_mock = MagicMock()
+        service_mock.generate_beneficiary_report = fake_generate
+        service_mock.get_owned_trust = fake_owned_trust
+        original = beneficiary_reports.beneficiary_report_service
+        beneficiary_reports.beneficiary_report_service = service_mock
+        try:
+            await beneficiary_reports.generate_report("trust_ca", {"user_id": "user_1"})
+        finally:
+            beneficiary_reports.beneficiary_report_service = original
+
+        stored = await fake_db.trust_state_compliance.find_one({"trust_id": "trust_ca", "state_code": "CA"})
+        assert stored is not None
+        assert stored["accounting_last_sent"] is not None
+        assert stored["accounting_next_due"] is not None
+        sent = datetime.fromisoformat(stored["accounting_last_sent"])
+        if sent.tzinfo is None:
+            sent = sent.replace(tzinfo=timezone.utc)
+        else:
+            sent = sent.astimezone(timezone.utc).replace(tzinfo=None)
+        due = datetime.fromisoformat(stored["accounting_next_due"])
+        assert 364 <= (due - sent).days <= 365  # annual
+
+    @pytest.mark.asyncio
+    async def test_report_for_unseeded_state_does_not_record(self, fake_db):
+        await fake_db.trusts.insert_one({"trust_id": "trust_xx", "user_id": "user_1", "state_code": "XX"})
+
+        async def fake_generate(trust_id, user_id):
+            return {"report_id": "rpt_test", "doc_id": "doc_test"}
+
+        async def fake_owned_trust(t_id, u_id):
+            return {"trust_id": "trust_xx", "user_id": "user_1", "state_code": "XX"}
+
+        service_mock = MagicMock()
+        service_mock.generate_beneficiary_report = fake_generate
+        service_mock.get_owned_trust = fake_owned_trust
+        original = beneficiary_reports.beneficiary_report_service
+        beneficiary_reports.beneficiary_report_service = service_mock
+        try:
+            await beneficiary_reports.generate_report("trust_xx", {"user_id": "user_1"})
+        finally:
+            beneficiary_reports.beneficiary_report_service = original
+
+        assert len(fake_db.trust_state_compliance.docs) == 0

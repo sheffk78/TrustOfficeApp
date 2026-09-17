@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import StateCompliancePage from '@/pages/StateCompliancePage';
 import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
@@ -14,7 +14,7 @@ const IconStub = ({ className, ...rest }) => <span data-testid="icon" className=
 
 const ICON_NAMES = [
   'MapPin','BookOpen','Gavel','Scale','Shield','AlertTriangle','CheckCircle2',
-  'Clock','FileText','ChevronRight','Send','Paperclip','Loader2','AlertCircle',
+  'Clock','FileText','ChevronRight','BookOpen','Send','Download','Paperclip','Loader2','AlertCircle',
   'X','Square','Plus','ArrowDown','Upload','File','Check','FolderOpen','Copy',
   'ChevronDown','ChevronUp',
 ];
@@ -177,5 +177,161 @@ describe('StateCompliancePage uncovered state handling', () => {
 
     // Should NOT show the green satisfied banner
     expect(container.textContent).not.toContain('All compliance requirements are satisfied');
+  });
+});
+
+describe('StateCompliancePage compliance actions (doc generation)', () => {
+  const selectedTrust = { trust_id: 'trust_1', state_code: 'CA', trustees: ['John Smith'] };
+
+  const mockCoveredResponses = () => {
+    fetchWithAuth.mockImplementation(async (url, opts) => {
+      if (url.includes('state-compliance/requirements')) {
+        return {
+          ok: true,
+          json: async () => ({
+            trust_id: 'trust_1', state_code: 'CA', coverage: 'covered',
+            requirements: [
+              { category: 'notice', title: 'California requires periodic beneficiary notice', severity: 'medium', points: 10 },
+            ],
+          }),
+        };
+      }
+      if (url === '/minutes-templates') {
+        return {
+          ok: true,
+          json: async () => ({ minutes_id: 'min_test123', generated_document: 'letter' }),
+        };
+      }
+      if (url === '/beneficiary-reports/trust_1/generate') {
+        return {
+          ok: true,
+          json: async () => ({ report_id: 'rpt_test123', doc_id: 'doc_test123' }),
+        };
+      }
+      if (url.includes('/state-compliance') && opts && opts.method === 'PATCH') {
+        return { ok: true, json: async () => ({}) };
+      }
+      // GET state-compliance record
+      return {
+        ok: true,
+        json: async () => ({
+          trust_id: 'trust_1', state_code: 'CA',
+          profile: { state_name: 'California' },
+          compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 90, alert_active: false },
+        }),
+      };
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust });
+  });
+
+  it('renders both action buttons for covered states', async () => {
+    mockCoveredResponses();
+    const { container } = render(<StateCompliancePage />);
+
+    expect(await screen.findByText('Generate Beneficiary Notice')).toBeInTheDocument();
+    expect(screen.getByText('Generate Annual Accounting')).toBeInTheDocument();
+    // Actions live in the deadlines card
+    expect(container.textContent).toContain('Take Action');
+  });
+
+  it('does not show action buttons when state compliance data is absent', async () => {
+    fetchWithAuth.mockImplementation(async (url) => {
+      if (url.includes('state-compliance/requirements')) {
+        return {
+          ok: true,
+          json: async () => ({ trust_id: 'trust_1', state_code: 'XX', requirements: [], coverage: 'uncovered' }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ trust_id: 'trust_1', state_code: 'XX', profile: null, compliance: null }),
+      };
+    });
+
+    const { container } = render(<StateCompliancePage />);
+    await waitFor(() => {
+      expect(container.textContent).toContain('requirements in our library yet');
+    }, { timeout: 3000 });
+
+    expect(container.textContent).not.toContain('Generate Beneficiary Notice');
+    expect(container.textContent).not.toContain('Generate Annual Accounting');
+  });
+
+  it('generating a notice POSTs the periodic-notice template and confirms the record', async () => {
+    mockCoveredResponses();
+
+    const { container } = render(<StateCompliancePage />);
+    const btn = await screen.findByText('Generate Beneficiary Notice');
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      const call = fetchWithAuth.mock.calls.find(([u]) => u === '/minutes-templates' && (fetchWithAuth.mock.contexts ? true : true));
+      expect(call).toBeTruthy();
+      const [, init] = call;
+      const body = JSON.parse(init.body);
+      expect(body.template_type).toBe('beneficiary_periodic_notice');
+      expect(body.trust_id).toBe('trust_1');
+      expect(body.template_data.trustee_name).toBe('John Smith');
+    });
+
+    // Confirmation that notice_last_sent was recorded
+    expect(await screen.findByText(/Notice recorded/)).toBeInTheDocument();
+    expect(screen.getByText('Download PDF')).toBeInTheDocument();
+    // Page refetched the compliance record after the action (initial GET + refetch)
+    const complianceGets = fetchWithAuth.mock.calls.filter(
+      ([u]) => String(u).includes('/state-compliance') && !String(u).includes('requirements')
+    );
+    expect(complianceGets.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('generating the accounting POSTs the report endpoint and confirms the record', async () => {
+    mockCoveredResponses();
+
+    render(<StateCompliancePage />);
+    const btn = await screen.findByText('Generate Annual Accounting');
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      const call = fetchWithAuth.mock.calls.find(([u]) => u === '/beneficiary-reports/trust_1/generate');
+      expect(call).toBeTruthy();
+    });
+
+    expect(await screen.findByText(/Accounting recorded/)).toBeInTheDocument();
+    const link = screen.getByText('Download PDF');
+    expect(link.closest('a')).toHaveAttribute('href', expect.stringContaining('/beneficiary-reports/trust_1/rpt_test123/download'));
+  });
+
+  it('shows an error toast when notice generation fails', async () => {
+    mockCoveredResponses();
+    const { toast } = await import('sonner');
+
+    fetchWithAuth.mockImplementation(async (url, opts) => {
+      if (url === '/minutes-templates') {
+        return { ok: false, json: async () => ({ detail: 'boom' }) };
+      }
+      if (url.includes('state-compliance/requirements')) {
+        return { ok: true, json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          trust_id: 'trust_1', state_code: 'CA',
+          profile: { state_name: 'California' },
+          compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 90, alert_active: false },
+        }),
+      };
+    });
+
+    render(<StateCompliancePage />);
+    const btn = await screen.findByText('Generate Beneficiary Notice');
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining('recorded'));
+    });
   });
 });

@@ -12,6 +12,7 @@ from fastapi.responses import Response
 from database import db
 from dependencies import get_current_user, require_write_access
 from services import beneficiary_report_service
+from routers.minutes import record_compliance_act
 
 router = APIRouter(tags=["beneficiary-reports"])
 
@@ -35,13 +36,20 @@ async def generate_report(
     user: dict = Depends(require_write_access),
 ):
     """Generate a new PDF beneficiary report for a trust."""
-    await _require_owned_trust(trust_id, user)
+    trust = await _require_owned_trust(trust_id, user)
     try:
         result = await beneficiary_report_service.generate_beneficiary_report(
             trust_id, user["user_id"]
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    # Auto-record the compliance act: generating the accounting report IS
+    # providing the accounting — mark accounting_last_sent/accounting_next_due
+    # on the trust's state-compliance record (no-op for unseeded states).
+    try:
+        await record_compliance_act(trust, "accounting")
+    except Exception:
+        pass
     return result
 
 

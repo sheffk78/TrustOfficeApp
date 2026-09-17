@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import {
   MapPin, AlertTriangle, Shield, CheckCircle2, Clock,
-  FileText, ChevronRight, BookOpen, Scale, Gavel
+  FileText, ChevronRight, BookOpen, Scale, Gavel, Send, Download
 } from 'lucide-react';
 
 import { SEVERITY_STYLES_FLAT as SEVERITY_STYLES } from '@/utils/severityStyles';
@@ -126,6 +126,94 @@ export default function StateCompliancePage() {
       loadData();
     } catch (e) {
       showError(toast, e, { operation: 'mark_accounting_sent', page: 'StateCompliance' });
+    }
+  };
+
+  // Helper: trustee name(s) from the selected trust (array or comma string).
+  const getTrusteeNames = () => {
+    const raw = selectedTrust?.trustees;
+    if (Array.isArray(raw)) return raw.filter(Boolean).join(', ');
+    if (typeof raw === 'string' && raw.trim()) return raw.trim();
+    return '';
+  };
+
+  const todayIso = () => new Date().toISOString().slice(0, 10);
+
+  // Act 1: generate the state-required periodic beneficiary notice (creates the
+  // doc, downloads the PDF; the backend records notice_last_sent/next_due).
+  const [generatingNotice, setGeneratingNotice] = useState(false);
+  const [noticeResult, setNoticeResult] = useState(null);
+  const generateBeneficiaryNotice = async () => {
+    setGeneratingNotice(true);
+    setNoticeResult(null);
+    try {
+      const res = await fetchWithAuth('/minutes-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          template_type: 'beneficiary_periodic_notice',
+          template_data: {
+            notice_date: todayIso(),
+            trustee_name: getTrusteeNames(),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to generate notice');
+      setNoticeResult({ minutesId: data.minutes_id, pdfReady: false });
+      toast.success('Beneficiary notice generated — notice recorded as sent');
+      loadData();
+    } catch (e) {
+      showError(toast, e, { operation: 'generate_beneficiary_notice', page: 'StateCompliance' });
+    } finally {
+      setGeneratingNotice(false);
+    }
+  };
+
+  const downloadNoticePdf = async () => {
+    if (!noticeResult?.minutesId) return;
+    try {
+      const response = await fetchWithAuth(`/minutes-templates/${noticeResult.minutesId}/pdf`);
+      if (response.ok) {
+        const data = await response.json();
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${data.pdf_base64}`;
+        link.download = data.filename || 'beneficiary_periodic_notice.pdf';
+        link.click();
+        setNoticeResult((prev) => ({ ...prev, pdfReady: true }));
+        toast.success('Notice PDF downloaded');
+      } else {
+        showError(toast, new Error('Failed to download notice PDF'), { operation: 'download_notice_pdf', page: 'StateCompliance' });
+      }
+    } catch (e) {
+      showError(toast, e, { operation: 'download_notice_pdf', page: 'StateCompliance' });
+    }
+  };
+
+  // Act 2: generate the annual accounting report (creates the PDF; the backend
+  // records accounting_last_sent/accounting_next_due).
+  const [generatingAccounting, setGeneratingAccounting] = useState(false);
+  const [accountingResult, setAccountingResult] = useState(null);
+  const generateAnnualAccounting = async () => {
+    setGeneratingAccounting(true);
+    setAccountingResult(null);
+    try {
+      const res = await fetchWithAuth(`/beneficiary-reports/${selectedTrust.trust_id}/generate`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to generate accounting');
+      setAccountingResult({
+        reportId: data.report_id || data.doc_id,
+        downloadUrl: `/beneficiary-reports/${selectedTrust.trust_id}/${data.report_id || data.doc_id}/download`,
+      });
+      toast.success('Annual accounting generated — accounting recorded as sent');
+      loadData();
+    } catch (e) {
+      showError(toast, e, { operation: 'generate_annual_accounting', page: 'StateCompliance' });
+    } finally {
+      setGeneratingAccounting(false);
     }
   };
 
@@ -275,6 +363,55 @@ export default function StateCompliancePage() {
                       <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Deadline Tracking</p>
                       <DeadlineRow label="Beneficiary Notice" lastSent={compliance.notice_last_sent} nextDue={compliance.notice_next_due} onMarkSent={markNoticeSent} />
                       <DeadlineRow label="Accounting" lastSent={compliance.accounting_last_sent} nextDue={compliance.accounting_next_due} onMarkSent={markAccountingSent} />
+
+                      {/* Do-the-act actions */}
+                      <div className="pt-3 mt-3 border-t border-border space-y-2">
+                        <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Take Action</p>
+                        <div className="grid grid-cols-1 gap-2">
+                          <Button
+                            onClick={generateBeneficiaryNotice}
+                            disabled={generatingNotice}
+                            className="w-full justify-start gap-2"
+                            variant="outline"
+                          >
+                            <Send className="w-4 h-4 text-gold" />
+                            {generatingNotice ? 'Generating…' : 'Generate Beneficiary Notice'}
+                          </Button>
+                          {noticeResult?.minutesId && (
+                            <div className="flex items-center justify-between gap-2 p-2 bg-success/5 border border-success/20 rounded">
+                              <span className="text-xs text-success flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Notice recorded — last sent updated
+                              </span>
+                              <button onClick={downloadNoticePdf} className="text-xs text-gold hover:underline flex items-center gap-1">
+                                <Download className="w-3 h-3" />
+                                Download PDF
+                              </button>
+                            </div>
+                          )}
+                          <Button
+                            onClick={generateAnnualAccounting}
+                            disabled={generatingAccounting}
+                            className="w-full justify-start gap-2"
+                            variant="outline"
+                          >
+                            <FileText className="w-4 h-4 text-gold" />
+                            {generatingAccounting ? 'Generating…' : 'Generate Annual Accounting'}
+                          </Button>
+                          {accountingResult?.downloadUrl && (
+                            <div className="flex items-center justify-between gap-2 p-2 bg-success/5 border border-success/20 rounded">
+                              <span className="text-xs text-success flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Accounting recorded — last sent updated
+                              </span>
+                              <a href={accountingResult.downloadUrl} className="text-xs text-gold hover:underline flex items-center gap-1" download>
+                                <Download className="w-3 h-3" />
+                                Download PDF
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>

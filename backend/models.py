@@ -76,6 +76,7 @@ class MinutesType(str, Enum):
     hems_distribution = "hems_distribution"
     beneficiary_loan = "beneficiary_loan"
     beneficiary_distribution_notice = "beneficiary_distribution_notice"
+    beneficiary_periodic_notice = "beneficiary_periodic_notice"
     evaluate_distribution = "evaluate_distribution"
     trust_amendment = "trust_amendment"
     conflict_of_interest = "conflict_of_interest"
@@ -155,6 +156,7 @@ class MinutesTemplateType(str, Enum):
     change_of_situs = "change_of_situs"
     benevolence_approval = "benevolence_approval"
     beneficiary_distribution_notice = "beneficiary_distribution_notice"
+    beneficiary_periodic_notice = "beneficiary_periodic_notice"
     evaluate_distribution = "evaluate_distribution"
     # New templates added (batch 1)
     investment_policy = "investment_policy"
