@@ -352,12 +352,17 @@ describe('StateCompliancePage deep-dive knowledge section', () => {
     markdown: '# Trust Compliance: California\n\n## State Income Tax on Trusts\n\nCalifornia taxes resident trusts.',
   };
 
-  const baseResponses = (deepPayload) => (url, opts) => {
+  const baseResponses = (deepPayload, deepDetail) => (url, opts) => {
     if (url.includes('state-compliance/requirements')) {
       return {
         ok: true,
         json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }),
       };
+    }
+    // Detail endpoint must be matched BEFORE the list (the detail URL contains
+    // the list path as a prefix).
+    if (deepDetail && url.includes('/state-compliance/deep-knowledge/')) {
+      return { ok: true, json: async () => deepDetail };
     }
     if (url.includes('/state-compliance/deep-knowledge')) {
       return { ok: true, json: async () => deepPayload };
@@ -394,11 +399,18 @@ describe('StateCompliancePage deep-dive knowledge section', () => {
     expect(container.textContent).not.toContain('California taxes resident trusts');
     expect(screen.getByTestId('deep-dive-toggle')).toHaveTextContent('Read the full guide');
 
-    // Expanding flips the toggle; react-markdown is mocked to null in Jest
-    // (ESM), so assert the toggle + summary swap rather than the markdown body.
+    // Expanding flips the toggle and lazy-fetches the full markdown from the
+    // detail endpoint (list entries carry only a summary).
+    fetchWithAuth.mockImplementation(baseResponses(
+      [CA_GUIDE],
+      { id: '18-state-compliance-california', state_code: 'CA', state_name: 'California', title: 'Trust Compliance: California', markdown: CA_GUIDE.markdown },
+    ));
     fireEvent.click(screen.getByTestId('deep-dive-toggle'));
     expect(screen.getByTestId('deep-dive-toggle')).toHaveTextContent('Show less');
     expect(container.textContent).not.toContain('California trust compliance summary text.');
+    await waitFor(() => {
+      expect(fetchWithAuth).toHaveBeenCalledWith('/state-compliance/deep-knowledge/CA');
+    });
   });
 
   it('renders no deep-dive card when the API returns no matching entry', async () => {

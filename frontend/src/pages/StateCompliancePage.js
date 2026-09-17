@@ -75,6 +75,7 @@ export default function StateCompliancePage() {
   const [coverage, setCoverage] = useState('covered');
   const [deepGuide, setDeepGuide] = useState(null);
   const [guideExpanded, setGuideExpanded] = useState(false);
+  const [guideMarkdown, setGuideMarkdown] = useState(null);
 
   useEffect(() => {
     if (selectedTrust) loadData();
@@ -110,6 +111,7 @@ export default function StateCompliancePage() {
         : null;
       setDeepGuide(entry || null);
       setGuideExpanded(false);
+      setGuideMarkdown(null);
     } catch (e) {
       showError(toast, e, { operation: 'load_state_compliance', page: 'StateCompliance' });
     } finally {
@@ -516,12 +518,28 @@ export default function StateCompliancePage() {
                     {guideExpanded && (
                       <div className="p-6 md:p-8 prose prose-navy max-w-none border border-border rounded mb-4">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {deepGuide.markdown}
+                          {guideMarkdown ?? deepGuide.markdown ?? ''}
                         </ReactMarkdown>
                       </div>
                     )}
                     <button
-                      onClick={() => setGuideExpanded(!guideExpanded)}
+                      onClick={async () => {
+                        const next = !guideExpanded;
+                        setGuideExpanded(next);
+                        // Full markdown lives on the detail endpoint, not the
+                        // list entry — fetch it the first time the guide is
+                        // expanded (deep-dive contract: list = summaries).
+                        if (next && !guideMarkdown) {
+                          try {
+                            const res = await fetchWithAuth(`/state-compliance/deep-knowledge/${deepGuide.state_code}`);
+                            const data = await res.json();
+                            if (res.ok) setGuideMarkdown(data.markdown || '');
+                            else setGuideMarkdown('');
+                          } catch {
+                            setGuideMarkdown('');
+                          }
+                        }
+                      }}
                       className="text-xs text-gold hover:underline flex items-center gap-1"
                       data-testid="deep-dive-toggle"
                       aria-expanded={guideExpanded}
