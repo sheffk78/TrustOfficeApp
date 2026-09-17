@@ -28,6 +28,10 @@ jest.mock('@/components/MobileBottomNav', () => ({ MobileBottomNav: () => <nav d
 jest.mock('@/components/PageHelpButton', () => () => <div data-testid="page-help" />);
 jest.mock('@/components/InfoTooltip', () => () => <span data-testid="info-tooltip" />);
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+// react-markdown / remark-gfm are ESM-only in Jest (same mock pattern as
+// frontend_smoke.test.js — the page renders them behind the expand toggle).
+jest.mock('react-markdown', () => () => null);
+jest.mock('remark-gfm', () => () => null);
 jest.mock('@/utils/severityStyles', () => ({
   SEVERITY_STYLES_FLAT: { high: 'bg-red', medium: 'bg-yellow', low: 'bg-green' },
 }));
@@ -333,5 +337,104 @@ describe('StateCompliancePage compliance actions (doc generation)', () => {
     await waitFor(() => {
       expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining('recorded'));
     });
+  });
+});
+
+describe('StateCompliancePage deep-dive knowledge section', () => {
+  const selectedTrust = { trust_id: 'trust_1', state_code: 'CA' };
+
+  const CA_GUIDE = {
+    id: '18-state-compliance-california',
+    state_code: 'CA',
+    state_name: 'California',
+    title: 'Trust Compliance: California',
+    summary: 'California trust compliance summary text.',
+    markdown: '# Trust Compliance: California\n\n## State Income Tax on Trusts\n\nCalifornia taxes resident trusts.',
+  };
+
+  const baseResponses = (deepPayload) => (url, opts) => {
+    if (url.includes('state-compliance/requirements')) {
+      return {
+        ok: true,
+        json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }),
+      };
+    }
+    if (url.includes('/state-compliance/deep-knowledge')) {
+      return { ok: true, json: async () => deepPayload };
+    }
+    if (url === '/minutes-templates') {
+      return { ok: true, json: async () => ({}) };
+    }
+    // compliance endpoint
+    return {
+      ok: true,
+      json: async () => ({
+        trust_id: 'trust_1', state_code: 'CA',
+        profile: { state_name: 'California' },
+        compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 100, alert_active: false },
+      }),
+    };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust });
+  });
+
+  it('renders the collapsed deep-dive card when the API returns an entry for the trust state', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([CA_GUIDE]));
+
+    const { container } = render(<StateCompliancePage />);
+
+    expect(await screen.findByTestId('deep-dive-card')).toBeInTheDocument();
+    expect(screen.getByText(/Deep Dive — California Trust Compliance/)).toBeInTheDocument();
+
+    // Collapsed by default: summary visible, full markdown NOT rendered
+    expect(container.textContent).toContain('California trust compliance summary text.');
+    expect(container.textContent).not.toContain('California taxes resident trusts');
+    expect(screen.getByTestId('deep-dive-toggle')).toHaveTextContent('Read the full guide');
+
+    // Expanding flips the toggle; react-markdown is mocked to null in Jest
+    // (ESM), so assert the toggle + summary swap rather than the markdown body.
+    fireEvent.click(screen.getByTestId('deep-dive-toggle'));
+    expect(screen.getByTestId('deep-dive-toggle')).toHaveTextContent('Show less');
+    expect(container.textContent).not.toContain('California trust compliance summary text.');
+  });
+
+  it('renders no deep-dive card when the API returns no matching entry', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([]));
+
+    const { container } = render(<StateCompliancePage />);
+
+    // Wait for the compliance data to land so loadData has fully finished
+    await waitFor(() => {
+      expect(container.textContent).toContain('All compliance requirements are satisfied for California');
+    }, { timeout: 3000 });
+
+    expect(screen.queryByTestId('deep-dive-card')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('deep-dive-toggle')).not.toBeInTheDocument();
+  });
+
+  it('matches the deep-knowledge entry by trust state code, not hard-coded CA', async () => {
+    const NY_GUIDE = { ...CA_GUIDE, state_code: 'NY', state_name: 'New York', title: 'Trust Compliance: New York', summary: 'New York trust compliance summary text.' };
+    useAuth.mockReturnValue({ selectedTrust: { trust_id: 'trust_1', state_code: 'NY' } });
+    fetchWithAuth.mockImplementation((url) => {
+      if (url.includes('state-compliance/requirements')) {
+        return {
+          ok: true,
+          json: async () => ({ trust_id: 'trust_1', state_code: 'NY', coverage: 'covered', requirements: [] }),
+        };
+      }
+      if (url.includes('/state-compliance/deep-knowledge')) {
+        return { ok: true, json: async () => [CA_GUIDE, NY_GUIDE] };
+      }
+      return {
+        ok: true,
+        json: async () => ({ trust_id: 'trust_1', state_code: 'NY', profile: { state_name: 'New York' }, compliance: { compliance_score: 100, alert_active: false } }),
+      };
+    });
+
+    render(<StateCompliancePage />);
+    expect(await screen.findByText(/Deep Dive — New York Trust Compliance/)).toBeInTheDocument();
   });
 });

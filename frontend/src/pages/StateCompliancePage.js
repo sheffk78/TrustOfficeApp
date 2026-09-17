@@ -11,9 +11,12 @@ import PageHelpButton from '@/components/PageHelpButton';
 import InfoTooltip from '@/components/InfoTooltip';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   MapPin, AlertTriangle, Shield, CheckCircle2, Clock,
-  FileText, ChevronRight, BookOpen, Scale, Gavel, Send, Download
+  FileText, ChevronRight, BookOpen, Scale, Gavel, Send, Download,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 
 import { SEVERITY_STYLES_FLAT as SEVERITY_STYLES } from '@/utils/severityStyles';
@@ -70,6 +73,8 @@ export default function StateCompliancePage() {
   const [stateData, setStateData] = useState(null);
   const [requirements, setRequirements] = useState([]);
   const [coverage, setCoverage] = useState('covered');
+  const [deepGuide, setDeepGuide] = useState(null);
+  const [guideExpanded, setGuideExpanded] = useState(false);
 
   useEffect(() => {
     if (selectedTrust) loadData();
@@ -78,9 +83,10 @@ export default function StateCompliancePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [complianceRes, reqRes] = await Promise.all([
+      const [complianceRes, reqRes, deepRes] = await Promise.all([
         fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance`),
         fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance/requirements`),
+        fetchWithAuth('/state-compliance/deep-knowledge'),
       ]);
       const cData = await complianceRes.json();
       if (!complianceRes.ok) throw new Error(cData.detail || 'Failed to load');
@@ -94,6 +100,16 @@ export default function StateCompliancePage() {
         setRequirements([]);
         setCoverage('uncovered');
       }
+
+      // Deep-dive guide for the trust's state (optional — render nothing when
+      // the API has no entry for this state_code).
+      const dData = await deepRes.json();
+      const trustState = (cData?.state_code || selectedTrust.state_code || '').toUpperCase();
+      const entry = Array.isArray(dData)
+        ? dData.find((g) => g.state_code === trustState)
+        : null;
+      setDeepGuide(entry || null);
+      setGuideExpanded(false);
     } catch (e) {
       showError(toast, e, { operation: 'load_state_compliance', page: 'StateCompliance' });
     } finally {
@@ -480,6 +496,42 @@ export default function StateCompliancePage() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Deep Dive — per-state trust compliance guide (rendered only
+                  when a knowledge file exists for the trust's state) */}
+              {deepGuide && (
+                <Card className="border border-border" data-testid="deep-dive-card">
+                  <CardHeader>
+                    <CardTitle className="font-serif text-lg text-navy flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-gold"/>
+                      Deep Dive — {deepGuide.state_name} Trust Compliance
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 pt-0">
+                    {!guideExpanded && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                        {deepGuide.summary}
+                      </p>
+                    )}
+                    {guideExpanded && (
+                      <div className="p-6 md:p-8 prose prose-navy max-w-none border border-border rounded mb-4">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {deepGuide.markdown}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setGuideExpanded(!guideExpanded)}
+                      className="text-xs text-gold hover:underline flex items-center gap-1"
+                      data-testid="deep-dive-toggle"
+                      aria-expanded={guideExpanded}
+                    >
+                      {guideExpanded ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>}
+                      {guideExpanded ? 'Show less' : 'Read the full guide'}
+                    </button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </div>
