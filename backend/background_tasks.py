@@ -682,10 +682,16 @@ class BackgroundTaskRunner:
             # below, instead of being permanently skipped by the $gte:1 filter.
             # Leads with nurture_step_sent >= 13 are treated as sequence-complete;
             # treated as sequence-complete and skipped.
+            # 2026-09-16 fix: catch-up eligibility must also match leads whose
+            # nurture_step_sent is an explicit integer 0 (backfilled/reactivated
+            # leads). The old `$in: [None, False]` missed BSON integer 0, so such
+            # leads were silently skipped by every drip run forever. `$not: {$gt: 0}`
+            # matches missing, null, False, AND integer 0 — superset of the old
+            # branch, still excludes 13+ (sequence-complete) via the $or first arm.
             leads = await self.db.leads.find({
                 "$or": [
                     {"nurture_step_sent": {"$exists": True, "$gte": 1, "$lt": 13}},
-                    {"nurture_step_sent": {"$in": [None, False]}},
+                    {"nurture_step_sent": {"$not": {"$gt": 0}}},
                 ],
                 "stage": {"$ne": "converted"},
                 # Booked leads are owned by the post-meeting flow (see
