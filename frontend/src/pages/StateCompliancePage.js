@@ -69,6 +69,7 @@ export default function StateCompliancePage() {
   const [loading, setLoading] = useState(true);
   const [stateData, setStateData] = useState(null);
   const [requirements, setRequirements] = useState([]);
+  const [coverage, setCoverage] = useState('covered');
 
   useEffect(() => {
     if (selectedTrust) loadData();
@@ -86,7 +87,13 @@ export default function StateCompliancePage() {
       setStateData(cData);
 
       const rData = await reqRes.json();
-      if (reqRes.ok) setRequirements(rData.requirements || []);
+      if (reqRes.ok) {
+        setRequirements(rData.requirements || []);
+        setCoverage(rData.coverage || 'covered');
+      } else {
+        setRequirements([]);
+        setCoverage('uncovered');
+      }
     } catch (e) {
       showError(toast, e, { operation: 'load_state_compliance', page: 'StateCompliance' });
     } finally {
@@ -283,10 +290,20 @@ export default function StateCompliancePage() {
                 </CardHeader>
                 <CardContent className="p-6 pt-0">
                   {requirements.length === 0 ? (
-                    <div className="flex items-center gap-3 p-4 bg-success/5 border border-success/20 rounded">
-                      <CheckCircle2 className="w-5 h-5 text-success"/>
-                      <p className="text-sm text-success">All compliance requirements are satisfied for {profile?.state_name}.</p>
-                    </div>
+                    coverage === 'uncovered' ? (
+                      <div className="flex items-center gap-3 p-4 bg-info/5 border border-info/20 rounded">
+                        <InfoTooltip text="The Uniform Trust Code is a model law that standardizes trust rules." />
+                        <p className="text-sm text-info">
+                          We don't have {profile?.state_name || stateData?.state_code} requirements in our library yet.
+                          General fiduciary duties still apply — see the Risk Dashboard for guidance.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 p-4 bg-success/5 border border-success/20 rounded">
+                        <CheckCircle2 className="w-5 h-5 text-success"/>
+                        <p className="text-sm text-success">All compliance requirements are satisfied for {profile?.state_name}.</p>
+                      </div>
+                    )
                   ) : (
                     <div className="space-y-4">
                       {requirements.map((req, i) => {

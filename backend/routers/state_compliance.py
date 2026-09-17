@@ -1,6 +1,6 @@
 # State Compliance router — seed data + per-trust compliance tracking
 from fastapi import APIRouter, HTTPException, Depends
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List
 import uuid
 
@@ -121,6 +121,56 @@ async def update_trust_state_compliance(
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     state_code = trust.get("state_code", "").upper()
+
+    # Compute next_due dates when last_sent is set
+    if "notice_last_sent" in update_data and update_data["notice_last_sent"]:
+        profile = await db.state_compliance_profiles.find_one(
+            {"_id": state_code}, {"_id": 0}
+        )
+        timing_days = profile.get("notice_timing_days", 365) if profile else 365
+        sent_date = datetime.fromisoformat(update_data["notice_last_sent"].replace("Z", "+00:00"))
+        update_data["notice_next_due"] = (sent_date + timedelta(days=timing_days)).date().isoformat()
+
+    if "accounting_last_sent" in update_data and update_data["accounting_last_sent"]:
+        profile = await db.state_compliance_profiles.find_one(
+            {"_id": state_code}, {"_id": 0}
+        )
+        freq = (profile.get("accounting_frequency", "annual") if profile else "annual")
+        freq_days = {"annual": 365, "quarterly": 90, "monthly": 30}.get(freq, 365)
+        sent_date = datetime.fromisoformat(update_data["accounting_last_sent"].replace("Z", "+00:00"))
+        update_data["accounting_next_due"] = (sent_date + timedelta(days=freq_days)).date().isoformat()
+
+    # Recompute compliance_score
+    score = 100
+    now = datetime.now(timezone.utc)
+
+    # Deduct 15 per overdue deadline
+    for field in ("notice_next_due", "accounting_next_due"):
+        due_val = update_data.get(field)
+        if due_val and not due_val.startswith("null"):
+            try:
+                due_date = datetime.fromisoformat(due_val).replace(tzinfo=timezone.utc)
+                if due_date < now:
+                    score -= 15
+            except (ValueError, TypeError):
+                pass
+
+    # Deduct per-state requirement points for unsatisfied requirements
+    compliance_doc = await db.trust_state_compliance.find_one(
+        {"trust_id": trust_id, "state_code": state_code}, {"_id": 0}
+    )
+    profile = await db.state_compliance_profiles.find_one(
+        {"_id": state_code}, {"_id": 0}
+    )
+    if profile and compliance_doc:
+        reqs = compliance_doc.get("requirements", [])
+        for req in reqs:
+            if not req.get("satisfied"):
+                score -= req.get("points", 0)
+
+    score = max(0, score)
+    update_data["compliance_score"] = score
+
     await db.trust_state_compliance.update_one(
         {"trust_id": trust_id, "state_code": state_code},
         {"$set": update_data},
@@ -147,7 +197,7 @@ async def get_trust_requirements(trust_id: str, user: dict = Depends(get_current
         {"_id": state_code.upper()}, {"_id": 0}
     )
     if not profile:
-        raise HTTPException(status_code=404, detail="State profile not found")
+        return {"trust_id": trust_id, "state_code": state_code.upper(), "requirements": [], "coverage": "uncovered"}
 
     requirements = []
 
@@ -200,4 +250,4 @@ async def get_trust_requirements(trust_id: str, user: dict = Depends(get_current
             "points": 10,
         })
 
-    return {"trust_id": trust_id, "state_code": state_code.upper(), "requirements": requirements}
+    return {"trust_id": trust_id, "state_code": state_code.upper(), "requirements": requirements, "coverage": "covered"}
