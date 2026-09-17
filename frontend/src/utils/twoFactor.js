@@ -134,6 +134,7 @@ export const disable2fa = async (totpCode, password) => {
 export const login2fa = async (challengeToken, code) => {
   const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app'}/api/auth/2fa/login`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ challenge_token: challengeToken, code }),
   });
