@@ -13,7 +13,20 @@ router = APIRouter(prefix="/state-compliance", tags=["state_deep_knowledge"])
 
 # Same pattern as routers/knowledge_retrieval.py: in Railway this file lives
 # at /app/routers/state_deep_knowledge.py, so parent.parent = /app.
-KNOWLEDGE_DIR = Path(__file__).resolve().parent.parent / "KNOWLEDGE"
+# NOTE: git tracks the directory as lowercase `knowledge/`, but some working
+# copies have it on disk as `KNOWLEDGE/` (case-insensitive macOS hides the
+# difference). Linux build containers check out the lowercase spelling, so
+# resolve the directory case-tolerantly instead of hardcoding one casing.
+def _knowledge_dir(base: "Path | None" = None) -> Path:
+    base = base or Path(__file__).resolve().parent.parent
+    for name in ("KNOWLEDGE", "knowledge"):
+        candidate = base / name
+        if candidate.is_dir():
+            return candidate
+    return base / "knowledge"
+
+
+KNOWLEDGE_DIR = _knowledge_dir()
 
 # <filename stem> -> state metadata (canonical state names for the 50 states
 # that have deep-knowledge guides; anything else 404s on the detail route).

@@ -120,3 +120,50 @@ class TestAuthRequired:
     def test_unauthenticated_detail_rejected(self, unauthed_client):
         r = unauthed_client.get("/api/state-compliance/deep-knowledge/CA")
         assert r.status_code in (401, 403)
+
+class TestCaseTolerantKnowledgeDir:
+    """Regression: prod container checks out lowercase `knowledge/` (git index
+    spelling) while macOS working copies may have `KNOWLEDGE/` on disk. The
+    router must resolve the directory regardless of on-disk casing.
+
+    macOS FS is case-insensitive, so 'KNOWLEDGE' and 'knowledge' are the same
+    physical directory there; the ordering assertions below only hold on
+    case-sensitive filesystems (like the Linux build container). We detect
+    the FS at runtime and assert the meaningful contract in each case."""
+
+    @staticmethod
+    def _fs_case_insensitive(tmp_path):
+        """True when a path can be reached under different casing (macOS)."""
+        import os
+        probe = tmp_path / "caseprobe_xyz"
+        probe.mkdir()
+        return os.path.exists(str(tmp_path / "CASEPROBE_XYZ"))
+
+    def _copy_guides(self, dest):
+        import shutil
+        dest.mkdir(parents=True, exist_ok=True)
+        for f in sdk.KNOWLEDGE_DIR.glob("18-state-compliance-*.md"):
+            shutil.copy(f, dest / f.name)
+
+    def test_resolver_finds_lowercase_dir(self, tmp_path):
+        lower = tmp_path / "knowledge"
+        self._copy_guides(lower)
+        resolved = sdk._knowledge_dir(tmp_path)
+        assert resolved.is_dir()
+        assert len(list(resolved.glob("18-state-compliance-*.md"))) >= 10
+        if not self._fs_case_insensitive(tmp_path):
+            # Linux prod condition: only lowercase exists, must be chosen
+            assert resolved.name == "knowledge"
+
+    def test_resolver_prefers_uppercase_when_both(self, tmp_path):
+        for name in ("KNOWLEDGE", "knowledge"):
+            self._copy_guides(tmp_path / name)
+        resolved = sdk._knowledge_dir(tmp_path)
+        assert resolved.is_dir()
+        if not self._fs_case_insensitive(tmp_path):
+            assert resolved.name == "KNOWLEDGE"
+
+    def test_resolver_falls_back_to_lowercase_when_missing(self, tmp_path):
+        resolved = sdk._knowledge_dir(tmp_path)
+        assert resolved.name == "knowledge"
+        assert not resolved.exists()
