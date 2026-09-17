@@ -11,28 +11,76 @@ router = APIRouter(tags=["state_compliance"])
 
 # ==================== SEED DATA: State Compliance Rules ====================
 STATE_COMPLIANCE_SEED = [
-    {"state_code": "AL", "state_name": "Alabama", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
     {"state_code": "AK", "state_name": "Alaska", "utc_adopted": "full", "utc_adoption_date": "2012-04-02", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+    {"state_code": "AL", "state_name": "Alabama", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+    {"state_code": "AR", "state_name": "Arkansas", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "AZ", "state_name": "Arizona", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": False},
     {"state_code": "CA", "state_name": "California", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "CO", "state_name": "Colorado", "utc_adopted": "full", "utc_adoption_date": "2019-05-02", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+    {"state_code": "CT", "state_name": "Connecticut", "utc_adopted": "full", "utc_adoption_date": "2020-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "DE", "state_name": "Delaware", "utc_adopted": "no", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "FL", "state_name": "Florida", "utc_adopted": "partial", "notice_required": True, "notice_timing_days": 45, "accounting_frequency": "quarterly", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "GA", "state_name": "Georgia", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+    {"state_code": "HI", "state_name": "Hawaii", "utc_adopted": "full", "utc_adoption_date": "2022-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "IA", "state_name": "Iowa", "utc_adopted": "no", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+    {"state_code": "ID", "state_name": "Idaho", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 30, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "IL", "state_name": "Illinois", "utc_adopted": "full", "utc_adoption_date": "2020-01-01", "notice_required": True, "notice_timing_days": 30, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "IN", "state_name": "Indiana", "utc_adopted": "no", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+    {"state_code": "KS", "state_name": "Kansas", "utc_adopted": "full", "utc_adoption_date": "2002-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "KY", "state_name": "Kentucky", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "LA", "state_name": "Louisiana", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 30, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
-    {"state_code": "MD", "state_name": "Maryland", "utc_adopted": "full", "utc_adoption_date": "2014-01-01", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "MA", "state_name": "Massachusetts", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 30, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "MD", "state_name": "Maryland", "utc_adopted": "full", "utc_adoption_date": "2014-01-01", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "ME", "state_name": "Maine", "utc_adopted": "full", "utc_adoption_date": "2007-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "MI", "state_name": "Michigan", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "MN", "state_name": "Minnesota", "utc_adopted": "full", "utc_adoption_date": "2019-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "MO", "state_name": "Missouri", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": False},
+    {"state_code": "MS", "state_name": "Mississippi", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": False},
+    {"state_code": "MT", "state_name": "Montana", "utc_adopted": "full", "utc_adoption_date": "2013-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "NC", "state_name": "North Carolina", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "ND", "state_name": "North Dakota", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": False},
+    {"state_code": "NE", "state_name": "Nebraska", "utc_adopted": "full", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "NH", "state_name": "New Hampshire", "utc_adopted": "full", "utc_adoption_date": "2007-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "NJ", "state_name": "New Jersey", "utc_adopted": "full", "utc_adoption_date": "2004-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "NM", "state_name": "New Mexico", "utc_adopted": "full", "utc_adoption_date": "2007-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "NV", "state_name": "Nevada", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "NY", "state_name": "New York", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "OH", "state_name": "Ohio", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "OK", "state_name": "Oklahoma", "utc_adopted": "full", "utc_adoption_date": "2025-11-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "OR", "state_name": "Oregon", "utc_adopted": "full", "utc_adoption_date": "2007-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "PA", "state_name": "Pennsylvania", "utc_adopted": "full", "utc_adoption_date": "2005-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "RI", "state_name": "Rhode Island", "utc_adopted": "no", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "SC", "state_name": "South Carolina", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "SD", "state_name": "South Dakota", "utc_adopted": "no", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "TN", "state_name": "Tennessee", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "TX", "state_name": "Texas", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "UT", "state_name": "Utah", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "VA", "state_name": "Virginia", "utc_adopted": "full", "utc_adoption_date": "2007-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "VT", "state_name": "Vermont", "utc_adopted": "full", "utc_adoption_date": "2007-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "WA", "state_name": "Washington", "utc_adopted": "full", "utc_adoption_date": "2016-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+    {"state_code": "WI", "state_name": "Wisconsin", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "WV", "state_name": "West Virginia", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+    {"state_code": "WY", "state_name": "Wyoming", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True}
 ]
 
 
 @router.post("/state-compliance/seed")
-async def seed_state_compliance(user: dict = Depends(get_current_user)):
+async def seed_state_compliance(user: dict = Depends(get_current_user), upsert_missing: bool = False):
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
+    if upsert_missing:
+        # Idempotent upsert: insert only profiles whose _id (state_code) is absent
+        inserted = 0
+        for s in STATE_COMPLIANCE_SEED:
+            doc = {"_id": s["state_code"], **s}
+            result = await db.state_compliance_profiles.update_one(
+                {"_id": s["state_code"]},
+                {"$setOnInsert": doc},
+                upsert=True,
+            )
+            if result.upserted_id is not None:
+                inserted += 1
+        return {"message": "Upserted missing states", "inserted": inserted}
     existing = await db.state_compliance_profiles.count_documents({})
     if existing > 0:
         return {"message": "Already seeded", "count": existing}
