@@ -415,3 +415,34 @@ async def test_welcome_dedupe_postmark_fallback_when_mailercloud_fails(runner, d
 
     mailercloud_module.send_nurture_email_via_mailercloud.assert_called_once()
     email_service_module.email_service.send_lead_welcome.assert_called_once()
+
+
+# --------------------------------------------------------------------------- #
+# Item 4 (regression): real notify_pipeline_alert must accept alert_level kw.
+# The autouse mock_services fixture replaces notify_pipeline_alert with a
+# MagicMock (which accepts anything), so it cannot catch a signature mismatch
+# in the REAL function. If the real function ever rejects `alert_level`, every
+# RED monitor alert would raise TypeError and be swallowed (silent failure).
+# We load the real module fresh and out-of-band to lock the contract.
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_real_notify_pipeline_alert_accepts_alert_level_kw():
+    import importlib.util
+    import os
+
+    real_path = os.path.join(os.path.dirname(__file__), "..", "discord_service.py")
+    spec = importlib.util.spec_from_file_location("discord_service_real_check", real_path)
+    real_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(real_mod)
+
+    # No webhook configured in the test env -> returns gracefully, no network.
+    res = await real_mod.notify_pipeline_alert(
+        title="Lead pipeline health check FAILED (RED)",
+        message="nurture throughput floor missed",
+        details={"eligible_cohort": 12, "sends_last_24h": 0},
+        alert_level="red",
+    )
+    assert isinstance(res, dict)
+    # And calling without alert_level must still work (backward compatible).
+    res2 = await real_mod.notify_pipeline_alert(title="t", message="m")
+    assert isinstance(res2, dict)

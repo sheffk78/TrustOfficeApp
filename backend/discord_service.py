@@ -199,6 +199,7 @@ async def notify_pipeline_alert(
     title: str,
     message: str,
     details: Optional[dict] = None,
+    alert_level: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Send a RED pipeline-health alert to #trustoffice-main (1479343804527153262).
 
