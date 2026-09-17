@@ -94,13 +94,17 @@ class FakeCollection:
                 new_doc = dict(query)
                 for k, v in update.get("$set", {}).items():
                     new_doc[k] = v
+                for k, v in update.get("$setOnInsert", {}).items():
+                    new_doc[k] = v
                 self.docs[new_doc.get("_id", self._next_id())] = new_doc
-                return MagicMock()
+                return MagicMock(upserted_id=new_doc.get("_id"))
             return MagicMock()
         for k, v in update.get("$set", {}).items():
             doc[k] = v
         self.docs[doc["_id"]] = dict(doc)
-        return MagicMock()
+        m = MagicMock()
+        m.upserted_id = None
+        return m
 
     def to_list(self, limit):
         return [dict(d) for d in self.docs.values()][:limit]
@@ -590,3 +594,200 @@ class TestBeneficiaryReportAutoRecord:
             beneficiary_reports.beneficiary_report_service = original
 
         assert len(fake_db.trust_state_compliance.docs) == 0
+
+# ==================== SEED DATA INTEGRATION TESTS ====================
+
+class TestSeedListIntegrity:
+    """(a) Seed list has exactly 50 unique state codes; original 15 byte-identical."""
+
+    def test_seed_count_is_fifty(self):
+        assert len(sc.STATE_COMPLIANCE_SEED) == 50
+
+    def test_all_50_state_codes_unique(self):
+        codes = [s["state_code"] for s in sc.STATE_COMPLIANCE_SEED]
+        assert len(codes) == len(set(codes)) == 50
+
+    def test_all_50_are_valid_us_state_codes(self):
+        valid_codes = {
+            "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+            "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+            "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+            "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+            "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+        }
+        codes = {s["state_code"] for s in sc.STATE_COMPLIANCE_SEED}
+        assert codes == valid_codes
+
+    def test_seed_is_alphabetical_by_state_code(self):
+        codes = [s["state_code"] for s in sc.STATE_COMPLIANCE_SEED]
+        assert codes == sorted(codes)
+
+    def test_original_15_entries_byte_identical(self):
+        original = [
+            {"state_code": "AL", "state_name": "Alabama", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+            {"state_code": "AK", "state_name": "Alaska", "utc_adopted": "full", "utc_adoption_date": "2012-04-02", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+            {"state_code": "AZ", "state_name": "Arizona", "utc_adopted": "partial", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": False},
+            {"state_code": "CA", "state_name": "California", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "CO", "state_name": "Colorado", "utc_adopted": "full", "utc_adoption_date": "2019-05-02", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+            {"state_code": "FL", "state_name": "Florida", "utc_adopted": "partial", "notice_required": True, "notice_timing_days": 45, "accounting_frequency": "quarterly", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "GA", "state_name": "Georgia", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+            {"state_code": "IL", "state_name": "Illinois", "utc_adopted": "full", "utc_adoption_date": "2020-01-01", "notice_required": True, "notice_timing_days": 30, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "LA", "state_name": "Louisiana", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 30, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "MD", "state_name": "Maryland", "utc_adopted": "full", "utc_adoption_date": "2014-01-01", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "MA", "state_name": "Massachusetts", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 30, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "NC", "state_name": "North Carolina", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "NY", "state_name": "New York", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "TX", "state_name": "Texas", "utc_adopted": "no", "notice_required": True, "notice_timing_days": 60, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
+            {"state_code": "WA", "state_name": "Washington", "utc_adopted": "full", "utc_adoption_date": "2016-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
+        ]
+        seed = sc.STATE_COMPLIANCE_SEED
+        for orig in original:
+            match = [s for s in seed if s["state_code"] == orig["state_code"]][0]
+            assert match == orig, f"Mismatch for {orig['state_code']}"
+
+    def test_no_mojibake_in_seed_strings(self):
+        """No seed entry should contain \xc2 (mojibake remnant)."""
+        import json
+        seed_json = json.dumps(sc.STATE_COMPLIANCE_SEED)
+        assert "\xc2" not in seed_json
+
+    def test_no_statutes_field_in_seed(self):
+        """Seed entries must not contain statutes (display-only, not prod)."""
+        for s in sc.STATE_COMPLIANCE_SEED:
+            assert "statutes" not in s
+
+
+class TestSeedUpsertMissing:
+    """(b) Upsert endpoint inserts missing states and leaves existing untouched."""
+
+    @pytest.mark.asyncio
+    async def test_upsert_inserts_missing_states(self, fake_db, monkeypatch):
+        """Upsert mode inserts only absent state codes."""
+        # Pre-seed with 2 of the 50 states
+        await fake_db.state_compliance_profiles.insert_one(
+            {"_id": "AL", "state_code": "AL", "state_name": "Alabama"}
+        )
+        await fake_db.state_compliance_profiles.insert_one(
+            {"_id": "CA", "state_code": "CA", "state_name": "California"}
+        )
+
+        result = await sc.seed_state_compliance(
+            {"user_id": "admin", "is_admin": True}, upsert_missing=True
+        )
+
+        # Should have inserted 48 missing states (50 - 2 existing)
+        assert result["inserted"] == 48
+        assert result["message"] == "Upserted missing states"
+
+        # All 50 states should now be present
+        all_docs = await (await fake_db.state_compliance_profiles.find({}, {"_id": 0})).to_list(60)
+        assert len(all_docs) == 50
+
+    @pytest.mark.asyncio
+    async def test_upsert_does_not_modify_existing(self, fake_db, monkeypatch):
+        """Upsert mode must never modify existing documents."""
+        # Pre-seed CA with a modified field
+        await fake_db.state_compliance_profiles.insert_one({
+            "_id": "CA",
+            "state_code": "CA",
+            "state_name": "California",
+            "notice_required": True,
+            "notice_timing_days": 60,
+            "accounting_frequency": "annual",
+            "utc_adopted": "no",
+            "trustee_removal_standard": "breach of trust",
+            "spendthrift_default": True,
+        })
+
+        # Record the original accounting_frequency
+        before = await fake_db.state_compliance_profiles.find_one({"_id": "CA"})
+        assert before["accounting_frequency"] == "annual"
+
+        result = await sc.seed_state_compliance(
+            {"user_id": "admin", "is_admin": True}, upsert_missing=True
+        )
+
+        # CA should still be there and unchanged
+        after = await fake_db.state_compliance_profiles.find_one({"_id": "CA"})
+        assert after["accounting_frequency"] == "annual"
+        assert after["notice_required"] == True  # unchanged
+
+    @pytest.mark.asyncio
+    async def test_upsert_with_no_missing_inserts_zero(self, fake_db):
+        """When all 50 states are already present, upsert inserts 0."""
+        # Pre-seed all 50 states
+        for s in sc.STATE_COMPLIANCE_SEED:
+            await fake_db.state_compliance_profiles.insert_one(
+                {"_id": s["state_code"], **s}
+            )
+
+        result = await sc.seed_state_compliance(
+            {"user_id": "admin", "is_admin": True}, upsert_missing=True
+        )
+
+        assert result["inserted"] == 0
+
+
+class TestRequirementsFullUTCNoNotice:
+    """(c) Full-UTC state with notice_required=False returns only accounting requirement."""
+
+    @pytest.mark.asyncio
+    async def test_full_utc_no_notice_returns_accounting_only(self, fake_db):
+        """A full-UTC state with notice_required=False should have coverage=covered
+        and only the accounting requirement (no notice, no utc_gap, no spendthrift)."""
+        # Seed a full-UTC state with notice_required=False
+        await fake_db.state_compliance_profiles.insert_one({
+            "_id": "XX",
+            "state_code": "XX",
+            "state_name": "Xavierland",
+            "utc_adopted": "full",
+            "utc_adoption_date": "2020-01-01",
+            "notice_required": False,
+            "accounting_frequency": "annual",
+            "trustee_removal_standard": "breach of trust",
+            "spendthrift_default": True,
+        })
+        await fake_db.trusts.insert_one({
+            "trust_id": "trust_xx",
+            "user_id": "user_1",
+            "state_code": "XX",
+        })
+
+        result = await sc.get_trust_requirements("trust_xx", {"user_id": "user_1"})
+
+        assert result["coverage"] == "covered"
+        # Only accounting requirement should be present
+        categories = [r["category"] for r in result["requirements"]]
+        assert categories == ["accounting"]
+        assert len(result["requirements"]) == 1
+        assert result["requirements"][0]["category"] == "accounting"
+
+    @pytest.mark.asyncio
+    async def test_full_utc_with_notice_has_notice_and_accounting(self, fake_db):
+        """A full-UTC state with notice_required=True should have both notice and accounting."""
+        await fake_db.state_compliance_profiles.insert_one({
+            "_id": "YY",
+            "state_code": "YY",
+            "state_name": "Yolandia",
+            "utc_adopted": "full",
+            "utc_adoption_date": "2020-01-01",
+            "notice_required": True,
+            "notice_timing_days": 30,
+            "accounting_frequency": "annual",
+            "trustee_removal_standard": "breach of trust",
+            "spendthrift_default": True,
+        })
+        await fake_db.trusts.insert_one({
+            "trust_id": "trust_yy",
+            "user_id": "user_1",
+            "state_code": "YY",
+        })
+
+        result = await sc.get_trust_requirements("trust_yy", {"user_id": "user_1"})
+
+        assert result["coverage"] == "covered"
+        categories = [r["category"] for r in result["requirements"]]
+        assert "notice" in categories
+        assert "accounting" in categories
+        assert "utc_gap" not in categories
+        assert "utc_partial" not in categories
