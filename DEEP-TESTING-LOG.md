@@ -253,7 +253,7 @@
 #### Cross-Feature (P2)
 13. **Activity feed only returns minutes + distributions**: Missing compensation, expenses, vault uploads, entity changes.
 14. **No compliance summary card on dashboard**: ComplianceSummaryCard exists but only used on RiskDashboardPage.
-15. **Mobile bottom nav missing Compliance section**: Risk, State Compliance, Audit Trail unreachable from mobile nav.
+15. **[VERIFIED/FIXED 2026-09-16]** Mobile bottom nav Compliance section: State Compliance (/governance?tab=state), Risk Dashboard (/governance?tab=risk) and Audit Trail (/audit-trail) are all present in the More sheet (BASE_MORE_NAV_GROUPS) and reachable. Remaining defect fixed: isActive()/isSubActive() compared location.pathname only, so query-string routes never rendered as active after navigation — now matches location.pathname + location.search consistently (mirrors Sidebar.js). Verified via MobileBottomNav.test.js (5 tests: sheet contains all three links with correct hrefs; /governance?tab=state highlights State Compliance + More button; tab=risk/tab-free variants isolated).
 16. **No vault/beneficiaries quick access on dashboard**: Only in onboarding checklist. No card or quick action post-onboarding.
 17. **FullSubscriptionGate is dead code**: Exported but never used. Hard paywall component never wired.
 
