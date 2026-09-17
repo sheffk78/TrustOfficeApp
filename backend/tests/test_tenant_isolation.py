@@ -92,7 +92,7 @@ NON_DATA_ROUTERS = {
     "error_reports", "feedback", "governance", "health", "knowledge",
     "knowledge_retrieval", "leads", "messaging", "notifications",
     "page_agent", "performance", "preferences", "referrals", "risk_dashboard",
-    "state_compliance", "stats", "subscriptions", "support_tickets",
+ "state_compliance", "state_deep_knowledge", "stats", "subscriptions", "support_tickets",
     "tax_calendar", "template_registry", "audit_defense", "exports",
     "exports_enhanced", "full_export", "cloud_backup", "benevolence",
     "benevolence_policy", "beneficiary_reports", "categories", "clients",
