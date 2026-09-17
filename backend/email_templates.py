@@ -1148,6 +1148,146 @@ Founder, TrustOffice
         """
     },
 
+    # Booking reminder â sent ~24h before the scheduled call (no-show reduction)
+    "booking_reminder_day_before": {
+        "subject": lambda data: f"Tomorrow: your TrustOffice call at {data.get('call_time', 'see you soon')}",
+        "html": lambda data: _base_template(f"""
+            <h2>Your call is tomorrow</h2>
+            <p>Hi {_h(data.get('name', 'there'))},</p>
+            <p>Just a reminder that your 15-minute discovery call with <strong>Kenneth (Jeff) Kohler, founder of TrustOffice</strong> â Kenneth is his legal name, Jeff is what everyone calls him â is tomorrow.</p>
+
+            <div class="task-card">
+              <p class="label">Date</p>
+              <p class="value">{data.get('call_date', '')}</p>
+              <p class="label">Time</p>
+              <p class="value">{data.get('call_time', '')}</p>
+              <p class="label">Time zone</p>
+              <p class="value">{data.get('timezone', '')}</p>
+            </div>
+
+            <p><strong>Meeting link (Google Meet):</strong></p>
+            <p style="text-align: center; margin: 20px 0;">
+              <a href="{data.get('meeting_url', '#')}" class="button">Join Your Call</a>
+            </p>
+            <p style="font-size: 12px; color: #666;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <span style="word-break: break-all;">{data.get('meeting_url', '#')}</span>
+            </p>
+
+            <p><strong>What to expect:</strong> No pitch, no pressure. We'll talk about what's going on with your trust right now, whether TrustOffice is a good fit, and if it makes sense I'll walk you through the annual plan. You'll walk away with a clearer picture of what you should be doing as trustee â whether or not you sign up.</p>
+            <p><strong>No prep needed.</strong> Just show up and tell me about your situation.</p>
+
+            <p>Need to reschedule or cancel? You can do that right from your original booking confirmation email, or reply to this one.</p>
+
+            <p>Looking forward to it,</p>
+            <p><strong>Kenneth (Jeff) Kohler</strong><br>Founder, TrustOffice</p>
+        """),
+        "text": lambda data: f"""
+Your call is tomorrow
+
+Hi {data.get('name', 'there')},
+
+Just a reminder that your 15-minute discovery call with Kenneth (Jeff) Kohler, founder of TrustOffice â Kenneth is his legal name, Jeff is what everyone calls him â is tomorrow.
+
+Date: {data.get('call_date', '')}
+Time: {data.get('call_time', '')}
+Time zone: {data.get('timezone', '')}
+
+Meeting link (Google Meet): {data.get('meeting_url', '#')}
+
+What to expect: No pitch, no pressure. We'll talk about what's going on with your trust right now, whether TrustOffice is a good fit, and if it makes sense I'll walk you through the annual plan. You'll walk away with a clearer picture of what you should be doing as trustee - whether or not you sign up.
+
+No prep needed. Just show up and tell me about your situation.
+
+Need to reschedule or cancel? You can do that right from your original booking confirmation email, or reply to this one.
+
+Looking forward to it,
+
+Kenneth (Jeff) Kohler
+Founder, TrustOffice
+        """
+    },
+
+    # Booking reminder â sent ~1h before the scheduled call (no-show reduction)
+    "booking_reminder_1h": {
+        "subject": lambda data: f"Your TrustOffice call is in 1 hour â join link inside",
+        "html": lambda data: _base_template(f"""
+            <h2>Your call is in 1 hour</h2>
+            <p>Hi {_h(data.get('name', 'there'))},</p>
+            <p>Your 15-minute discovery call with <strong>Kenneth (Jeff) Kohler</strong> is coming up in about an hour ({data.get('call_time', '')} {data.get('timezone', '')}).</p>
+
+            <p style="text-align: center; margin: 24px 0;">
+              <a href="{data.get('meeting_url', '#')}" class="button">Join Your Call Now</a>
+            </p>
+            <p style="font-size: 12px; color: #666;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <span style="word-break: break-all;">{data.get('meeting_url', '#')}</span>
+            </p>
+
+            <p>No prep needed â just click the link at call time and tell me about your situation. See you in a bit.</p>
+
+            <p><strong>Kenneth (Jeff) Kohler</strong><br>Founder, TrustOffice</p>
+        """),
+        "text": lambda data: f"""
+Your call is in 1 hour
+
+Hi {data.get('name', 'there')},
+
+Your 15-minute discovery call with Kenneth (Jeff) Kohler is coming up in about an hour ({data.get('call_time', '')} {data.get('timezone', '')}).
+
+Join link: {data.get('meeting_url', '#')}
+
+No prep needed - just click the link at call time and tell me about your situation. See you in a bit.
+
+Kenneth (Jeff) Kohler
+Founder, TrustOffice
+        """
+    },
+
+    # Post-drip re-engagement â sent ONCE to leads that finished the 12-email
+    # nurture sequence with no conversion. Distinct template (not part of the
+    # 12-email sequence); marks the cohort as stage='post_drip'.
+    "post_drip_reengagement": {
+        "subject": lambda data: f"Still here to help with your trust, {_h(data.get('name', 'there'))}",
+        "html": lambda data: _base_template(f"""
+            <h2>Still here whenever you're ready</h2>
+            <p>Hi {_h(data.get('name', 'there'))},</p>
+            <p>Over the last few months I've sent you a series of notes on protecting your trust and serving as trustee without the overwhelm. I don't want to keep landing in your inbox if it's not useful â but I also don't want you to slip through the cracks if the timing just wasn't right.</p>
+
+            <p>The single most valuable next step is a short conversation. In 15 minutes we can look at where your trust stands today and whether TrustOffice is worth it for your situation â no pressure, no pitch. Most people leave with at least one thing they should fix right away.</p>
+
+            <p style="text-align: center; margin: 24px 0;">
+              <a href="{data.get('booking_url', 'https://trustoffice.app/book-a-call/')}" class="button">Book a Free Call</a>
+            </p>
+
+            <p>If now's not the time, no worries â you can ignore this and I'll leave the door open. And the trustee course is still here whenever you want it:</p>
+            <p style="text-align: center; margin: 16px 0;">
+              <a href="{data.get('course_url', 'https://trustoffice.app/trustee-101')}" class="button-secondary">Open the Trustee 101 Course</a>
+            </p>
+
+            <p>Talk soon,</p>
+            <p><strong>Kenneth (Jeff) Kohler</strong><br>Founder, TrustOffice</p>
+        """),
+        "text": lambda data: f"""
+Still here whenever you're ready
+
+Hi {data.get('name', 'there')},
+
+Over the last few months I've sent you a series of notes on protecting your trust and serving as trustee without the overwhelm. I don't want to keep landing in your inbox if it's not useful - but I also don't want you to slip through the cracks if the timing just wasn't right.
+
+The single most valuable next step is a short conversation. In 15 minutes we can look at where your trust stands today and whether TrustOffice is worth it for your situation - no pressure, no pitch.
+
+Book a free call: {data.get('booking_url', 'https://trustoffice.app/book-a-call/')}
+
+If now's not the time, no worries - you can ignore this and I'll leave the door open. The trustee course is still here: {data.get('course_url', 'https://trustoffice.app/trustee-101')}
+
+Talk soon,
+
+Kenneth (Jeff) Kohler
+Founder, TrustOffice
+        """
+    },
+
     # Distribution Notice to Beneficiary
     "distribution_notice": {
         "subject": lambda data: f"Distribution Notice — {data.get('trust_name', 'Your Trust')}",

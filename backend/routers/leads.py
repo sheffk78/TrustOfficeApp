@@ -538,48 +538,11 @@ async def capture_lead(lead: LeadCapture):
         ping_on_phone=True,
     )
 
-    # Send welcome email (fire-and-forget — non-blocking)
-    try:
-        course_url = f"{email_service.app_url}/trustee-101"
-        booking_url = "https://trustoffice.app/book-a-call/"
-        await email_service.send_lead_welcome(
-            to_email=email,
-            name=name,
-            course_url=course_url,
-            booking_url=booking_url
-        )
-        await _log_activity(lead_id, "email", "Sent welcome email with book-a-call link")
-    except Exception as e:
-        logger.warning(f"Failed to send welcome email to {email}: {e}")
+    # Exactly one welcome on capture (item 6 dedupe): MailerCloud step-1 is the
+    # canonical welcome; Postmark lead_welcome is a fallback only when MC fails.
+    await _welcome_with_dedupe(db, email, name, lead_id)
 
-    # Add to MailerCloud leads list for nurture campaign
-    try:
-        from mailercloud_service import add_to_lead_list
-        mc_result = await add_to_lead_list(email, name)
-        if mc_result.get("success"):
-            await _log_activity(lead_id, "email", "Added to MailerCloud Leads list")
-        else:
-            logger.warning(f"MailerCloud add failed for {email}: {mc_result.get('error')}")
-    except Exception as e:
-        logger.warning(f"MailerCloud add failed for {email}: {e}")
-
-    # Send nurture email 1 via MailerCloud Email API (12-email sequence)
-    try:
-        from mailercloud_service import send_nurture_email_via_mailercloud
-        nurture_result = await send_nurture_email_via_mailercloud(email, name, step=1)
-        if nurture_result.get("success"):
-            await db.leads.update_one(
-                {"lead_id": lead_id},
-                {"$set": {
-                    "nurture_step_sent": 1,
-                    "nurture_step1_sent_at": datetime.now(timezone.utc).isoformat(),
-                }}
-            )
-            await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud")
-    except Exception as e:
-        logger.warning(f"MailerCloud nurture email 1 failed for {email}: {e}")
-
-    logger.info(f"Lead captured: {lead_id} — {email} via {source}")
+    logger.info(f"Lead captured: {lead_id} â {email} via {source}")
 
     # Create in-app notification
     await create_notification(
@@ -940,36 +903,10 @@ async def _create_facebook_lead(parsed: dict, leadgen_id: str, form_id: str, pag
         lead_id=lead_id, lead_email=email, lead_name=name,
     )
 
-    # Send welcome email + add to MailerCloud + start nurture sequence (only if we have a real email)
+    # Exactly one welcome on capture (item 6 dedupe): MailerCloud step-1 is the
+    # canonical welcome; Postmark lead_welcome is a fallback only when MC fails.
     if email and not email.endswith("@no-email.local"):
-        await _send_lead_welcome_email(email, name, lead_id)
-
-        # Add to MailerCloud leads list for the 12-email nurture campaign
-        try:
-            from mailercloud_service import add_to_lead_list
-            mc_result = await add_to_lead_list(email, name)
-            if mc_result.get("success"):
-                await _log_activity(lead_id, "email", "Added to MailerCloud Leads list")
-            else:
-                logger.warning(f"MailerCloud add failed for {email}: {mc_result.get('error')}")
-        except Exception as e:
-            logger.warning(f"MailerCloud add failed for {email}: {e}")
-
-        # Send nurture email 1 via MailerCloud Email API (12-email sequence)
-        try:
-            from mailercloud_service import send_nurture_email_via_mailercloud
-            nurture_result = await send_nurture_email_via_mailercloud(email, name, step=1)
-            if nurture_result.get("success"):
-                await db.leads.update_one(
-                    {"lead_id": lead_id},
-                    {"$set": {
-                        "nurture_step_sent": 1,
-                        "nurture_step1_sent_at": datetime.now(timezone.utc).isoformat(),
-                    }}
-                )
-                await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud")
-        except Exception as e:
-            logger.warning(f"MailerCloud nurture email 1 failed for {email}: {e}")
+        await _welcome_with_dedupe(db, email, name, lead_id)
 
     logger.info(f"Facebook lead captured: {lead_id} — {name} — {email}")
     return lead_id
@@ -1022,6 +959,46 @@ async def _send_facebook_discord_notification(parsed: dict, name: str, email: st
             )
     except Exception as e:
         logger.warning(f"Failed to send Discord notification for Facebook lead: {e}")
+
+
+async def _welcome_with_dedupe(db, email: str, name: str, lead_id: str):
+    """Send exactly ONE welcome email on lead capture (item 6 dedupe).
+
+    MailerCloud step-1 is the canonical welcome (12-email nurture sequence,
+    per the funnel contract: capture -> MailerCloud Leads list -> 90-day drip).
+    The Postmark lead_welcome is a FALLBACK used only when the MailerCloud
+    step-1 send fails, so a lead never receives both. This replaces the old
+    behavior where both a Postmark welcome and a MailerCloud step-1 fired on
+    every capture (double welcome). Documented choice: MailerCloud step-1 wins
+    when both would succeed same-run.
+    """
+    mc_step1_ok = False
+    try:
+        from mailercloud_service import add_to_lead_list, send_nurture_email_via_mailercloud
+        # Add to MailerCloud leads list for nurture campaign
+        mc_list = await add_to_lead_list(email, name)
+        if not mc_list.get("success"):
+            logger.warning(f"MailerCloud add failed for {email}: {mc_list.get('error')}")
+        # Send nurture email 1 (the welcome) via MailerCloud
+        nurture_result = await send_nurture_email_via_mailercloud(email, name, step=1)
+        if nurture_result.get("success"):
+            mc_step1_ok = True
+            await db.leads.update_one(
+                {"lead_id": lead_id},
+                {"$set": {
+                    "nurture_step_sent": 1,
+                    "nurture_step1_sent_at": datetime.now(timezone.utc).isoformat(),
+                }}
+            )
+            await _log_activity(lead_id, "email", "Sent nurture email 1/12 via MailerCloud (welcome)")
+        else:
+            logger.warning(f"MailerCloud nurture email 1 failed for {email}: {nurture_result.get('error')}")
+    except Exception as e:
+        logger.warning(f"MailerCloud nurture email 1 failed for {email}: {e}")
+
+    # Postmark welcome ONLY as fallback when MailerCloud step-1 did not succeed.
+    if not mc_step1_ok:
+        await _send_lead_welcome_email(email, name, lead_id)
 
 
 async def _send_lead_welcome_email(email: str, name: str, lead_id: str):
@@ -1646,13 +1623,18 @@ async def add_lead_note(
 
 
 async def _log_activity(lead_id: str, action_type: str, content: str):
-    """Log an activity entry for a lead."""
+    """Log an activity entry for a lead.
+
+    created_at is stored as a BSON Date (item 5) so time-range queries work
+    consistently. Legacy docs with an ISO string created_at are tolerated via
+    the _as_dt read-compat helper used by the pipeline monitor/backfill.
+    """
     await db.lead_activities.insert_one({
         "activity_id": f"act_{uuid.uuid4().hex[:12]}",
         "lead_id": lead_id,
         "action_type": action_type,
         "content": content,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc),
     })
 
 

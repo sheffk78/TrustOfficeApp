@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 DISCORD_LEADS_WEBHOOK_URL = os.environ.get('DISCORD_LEADS_WEBHOOK_URL')
 DISCORD_ALERTS_WEBHOOK_URL = os.environ.get('DISCORD_ALERTS_WEBHOOK_URL')
+# #trustoffice-main channel (1479343804527153262) â pipeline health RED alerts.
+DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL = os.environ.get('DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL') or DISCORD_ALERTS_WEBHOOK_URL
+TRUSTOFFICE_MAIN_CHANNEL_ID = "1479343804527153262"
 
 # TrustOffice brand colors
 NAVY = 0x010079
@@ -189,4 +192,45 @@ async def notify_alert(
         webhook_url=webhook_url,
         content=content,
         embeds=[embed]
+    )
+
+
+async def notify_pipeline_alert(
+    title: str,
+    message: str,
+    details: Optional[dict] = None,
+) -> Dict[str, Any]:
+    """Send a RED pipeline-health alert to #trustoffice-main (1479343804527153262).
+
+    Used by the leads pipeline monitor (leads_monitor.check_leads_pipeline_health)
+    when nurture throughput or booking-reminder asserts fail. Distinct from
+    notify_alert (which targets the generic alerts channel) so pipeline failures
+    surface in the TrustOffice brand channel.
+    """
+    webhook_url = DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL
+    if not webhook_url:
+        logger.warning("TrustOffice-main webhook not configured â skipping pipeline alert")
+        return {"success": False, "error": "Not configured"}
+
+    fields = [
+        {"name": "Channel", "value": f"#trustoffice-main ({TRUSTOFFICE_MAIN_CHANNEL_ID})", "inline": True},
+        {"name": "Severity", "value": "RED", "inline": True},
+    ]
+    if details:
+        for k, v in details.items():
+            fields.append({"name": k, "value": str(v), "inline": False})
+
+    embed = {
+        "title": f"Ã°Â¸Â®Âµ {title}",
+        "description": message,
+        "color": RUST,
+        "fields": fields,
+        "footer": {"text": "TrustOffice Lead Pipeline Monitor"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    return await send_discord_message(
+        webhook_url=webhook_url,
+        content=f"<@{TRUSTOFFICE_MAIN_CHANNEL_ID}> **RED ALERT** â {title}",
+        embeds=[embed],
     )
