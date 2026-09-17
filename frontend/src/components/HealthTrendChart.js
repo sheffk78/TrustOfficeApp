@@ -84,7 +84,7 @@ export default function HealthTrendChart({
   // Determine dominant line color from latest point
   const latestScore = points.length ? points[points.length - 1].score : 0;
   const lineColor =
-    latestScore >= 96 ? '#16a34a' : latestScore >= 72 ? '#d97706' : '#dc2626';
+    latestScore >= 85 ? '#16a34a' : latestScore >= 65 ? '#d97706' : '#dc2626';
 
   // Unique gradient ID to avoid collisions if multiple charts rendered
   const gradId = useMemo(() => `healthTrendFill_${Math.random().toString(36).slice(2, 9)}`, []);
