@@ -491,6 +491,62 @@ TrustOffice
         """
     },
 
+    # State Compliance Deadline Reminder Email
+    "compliance_deadline_reminder": {
+        "subject": lambda data: (
+            f"ACTION REQUIRED: {data.get('act', 'state compliance').title()} overdue â "
+            f"{data.get('trust_name', 'your trust')}"
+            if data.get("is_overdue")
+            else f"Reminder: {data.get('act', 'state compliance').title()} due "
+            f"{data.get('due_date', 'soon')} â {data.get('trust_name', 'your trust')}"
+        ),
+        "html": lambda data: _base_template(f"""
+            <h2 style="color: #dc3545;">State Compliance Deadline</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>This is a <strong>state compliance</strong> deadline reminder for
+            <strong>{data.get('trust_name', 'your trust')}</strong>{f" in {data.get('state_name')} ({data.get('state_code')})" if data.get('state_name') else ''}.</p>
+
+            <div class="task-card" style="border-left-color: #dc3545;">
+              <h3>{data.get('act', 'State compliance requirement').title()}</h3>
+              <p class="label">Required Act</p>
+              <p class="value">{data.get('act', 'State compliance requirement')}</p>
+              <p class="label">Due Date</p>
+              <p class="value">{data.get('due_date', 'N/A')}</p>
+              {f'<p class="label">Days Remaining</p><p class="value">{data.get("days_remaining")} days</p>' if not data.get('is_overdue') else f'<p class="label">Days Overdue</p><p class="value" style="color: #dc3545;">{data.get("days_overdue")} days</p>'}
+            </div>
+
+            <div class="alert" style="background-color: #f8d7da; border-color: #dc3545;">
+              <strong>Why this matters:</strong> {data.get('act')} is required by
+              {data.get('state_name', 'the governing state')} law for this trust.
+              {f" This deadline is now <strong>overdue</strong> â overdue state compliance directly lowers this trust's compliance score." if data.get('is_overdue') else " Completing it on time protects this trust's compliance score."}
+            </div>
+
+            <p style="text-align: center;">
+              <a href="{data.get('app_url', '#')}/governance?tab=state" class="button" style="background-color: #dc3545;">Review Compliance Status</a>
+            </p>
+
+            <p>Best regards,<br>TrustOffice</p>
+        """),
+        "text": lambda data: f"""
+STATE COMPLIANCE DEADLINE
+
+Hi {data.get('user_name', 'there')},
+
+This is a state compliance deadline reminder for {data.get('trust_name', 'your trust')}{f" in {data.get('state_name')} ({data.get('state_code')})" if data.get('state_name') else ''}.
+
+Required Act: {data.get('act', 'State compliance requirement')}
+Due Date: {data.get('due_date', 'N/A')}
+{f"Days Remaining: {data.get('days_remaining')} days" if not data.get('is_overdue') else f"Days Overdue: {data.get('days_overdue')} days"}
+
+Why this matters: {data.get('act')} is required by {data.get('state_name', 'the governing state')} law for this trust.{f" This deadline is now OVERDUE â overdue state compliance directly lowers this trust's compliance score." if data.get('is_overdue') else " Completing it on time protects this trust's compliance score."}
+
+Review Compliance Status: {data.get('app_url', '#')}/governance?tab=state
+
+Best regards,
+TrustOffice
+        """,
+    },
+
     # New Minutes Notification
     "minutes_created": {
         "subject": lambda data: f"New Minutes Recorded: {data.get('minutes_type', 'Meeting')} - {data.get('trust_name', '')}",

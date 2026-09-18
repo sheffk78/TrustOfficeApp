@@ -16,7 +16,7 @@ import remarkGfm from 'remark-gfm';
 import {
   MapPin, AlertTriangle, Shield, CheckCircle2, Clock,
   FileText, ChevronRight, BookOpen, Scale, Gavel, Send, Download,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, HelpCircle
 } from 'lucide-react';
 
 import { SEVERITY_STYLES_FLAT as SEVERITY_STYLES } from '@/utils/severityStyles';
@@ -44,6 +44,57 @@ const CATEGORY_PLAIN_ENGLISH = {
   accounting: 'Your state requires you to send regular financial reports to beneficiaries',
   spendthrift: 'Your state does not automatically protect trust assets from creditors',
 };
+
+// Deterministic mapper: requirement topic -> deep guide section heading.
+// Priority order mirrors the section hierarchy in the state guides.
+export function getSectionForRequirement(req) {
+  const title = (req.title || '').toLowerCase();
+  const description = (req.description || '').toLowerCase();
+  const combined = `${title} ${description}`;
+
+  if (/\b(court|removal|judge|judicial|supervision)\b/.test(combined)) {
+    return 'Court Supervision';
+  }
+  if (/\bnotice\b/.test(combined)) {
+    return 'Beneficiary Notice Requirements';
+  }
+  if (/\bincome tax\b/.test(combined)) {
+    return 'State Income Tax on Trusts';
+  }
+  if (/\bfil(e|ing)s?\b|\breturns?\b/.test(combined)) {
+    return 'Filing Requirements';
+  }
+  if (/\btaxes\b|\btax\b/.test(combined)) {
+    return 'State Income Tax on Trusts';
+  }
+  return 'Key State-Specific Rules';
+}
+
+// Extract the markdown content of a ## section from a full guide markdown.
+// Case-insensitive heading match; returns null when the heading is absent
+// (caller falls back to showing the whole guide).
+export function extractSectionFromMarkdown(markdown, sectionHeading) {
+  if (!markdown || !sectionHeading) return null;
+  const lines = markdown.split('\n');
+  const target = String(sectionHeading).trim().toLowerCase();
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (start === -1) {
+      // Heading line: '## <title>' — compare case-insensitively.
+      if (/^##\s+/.test(trimmed) && trimmed.replace(/^##\s+/, '').trim().toLowerCase() === target) {
+        start = i;
+      }
+    } else if (/^##\s+/.test(trimmed)) {
+      // Next ## heading ends the section.
+      return lines.slice(start + 1, i).join('\n').trim() || null;
+    }
+  }
+  if (start !== -1) {
+    return lines.slice(start + 1).join('\n').trim() || null;
+  }
+  return null;
+}
 
 function DeadlineRow({ label, lastSent, nextDue, onMarkSent }) {
   const overdue = nextDue && new Date(nextDue) < new Date();
@@ -76,6 +127,12 @@ export default function StateCompliancePage() {
   const [deepGuide, setDeepGuide] = useState(null);
   const [guideExpanded, setGuideExpanded] = useState(false);
   const [guideMarkdown, setGuideMarkdown] = useState(null);
+  // Per-requirement guidance: tracks which requirement row is expanded
+  // and caches the extracted section markdown for that row.
+  const [guidanceExpanded, setGuidanceExpanded] = useState(null);
+  const [guidanceSectionContent, setGuidanceSectionContent] = useState(null);
+  const [guidanceWholeGuide, setGuidanceWholeGuide] = useState(null);
+  const [guidanceLoading, setGuidanceLoading] = useState(false);
 
   useEffect(() => {
     if (selectedTrust) loadData();
@@ -112,6 +169,10 @@ export default function StateCompliancePage() {
       setDeepGuide(entry || null);
       setGuideExpanded(false);
       setGuideMarkdown(null);
+      // Reset per-requirement guidance when data reloads.
+      setGuidanceExpanded(null);
+      setGuidanceSectionContent(null);
+      setGuidanceWholeGuide(null);
     } catch (e) {
       showError(toast, e, { operation: 'load_state_compliance', page: 'StateCompliance' });
     } finally {
@@ -145,6 +206,46 @@ export default function StateCompliancePage() {
     } catch (e) {
       showError(toast, e, { operation: 'mark_accounting_sent', page: 'StateCompliance' });
     }
+  };
+
+  // Toggle per-requirement state guidance: fetch the deep guide for the
+  // trust's state (if not already loaded), extract the relevant section,
+  // and expand it inline below the requirement row.
+  const toggleGuidance = async (req, index) => {
+    if (guidanceExpanded === index) {
+      setGuidanceExpanded(null);
+      setGuidanceSectionContent(null);
+      setGuidanceWholeGuide(null);
+      return;
+    }
+    setGuidanceExpanded(index);
+    setGuidanceSectionContent(null);
+    setGuidanceWholeGuide(null);
+
+    // Ensure the deep guide markdown is loaded for this state.
+    let md = guideMarkdown;
+    if (!md && deepGuide) {
+      setGuidanceLoading(true);
+      try {
+        const res = await fetchWithAuth(`/state-compliance/deep-knowledge/${deepGuide.state_code}`);
+        const data = await res.json();
+        if (res.ok) {
+          md = data.markdown || '';
+          setGuideMarkdown(md);
+        }
+      } catch {
+        md = '';
+      } finally {
+        setGuidanceLoading(false);
+      }
+    }
+
+    const section = getSectionForRequirement(req);
+    const sectionContent = extractSectionFromMarkdown(md || '', section);
+    setGuidanceSectionContent(sectionContent);
+    // Graceful fallback: when the state's guide lacks the mapped section
+    // heading, show the whole guide instead of an empty panel.
+    setGuidanceWholeGuide(sectionContent ? null : (md || ''));
   };
 
   // Helper: trustee name(s) from the selected trust (array or comma string).
@@ -213,6 +314,42 @@ export default function StateCompliancePage() {
   // records accounting_last_sent/accounting_next_due).
   const [generatingAccounting, setGeneratingAccounting] = useState(false);
   const [accountingResult, setAccountingResult] = useState(null);
+
+  // Delivery log: derived from the state-compliance record the page already
+  // loads (compliance.documents_log); refetched via loadData() after actions.
+  const deliveryLog = stateData?.compliance?.documents_log || [];
+
+  const markDocumentSent = async (docId) => {
+    try {
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance/documents-log`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doc_id: docId, action: 'mark_sent' }),
+      });
+      if (res.ok) {
+        await loadData();
+        toast.success('Marked as sent');
+      }
+    } catch {
+      toast.error('Failed to update delivery status');
+    }
+  };
+
+  const markDocumentDelivered = async (docId) => {
+    try {
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance/documents-log`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doc_id: docId, action: 'mark_delivered' }),
+      });
+      if (res.ok) {
+        await loadData();
+        toast.success('Marked as delivered');
+      }
+    } catch {
+      toast.error('Failed to update delivery status');
+    }
+  };
   const generateAnnualAccounting = async () => {
     setGeneratingAccounting(true);
     setAccountingResult(null);
@@ -430,6 +567,36 @@ export default function StateCompliancePage() {
                           )}
                         </div>
                       </div>
+
+                      {/* Delivery Log */}
+                      <div className="pt-3 mt-3 border-t border-border space-y-2">
+                        <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          Delivery Log
+                          <InfoTooltip text="Track generated notices and accounting documents through delivery: Generated → Sent → Delivered." />
+                        </p>
+                        {deliveryLog.length === 0 && (
+                          <p className="text-xs text-muted-foreground">No documents logged yet. Generate a notice or accounting to start tracking.</p>
+                        )}
+                        {deliveryLog.map((entry) => (
+                          <div key={entry.doc_id} className="flex items-center justify-between gap-2 p-2 bg-muted/30 border border-border rounded text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium text-navy truncate">{entry.kind === 'accounting' ? 'Annual Accounting' : 'Beneficiary Notice'}</span>
+                              <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${entry.delivered_at ? 'bg-success' : entry.sent_at ? 'bg-gold' : 'bg-muted-foreground/40'}`} />
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {!entry.sent_at && (
+                                <button onClick={() => markDocumentSent(entry.doc_id)} className="text-gold hover:underline whitespace-nowrap">Mark sent</button>
+                              )}
+                              {!entry.delivered_at && entry.sent_at && (
+                                <button onClick={() => markDocumentDelivered(entry.doc_id)} className="text-gold hover:underline whitespace-nowrap">Mark delivered</button>
+                              )}
+                              {entry.delivered_at && (
+                                <span className="text-success whitespace-nowrap">Delivered</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
@@ -464,7 +631,8 @@ export default function StateCompliancePage() {
                       {requirements.map((req, i) => {
                         const Icon = CATEGORY_ICONS[req.category] || Shield;
                         return (
-                          <div key={i} className="flex gap-4 p-4 card-trust border border-border rounded">
+                          <div key={i}>
+                            <div className="flex gap-4 p-4 card-trust border border-border rounded">
                             <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 rounded ${
                               req.severity === 'high' ? 'bg-destructive/10 text-destructive' :
                               req.severity === 'medium' ? 'bg-warning/10 text-warning' :
@@ -490,7 +658,54 @@ export default function StateCompliancePage() {
                                 <ChevronRight className="w-3 h-3"/>
                                 {req.action}
                               </p>
+                              {deepGuide && (
+                                <button
+                                  onClick={() => toggleGuidance(req, i)}
+                                  className="mt-2 text-xs text-gold hover:underline flex items-center gap-1"
+                                  data-testid={`guidance-toggle-${i}`}
+                                  aria-expanded={guidanceExpanded === i}
+                                >
+                                  <HelpCircle className="w-3 h-3"/>
+                                  {guidanceExpanded === i ? 'Hide state guidance' : 'State guidance'}
+                                </button>
+                              )}
                             </div>
+                          </div>
+                          {guidanceExpanded === i && (
+                            <div className="mt-2 ml-14 p-4 border border-border rounded bg-subtle-bg" data-testid={`guidance-section-${i}`}>
+                              {guidanceLoading && (
+                                <p className="text-xs text-muted-foreground">Loading guidance…</p>
+                              )}
+                              {!guidanceLoading && guidanceSectionContent && (
+                                <div>
+                                  <div className="prose prose-navy max-w-none text-sm">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                      {guidanceSectionContent}
+                                    </ReactMarkdown>
+                                  </div>
+                                  <button
+                                    onClick={() => { setGuideExpanded(true); setGuidanceExpanded(null); }}
+                                    className="text-gold hover:underline text-xs mt-2"
+                                    data-testid={`guidance-full-guide-${i}`}
+                                  >
+                                    Read full guide
+                                  </button>
+                                </div>
+                              )}
+                              {!guidanceLoading && !guidanceSectionContent && (
+                                <div>
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Exact section not found in this state's guide — showing the full guide:
+                                  </p>
+                                  <div className="prose prose-navy max-w-none text-sm">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                      {guidanceWholeGuide || ''}
+                                    </ReactMarkdown>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                           </div>
                         );
                       })}

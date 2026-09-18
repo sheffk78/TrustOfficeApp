@@ -12,7 +12,7 @@ from fastapi.responses import Response
 from database import db
 from dependencies import get_current_user, require_write_access
 from services import beneficiary_report_service
-from routers.minutes import record_compliance_act
+from routers.minutes import record_compliance_act, log_compliance_document
 
 router = APIRouter(tags=["beneficiary-reports"])
 
@@ -48,6 +48,19 @@ async def generate_report(
     # on the trust's state-compliance record (no-op for unseeded states).
     try:
         await record_compliance_act(trust, "accounting")
+    except Exception:
+        pass
+    # Track the generated accounting in the delivery log (Generated status).
+    try:
+        if result.get("doc_id"):
+            await log_compliance_document(
+                trust_id,
+                user["user_id"],
+                result["doc_id"],
+                "accounting",
+                method="beneficiary-report",
+                notes="Generated annual accounting (beneficiary report)",
+            )
     except Exception:
         pass
     return result
