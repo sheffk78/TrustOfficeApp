@@ -15,6 +15,7 @@ from background_tasks import (
     run_post_drip_reengagement,
     run_leads_pipeline_health,
     run_backfill_activity_dates,
+    run_deadline_reminders,
 )
 
 router = APIRouter(prefix="/background-jobs", tags=["background-jobs"])
@@ -117,4 +118,29 @@ async def trigger_backfill_activity_dates(user: dict = Depends(get_current_user)
         return {"success": True, "message": "Backfill run", "converted": converted}
     except Exception as e:
         logger.error(f"Error running backfill: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/run/deadline-reminders")
+async def trigger_deadline_reminders(user: dict = Depends(get_current_user)):
+    """Manually trigger the daily deadline + state-compliance reminder job.
+
+    Returns a breakdown dict: {'task_deadlines': n, 'compliance': n}.
+    """
+    try:
+        result = await run_deadline_reminders()
+        return {"success": True, "message": "Deadline reminders run", "result": result}
+    except Exception as e:
+        logger.error(f"Error running deadline reminders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/run/compliance-reminder-health")
+async def trigger_compliance_reminder_health(user: dict = Depends(get_current_user)):
+    """Manually trigger the state-compliance reminder health monitor (item 4)."""
+    try:
+        result = await run_compliance_reminder_health()
+        return {"success": True, "message": "Compliance reminder health check run", "result": result}
+    except Exception as e:
+        logger.error(f"Error running compliance reminder health: {e}")
         raise HTTPException(status_code=500, detail=str(e))
