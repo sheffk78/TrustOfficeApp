@@ -213,6 +213,42 @@ export default function StateCompliancePage() {
   // records accounting_last_sent/accounting_next_due).
   const [generatingAccounting, setGeneratingAccounting] = useState(false);
   const [accountingResult, setAccountingResult] = useState(null);
+
+  // Delivery log: derived from the state-compliance record the page already
+  // loads (compliance.documents_log); refetched via loadData() after actions.
+  const deliveryLog = stateData?.compliance?.documents_log || [];
+
+  const markDocumentSent = async (docId) => {
+    try {
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance/documents-log`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doc_id: docId, action: 'mark_sent' }),
+      });
+      if (res.ok) {
+        await loadData();
+        toast.success('Marked as sent');
+      }
+    } catch {
+      toast.error('Failed to update delivery status');
+    }
+  };
+
+  const markDocumentDelivered = async (docId) => {
+    try {
+      const res = await fetchWithAuth(`/trusts/${selectedTrust.trust_id}/state-compliance/documents-log`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doc_id: docId, action: 'mark_delivered' }),
+      });
+      if (res.ok) {
+        await loadData();
+        toast.success('Marked as delivered');
+      }
+    } catch {
+      toast.error('Failed to update delivery status');
+    }
+  };
   const generateAnnualAccounting = async () => {
     setGeneratingAccounting(true);
     setAccountingResult(null);
@@ -429,6 +465,36 @@ export default function StateCompliancePage() {
                             </div>
                           )}
                         </div>
+                      </div>
+
+                      {/* Delivery Log */}
+                      <div className="pt-3 mt-3 border-t border-border space-y-2">
+                        <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          Delivery Log
+                          <InfoTooltip text="Track generated notices and accounting documents through delivery: Generated → Sent → Delivered." />
+                        </p>
+                        {deliveryLog.length === 0 && (
+                          <p className="text-xs text-muted-foreground">No documents logged yet. Generate a notice or accounting to start tracking.</p>
+                        )}
+                        {deliveryLog.map((entry) => (
+                          <div key={entry.doc_id} className="flex items-center justify-between gap-2 p-2 bg-muted/30 border border-border rounded text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium text-navy truncate">{entry.kind === 'accounting' ? 'Annual Accounting' : 'Beneficiary Notice'}</span>
+                              <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${entry.delivered_at ? 'bg-success' : entry.sent_at ? 'bg-gold' : 'bg-muted-foreground/40'}`} />
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {!entry.sent_at && (
+                                <button onClick={() => markDocumentSent(entry.doc_id)} className="text-gold hover:underline whitespace-nowrap">Mark sent</button>
+                              )}
+                              {!entry.delivered_at && entry.sent_at && (
+                                <button onClick={() => markDocumentDelivered(entry.doc_id)} className="text-gold hover:underline whitespace-nowrap">Mark delivered</button>
+                              )}
+                              {entry.delivered_at && (
+                                <span className="text-success whitespace-nowrap">Delivered</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>

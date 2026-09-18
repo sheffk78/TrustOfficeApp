@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trust Roles — Successor Instructions + Key Custody Suggestion (Mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ===== Royal Ledger design tokens (from TrustOfficeApp frontend/src/index.css) ===== */
+  :root {
+    --navy: #010079;
+    --gold: #D5AD36;
+    --subtle-bg: #F9FAFB;
+    --paper: #F5F5F7;
+    --muted-fg: #64748b;
+    --border-navy20: rgba(1, 0, 121, 0.20);
+    --border-navy10: rgba(1, 0, 121, 0.10);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--subtle-bg);
+    color: #0f172a;
+    font-size: 14px;
+  }
+  .main-layout { display: flex; min-height: 100vh; }
+
+  /* ===== Sidebar (navy, per live app) ===== */
+  .sidebar {
+    width: 232px; flex-shrink: 0; background: var(--navy); color: #fff;
+    display: flex; flex-direction: column; padding: 20px 0 12px;
+  }
+  .logo {
+    font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600;
+    letter-spacing: 0.02em; padding: 0 20px 18px; display: flex; align-items: center; gap: 8px;
+  }
+  .logo .mark {
+    width: 26px; height: 26px; border: 2px solid var(--gold); display: inline-flex;
+    align-items: center; justify-content: center; font-size: 13px; color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .nav-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase;
+    letter-spacing: 0.18em; color: rgba(255,255,255,0.45); padding: 14px 20px 6px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 20px;
+    color: rgba(255,255,255,0.82); font-size: 13px; text-decoration: none;
+  }
+  .nav-item .ico { width: 15px; height: 15px; opacity: 0.75; flex-shrink: 0; }
+  .nav-item.active { color: var(--gold); border-left: 3px solid var(--gold); padding-left: 17px; }
+  .nav-item.active .ico { opacity: 1; }
+
+  /* ===== Main content ===== */
+  .main-content { flex: 1; min-width: 0; }
+  .dot-grid {
+    background-image: radial-gradient(circle, rgba(1, 0, 121, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .page-container { max-width: 768px; margin: 0 auto; padding: 32px; }
+
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; }
+  .page-title {
+    font-family: 'Cormorant Garamond', serif; font-size: 2.5rem; font-weight: 600;
+    color: var(--navy); line-height: 1.1;
+  }
+  .page-subtitle {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 3px; color: rgba(1, 0, 121, 0.6); margin-top: 8px;
+  }
+  .help-btn {
+    width: 34px; height: 34px; border: 1px solid var(--border-navy20); background: #fff;
+    display: flex; align-items: center; justify-content: center; color: var(--navy);
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; flex-shrink: 0;
+  }
+  .btn-secondary {
+    background: transparent; color: var(--navy); border: 1px solid var(--navy);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+    height: 40px; padding: 0 20px; display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn-secondary svg { width: 14px; height: 14px; }
+  .header-actions { display: flex; align-items: center; gap: 12px; }
+
+  /* ===== Cards ===== */
+  .card-trust {
+    background: #fff; border: 1px solid var(--border-navy20); padding: 24px;
+    margin-bottom: 32px; position: relative;
+  }
+  .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+  .card-head svg { width: 18px; height: 18px; color: var(--navy); }
+  .card-title { font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 600; color: var(--navy); }
+  .card-sub { font-size: 13px; color: var(--muted-fg); margin-bottom: 20px; }
+
+  .label-trust {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--navy); font-weight: 500; display: block; margin-bottom: 6px;
+  }
+  .input-trust {
+    width: 100%; height: 40px; padding: 0 12px; background: #fff;
+    border: 1px solid rgba(1, 0, 121, 0.30); font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #0f172a;
+  }
+  .input-trust::placeholder { color: #94a3b8; font-family: 'DM Sans', sans-serif; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field { margin-bottom: 20px; }
+  .hint { font-size: 11px; color: var(--muted-fg); margin-top: 5px; }
+
+  /* ===== THE NEW SUGGESTION CARD (the piece being reviewed) ===== */
+  .suggestion-card {
+    background: var(--paper); border: 1px solid var(--border-navy20); padding: 24px;
+    margin-top: 24px; position: relative;
+  }
+  .suggestion-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase;
+    letter-spacing: 0.2em; color: var(--gold); border: 1px solid rgba(213, 173, 54, 0.5);
+    padding: 3px 8px; margin-bottom: 14px; background: rgba(213, 173, 54, 0.06);
+  }
+  .suggestion-title {
+    font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600;
+    color: var(--navy); margin-bottom: 10px;
+  }
+  .suggestion-text { font-size: 13.5px; line-height: 1.65; color: #334155; margin-bottom: 18px; }
+  .suggestion-text b { color: var(--navy); font-weight: 700; }
+
+  .custody-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .custody-option {
+    background: #fff; border: 1px solid var(--border-navy20); padding: 14px;
+    text-decoration: none; display: block; transition: border-color .15s ease;
+  }
+  .custody-option:hover { border-color: var(--gold); }
+  .custody-option img { width: 36px; height: 36px; display: block; margin-bottom: 10px; }
+  .custody-name {
+    font-family: 'Cormorant Garamond', serif; font-size: 16px; font-weight: 600; color: var(--navy);
+    display: flex; align-items: center; gap: 5px; margin-bottom: 5px;
+  }
+  .custody-name svg { width: 10px; height: 10px; flex-shrink: 0; }
+  .custody-desc { font-size: 11.5px; line-height: 1.5; color: var(--muted-fg); }
+
+  .custody-note { font-size: 11px; color: #94a3b8; border-top: 1px solid var(--border-navy10); padding-top: 12px; line-height: 1.55; }
+
+  /* ===== Save bar ===== */
+  .save-bar {
+    display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+    padding-top: 16px; border-top: 1px solid var(--border-navy10);
+  }
+  .btn-primary {
+    background: var(--navy); color: #fff; border: 1px solid var(--navy);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+    height: 40px; padding: 0 20px; display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn-primary svg { width: 14px; height: 14px; }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .custody-options { grid-template-columns: 1fr; }
+    .page-title { font-size: 1.75rem; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="main-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo"><span class="mark">T</span>TrustOffice</div>
+    <div class="nav-label">Overview</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>Trust Assistant</div>
+    <div class="nav-label">Money</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8V7l-3 2-3-2v1l3 2 3-2zM3 11l18-5v12L3 13v-2z"/></svg>Schedule A</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>Distributions</div>
+    <div class="nav-label">Governance</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Minutes</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/></svg>Documents</div>
+    <div class="nav-label">Settings</div>
+    <div class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h.08a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.08a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.08a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content dot-grid">
+    <div class="page-container">
+
+      <!-- Page header -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Trust Roles</h1>
+          <p class="page-subtitle">Keep every trustee, successor, protector, and handoff instruction in one place.</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button class="btn-secondary" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8m8 4H8m2-8H8"/></svg>
+            View Successor Packet
+          </button>
+          <div class="help-btn">?</div>
+        </div>
+      </div>
+
+      <!-- Successor Trustee card -->
+      <div class="card-trust">
+        <div class="card-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <h2 class="card-title">Successor Trustee</h2>
+        </div>
+        <p class="card-sub">Designate who steps in if the trustee can no longer serve.</p>
+
+        <div class="field">
+          <label class="label-trust">Successor Trustee Name</label>
+          <input class="input-trust" type="text" value="Sarah Kohler" readonly>
+          <p class="hint">The person named to take over if the trustee dies or becomes incapacitated</p>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="label-trust">Successor Trustee Email</label>
+            <input class="input-trust" type="email" value="sarah@example.com" readonly>
+          </div>
+          <div class="field">
+            <label class="label-trust">Successor Trustee Phone</label>
+            <input class="input-trust" type="tel" value="(555) 123-4567" readonly>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="label-trust">Relationship to Grantor</label>
+            <input class="input-trust" type="text" value="Adult daughter" readonly>
+          </div>
+          <div class="field">
+            <label class="label-trust">Notes</label>
+            <input class="input-trust" type="text" placeholder="Any special instructions about the successor trustee">
+          </div>
+        </div>
+      </div>
+
+      <!-- ★ THE NEW SUGGESTION CARD — placed inside Successor Instructions card, below the letter -->
+      <div class="card-trust">
+        <div class="card-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8m8 4H8m2-8H8"/></svg>
+          <h2 class="card-title">Successor Instructions</h2>
+        </div>
+        <p class="card-sub">A letter of guidance and document location for your successor trustee.</p>
+
+        <div class="field">
+          <label class="label-trust">Letter of Guidance for Successor Trustee</label>
+          <textarea class="input-trust" style="height:110px; padding-top:10px; font-family:'DM Sans',sans-serif; resize:none;">Sarah — the original trust documents are in the fireproof safe in my home office. The bank accounts are listed in this packet. For the crypto wallet and other digital assets, everything you need is arranged through My-Legacy.ai (see the key custody note below).</textarea>
+          <p class="hint">This will be included in the Successor Trustee Packet</p>
+        </div>
+
+        <div class="field" style="margin-bottom:0;">
+          <label class="label-trust">Physical Document Location</label>
+          <input class="input-trust" type="text" placeholder="Where are the original paper documents stored? (safe deposit box, filing cabinet, etc.)">
+        </div>
+
+        <!-- ★★★ THE NEW PIECE — suggestion block, styled as an in-app callout ★★★ -->
+        <div class="suggestion-card">
+          <span class="suggestion-tag">Suggestion — Key Custody</span>
+          <div class="suggestion-title">Where will your digital keys live?</div>
+          <p class="suggestion-text">
+            TrustOffice never stores private keys, seed phrases, or wallet credentials — by design.
+            If this trust holds self-custody crypto or other digital assets, use a dedicated
+            <b>key-custody service</b> to store and release them securely, then record the arrangement
+            (provider, guardians, release conditions) in your Letter of Guidance so your successor
+            trustee knows exactly where to go.
+          </p>
+          <div class="custody-options">
+            <a class="custody-option" href="https://my-legacy.ai/" target="_blank" rel="noopener sponsored">
+              <img src="my-legacy.png" alt="My-Legacy.ai logo">
+              <div class="custody-name">My-Legacy.ai
+                <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg>
+              </div>
+              <div class="custody-desc">Splits your seed phrase into key shares held by guardians; released only to your identity-verified successor.</div>
+            </a>
+            <a class="custody-option" href="https://vault12.com/" target="_blank" rel="noopener sponsored">
+              <img src="vault12.png" alt="Vault12 logo">
+              <div class="custody-name">Vault12
+                <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg>
+              </div>
+              <div class="custody-desc">Encrypted key shards distributed across guardians you choose — non-custodial backup and inheritance.</div>
+            </a>
+            <a class="custody-option" href="https://casa.io/inheritance" target="_blank" rel="noopener sponsored">
+              <img src="casa.png" alt="Casa logo">
+              <div class="custody-name">Casa
+                <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg>
+              </div>
+              <div class="custody-desc">Multisig vaults with inheritance planning included in every membership. Best known for Bitcoin.</div>
+            </a>
+          </div>
+          <p class="custody-note">
+            TrustOffice may receive a commission if you sign up through these links. TrustOffice provides
+            governance software only — it does not hold keys, provide custody, and is not affiliated with these providers.
+          </p>
+        </div>
+      </div>
+
+      <!-- Save bar -->
+      <div class="save-bar">
+        <button class="btn-primary" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+          Save Changes
+        </button>
+      </div>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

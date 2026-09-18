@@ -1,7 +1,7 @@
 # State Compliance router — seed data + per-trust compliance tracking
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone, timedelta
-from typing import List
+from typing import List, Optional
 import uuid
 
 from database import db
@@ -142,6 +142,7 @@ async def get_trust_state_compliance(trust_id: str, user: dict = Depends(get_cur
             "compliance_score": 100,
             "alert_active": False,
             "alert_reason": None,
+            "documents_log": [],
             "created_at": now,
             "updated_at": now,
         }
@@ -235,6 +236,141 @@ async def update_trust_state_compliance(
         "trust_id": trust_id, "state_code": state_code
     }, {"_id": 0})
     return updated
+
+
+async def log_compliance_document(
+    trust_id: str,
+    user_id: str,
+    doc_id: str,
+    kind: str,
+    method: str = "",
+    notes: str = "",
+) -> Optional[dict]:
+    """Append a generated notice/accounting document to the trust's delivery log.
+
+    Called automatically by the generation endpoints (minutes notice +
+    beneficiary-report accounting) so every generated document starts tracking
+    through Generated -> Sent -> Delivered. No-op when the trust has no state
+    or no compliance record (unseeded state / legacy trusts).
+    """
+    if kind not in ("notice", "accounting"):
+        return None
+    state_code = None
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user_id}, {"_id": 0, "state_code": 1}
+    )
+    if trust:
+        state_code = (trust.get("state_code") or "").upper() or None
+    if not state_code:
+        return None
+
+    now = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "doc_id": doc_id,
+        "kind": kind,
+        "generated_at": now,
+        "method": method,
+        "sent_at": None,
+        "delivered_at": None,
+        "tracking_ref": "",
+        "notes": notes,
+        "updated_at": now,
+    }
+    # No-op when the trust has no compliance record (unseeded state / legacy trusts).
+    existing = await db.trust_state_compliance.find_one(
+        {"trust_id": trust_id, "state_code": state_code}, {"_id": 0, "documents_log": 1}
+    )
+    if not existing:
+        return None
+    await db.trust_state_compliance.update_one(
+        {"trust_id": trust_id, "state_code": state_code},
+        {
+            "$push": {"documents_log": entry},
+            "$set": {"updated_at": now},
+        },
+    )
+    return entry
+
+
+@router.patch("/trusts/{trust_id}/state-compliance/documents-log")
+async def update_documents_log(
+    trust_id: str,
+    update: dict,
+    user: dict = Depends(require_write_access),
+):
+    """Append or update a document entry in the compliance documents log.
+
+    Expects {doc_id, kind, ...} fields. Validates ownership and
+    returns the updated documents_log list.
+    """
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    state_code = trust.get("state_code", "").upper()
+    if not state_code:
+        raise HTTPException(status_code=400, detail="Trust has no state_code set")
+
+    doc_id = update.get("doc_id")
+    if not doc_id:
+        raise HTTPException(status_code=400, detail="doc_id is required")
+
+    compliance = await db.trust_state_compliance.find_one(
+        {"trust_id": trust_id, "state_code": state_code}, {"_id": 0}
+    )
+    if not compliance:
+        raise HTTPException(status_code=404, detail="Compliance record not found")
+
+    documents_log = compliance.get("documents_log", [])
+    now = datetime.now(timezone.utc).isoformat()
+
+    action = update.get("action", "upsert")
+    if action == "upsert":
+        # Replace or append the document entry
+        existing_idx = None
+        for i, entry in enumerate(documents_log):
+            if entry.get("doc_id") == doc_id:
+                existing_idx = i
+                break
+        entry = {
+            "doc_id": doc_id,
+            "kind": update.get("kind", ""),
+            "generated_at": update.get("generated_at", now),
+            "method": update.get("method", ""),
+            "sent_at": update.get("sent_at"),
+            "delivered_at": update.get("delivered_at"),
+            "tracking_ref": update.get("tracking_ref", ""),
+            "notes": update.get("notes", ""),
+            "updated_at": now,
+        }
+        if existing_idx is not None:
+            documents_log[existing_idx].update(entry)
+        else:
+            documents_log.append(entry)
+    elif action == "mark_sent":
+        for entry in documents_log:
+            if entry.get("doc_id") == doc_id:
+                entry["sent_at"] = update.get("sent_at", now)
+                entry["updated_at"] = now
+                break
+    elif action == "mark_delivered":
+        for entry in documents_log:
+            if entry.get("doc_id") == doc_id:
+                entry["delivered_at"] = update.get("delivered_at", now)
+                entry["updated_at"] = now
+                break
+
+    await db.trust_state_compliance.update_one(
+        {"trust_id": trust_id, "state_code": state_code},
+        {"$set": {"documents_log": documents_log, "updated_at": now}},
+    )
+
+    updated = await db.trust_state_compliance.find_one(
+        {"trust_id": trust_id, "state_code": state_code}, {"_id": 0}
+    )
+    return {"documents_log": updated.get("documents_log", [])}
 
 
 @router.get("/trusts/{trust_id}/state-compliance/requirements")

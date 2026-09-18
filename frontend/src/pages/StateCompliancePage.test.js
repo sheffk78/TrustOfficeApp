@@ -59,7 +59,7 @@ describe('StateCompliancePage regression: stateData may be null/undefined', () =
     useAuth.mockReturnValue({ selectedTrust });
   });
 
-  // Bug: "Cannot read properties of null (reading 'state_code')" â when the
+  // Bug: "Cannot read properties of null (reading 'state_code')" — when the
   // compliance fetch failed (or stateData was otherwise empty), the guard
   // `stateData?.state_code === null` did not catch `undefined`, so the main
   // branch dereferenced `stateData.state_code` directly and crashed.
@@ -349,6 +349,92 @@ describe('StateCompliancePage compliance actions (doc generation)', () => {
     await waitFor(() => {
       expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining('recorded'));
     });
+  });
+});
+
+describe('StateCompliancePage delivery log', () => {
+  const selectedTrust = { trust_id: 'trust_1', state_code: 'CA', trustees: ['John Smith'] };
+
+  const LOGGED_COMPLIANCE = {
+    notice_last_sent: null, notice_next_due: null,
+    accounting_last_sent: null, accounting_next_due: null,
+    compliance_score: 90, alert_active: false,
+    documents_log: [
+      { doc_id: 'doc_notice1', kind: 'notice', generated_at: '2026-09-10T12:00:00Z', method: '', notes: '', sent_at: null, delivered_at: null },
+      { doc_id: 'doc_acct1', kind: 'accounting', generated_at: '2026-09-11T12:00:00Z', method: '', notes: '', sent_at: '2026-09-12T09:00:00Z', delivered_at: null },
+      { doc_id: 'doc_notice2', kind: 'notice', generated_at: '2026-09-13T12:00:00Z', method: 'mail', notes: '', sent_at: '2026-09-13T10:00:00Z', delivered_at: '2026-09-14T10:00:00Z' },
+    ],
+  };
+
+  const mockResponses = () => {
+    fetchWithAuth.mockImplementation(async (url, opts) => {
+      if (url.includes('state-compliance/requirements')) {
+        return { ok: true, json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }) };
+      }
+      if (url.includes('/state-compliance/documents-log') && opts && opts.method === 'PATCH') {
+        return { ok: true, json: async () => ({ documents_log: LOGGED_COMPLIANCE.documents_log }) };
+      }
+      // GET state-compliance record
+      return {
+        ok: true,
+        json: async () => ({
+          trust_id: 'trust_1', state_code: 'CA',
+          profile: { state_name: 'California' },
+          compliance: LOGGED_COMPLIANCE,
+        }),
+      };
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust });
+  });
+
+  it('lists generated documents with their delivery status', async () => {
+    mockResponses();
+    const { container } = render(<StateCompliancePage />);
+
+    expect(await screen.findByText('Delivery Log')).toBeInTheDocument();
+    expect(container.textContent).toContain('Annual Accounting');
+    expect(container.textContent).toContain('Beneficiary Notice');
+    expect(await screen.findByText('Delivered')).toBeInTheDocument();
+    // Two actionable rows: "Mark sent" (doc_notice1) + "Mark delivered" (doc_acct1)
+    expect(screen.getByText('Mark sent')).toBeInTheDocument();
+    expect(screen.getByText('Mark delivered')).toBeInTheDocument();
+  });
+
+  it('marks a document sent via the documents-log PATCH endpoint', async () => {
+    mockResponses();
+    render(<StateCompliancePage />);
+
+    fireEvent.click(await screen.findByText('Mark sent'));
+    await waitFor(() => {
+      const patchCall = fetchWithAuth.mock.calls.find(([u, o]) => String(u).includes('/documents-log') && o?.method === 'PATCH');
+      expect(patchCall).toBeTruthy();
+      expect(JSON.parse(patchCall[1].body)).toEqual({ doc_id: 'doc_notice1', action: 'mark_sent' });
+    });
+  });
+
+  it('shows the empty-state hint when no documents are logged', async () => {
+    fetchWithAuth.mockImplementation(async (url) => {
+      if (url.includes('state-compliance/requirements')) {
+        return { ok: true, json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          trust_id: 'trust_1', state_code: 'CA',
+          profile: { state_name: 'California' },
+          compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 90, alert_active: false, documents_log: [] },
+        }),
+      };
+    });
+    const { container } = render(<StateCompliancePage />);
+
+    expect(await screen.findByText('Delivery Log')).toBeInTheDocument();
+    expect(container.textContent).toContain('No documents logged yet');
+    expect(container.textContent).not.toContain('Mark sent');
   });
 });
 

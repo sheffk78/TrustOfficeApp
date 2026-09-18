@@ -212,6 +212,7 @@ async def _auto_create_draft_asset_from_minutes(
 
 
 from routers.template_registry import get_template_registry, get_template_definition, build_ai_prompt
+from routers.state_compliance import log_compliance_document
 from pdf_utils import NAVY, GRAY, create_doc_template
 
 router = APIRouter(tags=["minutes"])
@@ -4712,6 +4713,20 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
         except Exception:
             logging.getLogger(__name__).warning(
                 "state-compliance auto-record failed for trust %s", template.trust_id, exc_info=True
+            )
+        # Track the generated notice in the delivery log (Generated status).
+        try:
+            await log_compliance_document(
+                template.trust_id,
+                user["user_id"],
+                minutes_id,
+                "notice",
+                method="minutes-templates",
+                notes="Generated from Beneficiary Notice template",
+            )
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "delivery-log auto-entry failed for trust %s", template.trust_id, exc_info=True
             )
     
     # If accepting property or conveying property and add_to_schedule_a is true, add to Schedule A
