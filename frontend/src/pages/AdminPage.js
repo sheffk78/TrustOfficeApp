@@ -1162,6 +1162,7 @@ export default function AdminPage() {
                 onUpdateLeadStage={updateLeadStage}
                 onPrevPage={() => setLeadsPage(p => Math.max(1, p - 1))}
                 onNextPage={() => setLeadsPage(p => p + 1)}
+                onGoToPage={(p) => setLeadsPage(p)}
               />
             </TabsContent>
 

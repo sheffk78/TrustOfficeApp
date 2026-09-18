@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import LeadTriageView from '@/components/LeadTriageView';
 import { LEAD_STAGE_FILTERS, getLeadStageBadgeClass, getScoreColorClass, getResourceWord, formatCallOutcome } from './helpers';
+import { getPaginationPages } from './pagination';
 
 export function LeadsTab({
   leads, leadsLoading, leadsTotal, leadsPage, leadsSearch, leadsStageFilter,
@@ -19,7 +20,7 @@ export function LeadsTab({
   onClearSelection, onBulkExport, onBulkStageChange,
   onSelectAll, onSelectLead, onViewLead,
   onTriageViewLead, onTriageFollowUp,
-  onUpdateLeadStage, onPrevPage, onNextPage,
+  onUpdateLeadStage, onPrevPage, onNextPage, onGoToPage,
 }) {
   return (
     <div className="card-trust">
@@ -251,18 +252,43 @@ export function LeadsTab({
                   <p className="text-sm text-muted-foreground">
                     Showing {((leadsPage - 1) * 20) + 1}-{Math.min(leadsPage * 20, leadsTotal)} of {leadsTotal}
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => onPrevPage()}
                       disabled={leadsPage === 1}
                       className="p-2 text-muted-foreground hover:text-navy dark:hover:text-white disabled:opacity-30"
+                      aria-label="Previous page"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
+                    {(() => {
+                      const totalPages = Math.ceil(leadsTotal / 20);
+                      const pages = getPaginationPages(leadsPage, totalPages);
+                      return pages.map((p) =>
+                        typeof p === 'number' ? (
+                          <button
+                            key={p}
+                            onClick={() => onGoToPage(p)}
+                            aria-label={`Go to page ${p}`}
+                            aria-current={p === leadsPage ? 'page' : undefined}
+                            className={`min-w-[2rem] h-8 px-1 text-sm rounded transition-colors ${
+                              p === leadsPage
+                                ? 'bg-navy text-white dark:bg-gold dark:text-navy font-medium'
+                                : 'text-muted-foreground hover:text-navy dark:hover:text-white hover:bg-navy/5 dark:hover:bg-white/5'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ) : (
+                          <span key={p} className="w-6 text-center text-muted-foreground/60 select-none">…</span>
+                        )
+                      );
+                    })()}
                     <button
                       onClick={() => onNextPage()}
                       disabled={leadsPage * 20 >= leadsTotal}
                       className="p-2 text-muted-foreground hover:text-navy dark:hover:text-white disabled:opacity-30"
+                      aria-label="Next page"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>

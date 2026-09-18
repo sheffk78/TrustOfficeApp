@@ -42,3 +42,14 @@ pytesseract>=0.3.10
 Pillow>=10.0.0
 pyotp>=2.9.0
 qrcode>=8.0
+# OpenTelemetry (Traceway pilot, 2026-09-18) — distro provides opentelemetry-instrument
+# launcher + OTLP exporter; bootstrap installs matching instrumentation for installed
+# packages (fastapi, pymongo, httpx, requests, logging). Activated ONLY when
+# TRACEWAY_OTEL_ENDPOINT is set at build time — see Dockerfile.
+opentelemetry-distro>=0.44b0
+opentelemetry-exporter-otlp>=1.24.0
+opentelemetry-instrumentation-fastapi>=0.44b0
+opentelemetry-instrumentation-pymongo>=0.44b0
+opentelemetry-instrumentation-httpx>=0.44b0
+opentelemetry-instrumentation-requests>=0.44b0
+opentelemetry-instrumentation-logging>=0.44b0
