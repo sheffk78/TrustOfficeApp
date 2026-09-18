@@ -96,6 +96,25 @@ def _topic_phrases(note_text: str) -> List[str]:
     return phrases
 
 
+
+def _sort_key(note: Dict[str, Any]) -> str:
+    """Normalize created_at to a sortable ISO string.
+
+    lead_activities stores created_at as string (2305 rows) AND BSON date (32 rows);
+    Python's sorted() crashes comparing datetime vs str ('<' not supported).
+    """
+    from datetime import datetime, timezone
+
+    v = note.get("created_at")
+    if isinstance(v, datetime):
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
+    if isinstance(v, str) and v.strip():
+        return v
+    return ""
+
+
 def classify_notes(notes: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Scan notes (any order) and return detected signals.
 
@@ -104,7 +123,7 @@ def classify_notes(notes: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     notes = sorted(
         [n for n in (notes or []) if (n.get("content") or "").strip()],
-        key=lambda n: n.get("created_at") or "",
+        key=_sort_key,
         reverse=True,  # newest first
     )
     signal = "general"
