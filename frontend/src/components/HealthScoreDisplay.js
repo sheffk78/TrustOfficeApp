@@ -11,7 +11,7 @@ import React from 'react';
  */
 export default function HealthScoreDisplay({
   score = 0,
-  maxScore = 115,
+  maxScore = 100,
   size = 'md',
   showLabel = true,
 }) {
@@ -25,14 +25,14 @@ export default function HealthScoreDisplay({
   const dashOffset = circumference * (1 - pct);
 
   const color =
-    clamped >= 96
+    clamped >= 85
       ? 'var(--success, #16a34a)'
-      : clamped >= 72
+      : clamped >= 65
       ? 'var(--warning, #d97706)'
       : 'var(--error, #dc2626)';
 
   const textClass =
-    clamped >= 96 ? 'text-success' : clamped >= 72 ? 'text-warning' : 'text-error';
+    clamped >= 85 ? 'text-success' : clamped >= 65 ? 'text-warning' : 'text-error';
 
   const scoreFontSize =
     size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-5xl' : 'text-2xl';

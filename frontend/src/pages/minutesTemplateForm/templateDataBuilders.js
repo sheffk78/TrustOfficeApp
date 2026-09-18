@@ -344,6 +344,22 @@ const buildBeneficiaryDistributionNotice = (ctx) => {
   };
 };
 
+// Periodic beneficiary notice: a letter (not a resolution). State/window
+// context is filled server-side from the trust's state profile; the form
+// supplies the trustee name(s) and the notice date.
+const buildBeneficiaryPeriodicNotice = (ctx) => {
+  const base = buildBaseData(ctx);
+  const { formData } = ctx;
+  return {
+    ...base,
+    notice_date: formData?.meeting_date || new Date().toISOString().slice(0, 10),
+    trustee_name: (formData?.trustees_present || []).filter((t) => t.trim()).join(', ')
+      || base.trustee_name || '',
+    trustee_contact: base.trustee_contact || '',
+    additional_context: base.additional_context || '',
+  };
+};
+
 const buildBeneficiaryLoan = (ctx) => {
   const base = buildBaseData(ctx);
   const { beneficiaryLoanData } = ctx;
@@ -553,6 +569,7 @@ const TEMPLATE_DATA_BUILDERS = {
   beneficiary_request_denial: buildBeneficiaryRequestDenial,
   hems_distribution: buildHemsDistribution,
   beneficiary_distribution_notice: buildBeneficiaryDistributionNotice,
+  beneficiary_periodic_notice: buildBeneficiaryPeriodicNotice,
   beneficiary_loan: buildBeneficiaryLoan,
   trust_amendment: buildTrustAmendment,
   power_of_attorney: buildPowerOfAttorney,

@@ -16,6 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# OpenTelemetry auto-instrumentation (Traceway pilot 2026-09-18): match installed
+# packages to instrumentation packages. No-op at runtime unless TRACEWAY_OTEL_ENDPOINT
+# is set — see CMD below.
+RUN opentelemetry-bootstrap -a install
+
 # Copy application code. The explicit per-file COPY lines below ensure each
 # router file is part of the Docker layer checksum, preventing stale build
 # cache from producing an image missing files that are present in the git tree.
@@ -53,5 +58,7 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD exec uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}
+# Traceway OTel pilot (2026-09-18): when TRACEWAY_OTEL_ENDPOINT is set, launch under
+# opentelemetry-instrument so FastAPI/pymongo/httpx spans export via OTLP/HTTP.
+# Without it, the container behaves exactly as before (no telemetry, no behavior change).
+CMD ["sh", "-c", "if [ -n \"$TRACEWAY_OTEL_ENDPOINT\" ]; then exec opentelemetry-instrument uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}; else exec uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}; fi"]

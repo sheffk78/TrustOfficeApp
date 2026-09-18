@@ -12,6 +12,7 @@ async def gather_risk_findings(
     db,
     today: date,
     include_separation_alerts: bool = True,
+    include_upcoming_tax: bool = True,
 ) -> List[dict]:
     """
     Gather raw risk findings across all risk modules.
@@ -20,6 +21,11 @@ async def gather_risk_findings(
     Args:
         include_separation_alerts: True for Risk Dashboard display,
                                     False for health score penalty (avoids double-counting).
+        include_upcoming_tax: True for Risk Dashboard display. The health-score
+                                    path passes False: UPCOMING (not-yet-overdue)
+                                    tax deadlines are calendar reminders, not
+                                    governance failures, and must not penalize
+                                    the score. Overdue tax findings always apply.
     Returns: list of {type, severity, module, title, detail, action, deeplink}
     """
     risks: List[dict] = []
@@ -54,7 +60,7 @@ async def gather_risk_findings(
                     "module": "tax_calendar",
                     "deeplink": "/tax-calendar",
                 })
-            elif days <= 14:
+            elif include_upcoming_tax and days <= 14:
                 risks.append({
                     "type": "tax_deadline",
                     "severity": "medium",
@@ -64,7 +70,7 @@ async def gather_risk_findings(
                     "module": "tax_calendar",
                     "deeplink": "/tax-calendar",
                 })
-            elif days <= 30:
+            elif include_upcoming_tax and days <= 30:
                 risks.append({
                     "type": "tax_deadline",
                     "severity": "low",

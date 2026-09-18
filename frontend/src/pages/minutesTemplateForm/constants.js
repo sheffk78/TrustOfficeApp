@@ -57,6 +57,7 @@ export const TEMPLATE_TITLES = {
   'assignment_of_personal_property': 'Resolution to Assign Personal Property',
   'general_assignment': 'Resolution for General Assignment',
   'spending_authorization': 'Resolution to Authorize Spending',
+  'beneficiary_periodic_notice': 'Beneficiary Periodic Notice',
 };
 
 export const ASSET_CATEGORIES = [

@@ -96,6 +96,7 @@ from routers.banking import router as banking_router
 from routers.audit_defense import router as audit_defense_router
 from routers.tax_calendar import router as tax_calendar_router
 from routers.state_compliance import router as state_compliance_router
+from routers.state_deep_knowledge import router as state_deep_knowledge_router
 from routers.investments import router as investments_router
 from routers.communications import router as communications_router
 from routers.email_archive import router as email_archive_router, ensure_email_archive_indexes
@@ -528,6 +529,7 @@ app.include_router(banking_router, prefix="/api")
 app.include_router(audit_defense_router, prefix="/api")
 app.include_router(tax_calendar_router, prefix="/api")
 app.include_router(state_compliance_router, prefix="/api")
+app.include_router(state_deep_knowledge_router, prefix="/api")
 app.include_router(investments_router, prefix="/api")
 app.include_router(communications_router, prefix="/api")
 app.include_router(email_archive_router, prefix="/api")

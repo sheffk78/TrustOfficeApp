@@ -668,6 +668,75 @@ Amount: ${amount}
             metadata={"email_type": "booking_confirmation"},
         )
 
+    async def send_booking_reminder_day_before(
+        self,
+        to_email: str,
+        name: str,
+        call_date: str,
+        call_time: str,
+        timezone: str,
+        meeting_url: str,
+    ) -> Dict[str, Any]:
+        """Send the day-before booking reminder (no-show reduction). Kenneth-signed."""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="booking_reminder_day_before",
+            template_data={
+                "name": name or "there",
+                "call_date": call_date,
+                "call_time": call_time,
+                "timezone": timezone,
+                "meeting_url": meeting_url,
+            },
+            to_name=name,
+            tag="booking_reminder_day_before",
+            metadata={"email_type": "booking_reminder_day_before"},
+        )
+
+    async def send_booking_reminder_1h(
+        self,
+        to_email: str,
+        name: str,
+        call_time: str,
+        timezone: str,
+        meeting_url: str,
+    ) -> Dict[str, Any]:
+        """Send the 1-hour booking reminder (no-show reduction). Kenneth-signed."""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="booking_reminder_1h",
+            template_data={
+                "name": name or "there",
+                "call_time": call_time,
+                "timezone": timezone,
+                "meeting_url": meeting_url,
+            },
+            to_name=name,
+            tag="booking_reminder_1h",
+            metadata={"email_type": "booking_reminder_1h"},
+        )
+
+    async def send_post_drip_reengagement(
+        self,
+        to_email: str,
+        name: str,
+        course_url: str,
+        booking_url: str = "https://trustoffice.app/book-a-call/",
+    ) -> Dict[str, Any]:
+        """Send the one-time post-drip re-engagement email to finished-sequence leads."""
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="post_drip_reengagement",
+            template_data={
+                "name": name or "there",
+                "course_url": course_url,
+                "booking_url": booking_url,
+            },
+            to_name=name,
+            tag="post_drip_reengagement",
+            metadata={"email_type": "post_drip_reengagement"},
+        )
+
     # ==================== NURTURE SEQUENCE METHODS ====================
 
     NURTURE_TEMPLATES = {

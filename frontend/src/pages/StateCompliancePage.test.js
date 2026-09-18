@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import StateCompliancePage from '@/pages/StateCompliancePage';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import StateCompliancePage, { getSectionForRequirement, extractSectionFromMarkdown } from '@/pages/StateCompliancePage';
 import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
 
@@ -14,9 +14,9 @@ const IconStub = ({ className, ...rest }) => <span data-testid="icon" className=
 
 const ICON_NAMES = [
   'MapPin','BookOpen','Gavel','Scale','Shield','AlertTriangle','CheckCircle2',
-  'Clock','FileText','ChevronRight','Send','Paperclip','Loader2','AlertCircle',
+  'Clock','FileText','ChevronRight','BookOpen','Send','Download','Paperclip','Loader2','AlertCircle',
   'X','Square','Plus','ArrowDown','Upload','File','Check','FolderOpen','Copy',
-  'ChevronDown','ChevronUp',
+  'ChevronDown','ChevronUp','HelpCircle',
 ];
 
 const lucideMock = {};
@@ -28,6 +28,22 @@ jest.mock('@/components/MobileBottomNav', () => ({ MobileBottomNav: () => <nav d
 jest.mock('@/components/PageHelpButton', () => () => <div data-testid="page-help" />);
 jest.mock('@/components/InfoTooltip', () => () => <span data-testid="info-tooltip" />);
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+// Mock the error-reporting util so test-triggered showError() calls never
+// fire real fetch/sendBeacon against the production error-log endpoint.
+// The real reportErrorToBackend now also self-guards with _isDev(), but
+// mocking here is defense-in-depth and keeps the test hermetic.
+jest.mock('@/utils/errors', () => ({
+  showError: jest.fn(),
+  reportErrorToBackend: jest.fn(),
+  reportToErrorLog: jest.fn(),
+  extractErrorMessage: (e) => (e && e.message) ? e.message : String(e || 'error'),
+  SUPPORT_EMAIL: 'support@trustoffice.app',
+  installGlobalErrorHandlers: jest.fn(),
+}));
+// react-markdown / remark-gfm are ESM-only in Jest (same mock pattern as
+// frontend_smoke.test.js — the page renders them behind the expand toggle).
+jest.mock('react-markdown', () => ({ children }) => <div data-testid="react-markdown">{children}</div>);
+jest.mock('remark-gfm', () => () => null);
 jest.mock('@/utils/severityStyles', () => ({
   SEVERITY_STYLES_FLAT: { high: 'bg-red', medium: 'bg-yellow', low: 'bg-green' },
 }));
@@ -43,7 +59,7 @@ describe('StateCompliancePage regression: stateData may be null/undefined', () =
     useAuth.mockReturnValue({ selectedTrust });
   });
 
-  // Bug: "Cannot read properties of null (reading 'state_code')" â when the
+  // Bug: "Cannot read properties of null (reading 'state_code')" — when the
   // compliance fetch failed (or stateData was otherwise empty), the guard
   // `stateData?.state_code === null` did not catch `undefined`, so the main
   // branch dereferenced `stateData.state_code` directly and crashed.
@@ -177,5 +193,582 @@ describe('StateCompliancePage uncovered state handling', () => {
 
     // Should NOT show the green satisfied banner
     expect(container.textContent).not.toContain('All compliance requirements are satisfied');
+  });
+});
+
+describe('StateCompliancePage compliance actions (doc generation)', () => {
+  const selectedTrust = { trust_id: 'trust_1', state_code: 'CA', trustees: ['John Smith'] };
+
+  const mockCoveredResponses = () => {
+    fetchWithAuth.mockImplementation(async (url, opts) => {
+      if (url.includes('state-compliance/requirements')) {
+        return {
+          ok: true,
+          json: async () => ({
+            trust_id: 'trust_1', state_code: 'CA', coverage: 'covered',
+            requirements: [
+              { category: 'notice', title: 'California requires periodic beneficiary notice', severity: 'medium', points: 10 },
+            ],
+          }),
+        };
+      }
+      if (url === '/minutes-templates') {
+        return {
+          ok: true,
+          json: async () => ({ minutes_id: 'min_test123', generated_document: 'letter' }),
+        };
+      }
+      if (url === '/beneficiary-reports/trust_1/generate') {
+        return {
+          ok: true,
+          json: async () => ({ report_id: 'rpt_test123', doc_id: 'doc_test123' }),
+        };
+      }
+      if (url.includes('/state-compliance') && opts && opts.method === 'PATCH') {
+        return { ok: true, json: async () => ({}) };
+      }
+      // GET state-compliance record
+      return {
+        ok: true,
+        json: async () => ({
+          trust_id: 'trust_1', state_code: 'CA',
+          profile: { state_name: 'California' },
+          compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 90, alert_active: false },
+        }),
+      };
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust });
+  });
+
+  it('renders both action buttons for covered states', async () => {
+    mockCoveredResponses();
+    const { container } = render(<StateCompliancePage />);
+
+    expect(await screen.findByText('Generate Beneficiary Notice')).toBeInTheDocument();
+    expect(screen.getByText('Generate Annual Accounting')).toBeInTheDocument();
+    // Actions live in the deadlines card
+    expect(container.textContent).toContain('Take Action');
+  });
+
+  it('does not show action buttons when state compliance data is absent', async () => {
+    fetchWithAuth.mockImplementation(async (url) => {
+      if (url.includes('state-compliance/requirements')) {
+        return {
+          ok: true,
+          json: async () => ({ trust_id: 'trust_1', state_code: 'XX', requirements: [], coverage: 'uncovered' }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ trust_id: 'trust_1', state_code: 'XX', profile: null, compliance: null }),
+      };
+    });
+
+    const { container } = render(<StateCompliancePage />);
+    await waitFor(() => {
+      expect(container.textContent).toContain('requirements in our library yet');
+    }, { timeout: 3000 });
+
+    expect(container.textContent).not.toContain('Generate Beneficiary Notice');
+    expect(container.textContent).not.toContain('Generate Annual Accounting');
+  });
+
+  it('generating a notice POSTs the periodic-notice template and confirms the record', async () => {
+    mockCoveredResponses();
+
+    const { container } = render(<StateCompliancePage />);
+    const btn = await screen.findByText('Generate Beneficiary Notice');
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      const call = fetchWithAuth.mock.calls.find(([u]) => u === '/minutes-templates' && (fetchWithAuth.mock.contexts ? true : true));
+      expect(call).toBeTruthy();
+      const [, init] = call;
+      const body = JSON.parse(init.body);
+      expect(body.template_type).toBe('beneficiary_periodic_notice');
+      expect(body.trust_id).toBe('trust_1');
+      expect(body.template_data.trustee_name).toBe('John Smith');
+    });
+
+    // Confirmation that notice_last_sent was recorded
+    expect(await screen.findByText(/Notice recorded/)).toBeInTheDocument();
+    expect(screen.getByText('Download PDF')).toBeInTheDocument();
+    // Page refetched the compliance record after the action (initial GET + refetch)
+    const complianceGets = fetchWithAuth.mock.calls.filter(
+      ([u]) => String(u).includes('/state-compliance') && !String(u).includes('requirements')
+    );
+    expect(complianceGets.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('generating the accounting POSTs the report endpoint and confirms the record', async () => {
+    mockCoveredResponses();
+
+    render(<StateCompliancePage />);
+    const btn = await screen.findByText('Generate Annual Accounting');
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      const call = fetchWithAuth.mock.calls.find(([u]) => u === '/beneficiary-reports/trust_1/generate');
+      expect(call).toBeTruthy();
+    });
+
+    expect(await screen.findByText(/Accounting recorded/)).toBeInTheDocument();
+    const link = screen.getByText('Download PDF');
+    expect(link.closest('a')).toHaveAttribute('href', expect.stringContaining('/beneficiary-reports/trust_1/rpt_test123/download'));
+  });
+
+  it('shows an error toast when notice generation fails', async () => {
+    mockCoveredResponses();
+    const { toast } = await import('sonner');
+
+    fetchWithAuth.mockImplementation(async (url, opts) => {
+      if (url === '/minutes-templates') {
+        return { ok: false, json: async () => ({ detail: 'boom' }) };
+      }
+      if (url.includes('state-compliance/requirements')) {
+        return { ok: true, json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          trust_id: 'trust_1', state_code: 'CA',
+          profile: { state_name: 'California' },
+          compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 90, alert_active: false },
+        }),
+      };
+    });
+
+    render(<StateCompliancePage />);
+    const btn = await screen.findByText('Generate Beneficiary Notice');
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining('recorded'));
+    });
+  });
+});
+
+describe('StateCompliancePage delivery log', () => {
+  const selectedTrust = { trust_id: 'trust_1', state_code: 'CA', trustees: ['John Smith'] };
+
+  const LOGGED_COMPLIANCE = {
+    notice_last_sent: null, notice_next_due: null,
+    accounting_last_sent: null, accounting_next_due: null,
+    compliance_score: 90, alert_active: false,
+    documents_log: [
+      { doc_id: 'doc_notice1', kind: 'notice', generated_at: '2026-09-10T12:00:00Z', method: '', notes: '', sent_at: null, delivered_at: null },
+      { doc_id: 'doc_acct1', kind: 'accounting', generated_at: '2026-09-11T12:00:00Z', method: '', notes: '', sent_at: '2026-09-12T09:00:00Z', delivered_at: null },
+      { doc_id: 'doc_notice2', kind: 'notice', generated_at: '2026-09-13T12:00:00Z', method: 'mail', notes: '', sent_at: '2026-09-13T10:00:00Z', delivered_at: '2026-09-14T10:00:00Z' },
+    ],
+  };
+
+  const mockResponses = () => {
+    fetchWithAuth.mockImplementation(async (url, opts) => {
+      if (url.includes('state-compliance/requirements')) {
+        return { ok: true, json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }) };
+      }
+      if (url.includes('/state-compliance/documents-log') && opts && opts.method === 'PATCH') {
+        return { ok: true, json: async () => ({ documents_log: LOGGED_COMPLIANCE.documents_log }) };
+      }
+      // GET state-compliance record
+      return {
+        ok: true,
+        json: async () => ({
+          trust_id: 'trust_1', state_code: 'CA',
+          profile: { state_name: 'California' },
+          compliance: LOGGED_COMPLIANCE,
+        }),
+      };
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust });
+  });
+
+  it('lists generated documents with their delivery status', async () => {
+    mockResponses();
+    const { container } = render(<StateCompliancePage />);
+
+    expect(await screen.findByText('Delivery Log')).toBeInTheDocument();
+    expect(container.textContent).toContain('Annual Accounting');
+    expect(container.textContent).toContain('Beneficiary Notice');
+    expect(await screen.findByText('Delivered')).toBeInTheDocument();
+    // Two actionable rows: "Mark sent" (doc_notice1) + "Mark delivered" (doc_acct1)
+    expect(screen.getByText('Mark sent')).toBeInTheDocument();
+    expect(screen.getByText('Mark delivered')).toBeInTheDocument();
+  });
+
+  it('marks a document sent via the documents-log PATCH endpoint', async () => {
+    mockResponses();
+    render(<StateCompliancePage />);
+
+    fireEvent.click(await screen.findByText('Mark sent'));
+    await waitFor(() => {
+      const patchCall = fetchWithAuth.mock.calls.find(([u, o]) => String(u).includes('/documents-log') && o?.method === 'PATCH');
+      expect(patchCall).toBeTruthy();
+      expect(JSON.parse(patchCall[1].body)).toEqual({ doc_id: 'doc_notice1', action: 'mark_sent' });
+    });
+  });
+
+  it('shows the empty-state hint when no documents are logged', async () => {
+    fetchWithAuth.mockImplementation(async (url) => {
+      if (url.includes('state-compliance/requirements')) {
+        return { ok: true, json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          trust_id: 'trust_1', state_code: 'CA',
+          profile: { state_name: 'California' },
+          compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 90, alert_active: false, documents_log: [] },
+        }),
+      };
+    });
+    const { container } = render(<StateCompliancePage />);
+
+    expect(await screen.findByText('Delivery Log')).toBeInTheDocument();
+    expect(container.textContent).toContain('No documents logged yet');
+    expect(container.textContent).not.toContain('Mark sent');
+  });
+});
+
+describe('StateCompliancePage deep-dive knowledge section', () => {
+  const selectedTrust = { trust_id: 'trust_1', state_code: 'CA' };
+
+  const CA_GUIDE = {
+    id: '18-state-compliance-california',
+    state_code: 'CA',
+    state_name: 'California',
+    title: 'Trust Compliance: California',
+    summary: 'California trust compliance summary text.',
+    markdown: '# Trust Compliance: California\n\n## State Income Tax on Trusts\n\nCalifornia taxes resident trusts.',
+  };
+
+  const baseResponses = (deepPayload, deepDetail) => (url, opts) => {
+    if (url.includes('state-compliance/requirements')) {
+      return {
+        ok: true,
+        json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements: [] }),
+      };
+    }
+    // Detail endpoint must be matched BEFORE the list (the detail URL contains
+    // the list path as a prefix).
+    if (deepDetail && url.includes('/state-compliance/deep-knowledge/')) {
+      return { ok: true, json: async () => deepDetail };
+    }
+    if (url.includes('/state-compliance/deep-knowledge')) {
+      return { ok: true, json: async () => deepPayload };
+    }
+    if (url === '/minutes-templates') {
+      return { ok: true, json: async () => ({}) };
+    }
+    // compliance endpoint
+    return {
+      ok: true,
+      json: async () => ({
+        trust_id: 'trust_1', state_code: 'CA',
+        profile: { state_name: 'California' },
+        compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 100, alert_active: false },
+      }),
+    };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust });
+  });
+
+  it('renders the collapsed deep-dive card when the API returns an entry for the trust state', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([
+CA_GUIDE]));
+
+    const { container } = render(<StateCompliancePage />);
+
+    expect(await screen.findByTestId('deep-dive-card')).toBeInTheDocument();
+    expect(screen.getByText(/Deep Dive — California Trust Compliance/)).toBeInTheDocument();
+
+    // Collapsed by default: summary visible, full markdown NOT rendered
+    expect(container.textContent).toContain('California trust compliance summary text.');
+    expect(container.textContent).not.toContain('California taxes resident trusts');
+    expect(screen.getByTestId('deep-dive-toggle')).toHaveTextContent('Read the full guide');
+
+    // Expanding flips the toggle and lazy-fetches the full markdown from the
+    // detail endpoint (list entries carry only a summary).
+    fetchWithAuth.mockImplementation(baseResponses(
+      [CA_GUIDE],
+      { id: '18-state-compliance-california', state_code: 'CA', state_name: 'California', title: 'Trust Compliance: California', markdown: CA_GUIDE.markdown },
+    ));
+    fireEvent.click(screen.getByTestId('deep-dive-toggle'));
+    expect(screen.getByTestId('deep-dive-toggle')).toHaveTextContent('Show less');
+    expect(container.textContent).not.toContain('California trust compliance summary text.');
+    await waitFor(() => {
+      expect(fetchWithAuth).toHaveBeenCalledWith('/state-compliance/deep-knowledge/CA');
+    });
+  });
+
+  it('renders no deep-dive card when the API returns no matching entry', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([]));
+
+    const { container } = render(<StateCompliancePage />);
+
+    // Wait for the compliance data to land so loadData has fully finished
+    await waitFor(() => {
+      expect(container.textContent).toContain('All compliance requirements are satisfied for California');
+    }, { timeout: 3000 });
+
+    expect(screen.queryByTestId('deep-dive-card')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('deep-dive-toggle')).not.toBeInTheDocument();
+  });
+
+  it('matches the deep-knowledge entry by trust state code, not hard-coded CA', async () => {
+    const NY_GUIDE = { ...CA_GUIDE, state_code: 'NY', state_name: 'New York', title: 'Trust Compliance: New York', summary: 'New York trust compliance summary text.' };
+    useAuth.mockReturnValue({ selectedTrust: { trust_id: 'trust_1', state_code: 'NY' } });
+    fetchWithAuth.mockImplementation((url) => {
+      if (url.includes('state-compliance/requirements')) {
+        return {
+          ok: true,
+          json: async () => ({ trust_id: 'trust_1', state_code: 'NY', coverage: 'covered', requirements: [] }),
+        };
+      }
+      if (url.includes('/state-compliance/deep-knowledge')) {
+        return { ok: true, json: async () => [CA_GUIDE, NY_GUIDE] };
+      }
+      return {
+        ok: true,
+        json: async () => ({ trust_id: 'trust_1', state_code: 'NY', profile: { state_name: 'New York' }, compliance: { compliance_score: 100, alert_active: false } }),
+      };
+    });
+
+    render(<StateCompliancePage />);
+    expect(await screen.findByText(/Deep Dive — New York Trust Compliance/)).toBeInTheDocument();
+  });
+});
+
+describe('getSectionForRequirement mapper', () => {
+  it('maps notice-related requirements to Beneficiary Notice Requirements', () => {
+    expect(getSectionForRequirement({ title: 'California requires periodic beneficiary notice' })).toBe('Beneficiary Notice Requirements');
+    expect(getSectionForRequirement({ title: 'Notice to beneficiaries required', description: 'Send notice within 60 days' })).toBe('Beneficiary Notice Requirements');
+  });
+
+  it('maps income-tax-related requirements to State Income Tax on Trusts', () => {
+    expect(getSectionForRequirement({ title: 'California income tax on trusts applies' })).toBe('State Income Tax on Trusts');
+    expect(getSectionForRequirement({ description: 'State income tax filing for trusts' })).toBe('State Income Tax on Trusts');
+    expect(getSectionForRequirement({ title: 'Trust may owe state taxes' })).toBe('State Income Tax on Trusts');
+  });
+
+  it('maps court/removal-related requirements to Court Supervision', () => {
+    expect(getSectionForRequirement({ title: 'Court supervision for trustee removal' })).toBe('Court Supervision');
+    expect(getSectionForRequirement({ title: 'Removal requires court action', description: 'Judge must approve removal' })).toBe('Court Supervision');
+    expect(getSectionForRequirement({ title: 'Judicial supervision of trust' })).toBe('Court Supervision');
+  });
+
+  it('maps file/return-related requirements to Filing Requirements', () => {
+    expect(getSectionForRequirement({ title: 'File Form 541 annually' })).toBe('Filing Requirements');
+    expect(getSectionForRequirement({ title: 'Annual return must be filed' })).toBe('Filing Requirements');
+  });
+
+  it('falls back to Key State-Specific Rules for unmatched requirements', () => {
+    expect(getSectionForRequirement({ title: 'UTC adoption status' })).toBe('Key State-Specific Rules');
+    expect(getSectionForRequirement({ title: 'Spendthrift clause check' })).toBe('Key State-Specific Rules');
+    expect(getSectionForRequirement({})).toBe('Key State-Specific Rules');
+  });
+});
+
+describe('extractSectionFromMarkdown', () => {
+  const SAMPLE_MARKDOWN = '# Trust Compliance: California\n\n## State Income Tax on Trusts\n\nCalifornia taxes resident trusts.\n\n## Filing Requirements\n\nFile Form 541 annually.\n\n## Beneficiary Notice Requirements\n\nSend notice within 60 days.\n\n## Court Supervision\n\nCourt supervision is optional.\n\n## Key State-Specific Rules\n\nAsset protection rules apply.\n';
+
+  it('extracts a section by exact case-insensitive match', () => {
+    const result = extractSectionFromMarkdown(SAMPLE_MARKDOWN, 'Filing Requirements');
+    expect(result).toContain('File Form 541 annually.');
+  });
+
+  it('returns null when the section heading is not found', () => {
+    expect(extractSectionFromMarkdown(SAMPLE_MARKDOWN, 'Nonexistent Section')).toBeNull();
+  });
+
+  it('handles empty markdown or heading gracefully', () => {
+    expect(extractSectionFromMarkdown('', 'Filing Requirements')).toBeNull();
+    expect(extractSectionFromMarkdown(SAMPLE_MARKDOWN, '')).toBeNull();
+    expect(extractSectionFromMarkdown(null, 'Filing Requirements')).toBeNull();
+  });
+});
+
+describe('StateCompliancePage per-requirement guidance', () => {
+  const selectedTrust = { trust_id: 'trust_1', state_code: 'CA' };
+
+  const CA_GUIDE = {
+    id: '18-state-compliance-california',
+    state_code: 'CA',
+    state_name: 'California',
+    title: 'Trust Compliance: California',
+    summary: 'California trust compliance summary.',
+    markdown: '# Trust Compliance: California\n\n## Beneficiary Notice Requirements\n\nCalifornia Probate Code Section 16061.7 requires notice to beneficiaries.\n\n## Filing Requirements\n\nFile Form 541 annually.\n\n## Key State-Specific Rules\n\nCalifornia does not allow self-settled asset protection trusts.\n',
+  };
+
+  const baseResponses = (requirements, deepDetail) => (url, opts) => {
+    if (url.includes('state-compliance/requirements')) {
+      return {
+        ok: true,
+        json: async () => ({ trust_id: 'trust_1', state_code: 'CA', coverage: 'covered', requirements }),
+      };
+    }
+    if (deepDetail && url.includes('/state-compliance/deep-knowledge/')) {
+      return { ok: true, json: async () => deepDetail };
+    }
+    if (url.includes('/state-compliance/deep-knowledge')) {
+      return { ok: true, json: async () => [CA_GUIDE] };
+    }
+    if (url === '/minutes-templates') {
+      return { ok: true, json: async () => ({}) };
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        trust_id: 'trust_1', state_code: 'CA',
+        profile: { state_name: 'California' },
+        compliance: { notice_last_sent: null, notice_next_due: null, accounting_last_sent: null, accounting_next_due: null, compliance_score: 100, alert_active: false },
+      }),
+    };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust });
+  });
+
+  it('renders a State guidance button for each requirement when a deep guide is available', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([
+      { category: 'notice', title: 'California requires periodic beneficiary notice', severity: 'high', points: 15 },
+  ], CA_GUIDE));
+
+    render(<StateCompliancePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guidance-toggle-0')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('guidance-toggle-0')).toHaveTextContent('State guidance');
+  });
+
+  it('expands the guidance section inline when the State guidance button is clicked', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([
+
+      { category: 'notice', title: 'California requires periodic beneficiary notice', severity: 'high', points: 15 },
+  ], CA_GUIDE));
+
+    const { container } = render(<StateCompliancePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guidance-toggle-0')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('guidance-toggle-0'));
+
+    // The guidance section should now be visible
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="guidance-section-0"]')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('guidance-toggle-0')).toHaveTextContent('Hide state guidance');
+  });
+
+  it('renders the extracted section content when a matching section exists', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([
+
+      { category: 'notice', title: 'California requires periodic beneficiary notice', severity: 'high', points: 15 },
+  ], CA_GUIDE));
+
+    const { container } = render(<StateCompliancePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guidance-toggle-0')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('guidance-toggle-0'));
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Probate Code Section 16061.7');
+    });
+  });
+
+  it('falls back to the whole guide when the section heading is missing', async () => {
+    // Guide lacks the 'Key State-Specific Rules' fallback section, so the
+    // whole guide renders instead of an empty panel.
+    const GUIDE_NO_FALLBACK = {
+      ...CA_GUIDE,
+      markdown: '# Trust Compliance: California\n\n## Beneficiary Notice Requirements\n\nCalifornia Probate Code Section 16061.7 requires notice to beneficiaries.\n',
+    };
+    fetchWithAuth.mockImplementation(baseResponses([
+      { category: 'spendthrift', title: 'Spendthrift clause required', description: 'No spendthrift protection by default', severity: 'medium', points: 10 },
+  ], GUIDE_NO_FALLBACK));
+
+    const { container } = render(<StateCompliancePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guidance-toggle-0')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('guidance-toggle-0'));
+
+    // Whole-guide fallback: notice text visible even though the requirement
+    // mapped to the missing 'Key State-Specific Rules' section.
+    await waitFor(() => {
+      expect(container.textContent).toContain('Probate Code Section 16061.7');
+    });
+  });
+
+  it('shows a Read full guide link inside the expanded section', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([
+      { category: 'notice', title: 'California requires periodic beneficiary notice', severity: 'high', points: 15 },
+  ], CA_GUIDE));
+
+    const { container } = render(<StateCompliancePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guidance-toggle-0')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('guidance-toggle-0'));
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Probate Code Section 16061.7');
+    });
+    expect(screen.getByTestId('guidance-full-guide-0')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('guidance-full-guide-0'));
+    // Clicking opens the full Deep Dive guide and closes the inline section
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="guidance-section-0"]')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('deep-dive-card')).toBeInTheDocument();
+  });
+
+  it('closes the guidance section when the button is clicked again', async () => {
+    fetchWithAuth.mockImplementation(baseResponses([
+
+      { category: 'notice', title: 'California requires periodic beneficiary notice', severity: 'high', points: 15 },
+  ], CA_GUIDE));
+
+    const { container } = render(<StateCompliancePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guidance-toggle-0')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('guidance-toggle-0'));
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="guidance-section-0"]')).toBeInTheDocument();
+    });
+
+    // Click again to close
+    fireEvent.click(screen.getByTestId('guidance-toggle-0'));
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="guidance-section-0"]')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('guidance-toggle-0')).toHaveTextContent('State guidance');
   });
 });

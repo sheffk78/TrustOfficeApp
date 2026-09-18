@@ -634,6 +634,31 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
     },
 
+    "beneficiary_periodic_notice": {
+        "display_name": "Beneficiary Periodic Notice",
+        "description": "Send the periodic beneficiary notice your state requires and record it against the compliance deadline",
+        "icon": "mail-check",
+        "category": "distributions",
+        "fields": [
+            {"name": "notice_date", "label": "Notice Date", "type": "date", "required": False,
+             "placeholder": "YYYY-MM-DD"},
+            {"name": "trustee_name", "label": "Trustee Name(s)", "type": "text", "required": False,
+             "placeholder": "Defaults to the trustees on the trust"},
+            {"name": "trustee_contact", "label": "Trustee Contact (phone/email/address)", "type": "text", "required": False,
+             "placeholder": "How beneficiaries can reach you with questions"},
+            {"name": "additional_context", "label": "Additional Context", "type": "textarea", "required": False,
+             "placeholder": "Any extra information to include in the notice"},
+        ],
+        "ai_prompt_template": (
+            "Generate a formal periodic beneficiary notice letter for {trust_name}. "
+            "Notice date: {notice_date}. Trustee: {trustee_name}. "
+            "Trustee contact: {trustee_contact}. Additional context: {additional_context}. "
+            "This letter informs beneficiaries that the trustee is providing the periodic "
+            "notice required by the trust's state law, states the notice window, and invites "
+            "beneficiaries to submit questions or objections to the trustee. Format as a professional letter."
+        ),
+    },
+
     "evaluate_distribution": {
         "display_name": "Evaluate Distribution Request",
         "description": "Get an AI evaluation of whether a distribution request complies with your trust document and trust law",

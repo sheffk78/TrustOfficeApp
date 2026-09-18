@@ -42,14 +42,14 @@ import {
 } from 'lucide-react';
 
 const getScoreColor = (score) => {
-  if (score >= 96) return 'text-success';
-  if (score >= 72) return 'text-warning';
+  if (score >= 85) return 'text-success';
+  if (score >= 65) return 'text-warning';
   return 'text-error';
 };
 
 const getScoreBadgeStyle = (score) => {
-  if (score >= 96) return 'bg-success/10 text-success border-success/20';
-  if (score >= 72) return 'bg-warning/10 text-warning border-warning/20';
+  if (score >= 85) return 'bg-success/10 text-success border-success/20';
+  if (score >= 65) return 'bg-warning/10 text-warning border-warning/20';
   return 'bg-error/10 text-error border-error/20';
 };
 
@@ -220,9 +220,9 @@ export default function ClientDashboard() {
           trusts.reduce((sum, t) => sum + (t.governance_score || 0), 0) / trustCount
         )
       : null;
-  const greenCount = trusts.filter((t) => (t.governance_score || 0) >= 96).length;
+  const greenCount = trusts.filter((t) => (t.governance_score || 0) >= 85).length;
   const yellowCount = trusts.filter(
-    (t) => (t.governance_score || 0) >= 72 && (t.governance_score || 0) < 96
+    (t) => (t.governance_score || 0) >= 65 && (t.governance_score || 0) < 85
   ).length;
   const redCount = trusts.filter((t) => (t.governance_score || 0) < 72).length;
 

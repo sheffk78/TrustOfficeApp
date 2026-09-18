@@ -170,18 +170,24 @@ export const MobileBottomNav = () => {
     setOpenMenu(null);
   }, [location.pathname]);
 
+  // Query-string routes (e.g. /governance?tab=state) must be compared against
+  // pathname + search — matching location.pathname alone never highlights them
+  // after navigation. Normalize once so isSubActive and the More-button
+  // isActive (mirrors Sidebar.js exact-match semantics) stay consistent.
+  const fullPath = `${location.pathname}${location.search}`;
+
   const isActive = (item) => {
-    if (location.pathname === item.path) return true;
+    if (fullPath === item.path) return true;
     if (item.subMenu) {
-      return item.subMenu.some((s) => location.pathname === s.path);
+      return item.subMenu.some((s) => fullPath === s.path);
     }
     if (item.isMore) {
-      return moreNavGroups.flatMap(g => g.items).some((s) => location.pathname === s.path);
+      return moreNavGroups.flatMap(g => g.items).some((s) => fullPath === s.path);
     }
     return false;
   };
 
-  const isSubActive = (subPath) => location.pathname === subPath;
+  const isSubActive = (subPath) => fullPath === subPath;
 
   // Filter benevolence items from subMenu based on trust's benevolence_enabled flag
   const filterSubMenu = (subMenu) => {

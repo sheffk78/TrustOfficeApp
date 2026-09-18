@@ -43,6 +43,7 @@ from dependencies import (
     record_session_for_token,
     verify_password,
 )
+from routers.auth import rate_limit
 from services.security_events import check_security_alert, record_security_event
 from services import totp_service as totps
 from utils.audit import log_audit_event
@@ -246,7 +247,7 @@ def _build_login_payload(user_doc: dict, token: str):
 
 
 @router.post("/auth/2fa/login")
-async def login_2fa(request: Request, body: TwoFactorLoginRequest, response: Response):
+async def login_2fa(request: Request, body: TwoFactorLoginRequest, response: Response, _rl: None = Depends(rate_limit(10, 60))):
     """Second login step: validate a TOTP or single-use recovery code against
     a short-lived challenge token, then issue the normal session response."""
     challenge = totps.verify_challenge_token(body.challenge_token)

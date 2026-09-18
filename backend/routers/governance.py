@@ -89,9 +89,33 @@ CRITERIA_CONFIG = {
         "action_path": "/risk",
         "action_label": "View Alerts",
     },
+    "Foundation & Setup": {
+        "max_points": 15,
+        "insight_type": "info",
+        "insight_title": "Finish Getting Started",
+        "insight_desc": "Complete the remaining Getting Started steps to earn +{max_points} points",
+        "action_path": "/",
+        "action_label": "View Checklist",
+    },
 }
 
-TOTAL_MAX_POINTS = sum(c["max_points"] for c in CRITERIA_CONFIG.values())  # 115
+TOTAL_MAX_POINTS = sum(c["max_points"] for c in CRITERIA_CONFIG.values())  # 130
+
+# --- Score color thresholds (single source of truth) ---
+# v4 rebalance: on the 0-100 scaled display, green was effectively unreachable
+# (>=96 after risk penalties). Green >=85, yellow 65-84, red <65.
+SCORE_GREEN_THRESHOLD = 85
+SCORE_YELLOW_THRESHOLD = 65
+
+# Foundation & Setup criterion: fraction of the Getting Started checklist
+# completed, credited in 15 equal steps. Must mirror getOnboardingProgress()
+# in frontend/src/pages/dashboard/constants.js (10 steps).
+FOUNDATION_STEPS_TOTAL = 10
+
+# Quarterly Minutes grace: in the first N days of a quarter, missing minutes
+# are "not yet due" (no_data) rather than a 0/15 miss — prevents the day-1
+# score cliff when the quarter rolls over.
+QUARTER_GRACE_DAYS = 30
 
 
 # ==================== HELPER FUNCTIONS ====================
@@ -200,7 +224,8 @@ async def _gather_risk_findings(trust_id: str, trust_doc: dict, now: datetime, t
 
     if risk_findings is None:
         risk_findings = await gather_risk_findings(
-            trust_id, trust_doc, db, today, include_separation_alerts=False
+            trust_id, trust_doc, db, today, include_separation_alerts=False,
+            include_upcoming_tax=False,  # v4: upcoming tax = reminder, not penalty
         )
         if use_cache:
             await db.risk_findings_cache.update_one(
@@ -294,6 +319,13 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
     today = now.date()
     risk_findings = await _gather_risk_findings(trust_id, trust_doc, now, today, use_cache)
 
+    # Raw onboarding doc for the Foundation & Setup criterion. Read directly
+    # (not via OnboardingState model) so PATCH-only fields like
+    # backup_connected are visible to the score.
+    onboarding_state_raw = await db.user_onboarding.find_one(
+        {"user_id": user_id}, {"_id": 0}
+    ) or {}
+
     return {
         "now": now,
         "quarterly_minutes": quarterly_minutes,
@@ -313,6 +345,8 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "classified_txns": classified_txns,
         "active_alert_count": active_alert_count,
         "risk_findings": risk_findings,
+        "onboarding_state_raw": onboarding_state_raw,
+        "benevolence_enabled": bool(trust_doc.get("benevolence_enabled")),
     }
 
 
@@ -354,14 +388,33 @@ def _is_asset_stale(asset: dict, twelve_months_ago: datetime) -> bool:
 
 
 def _compute_quarterly_minutes_criterion(data: dict) -> tuple:
-    """Returns (HealthScoreCriterion, points) for Quarterly Minutes."""
+    """Returns (HealthScoreCriterion, points) for Quarterly Minutes.
+
+    v4 grace: within the first QUARTER_GRACE_DAYS of the quarter, missing
+    minutes are 'not yet due' (no_data=True, excluded from denominator)
+    instead of a 0/15 miss — removes the day-1 score cliff at quarter rollover.
+    """
     mp = CRITERIA_CONFIG["Quarterly Minutes"]["max_points"]
+    now = data["now"]
     achieved = data["quarterly_minutes"] > 0
-    points = mp if achieved else 0
+    if achieved:
+        points = mp
+        no_data = False
+        description = "Minutes generated this quarter"
+    else:
+        days_into_quarter = (now - get_quarter_start(now)).days
+        if days_into_quarter < QUARTER_GRACE_DAYS:
+            points = 0
+            no_data = True
+            description = "Quarterly minutes not yet due — record them by quarter end"
+        else:
+            points = 0
+            no_data = False
+            description = "No minutes recorded yet this quarter"
     criterion = HealthScoreCriterion(
         name="Quarterly Minutes",
-        description="Minutes generated this quarter",
-        points=points, max_points=mp, achieved=achieved, no_data=False
+        description=description,
+        points=points, max_points=mp, achieved=achieved, no_data=no_data
     )
     return criterion, points
 
@@ -546,12 +599,50 @@ def _compute_separation_alert_criterion(data: dict) -> tuple:
 
 
 def _score_to_color(final_score: int) -> HealthColor:
-    """Map a numeric score to a HealthColor."""
-    if final_score >= 96:
+    """Map a numeric score to a HealthColor (v4 thresholds)."""
+    if final_score >= SCORE_GREEN_THRESHOLD:
         return HealthColor.green
-    if final_score >= 72:
+    if final_score >= SCORE_YELLOW_THRESHOLD:
         return HealthColor.yellow
     return HealthColor.red
+
+
+def _compute_foundation_criterion(data: dict) -> tuple:
+    """Returns (HealthScoreCriterion, points) for Foundation & Setup.
+
+    Earned as a fraction of the Getting Started checklist completed
+    (10 steps, same set the dashboard checklist shows). Always applicable —
+    this guarantees the applicable-criteria denominator is never 0.
+    """
+    mp = CRITERIA_CONFIG["Foundation & Setup"]["max_points"]
+    raw = data.get("onboarding_state_raw") or {}
+    benevolence = bool(data.get("benevolence_enabled"))
+
+    steps = [
+        bool(raw.get("trust_doc_uploaded")),
+        bool(raw.get("beneficiaries_added")),
+        # Trust protector is optional; canonical setup step is successor trustee.
+        bool(raw.get("successor_trustee_added")),
+        bool(raw.get("assets_added")),
+        bool(raw.get("minutes_generated")),
+        bool(raw.get("ein_doc_uploaded")),
+        bool(raw.get("formation_date_added")),
+        bool(raw.get("backup_connected")),
+        bool(raw.get("ein_entered")),
+        # Calendar review is auto-satisfied for benevolence trusts (mirrors
+        # frontend: calendar_set || benevolence_enabled).
+        bool(raw.get("calendar_set")) or benevolence,
+    ]
+    completed = sum(steps)
+    points = int(mp * completed / FOUNDATION_STEPS_TOTAL)
+    achieved = completed >= FOUNDATION_STEPS_TOTAL
+
+    criterion = HealthScoreCriterion(
+        name="Foundation & Setup",
+        description=f"{completed}/{FOUNDATION_STEPS_TOTAL} Getting Started steps complete",
+        points=points, max_points=mp, achieved=achieved, no_data=False
+    )
+    return criterion, points
 
 
 def _compute_health_score(data: dict) -> dict:
@@ -560,7 +651,7 @@ def _compute_health_score(data: dict) -> dict:
     criteria = []
     total_score = 0
 
-    # 1–8: compute each criterion via dedicated helpers
+    # 1-8: compute each criterion via dedicated helpers
     c, pts = _compute_quarterly_minutes_criterion(data)
     criteria.append(c); total_score += pts
 
@@ -585,16 +676,24 @@ def _compute_health_score(data: dict) -> dict:
     c, pts = _compute_separation_alert_criterion(data)
     criteria.append(c); total_score += pts
 
+    # 9: Foundation & Setup — always applicable, guarantees denominator > 0
+    c, pts = _compute_foundation_criterion(data)
+    criteria.append(c); total_score += pts
+
     # --- Applicable-criteria denominator ---
     # Criteria with no_data=True have nothing to measure yet (no comp plan, no
     # distributions logged, annual review not due, no transactions). Counting
-    # them as 0/earned understates governance for new trusts. Score against the
-    # APPLICABLE max only; floor at 35 so a fresh trust can't show a perfect
-    # 115 from an empty slate.
+    # them as 0/earned understates governance for new trusts.
+    #
+    # v4: score against the APPLICABLE max only. The old max(35, ...) floor
+    # structurally capped quiet trusts (e.g. a benevolence trust with only
+    # minutes + annual review + assets applicable could never exceed ~86)
+    # and is removed. Foundation & Setup is always applicable, so the
+    # denominator is never 0.
     applicable_max = sum(
         c.max_points for c in criteria if not c.no_data
     )
-    effective_max = max(35, applicable_max)
+    effective_max = max(1, applicable_max)
 
     # --- Risk Penalty (separate from criteria) ---
     risk_findings = data.get("risk_findings", [])

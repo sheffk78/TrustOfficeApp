@@ -94,6 +94,12 @@ async def _aggregate_beneficiaries(trust_id: str, user_id: str) -> tuple:
     return beneficiaries, total_issued, len(certificates)
 
 
+def _fmt_money(val) -> str:
+    if val is None:
+        return "\u2014"
+    return f"${val:,.2f}"
+
+
 def _build_pdf(
     trust: dict,
     beneficiaries: List[dict],
@@ -102,6 +108,13 @@ def _build_pdf(
     total_issued: int,
     active_cert_count: int,
     unit_label: str,
+    period_start: str = "",
+    period_end: str = "",
+    starting_corpus: Optional[float] = None,
+    total_income: Optional[float] = None,
+    total_expenses: Optional[float] = None,
+    total_distributions: Optional[float] = None,
+    remaining_balance: Optional[float] = None,
 ) -> bytes:
     """Build the beneficiary report PDF and return raw bytes."""
     doc, buffer = create_doc_template()
@@ -212,6 +225,33 @@ def _build_pdf(
     )
     story.append(summary_table)
     story.append(Spacer(1, 16))
+
+    # ---- Financial Summary (prefilled from trust transaction data) ----
+    if period_start or period_end or starting_corpus is not None or total_income is not None:
+        story.append(Paragraph("Financial Summary", section_style))
+        fin_rows = [
+            ["Accounting Period:", f"{period_start} \u2014 {period_end}" if period_start and period_end else (period_end or period_start or "\u2014")],
+            ["Starting Corpus:", _fmt_money(starting_corpus)],
+            ["Total Income:", _fmt_money(total_income)],
+            ["Total Expenses:", _fmt_money(total_expenses)],
+            ["Total Distributions:", _fmt_money(total_distributions)],
+            ["Remaining Balance:", _fmt_money(remaining_balance)],
+        ]
+        fin_table = Table(fin_rows, colWidths=[2.2 * inch, 4.3 * inch])
+        fin_table.setStyle(
+            TableStyle([
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("TEXTCOLOR", (0, 0), (0, -1), NAVY),
+                ("ALIGN", (0, 0), (0, -1), "RIGHT"),
+                ("ALIGN", (1, 0), (1, -1), "LEFT"),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ])
+        )
+        story.append(fin_table)
+        story.append(Spacer(1, 16))
 
     # ---- Beneficiary Table ----
     if beneficiaries:
@@ -333,10 +373,97 @@ async def generate_beneficiary_report(trust_id: str, user_id: str) -> dict:
         {"_id": 0},
     ).sort("created_at", -1).to_list(100)
 
+    # ---- Financial summary from trust data (Phase C prefill) ----
+    # Accounting period: last accounting date -> now, falling back to the
+    # trust's created date when no accounting has been recorded yet.
+    period_start = ""
+    period_end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    starting_corpus = None
+    total_income = 0.0
+    total_expenses = 0.0
+    total_distributions = 0.0
+    remaining_balance = None
+
+    created_at = trust.get("created_at", "") or trust.get("start_date", "") or ""
+    if created_at:
+        period_start = created_at[:10]
+
+    if trust.get("state_code"):
+        state_code = trust["state_code"].upper()
+        sc = await db.trust_state_compliance.find_one(
+            {"trust_id": trust_id, "state_code": state_code}, {"_id": 0}
+        )
+        if sc and sc.get("accounting_last_sent"):
+            try:
+                period_start = sc["accounting_last_sent"][:10]
+            except (ValueError, TypeError, IndexError):
+                pass
+
+    def _within_period(date_str) -> bool:
+        """True when a transaction date falls inside the accounting period."""
+        if not date_str or not period_start:
+            return True
+        try:
+            return str(date_str)[:10] >= period_start
+        except (ValueError, TypeError):
+            return True
+
+    # Aggregate transaction data for the accounting period only.
+    txns = await db.transactions.find(
+        {"trust_id": trust_id, "user_id": user_id}, {"_id": 0}
+    ).sort("date", 1).to_list(10000)
+
+    for txn in txns:
+        if not _within_period(txn.get("date")):
+            continue
+        amount = txn.get("amount", 0.0)
+        direction = txn.get("direction", "")
+        classification = txn.get("governance_classification", "")
+        if direction == "inflow":
+            if classification == "Distribution":
+                total_distributions += amount
+            else:
+                total_income += amount
+        elif direction == "outflow":
+            if classification == "Distribution":
+                total_distributions += amount
+            else:
+                total_expenses += amount
+
+    # Starting corpus: sum of active Schedule A assets conveyed into the trust
+    # on or before the accounting period start. This is the closest real data
+    # source to fiduciary "corpus at period start"; left as a labeled blank
+    # ("—") when Schedule A has no dated values.
+    try:
+        schedule_items = await db.schedule_a_items.find(
+            {"trust_id": trust_id, "user_id": user_id, "status": "active"}, {"_id": 0}
+        ).to_list(1000)
+        corpus_total = 0.0
+        for item in schedule_items:
+            date_conveyed = item.get("date_conveyed") or ""
+            if date_conveyed and period_start and str(date_conveyed)[:10] > period_start:
+                continue  # conveyed after period start: not corpus at start
+            corpus_total += item.get("approximate_value", 0) or 0
+        if corpus_total > 0:
+            starting_corpus = corpus_total
+    except Exception:
+        starting_corpus = None  # schedule A unavailable: leave labeled blank
+
+    net_income = total_income - total_expenses
+    if starting_corpus is not None:
+        remaining_balance = starting_corpus + net_income - total_distributions
+
     # Build PDF
     pdf_bytes = _build_pdf(
         trust, beneficiaries, class_beneficiaries,
         total_authorized, total_issued, active_cert_count, unit_label,
+        period_start=period_start,
+        period_end=period_end,
+        starting_corpus=starting_corpus,
+        total_income=total_income if total_income > 0 else None,
+        total_expenses=total_expenses if total_expenses > 0 else None,
+        total_distributions=total_distributions if total_distributions > 0 else None,
+        remaining_balance=remaining_balance,
     )
 
     # Store in vault_documents
@@ -386,6 +513,16 @@ async def generate_beneficiary_report(trust_id: str, user_id: str) -> dict:
         "generated_at": now,
         "trust_name": trust_name,
         "beneficiary_count": len(beneficiaries),
+        # Financial summary actually rendered into the PDF (Phase C prefill)
+        "financial_summary": {
+            "period_start": period_start or None,
+            "period_end": period_end,
+            "starting_corpus": starting_corpus,
+            "total_income": round(total_income, 2),
+            "total_expenses": round(total_expenses, 2),
+            "total_distributions": round(total_distributions, 2),
+            "remaining_balance": round(remaining_balance, 2) if remaining_balance is not None else None,
+        },
     }
 
 

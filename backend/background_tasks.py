@@ -8,7 +8,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, List, Dict
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -20,6 +20,39 @@ logger = logging.getLogger(__name__)
 # Configuration
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 DB_NAME = os.environ.get('DB_NAME', 'test_database')
+
+# Nurture drip throughput cap (item 1): keep a sudden backlog of due sends
+# inside MailerCloud rate limits. All due sends still fire across runs.
+DRIP_MAX_PER_RUN = 80
+
+# Booking-reminder windows (item 2), mirror leads_monitor.check_leads_pipeline_health.
+BOOKING_DAY_BEFORE_LOWER = timedelta(hours=23)
+BOOKING_DAY_BEFORE_UPPER = timedelta(hours=25)
+BOOKING_ONE_HOUR_LOWER = timedelta(minutes=55)
+BOOKING_ONE_HOUR_UPPER = timedelta(minutes=65)
+# Default time zone for rendering booked-call times in reminder emails.
+BOOKING_TZ = os.environ.get('BOOKING_TZ', 'America/Denver')
+
+
+def _as_dt(value):
+    """Normalize a stored created_at (BSON Date OR ISO string) to a tz-aware UTC datetime.
+
+    Handles the lead_activities.created_at string->Date migration (item 5):
+    old docs store an ISO string; new writes store a BSON Date. Returns None
+    when unparseable so callers can treat it as 'outside any window'.
+    """
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except (ValueError, TypeError):
+            return None
+    else:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 class BackgroundTaskRunner:
@@ -97,7 +130,7 @@ class BackgroundTaskRunner:
             self.send_nurture_drip_emails,
             trigger=IntervalTrigger(hours=6),
             id='nurture_drip',
-            name='Send nurture sequence emails 2-7 on schedule',
+            name='Send 12-email nurture sequence (MailerCloud)',
             replace_existing=True
         )
 
@@ -116,6 +149,51 @@ class BackgroundTaskRunner:
             trigger=CronTrigger(hour=7, minute=0, timezone='UTC'),
             id='booking_confirmation',
             name='Send same-day booking confirmation emails',
+            replace_existing=True
+        )
+
+        # Item 2: booking reminders (day-before + 1h) â hourly check.
+        self.scheduler.add_job(
+            self.send_booking_reminder_emails,
+            trigger=IntervalTrigger(hours=1),
+            id='booking_reminders',
+            name='Send booking day-before + 1-hour reminders',
+            replace_existing=True
+        )
+
+        # Item 3: post-drip re-engagement for completed-but-stuck cohort â 6h.
+        self.scheduler.add_job(
+            self.send_post_drip_reengagement,
+            trigger=IntervalTrigger(hours=6),
+            id='post_drip_reengagement',
+            name='One-time post-drip re-engagement send',
+            replace_existing=True
+        )
+
+        # Item 4: pipeline health monitor (asserts + RED alert) â 6h.
+        self.scheduler.add_job(
+            self.check_leads_pipeline_health,
+            trigger=IntervalTrigger(hours=6),
+            id='leads_pipeline_health',
+            name='Leads pipeline health monitor (anti-silent-failure)',
+            replace_existing=True
+        )
+
+        # State compliance reminder monitor (asserts + RED alert) â 6h (item 4).
+        self.scheduler.add_job(
+            self.check_compliance_reminder_health,
+            trigger=IntervalTrigger(hours=6),
+            id='compliance_reminder_health',
+            name='State compliance reminder health monitor (anti-silent-failure)',
+            replace_existing=True
+        )
+
+        # Item 5: backfill lead_activities.created_at strings -> BSON Dates â daily.
+        self.scheduler.add_job(
+            self.backfill_lead_activities_dates,
+            trigger=IntervalTrigger(hours=24),
+            id='backfill_activity_dates',
+            name='Backfill lead_activities created_at to BSON Date',
             replace_existing=True
         )
 
@@ -568,15 +646,27 @@ class BackgroundTaskRunner:
                 return 0
 
             now = datetime.now(timezone.utc)
-            cutoff = (now - timedelta(days=3)).isoformat()
+            # cutoff is a BSON Date used for the in-Python 3-day gate below.
+            cutoff = now - timedelta(days=3)
 
-            # Find leads: created 3+ days ago, 0 lessons watched, no re-engagement sent yet
+            # Find leads: 0 lessons watched, no re-engagement sent yet, not
+            # converted. The "created 3+ days ago" gate is applied in Python
+            # (below) via _as_dt so it works whether leads.created_at is stored
+            # as a BSON Date or a legacy ISO string (mixed across the codebase).
+            # A DB-level `created_at: {$lte: cutoff}` would silently exclude
+            # whichever type doesn't match the cutoff type.
             leads = await self.db.leads.find({
-                "created_at": {"$lte": cutoff},
                 "lessons_watched": 0,
                 "reengagement_sent_at": None,
                 "stage": {"$ne": "converted"},
             }, {"_id": 0}).to_list(200)
+
+            eligible = []
+            for lead in leads:
+                created = _as_dt(lead.get("created_at"))
+                if created is not None and created <= cutoff:
+                    eligible.append(lead)
+            leads = eligible
 
             emails_sent = 0
             course_url = f"{email_service.app_url}/trustee-101"
@@ -604,7 +694,7 @@ class BackgroundTaskRunner:
                         "lead_id": lead["lead_id"],
                         "action_type": "email",
                         "content": "Sent re-engagement email (3+ days, no lessons watched)",
-                        "created_at": now.isoformat(),
+                        "created_at": now,
                     })
 
                     emails_sent += 1
@@ -622,13 +712,13 @@ class BackgroundTaskRunner:
 
     async def send_nurture_drip_emails(self) -> int:
         """
-        Send nurture sequence emails 2-7 on schedule via MailerCloud Email API.
+        Send the 12-email nurture sequence via MailerCloud (steps 2-12 on schedule;
+        step 1 fires on capture in leads.py).
 
-        Schedule (7-email sequence, reduced & spread from the old 12-email
-        sequence on 2026-09-07 to be less overwhelming):
+        Schedule (12-email sequence, day offsets 0-80):
         - Email 1: Sent immediately on lead capture (in leads.py)
         - Email 2: Day 3 after capture
-        - Email 3: Day 7
+        - Email 3: Day 8
         - Email 4: Day 12
         - Email 5: Day 18
         - Email 6: Day 25
@@ -638,15 +728,17 @@ class BackgroundTaskRunner:
         - Email 10: Day 60
         - Email 11: Day 70
         - Email 12: Day 80
-        - Email 13: Day 90
 
         Runs every 6 hours. Tracks which step each lead has received
         via the `nurture_step_sent` field on the lead record.
 
-        Backward-compat: leads partway through the old 12-email sequence may
-        carry nurture_step_sent values 1-12. Any lead with nurture_step_sent
-        >= 13 is treated as sequence-complete (step 7 of the new schedule is the
-        final email) and is skipped without error.
+        Throughput (item 1): all eligible due sends fire each run, capped at
+        DRIP_MAX_PER_RUN (default 80) to stay inside MailerCloud rate limits.
+        A [drip-metric] line logs sends/eligible/cap each run.
+
+        Backward-compat: leads partway through the old sequence may carry
+        nurture_step_sent values 1-12. Any lead with nurture_step_sent >= 12 is
+        treated as sequence-complete (12 emails total) and is skipped.
         """
         logger.info("Running nurture drip check (7-email MailerCloud sequence)")
         try:
@@ -659,7 +751,10 @@ class BackgroundTaskRunner:
             now = datetime.now(timezone.utc)
             emails_sent = 0
 
-            # 7-email nurture schedule: step -> days after capture
+            # 12-email nurture schedule: step -> days after the step-1 anchor.
+            # The sequence has exactly 12 emails (steps 1..12, day offsets 0-80);
+            # step-13 was a leftover from the old schedule and is not a real
+            # email, so it has been removed. Completion is step >= 12.
             NURTURE_SCHEDULE = {
                 2: 3,   # Day 3
                 3: 8,   # Day 8
@@ -672,7 +767,6 @@ class BackgroundTaskRunner:
                 10: 60, # Day 60
                 11: 70, # Day 70
                 12: 80, # Day 80
-                13: 90, # Day 90
             }
 
             # Find leads that have received Email 1 but haven't completed all 13.
@@ -702,9 +796,21 @@ class BackgroundTaskRunner:
                 # excluded too (they carry booked_call: true) — the no-show
                 # flow (reschedule email, 7-day nudge, 14-day DNC) owns them.
                 "booked_call": {"$ne": True},
-            }, {"_id": 0}).to_list(500)
+            }, {"_id": 0}).to_list(2000)
+
+            eligible_count = len(leads)
+            if eligible_count > DRIP_MAX_PER_RUN:
+                logger.info(
+                    f"[drip-metric] eligible={eligible_count} exceeds cap "
+                    f"{DRIP_MAX_PER_RUN}; remaining due sends fire on subsequent runs"
+                )
 
             for lead in leads:
+                # Per-run cap: stop sending once we hit DRIP_MAX_PER_RUN so we
+                # stay inside MailerCloud rate limits. Due-but-uncapped leads
+                # simply fire on the next 6h run (all due sends still get sent).
+                if emails_sent >= DRIP_MAX_PER_RUN:
+                    break
                 try:
                     # Missing/null nurture_step_sent = step 0 (never got Email 1)
                     if not lead.get("nurture_step_sent"):
@@ -712,11 +818,11 @@ class BackgroundTaskRunner:
                     else:
                         current_step = lead.get("nurture_step_sent", 0)
 
-                    # Backward-compat: legacy leads from the old 12-email sequence
-                    # may carry nurture_step_sent values 8-12. The new schedule tops
-                    # out at step 13, so treat any lead at step >= 13 as
-                    # sequence-complete: skip without sending or raising.
-                    if current_step >= 13:
+                    # Backward-compat: legacy leads from the old sequence may
+                    # carry nurture_step_sent values 8-12. The schedule tops out
+                    # at step 12 (12 emails total), so treat any lead at step
+                    # >= 12 as sequence-complete: skip without sending or raising.
+                    if current_step >= 12:
                         continue
                     # capture timestamp. Catch-up leads (backfill/re-engagement)
                     # were captured long before they entered the sequence —
@@ -750,8 +856,8 @@ class BackgroundTaskRunner:
                     # Check which step to send next
                     next_step = current_step + 1
                     # Catch-up: a lead with no nurture_step_sent never got Email 1
-                    # (the sequence opener). The schedule below only covers steps
-                    # 2-7, so such a lead is due immediately for step 1; the next
+                    # 1 (the sequence opener). The schedule below only covers steps
+                    # 2-12, so such a lead is due immediately for step 1; the next
                     # drip run (6h later) sends step 2 onward. Normal leads are
                     # due once their Day-N schedule requirement has elapsed.
                     if current_step < 1:
@@ -791,13 +897,13 @@ class BackgroundTaskRunner:
                                 "activity_id": f"act_{uuid.uuid4().hex[:12]}",
                                 "lead_id": lead["lead_id"],
                                 "action_type": "email",
-                                "content": f"Sent nurture email {sent_step}/13 via MailerCloud",
-                                "created_at": now.isoformat(),
+                                "content": f"Sent nurture email {sent_step}/12 via MailerCloud",
+                                "created_at": now,
                             })
 
                             emails_sent += 1
                             logger.info(
-                                f"Sent nurture email {sent_step}/13 to {lead['email']}"
+                                f"Sent nurture email {sent_step}/12 to {lead['email']}"
                             )
 
                 except Exception as e:
@@ -805,12 +911,237 @@ class BackgroundTaskRunner:
                         f"Failed to send nurture drip to {lead.get('email')}: {e}"
                     )
 
-            logger.info(f"Nurture drip complete: {emails_sent} emails sent")
+            # [drip-metric] sends-per-run metric line (item 1). ratio is sends
+            # vs. eligible cohort; at 100% all eligible due sends fired this run.
+            ratio = (emails_sent / eligible_count) if eligible_count else 0.0
+            logger.info(
+                f"[drip-metric] emails_sent={emails_sent} eligible={eligible_count} "
+                f"cap={DRIP_MAX_PER_RUN} ratio={ratio:.2%} "
+                f"sends_per_run={emails_sent}"
+            )
             return emails_sent
 
         except Exception as e:
             logger.error(f"Error in nurture drip: {e}")
             return 0
+
+    async def _log_drip_activity(self, lead_id, action_type, content):
+        """Write a lead_activities row with a BSON Date created_at (item 5)."""
+        await self.db.lead_activities.insert_one({
+            "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+            "lead_id": lead_id,
+            "action_type": action_type,
+            "content": content,
+            "created_at": datetime.now(timezone.utc),
+        })
+
+    async def send_booking_reminder_emails(self) -> Dict[str, int]:
+        """Send day-before + 1-hour booking reminders for booked calls (item 2).
+
+        Reads booked_call_at from the CRM leads collection (same DB as nurture,
+        already synced from TidyCal every 5 min by sync_tidycal_bookings) so there
+        is no cross-instance dependency on the booking-trustoffice Mongo.
+
+        Runs hourly. Idempotent via reminder_day_before_sent_at /
+        reminder_1h_sent_at flags per lead. Templates are Kenneth-signed and
+        consistent with the existing booking_confirmation style.
+        """
+        logger.info("Running booking reminder check")
+        result: Dict[str, int] = {"day_before": 0, "one_hour": 0}
+        try:
+            from email_service import email_service
+
+            if not email_service.is_configured:
+                logger.warning("Email service not configured, skipping booking reminders")
+                return result
+
+            now = datetime.now(timezone.utc)
+            leads = await self.db.leads.find(
+                {"booked_call": True, "booked_call_at": {"$exists": True, "$ne": None}},
+                {"_id": 0},
+            ).to_list(2000)
+
+            try:
+                from zoneinfo import ZoneInfo
+                tz = ZoneInfo(BOOKING_TZ)
+            except Exception:
+                tz = timezone.utc
+
+            for lead in leads:
+                try:
+                    booked_at = _as_dt(lead.get("booked_call_at"))
+                    if booked_at is None:
+                        continue
+                    lead_id = lead.get("lead_id")
+                    email = lead.get("email")
+                    if not email:
+                        continue
+
+                    local_dt = booked_at.astimezone(tz)
+                    data = {
+                        "name": lead.get("name", ""),
+                        "call_date": local_dt.strftime("%A, %B %d, %Y"),
+                        "call_time": local_dt.strftime("%-I:%M %p"),
+                        "timezone": BOOKING_TZ.replace("_", " "),
+                        "meeting_url": lead.get("meeting_url")
+                        or (email_service.app_url + "/meeting"),
+                    }
+
+                    if (
+                        now + BOOKING_DAY_BEFORE_LOWER <= booked_at <= now + BOOKING_DAY_BEFORE_UPPER
+                        and not lead.get("reminder_day_before_sent_at")
+                    ):
+                        r = await email_service.send_booking_reminder_day_before(
+                            to_email=email, **data
+                        )
+                        if r.get("success"):
+                            await self.db.leads.update_one(
+                                {"lead_id": lead_id},
+                                {"$set": {"reminder_day_before_sent_at": now.isoformat()}},
+                            )
+                            await self._log_drip_activity(
+                                lead_id, "booking_reminder_day_before",
+                                "Sent day-before booking reminder",
+                            )
+                            result["day_before"] += 1
+
+                    if (
+                        now + BOOKING_ONE_HOUR_LOWER <= booked_at <= now + BOOKING_ONE_HOUR_UPPER
+                        and not lead.get("reminder_1h_sent_at")
+                    ):
+                        r = await email_service.send_booking_reminder_1h(
+                            to_email=email, **data
+                        )
+                        if r.get("success"):
+                            await self.db.leads.update_one(
+                                {"lead_id": lead_id},
+                                {"$set": {"reminder_1h_sent_at": now.isoformat()}},
+                            )
+                            await self._log_drip_activity(
+                                lead_id, "booking_reminder_1h",
+                                "Sent 1-hour booking reminder",
+                            )
+                            result["one_hour"] += 1
+                except Exception as e:
+                    logger.error(
+                        f"Booking reminder failed for {lead.get('email')}: {e}"
+                    )
+
+            logger.info(
+                f"[booking-reminder] day_before={result['day_before']} "
+                f"one_hour={result['one_hour']} eligible={len(leads)}"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Error in booking reminders: {e}")
+            return result
+
+    async def send_post_drip_reengagement(self) -> int:
+        """One-time re-engagement for leads that completed the 12-email drip but
+        are still stage=new with zero follow-up (item 3). Uses a distinct
+        template from the nurture sequence. Idempotent via post_drip_reengaged_at.
+        """
+        logger.info("Running post-drip re-engagement check")
+        try:
+            from email_service import email_service
+
+            if not email_service.is_configured:
+                logger.warning("Email service not configured, skipping post-drip re-engagement")
+                return 0
+
+            now = datetime.now(timezone.utc)
+            leads = await self.db.leads.find({
+                "nurture_step_sent": {"$gte": 12},
+                "stage": "new",
+                "post_drip_reengaged_at": {"$in": [None, False]},
+            }, {"_id": 0}).to_list(2000)
+
+            sent = 0
+            for lead in leads:
+                try:
+                    r = await email_service.send_post_drip_reengagement(
+                        to_email=lead["email"],
+                        name=lead.get("name", ""),
+                        course_url=f"{email_service.app_url}/trustee-101",
+                        booking_url=f"{email_service.app_url}/book",
+                    )
+                    if r.get("success"):
+                        await self.db.leads.update_one(
+                            {"lead_id": lead.get("lead_id")},
+                            {"$set": {
+                                "stage": "post_drip",
+                                "post_drip_reengaged_at": now.isoformat(),
+                            }},
+                        )
+                        await self._log_drip_activity(
+                            lead.get("lead_id"), "post_drip_reengagement",
+                            "Sent one-time post-drip re-engagement email",
+                        )
+                        sent += 1
+                except Exception as e:
+                    logger.error(
+                        f"Post-drip re-engagement failed for {lead.get('email')}: {e}"
+                    )
+
+            logger.info(f"[post-drip] reengaged={sent} eligible={len(leads)}")
+            return sent
+        except Exception as e:
+            logger.error(f"Error in post-drip re-engagement: {e}")
+            return 0
+
+    async def backfill_lead_activities_dates(self) -> int:
+        """Backfill lead_activities.created_at ISO strings to BSON Dates (item 5).
+
+        New writes use BSON Date; this converts existing string docs. Idempotent:
+        only touches docs where created_at is currently a string; once converted
+        the $type filter matches nothing.
+        """
+        try:
+            now = datetime.now(timezone.utc)
+            try:
+                cursor = self.db.lead_activities.find(
+                    {"created_at": {"$type": "string"}}, {"_id": 1, "created_at": 1}
+                )
+                docs = await cursor.to_list(5000)
+            except Exception:
+                # Fallback for drivers/mocks without $type support: scan + filter.
+                cursor = self.db.lead_activities.find(
+                    {"created_at": {"$exists": True}}, {"_id": 1, "created_at": 1}
+                )
+                docs = await cursor.to_list(5000)
+                docs = [d for d in docs if isinstance(d.get("created_at"), str)]
+
+            converted = 0
+            for doc in docs:
+                dt = _as_dt(doc.get("created_at"))
+                if dt is None:
+                    continue
+                await self.db.lead_activities.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {
+                        "created_at": dt,
+                        "created_at_backfilled_at": now.isoformat(),
+                    }},
+                )
+                converted += 1
+
+            logger.info(
+                f"[backfill] lead_activities created_at strings->Date: {converted}"
+            )
+            return converted
+        except Exception as e:
+            logger.error(f"Error backfilling lead_activities dates: {e}")
+            return 0
+
+    async def check_leads_pipeline_health(self) -> dict:
+        """Run the leads pipeline monitor asserts and RED-alert on failure (item 4)."""
+        from leads_monitor import check_leads_pipeline_health as _run
+        return await _run(self.db)
+
+    async def check_compliance_reminder_health(self) -> dict:
+        """Run the state-compliance reminder monitor asserts + RED-alert (item 4)."""
+        from compliance_monitor import check_compliance_reminder_health as _run
+        return await _run(self.db)
 
     async def create_daily_health_snapshots(self) -> int:
         """
@@ -850,7 +1181,7 @@ class BackgroundTaskRunner:
         result = await calculate_health_score(trust_id, user_id, save_snapshot=True)
         return result
 
-    async def send_deadline_reminders(self) -> int:
+    async def send_deadline_reminders(self) -> dict:
         """
         Check upcoming deadlines and send reminder emails for any whose
         days_remaining matches one of their reminder_days_before thresholds.
@@ -864,8 +1195,8 @@ class BackgroundTaskRunner:
             from email_service import email_service
 
             if not email_service.is_configured:
-                logger.warning("Email service not configured — skipping deadline reminders")
-                return 0
+                logger.warning("Email service not configured â skipping deadline + compliance reminders")
+                return {"task_deadlines": 0, "compliance": 0}
 
             today = datetime.now(timezone.utc).date()
             reminders_sent = 0
@@ -961,11 +1292,173 @@ class BackgroundTaskRunner:
                         f"Failed to send deadline reminder for {deadline.get('deadline_id')}: {e}"
                     )
 
-            logger.info(f"Deadline reminders complete: {reminders_sent} emails sent")
-            return reminders_sent
+            compliance_count = await self.send_compliance_deadline_reminders()
+            logger.info(
+                f"Deadline reminders complete: task={reminders_sent}, compliance={compliance_count}"
+            )
+            return {"task_deadlines": reminders_sent, "compliance": compliance_count}
 
         except Exception as e:
             logger.error(f"Error in deadline reminder job: {e}")
+            return {"task_deadlines": 0, "compliance": 0}
+
+    async def send_compliance_deadline_reminders(self) -> int:
+        """Scan trust_state_compliance for upcoming/overdue state-compliance
+        deadlines (beneficiary notice + annual accounting) and send reminder
+        emails. Each (field, episode) reminder fires at most once via a per-field
+        sent-marker stored in compliance_reminder_sent (a dict mapping
+        'notice'/'accounting' to a list of threshold markers, e.g. 'upcoming'
+        and 'overdue'), added with $addToSet so it never repeats daily.
+
+        Returns the number of reminder emails sent.
+        """
+        logger.info("Running state-compliance deadline reminder job")
+
+        try:
+            from email_service import email_service
+
+            if not email_service.is_configured:
+                logger.warning("Email service not configured Ã¢ÂÂ skipping compliance reminders")
+                return 0
+
+            today = datetime.now(timezone.utc).date()
+            reminders_sent = 0
+
+            # All state-compliance records. We filter in Python for transition
+            # robustness (mirrors send_deadline_reminders), since the per-field
+            # "is this a real date" check is non-trivial.
+            cursor = self.db.trust_state_compliance.find({}, {"_id": 0})
+            records = await cursor.to_list(5000)
+
+            # Cache lookups (same pattern as send_deadline_reminders).
+            trust_cache: dict = {}
+            user_cache: dict = {}
+
+            for rec in records:
+                try:
+                    if not rec.get("trust_id"):
+                        continue
+
+                    sent_markers = rec.get("compliance_reminder_sent") or {}
+                    compliance_id = rec.get("compliance_id") or (
+                        f"sc_{rec.get('trust_id')}_{rec.get('state_code')}"
+                    )
+
+                    for field in ("notice", "accounting"):
+                        due_raw = rec.get(f"{field}_next_due")
+                        # Treat ('null', None, missing, '') as "no deadline".
+                        if due_raw in (None, "null", "", "None"):
+                            continue
+                        try:
+                            due = datetime.fromisoformat(str(due_raw)[:10]).date()
+                        except (ValueError, TypeError):
+                            continue
+
+                        days_remaining = (due - today).days
+                        # Remind only inside the 30-day upcoming window, or when
+                        # overdue. Later than 30 days out -> not yet in scope.
+                        if days_remaining > 30:
+                            continue
+                        marker = "overdue" if days_remaining < 0 else "upcoming"
+
+                        field_markers = set(sent_markers.get(field, []) or [])
+                        if marker in field_markers:
+                            continue  # already reminded for this episode
+
+                        # Resolve trust (cached).
+                        trust_id = rec.get("trust_id")
+                        if trust_id not in trust_cache:
+                            trust_cache[trust_id] = await self.db.trusts.find_one(
+                                {"trust_id": trust_id}, {"_id": 0}
+                            )
+                        trust = trust_cache[trust_id]
+                        if not trust:
+                            continue
+
+                        # Resolve recipient user (cached).
+                        user_id = trust.get("user_id")
+                        if user_id not in user_cache:
+                            user_cache[user_id] = await self.db.users.find_one(
+                                {"user_id": user_id}, {"_id": 0}
+                            )
+                        recipient = user_cache[user_id]
+                        if not recipient or not recipient.get("email"):
+                            continue
+
+                        act = (
+                            "beneficiary notice"
+                            if field == "notice"
+                            else "annual accounting"
+                        )
+                        state_code = (
+                            rec.get("state_code") or trust.get("state_code") or ""
+                        )
+                        state_name = (
+                            trust.get("state_name")
+                            or rec.get("state_name")
+                            or ""
+                        )
+
+                        template_data = {
+                            "user_name": recipient.get("name")
+                            or recipient.get("email").split("@")[0],
+                            "trust_name": trust.get("trust_name", "your trust"),
+                            "state_code": state_code,
+                            "state_name": state_name,
+                            "act": act,
+                            "due_date": due.isoformat(),
+                            "is_overdue": days_remaining < 0,
+                        }
+                        if days_remaining < 0:
+                            template_data["days_overdue"] = abs(days_remaining)
+                        else:
+                            template_data["days_remaining"] = days_remaining
+
+                        await email_service.send_templated_email(
+                            to_email=recipient["email"],
+                            template_name="compliance_deadline_reminder",
+                            template_data=template_data,
+                            to_name=recipient.get("name"),
+                            tag="compliance_reminder",
+                        )
+
+                        # Mark this episode as reminded (idempotent via $addToSet).
+                        await self.db.trust_state_compliance.update_one(
+                            {"trust_id": trust_id, "state_code": state_code},
+                            {
+                                "$addToSet": {f"compliance_reminder_sent.{field}": marker},
+                                "$set": {
+                                    "updated_at": datetime.now(timezone.utc).isoformat()
+                                },
+                            },
+                        )
+
+                        # Audit trail so the health monitor can detect recent sends.
+                        try:
+                            await self._log_audit(
+                                user_id,
+                                "compliance_reminder_sent",
+                                "trust_state_compliance",
+                                compliance_id,
+                                {"field": field, "act": act, "due_date": due.isoformat()},
+                            )
+                        except Exception:
+                            pass
+
+                        reminders_sent += 1
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to send compliance reminder for {rec.get('trust_id')}: {e}"
+                    )
+
+            logger.info(
+                f"Compliance deadline reminders complete: {reminders_sent} emails sent"
+            )
+            return reminders_sent
+
+        except Exception as e:
+            logger.error(f"Error in compliance deadline reminder job: {e}")
             return 0
 
     async def _log_audit(
@@ -1038,7 +1531,7 @@ async def run_health_snapshots() -> int:
         runner.client.close()
 
 
-async def run_deadline_reminders() -> int:
+async def run_deadline_reminders() -> dict:
     """Manual trigger for deadline reminders"""
     runner = BackgroundTaskRunner()
     runner.client = AsyncIOMotorClient(MONGO_URL)
@@ -1047,5 +1540,63 @@ async def run_deadline_reminders() -> int:
     try:
         result = await runner.send_deadline_reminders()
         return result
+    finally:
+        runner.client.close()
+
+
+# ---- Item 2/3/4/5 manual triggers ----------------------------------------
+
+
+async def run_booking_reminders():
+    """Manual trigger for booking reminders (item 2)."""
+    runner = BackgroundTaskRunner()
+    runner.client = AsyncIOMotorClient(MONGO_URL)
+    runner.db = runner.client[DB_NAME]
+    try:
+        return await runner.send_booking_reminder_emails()
+    finally:
+        runner.client.close()
+
+
+async def run_post_drip_reengagement() -> int:
+    """Manual trigger for post-drip re-engagement (item 3)."""
+    runner = BackgroundTaskRunner()
+    runner.client = AsyncIOMotorClient(MONGO_URL)
+    runner.db = runner.client[DB_NAME]
+    try:
+        return await runner.send_post_drip_reengagement()
+    finally:
+        runner.client.close()
+
+
+async def run_leads_pipeline_health() -> dict:
+    """Manual trigger for the pipeline health monitor (item 4)."""
+    runner = BackgroundTaskRunner()
+    runner.client = AsyncIOMotorClient(MONGO_URL)
+    runner.db = runner.client[DB_NAME]
+    try:
+        return await runner.check_leads_pipeline_health()
+    finally:
+        runner.client.close()
+
+
+async def run_compliance_reminder_health() -> dict:
+    """Manual trigger for the state-compliance reminder health monitor (item 4)."""
+    runner = BackgroundTaskRunner()
+    runner.client = AsyncIOMotorClient(MONGO_URL)
+    runner.db = runner.client[DB_NAME]
+    try:
+        return await runner.check_compliance_reminder_health()
+    finally:
+        runner.client.close()
+
+
+async def run_backfill_activity_dates() -> int:
+    """Manual trigger for the lead_activities date backfill (item 5)."""
+    runner = BackgroundTaskRunner()
+    runner.client = AsyncIOMotorClient(MONGO_URL)
+    runner.db = runner.client[DB_NAME]
+    try:
+        return await runner.backfill_lead_activities_dates()
     finally:
         runner.client.close()

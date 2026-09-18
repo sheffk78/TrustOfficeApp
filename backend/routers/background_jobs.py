@@ -6,7 +6,17 @@ from fastapi import APIRouter, HTTPException, Depends
 import logging
 
 from dependencies import get_current_user
-from background_tasks import background_runner, run_task_status_update, run_daily_reminders, run_health_snapshots
+from background_tasks import (
+    background_runner,
+    run_task_status_update,
+    run_daily_reminders,
+    run_health_snapshots,
+    run_booking_reminders,
+    run_post_drip_reengagement,
+    run_leads_pipeline_health,
+    run_backfill_activity_dates,
+    run_deadline_reminders,
+)
 
 router = APIRouter(prefix="/background-jobs", tags=["background-jobs"])
 logger = logging.getLogger(__name__)
@@ -64,4 +74,73 @@ async def trigger_health_snapshots(user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"Error running health snapshots: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/run/booking-reminders")
+async def trigger_booking_reminders(user: dict = Depends(get_current_user)):
+    """Manually trigger booking day-before + 1-hour reminders (item 2)."""
+    try:
+        result = await run_booking_reminders()
+        return {"success": True, "message": "Booking reminders run", "result": result}
+    except Exception as e:
+        logger.error(f"Error running booking reminders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/run/post-drip-reengagement")
+async def trigger_post_drip_reengagement(user: dict = Depends(get_current_user)):
+    """Manually trigger post-drip re-engagement send (item 3)."""
+    try:
+        sent = await run_post_drip_reengagement()
+        return {"success": True, "message": "Post-drip re-engagement run", "emails_sent": sent}
+    except Exception as e:
+        logger.error(f"Error running post-drip re-engagement: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/run/leads-pipeline-health")
+async def trigger_leads_pipeline_health(user: dict = Depends(get_current_user)):
+    """Manually trigger the leads pipeline health monitor (item 4)."""
+    try:
+        result = await run_leads_pipeline_health()
+        return {"success": True, "message": "Pipeline health check run", "result": result}
+    except Exception as e:
+        logger.error(f"Error running pipeline health: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/run/backfill-activity-dates")
+async def trigger_backfill_activity_dates(user: dict = Depends(get_current_user)):
+    """Manually trigger lead_activities.created_at string->Date backfill (item 5)."""
+    try:
+        converted = await run_backfill_activity_dates()
+        return {"success": True, "message": "Backfill run", "converted": converted}
+    except Exception as e:
+        logger.error(f"Error running backfill: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/run/deadline-reminders")
+async def trigger_deadline_reminders(user: dict = Depends(get_current_user)):
+    """Manually trigger the daily deadline + state-compliance reminder job.
+
+    Returns a breakdown dict: {'task_deadlines': n, 'compliance': n}.
+    """
+    try:
+        result = await run_deadline_reminders()
+        return {"success": True, "message": "Deadline reminders run", "result": result}
+    except Exception as e:
+        logger.error(f"Error running deadline reminders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/run/compliance-reminder-health")
+async def trigger_compliance_reminder_health(user: dict = Depends(get_current_user)):
+    """Manually trigger the state-compliance reminder health monitor (item 4)."""
+    try:
+        result = await run_compliance_reminder_health()
+        return {"success": True, "message": "Compliance reminder health check run", "result": result}
+    except Exception as e:
+        logger.error(f"Error running compliance reminder health: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,7 +1,7 @@
 # Minutes router - handles minutes records and templates
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from pydantic import BaseModel
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import uuid
 import base64
@@ -212,6 +212,7 @@ async def _auto_create_draft_asset_from_minutes(
 
 
 from routers.template_registry import get_template_registry, get_template_definition, build_ai_prompt
+from routers.state_compliance import log_compliance_document
 from pdf_utils import NAVY, GRAY, create_doc_template
 
 router = APIRouter(tags=["minutes"])
@@ -1368,6 +1369,76 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
 
 # ==================== MINUTES TEMPLATES ENDPOINTS ====================
 
+# ==================== STATE COMPLIANCE AUTO-RECORD ====================
+# Shared with beneficiary_reports.py: when a trustee actually performs a
+# compliance act (sends the periodic notice, generates an accounting), record
+# it on the trust's state-compliance record so the deadline tracking updates.
+# Only acts when the trust's state has a seeded compliance profile; otherwise
+# this is a silent no-op.
+
+_ACCOUNTING_FREQUENCY_DAYS = {"annual": 365, "quarterly": 90, "monthly": 30}
+
+
+def compute_notice_next_due(sent_dt: datetime, profile: Optional[dict]) -> str:
+    """Deterministic: notice_last_sent + profile.notice_timing_days (fallback 365)."""
+    timing_days = profile.get("notice_timing_days", 365) if profile else 365
+    return (sent_dt + timedelta(days=timing_days)).date().isoformat()
+
+
+def compute_accounting_next_due(sent_dt: datetime, profile: Optional[dict]) -> str:
+    """Deterministic: accounting_last_sent + frequency days (fallback annual)."""
+    freq = profile.get("accounting_frequency", "annual") if profile else "annual"
+    freq_days = _ACCOUNTING_FREQUENCY_DAYS.get(freq, 365)
+    return (sent_dt + timedelta(days=freq_days)).date().isoformat()
+
+
+async def record_compliance_act(trust: dict, kind: str, sent_dt: Optional[datetime] = None) -> Optional[dict]:
+    """Record a compliance act ('notice' | 'accounting') performed for a trust.
+
+    Looks up the state-compliance profile for the trust's state; if the state is
+    not seeded (no profile), skips silently and returns None. Otherwise sets
+    {kind}_last_sent to now and computes {kind}_next_due deterministically.
+    """
+    if kind not in ("notice", "accounting"):
+        return None
+    state_code = (trust.get("state_code") or "").upper()
+    if not state_code:
+        return None
+    profile = await db.state_compliance_profiles.find_one({"_id": state_code}, {"_id": 0})
+    if not profile:
+        return None  # unseeded state: skip silently
+
+    sent_dt = sent_dt or datetime.now(timezone.utc)
+    last_field = f"{kind}_last_sent"
+    next_field = f"{kind}_next_due"
+    update = {
+        last_field: sent_dt.isoformat(),
+        "updated_at": sent_dt.isoformat(),
+    }
+    if kind == "notice":
+        update[next_field] = compute_notice_next_due(sent_dt, profile)
+    else:
+        update[next_field] = compute_accounting_next_due(sent_dt, profile)
+
+    await db.trust_state_compliance.update_one(
+        {"trust_id": trust["trust_id"], "state_code": state_code},
+        {"$set": update},
+        upsert=True,
+    )
+    return update
+
+
+async def _lookup_state_notice_context(trust: dict):
+    """Return (state_name, notice_timing_days) for the trust's state, or (None, None)."""
+    state_code = (trust.get("state_code") or "").upper()
+    if not state_code:
+        return None, None
+    profile = await db.state_compliance_profiles.find_one({"_id": state_code}, {"_id": 0})
+    if not profile:
+        return None, None
+    return profile.get("state_name"), profile.get("notice_timing_days")
+
+
 # Dispatch table: template_type -> content generator function.
 # Functions that take (trust, data) are wrapped to match the (data) signature.
 def _dispatch_template_content(template_type: str, trust: dict, template_data: dict) -> str:
@@ -1409,6 +1480,7 @@ def _dispatch_template_content(template_type: str, trust: dict, template_data: d
         "general_assignment": lambda d: generate_general_assignment_content(d),
         "spending_authorization": lambda d: generate_spending_authorization_content(d),
         "beneficiary_distribution_notice": lambda d: generate_beneficiary_distribution_notice_content(d),
+        "beneficiary_periodic_notice": lambda d: generate_beneficiary_periodic_notice_content(d),
         "evaluate_distribution": lambda d: generate_evaluate_distribution_content(d),
     }
     gen = _generators.get(template_type)
@@ -1524,9 +1596,15 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
         template_data.setdefault("ein", trust.get("ein", ""))
         template_data.setdefault("state_code", trust.get("jurisdiction", "") or trust.get("state_code", ""))
 
+    # Enrich template_data with trust context for the periodic notice letter
+    # (state name + notice window come from the trust's state profile)
+    if template_type == "beneficiary_periodic_notice":
+        template_data.setdefault("trust_name", trust_name)
+        template_data.setdefault("trustee_name", ", ".join(trustee_names))
+
     # Generate template-specific content via dispatch table
     doc += _dispatch_template_content(template_type, trust, template_data)
-    
+
     # Add adjournment and certification
     doc += f"""
 ═══════════════════════════════════════════════════════════════════════════════
@@ -4448,6 +4526,81 @@ Effective Date: Immediately upon adoption
     return content
 
 
+def generate_beneficiary_periodic_notice_content(data: dict) -> str:
+    """Generate content for the state-required periodic beneficiary notice (formal letter).
+
+    Letter form (not resolution form): from the trustee(s), to the beneficiaries
+    of the trust, stating that the trustee is providing the periodic notice
+    required by the trust's state, referencing the notice window, inviting
+    questions/objections, and closing with a professional signature block.
+    """
+    trust_name = data.get("trust_name", "[Trust Name]")
+    notice_date = data.get("notice_date") or datetime.now().strftime("%B %d, %Y")
+    notice_date = _fmt_iso_date(notice_date)
+    trustee_name = data.get("trustee_name", "[Trustee Name]")
+    state_name = data.get("state_name") or "[State]"
+    notice_days = data.get("notice_days")
+    notice_window = (
+        f"{notice_days} days" if notice_days else "the period required by applicable law"
+    )
+    trustee_contact = data.get("trustee_contact") or "[Trustee contact information]"
+    additional_context = data.get("additional_context") or ""
+
+    content = f"""Beneficiary Periodic Notice
+
+{trust_name}
+
+Date: {notice_date}
+
+TO: All Beneficiaries of {trust_name}
+
+FROM: {trustee_name}, Trustee of {trust_name}
+
+RE: Periodic Notice to Beneficiaries — {state_name}
+
+Dear Beneficiaries:
+
+This letter constitutes the periodic written notice to the beneficiaries of
+{trust_name}, provided in accordance with the periodic notice requirements of
+{state_name} and the terms of the Trust Indenture.
+
+The Trustee is required to provide written notice to beneficiaries at least once
+every {notice_window}. This letter satisfies that requirement for the current
+notice period.
+
+As beneficiaries of the Trust, you are entitled to be informed regarding the
+administration of the Trust. If you have any questions concerning the Trust, its
+administration, or your interest in the Trust, or if you wish to raise any
+objection regarding the administration of the Trust, please submit your questions
+or objections in writing to the Trustee at:
+
+    {trustee_contact}
+
+The Trustee will respond to any questions or objections received within a
+reasonable time.
+"""
+    if additional_context:
+        content += f"""
+Additional Information:
+
+{additional_context}
+"""
+    content += f"""
+Sincerely,
+
+
+_______________________________
+{trustee_name}
+Trustee, {trust_name}
+Date: {notice_date}
+
+This notice is a fiduciary communication from the Trustee of {trust_name}.
+Please retain this letter for your records.
+
+"""
+    return content
+
+
 def generate_evaluate_distribution_content(data: dict) -> str:
     """Generate content for distribution evaluation record"""
     beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
@@ -4512,6 +4665,16 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
     
     minutes_id = f"min_{uuid.uuid4().hex[:12]}"
     
+    # Periodic notice: resolve state context (state_name, notice window) from
+    # the trust's state profile so the letter cites the right state/window.
+    if template.template_type.value == "beneficiary_periodic_notice":
+        try:
+            state_name, notice_days = await _lookup_state_notice_context(trust)
+            template.template_data.setdefault("state_name", state_name)
+            template.template_data.setdefault("notice_days", notice_days)
+        except Exception:
+            pass
+    
     # Generate the document
     generated_doc = generate_template_document(trust, template.template_type.value, template.template_data)
     
@@ -4540,6 +4703,31 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
         await auto_update_onboarding(user["user_id"], template.trust_id)
     except Exception:
         pass
+    
+    # Auto-record the compliance act: creating a periodic beneficiary notice IS
+    # sending the notice — mark notice_last_sent/notice_next_due on the trust's
+    # state-compliance record (no-op for states without a seeded profile).
+    if template.template_type.value == "beneficiary_periodic_notice":
+        try:
+            await record_compliance_act(trust, "notice")
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "state-compliance auto-record failed for trust %s", template.trust_id, exc_info=True
+            )
+        # Track the generated notice in the delivery log (Generated status).
+        try:
+            await log_compliance_document(
+                template.trust_id,
+                user["user_id"],
+                minutes_id,
+                "notice",
+                method="minutes-templates",
+                notes="Generated from Beneficiary Notice template",
+            )
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "delivery-log auto-entry failed for trust %s", template.trust_id, exc_info=True
+            )
     
     # If accepting property or conveying property and add_to_schedule_a is true, add to Schedule A
     CONVEYANCE_TEMPLATES = {"acceptance_of_property", "bill_of_sale", "assignment_of_personal_property", "general_assignment"}
