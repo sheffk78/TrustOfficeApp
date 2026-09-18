@@ -116,24 +116,51 @@ async def move_to_paid_list(email: str, name: str = None):
 
 
 async def remove_contact_from_list(email: str, list_id: str, list_name: str = "list"):
-    """Remove a contact from a Mailercloud list by email."""
+    """Remove a contact from Mailercloud by deleting the contact record.
+
+    2026-09-18 fix: the old implementation sent DELETE /v1/contacts with a JSON
+    body {email, list_id} — MailerCloud has no such route and returns 405
+    "Method not allowed", so this function NEVER succeeded (silently breaking
+    move_to_paid_list's remove-from-leads step: converted members kept getting
+    nurture emails). Correct API per apidoc.mailercloud.com: DELETE
+    /v1/contacts/{id-or-email} with the identifier in the PATH, no body.
+    Deletion is contact-level (all lists) — that is the intended semantics for
+    lost leads and for post-conversion list hygiene.
+    """
     if not MAILERCLOUD_API_KEY:
         logger.warning("Mailercloud API key not configured, skipping list removal")
         return {"success": False, "error": "API key not configured"}
 
+    from urllib.parse import quote
+
     try:
         async with httpx.AsyncClient() as client:
-            # MailerCloud DELETE endpoint for removing a contact from a list
+            # Resolve the contact id first: DELETE by email path returns 404
+            # even when the contact exists (probed 2026-09-18 — GET/DELETE by
+            # email are inconsistent). GET /v1/contacts/{email} -> id, then
+            # DELETE /v1/contacts/{id}.
+            get_r = await client.get(
+                f"{MAILERCLOUD_API_URL}/{quote(email, safe='')}",
+                headers={"Authorization": MAILERCLOUD_API_KEY},
+                timeout=10.0,
+            )
+            if get_r.status_code == 404:
+                logger.info(f"Contact {email} not found on Mailercloud {list_name} — nothing to remove")
+                return {"success": True, "email": email, "list": list_name, "note": "not_on_list"}
+            if get_r.status_code != 200:
+                logger.error(f"Failed to look up {email} on Mailercloud: {get_r.status_code} - {get_r.text}")
+                return {"success": False, "error": get_r.text}
+            contact_id = (get_r.json().get("data") or {}).get("id")
+            if not contact_id:
+                return {"success": False, "error": f"No contact id in lookup response for {email}"}
+
+            # MailerCloud Delete Contact: DELETE /v1/contacts/{id}
             response = await client.request(
                 "DELETE",
-                f"https://cloudapi.mailercloud.com/v1/contacts",
+                f"{MAILERCLOUD_API_URL}/{contact_id}",
                 headers={
                     "Authorization": MAILERCLOUD_API_KEY,
                     "Content-Type": "application/json"
-                },
-                json={
-                    "email": email,
-                    "list_id": list_id
                 },
                 timeout=10.0
             )
