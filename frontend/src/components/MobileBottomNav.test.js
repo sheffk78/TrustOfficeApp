@@ -5,10 +5,14 @@
  * sheet already contained State Compliance / Risk Dashboard / Audit Trail, but
  * isSubActive()/isActive() compared location.pathname only, so query-string
  * routes (e.g. /governance?tab=state) never rendered as active after
- * navigation. These tests pin the pathname+search matching.
+ * navigation. These tests pin the pathname+search matching, plus the State
+ * Compliance entry's icon/label/route/visibility contract (MapPin icon,
+ * /governance?tab=state href, visible to every logged-in user regardless of
+ * admin or benevolence flags — visibility itself is enforced app-wide by
+ * ProtectedRoute, since no public page embeds this nav).
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { useAuth } from '@/context/AuthContext';
 
@@ -95,5 +99,65 @@ describe('MobileBottomNav active state for query-string routes', () => {
     expect(screen.getByTestId('mobile-more-trust-health')).toHaveClass('active');
     expect(screen.getByTestId('mobile-more-state-compliance')).not.toHaveClass('active');
     expect(screen.getByTestId('mobile-more-risk-dashboard')).not.toHaveClass('active');
+  });
+});
+
+describe('MobileBottomNav State Compliance entry — icon/label/visibility contract', () => {
+  const openMore = () => {
+    render(<MobileBottomNav />);
+    fireEvent.click(screen.getByTestId('mobile-nav-more'));
+    return within(screen.getByTestId('mobile-more-state-compliance'));
+  };
+
+  it('State Compliance entry follows the nav pattern: MapPin icon, label, href, no gating flags', () => {
+    useAuth.mockReturnValue({ selectedTrust: { trust_id: 't1' }, user: null });
+    setLocation({ pathname: '/dashboard' });
+    const item = openMore();
+
+    // Icon pattern: MapPin rendered inside the item, same lucide pattern as siblings
+    expect(item.getByTestId('icon-MapPin')).toBeInTheDocument();
+    // Label pattern: visible "State Compliance" text
+    expect(item.getByText('State Compliance')).toBeInTheDocument();
+    // Route: /governance with the state tab selected
+    expect(screen.getByTestId('mobile-more-state-compliance')).toHaveAttribute('href', '/governance?tab=state');
+  });
+
+  it('entry is visible to a standard (non-admin) logged-in user — same as other More entries', () => {
+    useAuth.mockReturnValue({
+      selectedTrust: { trust_id: 't1' },
+      user: { email: 'trustee@example.com', is_admin: false },
+    });
+    setLocation({ pathname: '/dashboard' });
+    openMore();
+
+    expect(screen.getByTestId('mobile-more-state-compliance')).toBeInTheDocument();
+    // Standard entries stay visible for non-admins; only the Admin group is admin-gated
+    expect(screen.queryByTestId('mobile-more-leads')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mobile-more-admin-panel')).not.toBeInTheDocument();
+  });
+
+  it('entry is visible to an admin user', () => {
+    useAuth.mockReturnValue({
+      selectedTrust: { trust_id: 't1' },
+      user: { email: 'contact@trustoffice.app', is_admin: true },
+    });
+    setLocation({ pathname: '/dashboard' });
+    openMore();
+
+    expect(screen.getByTestId('mobile-more-state-compliance')).toBeInTheDocument();
+    // Admin-gated group appears only for admins, mirroring the sidebar's isAdmin check
+    expect(screen.getByTestId('mobile-more-leads')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-more-admin-panel')).toBeInTheDocument();
+  });
+
+  it('is not benevolence-gated: renders even when the trust has benevolence disabled', () => {
+    useAuth.mockReturnValue({
+      selectedTrust: { trust_id: 't1', benevolence_enabled: false },
+      user: { email: 'trustee@example.com', is_admin: false },
+    });
+    setLocation({ pathname: '/dashboard' });
+    openMore();
+
+    expect(screen.getByTestId('mobile-more-state-compliance')).toBeInTheDocument();
   });
 });
