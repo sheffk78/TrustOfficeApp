@@ -105,6 +105,7 @@ EMAIL_METHODS = [
     "send_booking_reminder_1h",
     "send_post_drip_reengagement",
     "send_lead_welcome",
+    "send_lead_reengagement",
 ]
 
 
@@ -201,7 +202,55 @@ async def test_drip_excludes_booked_and_converted(runner, db):
     assert sent == 0
 
 
-# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_reengagement_excludes_lost(runner, db):
+    """2026-09-18 fix: the 3-day re-engagement nudge must skip lost leads —
+    Jeff marks bad/wrong-number leads lost from the admin."""
+    await db.leads.insert_one(_make_lead("RE1", lessons_watched=0))                     # eligible
+    await db.leads.insert_one(_make_lead("RE2", stage="lost", lessons_watched=0))       # excluded
+    await db.leads.insert_one(_make_lead("RE3", stage="converted", lessons_watched=0))  # excluded
+    sent = await runner.send_lead_reengagement_emails()
+    assert sent == 1
+    lost = await db.leads.find_one({"lead_id": "RE2"})
+    assert not lost.get("reengagement_sent_at")
+
+
+@pytest.mark.asyncio
+async def test_drip_excludes_lost(runner, db):
+    """2026-09-18 fix: leads marked lost (bad number / wrong number / closed)
+    must not receive further nurture emails — Jeff closed that lane manually."""
+    await db.leads.insert_one(_make_lead("LOST1", stage="lost", manual_stage_override=True))
+    await db.leads.insert_one(_make_lead("OK1"))  # control: new lead still enrolled
+    sent = await runner.send_nurture_drip_emails()
+    assert sent == 1  # only the control
+    lost = await db.leads.find_one({"lead_id": "LOST1"})
+    ok = await db.leads.find_one({"lead_id": "OK1"})
+    assert lost.get("nurture_step_sent", 0) in (0, None)  # untouched
+    assert ok["nurture_step_sent"] == 1
+
+
+@pytest.mark.asyncio
+async def test_drip_sweep_removes_lost_from_mailercloud(runner, db, monkeypatch):
+    """2026-09-18 fix: the standing sweep drops lost leads from the MailerCloud
+    Leads list (idempotent via mailercloud_removed_at) and logs an activity."""
+    mailercloud_module.remove_contact_from_list = AsyncMock(
+        return_value={"success": True}
+    )
+    await db.leads.insert_one(_make_lead("SWEEP1", stage="lost"))
+    await db.leads.insert_one(_make_lead("SWEEP2", stage="new"))
+    sent = await runner.send_nurture_drip_emails()
+    assert mailercloud_module.remove_contact_from_list.call_count == 1
+    lost = await db.leads.find_one({"lead_id": "SWEEP1"})
+    assert lost["mailercloud_removed_at"]
+    act = await db.lead_activities.find_one({"lead_id": "SWEEP1",
+                                             "action_type": "mailercloud_removed"})
+    assert act is not None
+    # Idempotent: second run makes no further remove calls.
+    await runner.send_nurture_drip_emails()
+    assert mailercloud_module.remove_contact_from_list.call_count == 1
+
+
+# ---------------------------------------------------------------------------
 # Item 2: Booking reminders
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio

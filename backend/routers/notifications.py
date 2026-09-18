@@ -192,11 +192,12 @@ async def get_lead_triage(
         {"_id": 0},
     ).sort("created_at", -1).limit(10).to_list(10)
 
-    # Booked calls not yet converted
+    # Booked calls not yet converted (2026-09-18: lost excluded — closed leads
+    # are no longer actionable work and inflate the daily work queue)
     booked_calls = await db.leads.find(
         {
             "booked_call": True,
-            "stage": {"$ne": "converted"},
+            "stage": {"$nin": ["converted", "lost"]},
         },
         {"_id": 0},
     ).sort("booked_call_at", -1).limit(10).to_list(10)
@@ -210,11 +211,11 @@ async def get_lead_triage(
         {"_id": 0},
     ).sort("score", -1).limit(10).to_list(10)
 
-    # High-score idle: score >= 60, not converted
+    # High-score idle: score >= 60, not converted/lost (2026-09-18 fix)
     high_score = await db.leads.find(
         {
             "score": {"$gte": 60},
-            "stage": {"$ne": "converted"},
+            "stage": {"$nin": ["converted", "lost"]},
         },
         {"_id": 0},
     ).sort("score", -1).limit(5).to_list(5)

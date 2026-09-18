@@ -655,10 +655,14 @@ class BackgroundTaskRunner:
             # as a BSON Date or a legacy ISO string (mixed across the codebase).
             # A DB-level `created_at: {$lte: cutoff}` would silently exclude
             # whichever type doesn't match the cutoff type.
+            # 2026-09-18 fix: exclude lost leads. Jeff marks bad/wrong-number
+            # leads lost from the admin — the re-engagement nudge must not email
+            # them (their only contact channel left is email, and Jeff
+            # deliberately closed that lane when he marked them lost).
             leads = await self.db.leads.find({
                 "lessons_watched": 0,
                 "reengagement_sent_at": None,
-                "stage": {"$ne": "converted"},
+                "stage": {"$nin": ["converted", "lost"]},
             }, {"_id": 0}).to_list(200)
 
             eligible = []
@@ -742,7 +746,12 @@ class BackgroundTaskRunner:
         """
         logger.info("Running nurture drip check (7-email MailerCloud sequence)")
         try:
-            from mailercloud_service import send_nurture_email_via_mailercloud, MAILERCLOUD_API_KEY
+            from mailercloud_service import (
+                send_nurture_email_via_mailercloud,
+                MAILERCLOUD_API_KEY,
+                remove_contact_from_list,
+                MAILERCLOUD_LEADS_LIST_ID,
+            )
 
             if not MAILERCLOUD_API_KEY:
                 logger.warning("MailerCloud API key not configured, skipping nurture drip")
@@ -782,12 +791,15 @@ class BackgroundTaskRunner:
             # leads were silently skipped by every drip run forever. `$not: {$gt: 0}`
             # matches missing, null, False, AND integer 0 — superset of the old
             # branch, still excludes 13+ (sequence-complete) via the $or first arm.
+            # 2026-09-18 fix: exclude lost leads — Jeff marks bad/wrong-number
+            # leads lost from the admin; the drip must not keep emailing them.
+            # (Joy Giesen got nurture 4 AFTER being marked lost 2026-09-15.)
             leads = await self.db.leads.find({
                 "$or": [
                     {"nurture_step_sent": {"$exists": True, "$gte": 1, "$lt": 13}},
                     {"nurture_step_sent": {"$not": {"$gt": 0}}},
                 ],
-                "stage": {"$ne": "converted"},
+                "stage": {"$nin": ["converted", "lost"]},
                 # Booked leads are owned by the post-meeting flow (see
                 # leads/MEETING-PROCESS.md). Booking is the conversion event:
                 # drip emails with booking CTAs are noise for them, and a
@@ -919,6 +931,45 @@ class BackgroundTaskRunner:
                 f"cap={DRIP_MAX_PER_RUN} ratio={ratio:.2%} "
                 f"sends_per_run={emails_sent}"
             )
+
+            # 2026-09-18 fix: standing lost-lead sweep. Every drip run, drop any
+            # lead marked lost from the MailerCloud Leads list so stopped
+            # sequence emails (which live on the MC side, outside the code
+            # queries above) stop too. Idempotent: a lead is only processed
+            # until mailercloud_removed_at is set. Covers manual lost-marks made
+            # in the admin (Jeff's wrong-number/bad-number call notes) and the
+            # 3 leads already lost before this fix shipped.
+            try:
+                lost_leads = await self.db.leads.find({
+                    "stage": "lost",
+                    "mailercloud_removed_at": {"$in": [None, False]},
+                    "email": {"$exists": True, "$ne": ""},
+                }, {"_id": 0, "lead_id": 1, "email": 1}).to_list(200)
+                removed = 0
+                for lost in lost_leads:
+                    r = await remove_contact_from_list(
+                        email=lost["email"],
+                        list_id=MAILERCLOUD_LEADS_LIST_ID,
+                        list_name="TrustOffice Leads",
+                    )
+                    if r.get("success"):
+                        await self.db.leads.update_one(
+                            {"lead_id": lost["lead_id"]},
+                            {"$set": {
+                                "mailercloud_removed_at": now.isoformat(),
+                                "updated_at": now.isoformat(),
+                            }}
+                        )
+                        await self._log_drip_activity(
+                            lost["lead_id"], "mailercloud_removed",
+                            "Removed from MailerCloud Leads list (lead marked lost)",
+                        )
+                        removed += 1
+                if removed:
+                    logger.info(f"[drip-metric] lost-lead sweep removed {removed} from MailerCloud Leads")
+            except Exception as e:
+                logger.error(f"Lost-lead MailerCloud sweep failed (non-fatal): {e}")
+
             return emails_sent
 
         except Exception as e:
