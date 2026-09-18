@@ -9,6 +9,9 @@ about the revocable trust" shapes the copy:
   - Voicemail note  -> "I just left you a voicemail a minute ago..."
   - Call note       -> "Good talking with you..." (+ paraphrased topic)
   - No-answer note  -> "I tried you by phone a little earlier..."
+  - FAILED-voicemail note ("unable to leave a voicemail — mailbox was full")
+                    -> treated as no-answer ("I tried you by phone..."), never
+                       as a left voicemail. 2026-09-18 (Jeff caught the bug).
   - Always includes the booking link (trustoffice.app/book-a-call)
   - Always includes source attribution ("you came in through one of our
     ads on Facebook") so the lead knows how we got their information.
@@ -39,6 +42,22 @@ _P_SIGN = 'style="margin:0;color:#1a1a2e;font-size:15px;"'
 # Order of checks matters; first hit wins for the primary signal.
 _VM_RE = re.compile(
     r"\bvoicemail\b|\bv-?mail\b|left a (?:message|voicemail)|\bvm\b", re.I
+)
+# Failed-voicemail markers — checked BEFORE _VM_RE. 2026-09-18 (Jeff, #trustoffice-main):
+# his note "called and was unable to leave a voicemail because the mailbox was full"
+# produced "I just left you a voicemail a minute ago." The word "voicemail" in a note
+# is NOT proof a voicemail was left — detect failure phrasing first and route those
+# notes to the no-answer copy. Extend these patterns as new failure phrasings appear.
+_VM_FAIL_RE = re.compile(
+    r"unable to (?:leave|record|save|drop)\s+(?:a\s+|the\s+)?(?:v-?mail|voicemail|\bvm\b|message)"
+    r"|could(?:n't| not)\s+(?:leave|record|save|drop)\s+(?:a\s+|the\s+)?(?:v-?mail|voicemail|\bvm\b|message)"
+    r"|(?:mailbox|voice\s?mail(?:\s?box)?|voicemail(?:\s?box)?|v-?mail(?:\s?box)?)\s+"
+    r"(?:is|was|it'?s|its)\s+(?:completely\s+)?full"
+    r"|(?:mailbox|voice\s?mail(?:\s?box)?|voicemail(?:\s?box)?|v-?mail)\s+full\b"
+    r"|\bfull\s+(?:mailbox|voicemail(?:\s?box)?)"
+    r"|voicemail\s+(?:didn'?t|did\s?not|would\s?not)\s+(?:go\s+through|send|save|work|record)"
+    r"|voicemail\s+(?:failed|bounced|error(?:ed)?)",
+    re.I,
 )
 _NOANSWER_RE = re.compile(
     r"no answer|didn'?t (?:answer|pick(?:\s?up)?)|did not answer|no pick-?up|"
@@ -120,6 +139,8 @@ def classify_notes(notes: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     Returns {"signal": str, "topics": [str], "objection": bool, "notes_used": [str]}.
     Priority: voicemail > no_answer > call > text > email > general.
+    Failed-voicemail phrasing ("unable to leave a voicemail", "mailbox full")
+    routes to no_answer BEFORE the voicemail check — the newest note wins.
     """
     notes = sorted(
         [n for n in (notes or []) if (n.get("content") or "").strip()],
@@ -138,7 +159,11 @@ def classify_notes(notes: List[Dict[str, Any]]) -> Dict[str, Any]:
             if ph not in topics:
                 topics.append(ph)
         if signal == "general":
-            if _VM_RE.search(text):
+            if _VM_FAIL_RE.search(text):
+                # "unable to leave a voicemail / mailbox full" — a FAILED voicemail
+                # attempt is a no-answer follow-up, never "I just left you a voicemail."
+                signal = "no_answer"
+            elif _VM_RE.search(text):
                 signal = "voicemail"
             elif _NOANSWER_RE.search(text):
                 signal = "no_answer"

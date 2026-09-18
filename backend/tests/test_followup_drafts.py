@@ -42,6 +42,49 @@ def test_vm_shorthand_detected():
     assert cls["signal"] == "voicemail"
 
 
+# ── Failed-voicemail notes route to no_answer (2026-09-18 Jeff bug) ─────────
+# Jeff's actual note: "called and was unable to leave a voicemail because the
+# mailbox was full" — the old classifier keyed on the bare word "voicemail" and
+# drafted "I just left you a voicemail a minute ago." A FAILED voicemail attempt
+# must never produce left-a-voicemail copy.
+
+def test_failed_vm_mailbox_full_routes_to_no_answer():
+    cls = classify_notes([
+        _note("called and was unable to leave a voicemail because the mailbox was full")
+    ])
+    assert cls["signal"] == "no_answer"
+
+
+def test_failed_vm_couldnt_leave_routes_to_no_answer():
+    cls = classify_notes([_note("Couldn't leave a voicemail — their box is full")])
+    assert cls["signal"] == "no_answer"
+
+
+def test_failed_vm_draft_uses_no_answer_copy():
+    d = derive_draft(_lead(), [_note("Called, unable to leave a voicemail — mailbox full")])
+    assert "voicemail" not in d["subject"].lower()
+    assert "just left you a voicemail" not in d["body_html"].lower()
+    assert "tried you by phone" in d["body_html"].lower()
+    assert BOOKING_URL in d["body_html"]
+
+
+def test_failed_vm_newest_note_overrides_older_left_vm():
+    cls = classify_notes([
+        _note("Left a voicemail just now", "2026-09-17T09:00:00"),
+        _note("Called and was unable to leave a voicemail because the mailbox was full",
+              "2026-09-18T19:42:49"),
+    ])
+    assert cls["signal"] == "no_answer"
+
+
+def test_left_vm_newest_still_wins_over_older_failed_attempt():
+    cls = classify_notes([
+        _note("Unable to leave a voicemail, mailbox was full", "2026-09-17T09:00:00"),
+        _note("Left a voicemail just now", "2026-09-18T09:00:00"),
+    ])
+    assert cls["signal"] == "voicemail"
+
+
 def test_no_answer_signal():
     cls = classify_notes([_note("Called twice, didn't answer")])
     assert cls["signal"] == "no_answer"
