@@ -62,16 +62,22 @@ def unauthed_client(app):
 
 
 class TestListDeepKnowledge:
-    def test_returns_10_entries_sorted_by_state_name(self, authed_client):
+    def test_returns_50_entries_sorted_by_state_name(self, authed_client):
         r = authed_client.get("/api/state-compliance/deep-knowledge")
         assert r.status_code == 200
         items = r.json()
-        assert len(items) == 10
+        assert len(items) == 50
 
         names = [i["state_name"] for i in items]
         assert names == sorted(names)
 
-        expected_codes = {"AZ", "CA", "DE", "FL", "IL", "NV", "NY", "SD", "TX", "WA"}
+        expected_codes = {
+            "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+            "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+            "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+            "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+            "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+        }
         assert {i["state_code"] for i in items} == expected_codes
 
         for item in items:
@@ -106,10 +112,6 @@ class TestDeepKnowledgeDetail:
     def test_detail_404_for_uncovered_state(self, authed_client):
         r = authed_client.get("/api/state-compliance/deep-knowledge/XX")
         assert r.status_code == 404
-
-        # A real state code that simply has no deep guide yet
-        r2 = authed_client.get("/api/state-compliance/deep-knowledge/AL")
-        assert r2.status_code == 404
 
 
 class TestAuthRequired:
