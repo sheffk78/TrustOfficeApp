@@ -301,12 +301,17 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "trust_id": trust_id,
         "user_id": user_id
     })
+    # 2026-09-19 fix: transactions store their classification in
+    # governance_classification (set at create + bulk-classify). The old query
+    # looked for a "classification" field that never exists, so this criterion
+    # scored 0/10 for EVERY trust with transactions — verified against 1,411
+    # live snapshots (0 ever earned points). Count the real field.
     classified_txns = 0
     if total_txns > 0:
         classified_txns = await db.transactions.count_documents({
             "trust_id": trust_id,
             "user_id": user_id,
-            "classification": {"$exists": True, "$ne": None, "$ne": ""}
+            "governance_classification": {"$exists": True, "$ne": None, "$ne": ""}
         })
 
     active_alert_count = await db.separation_alerts.count_documents({

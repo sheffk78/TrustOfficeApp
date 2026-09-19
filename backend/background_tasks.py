@@ -1200,8 +1200,17 @@ class BackgroundTaskRunner:
         This enables historical tracking and trend analysis.
         """
         logger.info("Running daily health snapshot job")
-        
+
         try:
+            # Demo trusts go stale at every quarter rollover (their seeded
+            # minutes age out of the current quarter and the health score
+            # craters — reported by Jeff 2026-09-18). Before scoring, top up
+            # demo trusts that have no minutes in the current quarter with a
+            # fresh quarterly demo minute. Non-demo trusts are untouched.
+            topped_up = await self._top_up_demo_quarterly_minutes()
+            if topped_up:
+                logger.info(f"[demo-evergreen] inserted {topped_up} quarterly demo minutes")
+
             # Get all trusts
             trusts = await self.db.trusts.find({}, {"_id": 0}).to_list(1000)
             snapshots_created = 0
@@ -1231,6 +1240,61 @@ class BackgroundTaskRunner:
 
         result = await calculate_health_score(trust_id, user_id, save_snapshot=True)
         return result
+
+    async def _top_up_demo_quarterly_minutes(self) -> int:
+        """Evergreen demo minutes (Jeff approved 2026-09-19).
+
+        Demo trusts otherwise sag every quarter rollover: their seeded minutes
+        age out of the current quarter, Quarterly Minutes drops to 0/15 and the
+        health score craters — reported by Jeff 2026-09-18 (Smith demo: 16→7).
+        For each is_demo trust with zero minutes dated in the current quarter,
+        insert one demo quarterly minute dated inside this quarter. Non-demo
+        trusts are never touched.
+        """
+        from routers.governance import get_quarter_start
+
+        now = datetime.now(timezone.utc)
+        quarter_start_iso = get_quarter_start(now).isoformat()
+        inserted = 0
+
+        try:
+            demo_trusts = await self.db.trusts.find(
+                {"is_demo": True}, {"_id": 0, "trust_id": 1, "user_id": 1, "name": 1}
+            ).to_list(500)
+
+            for trust in demo_trusts:
+                trust_id, user_id = trust["trust_id"], trust["user_id"]
+                try:
+                    in_quarter = await self.db.minutes_records.count_documents({
+                        "trust_id": trust_id,
+                        "user_id": user_id,
+                        "created_at": {"$gte": quarter_start_iso},
+                    })
+                    if in_quarter > 0:
+                        continue
+
+                    await self.db.minutes_records.insert_one({
+                        "minutes_id": f"minutes_{uuid.uuid4().hex[:12]}",
+                        "trust_id": trust_id,
+                        "user_id": user_id,
+                        "minutes_type": "quarterly",
+                        "meeting_date": now.isoformat(),
+                        "participants_text": "Demo Trustee (auto-generated quarterly review)",
+                        "decisions_text": (
+                            "DEMO RECORD (auto-generated): Quarterly review. Reviewed trust "
+                            "performance, Schedule A accuracy, and upcoming governance calendar. "
+                            "Demo data — not a real trustee action."
+                        ),
+                        "created_at": now.isoformat(),
+                        "is_demo": True,
+                    })
+                    inserted += 1
+                except Exception as e:
+                    logger.error(f"[demo-evergreen] top-up failed for {trust_id}: {e}")
+
+        except Exception as e:
+            logger.error(f"[demo-evergreen] top-up sweep failed: {e}")
+        return inserted
 
     async def send_deadline_reminders(self) -> dict:
         """
