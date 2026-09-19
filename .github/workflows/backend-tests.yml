@@ -44,7 +44,12 @@ jobs:
           fi
           mkdir -p /tmp/mongodb-data
           mongod --dbpath /tmp/mongodb-data --port 27017 --fork --logpath /tmp/mongod.log
-          until mongosh --port 27017 --eval 'db.runCommand({ping:1})' >/dev/null 2>&1 || mongo --port 27017 --eval 'db.runCommand({ping:1})' >/dev/null 2>&1; do sleep 1; done
+          # Readiness: TCP probe (mongosh is not bundled with server tarballs)
+          for i in $(seq 1 30); do
+            (echo > /dev/tcp/127.0.0.1/27017) 2>/dev/null && break
+            sleep 1
+          done
+          (echo > /dev/tcp/127.0.0.1/27017) || { echo "mongod failed to open port 27017"; tail -20 /tmp/mongod.log; exit 1; }
 
       - name: Select unit tests
         working-directory: backend
