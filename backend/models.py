@@ -158,6 +158,7 @@ class MinutesTemplateType(str, Enum):
     beneficiary_distribution_notice = "beneficiary_distribution_notice"
     beneficiary_periodic_notice = "beneficiary_periodic_notice"
     evaluate_distribution = "evaluate_distribution"
+    spending_authorization = "spending_authorization"  # 2026-09-18: was in registry + generator since 8/12 but never added here → 422 on generate
     # New templates added (batch 1)
     investment_policy = "investment_policy"
     loan_authorization = "loan_authorization"
