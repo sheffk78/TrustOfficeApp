@@ -64,7 +64,11 @@ class TestGetTrustsExcludesDemo:
         assert 't.get("is_demo") is not True' in body, (
             "GET /trusts must filter out demo trusts once real trusts exist"
         )
-        assert "real_trusts if real_trusts else all_trusts" in body, (
+        # TO-F14 (2026-09-19): the else-branch fallback was replaced by a
+        # persisted preference — demo-only accounts still see demo trusts via
+        # `trusts = all_trusts`, and real+demo accounts can opt back in with
+        # user_preferences.show_demo_trusts (see tests/test_show_demo_toggle.py).
+        assert "trusts = all_trusts" in body, (
             "demo-only accounts must still see their demo trusts"
         )
 

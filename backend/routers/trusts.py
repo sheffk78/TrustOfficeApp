@@ -321,10 +321,27 @@ async def get_trusts(user: dict = Depends(get_current_user)):
     real trust — they must never appear in the sidebar trust selector alongside
     real data. Demo-only accounts (legacy exploration data, no real trust yet)
     still see their demo trusts so the demo experience keeps working.
+
+    Show-demo toggle (TO-F14 fix, 2026-09-19): users with BOTH real and demo
+    trusts can re-reveal the demo trusts via their saved preference
+    (user_preferences.show_demo_trusts). Default OFF — privacy fix stays the
+    default behavior; the toggle only restores visibility on request.
     """
     all_trusts = await db.trusts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
     real_trusts = [t for t in all_trusts if t.get("is_demo") is not True]
-    trusts = real_trusts if real_trusts else all_trusts
+    demo_trusts = [t for t in all_trusts if t.get("is_demo") is True]
+
+    if real_trusts:
+        show_demo = False
+        if demo_trusts:
+            # Only hit the preferences collection when demo trusts exist.
+            prefs = await db.user_preferences.find_one(
+                {"user_id": user["user_id"]}, {"_id": 0, "show_demo_trusts": 1}
+            )
+            show_demo = bool(prefs and prefs.get("show_demo_trusts"))
+        trusts = (real_trusts + demo_trusts) if show_demo else real_trusts
+    else:
+        trusts = all_trusts
     
     result = []
     for trust in trusts:

@@ -1,0 +1,54 @@
+name: Backend Tests
+
+# Gap 2 (Jeff directive 2026-09-19): unit tests gate every push to main.
+# Live-server suites (test_api_smoke, test_data_isolation, TOTP, subscription
+# state machines, background jobs) are excluded — they are nightly-suite
+# material; tests/select_unit_tests.sh holds the canonical exclusion list.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    name: Backend unit suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pytest-asyncio httpx
+
+      - name: Start MongoDB
+        uses: mongo-unit/mongo-unit-action@v1
+        with:
+          port: "27017"
+
+      - name: Select unit tests
+        working-directory: backend
+        id: select
+        run: |
+          # Emit the --ignore list the same way local runs do; fail if empty.
+          ARGS=$(bash tests/select_unit_tests.sh)
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+          echo "ignore args: $ARGS" | head -c 400
+
+      - name: Run unit suite
+        working-directory: backend
+        env:
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: test_database
+          JWT_SECRET: ci-only-not-a-real-secret
+          CORS_ORIGINS: https://app.trustoffice.app
+        run: python -m pytest tests/ ${{ steps.select.outputs.args }} -q -p no:cacheprovider

@@ -174,6 +174,14 @@ logger = logging.getLogger(__name__)
 # Create the main app
 app = FastAPI(title="TrustOffice API")
 
+# ==================== 4XX REJECTION CAPTURE (Jeff directive 2026-09-19) ====================
+# Dedicated handlers for HTTPException / RequestValidationError so server-side
+# REJECTIONS (e.g. the minutes-template 422 that ran 38 days unnoticed) land in
+# error_logs like 500s already do. Response bodies are unchanged — clients see
+# the exact same {"detail": ...}. See http_4xx_capture.py.
+from http_4xx_capture import install_4xx_capture
+install_4xx_capture(app)
+
 # ==================== GLOBAL EXCEPTION HANDLER ====================
 # Catches ALL unhandled exceptions (500s), logs with full context, and sends a
 # deduped Discord alert via error_alerting.report_error.

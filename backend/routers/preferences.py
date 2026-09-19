@@ -108,9 +108,12 @@ async def get_user_preferences(user: dict = Depends(get_current_user)):
         return {
             "user_id": user["user_id"],
             "hide_watermark": hide_watermark,
-            "admin_access_locked": False
+            "admin_access_locked": False,
+            "show_demo_trusts": False
         }
-    
+
+    # Backfill the toggle key for existing preference docs (TO-F14, 2026-09-19)
+    prefs.setdefault("show_demo_trusts", False)
     return prefs
 
 

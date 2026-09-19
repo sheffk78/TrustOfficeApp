@@ -148,11 +148,13 @@ class TestCalendarYearEntries:
         # Q4 for 2025 calendar year is due Jan 15, 2026
         assert e["due_date"] == "2026-01-15"
 
-    def test_k1_march_15(self):
+    def test_k1_with_1041_april_15(self):
+        """K-1 due April 15 — filed WITH Form 1041 (STOP-SHIP fix 96dc4ed,
+        2026-07-08: moved from the old standalone Mar-15 pin)."""
         trust = {"trust_id": "t1", "is_fiscal_year": False}
         entries = _generate_entries(trust, 2025)
         e = next(e for e in entries if e["deadline_type"] == "k1_beneficiaries")
-        assert e["due_date"] == "2025-03-15"
+        assert e["due_date"] == "2025-04-15"
 
 
 class TestFiscalYearEntries:
@@ -164,11 +166,13 @@ class TestFiscalYearEntries:
         assert e["due_date"] == "2025-10-15"
 
     def test_june_30_fy_extension(self):
-        """Extension: 6 months from original due = April 15"""
+        """Extension: 5.5-month rule via Form 7004 — FY Jun 30: 1041 due Oct 15,
+        extension lands Mar 30 (STOP-SHIP fix 96dc4ed, 2026-07-08; was the old
+        flat 6-month Apr-15 pin)."""
         trust = {"trust_id": "t1", "is_fiscal_year": True, "tax_year_end_month": 6, "tax_year_end_day": 30}
         entries = _generate_entries(trust, 2025)
         e = next(e for e in entries if e["deadline_type"] == "federal_1041_extension")
-        assert e["due_date"] == "2026-04-15"
+        assert e["due_date"] == "2026-03-30"
 
     def test_june_30_fy_estimated_q1(self):
         """FY starts July 1. Q1 estimated = 15th of 4th month = Oct 15"""

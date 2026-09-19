@@ -22,6 +22,26 @@ import pytest
 
 pytest.importorskip("fastapi")
 
+import routers.governance as _gov_module
+
+
+@pytest.fixture(autouse=True)
+def _restore_governance_stubs():
+    """Snapshot routers.governance attributes before each test and restore
+    them after. Tests here assign AsyncMock stubs (gov._gather_risk_findings,
+    gov.db) directly onto the shared module object; without restoration the
+    stubs leak into every later test module in the same pytest run (seen as
+    'TypeError: ... got AsyncMock' in test_health_score_v4's source inspect)."""
+    snapshot = dict(vars(_gov_module))
+    yield
+    restored = {}
+    for key, value in list(vars(_gov_module).items()):
+        if key not in snapshot or snapshot[key] is not value:
+            if key.startswith("_") or key in ("db",):
+                restored[key] = snapshot.get(key, value)
+    for key, value in restored.items():
+        setattr(_gov_module, key, value)
+
 
 # --------------------------------------------------------------------------- #
 # Helpers

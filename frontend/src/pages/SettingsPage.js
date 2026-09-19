@@ -80,7 +80,7 @@ export default function SettingsPage() {
     weekly_digest: false
   });
   const [notificationLoading, setNotificationLoading] = useState(false);
-  const [userPrefs, setUserPrefs] = useState({ hide_watermark: false, admin_access_locked: false });
+  const [userPrefs, setUserPrefs] = useState({ hide_watermark: false, admin_access_locked: false, show_demo_trusts: false });
   const [userPrefsLoading, setUserPrefsLoading] = useState(false);
   
   // Demo data management state
@@ -493,6 +493,37 @@ export default function SettingsPage() {
       if (response.ok) {
         setUserPrefs({ ...userPrefs, hide_watermark: checked });
         toast.success(checked ? 'Watermark hidden' : 'Watermark enabled');
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, errBody || { detail: `Update failed (${response.status})` }, { operation: 'update', page: 'Settings' });
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'update', page: 'Settings' });
+    } finally {
+      setUserPrefsLoading(false);
+    }
+  };
+
+  // Show-demo-trusts toggle (TO-F14, 2026-09-19): re-reveals demo trusts for
+  // accounts that hold BOTH real and demo data. Persists in user_preferences.
+  const handleShowDemoToggle = async (checked) => {
+    try {
+      setUserPrefsLoading(true);
+      const response = await fetchWithAuth('/user/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_demo_trusts: checked })
+      });
+
+      if (response.ok) {
+        setUserPrefs({ ...userPrefs, show_demo_trusts: checked });
+        toast.success(checked ? 'Demo trusts visible' : 'Demo trusts hidden', {
+          description: checked
+            ? 'Demo data is shown alongside your real data (marked DEMO).'
+            : 'Your trust selector shows only your real trusts.'
+        });
+        // Refresh the trust list so the sidebar selector reflects it immediately.
+        if (typeof loadTrusts === 'function') await loadTrusts();
       } else {
         const errBody = await response.json().catch(() => ({}));
         showError(toast, errBody || { detail: `Update failed (${response.status})` }, { operation: 'update', page: 'Settings' });
@@ -2323,6 +2354,27 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Load sample data to explore TrustOffice features. Demo data can be removed at any time without affecting your own trusts and records.
             </p>
+
+            {/* Show-demo-trusts toggle (TO-F14, 2026-09-19) */}
+            {demoStatus?.has_demo_data && (
+              <div className="p-4 border border-navy/10 bg-navy/5 mb-4" data-testid="show-demo-toggle-row">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-medium text-navy">Show demo trusts in selector</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Reveal your demo trusts alongside your real trusts. They are always marked DEMO and never affect your real data.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!!userPrefs.show_demo_trusts}
+                    onCheckedChange={handleShowDemoToggle}
+                    disabled={userPrefsLoading}
+                    data-testid="show-demo-toggle"
+                    aria-label="Toggle showing demo trusts in the trust selector"
+                  />
+                </div>
+              </div>
+            )}
             
             {demoStatus && (
               <div className="mb-4 p-4 bg-navy/5 border border-navy/10">

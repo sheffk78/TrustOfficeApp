@@ -278,6 +278,7 @@ class UserPreferences(BaseModel):
 class UserPreferencesUpdate(BaseModel):
     hide_watermark: Optional[bool] = None
     admin_access_locked: Optional[bool] = None
+    show_demo_trusts: Optional[bool] = None
 
 
 # ==================== PASSWORD RESET MODELS ====================
