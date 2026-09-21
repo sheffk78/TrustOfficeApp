@@ -36,6 +36,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from error_alerting import report_error
+from error_classifier import classify_and_alert
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -113,7 +114,14 @@ async def _capture(
             except Exception:
                 pass
 
-        alert = _looks_like_drift(detail, status_code)
+        # --- Noise classification (Jeff directive 2026-09-21) ---
+        # Classify AT CAPTURE TIME: known-noise rejections (scanner probes,
+        # test-suite traffic, api-root pings, business-empty answers) are
+        # still STORED (forensics intact) but never alert Discord / never
+        # enter the fixer queue — the orchestrator reads metadata.noise_class.
+        # Real errors keep today's behavior: alert only on enum-drift shape.
+        noise_class, alert = classify_and_alert(status_code, detail, request.url.path)
+        alert = alert and _looks_like_drift(detail, status_code)
 
         await report_error(
             source="server",
@@ -124,6 +132,7 @@ async def _capture(
             extra_context={
                 "status_code": status_code,
                 "capture": "4xx_middleware",
+                "noise_class": noise_class,
             },
             alert=alert,
         )

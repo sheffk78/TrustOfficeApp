@@ -9,6 +9,11 @@ Proves:
 5. Enum-drift-shaped 422 messages flag alert=True (Discord path).
 """
 import os
+import sys
+from pathlib import Path
+
+BACKEND = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BACKEND))
 
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "test_database")
