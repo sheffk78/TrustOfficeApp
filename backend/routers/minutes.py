@@ -1530,7 +1530,9 @@ def generate_template_document(trust: dict, template_type: str, template_data: d
     trust_name = trust.get("name", "[Trust Name]")
     trustees_raw = trust.get("trustees") or trust.get("trustee_names") or ""
     trustees = parse_trustees(trustees_raw) if isinstance(trustees_raw, str) else (trustees_raw if isinstance(trustees_raw, list) else [])
-    trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
+    # Never use the generic "Trustee" role string as a person's name — it renders
+    # "Trustee, Trustee" in the TRUSTEES PRESENT block. Use a fill-in placeholder.
+    trustee_names = trustees if trustees else ["[Trustee Name]"]
 
     # Get data from template_data with defaults
     minute_number = template_data.get("minute_number", f"{datetime.now().year}-001")
@@ -1601,6 +1603,29 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
     if template_type == "beneficiary_periodic_notice":
         template_data.setdefault("trust_name", trust_name)
         template_data.setdefault("trustee_name", ", ".join(trustee_names))
+
+    # ─── Initial trustee meeting: self-contained document ──────────────
+    # The initial trustee meeting generator produces its own header, call to order,
+    # quorum, resolutions, adjournment, attestation, and signature block. It must
+    # NOT be wrapped in the generic header/adjournment/signature scaffold below,
+    # which would produce a doubled document with two headers, two adjournments,
+    # and two signature blocks. Return the generator output directly.
+    if template_type == "initial_trustee_meeting":
+        body = _dispatch_template_content(template_type, trust, template_data)
+        if not body:
+            # Generator produced nothing (should not happen post-fix). Never fall
+            # back to a general_meeting scaffold — that would emit a MISLABELED
+            # document ("TRUST MINUTES" instead of the organizational-meeting
+            # header) for a record users rely on as initial-meeting minutes.
+            # Fail loudly with a clearly-marked error placeholder instead.
+            body = (
+                "FIRST ORGANIZATIONAL MEETING MINUTES\n"
+                f"{trust.get('name', '[Trust Name]')}\n\n"
+                "[GENERATION ERROR: The initial trustee meeting document could "
+                "not be generated. Please contact support — do not execute or "
+                "notarize this document.]\n"
+            )
+        return body
 
     # Generate template-specific content via dispatch table
     doc += _dispatch_template_content(template_type, trust, template_data)
@@ -1742,7 +1767,7 @@ tax filing and banking purposes;
 BE IT RESOLVED, that the Trustee(s) are authorized and directed to apply for 
 and obtain an EIN from the Internal Revenue Service for the {trust_name};
 
-FURTHER RESOLVED, that once obtained, the EIN shall be used for all tax filing 
+BE IT FURTHER RESOLVED, that once obtained, the EIN shall be used for all tax filing 
 and banking purposes related to the Trust.
 
 VOTE: Unanimous approval.
@@ -1752,7 +1777,7 @@ VOTE: Unanimous approval.
 
 def _initial_meeting_header(trust_name: str, start_date: str, meeting_date: str,
                             meeting_time: str, meeting_location: str,
-                            trustee_names: list) -> str:
+                            trustee_names: list, jurisdiction: str = "") -> str:
     """Build the opening header (title + trustees present + call to order + quorum)."""
     content = f"""FIRST ORGANIZATIONAL MEETING MINUTES
 {trust_name}
@@ -1762,6 +1787,8 @@ Date: {meeting_date}"""
     if meeting_time:
         content += f"\nTime: {meeting_time}"
     content += f"\nLocation: {meeting_location}"
+    if jurisdiction:
+        content += f"\nGoverning Law: {jurisdiction}"
 
     content += f"""
 
@@ -1799,12 +1826,19 @@ quorum exists for the transaction of business.
 def _initial_meeting_resolution_1(trust_name: str, start_date: str,
                                   trustee_names: list) -> str:
     """Build Resolution 1: Adoption of Declaration of Trust and Acceptance of Trusteeship."""
+    # Format trustee names with proper "and" before the last trustee
+    if len(trustee_names) == 1:
+        trustees_str = trustee_names[0]
+    elif len(trustee_names) == 2:
+        trustees_str = f"{trustee_names[0]} and {trustee_names[1]}"
+    else:
+        trustees_str = ", ".join(trustee_names[:-1]) + f", and {trustee_names[-1]}"
     content = f"""═══════════════════════════════════════════════════════════════════════════════
 
 RESOLUTION 1: ADOPTION OF DECLARATION OF TRUST AND ACCEPTANCE OF TRUSTEESHIP
 
 WHEREAS, the Declaration of Trust for {trust_name} was duly executed on 
-{start_date} by {"; ".join(trustee_names)} as Trustee(s);
+{start_date} by {trustees_str}, as Trustee(s);
 
 BE IT RESOLVED, that the Trustees hereby acknowledge receipt of the Declaration 
 of Trust, accept their appointment as Trustees, and agree to hold and administer 
@@ -1838,7 +1872,7 @@ duties as binding upon them:
   necessary.
 
   Duty of Impartiality — To balance the interests of all Beneficiaries fairly 
-  and in accordance with the Trust instrument.
+  and in accordance with the Trust Instrument.
 
   Duty of Obedience — To follow the written terms of the Declaration of Trust 
   and act only within the powers granted therein.
@@ -1850,7 +1884,7 @@ duties as binding upon them:
   minutes, and internal deliberations, disclosing information only when required 
   by law or authorized by the Board.
 
-VOTE: Unanimous acknowledgment.
+VOTE: Unanimous approval.
 
 """
 
@@ -2028,12 +2062,11 @@ RESOLUTION 12: DESIGNATION OF RECORD KEEPER
 WHEREAS, the Trust Instrument requires that adequate records be kept of all 
 trust proceedings;
 
-BE IT RESOLVED, that {record_keeper} 
-is hereby designated as the Record Keeper of {trust_name}, responsible for 
-maintaining all trust records, minutes, and documents at the principal place of 
-administration.
+BE IT RESOLVED, that {record_keeper} is hereby designated as the Record Keeper 
+of {trust_name}, responsible for maintaining all trust records, minutes, and 
+documents at the principal place of administration.
 
-FURTHER RESOLVED, that all trust records shall be kept in a secure and accessible 
+BE IT FURTHER RESOLVED, that all trust records shall be kept in a secure and accessible 
 manner, and shall be available for review by any Trustee or beneficiary as 
 required by law.
 
@@ -2073,10 +2106,13 @@ def _initial_meeting_resolution_14(trust_name: str) -> str:
 
 RESOLUTION 14: RATIFICATION OF PRIOR ACTIONS
 
-BE IT RESOLVED, that all actions taken by the Settlor and the Trustees in 
-connection with the formation, execution, and initial administration of 
-{trust_name} are hereby ratified, confirmed, and approved as valid and binding 
-acts of the Trust.
+WHEREAS, certain actions may have been taken by the Settlor and the Trustees 
+in connection with the formation, execution, and initial administration of 
+{trust_name} prior to this organizational meeting;
+
+BE IT RESOLVED, that all such actions are hereby ratified, confirmed, and 
+approved as valid and binding acts of the Trust, as if formally authorized at 
+this meeting.
 
 VOTE: Unanimous approval.
 
@@ -2120,7 +2156,9 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     trust_name = trust.get("name", "[Trust Name]")
     trustees_raw = trust.get("trustees") or trust.get("trustee_names") or ""
     trustees = parse_trustees(trustees_raw) if isinstance(trustees_raw, str) else (trustees_raw if isinstance(trustees_raw, list) else [])
-    trustee_names = trustees if trustees else [trust.get("role", "Trustee")]
+    # Never use the generic "Trustee" role string as a person's name — it renders
+    # "Trustee, Trustee" in the TRUSTEES PRESENT block. Use a fill-in placeholder.
+    trustee_names = trustees if trustees else ["[Trustee Name]"]
     jurisdiction = trust.get("jurisdiction") or trust.get("state_code") or "[State]"
     # Use the trust_formation_date from the form data (which comes from the entity's
     # formation_date, the same source Settings uses) instead of trust.start_date
@@ -2161,7 +2199,11 @@ def generate_initial_trustee_meeting_content(trust: dict, data: dict) -> str:
     meeting_time = _fmt_time_12h(meeting_time)
     
     content = _initial_meeting_header(
-        trust_name, start_date, meeting_date, meeting_time, meeting_location, trustee_names
+        trust_name, start_date, meeting_date, meeting_time, meeting_location,
+        trustee_names,
+        # Never emit a "[State]" placeholder in a legal record — omit the
+        # Governing Law line when no real jurisdiction is set.
+        jurisdiction if jurisdiction and jurisdiction != "[State]" else "",
     )
 
     # RESOLUTION 1: Acceptance of Trusteeship + Adoption of Declaration
@@ -2224,6 +2266,18 @@ RESOLUTION 8: TRUSTEE COMPENSATION
 
     # ADJOURNMENT AND ATTESTATION
     content += _initial_meeting_adjournment(trust_name, meeting_date, trustee_names)
+
+    # Post-processing: resolve "Trustee(s)" placeholder AND fix verb agreement
+    # for single-trustee documents (templates use plural verbs with the placeholder).
+    trustee_term = "Trustee" if len(trustee_names) == 1 else "Trustees"
+    content = content.replace("Trustee(s)", trustee_term)
+    if trustee_term == "Trustee":
+        content = content.replace("the Trustee are", "the Trustee is")
+        content = content.replace("the Trustee have", "the Trustee has")
+        content = content.replace("the Trustee were", "the Trustee was")
+
+    return content
+
 
 def generate_general_meeting_content(data: dict) -> str:
     """Generate content for general meeting with multiple resolutions"""
