@@ -1919,6 +1919,7 @@ RESOLUTION 4: AUTHORIZATION TO OPEN BANK ACCOUNTS
 WHEREAS, the Trustees determine that it is necessary and prudent to establish 
 one or more financial accounts in the name of the Trust for the proper 
 administration of Trust assets;
+
 """
     return content
 

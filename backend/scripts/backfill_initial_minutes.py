@@ -33,6 +33,17 @@ BROKEN_MARKERS = [
     "RESOLUTION 1",  # missing when the None->"" bug hit
 ]
 
+# Pre-cleanup documents: sovereign-citizen language + generic double-wrapper.
+# These drafts DO contain "RESOLUTION 1" but must still be regenerated.
+OLD_STYLE_MARKERS = [
+    "Ecclesiastical",
+    "Natural Law",
+    "Common Law Copyright",
+    "living men",
+    "artificial PERSON",
+    "CERTIFICATION AND AUTHENTICATION",  # generic wrapper section
+]
+
 
 def classify(doc: dict) -> str:
     """Classify a minutes_templates record into a remediation tier."""
@@ -41,8 +52,9 @@ def classify(doc: dict) -> str:
         return "skip:not_initial_meeting"
     status = doc.get("status", "draft")
     generated = doc.get("generated_document") or ""
-    is_broken = all(marker not in generated for marker in BROKEN_MARKERS)
-    if not is_broken:
+    is_empty = all(marker not in generated for marker in BROKEN_MARKERS)
+    is_old_style = any(marker in generated for marker in OLD_STYLE_MARKERS)
+    if not (is_empty or is_old_style):
         return "skip:healthy"
     if status == "final":
         return "tier2:final_needs_approval"
