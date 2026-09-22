@@ -547,14 +547,22 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
         )
         if analysis:
             fields = analysis.get("extracted_fields", {})
+            if not isinstance(fields, dict):
+                fields = {}
             dist_std = fields.get("distribution_standard", {})
+            # LLM extraction is inconsistent across analysis runs: older docs
+            # store distribution_standard as a plain string (the standard's
+            # language itself), newer ones as {exact_language, type,
+            # article_reference}. Accept both (2026-09-22 chat 500 incident).
+            if not isinstance(dist_std, dict):
+                dist_std = {"exact_language": dist_std if isinstance(dist_std, str) else ""}
             context["trust_document"] = {
-                "grantor": fields.get("grantor_name", ""),
-                "trust_type": fields.get("trust_type", ""),
+                "grantor": fields.get("grantor_name", "") if isinstance(fields.get("grantor_name"), str) else "",
+                "trust_type": fields.get("trust_type", "") if isinstance(fields.get("trust_type"), str) else "",
                 "distribution_standard": dist_std.get("exact_language", ""),
-                "distribution_standard_type": dist_std.get("type", ""),
-                "distribution_article": dist_std.get("article_reference", ""),
-                "beneficiary_names": fields.get("beneficiary_names", []),
+                "distribution_standard_type": dist_std.get("type", "") if isinstance(dist_std.get("type"), str) else "",
+                "distribution_article": dist_std.get("article_reference", "") if isinstance(dist_std.get("article_reference"), str) else "",
+                "beneficiary_names": fields.get("beneficiary_names", []) if isinstance(fields.get("beneficiary_names"), list) else [],
             }
         else:
             context["trust_document"] = {}
