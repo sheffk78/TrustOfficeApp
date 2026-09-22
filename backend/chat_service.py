@@ -729,23 +729,48 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
     )
     if analysis:
         fields = analysis.get("extracted_fields", {})
+        if not isinstance(fields, dict):
+            fields = {}
         dist_std = fields.get("distribution_standard", {})
+        # LLM extraction is inconsistent across analysis runs: older docs store
+        # several fields as plain strings where newer ones store objects. Accept
+        # both shapes everywhere (2026-09-22 chat 500 incidents — this block
+        # crashed for 16 real docs when the intent was action-oriented, i.e.
+        # the non-lightweight path; the lightweight path was fixed in a4bd4e4).
+        if not isinstance(dist_std, dict):
+            dist_std = {"exact_language": dist_std if isinstance(dist_std, str) else ""}
+        trustee_powers = fields.get("trustee_powers", [])
+        if not isinstance(trustee_powers, list):
+            trustee_powers = []
+        removal = fields.get("removal_provisions", {})
+        if not isinstance(removal, dict):
+            removal = {"summary": removal if isinstance(removal, str) else ""}
+        termination = fields.get("termination_rules", {})
+        if not isinstance(termination, dict):
+            termination = {"summary": termination if isinstance(termination, str) else ""}
         context["trust_document"] = {
-            "grantor": fields.get("grantor_name", ""),
-            "trust_type": fields.get("trust_type", ""),
+            "grantor": fields.get("grantor_name", "") if isinstance(fields.get("grantor_name"), str) else "",
+            "trust_type": fields.get("trust_type", "") if isinstance(fields.get("trust_type"), str) else "",
             "distribution_standard": dist_std.get("exact_language", ""),
-            "distribution_standard_type": dist_std.get("type", ""),
-            "distribution_article": dist_std.get("article_reference", ""),
+            "distribution_standard_type": dist_std.get("type", "") if isinstance(dist_std.get("type"), str) else "",
+            "distribution_article": dist_std.get("article_reference", "") if isinstance(dist_std.get("article_reference"), str) else "",
             "trustee_powers": [
                 {"power": p.get("power", ""), "article": p.get("article_reference", "")}
-                for p in fields.get("trustee_powers", [])
+                for p in trustee_powers
+                if isinstance(p, dict)
             ],
-            "removal_provisions": fields.get("removal_provisions", {}).get("summary", ""),
-            "termination_rules": fields.get("termination_rules", {}).get("summary", ""),
-            "beneficiary_names": fields.get("beneficiary_names", []),
+            "removal_provisions": removal.get("summary", ""),
+            "termination_rules": termination.get("summary", ""),
+            "beneficiary_names": fields.get("beneficiary_names", []) if isinstance(fields.get("beneficiary_names"), list) else [],
         }
-        context["trust_document"]["distribution_rules"] = fields.get("distribution_rules", {})
-        context["trust_document"]["trustee_powers_detail"] = fields.get("trustee_powers_detail", {})
+        dist_rules = fields.get("distribution_rules", {})
+        if not isinstance(dist_rules, dict):
+            dist_rules = {}
+        powers_detail = fields.get("trustee_powers_detail", {})
+        if not isinstance(powers_detail, dict):
+            powers_detail = {}
+        context["trust_document"]["distribution_rules"] = dist_rules
+        context["trust_document"]["trustee_powers_detail"] = powers_detail
 
     # 9. Vault document metadata (titles, categories, descriptions — no file content)
     # This is queried for every request but only injected into the prompt when relevant
