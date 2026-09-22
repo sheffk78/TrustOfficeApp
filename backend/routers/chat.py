@@ -340,8 +340,12 @@ async def chat(
 
     # 4. Classify intent
     intent_result = await classify_intent(request.message, None)
+    # Guard: a hostile/quirky model can return a JSON scalar (e.g. the string
+    # "general_chat") instead of an object — _coerce_dict's callers assume dict.
+    if not isinstance(intent_result, dict):
+        intent_result = {}
     intent = intent_result.get("intent", "general_chat")
-    entities = intent_result.get("entities", {})
+    entities = intent_result.get("entities", {}) or {}
 
     # 5. Build trust context (intent-aware: lightweight intents skip heavy DB queries)
     trust_context = await build_trust_context(user_id, trust_id, intent=intent)
@@ -2293,8 +2297,10 @@ async def _chat_stream_generator(
         # Send SSE comment heartbeats every 5s while these block.
         async def _prepare_context():
             intent_result = await classify_intent(message, None)
+            if not isinstance(intent_result, dict):
+                intent_result = {}
             intent = intent_result.get("intent", "general_chat")
-            entities = intent_result.get("entities", {})
+            entities = intent_result.get("entities", {}) or {}
             trust_context = await build_trust_context(
                 user_id, trust_id_resolved, intent=intent
             )
