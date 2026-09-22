@@ -1,0 +1,20 @@
+{
+  "name": "trustoffice-proton-bridge",
+  "version": "0.1.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@protontech/drive-sdk": "^0.21.1",
+    "express": "^4.22.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

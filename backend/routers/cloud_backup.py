@@ -23,6 +23,7 @@ from database import db
 from dependencies import get_current_user
 from services.backup_service import backup_user_vault
 from services.backup_providers import get_provider
+from services.proton_provider import ProtonDriveProvider, BridgeClientError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["cloud_backup"])
@@ -205,6 +206,124 @@ async def oauth_callback(
 
     logger.info(f"Cloud backup connected: user={user_id}, provider={provider_name}")
     return RedirectResponse(url="/vault?backup_connected=true")
+
+
+# ---------------------------------------------------------------------------
+# Proton Drive — session-fork flow (no OAuth; bridge-mediated)
+# ---------------------------------------------------------------------------
+
+def _encrypt_proton_credentials(creds: dict) -> str:
+    """Fernet-encrypt Proton session credentials for MongoDB at-rest."""
+    import json as _json
+    from services.crypto_utils import fernet_encrypt, fernet_decrypt
+    return fernet_encrypt(_json.dumps(creds))
+
+
+@router.post("/backup/proton/connect/start")
+async def proton_connect_start(user: dict = Depends(get_current_user)):
+    """Start a Proton connect: member completes sign-in on Proton's own page.
+    The member's Proton password and 2FA code never touch TrustOffice."""
+    provider = ProtonDriveProvider()
+    try:
+        result = await provider.start_connect()
+    except Exception as e:
+        logger.error(f"Proton connect start failed: {e}")
+        raise HTTPException(status_code=502, detail="Proton connect unavailable. Please try again.")
+    await db.cloud_backup_connections.update_one(
+        {"user_id": user["user_id"], "connect_id": result["connect_id"]},
+        {"$set": {
+            "user_id": user["user_id"],
+            "provider": "proton_drive",
+            "status": "pending",
+            "connect_id": result["connect_id"],
+            "sign_in_url": result["sign_in_url"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return result
+
+
+@router.post("/backup/proton/connect/status")
+async def proton_connect_status(user: dict = Depends(get_current_user)):
+    """Poll the newest pending Proton connect for this user.
+
+    On success: decrypts the bridge's envelope, re-encrypts with Fernet,
+    stores it, and finalizes the connection doc.
+    """
+    doc = await db.cloud_backup_connections.find_one(
+        {"user_id": user["user_id"], "provider": "proton_drive", "status": "pending"},
+        sort=[("created_at", -1)],
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="No pending Proton connect. Start one first.")
+
+    provider = ProtonDriveProvider()
+    try:
+        result = await provider.connect_status(
+            doc["connect_id"], {"bridge_url": doc.get("bridge_url")}
+        )
+    except Exception as e:
+        logger.error(f"Proton connect status failed: {e}")
+        raise HTTPException(status_code=502, detail="Proton connect status unavailable.")
+
+    bridge_status = result.get("status")
+    if bridge_status == "complete":
+        envelope = result.get("credentials_encrypted")
+        if not envelope:
+            return {"status": "pending"}
+        creds = _decrypt_bridge_envelope(envelope)
+        await db.cloud_backup_connections.update_one(
+            {"_id": doc["_id"]},
+            {"$set": {
+                "status": "connected",
+                "proton_credentials_encrypted": _encrypt_proton_credentials(creds),
+                "connected_at": datetime.now(timezone.utc).isoformat(),
+                "backup_frequency": "weekly",
+                "last_backup_at": None,
+                "last_backup_status": "connected",
+                "last_backup_error": None,
+                "last_backup_doc_count": 0,
+                "backup_folder_id": None,
+                "is_active": True,
+            }, "$unset": {"connect_id": "", "sign_in_url": ""}},
+        )
+        logger.info(f"Proton connected: user={user['user_id']}")
+        return {"status": "complete"}
+    if bridge_status == "expired":
+        await db.cloud_backup_connections.delete_one({"_id": doc["_id"]})
+        return {"status": "expired"}
+    return {"status": bridge_status or "pending"}
+
+
+def _decrypt_bridge_envelope(envelope: str) -> dict:
+    """Decode the bridge's base64-encrypted credential envelope from
+    /connect/status:complete. Returns the plaintext session snapshot
+    (immediately re-encrypted with Fernet by the caller)."""
+    import base64 as _b64
+    import json as _json
+    from services.crypto_utils import fernet_decrypt
+    return _json.loads(fernet_decrypt(_b64.b64decode(envelope).decode()))
+
+
+@router.post("/backup/proton/verify")
+async def proton_verify(user: dict = Depends(get_current_user)):
+    """Ask the bridge to validate the stored session (cheap health check)."""
+    conn = await db.cloud_backup_connections.find_one(
+        {"user_id": user["user_id"], "provider": "proton_drive", "is_active": True}
+    )
+    if not conn:
+        raise HTTPException(status_code=404, detail="No active Proton connection.")
+    provider = ProtonDriveProvider()
+    try:
+        result = await provider.verify(conn)
+        return result
+    except BridgeClientError as e:
+        # Structured bridge error (e.g. 401 not_signed_in) — surface it honestly
+        return {"ok": False, **e.body}
+    except Exception as e:
+        logger.error(f"Proton verify failed: {e}")
+        return {"ok": False, "error": "bridge_unreachable"}
 
 
 @router.get("/backup/status")

@@ -8,6 +8,7 @@ import os
 import json
 import logging
 import httpx
+from services.proton_provider import ProtonDriveProvider  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +348,7 @@ PROVIDERS = {
     "google_drive": GoogleDriveProvider,
     "dropbox": DropboxProvider,
     "onedrive": OneDriveProvider,
+    "proton_drive": ProtonDriveProvider,
 }
 
 

@@ -29,7 +29,7 @@ describe('getOnboardingProgress — backup_connect step', () => {
     const step = allSteps.find((s) => s.id === 'backup_connect');
     expect(step).toEqual(expect.objectContaining({
       label: 'Connect your off-site backup',
-      action: '/vault?tab=vault&focus=backup',
+      action: '/vault?tab=backup',
       priority: 7,
       field: 'backup_connected',
     }));

@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Cloud, HardDrive, RefreshCw, CheckCircle2, AlertCircle, Loader2, CloudUpload, X, ExternalLink } from 'lucide-react';
+import { Cloud, HardDrive, RefreshCw, CheckCircle2, AlertCircle, Loader2, CloudUpload, X, ExternalLink, ShieldCheck } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
+import ProtonConnectModal from './ProtonConnectModal';
 
 const PROVIDER_LABELS = {
   google_drive: 'Google Drive',
   dropbox: 'Dropbox',
   onedrive: 'OneDrive',
+  proton_drive: 'Proton Drive',
 };
 
 const PROVIDER_ICONS = {
@@ -52,6 +54,7 @@ export default function CloudBackupSection({ selectedTrust }) {
   const [loading, setLoading] = useState(true);
   const [backupRunning, setBackupRunning] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [showProtonModal, setShowProtonModal] = useState(false);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -111,6 +114,8 @@ export default function CloudBackupSection({ selectedTrust }) {
       setBackupRunning(false);
     }
   };
+
+  const startProtonConnect = () => setShowProtonModal(true);
 
   const disconnect = async (provider) => {
     if (!confirm(`Disconnect ${PROVIDER_LABELS[provider]}? Your files will remain in your cloud storage.`)) return;
@@ -262,6 +267,16 @@ export default function CloudBackupSection({ selectedTrust }) {
                 </button>
               );
             })}
+            <button
+              onClick={startProtonConnect}
+              className="border border-gray-200 rounded-lg px-4 py-3 hover:border-navy hover:bg-navy/5 transition-all flex items-center gap-2 group"
+              data-testid="connect-proton_drive"
+            >
+              <ShieldCheck className="w-5 h-5 text-gray-600 group-hover:text-navy" />
+              <span className="text-sm font-medium text-gray-700 group-hover:text-navy">
+                Connect Proton Drive
+              </span>
+            </button>
           </div>
         </div>
       )}
@@ -274,6 +289,12 @@ export default function CloudBackupSection({ selectedTrust }) {
           Only files created by TrustOffice are accessible to us. Your data stays yours.
         </span>
       </div>
+
+      <ProtonConnectModal
+        open={showProtonModal}
+        onClose={() => setShowProtonModal(false)}
+        onConnected={loadStatus}
+      />
     </div>
   );
 }

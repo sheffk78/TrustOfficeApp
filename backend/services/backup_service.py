@@ -90,6 +90,8 @@ async def backup_user_vault(user_id: str, conn: dict):
     failed = 0
     manifest_docs = []
 
+    is_proton = conn.get("provider") == "proton_drive"
+
     async for doc in cursor:
         try:
             category = doc.get("category", "other")
@@ -98,11 +100,18 @@ async def backup_user_vault(user_id: str, conn: dict):
             backup_path = f"TrustOffice-Backup/{category_folder}/{file_name}"
 
             # Upload with retry
-            success = await _upload_with_retry(
-                provider, access_token, folder_ref, backup_path,
-                doc["file_content"],
-                doc.get("file_content_type", "application/octet-stream")
-            )
+            if is_proton:
+                success = await _upload_proton_with_retry(
+                    conn, backup_path,
+                    doc["file_content"],
+                    doc.get("file_content_type", "application/octet-stream")
+                )
+            else:
+                success = await _upload_with_retry(
+                    provider, access_token, folder_ref, backup_path,
+                    doc["file_content"],
+                    doc.get("file_content_type", "application/octet-stream")
+                )
 
             if success:
                 now_iso = datetime.now(timezone.utc).isoformat()
@@ -135,7 +144,10 @@ async def backup_user_vault(user_id: str, conn: dict):
         "documents": manifest_docs,
     }
     try:
-        await provider.update_manifest(access_token, folder_ref, manifest)
+        if is_proton:
+            await get_provider("proton_drive").update_manifest_with_conn(conn, manifest)
+        else:
+            await provider.update_manifest(access_token, folder_ref, manifest)
     except Exception as e:
         logger.warning(f"Manifest upload failed: {e}")
 
@@ -172,6 +184,23 @@ async def _upload_with_retry(provider, access_token, folder_ref, path, content, 
                 await asyncio.sleep(RETRY_DELAYS[attempt])
             else:
                 logger.error(f"Upload failed after {MAX_RETRIES} attempts for {path}: {e}")
+                return False
+
+
+async def _upload_proton_with_retry(conn: dict, path: str, content: bytes, content_type: str) -> bool:
+    """Upload via the Proton bridge with the same retry cadence as OAuth providers."""
+    from services.proton_provider import ProtonDriveProvider
+    provider = ProtonDriveProvider()
+    for attempt in range(MAX_RETRIES):
+        try:
+            await provider.upload_file_with_conn(conn, path, content, content_type)
+            return True
+        except Exception as e:
+            if attempt < MAX_RETRIES - 1:
+                logger.warning(f"Proton upload attempt {attempt+1} failed for {path}: {e}. Retrying in {RETRY_DELAYS[attempt]}s")
+                await asyncio.sleep(RETRY_DELAYS[attempt])
+            else:
+                logger.error(f"Proton upload failed after {MAX_RETRIES} attempts for {path}: {e}")
                 return False
 
 
