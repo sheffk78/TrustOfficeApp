@@ -1981,6 +1981,17 @@ async def _execute_approved_action(
         "setup_compensation": "compensation_plan_preview",
         "record_compensation_payment": "compensation_payment_preview",
         "add_investment": "investment_preview",
+        # Observed in prod card data (aggregate audit of chat_conversations):
+        "add_asset_preview": "asset_preview",
+        "cancel_distribution_preview": "distribution_cancel_preview",
+        "remove_beneficiary_preview": "beneficiary_removal_preview",
+        "schedule_task_preview": "task_preview",
+        "upload_document_preview": "document_upload_preview",
+        "create_beneficiary_preview": "beneficiary_preview",
+        "update_beneficiary": "beneficiary_update_preview",
+        "add_transaction": "transaction_preview",
+        "dismiss_alert_preview": "alert_dismiss",
+        "create_minutes": "minutes_preview",
     }
     card_type = TYPE_ALIASES.get(card_type, card_type)
     
