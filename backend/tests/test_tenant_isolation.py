@@ -80,6 +80,13 @@ ROUTE_MAP = [
         ("PATCH", "/api/client-notes/{note_id}", False),
         ("DELETE", "/api/client-notes/{note_id}", False),
     ]),
+    # Shared action layer (2026-09-22): tenant enforcement lives INSIDE the
+    # call_action pipeline (action_layer.py), not in the route signature —
+    # trust_id is a body param here, so the {x_trust_id} placeholder is used
+    # and the cross-tenant probe asserts the request is rejected.
+    ("actions", [
+        ("POST", "/api/actions/{x_action_name}", False),
+    ]),
 ]
 
 ENDPOINTS = [(mod, m, p, c) for mod, eps in ROUTE_MAP for (m, p, c) in eps]
@@ -288,12 +295,12 @@ def app(iso_db):
     from fastapi import FastAPI
     import routers.trusts, routers.vault, routers.minutes, routers.banking
     import routers.beneficiaries, routers.compensation, routers.calendar
-    import routers.client_notes
+    import routers.client_notes, routers.actions
 
     a = FastAPI()
     for r in (routers.trusts, routers.vault, routers.minutes, routers.banking,
               routers.beneficiaries, routers.compensation, routers.calendar,
-              routers.client_notes):
+              routers.client_notes, routers.actions):
         a.include_router(r.router, prefix="/api")
     return a
 

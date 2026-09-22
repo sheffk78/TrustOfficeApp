@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/api';
+import { callAction } from '@/utils/actions';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import {
@@ -602,25 +603,50 @@ export default function MinutesTemplateFormPage() {
         resolutions,
       });
 
-      const response = await fetchWithAuth('/minutes-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trust_id: selectedTrust.trust_id,
-          template_type: templateType,
-          template_data: templateData
-        })
-      });
+      // Shared action layer (2026-09-21): template generation now flows
+      // through POST /api/actions/generate-minutes — the same handler the
+      // Trust Assistant's approval pipeline uses, so UI and chat can't
+      // drift apart. Falls back to the legacy route on any layer error.
+      let result = null;
+      let responseOk = false;
+      const actionRes = await callAction(
+        'generate-minutes',
+        {
+          minutes_type: templateType,
+          meeting_date: templateData?.meeting_date || new Date().toISOString().slice(0, 10),
+          participants: templateData?.participants || [],
+          decisions: templateData?.decisions || [],
+        },
+        { trustId: selectedTrust.trust_id }
+      );
+      if (actionRes.ok) {
+        responseOk = true;
+        result = actionRes.result;
+      } else {
+        // Legacy direct call (fallback while the action layer rolls out)
+        const response = await fetchWithAuth('/minutes-templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            trust_id: selectedTrust.trust_id,
+            template_type: templateType,
+            template_data: templateData
+          })
+        });
+        if (response.ok) {
+          result = await response.json();
+          responseOk = true;
+        } else {
+          const error = await response.json();
+          showError(toast, new Error(error.detail || 'Failed to generate minutes'), { operation: 'generate', page: 'MinutesTemplateForm' });
+        }
+      }
 
-      if (response.ok) {
-        const result = await response.json();
+      if (responseOk && result) {
         setGeneratedDoc(result.generated_document);
         setMinutesId(result.minutes_id);
         setPreviewMode(true);
         toast.success('Minutes generated');
-      } else {
-        const error = await response.json();
-        showError(toast, new Error(error.detail || 'Failed to generate minutes'), { operation: 'generate', page: 'MinutesTemplateForm' });
       }
     } catch (error) {
       showError(toast, error, { operation: 'generate', page: 'MinutesTemplateForm' });

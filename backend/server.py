@@ -98,6 +98,8 @@ from routers.tax_calendar import router as tax_calendar_router
 from routers.state_compliance import router as state_compliance_router
 from routers.state_deep_knowledge import router as state_deep_knowledge_router
 from routers.investments import router as investments_router
+from routers.actions import router as actions_router
+from action_layer import register_all as register_seed_actions
 from routers.communications import router as communications_router
 from routers.email_archive import router as email_archive_router, ensure_email_archive_indexes
 from routers.vault import router as vault_router
@@ -493,6 +495,7 @@ app.add_middleware(
 # Register all routers
 app.include_router(auth_router, prefix="/api")
 app.include_router(totp_2fa_router, prefix="/api")
+app.include_router(actions_router, prefix="/api")
 app.include_router(trusts_router, prefix="/api")
 app.include_router(successor_router, prefix="/api")
 app.include_router(entities_router, prefix="/api")
@@ -635,7 +638,17 @@ async def health_check():
 async def startup_event():
     """Start background task runner and create indexes on app startup"""
     startup_errors = []
-    
+
+    # Shared action layer: import seed actions so their @action decorators
+    # run before the API serves any traffic (fail-soft: registry stays
+    # empty rather than crashing the app if a seed module breaks).
+    try:
+        n_actions = register_seed_actions()
+        logger.info(f"Action layer registered {n_actions} actions")
+    except Exception as e:
+        logger.error(f"Failed to register seed actions: {e}")
+        startup_errors.append(f"action_layer: {e}")
+
     try:
         await background_runner.start()
         logger.info("Background task runner started successfully")
