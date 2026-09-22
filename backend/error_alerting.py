@@ -331,7 +331,10 @@ async def report_error(
         "user_id": user_id,
         "error_type": (error_type or "unknown")[:200],
         "error_message": (error_message or "")[:4000],
-        "stack_trace": (traceback_str or "")[:8000] if traceback_str else None,
+        # 8k cut the endpoint frame out of the middleware exception-group trace
+        # (2026-09-22 chat 500 hunt — deep frame never visible). 20k keeps
+        # the full chain including the raising line.
+        "stack_trace": (traceback_str or "")[:20000] if traceback_str else None,
         "url": (_ctx.get("location") or request_path or "")[:1000] or None,
         "user_agent": (_ctx.get("user_agent") or "")[:500] or None,
         "component_stack": (_ctx.get("component_stack") or "")[:4000] or None,
