@@ -114,22 +114,31 @@ def _format_date_conveyed(date_conveyed):
     return date_conveyed
 
 
-# Truncate a string to `limit` chars, appending "..." if truncated.
-def _truncate(value, limit, placeholder="—"):
-    value = value or placeholder
-    if len(value) > limit:
-        return value[:limit] + "..."
-    return value
+# Cell paragraph style for table data â enables text wrapping within cells
+# so long strings never get truncated mid-word.
+def _cell_style():
+    return ParagraphStyle(
+        'CellStyle',
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        splitLongWords=True,
+        allowWidows=False,
+        allowOrphans=False,
+    )
 
 
 # Build one PDF table row for a schedule-a item.
+# Returns Paragraph objects so ReportLab wraps text within cells
+# instead of truncating mid-word.
 def _build_item_row(item):
-    desc = _truncate(item.get("description", ""), 50)
-    identifier = item.get("identifier", "—") or "—"
-    location = _truncate(item.get("location", "—"), 30)
+    desc = item.get("description", "") or "â"
+    identifier = item.get("identifier", "â") or "â"
+    location = item.get("location", "â") or "â"
     value = f"${item.get('approximate_value', 0):,.2f}" if item.get("approximate_value") else "N/D"
-    date_conveyed = _format_date_conveyed(item.get("date_conveyed", "—"))
-    return [desc, identifier, location, value, date_conveyed]
+    date_conveyed = _format_date_conveyed(item.get("date_conveyed", "â"))
+    cs = _cell_style()
+    return [Paragraph(desc, cs), Paragraph(identifier, cs), Paragraph(location, cs), Paragraph(value, cs), Paragraph(date_conveyed, cs)]
 
 
 # ==================== SCHEDULE A ENDPOINTS ====================
@@ -396,15 +405,32 @@ def _build_pdf_styles(white_label: bool = False):
 # Build the asset table for one category.
 def _build_category_table(cat_items, accent):
     cat_total = _sum_item_values(cat_items)
-
-    table_data = [["Description", "Identifier", "Location", "Value", "Date"]]
+    cs = _cell_style()
+    # Header row uses Paragraph objects for consistent wrapping
+    header_style = ParagraphStyle(
+        'HeaderCell', parent=cs, fontName='Helvetica-Bold', fontSize=8,
+        alignment=1,
+    )
+    table_data = [[
+        Paragraph("Description", header_style),
+        Paragraph("Identifier", header_style),
+        Paragraph("Location", header_style),
+        Paragraph("Value", header_style),
+        Paragraph("Date", header_style),
+    ]]
     for item in cat_items:
         table_data.append(_build_item_row(item))
 
     # Add subtotal row
-    table_data.append(["", "", f"Subtotal ({len(cat_items)} items):", f"${cat_total:,.2f}", ""])
+    table_data.append([
+        Paragraph("", cs),
+        Paragraph("", cs),
+        Paragraph(f"Subtotal ({len(cat_items)} items):", cs),
+        Paragraph(f"${cat_total:,.2f}", cs),
+        Paragraph("", cs),
+    ])
 
-    col_widths = [2*inch, 1.2*inch, 1.5*inch, 0.9*inch, 0.9*inch]
+    col_widths = [2.5*inch, 1.5*inch, 1.2*inch, 0.8*inch, 0.5*inch]
     asset_table = Table(table_data, colWidths=col_widths)
     asset_table.setStyle(TableStyle([
         # Header row

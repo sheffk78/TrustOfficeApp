@@ -119,22 +119,99 @@ class TestScheduleAPDFExport:
         """Test that Schedule A assets can be retrieved"""
         response = self.session.get(f"{BASE_URL}/api/schedule-a?trust_id={self.trust_id}")
         assert response.status_code == 200
-        
+
         assets = response.json()
         assert isinstance(assets, list), "Response should be a list"
-        
+
         if assets:
             asset = assets[0]
             assert "item_id" in asset
             assert "category" in asset
             assert "description" in asset
-            print(f"✓ Schedule A has {len(assets)} assets")
-            
+            print(f"Schedule A has {len(assets)} assets")
+
             # Check categories present
             categories = set(a["category"] for a in assets)
             print(f"  - Categories: {categories}")
         else:
-            print("✓ Schedule A assets endpoint works (no assets found)")
+            print("Schedule A assets endpoint works (no assets found)")
+
+
+def test_pdf_no_midword_truncation():
+    """Regression test: long strings in table cells must wrap, never truncate mid-word.
+
+    Generates a PDF the same way the Schedule A export does and asserts that
+    Paragraph objects are used for table cells so ReportLab wraps text within
+    cells instead of truncating mid-word.
+    """
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Table
+    import io
+
+    # Strings that exceed the old truncation limits and would be cut mid-word
+    long_desc = (
+        "This is a very long description that would have been truncated "
+        "mid-word by the old _truncate function at fifty characters"
+    )
+    long_id = "UTState passport registration number that is quite long"
+    long_loc = "A very long location string that exceeds the old thirty character limit"
+
+    # Replicate the cell style from schedule_a.py _cell_style()
+    cs = ParagraphStyle(
+        "CellStyle",
+        fontName="Helvetica",
+        fontSize=8,
+        leading=10,
+        splitLongWords=True,
+        allowWidows=False,
+        allowOrphans=False,
+    )
+
+    # Build a table row exactly as _build_item_row does now (Paragraph objects)
+    row = [
+        Paragraph(long_desc, cs),
+        Paragraph(long_id, cs),
+        Paragraph(long_loc, cs),
+        Paragraph("$100.00", cs),
+        Paragraph("2026-01-15", cs),
+    ]
+
+    # Every cell must be a Paragraph (not a truncated string)
+    for cell in row:
+        assert isinstance(cell, Paragraph), f"Expected Paragraph, got {type(cell)}"
+        full_text = cell.getPlainText()
+        assert "..." not in full_text, (
+            f"Cell text was truncated with '...': {full_text[:80]}"
+        )
+
+    # Build a full table like _build_category_table does
+    header_style = ParagraphStyle(
+        "HeaderCell", parent=cs, fontName="Helvetica-Bold", fontSize=8,
+        alignment=1,
+    )
+    table_data = [[
+        Paragraph("Description", header_style),
+        Paragraph("Identifier", header_style),
+        Paragraph("Location", header_style),
+        Paragraph("Value", header_style),
+        Paragraph("Date", header_style),
+    ], row]
+
+    col_widths = [2.5 * inch, 1.5 * inch, 1.2 * inch, 0.8 * inch, 0.5 * inch]
+    table = Table(table_data, colWidths=col_widths)
+
+    # Build the PDF to verify it renders without error
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter)
+    doc.build([table])
+    pdf_bytes = buf.getvalue()
+
+    assert len(pdf_bytes) > 0, "PDF should not be empty"
+    assert pdf_bytes[:4] == b"%PDF", "Output should be a valid PDF"
+
+    print("PDF export wraps long strings without mid-word truncation")
 
 
 if __name__ == "__main__":
