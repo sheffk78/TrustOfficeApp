@@ -111,8 +111,15 @@ def _call_openrouter(
 
         if 'error' in response_data:
             err = response_data['error']
-            msg = err.get('message', str(err))
-            code = err.get('code', '')
+            # OpenRouter sometimes returns the error as a plain string (or an
+            # array) instead of an object — guard so .get can never crash
+            # (2026-09-22 prod incident: AttributeError → 500 on every chat).
+            if isinstance(err, dict):
+                msg = err.get('message', str(err))
+                code = err.get('code', '')
+            else:
+                msg = str(err)
+                code = ''
             logger.error(f"OpenRouter API error: {code} — {msg}")
             raise OpenRouterClientError(f"OpenRouter error: {msg}")
 
@@ -120,7 +127,11 @@ def _call_openrouter(
         if not choices:
             raise OpenRouterClientError("OpenRouter returned no choices")
 
-        content = choices[0].get('message', {}).get('content', '')
+        _first = choices[0] if isinstance(choices[0], dict) else {}
+        _msg = _first.get('message', {}) if isinstance(_first, dict) else {}
+        if not isinstance(_msg, dict):
+            _msg = {}
+        content = _msg.get('content', '')
         if not content:
             raise OpenRouterClientError("OpenRouter returned empty content")
 
@@ -218,14 +229,19 @@ def _call_openrouter_stream(
                     break
                 try:
                     chunk = json.loads(data_str)
+                    if not isinstance(chunk, dict):
+                        continue
                     choices = chunk.get('choices', [])
-                    if choices:
+                    if choices and isinstance(choices[0], dict):
                         delta = choices[0].get('delta', {})
+                        if not isinstance(delta, dict):
+                            continue
                         content = delta.get('content', '')
                         if content:
                             yield content
-                except json.JSONDecodeError:
-                    # Skip malformed chunks
+                except (json.JSONDecodeError, AttributeError):
+                    # Skip malformed chunks (OpenRouter occasionally sends a
+                    # bare string/odd shape mid-stream — never crash the stream)
                     continue
         resp.close()
 
