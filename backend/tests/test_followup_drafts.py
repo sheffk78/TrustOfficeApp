@@ -85,6 +85,92 @@ def test_left_vm_newest_still_wins_over_older_failed_attempt():
     assert cls["signal"] == "voicemail"
 
 
+# ── Meeting no-show → rebook invite (2026-09-22 Jeff, #trustoffice-main) ────
+# Jeff's flow: log the missed meeting as an activity, hit Preview, and get a
+# rebook invitation — never a cold intro, never a fake "just left a voicemail."
+# His example note: "had a scheduled meeting right now and Brandon didn't attend".
+
+def test_jeff_example_note_detected():
+    cls = classify_notes([_note("Had a scheduled meeting right now and Brandon didn't attend")])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_lead_didnt_attend_detected():
+    cls = classify_notes([_note("Lead didn't attend the scheduled call")])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_missed_our_meeting_detected():
+    cls = classify_notes([_note("Missed our meeting today")])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_noshow_word_detected():
+    cls = classify_notes([_note("Appointment was a no-show")])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_didnt_show_up_detected():
+    cls = classify_notes([_note("Booked 2pm but he didn't show up")])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_scheduled_but_didnt_attend_variant():
+    cls = classify_notes([_note("Scheduled meeting but he didn't attend — tried calling after")])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_noshow_draft_is_rebook_invite():
+    d = derive_draft(_lead(), [_note("Had a scheduled meeting right now and Brandon didn't attend")])
+    assert d["signal"] == "meeting_no_show"
+    assert "Missed you today" in d["subject"]
+    assert "We had a time set" in d["body_html"]
+    assert "book again" in d["body_html"].lower()
+    assert BOOKING_URL in d["body_html"]
+    # must NOT be the cold intro or a voicemail claim
+    assert "just left you a voicemail" not in d["body_html"].lower()
+    assert "walk around TrustOffice" not in d["body_html"]
+
+
+def test_noshow_label_present():
+    from followup_drafts import SIGNAL_LABELS
+    assert "meeting_no_show" in SIGNAL_LABELS
+    assert "book again" in SIGNAL_LABELS["meeting_no_show"]
+
+
+def test_older_noshow_note_loses_to_newer_voicemail():
+    cls = classify_notes([
+        _note("Lead didn't attend the meeting", "2026-09-20T09:00:00"),
+        _note("Left a voicemail just now", "2026-09-22T09:00:00"),
+    ])
+    assert cls["signal"] == "voicemail"
+
+
+def test_newer_noshow_note_beats_older_call_recap():
+    cls = classify_notes([
+        _note("Spoke last week", "2026-09-14T10:00:00"),
+        _note("Didn't attend the meeting today", "2026-09-22T09:00:00"),
+    ])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_noshow_note_mentioning_call_still_noshow():
+    # "missed the call" alone is phone no-answer, but paired with a meeting
+    # phrase the meeting no-show wins (checked first, same note).
+    cls = classify_notes([_note("Missed our meeting — also called after, no answer")])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_plain_missed_your_call_is_no_answer_not_noshow():
+    # "Missed your call" with NO meeting context = phone no-answer, never
+    # a meeting no-show and never a call recap ("Good talking with you").
+    cls = classify_notes([_note("Missed your call this morning")])
+    assert cls["signal"] == "no_answer"
+    d = derive_draft(_lead(), [_note("Missed your call this morning")])
+    assert "Good talking with you" not in d["body_html"]
+    assert "Tried you by phone" in d["subject"]
+
+
 def test_no_answer_signal():
     cls = classify_notes([_note("Called twice, didn't answer")])
     assert cls["signal"] == "no_answer"

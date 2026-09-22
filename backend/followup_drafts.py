@@ -9,6 +9,11 @@ about the revocable trust" shapes the copy:
   - Voicemail note  -> "I just left you a voicemail a minute ago..."
   - Call note       -> "Good talking with you..." (+ paraphrased topic)
   - No-answer note  -> "I tried you by phone a little earlier..."
+  - Meeting no-show note ("didn't attend", "missed our meeting", "Brandon
+    didn't attend") -> "we had a time set for today but we didn't connect..."
+    + a no-hard-feelings rebook invite. 2026-09-22 (Jeff, #trustoffice-main):
+    after logging a missed meeting as an activity, Preview must draft the
+    right kind of email — an invite to book again, not a cold intro.
   - FAILED-voicemail note ("unable to leave a voicemail — mailbox was full")
                     -> treated as no-answer ("I tried you by phone..."), never
                        as a left voicemail. 2026-09-18 (Jeff caught the bug).
@@ -61,12 +66,29 @@ _VM_FAIL_RE = re.compile(
 )
 _NOANSWER_RE = re.compile(
     r"no answer|didn'?t (?:answer|pick(?:\s?up)?)|did not answer|no pick-?up|"
-    r"missed (?:the )?call|unreachable|no response (?:by|to) phone",
+    r"missed (?:the |your |our |a )?call|unreachable|no response (?:by|to) phone",
     re.I,
 )
 _CALL_RE = re.compile(
     r"\bcall(?:ed)?\b|\bspoke\b|\btalked\b|\bphone\b|\bchat(?:ted)?\b|"
     r"\bconversation\b|\bconnected\b",
+    re.I,
+)
+# Meeting no-show — checked BEFORE _CALL_RE etc. 2026-09-22 (Jeff, #trustoffice-main):
+# his note "Brandon had a scheduled meeting right now and Brandon didn't attend"
+# must draft a rebook invite ("we had a time set for today..."), not a cold intro.
+# Covers the scheduled-but-not-attended phrasings Jeff actually writes; extend as
+# new phrasings appear. Plain "missed your call" stays a phone no-answer.
+_NOSHOW_RE = re.compile(
+    r"didn'?t attend|did not attend|was(?:n't| not) (?:in attendance|present)|"
+    r"no-?show|"
+    r"(?:missed|skipped|blew(?:\s?off)?|stood\s?(?:up|me)|(?:no|didn'?t)\s?show(?:ed)?(?:\s?up)?)\s+"
+    r"(?:our|the|his|her|their|today'?s|scheduled)?\s*(?:meeting|appointment|slot|session|consult)\b|"
+    r"(?:meeting|appointment|slot|session|consult)\s+(?:was\s+)?"
+    r"(?:missed|skipped|no-?show(?:ed)?|didn'?t happen|fell through|was a no-?show)|"
+    r"(?:lead|he|she|they|prospect)\s+didn'?t\s+(?:show|attend)|"
+    r"didn'?t\s+(?:show|attend)(?:\s?up)?\b|"
+    r"(?:scheduled|booked)\s+(?:meeting|call|appointment)\s+(?:but|and)\b.{0,40}didn'?t",
     re.I,
 )
 _TEXT_RE = re.compile(r"\btext(?:ed)?\b|\bsms\b", re.I)
@@ -138,7 +160,7 @@ def classify_notes(notes: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Scan notes (any order) and return detected signals.
 
     Returns {"signal": str, "topics": [str], "objection": bool, "notes_used": [str]}.
-    Priority: voicemail > no_answer > call > text > email > general.
+    Priority: meeting_no_show > voicemail > no_answer > call > text > email > general.
     Failed-voicemail phrasing ("unable to leave a voicemail", "mailbox full")
     routes to no_answer BEFORE the voicemail check — the newest note wins.
     """
@@ -163,6 +185,10 @@ def classify_notes(notes: List[Dict[str, Any]]) -> Dict[str, Any]:
                 # "unable to leave a voicemail / mailbox full" — a FAILED voicemail
                 # attempt is a no-answer follow-up, never "I just left you a voicemail."
                 signal = "no_answer"
+            elif _NOSHOW_RE.search(text):
+                # Scheduled-but-not-attended — rebook invite, checked before
+                # call/voicemail so "missed our meeting" isn't read as a call recap.
+                signal = "meeting_no_show"
             elif _VM_RE.search(text):
                 signal = "voicemail"
             elif _NOANSWER_RE.search(text):
@@ -235,6 +261,8 @@ def derive_draft(lead: Dict[str, Any], notes: List[Dict[str, Any]]) -> Dict[str,
     # ── Subject ──
     if signal == "voicemail":
         subject = f"Just left you a voicemail, {name}"
+    elif signal == "meeting_no_show":
+        subject = f"Missed you today, {name}"
     elif signal == "no_answer":
         subject = f"Tried you by phone, {name}"
     elif signal == "call":
@@ -255,6 +283,20 @@ def derive_draft(lead: Dict[str, Any], notes: List[Dict[str, Any]]) -> Dict[str,
             "for the details. Easier to grab a time here:</p>"
         )
         parts.append(link_p)
+    elif signal == "meeting_no_show":
+        parts.append(
+            f"<p {_P_STYLE}>We had a time set for today but we didn't connect — no worries at "
+            "all, I know how fast schedules get away from you.</p>"
+        )
+        parts.append(
+            f"<p {_P_STYLE}>If you'd still like the walkthrough of TrustOffice, you can book "
+            "again in one click — pick a fresh time and I'll be there:</p>"
+        )
+        parts.append(link_p)
+        parts.append(
+            f"<p {_P_STYLE}>If the timing just isn't right anymore, no hard feelings — reply "
+            "and tell me what would be more useful.</p>"
+        )
     elif signal == "no_answer":
         parts.append(
             f"<p {_P_STYLE}>I tried you by phone a little earlier — phone tag isn't anyone's "
@@ -323,6 +365,7 @@ def derive_draft(lead: Dict[str, Any], notes: List[Dict[str, Any]]) -> Dict[str,
 # ── Signal label map (shared with the frontend chips) ──────────────────────
 SIGNAL_LABELS = {
     "voicemail": "Voicemail follow-up",
+    "meeting_no_show": "Missed meeting — invite to book again",
     "no_answer": "Phone follow-up (no answer)",
     "call": "Call recap",
     "text": "Text follow-up",
