@@ -362,9 +362,14 @@ async def chat(
     )
 
     # 7. Build action card if applicable
+    # Prod 500 fix (2026-09-22, error_logs 19:49+): OpenRouter occasionally
+    # emits action_card as a plain string (e.g. "create_minutes") instead of
+    # an object — .get() on str crashed the whole /ai/chat route. Only
+    # dict-shaped cards are usable; anything else degrades to "no card".
     action_card = None
-    if ai_response.get("action_card") and ai_response["action_card"].get("type"):
-        action_data = ai_response["action_card"]
+    _card_payload = ai_response.get("action_card")
+    if isinstance(_card_payload, dict) and _card_payload.get("type"):
+        action_data = _card_payload
         action_card = ChatAction(
             type=action_data.get("type", f"{intent}_preview"),
             data=action_data.get("data", {}),
