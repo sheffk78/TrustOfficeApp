@@ -161,6 +161,17 @@ def test_noshow_note_mentioning_call_still_noshow():
     assert cls["signal"] == "meeting_no_show"
 
 
+def test_did_not_show_to_appointment_detected():
+    # Jeff's real note 2026-09-22 16:52Z: "He did not show to his appointment today."
+    cls = classify_notes([_note("He did not show to his appointment today.")])
+    assert cls["signal"] == "meeting_no_show"
+
+
+def test_didnt_show_to_appointment_detected():
+    cls = classify_notes([_note("She didn't show to her appointment")])
+    assert cls["signal"] == "meeting_no_show"
+
+
 def test_plain_missed_your_call_is_no_answer_not_noshow():
     # "Missed your call" with NO meeting context = phone no-answer, never
     # a meeting no-show and never a call recap ("Good talking with you").

@@ -86,7 +86,8 @@ _NOSHOW_RE = re.compile(
     r"(?:our|the|his|her|their|today'?s|scheduled)?\s*(?:meeting|appointment|slot|session|consult)\b|"
     r"(?:meeting|appointment|slot|session|consult)\s+(?:was\s+)?"
     r"(?:missed|skipped|no-?show(?:ed)?|didn'?t happen|fell through|was a no-?show)|"
-    r"(?:lead|he|she|they|prospect)\s+didn'?t\s+(?:show|attend)|"
+    r"(?:lead|he|she|they|prospect|brandon)\s+didn'?t\s+(?:show|attend)|"
+    r"\bdid(?:\s)?not\s+show\s+to\b|"
     r"didn'?t\s+(?:show|attend)(?:\s?up)?\b|"
     r"(?:scheduled|booked)\s+(?:meeting|call|appointment)\s+(?:but|and)\b.{0,40}didn'?t",
     re.I,
