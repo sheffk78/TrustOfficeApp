@@ -36,7 +36,12 @@ def _sync():
     """Sync pymongo handle for test-side seeding/verification (app itself uses motor)."""
     return MongoClient(_SYNC_URL)[TEST_DB]
 
-MongoClient(_SYNC_URL).drop_database(TEST_DB)
+# pytest-safe: when collected by CI pytest (no mongod on 27999), skip the
+# pre-clean silently instead of erroring collection — this script runs standalone.
+try:
+    MongoClient(_SYNC_URL, serverSelectionTimeoutMS=3000).drop_database(TEST_DB)
+except Exception:
+    pass
 
 import secrets
 

@@ -27,7 +27,10 @@ MARKERS='REACT_APP_BACKEND_URL|BACKEND_URL|TEST_BASE_URL|requests\.(post|get|put
 # Isolation-hostile files: they inject sys.modules stubs (e.g. a fake
 # "dependencies") at import time that poison every later collection in the
 # same process. They must run alone, never in the combined CI unit run.
-ISOLATION_HOSTILES='test_cc_normalize.py test_booking_email_endpoints.py test_booking_lead_push.py'
+# Standalone integration scripts: run via __main__ with their OWN mongod/port, 
+# no pytest test functions. Module-level Mongo I/O breaks pytest collection
+# (2026-09-22 CI: drop_database against 127.0.0.1:27999 aborted the suite).
+ISOLATION_HOSTILES='test_cc_normalize.py test_booking_email_endpoints.py test_booking_lead_push.py test_action_layer_integration.py'
 
 args=""
 for f in test_*.py; do
