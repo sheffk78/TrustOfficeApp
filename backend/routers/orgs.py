@@ -369,3 +369,33 @@ def _send_grant_notice(grant: dict, event: str):
         )
     except Exception:
         pass
+
+
+@router.post("/revoke/{token}")
+async def revoke_by_token(token: str):
+    """D7: tokenized one-click revoke (no login required).
+    Looks up active grant by grant_id, sets status=revoked.
+    Single-use: already-revoked/expired grants return 410 Gone.
+    """
+    now = _now()
+    # Try org grant first
+    grant = await db.trust_grants.find_one({"grant_id": token})
+    if grant:
+        if grant.get("status") != "active":
+            raise HTTPException(status_code=410, detail={"code": "grant_already_revoked"})
+        await db.trust_grants.update_one(
+            {"grant_id": token},
+            {"$set": {"status": "revoked", "revoked_at": now, "revoke_reason": "token_revoke"}},
+        )
+        return {"grant_id": token, "status": "revoked", "type": "org_grant"}
+    # Try party grant
+    pgrant = await db.party_grants.find_one({"grant_id": token})
+    if pgrant:
+        if pgrant.get("status") != "active":
+            raise HTTPException(status_code=410, detail={"code": "grant_already_revoked"})
+        await db.party_grants.update_one(
+            {"grant_id": token},
+            {"$set": {"status": "revoked", "revoked_at": now, "revoke_reason": "token_revoke"}},
+        )
+        return {"grant_id": token, "status": "revoked", "type": "party_grant"}
+    raise HTTPException(status_code=404, detail={"code": "grant_not_found"})
