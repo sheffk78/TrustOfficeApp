@@ -14,9 +14,10 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 from database import db
-from dependencies import get_current_user, require_write_access, should_show_watermark, auto_update_onboarding, is_white_label
+from dependencies import get_current_user, require_write_access, require_org_grant, require_trust_party_access, should_show_watermark, auto_update_onboarding, is_white_label
 from trustee_utils import parse_trustees
 from models import (
+    GrantLevel, PartyLevel,
     MinutesCreate, MinutesResponse, MinutesTemplateCreate, MinutesTemplateResponse,
     MinutesDraftRequest, MinutesDraftResponse, MinutesAutosaveRequest,
     GuidedMinutesContext
@@ -221,7 +222,12 @@ logger = logging.getLogger(__name__)
 
 @router.post("/minutes", response_model=MinutesResponse)
 async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTasks, user: dict = Depends(require_write_access)):
+    # Institution/party guards (T3/D-B): preparer org-grant or actor party-grant
+    # may create minutes; owners pass unchanged. Flag off = legacy identical.
+    user = await _apply_minutes_write_guards(minutes.trust_id, user)
     trust = await db.trusts.find_one({"trust_id": minutes.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust and (user.get("org_grant") or user.get("party_grant")):
+        trust = await db.trusts.find_one({"trust_id": minutes.trust_id}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
@@ -246,7 +252,10 @@ async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTas
         "retroactive_type": minutes.retroactive_type,
         "manually_edited": minutes.manually_edited,
     }
-    
+    attribution = await _build_attribution(user, trust)
+    if attribution:
+        minutes_doc["attribution"] = attribution  # additive; absent without grants
+
     await db.minutes_records.insert_one(minutes_doc)
     
     # Link to distribution if provided
@@ -458,6 +467,41 @@ def _build_quick_mode_context(request) -> list:
     return parts
 
 
+async def _apply_minutes_write_guards(trust_id: str, user: dict) -> dict:
+    """Union guard for minutes writes (T3/D-B): actor party grant OR preparer
+    org grant. Owner passes unchanged. Flag off = both guards short-circuit,
+    returns user as-is (byte-identical legacy).
+    """
+    try:
+        return await require_trust_party_access(trust_id, PartyLevel.actor, user=user)
+    except HTTPException:
+        return await require_org_grant(trust_id, GrantLevel.preparer, user=user)
+
+
+async def _build_attribution(user: dict, trust: dict) -> Optional[str]:
+    """D10 attribution line for preparer/actor paths (D-B fix).
+
+    Org: 'Prepared by {member_name}, {org_name} — on behalf of {trustee_name}'
+    — org name resolved from db.orgs (TrustGrant docs carry no org_name).
+    Party: 'Acted by {name} ({party_type})'
+    Owners / ungated users: None (attribution stays additive-only).
+    """
+    if user.get("org_grant"):
+        grant = user["org_grant"]
+        org_name = ""
+        if grant.get("org_id"):
+            org = await db.orgs.find_one({"org_id": grant["org_id"]}, {"_id": 0, "name": 1})
+            org_name = (org or {}).get("name", "")
+        member_name = user.get("name") or user.get("email", "")
+        trustee_name = trust.get("trustee_names", "") or trust.get("name", "")
+        return f"Prepared by {member_name}, {org_name} — on behalf of {trustee_name}"
+    if user.get("party_grant"):
+        party_type = user["party_grant"].get("party_type", "party")
+        name = user.get("name") or user.get("email", "")
+        return f"Acted by {name} ({party_type})"
+    return None
+
+
 async def _call_ai_draft(ai_request) -> object:
     """Call the AI draft service, translating HTTPException re-raises and logging others as 500."""
     try:
@@ -488,11 +532,19 @@ async def create_minutes_draft(
     """
     user_id = user["user_id"]
 
-    # Get trust context for AI
+    # Institution/party guards (T3): preparer org-grant or actor party-grant
+    # may draft. Runs before trust lookup; owner passes through unchanged.
+    # Flag off = both guards short-circuit to pass (byte-identical legacy).
+    user = await _apply_minutes_write_guards(request.trust_id, user)
+
+    # Get trust context for AI (owners by user_id; granted members fall back
+    # to trust_id-only — the guards above already verified their access)
     trust = await db.trusts.find_one(
         {"trust_id": request.trust_id, "user_id": user_id},
         {"_id": 0}
     )
+    if not trust and (user.get("org_grant") or user.get("party_grant")):
+        trust = await db.trusts.find_one({"trust_id": request.trust_id}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
@@ -508,6 +560,10 @@ async def create_minutes_draft(
     participants_list = _resolve_participants(request, trust)
     participants_str = ", ".join(participants_list) if participants_list else ""
     minutes_type = request.minutes_type or "general"
+
+    # Attribution: D10 line via helper (D-B fix: org name resolved from
+    # db.orgs — TrustGrant docs carry no org_name)
+    attribution = await _build_attribution(user, trust)
 
     if request.template_type:
         # ── Template mode ──
@@ -559,7 +615,8 @@ async def create_minutes_draft(
         minutes_type=minutes_type,
         meeting_date=request.meeting_date,
         participants_text=participants_str,
-        template_type=request.template_type
+        template_type=request.template_type,
+        attribution=attribution,
     )
 
 
@@ -577,14 +634,22 @@ async def autosave_minutes(
     """
     user_id = user["user_id"]
     
-    # Verify trust exists
+    # Institution/party guards (T3/D-B): preparer org-grant or actor party-grant
+    # may autosave drafts; owners pass unchanged. Flag off = legacy identical.
+    user = await _apply_minutes_write_guards(request.trust_id, user)
+
+    # Verify trust exists (owners by user_id; granted members by trust_id —
+    # the guards above already verified their access)
     trust = await db.trusts.find_one(
         {"trust_id": request.trust_id, "user_id": user_id},
         {"_id": 0}
     )
+    if not trust and (user.get("org_grant") or user.get("party_grant")):
+        trust = await db.trusts.find_one({"trust_id": request.trust_id}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
     
+    attribution = await _build_attribution(user, trust)
     now = datetime.now(timezone.utc).isoformat()
     
     if request.minutes_id:
@@ -614,6 +679,8 @@ async def autosave_minutes(
             "retroactive_type": request.retroactive_type,
             "updated_at": now,
         }
+        if attribution:
+            update_doc["attribution"] = attribution  # additive; absent without grants
         
         await db.minutes_records.update_one(
             {"minutes_id": request.minutes_id, "user_id": user_id},
@@ -650,6 +717,8 @@ async def autosave_minutes(
             "created_at": now,
             "source": "wizard",
         }
+        if attribution:
+            minutes_doc["attribution"] = attribution  # additive; absent without grants
         
         await db.minutes_records.insert_one(minutes_doc)
         logger.info(f"Autosave created new draft: {minutes_id}")

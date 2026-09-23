@@ -430,7 +430,7 @@ class EmailService:
         plan_type: str,
         amount: str,
         next_billing_date: str,
-        legacy_trust_limit: int | None = None
+        legacy_trust_limit: Optional[int] = None
     ) -> Dict[str, Any]:
         """Send notification when subscription is activated"""
         template_data = {

@@ -8,7 +8,7 @@ from ledger_sync import auto_write_ledger_transaction
 import re
 
 from database import db
-from dependencies import get_current_user, require_write_access, auto_update_onboarding, check_feature_access, Feature, PREMIUM_FEATURE_ERROR_CODE, PREMIUM_FEATURE_ERROR_MESSAGE
+from dependencies import get_current_user, require_write_access, require_org_grant, auto_update_onboarding, check_feature_access, Feature, PREMIUM_FEATURE_ERROR_CODE, PREMIUM_FEATURE_ERROR_MESSAGE
 from trustee_utils import parse_trustees
 from models import (
     DistributionCreate, DistributionUpdate, DistributionResponse,
@@ -116,9 +116,10 @@ DISTRIBUTION_NOT_FOUND_MSG = (
 async def create_distribution(
     dist: DistributionCreate,
     background_tasks: BackgroundTasks,
-    user: dict = Depends(require_write_access)
+    user: dict = Depends(require_write_access),
 ):
     """Create a new distribution record"""
+    await require_org_grant(dist.trust_id, user=user)
     trust = await db.trusts.find_one({"trust_id": dist.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
@@ -321,7 +322,7 @@ async def get_distributions(
 async def update_distribution(
     distribution_id: str,
     update: DistributionUpdate,
-    user: dict = Depends(require_write_access)
+    user: dict = Depends(require_write_access),
 ):
     """Update a distribution record"""
     dist = await db.distribution_records.find_one(
@@ -330,6 +331,7 @@ async def update_distribution(
     )
     if not dist:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
+    await require_org_grant(dist["trust_id"], user=user)
 
     # Build update dict with only provided fields
     update_data = {}
@@ -367,7 +369,7 @@ async def approve_distribution(
     distribution_id: str,
     approval: DistributionApprove,
     background_tasks: BackgroundTasks,
-    user: dict = Depends(require_write_access)
+    user: dict = Depends(require_write_access),
 ):
     """Approve a distribution with solvency and recusal confirmation"""
     dist = await db.distribution_records.find_one(
@@ -376,6 +378,7 @@ async def approve_distribution(
     )
     if not dist:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
+    await require_org_grant(dist["trust_id"], user=user)
 
     if not approval.solvency_confirmed:
         raise HTTPException(status_code=400, detail="Solvency must be confirmed to approve the distribution. Please review the trust's financial position and check the solvency confirmation box.")
@@ -443,9 +446,17 @@ async def approve_distribution(
 async def patch_distribution_status(
     distribution_id: str,
     status_update: DistributionStatusUpdate,
-    user: dict = Depends(require_write_access)
+    user: dict = Depends(require_write_access),
 ):
     """Update distribution status via PATCH (set to review, declined, etc.)"""
+    distribution = await db.distribution_records.find_one(
+        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not distribution:
+        raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
+    await require_org_grant(distribution["trust_id"], user=user)
+
     status = status_update.status
 
     if status not in VALID_PATCH_STATUSES:
@@ -569,6 +580,7 @@ async def delete_distribution(distribution_id: str, user: dict = Depends(require
     )
     if not dist:
         raise HTTPException(status_code=404, detail="Distribution not found. It may have been already deleted. Please refresh the page and try again.")
+    await require_org_grant(dist["trust_id"], user=user)
 
     result = await db.distribution_records.delete_one({
         "distribution_id": distribution_id,
@@ -730,20 +742,20 @@ async def get_benevolence_log(
 async def send_distribution_notice(
     distribution_id: str,
     background_tasks: BackgroundTasks,
-    user: dict = Depends(require_write_access)
+    user: dict = Depends(require_write_access),
 ):
     """Send a distribution notice email to the beneficiary.
 
     Looks up the beneficiary's email from certificate records (Phase 1 data).
     Requires the distribution to exist and the beneficiary to have an email on file.
     """
-    # Find the distribution
     dist = await db.distribution_records.find_one(
         {"distribution_id": distribution_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
     if not dist:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
+    await require_org_grant(dist["trust_id"], user=user)
 
     # Get trust info
     trust = await db.trusts.find_one(

@@ -46,6 +46,8 @@ from dependencies import (
     JWT_SECRET,
     JWT_ALGORITHM,
     touch_session,
+    _toggle_institution,
+    _toggle_trust_parties,
 )
 
 # Import all routers
@@ -74,6 +76,7 @@ from routers.trusts import router as trusts_router
 from routers.successor import router as successor_router
 from routers.entities import router as entities_router
 from routers.tasks import router as tasks_router
+from routers.orgs import router as orgs_router
 from routers.auth import router as auth_router
 from routers.totp_2fa import router as totp_2fa_router
 from routers.preferences import router as preferences_router
@@ -118,6 +121,7 @@ from routers.chat import router as chat_router  # Trust Assistant
 from routers.performance import router as performance_router
 from routers.trust_doc_analysis import router as trust_doc_analysis_router
 from routers.marketing_expenses import router as marketing_expenses_router
+from routers.trust_parties import router as trust_parties_router
 from routers.trust_admin_kits import router as trust_admin_kits_router
 from routers.page_agent import router as page_agent_router  # Page Agent LLM proxy
 from routers.analytics import router as analytics_router  # Analytics events + funnel
@@ -493,6 +497,7 @@ app.add_middleware(
 )
 
 # Register all routers
+app.include_router(orgs_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(totp_2fa_router, prefix="/api")
 app.include_router(actions_router, prefix="/api")
@@ -573,6 +578,7 @@ app.include_router(marketing_expenses_router, prefix="/api")
 # Performance Dashboard — contractor/lead performance metrics
 app.include_router(performance_router, prefix="/api")
 # Trust Administration Kits — auto-gathered paperwork packets (vehicle retitle, bank, real estate, etc.)
+app.include_router(trust_parties_router, prefix="/api")
 app.include_router(trust_admin_kits_router, prefix="/api")
 # Page Agent — authenticated LLM proxy for the onboarding Page Agent pilot
 app.include_router(page_agent_router, prefix="/api")
@@ -886,9 +892,24 @@ async def startup_event():
         await db.trust_admin_kits.create_index("kit_id", unique=True)
         await db.trust_admin_kits.create_index([("user_id", 1), ("trust_id", 1)])
         await db.trust_admin_kits.create_index([("user_id", 1), ("created_at", -1)])
+
+        # Org skeleton indexes (M1) — gated on TOGGLE_INSTITUTION
+        if _toggle_institution():
+            await db.orgs.create_index("owner_user_id")
+            await db.org_members.create_index([("org_id", 1), ("status", 1)])
+            await db.org_members.create_index("email")
+            await db.trust_grants.create_index([("trust_id", 1), ("status", 1)])
+            await db.trust_grants.create_index([("org_id", 1), ("member_id", 1)])
+        
+        # Trust-party indexes (M2) — gated on TOGGLE_TRUST_PARTIES
+        if _toggle_trust_parties():
+            await db.trust_parties.create_index([("trust_id", 1), ("party_type", 1)])
+            await db.trust_parties.create_index("email")
+            await db.party_grants.create_index([("trust_id", 1), ("status", 1)])
+            await db.party_grants.create_index("party_id")
+            await db.party_audit.create_index([("trust_id", 1), ("at", -1)])
         
         # Bank accounts indexes
-        await db.bank_accounts.create_index("account_id", unique=True)
         await db.bank_accounts.create_index([("trust_id", 1), ("user_id", 1)])
         await db.bank_accounts.create_index([("entity_id", 1), ("user_id", 1)])
         

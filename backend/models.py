@@ -353,6 +353,7 @@ class TrustCreate(BaseModel):
     review_cadence: Optional[str] = "quarterly"
     benevolence_mission: Optional[str] = None
     determination_letter_date: Optional[str] = None
+    approval_threshold: Optional[int] = None  # null = all active co-trustees must approve (M2 D9)
 
     @model_validator(mode="after")
     def validate_tax_fields(self):
@@ -423,6 +424,7 @@ class TrustUpdate(BaseModel):
     review_cadence: Optional[str] = None
     benevolence_mission: Optional[str] = None
     determination_letter_date: Optional[str] = None
+    approval_threshold: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_tax_fields(self):
@@ -502,6 +504,7 @@ class TrustResponse(BaseModel):
     # "active" (default) | "dissolved_archived" — the latter is read-only.
     status: Optional[str] = "active"
     dissolved_on: Optional[str] = None
+    approval_threshold: Optional[int] = None  # multi-sig: null = all active co-trustees (M2 D9)
 
 
 # ==================== ENTITY MODELS ====================
@@ -745,6 +748,7 @@ class MinutesResponse(BaseModel):
     retroactive_trustees_aware: Optional[str] = None
     retroactive_type: Optional[str] = None
     manually_edited: bool = False
+    attribution: Optional[str] = None  # D10/D-B: additive, set when prepared via a grant
 
 class MinutesResolution(BaseModel):
     title: str
@@ -861,7 +865,7 @@ class MinutesDraftRequest(BaseModel):
     section_context: Optional[str] = None
 
 class MinutesDraftResponse(BaseModel):
-    """Response model for unified AI minutes draft — same as GuidedMinutesDraftResponse + template_type"""
+    """Response model for unified AI minutes draft â same as GuidedMinutesDraftResponse + template_type"""
     suggested_title: str = Field(..., description="Suggested title for the minutes")
     draft_body: str = Field(..., description="The main minutes text body")
     cautions: List[str] = Field(default_factory=list, description="Warnings or notes for the trustee")
@@ -869,6 +873,7 @@ class MinutesDraftResponse(BaseModel):
     meeting_date: str
     participants_text: str
     template_type: Optional[str] = None
+    attribution: Optional[str] = None
 
 class MinutesAutosaveRequest(BaseModel):
     """Subset of MinutesCreate for autosave draft operations"""
@@ -2172,6 +2177,7 @@ class ApprovalRole(str, Enum):
     drafter = "drafter"
     reviewer = "reviewer"
     approver = "approver"
+    co_trustee = "co_trustee"
 
 class MinutesApprovalStatusCreate(BaseModel):
     """Create approval workflow status for minutes"""
@@ -2222,6 +2228,9 @@ class MinutesApprovalStatusResponse(BaseModel):
     rejection_reason: Optional[str] = None
     created_at: str
     updated_at: Optional[str] = None
+    # D9 multi-sig (additive): signature bookkeeping surfaced to clients
+    co_trustee_approvers: List[str] = []
+    pending_signatures: int = 0
 
 class ApprovalWorkflowSummary(BaseModel):
     """High-level workflow status for a trust"""
@@ -2456,3 +2465,127 @@ class ContactContextResponse(BaseModel):
     contact: ContactResponse
     profile_summary: Optional[ContactProfileSummary] = None
     recent_interactions: List[SupportInteractionResponse] = []
+
+
+# ==================== ORG SKELETON MODELS (M1) ====================
+
+class OrgCreate(BaseModel):
+    name: str
+    billing_contact_email: Optional[str] = None
+
+class OrgResponse(BaseModel):
+    org_id: str
+    name: str
+    owner_user_id: str
+    created_at: str
+
+class OrgMemberRole(str, Enum):
+    owner = "owner"
+    admin = "admin"
+    member = "member"
+
+class OrgMember(BaseModel):
+    member_id: str
+    org_id: str
+    user_id: Optional[str] = None
+    email: EmailStr
+    name: str
+    role: OrgMemberRole = OrgMemberRole.member
+    status: str = "invited"
+    invited_at: str
+    invited_by: str
+    joined_at: Optional[str] = None
+
+class GrantLevel(str, Enum):
+    viewer = "viewer"
+    preparer = "preparer"
+
+class TrustGrantCreate(BaseModel):
+    org_id: str
+    member_id: str
+    level: GrantLevel
+    expires_at: str
+    attested_delegation: bool
+    attestation_ref: Optional[str] = None
+
+class TrustGrant(BaseModel):
+    grant_id: str
+    trust_id: str
+    org_id: str
+    member_id: str
+    level: GrantLevel
+    status: str = "active"
+    granted_by: str
+    granted_at: str
+    expires_at: str
+    revoked_at: Optional[str] = None
+    revoke_reason: Optional[str] = None
+    client_notified_at: Optional[str] = None
+    attestation_ref: Optional[str] = None
+
+
+# ==================== TRUST PARTY MODELS (M2) ====================
+
+class PartyType(str, Enum):
+    co_trustee = "co_trustee"
+    protector = "protector"
+    advisor = "advisor"
+    trust_manager = "trust_manager"
+
+class PartyStatus(str, Enum):
+    active = "active"
+    invited = "invited"
+    inactive = "inactive"
+
+class TrustPartyCreate(BaseModel):
+    trust_id: str
+    party_type: PartyType
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    powers: Optional[List[str]] = None
+    notes: Optional[str] = None
+
+class TrustParty(BaseModel):
+    party_id: str
+    trust_id: str
+    party_type: PartyType
+    name: str
+    email: EmailStr
+    status: PartyStatus = PartyStatus.invited
+    powers: List[str] = []
+    invited_at: str
+    activated_at: Optional[str] = None
+    user_id: Optional[str] = None
+    source: str = "backfill"
+
+class PartyLevel(str, Enum):
+    viewer = "viewer"
+    actor = "actor"
+    protector_scope = "protector_scope"
+
+class PartyGrantCreate(BaseModel):
+    party_id: str
+    level: PartyLevel
+    expires_at: Optional[str] = None
+
+class PartyGrant(BaseModel):
+    grant_id: str
+    trust_id: str
+    party_id: str
+    level: PartyLevel
+    status: str = "active"
+    granted_by: str
+    granted_at: str
+    expires_at: Optional[str] = None
+    revoked_at: Optional[str] = None
+    client_notified_at: Optional[str] = None
+
+class PartyAudit(BaseModel):
+    audit_id: str
+    trust_id: str
+    party_id: str
+    action: str
+    attribution: str
+    at: str
+    meta: dict = {}

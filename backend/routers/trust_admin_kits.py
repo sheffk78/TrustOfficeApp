@@ -20,7 +20,7 @@ import logging
 import uuid
 
 from database import db
-from dependencies import get_current_user, require_write_access
+from dependencies import get_current_user, require_write_access, require_org_grant
 from ai_client import ai_sonnet, AIClientError
 
 logger = logging.getLogger(__name__)
@@ -350,6 +350,11 @@ async def generate_kit(
     body: Dict[str, Any],
     user: dict = Depends(require_write_access),
 ):
+    """Generate a Trust Administration Kit."""
+    trust_id = body.get("trust_id")
+    if not trust_id:
+        raise HTTPException(status_code=400, detail="trust_id is required")
+    await require_org_grant(trust_id, user=user)
     """
     Generate a Trust Administration Kit.
 
@@ -515,12 +520,13 @@ async def get_kit(kit_id: str, user: dict = Depends(get_current_user)):
 @router.delete("/trust-admin-kits/{kit_id}")
 async def delete_kit(kit_id: str, user: dict = Depends(require_write_access)):
     """Delete a kit."""
-    result = await db.trust_admin_kits.delete_one(
+    kit = await db.trust_admin_kits.find_one(
         {"kit_id": kit_id, "user_id": user["user_id"]},
     )
-    if result.deleted_count == 0:
+    if not kit:
         raise HTTPException(
             status_code=404,
             detail="Kit not found. It may have already been deleted. Please refresh the page and try again.",
         )
+    await require_org_grant(kit["trust_id"], user=user)
     return {"message": "Kit deleted", "kit_id": kit_id}
