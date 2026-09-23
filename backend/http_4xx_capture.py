@@ -109,7 +109,10 @@ async def _capture(
                 pairs = []
                 for err in list(validation_errors)[:5]:
                     loc = ".".join(str(p) for p in (err.get("loc") or [])[1:]) or "?"
-                    pairs.append(f"{loc}: {err.get('message', '')}")
+                    # pydantic v2 puts the human message in 'msg' ('message'
+                    # never existed — that's why 422 docs logged bare "33: "
+                    # / "?: " prefixes with no text).
+                    pairs.append(f"{loc}: {err.get('msg') or err.get('message', '')}")
                 message = "; ".join(pairs)
             except Exception:
                 pass
@@ -123,10 +126,35 @@ async def _capture(
         noise_class, alert = classify_and_alert(status_code, detail, request.url.path)
         alert = alert and _looks_like_drift(detail, status_code)
 
+        # 2026-09-23: attribute the caller. 4xx docs used to carry user_id=None
+        # even for authenticated traffic, making verification sweeps and real
+        # user errors indistinguishable in the fixer queue. Same best-effort
+        # JWT decode as error_alerting.handle_uncaught — DB not required.
+        user_id = None
+        try:
+            import jwt as _jwt
+            import os as _os
+            token = _extract_token(request)
+            if token and _os.environ.get("JWT_SECRET"):
+                payload = _jwt.decode(
+                    token, _os.environ["JWT_SECRET"], algorithms=["HS256"]
+                )
+                user_id = payload.get("user_id")
+        except Exception:
+            user_id = None  # missing/invalid token — anonymous request
+
+        if noise_class is None and user_id and str(user_id).endswith(
+            ("2cfa2f0bf577",)
+        ):
+            # Demo-verification traffic (demo account) is never a real user
+            # error: store for forensics, keep it out of the fixer queue.
+            noise_class = "verification"
+
         await report_error(
             source="server",
             error_type=error_type,
             error_message=message[:2000],
+            user_id=user_id,
             request_path=request.url.path,
             request_method=request.method,
             extra_context={
@@ -138,6 +166,17 @@ async def _capture(
         )
     except Exception as exc:  # observability must never break responses
         logger.debug(f"4xx capture failed (non-fatal): {exc}")
+
+
+def _extract_token(request: Request) -> Optional[str]:
+    """Best-effort bearer-token extraction (Authorization header or cookie)."""
+    auth = request.headers.get("Authorization") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip() or None
+    try:
+        return request.cookies.get("access_token")
+    except Exception:
+        return None
 
 
 def install_4xx_capture(app: FastAPI) -> None:

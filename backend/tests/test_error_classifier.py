@@ -360,3 +360,58 @@ def test_genuine_frontend_error_never_classified():
     # The one real error in the 1,449 sweep (frontend load_trusts, /course,
     # iPad CriOS UA). Never silence this shape.
     assert classify(0, "Load failed", "/course") is None
+
+# ---------------------------------------------------------------------------
+# 2026-09-23 additions — verification-traffic era (prod_chat_intent_sweep +
+# fixer self-verify probes hit live API with demo creds; their 404s on
+# already-cleaned IDs were alerting as real errors).
+# ---------------------------------------------------------------------------
+
+
+def test_empty_noise_class_string_not_treated_as_tagged():
+    # Sweep-era docs stored noise_class:"" (empty string = untagged). The
+    # orchestrator treats any non-empty stored tag as final — "" must fall
+    # through to legacy classification, never silence a doc silently.
+    from error_classifier import classify as _c
+    # An untagged-looking dead-id 404 stays REAL for the shared classifier:
+    assert _c(404, "Beneficiary certificate not found",
+              "/api/beneficiaries/cert_49cd731b856d") is None
+
+
+def test_ratification_addendum_404_stays_real():
+    # "No ratification addendum exists for these minutes." on a real minutes id
+    # is a genuine user-facing miss (07-17 minutes, wrong owner probing) — the
+    # classifier has no business silencing it.
+    assert classify(404, "No ratification addendum exists for these minutes.",
+                    "/api/minutes-templates/min_ea823b093bbe/ratification-addendum-pdf") is None
+
+
+def test_minutes_not_found_404_stays_real():
+    assert classify(404, "Minutes not found. It may have been deleted. "
+                    "Please refresh the page and try again.",
+                    "/api/minutes/min_ea823b093bbe") is None
+
+
+def test_dead_entity_id_404s_stay_real_for_shared_classifier():
+    # Cleanup re-attempts against prior runs' already-deleted records. These
+    # are handled by the verification TAG at capture time, not by path
+    # patterns here — the shared classifier must keep them real so a REAL
+    # user hitting the same message still pages.
+    assert classify(404, "Beneficiary certificate not found",
+                    "/api/beneficiaries/cert_d6a0b9bc6842") is None
+    assert classify(404, "Distribution not found. It may have been already deleted.",
+                    "/api/distributions/dist_5ec578fa2557") is None
+    # Bare "Not Found" inside /api/* is the verified 2026-09-21 probe rule —
+    # sweep leftover DELETEs that hit a missing route shape land there, which
+    # is correct (real app failures carry real detail, shown above).
+    assert classify(404, "Not Found",
+                    "/api/class-beneficiaries/cb_a480a632c47f4bdf") == "scanner"
+
+
+def test_405_wrapped_probe_ids_stay_real():
+    # trust-id-in-beneficiary-path 405s from sweep cleanup were briefly
+    # mis-tagged scanner in early drafts — pinned real on purpose.
+    assert classify(405, "Method Not Allowed",
+                    "/api/beneficiaries/trust_9f5b1f59b205") is None
+    assert classify(405, "Method Not Allowed",
+                    "/api/trusts/trust_9f5b1f59b205") is None

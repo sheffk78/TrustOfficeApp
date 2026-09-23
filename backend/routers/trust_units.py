@@ -326,6 +326,16 @@ async def reserve_units(trust_id: str, user_id: str, units: float, authorized: f
         )
         if not counter:
             raise HTTPException(status_code=400, detail=f"Cannot issue {units} units. Only {authorized - current} units remaining.")
+    # 2026-09-23 self-heal: reconcile counter drift on every successful
+    # issuance (delete/deactivate paths used to leak reserved capacity; the
+    # counter could never recover on its own). At this point the new cert is
+    # NOT yet inserted, so the correct post-issuance value is actual+units.
+    actual = await get_total_active_units(trust_id, user_id)
+    if abs(counter["reserved_units"] - actual) > 0.001:
+        await db.trust_unit_counters.update_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"$set": {"reserved_units": actual + units}}
+        )
     return f"CU-{str(counter['next_cert_number']).zfill(3)}"
 
 
@@ -757,6 +767,15 @@ async def delete_unit_certificate(
     await db.trust_unit_certificates.delete_one(
         {"certificate_id": certificate_id, "user_id": user["user_id"]}
     )
+
+    # 2026-09-23: releasing capacity — only the revoke path decremented the
+    # counter, so hard-deleting an ACTIVE certificate permanently burned its
+    # units ("Cannot issue X units" with an empty pool). Mirrors revoke.
+    if cert.get("status") == "active":
+        await db.trust_unit_counters.update_one(
+            {"trust_id": cert["trust_id"], "user_id": user["user_id"]},
+            {"$inc": {"reserved_units": -cert["units"]}}
+        )
 
     # Remove auto-linked entity relationships for this certificate
     await _remove_auto_link_relationships(certificate_id, user["user_id"])

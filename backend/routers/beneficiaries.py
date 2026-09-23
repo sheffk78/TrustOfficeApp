@@ -618,6 +618,14 @@ async def delete_beneficiary(
         }}
     )
 
+    # 2026-09-23: releasing reserved capacity — this deactivate path skipped
+    # the counter decrement, so removing a beneficiary permanently burned its
+    # units. Mirrors the revoke path.
+    await db.trust_unit_counters.update_one(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"$inc": {"reserved_units": -existing["units"]}}
+    )
+
     return {"status": "deleted", "certificate_id": beneficiary_id}
 
 
@@ -684,7 +692,11 @@ async def send_beneficiary_certificate(
     from_name = user_doc.get("name", "Trustee") if user_doc else "Trustee"
 
     # Send the certificate email
-    import email_service
+    # 2026-09-23: `import email_service` bound the MODULE, not the singleton,
+    # so .send_certificate_notice raised AttributeError on every send
+    # ("module 'email_service' has no attribute 'send_certificate_notice'").
+    # Every other router imports the instance directly.
+    from email_service import email_service
     result = await email_service.send_certificate_notice(
         to_email=cert_email,
         beneficiary_name=holder_name,
