@@ -393,6 +393,40 @@ def _coerce_dict(raw, default=None):
         return raw[0]
     return default if default is not None else {}
 
+def _parse_llm_json(text, default=None):
+    """Parse an LLM reply that should be a JSON object.
+
+    Models frequently wrap JSON in markdown fences (```json ... ```) or pad it
+    with prose. json.loads on the raw text then raises JSONDecodeError and the
+    caller silently falls back — e.g. classify_intent degrading every write
+    intent to general_chat. Strip fences and grab the first {...} block before
+    parsing. Returns default (dict) when nothing parseable remains.
+    """
+    if default is None:
+        default = {}
+    if not text or not text.strip():
+        return default
+    clean = text.strip()
+    if clean.startswith("```json"):
+        clean = clean[7:]
+    elif clean.startswith("```"):
+        clean = clean[3:]
+    if clean.endswith("```"):
+        clean = clean[:-3]
+    clean = clean.strip()
+    try:
+        return _coerce_dict(json.loads(clean), default)
+    except json.JSONDecodeError:
+        pass
+    start = clean.find("{")
+    end = clean.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return _coerce_dict(json.loads(clean[start:end + 1]), default)
+        except json.JSONDecodeError:
+            return default
+    return default
+
 
 async def classify_intent(user_message: str, ai_client_module) -> dict:
     """
@@ -417,12 +451,12 @@ Respond with JSON only — no other text."""
             temperature=0.1,
         )
         if response:
-            # Parse JSON from response. Guard against scalar/JSON-string
-            # replies so a non-dict never leaks into the caller's .get() calls.
-            result = _coerce_dict(json.loads(response.strip()), {"intent": "general_chat", "confidence": 0.3, "entities": {}})
+            # Parse JSON from response. Strip markdown fences first — models
+            # wrap JSON in ```json blocks, which made classify degrade every
+            # write intent to general_chat in prod. Guard against scalar
+            # replies so a non-dict never leaks into the caller's .get().
+            result = _parse_llm_json(response, {"intent": "general_chat", "confidence": 0.3, "entities": {}})
             return result
-    except json.JSONDecodeError:
-        logger.warning(f"Failed to parse intent classifier response: {response[:200]}")
     except Exception as e:
         logger.error(f"Intent classifier error: {type(e).__name__}: {e}")
 
@@ -458,10 +492,8 @@ Respond with JSON only — no other text."""
             temperature=0.1,
         )
         if response:
-            result = _coerce_dict(json.loads(response.strip()), {"action_type": intent, "extracted": {}, "missing_required": [], "suggested_clarification": None})
+            result = _parse_llm_json(response, {"action_type": intent, "extracted": {}, "missing_required": [], "suggested_clarification": None})
             return result
-    except json.JSONDecodeError:
-        logger.warning(f"Failed to parse action extractor response: {response[:200]}")
     except Exception as e:
         logger.error(f"Action extractor error: {type(e).__name__}: {e}")
 
