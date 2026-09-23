@@ -74,6 +74,7 @@ from routers.trusts import router as trusts_router
 from routers.successor import router as successor_router
 from routers.entities import router as entities_router
 from routers.tasks import router as tasks_router
+from routers.orgs import router as orgs_router
 from routers.auth import router as auth_router
 from routers.totp_2fa import router as totp_2fa_router
 from routers.preferences import router as preferences_router
@@ -493,6 +494,7 @@ app.add_middleware(
 )
 
 # Register all routers
+app.include_router(orgs_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(totp_2fa_router, prefix="/api")
 app.include_router(actions_router, prefix="/api")
@@ -886,6 +888,13 @@ async def startup_event():
         await db.trust_admin_kits.create_index("kit_id", unique=True)
         await db.trust_admin_kits.create_index([("user_id", 1), ("trust_id", 1)])
         await db.trust_admin_kits.create_index([("user_id", 1), ("created_at", -1)])
+
+        # Org skeleton indexes (M1)
+        await db.orgs.create_index("owner_user_id")
+        await db.org_members.create_index([("org_id", 1), ("status", 1)])
+        await db.org_members.create_index("email")
+        await db.trust_grants.create_index([("trust_id", 1), ("status", 1)])
+        await db.trust_grants.create_index([("org_id", 1), ("member_id", 1)])
         
         # Bank accounts indexes
         await db.bank_accounts.create_index("account_id", unique=True)

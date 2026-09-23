@@ -2172,6 +2172,7 @@ class ApprovalRole(str, Enum):
     drafter = "drafter"
     reviewer = "reviewer"
     approver = "approver"
+    co_trustee = "co_trustee"
 
 class MinutesApprovalStatusCreate(BaseModel):
     """Create approval workflow status for minutes"""
@@ -2456,3 +2457,60 @@ class ContactContextResponse(BaseModel):
     contact: ContactResponse
     profile_summary: Optional[ContactProfileSummary] = None
     recent_interactions: List[SupportInteractionResponse] = []
+
+
+# ==================== ORG SKELETON MODELS (M1) ====================
+
+class OrgCreate(BaseModel):
+    name: str
+    billing_contact_email: Optional[str] = None
+
+class OrgResponse(BaseModel):
+    org_id: str
+    name: str
+    owner_user_id: str
+    created_at: str
+
+class OrgMemberRole(str, Enum):
+    owner = "owner"
+    admin = "admin"
+    member = "member"
+
+class OrgMember(BaseModel):
+    member_id: str
+    org_id: str
+    user_id: Optional[str] = None
+    email: EmailStr
+    name: str
+    role: OrgMemberRole = OrgMemberRole.member
+    status: str = "invited"
+    invited_at: str
+    invited_by: str
+    joined_at: Optional[str] = None
+
+class GrantLevel(str, Enum):
+    viewer = "viewer"
+    preparer = "preparer"
+
+class TrustGrantCreate(BaseModel):
+    org_id: str
+    member_id: str
+    level: GrantLevel
+    expires_at: str
+    attested_delegation: bool
+    attestation_ref: Optional[str] = None
+
+class TrustGrant(BaseModel):
+    grant_id: str
+    trust_id: str
+    org_id: str
+    member_id: str
+    level: GrantLevel
+    status: str = "active"
+    granted_by: str
+    granted_at: str
+    expires_at: str
+    revoked_at: Optional[str] = None
+    revoke_reason: Optional[str] = None
+    client_notified_at: Optional[str] = None
+    attestation_ref: Optional[str] = None
