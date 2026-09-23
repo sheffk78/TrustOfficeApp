@@ -1505,10 +1505,16 @@ async def require_org_grant(
     trust = await db.trusts.find_one({"trust_id": trust_id})
     if trust and trust.get("user_id") == user["user_id"]:
         return user  # owner always passes
+    now = datetime.now(timezone.utc).isoformat()
     grant = await db.trust_grants.find_one({
         "trust_id": trust_id,
         "status": "active",
         "member_id": {"$in": await _active_member_ids(user)},
+        "$or": [
+            {"expires_at": {"$gte": now}},
+            {"expires_at": {"$exists": False}},
+            {"expires_at": None},
+        ],
     })
     if not grant or _level_rank(grant["level"]) < _level_rank(min_level.value):
         raise HTTPException(
@@ -1519,7 +1525,8 @@ async def require_org_grant(
 
 
 def _party_level_rank(level: str) -> int:
-    return {"viewer": 1, "actor": 2, "protector_scope": 3}.get(level, 0)
+    # per TRUST-PARTY-ACCESS-DESIGN.md: viewer < actor < protector_scope
+    return {"viewer": 1, "actor": 2, "protector": 3, "protector_scope": 3}.get(level, 0)
 
 
 def _level_rank(level: str) -> int:
@@ -1550,19 +1557,25 @@ async def require_trust_party_access(
     trust = await db.trusts.find_one({"trust_id": trust_id})
     if trust and trust.get("user_id") == user["user_id"]:
         return user  # owner always passes
-    # Check party grants
+    now = datetime.now(timezone.utc).isoformat()
+    # Check party grants (with expiry)
     party_ids = await _my_party_ids(user)
     if party_ids:
         party_grant = await db.party_grants.find_one({
             "trust_id": trust_id,
             "party_id": {"$in": party_ids},
             "status": "active",
+            "$or": [
+                {"expires_at": {"$gte": now}},
+                {"expires_at": {"$exists": False}},
+                {"expires_at": None},
+            ],
         })
         if party_grant:
             if _party_level_rank(party_grant["level"]) >= _party_level_rank(min_level.value):
                 return {**user, "party_grant": party_grant}
             raise HTTPException(status_code=403, detail={"code": "party_access_denied"})
-    # Check org grants
+    # Check org grants (with expiry)
     org_grant = await db.trust_grants.find_one({
         "trust_id": trust_id,
         "status": "active",
@@ -1570,6 +1583,11 @@ async def require_trust_party_access(
             {"user_id": user["user_id"], "status": "active"},
             {"_id": 0, "member_id": 1},
         )]},
+        "$or": [
+            {"expires_at": {"$gte": now}},
+            {"expires_at": {"$exists": False}},
+            {"expires_at": None},
+        ],
     })
     if org_grant and _level_rank(org_grant["level"]) >= _level_rank(min_level.value):
         return {**user, "org_grant": org_grant}

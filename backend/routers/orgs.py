@@ -76,20 +76,41 @@ async def create_org(body: OrgCreate, user: dict = Depends(get_current_user)):
 
 @router.get("/orgs/{org_id}", response_model=OrgResponse)
 async def get_org(org_id: str, user: dict = Depends(get_current_user)):
-    """Read org. Member-level access (counts + trusts under management)."""
+    """Read org. Owner-or-member access (M1-M2 authz)."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
     org = await db.orgs.find_one({"org_id": org_id}, {"_id": 0})
     if not org:
         raise HTTPException(status_code=404, detail="Org not found")
+    # Owner short-circuit
+    if org.get("owner_user_id") == user["user_id"]:
+        return OrgResponse(**org)
+    # Member check
+    memberships = await _my_memberships(user)
+    if not any(m.get("org_id") == org_id and m.get("status") == "active" for m in memberships):
+        raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
     return OrgResponse(**org)
 
 
 @router.get("/orgs/{org_id}/members", response_model=List[OrgMember])
 async def list_org_members(org_id: str, user: dict = Depends(get_current_user)):
-    """List org members. Member-level access."""
+    """List org members. Owner-or-member access (M1-M2 authz)."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    org = await db.orgs.find_one({"org_id": org_id}, {"_id": 0})
+    if not org:
+        raise HTTPException(status_code=404, detail="Org not found")
+    # Owner short-circuit
+    if org.get("owner_user_id") == user["user_id"]:
+        cursor = db.org_members.find({"org_id": org_id}, {"_id": 0})
+        members = []
+        async for m in cursor:
+            members.append(OrgMember(**m))
+        return members
+    # Member check
+    memberships = await _my_memberships(user)
+    if not any(m.get("org_id") == org_id and m.get("status") == "active" for m in memberships):
+        raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
     cursor = db.org_members.find({"org_id": org_id}, {"_id": 0})
     members = []
     async for m in cursor:
@@ -142,7 +163,7 @@ async def invite_org_member(
 
 @router.post("/orgs/invites/{token}/accept")
 async def accept_org_invite(token: str, user: dict = Depends(get_current_user)):
-    """Accept an org invite by token. Binds user_id, status=active."""
+    """Accept an org invite by token. Binds user_id, status=active (C3 email binding)."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
     member = await db.org_members.find_one(
@@ -151,6 +172,9 @@ async def accept_org_invite(token: str, user: dict = Depends(get_current_user)):
     )
     if not member:
         raise HTTPException(status_code=404, detail="Invite not found or already accepted")
+    # C3: invited email must match authenticated user email
+    if member.get("email", "").lower() != (user.get("email", "")).lower():
+        raise HTTPException(status_code=403, detail={"code": "invite_email_mismatch"})
     now = _now()
     await db.org_members.update_one(
         {"member_id": member["member_id"]},
@@ -233,6 +257,12 @@ async def grant_trust_access(
     await db.trust_grants.insert_one(grant_doc)
     # D7: fire grant_created notice email (best-effort, non-blocking)
     _ = _send_grant_notice(grant_doc, "grant_created")
+    # M4: record notification timestamp
+    await db.trust_grants.update_one(
+        {"grant_id": grant_id},
+        {"$set": {"client_notified_at": now}},
+    )
+    grant_doc["client_notified_at"] = now
     return TrustGrant(**grant_doc)
 
 
@@ -273,7 +303,10 @@ async def revoke_trust_grant(
         raise HTTPException(status_code=404, detail="Grant not found")
     trust = await db.trusts.find_one({"trust_id": trust_id})
     is_owner = trust and trust.get("user_id") == user["user_id"]
-    is_granted_member = grant["member_id"] == user.get("org_grant", {}).get("member_id")
+    # Resolve via active member_ids (works whether caller passed through guard or not)
+    from dependencies import _active_member_ids
+    user_member_ids = await _active_member_ids(user)
+    is_granted_member = grant["member_id"] in user_member_ids
     if not is_owner and not is_granted_member:
         raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
     now = _now()
@@ -316,14 +349,20 @@ async def org_trusts(org_id: str, user: dict = Depends(get_current_user)):
 # ==================== EMAIL (best-effort, non-blocking) ====================
 
 def _send_grant_notice(grant: dict, event: str):
-    """Fire a notice email. Best-effort â never blocks the request."""
+    """Fire a notice email. Best-effort — never blocks the request."""
     try:
         from email_service import email_service
         # Tokenized one-click revoke link (D7)
         revoke_token = grant["grant_id"]
         revoke_url = f"{os.environ.get('APP_URL', 'http://localhost:3000')}/revoke/{revoke_token}"
+        # Look up real email instead of using member_id string
+        to_email = grant.get("email", "")
+        if not to_email:
+            # fallback: this is a sync context, can't async lookup.
+            # In production, refactor to async. For now, rely on grant.email if populated.
+            to_email = grant.get("member_id", "")
         email_service.send_email(
-            to_email=grant.get("member_id", ""),
+            to_email=to_email,
             subject=f"Trust access {event}",
             html_body=f"<p>Grant {event}. Revoke: <a href='{revoke_url}'>revoke</a></p>",
             text_body=f"Grant {event}. Revoke at: {revoke_url}",

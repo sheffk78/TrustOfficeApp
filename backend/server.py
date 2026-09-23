@@ -46,6 +46,8 @@ from dependencies import (
     JWT_SECRET,
     JWT_ALGORITHM,
     touch_session,
+    _toggle_institution,
+    _toggle_trust_parties,
 )
 
 # Import all routers
@@ -891,19 +893,21 @@ async def startup_event():
         await db.trust_admin_kits.create_index([("user_id", 1), ("trust_id", 1)])
         await db.trust_admin_kits.create_index([("user_id", 1), ("created_at", -1)])
 
-        # Org skeleton indexes (M1)
-        await db.orgs.create_index("owner_user_id")
-        await db.org_members.create_index([("org_id", 1), ("status", 1)])
-        await db.org_members.create_index("email")
-        await db.trust_grants.create_index([("trust_id", 1), ("status", 1)])
-        await db.trust_grants.create_index([("org_id", 1), ("member_id", 1)])
+        # Org skeleton indexes (M1) — gated on TOGGLE_INSTITUTION
+        if _toggle_institution():
+            await db.orgs.create_index("owner_user_id")
+            await db.org_members.create_index([("org_id", 1), ("status", 1)])
+            await db.org_members.create_index("email")
+            await db.trust_grants.create_index([("trust_id", 1), ("status", 1)])
+            await db.trust_grants.create_index([("org_id", 1), ("member_id", 1)])
         
-        # Trust-party indexes (M2)
-        await db.trust_parties.create_index([("trust_id", 1), ("party_type", 1)])
-        await db.trust_parties.create_index("email")
-        await db.party_grants.create_index([("trust_id", 1), ("status", 1)])
-        await db.party_grants.create_index("party_id")
-        await db.party_audit.create_index([("trust_id", 1), ("at", -1)])
+        # Trust-party indexes (M2) — gated on TOGGLE_TRUST_PARTIES
+        if _toggle_trust_parties():
+            await db.trust_parties.create_index([("trust_id", 1), ("party_type", 1)])
+            await db.trust_parties.create_index("email")
+            await db.party_grants.create_index([("trust_id", 1), ("status", 1)])
+            await db.party_grants.create_index("party_id")
+            await db.party_audit.create_index([("trust_id", 1), ("at", -1)])
         
         # Bank accounts indexes
         await db.bank_accounts.create_index([("trust_id", 1), ("user_id", 1)])

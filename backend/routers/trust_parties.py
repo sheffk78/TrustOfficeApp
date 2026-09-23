@@ -10,7 +10,7 @@ import json
 import os
 
 from database import db
-from dependencies import get_current_user, _toggle_trust_parties, _party_level_rank
+from dependencies import get_current_user, _toggle_trust_parties, _party_level_rank, _my_party_ids
 from models import TrustPartyCreate, TrustParty, PartyGrantCreate, PartyGrant, PartyAudit, PartyType, PartyLevel
 
 router = APIRouter(tags=["trust_parties"])
@@ -108,6 +108,10 @@ async def grant_party_access(
     party = await db.trust_parties.find_one({"party_id": party_id}, {"_id": 0})
     if not party:
         raise HTTPException(status_code=404, detail="Party not found")
+    # M5: only trust owner may grant
+    trust = await db.trusts.find_one({"trust_id": party["trust_id"]})
+    if not trust or trust.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail={"code": "owner_only"})
     grant_id = f"pgrant_{uuid.uuid4().hex[:12]}"
     doc = {
         "grant_id": grant_id,
@@ -131,8 +135,17 @@ async def list_party_grants(
     user: dict = Depends(get_current_user),
 ):
     _require_toggle()
+    # Caller filtering: owner sees all; parties see only their own
+    trust = await db.trusts.find_one({"trust_id": trust_id})
+    is_owner = trust and trust.get("user_id") == user["user_id"]
+    party_ids = []
+    if not is_owner:
+        party_ids = await _my_party_ids(user)
+    query: dict = {"trust_id": trust_id}
+    if not is_owner:
+        query["party_id"] = {"$in": party_ids}
     cursor = db.party_grants.find(
-        {"trust_id": trust_id}, {"_id": 0}
+        query, {"_id": 0}
     ).sort("granted_at", -1)
     return [g async for g in cursor]
 

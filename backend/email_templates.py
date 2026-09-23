@@ -3,7 +3,7 @@ Email Templates for TrustOffice
 Centralized email templates for easy editing
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 import html
 
@@ -114,7 +114,7 @@ def _base_template(content: str, year: int = None) -> str:
 """
 
 
-def get_trust_limit_text(plan_type: str, legacy_trust_limit: int | None = None) -> str:
+def get_trust_limit_text(plan_type: str, legacy_trust_limit: Optional[int] = None) -> str:
     """
     Return the tier-aware trust limit text for subscription emails.
 
