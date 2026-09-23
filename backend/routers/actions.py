@@ -37,14 +37,19 @@ class ActionCallRequest(BaseModel):
 
 @router.get("")
 async def list_all_actions(user: dict = Depends(get_current_user)):
-    """Manifest of every registered action — the discovery surface."""
-    return {"actions": list_actions()}
+    """
+    Manifest of every HTTP-surface action — the discovery surface.
+
+    Chat-internal intent actions (surfaces=("chat",)) are NOT listed: the
+    HTTP manifest is the UI/agent discovery surface only.
+    """
+    return {"actions": [a for a in list_actions() if "ui" in a.get("surfaces", [])]}
 
 
 @router.get("/{name}")
 async def get_action_manifest(name: str, user: dict = Depends(get_current_user)):
     act = ACTIONS.get(name)
-    if not act:
+    if not act or "ui" not in act.surfaces:
         raise HTTPException(status_code=404, detail=f"Unknown action: {name}")
     return act.to_manifest()
 
@@ -63,7 +68,10 @@ async def call_action_endpoint(
     inside action_layer.call_action(); failures come back as ok=false with a
     machine-readable error code (the layer never raises past this point).
     """
-    if name not in ACTIONS:
+    act = ACTIONS.get(name)
+    if not act or "ui" not in act.surfaces:
+        # Unknown names AND chat-internal actions both 404 here (the layer
+        # would refuse with action_forbidden; 404 keeps the surface flat).
         raise HTTPException(status_code=404, detail=f"Unknown action: {name}")
 
     outcome = await call_action(

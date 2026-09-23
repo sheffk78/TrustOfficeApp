@@ -1964,6 +1964,12 @@ async def _execute_approved_action(
     """
     Execute the real backend write operation for an approved action card.
     Creates the corresponding record in the database.
+
+    2026-09-22: execution is unified onto the shared action layer —
+    call_action() with the chat-intent actions registered in actions_seed.py
+    (same layer the UI uses). Legacy envelope preserved via the adapter below;
+    the 'minutes' intent keeps its dedicated chat handler (different card
+    shape from the seed generate-minutes action).
     """
     card_type = action_card.get("type", "")
     action_data = action_card.get("data", {})
@@ -2018,18 +2024,71 @@ async def _execute_approved_action(
         if src_key in action_data and action_data[src_key] is not None:
             mapped_data[dst_key] = action_data[src_key]
 
-    # Always include trust_id and user_id
-    mapped_data["trust_id"] = trust_id
+    # 2026-09-22 unification: chat intents execute through the shared action
+    # layer (action_layer.call_action) — the same registered handlers other
+    # surfaces use (registered in actions_seed.py, surfaces=("chat",)).
+    # trust_id is scope — the layer verifies ownership itself, and must not
+    # appear as a handler param (validate_params rejects unknown fields).
+    mapped_data.pop("trust_id", None)
 
-    try:
-        handler = ACTION_DISPATCH.get(endpoint_type)
-        if handler:
-            return await handler(mapped_data, trust_id, user_id)
+    if endpoint_type == "minutes":
+        # Chat minutes cards carry participants_text / decisions_text and
+        # status=draft — a different shape from the seed generate-minutes
+        # action — so this intent keeps its dedicated handler (which itself
+        # routes through the real minutes router).
+        try:
+            return await _exec_minutes(mapped_data, trust_id, user_id)
+        except Exception as e:
+            logger.error(f"Action execution error: {type(e).__name__}: {e}")
+            return {"success": False, "error": str(e)}
+
+    from actions_seed import get_chat_intent_action
+    from action_layer import call_action
+
+    action_name = get_chat_intent_action(endpoint_type)
+    if not action_name:
         return {"success": False, "error": f"Unhandled endpoint type: {endpoint_type}"}
 
-    except Exception as e:
-        logger.error(f"Action execution error: {type(e).__name__}: {e}")
-        return {"success": False, "error": str(e)}
+    # Coerce card values to the action's declared field types: cards are
+    # LLM-shaped and sometimes carry lists where the handler expects a
+    # comma-joined string (legacy handlers did the join themselves).
+    from action_layer import get_action as _get_action
+    _act = _get_action(action_name)
+    if _act:
+        known = {f.name: f for f in _act.fields}
+        coerced = {}
+        for k, v in mapped_data.items():
+            if k not in known:
+                continue  # drop undeclared keys (validate_params would reject)
+            if known[k].type == "string" and isinstance(v, list):
+                v = ", ".join(str(x) for x in v)
+            coerced[k] = v
+        mapped_data = coerced
+
+    outcome = await call_action(
+        action_name,
+        mapped_data,
+        user_id=user_id,
+        trust_id=trust_id,
+        user=None,  # intent handlers backfill the user doc when needed
+        surface="chat",
+    )
+    # Adapt the layer envelope {ok, action, result|error} back to the legacy
+    # {success, record_id, endpoint, ...} envelope stored on action cards
+    # (frontend ActionCard.js + approval_handler.py read these fields).
+    if outcome.get("ok"):
+        result = outcome.get("result") or {}
+        result.setdefault("success", True)
+        return result
+    err = outcome.get("error")
+    if not err:
+        err = (outcome.get("result") or {}).get("error")
+    if isinstance(err, dict):
+        detail = err.get("detail") or err.get("code") or "Action failed"
+    else:
+        detail = err or "Action failed"
+    logger.error(f"Action execution error (action_layer): {action_name}: {detail}")
+    return {"success": False, "error": detail}
 
 
 @router.post("/chat/actions/{conversation_id}/{message_index}/confirm")
