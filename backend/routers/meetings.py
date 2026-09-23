@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel
 from typing import List, Optional
 
-from dependencies import get_current_user, require_write_access, require_org_grant
+from dependencies import get_current_user, require_write_access, require_org_grant, _toggle_trust_parties, _toggle_institution
 from models import (
     MeetingAgendaCreate, MeetingAgendaUpdate, MeetingAgendaResponse,
     MeetingCreate, MeetingResponse,
@@ -73,6 +73,24 @@ async def _resolve_minutes_trust_id(minutes_id: str):
             {"minutes_id": minutes_id}, {"_id": 0, "trust_id": 1}
         )
     return (doc or {}).get("trust_id") or None
+
+
+async def _require_owner_or_co_trustee(trust_id: str, user: dict) -> None:
+    """D-C spec rule (ORG-SKELETON-SPEC §5): org grants are NEVER sufficient
+    for the approve/sign family — owner or active co-trustee party only.
+    Flag-gated: only enforced when an institution/party flag is ON.
+    """
+    trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "user_id": 1})
+    if trust and trust.get("user_id") == user["user_id"]:
+        return  # owner
+    if _toggle_trust_parties():
+        party = await db.trust_parties.find_one({
+            "trust_id": trust_id, "party_type": "co_trustee",
+            "status": "active", "user_id": user["user_id"],
+        })
+        if party:
+            return  # active co-trustee
+    raise HTTPException(status_code=403, detail={"code": "approval_owner_or_co_trustee_only"})
 
 
 # ==================== AGENDAS ====================
@@ -191,8 +209,9 @@ async def approve_minutes(
 ):
     """Approve minutes. Valid from under_review; advances the workflow toward finalized."""
     trust_id = await _resolve_minutes_trust_id(minutes_id)
-    if trust_id:
-        await require_org_grant(trust_id, user=user)
+    if trust_id and (_toggle_institution() or _toggle_trust_parties()):
+        # ORG-SKELETON-SPEC §5: org grant never sufficient here (D-C)
+        await _require_owner_or_co_trustee(trust_id, user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.approved, user, note=payload.note
     )
@@ -212,8 +231,9 @@ async def request_changes(
 ):
     """Request changes on minutes under review."""
     trust_id = await _resolve_minutes_trust_id(minutes_id)
-    if trust_id:
-        await require_org_grant(trust_id, user=user)
+    if trust_id and (_toggle_institution() or _toggle_trust_parties()):
+        # ORG-SKELETON-SPEC §5: org grant never sufficient here (D-C)
+        await _require_owner_or_co_trustee(trust_id, user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.changes_requested, user, note=payload.note
     )
@@ -233,8 +253,9 @@ async def submit_for_review(
 ):
     """Submit draft minutes for review (draft â pending_review)."""
     trust_id = await _resolve_minutes_trust_id(minutes_id)
-    if trust_id:
-        await require_org_grant(trust_id, user=user)
+    if trust_id and (_toggle_institution() or _toggle_trust_parties()):
+        # ORG-SKELETON-SPEC §5: org grant never sufficient here (D-C)
+        await _require_owner_or_co_trustee(trust_id, user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.pending_review, user, note=payload.note
     )
@@ -254,8 +275,9 @@ async def start_review(
 ):
     """Start reviewing pending minutes (pending_review Ã¢ÂÂ under_review)."""
     trust_id = await _resolve_minutes_trust_id(minutes_id)
-    if trust_id:
-        await require_org_grant(trust_id, user=user)
+    if trust_id and (_toggle_institution() or _toggle_trust_parties()):
+        # ORG-SKELETON-SPEC §5: org grant never sufficient here (D-C)
+        await _require_owner_or_co_trustee(trust_id, user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.under_review, user, note=payload.note
     )

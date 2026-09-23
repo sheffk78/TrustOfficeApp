@@ -359,6 +359,7 @@ _TRANSITIONS = {
     ApprovalStatus.approved: {ApprovalStatus.finalized},
     ApprovalStatus.rejected: set(),  # terminal
     ApprovalStatus.finalized: set(),  # terminal
+    "pending_signatures": {ApprovalStatus.approved, ApprovalStatus.rejected},
 }
 
 # Map transition target -> (action label, role performing it)
@@ -528,12 +529,25 @@ async def transition_minutes(
     approval = await db.minutes_approval_status.find_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]}
     )
+    if not approval and _toggle_trust_parties():
+        # Fallback: any approval record for this minutes (co-trustee path).
+        # Parties flag only — flag-off keeps the original user-scoped lookup
+        # (byte-identical legacy).
+        approval = await db.minutes_approval_status.find_one(
+            {"minutes_id": minutes_id}
+        )
     if not approval:
         return None, "Minutes approval record not found."
 
-    current = ApprovalStatus(approval["current_status"])
+    raw_status = approval["current_status"]
+    try:
+        current = ApprovalStatus(raw_status)
+    except ValueError:
+        # Multi-sig intermediate state (e.g. "pending_signatures") — not an
+        # ApprovalStatus member; _TRANSITIONS carries a string key for it.
+        current = raw_status
     if target not in _TRANSITIONS.get(current, set()):
-        return None, f"Invalid transition: {current.value} â {target.value}."
+        return None, f"Invalid transition: {raw_status} -> {target.value}."
 
     action, role = _ACTION_MAP[target]
     now = _now()
@@ -561,36 +575,52 @@ async def transition_minutes(
         set_fields["approver_user_id"] = user["user_id"]
         set_fields["approver_name"] = user_name
 
-    # Multi-sig: co-trustee approval counting (behind TOGGLE_TRUST_PARTIES)
-        if _toggle_trust_parties() and approval.get("approval_threshold") is not None:
-            # Track distinct co-trustee approvers via $addToSet (dedupes)
-            if role == ApprovalRole.approver and user["user_id"] not in approval.get("co_trustee_approvers", []):
-                set_fields.setdefault("co_trustee_approvers", approval.get("co_trustee_approvers", []))
+    # Multi-sig: co-trustee approval counting (D9, behind TOGGLE_TRUST_PARTIES).
+    # Frozen semantics: explicit threshold wins; null threshold = ALL active
+    # co_trustee parties must sign (only when >= 2 exist — single-trustee
+    # trusts keep the legacy single-approval path untouched).
+    if (
+        _toggle_trust_parties()
+        and target == ApprovalStatus.approved
+        and role == ApprovalRole.approver
+    ):
+        threshold = approval.get("approval_threshold")
+        if threshold is None:
+            active_co_trustees = await db.trust_parties.count_documents({
+                "trust_id": approval.get("trust_id"),
+                "party_type": "co_trustee",
+                "status": "active",
+            })
+            if active_co_trustees >= 2:
+                threshold = active_co_trustees  # null = all active co-trustees
+        if threshold is not None:
+            # Track distinct approvers (dedupes self re-approval)
+            if user["user_id"] not in approval.get("co_trustee_approvers", []):
+                set_fields.setdefault("co_trustee_approvers", list(approval.get("co_trustee_approvers", [])))
                 set_fields["co_trustee_approvers"].append(user["user_id"])
-            # Count distinct approvers including the new one
-            co_trustee_count = len(set(approval.get("co_trustee_approvers", []) | {user["user_id"]}))
-            threshold = approval["approval_threshold"]
-            if co_trustee_count >= threshold and target == ApprovalStatus.approved:
-                # Threshold met â proceed as today
-                pass
-            elif co_trustee_count < threshold and target == ApprovalStatus.approved:
-                # Not yet met â stay pending_signatures
+            co_trustee_count = len(set(approval.get("co_trustee_approvers", [])) | {user["user_id"]})
+            if co_trustee_count < threshold:
+                # Threshold not met — collect signatures, stay pending
                 set_fields["current_status"] = "pending_signatures"
                 set_fields["pending_signatures"] = threshold - co_trustee_count
+            else:
+                # Threshold met — approve, clear the pending counter
+                set_fields["pending_signatures"] = 0
 
     await db.minutes_approval_status.update_one(
-        {"minutes_id": minutes_id, "user_id": user["user_id"]},
+        {"minutes_id": minutes_id},
         {"$set": set_fields, "$push": {"action_log": log_entry}},
     )
 
-    # Mirror the high-level status onto the minutes document
+    # Mirror the high-level status onto the minutes document (the EFFECTIVE
+    # status — multi-sig may hold at pending_signatures instead of target)
     await db.meeting_minutes.update_one(
-        {"minutes_id": minutes_id, "user_id": user["user_id"]},
-        {"$set": {"status": target.value, "updated_at": now}},
+        {"minutes_id": minutes_id},
+        {"$set": {"status": set_fields["current_status"], "updated_at": now}},
     )
 
     updated = await db.minutes_approval_status.find_one(
-        {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
+        {"minutes_id": minutes_id}, {"_id": 0}
     )
     return updated, None
 

@@ -2228,6 +2228,9 @@ class MinutesApprovalStatusResponse(BaseModel):
     rejection_reason: Optional[str] = None
     created_at: str
     updated_at: Optional[str] = None
+    # D9 multi-sig (additive): signature bookkeeping surfaced to clients
+    co_trustee_approvers: List[str] = []
+    pending_signatures: int = 0
 
 class ApprovalWorkflowSummary(BaseModel):
     """High-level workflow status for a trust"""

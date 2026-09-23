@@ -688,3 +688,475 @@ class TestT3Attribution:
         # Verify party_grant exists for party_user
         grant_check = await db.party_grants.find_one({"trust_id": trust["trust_id"], "party_id": "party_t8"})
         assert grant_check is not None
+
+
+# ======================================================================
+# FIX-PASS 2026-09-23: router-level regressions for D-A / D-B / D-C
+# (guards, attribution, multi-sig exercised through the ROUTER functions
+# so wrong-keyed guards like D-A cannot hide behind direct service calls)
+# ======================================================================
+
+_ROUTER_IMPORTS_DONE = False
+
+
+def _router_modules():
+    """Import the minutes/meetings routers in-process (mongomock already
+    patched at module top). Idempotent."""
+    global _ROUTER_IMPORTS_DONE
+    import types, sys
+    backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if not _ROUTER_IMPORTS_DONE:
+        # bypass routers/__init__.py (it imports email_service -> postmarker,
+        # which is not installed in this venv)
+        pkg = types.ModuleType("routers")
+        pkg.__path__ = [os.path.join(backend_dir, "routers")]
+        sys.modules["routers"] = pkg
+        es = types.ModuleType("email_service")
+
+        class _StubEmailService:
+            async def send_minutes_notification(self, **kw):
+                pass
+
+        es.email_service = _StubEmailService()
+        sys.modules["email_service"] = es
+        _ROUTER_IMPORTS_DONE = True
+    import routers.minutes as _rm
+    import routers.meetings as _rmeet
+    return _rm, _rmeet
+
+
+class TestFixPassDARouter:
+    @pytest.mark.asyncio
+    async def test_owner_can_finalize_legacy_minutes_flag_on(self, seeded_db):
+        """D-A regression: owner finalize of legacy minutes must not 403."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        rm, rmeet = _router_modules()
+        owner = await _seed_user("fpa_owner@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        await db.minutes_records.insert_one({
+            "minutes_id": "mins_fpa1", "trust_id": trust["trust_id"],
+            "user_id": owner["user_id"], "minutes_type": "general",
+            "meeting_date": "2026-01-01", "participants_text": "Owner",
+            "decisions_text": "ok", "status": "draft", "created_at": _now(),
+        })
+        resp = await rmeet.finalize_minutes(
+            "mins_fpa1", rmeet.WorkflowActionBody(), user=owner
+        )
+        assert resp["legacy_path"] is True
+        assert resp["current_status"] == "finalized"
+        doc = await db.minutes_records.find_one({"minutes_id": "mins_fpa1"})
+        assert doc["status"] == "finalized"
+
+    @pytest.mark.asyncio
+    async def test_preparer_can_create_and_update_draft_flag_on(self, seeded_db):
+        """D-A + D-B path: preparer via org grant drafts through the router."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("fpa_o2@example.com", "Owner")
+        marge = await _seed_user("fpa_marge@example.com", "Marge")
+        trust = await _seed_trust(owner, "FPA Trust")
+        await db.orgs.insert_one({"org_id": "org_fpa", "name": "Acme Fiduciary",
+                                  "owner_user_id": owner["user_id"], "created_at": _now()})
+        await db.org_members.insert_one({
+            "org_id": "org_fpa", "member_id": "mem_fpa",
+            "user_id": marge["user_id"], "email": marge["email"],
+            "name": marge["name"], "role": "member", "status": "active",
+            "invited_at": _now(), "invited_by": owner["user_id"], "joined_at": _now(),
+        })
+        await db.trust_grants.insert_one({
+            "grant_id": "grant_fpa", "trust_id": trust["trust_id"],
+            "org_id": "org_fpa", "member_id": "mem_fpa", "level": "preparer",
+            "status": "active", "granted_by": owner["user_id"], "granted_at": _now(),
+        })
+        rm, rmeet = _router_modules()
+        from models import MinutesAutosaveRequest
+        req = MinutesAutosaveRequest(
+            trust_id=trust["trust_id"], minutes_type="general",
+            meeting_date="2026-02-02", participants_text="Marge",
+            decisions_text="Prepared set of minutes",
+        )
+        resp = await rm.autosave_minutes(req, user=marge)
+        assert resp.attribution and resp.attribution.startswith("Prepared by Marge")
+        assert "Acme Fiduciary" in resp.attribution
+        doc = await db.minutes_records.find_one({"minutes_id": resp.minutes_id})
+        assert doc.get("attribution") == resp.attribution  # persisted, not just response
+        # update path keeps/refreshes attribution
+        req2 = MinutesAutosaveRequest(
+            trust_id=trust["trust_id"], minutes_type="general",
+            meeting_date="2026-02-02", participants_text="Marge",
+            decisions_text="Updated decisions", minutes_id=resp.minutes_id,
+        )
+        resp2 = await rm.autosave_minutes(req2, user=marge)
+        doc2 = await db.minutes_records.find_one({"minutes_id": resp.minutes_id})
+        assert doc2.get("attribution")
+
+
+class TestFixPassDCSpec:
+    @pytest.mark.asyncio
+    async def test_preparer_via_org_grant_cannot_approve(self, seeded_db):
+        """ORG-SKELETON-SPEC §5: org grant never sufficient to approve."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        os.environ["TOGGLE_TRUST_PARTIES"] = "1"
+        owner = await _seed_user("fpc_owner@example.com", "Owner")
+        marge = await _seed_user("fpc_marge@example.com", "Marge")
+        trust = await _seed_trust(owner)
+        await db.orgs.insert_one({"org_id": "org_fpc", "name": "Acme",
+                                  "owner_user_id": owner["user_id"], "created_at": _now()})
+        await db.org_members.insert_one({
+            "org_id": "org_fpc", "member_id": "mem_fpc", "user_id": marge["user_id"],
+            "email": marge["email"], "name": marge["name"], "role": "member",
+            "status": "active", "invited_at": _now(), "invited_by": owner["user_id"],
+            "joined_at": _now(),
+        })
+        await db.trust_grants.insert_one({
+            "grant_id": "grant_fpc", "trust_id": trust["trust_id"],
+            "org_id": "org_fpc", "member_id": "mem_fpc", "level": "preparer",
+            "status": "active", "granted_by": owner["user_id"], "granted_at": _now(),
+            "expires_at": _future(30),
+        })
+        from services.meeting_service import create_minutes_record, transition_minutes
+        from models import ApprovalStatus
+        rm, rmeet = _router_modules()
+        mins = await create_minutes_record(trust["trust_id"], {"meeting_date": "2026-01-01"}, owner)
+        _, e1 = await transition_minutes(mins["minutes_id"], ApprovalStatus.pending_review, owner)
+        assert e1 is None
+        _, e2 = await transition_minutes(mins["minutes_id"], ApprovalStatus.under_review, owner)
+        assert e2 is None
+        from fastapi import HTTPException
+        with pytest.raises(HTTPException) as exc:
+            await rmeet.approve_minutes(
+                mins["minutes_id"], rmeet.WorkflowActionBody(), user=marge)
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_null_threshold_two_co_trustees_multi_sig(self, seeded_db):
+        """D9: null threshold + 2 active co-trustees = both must sign."""
+        os.environ["TOGGLE_TRUST_PARTIES"] = "1"
+        owner = await _seed_user("fpc_o2@example.com", "Owner")
+        t1 = await _seed_user("fpc_t1@example.com", "Trudy")
+        t2 = await _seed_user("fpc_t2@example.com", "Tom")
+        trust = await _seed_trust(owner)  # approval_threshold: None
+        await db.trust_parties.insert_many([
+            {"party_id": "party_fpc1", "trust_id": trust["trust_id"],
+             "party_type": "co_trustee", "name": "Trudy", "email": t1["email"],
+             "status": "active", "powers": [], "invited_at": _now(),
+             "activated_at": _now(), "user_id": t1["user_id"], "source": "manual"},
+            {"party_id": "party_fpc2", "trust_id": trust["trust_id"],
+             "party_type": "co_trustee", "name": "Tom", "email": t2["email"],
+             "status": "active", "powers": [], "invited_at": _now(),
+             "activated_at": _now(), "user_id": t2["user_id"], "source": "manual"},
+        ])
+        from services.meeting_service import create_minutes_record, transition_minutes
+        from models import ApprovalStatus
+        rm, rmeet = _router_modules()
+        mins = await create_minutes_record(trust["trust_id"], {"meeting_date": "2026-01-01"}, owner)
+        _, e1 = await transition_minutes(mins["minutes_id"], ApprovalStatus.pending_review, owner)
+        assert e1 is None
+        _, e2 = await transition_minutes(mins["minutes_id"], ApprovalStatus.under_review, owner)
+        assert e2 is None
+        # first co-trustee approves -> pending_signatures (1 still needed)
+        r1 = await rmeet.approve_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=t1)
+        assert r1.current_status == "pending_signatures"
+        assert r1.pending_signatures == 1
+        assert t1["user_id"] in r1.co_trustee_approvers
+        # second co-trustee approves -> threshold met
+        r2 = await rmeet.approve_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=t2)
+        assert r2.current_status == "approved"
+        assert r2.pending_signatures == 0
+        mm = await db.meeting_minutes.find_one({"minutes_id": mins["minutes_id"]}, {"_id": 0})
+        assert mm["status"] == "approved"
+
+    @pytest.mark.asyncio
+    async def test_single_trustee_null_threshold_owner_approves(self, seeded_db):
+        """D9 line 88: single-trustee trusts unchanged with null threshold."""
+        os.environ["TOGGLE_TRUST_PARTIES"] = "1"
+        owner = await _seed_user("fpc_o3@example.com", "Owner")
+        trust = await _seed_trust(owner)  # no co-trustee parties, threshold None
+        from services.meeting_service import create_minutes_record, transition_minutes
+        from models import ApprovalStatus
+        rm, rmeet = _router_modules()
+        mins = await create_minutes_record(trust["trust_id"], {"meeting_date": "2026-01-01"}, owner)
+        _, e1 = await transition_minutes(mins["minutes_id"], ApprovalStatus.pending_review, owner)
+        assert e1 is None
+        _, e2 = await transition_minutes(mins["minutes_id"], ApprovalStatus.under_review, owner)
+        assert e2 is None
+        r = await rmeet.approve_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=owner)
+        assert r.current_status == "approved"
+
+    @pytest.mark.asyncio
+    async def test_flag_off_approve_family_byte_identical(self, seeded_db):
+        """Flags off: legacy single-approval path, user-scoped lookups intact."""
+        os.environ.pop("TOGGLE_INSTITUTION", None)
+        os.environ.pop("TOGGLE_TRUST_PARTIES", None)
+        owner = await _seed_user("fpc_o4@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        from services.meeting_service import create_minutes_record, transition_minutes
+        from models import ApprovalStatus
+        rm, rmeet = _router_modules()
+        mins = await create_minutes_record(trust["trust_id"], {"meeting_date": "2026-01-01"}, owner)
+        _, e1 = await transition_minutes(mins["minutes_id"], ApprovalStatus.pending_review, owner)
+        assert e1 is None
+        _, e2 = await transition_minutes(mins["minutes_id"], ApprovalStatus.under_review, owner)
+        assert e2 is None
+        r = await rmeet.approve_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=owner)
+        assert r.current_status == "approved"
+        # owner finalize of workflow minutes still works flag-off
+        rf = await rmeet.finalize_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=owner)
+        assert rf.current_status == "finalized"
+
+
+class TestFixPassDBAttribution:
+    @pytest.mark.asyncio
+    async def test_attribution_absent_flag_off(self, seeded_db):
+        """Owner-created minutes carry NO attribution field with flags off."""
+        os.environ.pop("TOGGLE_INSTITUTION", None)
+        os.environ.pop("TOGGLE_TRUST_PARTIES", None)
+        owner = await _seed_user("fpb_owner@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        rm, rmeet = _router_modules()
+        from models import MinutesAutosaveRequest
+        req = MinutesAutosaveRequest(
+            trust_id=trust["trust_id"], minutes_type="general",
+            meeting_date="2026-03-03", participants_text="Owner",
+            decisions_text="Owner prepared",
+        )
+        resp = await rm.autosave_minutes(req, user=owner)
+        assert resp.attribution is None
+        doc = await db.minutes_records.find_one({"minutes_id": resp.minutes_id})
+        assert "attribution" not in doc  # additive-only: field absent, not empty
+
+
+# ======================================================================
+# FIX-PASS 2026-09-23: router-level regressions for D-A / D-B / D-C
+# (guards, attribution, multi-sig exercised through the ROUTER functions
+# so wrong-keyed guards like D-A cannot hide behind direct service calls)
+# ======================================================================
+
+_ROUTER_IMPORTS_DONE = False
+
+
+def _router_modules():
+    """Import the minutes/meetings routers in-process (mongomock already
+    patched at module top). Idempotent."""
+    global _ROUTER_IMPORTS_DONE
+    import types, sys
+    backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if not _ROUTER_IMPORTS_DONE:
+        # bypass routers/__init__.py (it imports email_service -> postmarker,
+        # which is not installed in this venv)
+        pkg = types.ModuleType("routers")
+        pkg.__path__ = [os.path.join(backend_dir, "routers")]
+        sys.modules["routers"] = pkg
+        es = types.ModuleType("email_service")
+
+        class _StubEmailService:
+            async def send_minutes_notification(self, **kw):
+                pass
+
+        es.email_service = _StubEmailService()
+        sys.modules["email_service"] = es
+        _ROUTER_IMPORTS_DONE = True
+    import routers.minutes as _rm
+    import routers.meetings as _rmeet
+    return _rm, _rmeet
+
+
+class TestFixPassDARouter:
+    @pytest.mark.asyncio
+    async def test_owner_can_finalize_legacy_minutes_flag_on(self, seeded_db):
+        """D-A regression: owner finalize of legacy minutes must not 403."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        rm, rmeet = _router_modules()
+        owner = await _seed_user("fpa_owner@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        await db.minutes_records.insert_one({
+            "minutes_id": "mins_fpa1", "trust_id": trust["trust_id"],
+            "user_id": owner["user_id"], "minutes_type": "general",
+            "meeting_date": "2026-01-01", "participants_text": "Owner",
+            "decisions_text": "ok", "status": "draft", "created_at": _now(),
+        })
+        resp = await rmeet.finalize_minutes(
+            "mins_fpa1", rmeet.WorkflowActionBody(), user=owner
+        )
+        assert resp["legacy_path"] is True
+        assert resp["current_status"] == "finalized"
+        doc = await db.minutes_records.find_one({"minutes_id": "mins_fpa1"})
+        assert doc["status"] == "finalized"
+
+    @pytest.mark.asyncio
+    async def test_preparer_can_create_and_update_draft_flag_on(self, seeded_db):
+        """D-A + D-B path: preparer via org grant drafts through the router."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("fpa_o2@example.com", "Owner")
+        marge = await _seed_user("fpa_marge@example.com", "Marge")
+        trust = await _seed_trust(owner, "FPA Trust")
+        await db.orgs.insert_one({"org_id": "org_fpa", "name": "Acme Fiduciary",
+                                  "owner_user_id": owner["user_id"], "created_at": _now()})
+        await db.org_members.insert_one({
+            "org_id": "org_fpa", "member_id": "mem_fpa", "org_id": "org_fpa",
+            "user_id": marge["user_id"], "email": marge["email"],
+            "name": marge["name"], "role": "member", "status": "active",
+            "invited_at": _now(), "invited_by": owner["user_id"], "joined_at": _now(),
+        })
+        await db.trust_grants.insert_one({
+            "grant_id": "grant_fpa", "trust_id": trust["trust_id"],
+            "org_id": "org_fpa", "member_id": "mem_fpa", "level": "preparer",
+            "status": "active", "granted_by": owner["user_id"], "granted_at": _now(),
+        })
+        rm, rmeet = _router_modules()
+        from models import MinutesAutosaveRequest
+        req = MinutesAutosaveRequest(
+            trust_id=trust["trust_id"], minutes_type="general",
+            meeting_date="2026-02-02", participants_text="Marge",
+            decisions_text="Prepared set of minutes",
+        )
+        resp = await rm.autosave_minutes(req, user=marge)
+        assert resp.attribution and resp.attribution.startswith("Prepared by Marge")
+        assert "Acme Fiduciary" in resp.attribution
+        doc = await db.minutes_records.find_one({"minutes_id": resp.minutes_id})
+        assert doc.get("attribution") == resp.attribution  # persisted, not just response
+        # update path keeps/refreshes attribution
+        req2 = MinutesAutosaveRequest(
+            trust_id=trust["trust_id"], minutes_type="general",
+            meeting_date="2026-02-02", participants_text="Marge",
+            decisions_text="Updated decisions", minutes_id=resp.minutes_id,
+        )
+        resp2 = await rm.autosave_minutes(req2, user=marge)
+        doc2 = await db.minutes_records.find_one({"minutes_id": resp.minutes_id})
+        assert doc2.get("attribution")
+
+
+class TestFixPassDCSpec:
+    @pytest.mark.asyncio
+    async def test_preparer_via_org_grant_cannot_approve(self, seeded_db):
+        """ORG-SKELETON-SPEC §5: org grant never sufficient to approve."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        os.environ["TOGGLE_TRUST_PARTIES"] = "1"
+        owner = await _seed_user("fpc_owner@example.com", "Owner")
+        marge = await _seed_user("fpc_marge@example.com", "Marge")
+        trust = await _seed_trust(owner)
+        await db.orgs.insert_one({"org_id": "org_fpc", "name": "Acme",
+                                  "owner_user_id": owner["user_id"], "created_at": _now()})
+        await db.org_members.insert_one({
+            "org_id": "org_fpc", "member_id": "mem_fpc", "user_id": marge["user_id"],
+            "email": marge["email"], "name": marge["name"], "role": "member",
+            "status": "active", "invited_at": _now(), "invited_by": owner["user_id"],
+            "joined_at": _now(),
+        })
+        await db.trust_grants.insert_one({
+            "grant_id": "grant_fpc", "trust_id": trust["trust_id"],
+            "org_id": "org_fpc", "member_id": "mem_fpc", "level": "preparer",
+            "status": "active", "granted_by": owner["user_id"], "granted_at": _now(),
+            "expires_at": _future(30),
+        })
+        from services.meeting_service import create_minutes_record
+        from models import ApprovalStatus
+        rm, rmeet = _router_modules()
+        mins = await create_minutes_record(trust["trust_id"], {"meeting_date": "2026-01-01"}, owner)
+        _, e1 = await __import__("services.meeting_service", fromlist=["transition_minutes"]).transition_minutes(
+            mins["minutes_id"], ApprovalStatus.pending_review, owner)
+        assert e1 is None
+        _, e2 = await __import__("services.meeting_service", fromlist=["transition_minutes"]).transition_minutes(
+            mins["minutes_id"], ApprovalStatus.under_review, owner)
+        assert e2 is None
+        from fastapi import HTTPException
+        with pytest.raises(HTTPException) as exc:
+            await rmeet.approve_minutes(
+                mins["minutes_id"], rmeet.WorkflowActionBody(), user=marge)
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_null_threshold_two_co_trustees_multi_sig(self, seeded_db):
+        """D9: null threshold + 2 active co-trustees = both must sign."""
+        os.environ["TOGGLE_TRUST_PARTIES"] = "1"
+        owner = await _seed_user("fpc_o2@example.com", "Owner")
+        t1 = await _seed_user("fpc_t1@example.com", "Trudy")
+        t2 = await _seed_user("fpc_t2@example.com", "Tom")
+        trust = await _seed_trust(owner)  # approval_threshold: None
+        await db.trust_parties.insert_many([
+            {"party_id": "party_fpc1", "trust_id": trust["trust_id"],
+             "party_type": "co_trustee", "name": "Trudy", "email": t1["email"],
+             "status": "active", "powers": [], "invited_at": _now(),
+             "activated_at": _now(), "user_id": t1["user_id"], "source": "manual"},
+            {"party_id": "party_fpc2", "trust_id": trust["trust_id"],
+             "party_type": "co_trustee", "name": "Tom", "email": t2["email"],
+             "status": "active", "powers": [], "invited_at": _now(),
+             "activated_at": _now(), "user_id": t2["user_id"], "source": "manual"},
+        ])
+        from services.meeting_service import create_minutes_record, transition_minutes
+        from models import ApprovalStatus
+        rm, rmeet = _router_modules()
+        mins = await create_minutes_record(trust["trust_id"], {"meeting_date": "2026-01-01"}, owner)
+        _, e1 = await transition_minutes(mins["minutes_id"], ApprovalStatus.pending_review, owner)
+        assert e1 is None
+        _, e2 = await transition_minutes(mins["minutes_id"], ApprovalStatus.under_review, owner)
+        assert e2 is None
+        # first co-trustee approves -> pending_signatures (1 still needed)
+        r1 = await rmeet.approve_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=t1)
+        assert r1.current_status == "pending_signatures"
+        assert r1.pending_signatures == 1
+        assert t1["user_id"] in r1.co_trustee_approvers
+        # second co-trustee approves -> threshold met
+        r2 = await rmeet.approve_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=t2)
+        assert r2.current_status == "approved"
+        assert r2.pending_signatures == 0
+        mm = await db.meeting_minutes.find_one({"minutes_id": mins["minutes_id"]}, {"_id": 0})
+        assert mm["status"] == "approved"
+
+    @pytest.mark.asyncio
+    async def test_single_trustee_null_threshold_owner_approves(self, seeded_db):
+        """D9 line 88: single-trustee trusts unchanged with null threshold."""
+        os.environ["TOGGLE_TRUST_PARTIES"] = "1"
+        owner = await _seed_user("fpc_o3@example.com", "Owner")
+        trust = await _seed_trust(owner)  # no co-trustee parties, threshold None
+        from services.meeting_service import create_minutes_record, transition_minutes
+        from models import ApprovalStatus
+        rm, rmeet = _router_modules()
+        mins = await create_minutes_record(trust["trust_id"], {"meeting_date": "2026-01-01"}, owner)
+        _, e1 = await transition_minutes(mins["minutes_id"], ApprovalStatus.pending_review, owner)
+        assert e1 is None
+        _, e2 = await transition_minutes(mins["minutes_id"], ApprovalStatus.under_review, owner)
+        assert e2 is None
+        r = await rmeet.approve_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=owner)
+        assert r.current_status == "approved"
+
+    @pytest.mark.asyncio
+    async def test_flag_off_approve_family_byte_identical(self, seeded_db):
+        """Flags off: legacy single-approval path, user-scoped lookups intact."""
+        os.environ.pop("TOGGLE_INSTITUTION", None)
+        os.environ.pop("TOGGLE_TRUST_PARTIES", None)
+        owner = await _seed_user("fpc_o4@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        from services.meeting_service import create_minutes_record, transition_minutes
+        from models import ApprovalStatus
+        rm, rmeet = _router_modules()
+        mins = await create_minutes_record(trust["trust_id"], {"meeting_date": "2026-01-01"}, owner)
+        _, e1 = await transition_minutes(mins["minutes_id"], ApprovalStatus.pending_review, owner)
+        assert e1 is None
+        _, e2 = await transition_minutes(mins["minutes_id"], ApprovalStatus.under_review, owner)
+        assert e2 is None
+        r = await rmeet.approve_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=owner)
+        assert r.current_status == "approved"
+        # owner finalize of workflow minutes still works flag-off
+        rf = await rmeet.finalize_minutes(mins["minutes_id"], rmeet.WorkflowActionBody(), user=owner)
+        assert rf.current_status == "finalized"
+
+
+class TestFixPassDBAttribution:
+    @pytest.mark.asyncio
+    async def test_attribution_absent_flag_off(self, seeded_db):
+        """Owner-created minutes carry NO attribution field with flags off."""
+        os.environ.pop("TOGGLE_INSTITUTION", None)
+        os.environ.pop("TOGGLE_TRUST_PARTIES", None)
+        owner = await _seed_user("fpb_owner@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        rm, rmeet = _router_modules()
+        from models import MinutesAutosaveRequest
+        req = MinutesAutosaveRequest(
+            trust_id=trust["trust_id"], minutes_type="general",
+            meeting_date="2026-03-03", participants_text="Owner",
+            decisions_text="Owner prepared",
+        )
+        resp = await rm.autosave_minutes(req, user=owner)
+        assert resp.attribution is None
+        doc = await db.minutes_records.find_one({"minutes_id": resp.minutes_id})
+        assert "attribution" not in doc  # additive-only: field absent, not empty
