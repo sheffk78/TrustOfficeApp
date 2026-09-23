@@ -92,9 +92,9 @@ describe('BankingSummaryCard (TO-004): error state vs empty state', () => {
     render(<BankingSummaryCard />);
 
     expect(await screen.findByText('2')).toBeInTheDocument();
-    // $ and the formatted amount render as adjacent text nodes; match the
-    // numeric part which is the fmtMoney output.
-    expect(screen.getByText('1,234.56')).toBeInTheDocument();
+    // The balance renders as a single "$1,234.56" text node (template literal),
+    // not "$" + "1,234.56" as adjacent nodes — match the full node.
+    expect(screen.getByText('$1,234.56')).toBeInTheDocument();
     expect(screen.queryByTestId('banking-summary-error')).not.toBeInTheDocument();
     expect(screen.queryByText('No bank accounts linked yet')).not.toBeInTheDocument();
   });

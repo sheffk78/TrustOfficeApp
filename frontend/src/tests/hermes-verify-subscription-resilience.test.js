@@ -214,7 +214,7 @@ test('6. genuine expired subscription — read-only applied, no retries', async 
 test('7. periodic re-check restores write access after transient failure', async () => {
   // First load: all 3 attempts fail → read-only + re-check timer starts.
   setupFetches([
-    () => Promise.reject(new Error('Network failure')),
+     () => Promise.reject(new Error('Network failure')),
     () => Promise.reject(new Error('Network failure')),
     () => Promise.reject(new Error('Network failure')),
   ]);
@@ -242,4 +242,4 @@ test('7. periodic re-check restores write access after transient failure', async
 
   warnSpy.mockRestore();
   harness.unmount();
-});
+}, 90000); // waits for the real 60s re-check timer (SUBSCRIPTION_RECHECK_INTERVAL_MS) + settle
