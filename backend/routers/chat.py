@@ -755,6 +755,7 @@ ACTION_EXECUTION_MAP = {
     "class_beneficiary_removal_preview": {
         "endpoint_type": "class_beneficiary_removal",
         "field_map": {
+            "class_name": "class_name",
             "class_type": "class_type",
             "reason": "reason",
         },
