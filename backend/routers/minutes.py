@@ -509,6 +509,18 @@ async def create_minutes_draft(
     participants_str = ", ".join(participants_list) if participants_list else ""
     minutes_type = request.minutes_type or "general"
 
+    # Attribution: add preparer/actor line based on grants (T3)
+    attribution = None
+    if user.get("org_grant"):
+        org_name = user["org_grant"].get("org_name", "")
+        member_name = user.get("name") or user.get("email", "")
+        trustee_name = trust.get("trustee_names", "") or trust.get("name", "")
+        attribution = f"Prepared by {member_name}, {org_name} â on behalf of {trustee_name}"
+    elif user.get("party_grant"):
+        party_type = user["party_grant"].get("party_type", "party")
+        name = user.get("name") or user.get("email", "")
+        attribution = f"Acted by {name} ({party_type})"
+
     if request.template_type:
         # ── Template mode ──
         if not get_template_definition(request.template_type):
@@ -559,7 +571,8 @@ async def create_minutes_draft(
         minutes_type=minutes_type,
         meeting_date=request.meeting_date,
         participants_text=participants_str,
-        template_type=request.template_type
+        template_type=request.template_type,
+        attribution=attribution,
     )
 
 
