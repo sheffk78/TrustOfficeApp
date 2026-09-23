@@ -31,6 +31,10 @@ async def create_trust_party(
     user: dict = Depends(get_current_user),
 ):
     _require_toggle()
+    # M3: only trust owner may create parties
+    trust = await db.trusts.find_one({"trust_id": payload.trust_id})
+    if not trust or trust.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail={"code": "owner_only"})
     # Validate protector powers against trust_protector_powers.json
     if payload.party_type == PartyType.protector and payload.powers:
         powers_path = os.path.join(
@@ -73,6 +77,13 @@ async def list_trust_parties(
     user: dict = Depends(get_current_user),
 ):
     _require_toggle()
+    # M6: owner-or-party access
+    trust = await db.trusts.find_one({"trust_id": trust_id})
+    is_owner = trust and trust.get("user_id") == user["user_id"]
+    if not is_owner:
+        party_ids = await _my_party_ids(user)
+        if not party_ids:
+            raise HTTPException(status_code=403, detail={"code": "party_access_denied"})
     cursor = db.trust_parties.find(
         {"trust_id": trust_id}, {"_id": 0}
     ).sort("invited_at", -1)
@@ -157,6 +168,15 @@ async def revoke_party_grant(
     user: dict = Depends(get_current_user),
 ):
     _require_toggle()
+    grant = await db.party_grants.find_one({"grant_id": grant_id, "trust_id": trust_id})
+    if not grant:
+        raise HTTPException(status_code=404, detail="Grant not found")
+    trust = await db.trusts.find_one({"trust_id": trust_id})
+    is_owner = trust and trust.get("user_id") == user["user_id"]
+    party_ids = await _my_party_ids(user)
+    is_granted_party = grant["party_id"] in party_ids
+    if not is_owner and not is_granted_party:
+        raise HTTPException(status_code=403, detail={"code": "party_access_denied"})
     result = await db.party_grants.update_one(
         {"grant_id": grant_id, "trust_id": trust_id},
         {"$set": {
@@ -177,6 +197,12 @@ async def record_party_audit(
     user: dict = Depends(get_current_user),
 ):
     _require_toggle()
+    # M8: restrict to trust owner or verified party actors
+    trust = await db.trusts.find_one({"trust_id": trust_id})
+    is_owner = trust and trust.get("user_id") == user["user_id"]
+    party_ids = await _my_party_ids(user)
+    if not is_owner and payload.party_id not in party_ids:
+        raise HTTPException(status_code=403, detail={"code": "party_access_denied"})
     audit_id = f"paudit_{uuid.uuid4().hex[:12]}"
     doc = {
         "audit_id": audit_id,
