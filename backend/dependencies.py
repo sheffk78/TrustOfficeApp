@@ -1589,6 +1589,11 @@ async def require_trust_party_access(
             {"expires_at": None},
         ],
     })
-    if org_grant and _level_rank(org_grant["level"]) >= _level_rank(min_level.value):
+    # Org-grant fallback (union per TRUST-PARTY-ACCESS-DESIGN §0): compare the
+    # org level against the PARTY level on their rank scales — viewer=1 on both,
+    # actor(2) maps to preparer(2). Using _level_rank here ranked party levels
+    # like "actor"/"protector_scope" as 0, letting a viewer org grant pass an
+    # actor/protector check (escalation bug, caught by D-B probes 2026-09-23).
+    if org_grant and _level_rank(org_grant["level"]) >= _party_level_rank(min_level.value):
         return {**user, "org_grant": org_grant}
     raise HTTPException(status_code=403, detail={"code": "party_access_denied"})

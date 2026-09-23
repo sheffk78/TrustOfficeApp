@@ -748,6 +748,7 @@ class MinutesResponse(BaseModel):
     retroactive_trustees_aware: Optional[str] = None
     retroactive_type: Optional[str] = None
     manually_edited: bool = False
+    attribution: Optional[str] = None  # D10/D-B: additive, set when prepared via a grant
 
 class MinutesResolution(BaseModel):
     title: str
