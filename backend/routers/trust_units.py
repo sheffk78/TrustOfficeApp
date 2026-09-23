@@ -322,7 +322,7 @@ async def reserve_units(trust_id: str, user_id: str, units: float, authorized: f
             {"trust_id": trust_id, "user_id": user_id,
              "reserved_units": {"$lte": authorized - units}},
             {"$inc": {"reserved_units": units, "next_cert_number": 1}},
-            projection={"next_cert_number": 1}, return_document=ReturnDocument.BEFORE,
+            projection={"next_cert_number": 1, "reserved_units": 1}, return_document=ReturnDocument.BEFORE,
         )
         if not counter:
             raise HTTPException(status_code=400, detail=f"Cannot issue {units} units. Only {authorized - current} units remaining.")
@@ -331,7 +331,8 @@ async def reserve_units(trust_id: str, user_id: str, units: float, authorized: f
     # counter could never recover on its own). At this point the new cert is
     # NOT yet inserted, so the correct post-issuance value is actual+units.
     actual = await get_total_active_units(trust_id, user_id)
-    if abs(counter["reserved_units"] - actual) > 0.001:
+    pre = counter.get("reserved_units", actual)
+    if abs(pre - actual) > 0.001:
         await db.trust_unit_counters.update_one(
             {"trust_id": trust_id, "user_id": user_id},
             {"$set": {"reserved_units": actual + units}}
