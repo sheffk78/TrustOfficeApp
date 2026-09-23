@@ -240,6 +240,17 @@ For `dismiss_alert` intents, `extracted` MUST use the key `criterion_name` with 
 ```
 Valid criterion names: Quarterly Minutes, Task Compliance, Compensation Alignment, Distribution Documentation, Annual Review, Asset Valuation Freshness, Transaction Classification, Separation Alert Health. Use the user's wording verbatim when it matches one of these titles; otherwise echo their phrase as criterion_name.
 
+## Output Format (Beneficiary Class Removal)
+For `class_beneficiary_removal` intents, `extracted` MUST use the key `class_name` (the class's name as the user stated it, without trailing punctuation) — not `class_type`:
+```json
+{
+  "action_type": "class_beneficiary_removal",
+  "extracted": {"class_name": "descendants of John Smith"},
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+
 ## Strong Clarification Rules
 When `missing_required` is non-empty, the `suggested_clarification` MUST be a natural, conversational question, not a technical field request:
 - Good: "What's Jane's email address?" or "How many units should Jane receive?"

@@ -310,8 +310,22 @@ async def reserve_units(trust_id: str, user_id: str, units: float, authorized: f
         projection={"next_cert_number": 1}, return_document=ReturnDocument.BEFORE,
     )
     if not counter:
+        # Self-heal a drifted counter: reserved_units can go stale when capacity is
+        # released through paths that skip the decrement (revoke, replace, legacy
+        # deletes). Re-sync from real active units and retry once.
         current = await get_total_active_units(trust_id, user_id)
-        raise HTTPException(status_code=400, detail=f"Cannot issue {units} units. Only {authorized - current} units remaining.")
+        await db.trust_unit_counters.update_one(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"$set": {"reserved_units": current}},
+        )
+        counter = await db.trust_unit_counters.find_one_and_update(
+            {"trust_id": trust_id, "user_id": user_id,
+             "reserved_units": {"$lte": authorized - units}},
+            {"$inc": {"reserved_units": units, "next_cert_number": 1}},
+            projection={"next_cert_number": 1}, return_document=ReturnDocument.BEFORE,
+        )
+        if not counter:
+            raise HTTPException(status_code=400, detail=f"Cannot issue {units} units. Only {authorized - current} units remaining.")
     return f"CU-{str(counter['next_cert_number']).zfill(3)}"
 
 

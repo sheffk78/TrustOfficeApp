@@ -1634,7 +1634,8 @@ async def _chat_class_beneficiary(params: dict, ctx: ActionContext) -> dict:
     trust_scoped=True,
     surfaces=("chat",),
     fields=[
-        F("class_type", "string", required=True),
+        F("class_name", "string", required=False),
+        F("class_type", "string", required=False),
         F("reason", "string", required=False),
     ],
 )
@@ -1645,13 +1646,23 @@ async def _chat_class_beneficiary_removal(params: dict, ctx: ActionContext) -> d
     from routers.beneficiaries import delete_class_beneficiary as _delete_cb
 
     class_type = params.get("class_type", "")
-    existing = await db.class_beneficiaries.find_one({
-        "trust_id": ctx.trust_id,
-        "user_id": ctx.user_id,
-        "class_type": class_type,
-    })
+    class_name = params.get("class_name", "")
+    existing = None
+    if class_name:
+        existing = await db.class_beneficiaries.find_one({
+            "trust_id": ctx.trust_id,
+            "user_id": ctx.user_id,
+            "class_name": {"$regex": f"^{class_name.rstrip('.')}$", "$options": "i"},
+        })
+    if not existing and class_type:
+        existing = await db.class_beneficiaries.find_one({
+            "trust_id": ctx.trust_id,
+            "user_id": ctx.user_id,
+            "class_type": class_type,
+        })
     if not existing:
-        return {"success": False, "error": f"Class beneficiary '{class_type}' not found for this trust."}
+        label = class_name or class_type or "(unspecified)"
+        return {"success": False, "error": f"Class beneficiary '{label}' not found for this trust."}
 
     user = ctx.user or await _user_doc(ctx.user_id)
     try:
