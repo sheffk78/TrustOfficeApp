@@ -353,6 +353,7 @@ class TrustCreate(BaseModel):
     review_cadence: Optional[str] = "quarterly"
     benevolence_mission: Optional[str] = None
     determination_letter_date: Optional[str] = None
+    approval_threshold: Optional[int] = None  # null = all active co-trustees must approve (M2 D9)
 
     @model_validator(mode="after")
     def validate_tax_fields(self):
@@ -423,6 +424,7 @@ class TrustUpdate(BaseModel):
     review_cadence: Optional[str] = None
     benevolence_mission: Optional[str] = None
     determination_letter_date: Optional[str] = None
+    approval_threshold: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_tax_fields(self):
@@ -502,6 +504,7 @@ class TrustResponse(BaseModel):
     # "active" (default) | "dissolved_archived" — the latter is read-only.
     status: Optional[str] = "active"
     dissolved_on: Optional[str] = None
+    approval_threshold: Optional[int] = None  # multi-sig: null = all active co-trustees (M2 D9)
 
 
 # ==================== ENTITY MODELS ====================
