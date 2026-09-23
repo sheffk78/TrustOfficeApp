@@ -4,15 +4,16 @@
 
 import os
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel, EmailStr, Field
-from enum import Enum
-
 from database import db
-from dependencies import get_current_user
+from dependencies import (
+    get_current_user, _toggle_institution, _level_rank,
+    require_org_grant,
+)
 from models import (
     OrgCreate, OrgResponse, OrgMemberRole, OrgMember,
     GrantLevel, TrustGrantCreate, TrustGrant,
@@ -21,20 +22,10 @@ from models import (
 router = APIRouter(tags=["orgs"])
 
 
-# ==================== SETTINGS ====================
-
-def _toggle_institution() -> bool:
-    return os.environ.get("TOGGLE_INSTITUTION", "").lower() in ("1", "true", "yes")
-
-
 # ==================== HELPERS ====================
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _level_rank(level: str) -> int:
-    return {"viewer": 1, "preparer": 2}.get(level, 0)
 
 
 async def _my_memberships(user: dict) -> List[dict]:
@@ -49,40 +40,9 @@ async def _my_memberships(user: dict) -> List[dict]:
     return memberships
 
 
-# ==================== GUARD (require_org_grant) ====================
-# Modeled line-for-line on guard_trust_archive (dependencies.py:1346).
-# Resolution order: trust owner -> org grant -> 403.
-# Short-circuits when TOGGLE_INSTITUTION is off (D8): returns user as-is.
-
-async def require_org_grant(
-    trust_id: str,
-    min_level: GrantLevel = GrantLevel.viewer,
-    request: Request = None,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    if not _toggle_institution():
-        return user  # D8 short-circuit: byte-identical legacy behavior
-    trust = await db.trusts.find_one({"trust_id": trust_id})
-    if trust and trust.get("user_id") == user["user_id"]:
-        return user  # owner always passes
-    memberships = await _my_memberships(user)
-    member_ids = [m["member_id"] for m in memberships if m.get("status") == "active"]
-    grant = await db.trust_grants.find_one({
-        "trust_id": trust_id,
-        "status": "active",
-        "member_id": {"$in": member_ids},
-    })
-    if not grant or _level_rank(grant["level"]) < _level_rank(min_level.value):
-        raise HTTPException(
-            status_code=403,
-            detail={"code": "org_access_denied"},
-        )
-    return {**user, "org_grant": grant}
-
-
 # ==================== ORG ENDPOINTS ====================
 
-@router.post("/api/orgs", response_model=OrgResponse)
+@router.post("/orgs", response_model=OrgResponse)
 async def create_org(body: OrgCreate, user: dict = Depends(get_current_user)):
     """Create an org. Creator becomes owner (D3)."""
     if not _toggle_institution():
@@ -114,7 +74,7 @@ async def create_org(body: OrgCreate, user: dict = Depends(get_current_user)):
     return OrgResponse(**org_doc)
 
 
-@router.get("/api/orgs/{org_id}", response_model=OrgResponse)
+@router.get("/orgs/{org_id}", response_model=OrgResponse)
 async def get_org(org_id: str, user: dict = Depends(get_current_user)):
     """Read org. Member-level access (counts + trusts under management)."""
     if not _toggle_institution():
@@ -125,7 +85,7 @@ async def get_org(org_id: str, user: dict = Depends(get_current_user)):
     return OrgResponse(**org)
 
 
-@router.get("/api/orgs/{org_id}/members", response_model=List[OrgMember])
+@router.get("/orgs/{org_id}/members", response_model=List[OrgMember])
 async def list_org_members(org_id: str, user: dict = Depends(get_current_user)):
     """List org members. Member-level access."""
     if not _toggle_institution():
@@ -137,7 +97,7 @@ async def list_org_members(org_id: str, user: dict = Depends(get_current_user)):
     return members
 
 
-@router.post("/api/orgs/{org_id}/invites")
+@router.post("/orgs/{org_id}/invites")
 async def invite_org_member(
     org_id: str,
     body: dict,
@@ -180,7 +140,7 @@ async def invite_org_member(
     return {"member_id": member_id, "invite_token": invite_token, "expires_in": "72h"}
 
 
-@router.post("/api/orgs/invites/{token}/accept")
+@router.post("/orgs/invites/{token}/accept")
 async def accept_org_invite(token: str, user: dict = Depends(get_current_user)):
     """Accept an org invite by token. Binds user_id, status=active."""
     if not _toggle_institution():
@@ -203,7 +163,7 @@ async def accept_org_invite(token: str, user: dict = Depends(get_current_user)):
     return {"member_id": member["member_id"], "org_id": member["org_id"], "status": "active"}
 
 
-@router.patch("/api/orgs/{org_id}/members/{member_id}")
+@router.patch("/orgs/{org_id}/members/{member_id}")
 async def update_org_member(
     org_id: str,
     member_id: str,
@@ -234,7 +194,7 @@ async def update_org_member(
 
 # ==================== TRUST GRANT ENDPOINTS ====================
 
-@router.post("/api/trusts/{trust_id}/org-grants", response_model=TrustGrant)
+@router.post("/trusts/{trust_id}/org-grants", response_model=TrustGrant)
 async def grant_trust_access(
     trust_id: str,
     body: TrustGrantCreate,
@@ -276,7 +236,7 @@ async def grant_trust_access(
     return TrustGrant(**grant_doc)
 
 
-@router.get("/api/trusts/{trust_id}/org-grants", response_model=List[TrustGrant])
+@router.get("/trusts/{trust_id}/org-grants", response_model=List[TrustGrant])
 async def list_trust_grants(trust_id: str, user: dict = Depends(get_current_user)):
     """List grants for a trust. Owner + granted members."""
     if not _toggle_institution():
@@ -299,7 +259,7 @@ async def list_trust_grants(trust_id: str, user: dict = Depends(get_current_user
     return grants
 
 
-@router.delete("/api/trusts/{trust_id}/org-grants/{grant_id}")
+@router.delete("/trusts/{trust_id}/org-grants/{grant_id}")
 async def revoke_trust_grant(
     trust_id: str,
     grant_id: str,
@@ -325,7 +285,7 @@ async def revoke_trust_grant(
     return {"grant_id": grant_id, "status": "revoked"}
 
 
-@router.get("/api/orgs/{org_id}/trusts")
+@router.get("/orgs/{org_id}/trusts")
 async def org_trusts(org_id: str, user: dict = Depends(get_current_user)):
     """Org console read: trust name, owner, pending minutes, next deadline."""
     if not _toggle_institution():

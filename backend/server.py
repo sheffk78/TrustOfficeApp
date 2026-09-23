@@ -119,6 +119,7 @@ from routers.chat import router as chat_router  # Trust Assistant
 from routers.performance import router as performance_router
 from routers.trust_doc_analysis import router as trust_doc_analysis_router
 from routers.marketing_expenses import router as marketing_expenses_router
+from routers.trust_parties import router as trust_parties_router
 from routers.trust_admin_kits import router as trust_admin_kits_router
 from routers.page_agent import router as page_agent_router  # Page Agent LLM proxy
 from routers.analytics import router as analytics_router  # Analytics events + funnel
@@ -575,6 +576,7 @@ app.include_router(marketing_expenses_router, prefix="/api")
 # Performance Dashboard — contractor/lead performance metrics
 app.include_router(performance_router, prefix="/api")
 # Trust Administration Kits — auto-gathered paperwork packets (vehicle retitle, bank, real estate, etc.)
+app.include_router(trust_parties_router, prefix="/api")
 app.include_router(trust_admin_kits_router, prefix="/api")
 # Page Agent — authenticated LLM proxy for the onboarding Page Agent pilot
 app.include_router(page_agent_router, prefix="/api")

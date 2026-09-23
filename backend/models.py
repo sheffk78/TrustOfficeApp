@@ -2514,3 +2514,70 @@ class TrustGrant(BaseModel):
     revoke_reason: Optional[str] = None
     client_notified_at: Optional[str] = None
     attestation_ref: Optional[str] = None
+
+
+# ==================== TRUST PARTY MODELS (M2) ====================
+
+class PartyType(str, Enum):
+    co_trustee = "co_trustee"
+    protector = "protector"
+    advisor = "advisor"
+    trust_manager = "trust_manager"
+
+class PartyStatus(str, Enum):
+    active = "active"
+    invited = "invited"
+    inactive = "inactive"
+
+class TrustPartyCreate(BaseModel):
+    trust_id: str
+    party_type: PartyType
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    powers: Optional[List[str]] = None
+    notes: Optional[str] = None
+
+class TrustParty(BaseModel):
+    party_id: str
+    trust_id: str
+    party_type: PartyType
+    name: str
+    email: EmailStr
+    status: PartyStatus = PartyStatus.invited
+    powers: List[str] = []
+    invited_at: str
+    activated_at: Optional[str] = None
+    user_id: Optional[str] = None
+    source: str = "backfill"
+
+class PartyLevel(str, Enum):
+    viewer = "viewer"
+    actor = "actor"
+    protector_scope = "protector_scope"
+
+class PartyGrantCreate(BaseModel):
+    party_id: str
+    level: PartyLevel
+    expires_at: Optional[str] = None
+
+class PartyGrant(BaseModel):
+    grant_id: str
+    trust_id: str
+    party_id: str
+    level: PartyLevel
+    status: str = "active"
+    granted_by: str
+    granted_at: str
+    expires_at: Optional[str] = None
+    revoked_at: Optional[str] = None
+    client_notified_at: Optional[str] = None
+
+class PartyAudit(BaseModel):
+    audit_id: str
+    trust_id: str
+    party_id: str
+    action: str
+    attribution: str
+    at: str
+    meta: dict = {}

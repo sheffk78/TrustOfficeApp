@@ -12,6 +12,7 @@ import secrets
 import logging
 
 from database import db
+from models import PartyLevel, PartyGrant, TrustParty
 
 logger = logging.getLogger(__name__)
 
@@ -405,7 +406,9 @@ class Feature:
     ADVANCED_TEMPLATES = "advanced_templates"
     
     # Advisor-tier features (Phase 2 sprint, not yet built)
-    CLIENT_VIEW = "client_view"           # Advisor can view client trusts
+    # CLIENT_VIEW ("client_view") RETIRED 2026-09-23 per TRUST-PARTY-ACCESS-DESIGN §6:
+    # dead flag removed; advisor read access is enforced through trust-party
+    # grants (level=viewer) behind TOGGLE_TRUST_PARTIES instead.
     WHITE_LABEL_BINDER = "white_label"    # White-label PDF binder export
     MULTI_SIGNATURE = "multi_signature"   # Multi-signature approvals
 
@@ -503,7 +506,6 @@ PLAN_FEATURES = {
         Feature.GOVERNANCE_HISTORY,
         Feature.ADVANCED_TEMPLATES,
         Feature.MULTIPLE_TRUSTS,
-        Feature.CLIENT_VIEW,
         Feature.WHITE_LABEL_BINDER,
         Feature.MULTI_SIGNATURE,
     },
@@ -1450,3 +1452,125 @@ async def check_repository_ai_quota(user_id: str) -> dict:
             ),
         )
     return {"allowed": True, "count": count, "quota": REPOSITORY_AI_MONTHLY_QUOTA}
+
+
+# ==================== TRUST PARTY GUARD (M2) ====================
+# Resolution order: owner -> party grant -> org grant -> 403.
+# Short-circuits when TOGGLE_TRUST_PARTIES off (byte-identical legacy behavior).
+
+# ==================== FEATURE FLAGS (M1/M2, D8) ====================
+
+def _toggle_trust_parties() -> bool:
+    return os.environ.get("TOGGLE_TRUST_PARTIES", "").lower() in ("1", "true", "yes")
+
+
+def _toggle_institution() -> bool:
+    return os.environ.get("TOGGLE_INSTITUTION", "").lower() in ("1", "true", "yes")
+
+
+def _my_memberships(user: dict):
+    """Cursor of org_member docs where user is linked (by user_id or email)."""
+    return db.org_members.find(
+        {"$or": [{"user_id": user["user_id"]}, {"email": user.get("email", "")}]},
+        {"_id": 0, "org_id": 1, "member_id": 1, "role": 1, "status": 1},
+    )
+
+
+async def _active_member_ids(user: dict) -> list:
+    """member_ids of this user's active org memberships (M1 helper, shared by guards)."""
+    ids = []
+    cursor = _my_memberships(user)
+    async for m in cursor:
+        if m.get("status") == "active":
+            ids.append(m["member_id"])
+    return ids
+
+
+# ==================== ORG GUARD (M1, spec §4) ====================
+# Modeled line-for-line on guard_trust_archive (dependencies.py:1346).
+# Resolution order: trust owner -> org grant -> 403.
+# Short-circuits when TOGGLE_INSTITUTION is off (D8): returns user as-is.
+
+
+async def require_org_grant(
+    trust_id: str,
+    min_level=None,
+    request: Request = None,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    from models import GrantLevel as _GrantLevel
+    min_level = min_level or _GrantLevel.viewer
+    if not _toggle_institution():
+        return user  # D8 short-circuit: byte-identical legacy behavior
+    trust = await db.trusts.find_one({"trust_id": trust_id})
+    if trust and trust.get("user_id") == user["user_id"]:
+        return user  # owner always passes
+    grant = await db.trust_grants.find_one({
+        "trust_id": trust_id,
+        "status": "active",
+        "member_id": {"$in": await _active_member_ids(user)},
+    })
+    if not grant or _level_rank(grant["level"]) < _level_rank(min_level.value):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "org_access_denied"},
+        )
+    return {**user, "org_grant": grant}
+
+
+def _party_level_rank(level: str) -> int:
+    return {"viewer": 1, "actor": 2, "protector_scope": 3}.get(level, 0)
+
+
+def _level_rank(level: str) -> int:
+    """Org-grant level rank (M1 D1): viewer < preparer."""
+    return {"viewer": 1, "preparer": 2}.get(level, 0)
+
+
+async def _my_party_ids(user: dict) -> list:
+    """Return party_ids for active trust parties bound to this user."""
+    ids = []
+    cursor = db.trust_parties.find(
+        {"user_id": user["user_id"], "status": "active"},
+        {"_id": 0, "party_id": 1},
+    )
+    async for p in cursor:
+        ids.append(p["party_id"])
+    return ids
+
+
+async def require_trust_party_access(
+    trust_id: str,
+    min_level: PartyLevel = PartyLevel.viewer,
+    request: Request = None,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    if not _toggle_trust_parties():
+        return user  # D8 short-circuit: byte-identical legacy behavior
+    trust = await db.trusts.find_one({"trust_id": trust_id})
+    if trust and trust.get("user_id") == user["user_id"]:
+        return user  # owner always passes
+    # Check party grants
+    party_ids = await _my_party_ids(user)
+    if party_ids:
+        party_grant = await db.party_grants.find_one({
+            "trust_id": trust_id,
+            "party_id": {"$in": party_ids},
+            "status": "active",
+        })
+        if party_grant:
+            if _party_level_rank(party_grant["level"]) >= _party_level_rank(min_level.value):
+                return {**user, "party_grant": party_grant}
+            raise HTTPException(status_code=403, detail={"code": "party_access_denied"})
+    # Check org grants
+    org_grant = await db.trust_grants.find_one({
+        "trust_id": trust_id,
+        "status": "active",
+        "member_id": {"$in": [m["member_id"] async for m in db.org_members.find(
+            {"user_id": user["user_id"], "status": "active"},
+            {"_id": 0, "member_id": 1},
+        )]},
+    })
+    if org_grant and _level_rank(org_grant["level"]) >= _level_rank(min_level.value):
+        return {**user, "org_grant": org_grant}
+    raise HTTPException(status_code=403, detail={"code": "party_access_denied"})
