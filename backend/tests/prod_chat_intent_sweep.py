@@ -128,7 +128,7 @@ def cleanup(endpoint, rid, method="DELETE", body=None, expect_404_ok=False):
 SWEEP = [
     # (key, message, type_variants, expect_success)
     ("distribution",
-     "Create a distribution of $500 to Jane Doe from the trust today for expenses.",
+     "Create a distribution of $500 to Jordan Blake from the trust today for expenses.",
      ["distribution_preview", "add_distribution", "create_distribution"], True),
     ("asset",
      "Add an asset to Schedule A: a 2024 Honda Accord worth $28,000, acquired today.",
@@ -138,23 +138,23 @@ SWEEP = [
      ["asset_update_preview", "update_asset_value", "update_asset"], True),
     ("contribute_asset",
      "Contribute my wine collection worth $12,000 to the trust. Grantor is John Smith, "
-     "contribution meeting today with trustees Jane Doe and John Smith.",
+     "contribution meeting today with trustees Jordan Blake and John Smith.",
      ["contribute_asset", "contribute_asset_to_trust", "accept_asset_contribution"], True),
     ("beneficiary",
-     "Add Jane Doe as a beneficiary with a 40% allocation, email jane.doe@example.com.",
+     "Add Jordan Blake as a beneficiary with a 25% allocation, email jordan.blake@example.com.",
      ["beneficiary_preview", "add_beneficiary", "create_beneficiary"], True),
     ("beneficiary_update",  # after beneficiary
-     "Update beneficiary Jane Doe's email to jane2@example.com and add a note that she "
+     "Update beneficiary Jordan Blake's email to jane2@example.com and add a note that she "
      "confirmed her mailing address.",
      ["beneficiary_update_preview", "update_beneficiary_contact", "update_beneficiary"], True),
     ("send_certificate",  # after beneficiary (active cert required); self-addressed email
-     "Email Jane Doe's certificate notice to demovideo@trustoffice.app.",
+     "Email Jordan Blake's certificate notice to demovideo@trustoffice.app.",
      ["certificate_preview", "send_certificate_notice", "send_certificate"], True),
     ("beneficiary_removal",  # after certificate (soft-deletes the cert)
-     "Remove beneficiary Jane Doe — she is no longer eligible under the trust terms.",
+     "Remove beneficiary Jordan Blake — she is no longer eligible under the trust terms.",
      ["beneficiary_removal_preview", "remove_beneficiary", "delete_beneficiary"], True),
     ("distribution_cancel",  # after distribution
-     "Cancel the $500 distribution to Jane Doe dated today.",
+     "Cancel the $500 distribution to Jordan Blake dated today.",
      ["distribution_cancel_preview", "cancel_distribution", "delete_distribution"], True),
     ("document_upload",
      "Upload a vault document titled 'Sweep Test Deed 2026' to the vault with category deed.",
@@ -179,7 +179,7 @@ SWEEP = [
      "Create an LLC named Sweep Test Properties LLC, formed in Utah on 2026-09-22.",
      ["entity_preview", "create_entity", "add_entity"], True),
     ("class_beneficiary",
-     "Add a class of beneficiaries: descendants of John Smith, 60 percent.",
+     "Add a class of beneficiaries: descendants of John Smith, 30 percent.",
      ["class_beneficiary_preview", "add_beneficiary_class", "create_class_beneficiary"], True),
     ("class_beneficiary_removal",  # after class_beneficiary
      "Remove the descendants of John Smith class of beneficiaries.",
@@ -191,7 +191,7 @@ SWEEP = [
      "Change the trust's jurisdiction to Nevada.",
      ["settings_update_preview", "update_trust_jurisdiction", "update_trust_settings"], True),
     ("minutes",
-     "Log general minutes for our annual meeting today. Trustees present were Jane Doe "
+     "Log general minutes for our annual meeting today. Trustees present were Jordan Blake "
      "and John Smith, and we approved the annual budget review.",
      ["minutes_preview", "log_minutes", "create_minutes"], True),
 ]
@@ -224,7 +224,7 @@ def main():
     seed_beneficiary_keys = []
     try:
         r = c.post(f"{BASE}/beneficiaries/create", headers=H, json={
-            "trust_id": TRUST, "name": "Jane Doe", "email": "jane.doe@example.com",
+            "trust_id": TRUST, "name": "Jordan Blake", "email": "jane.doe@example.com",
             "allocation_pct": 10})
         if r.status_code in (200, 201):
             rj = r.json() or {}
@@ -253,7 +253,7 @@ def main():
     seed_distribution_id = None
     try:
         r = c.post(f"{BASE}/distributions", headers=H, json={
-            "trust_id": TRUST, "beneficiary_name": "Jane Doe", "amount": 500,
+            "trust_id": TRUST, "beneficiary_name": "Jordan Blake", "amount": 500,
             "purpose_classification": "distribution", "date": "2026-09-22"})
         if r.status_code in (200, 201):
             rj = r.json() or {}
@@ -313,8 +313,9 @@ def main():
                              json={"trust_id": TRUST, "criterion_name": "Quarterly Minutes"})
                 log(key + "/restore", "ok", f"restore={res.status_code}")
             elif ep and rid and ep != "trusts":
-                code, body_ = cleanup(ep, rid, expect_404_ok=(key == "beneficiary_removal"))
-                log(key + "/cleanup", "ok" if code == 200 or expect_404_ok else "WARN",
+                allow_404 = (key == "beneficiary_removal")
+                code, body_ = cleanup(ep, rid, expect_404_ok=allow_404)
+                log(key + "/cleanup", "ok" if code == 200 or allow_404 else "WARN",
                     f"{code} {body_}")
             # conversation tidy-up
             c.delete(f"{BASE}/ai/chat/conversations/{conv_id}", headers=H)
@@ -387,6 +388,17 @@ def main():
     except Exception as e:
         log("missing-field", "ERROR", f"{type(e).__name__}: {e}")
         failed += 1
+
+    # --- sweep any leftover test certificates (chat-created certs survive beneficiary deletes) ---
+    try:
+        rc_ = c.get(f"{BASE}/trust-units/certificates", headers=H, params={"trust_id": TRUST})
+        for cert in (rc_.json() or []):
+            holder = str(cert.get("holder_name", ""))
+            if cert.get("status") != "cancelled" and ("Jordan Blake" in holder or "Sweep" in holder):
+                c.delete(f"{BASE}/trust-units/certificates/{cert['certificate_id']}", headers=H)
+                log("cleanup/stray-cert", "ok", f"cancelled {cert['certificate_id']}")
+    except Exception as e:
+        log("cleanup/stray-cert", "WARN", f"{type(e).__name__}: {e}")
 
     # --- cleanup deferred (chain) records ---
     for dkey in ("asset_update", "asset", "beneficiary_removal", "send_certificate",
