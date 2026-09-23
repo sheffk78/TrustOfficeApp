@@ -58,6 +58,23 @@ async def _require_owned_trust(trust_id: str, user: dict) -> dict:
     return trust
 
 
+async def _resolve_minutes_trust_id(minutes_id: str):
+    """D-A fix: resolve trust_id from the minutes doc so guards key on trust_id.
+
+    Checks meeting_minutes first, then legacy minutes_records. Returns None when
+    no minutes doc exists — the caller then skips the guard and the existing
+    404 path handles the missing doc (never 403 an owner on a missing doc).
+    """
+    doc = await db.meeting_minutes.find_one(
+        {"minutes_id": minutes_id}, {"_id": 0, "trust_id": 1}
+    )
+    if not doc:
+        doc = await db.minutes_records.find_one(
+            {"minutes_id": minutes_id}, {"_id": 0, "trust_id": 1}
+        )
+    return (doc or {}).get("trust_id") or None
+
+
 # ==================== AGENDAS ====================
 
 @router.post("/meetings/{trust_id}/agendas", response_model=MeetingAgendaResponse)
@@ -147,7 +164,9 @@ async def update_minutes(
     payload: MinutesUpdateBody,
     user: dict = Depends(require_write_access),
 ):
-    await require_org_grant(minutes_id, user=user)
+    trust_id = await _resolve_minutes_trust_id(minutes_id)
+    if trust_id:
+        await require_org_grant(trust_id, user=user)
     try:
         minutes = await meeting_service.update_minutes_record(
             minutes_id, payload.model_dump(exclude_unset=True), user["user_id"]
@@ -171,7 +190,9 @@ async def approve_minutes(
     user: dict = Depends(require_write_access),
 ):
     """Approve minutes. Valid from under_review; advances the workflow toward finalized."""
-    await require_org_grant(minutes_id, user=user)
+    trust_id = await _resolve_minutes_trust_id(minutes_id)
+    if trust_id:
+        await require_org_grant(trust_id, user=user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.approved, user, note=payload.note
     )
@@ -190,7 +211,9 @@ async def request_changes(
     user: dict = Depends(require_write_access),
 ):
     """Request changes on minutes under review."""
-    await require_org_grant(minutes_id, user=user)
+    trust_id = await _resolve_minutes_trust_id(minutes_id)
+    if trust_id:
+        await require_org_grant(trust_id, user=user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.changes_requested, user, note=payload.note
     )
@@ -209,7 +232,9 @@ async def submit_for_review(
     user: dict = Depends(require_write_access),
 ):
     """Submit draft minutes for review (draft â pending_review)."""
-    await require_org_grant(minutes_id, user=user)
+    trust_id = await _resolve_minutes_trust_id(minutes_id)
+    if trust_id:
+        await require_org_grant(trust_id, user=user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.pending_review, user, note=payload.note
     )
@@ -228,7 +253,9 @@ async def start_review(
     user: dict = Depends(require_write_access),
 ):
     """Start reviewing pending minutes (pending_review Ã¢ÂÂ under_review)."""
-    await require_org_grant(minutes_id, user=user)
+    trust_id = await _resolve_minutes_trust_id(minutes_id)
+    if trust_id:
+        await require_org_grant(trust_id, user=user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.under_review, user, note=payload.note
     )
@@ -246,7 +273,9 @@ async def finalize_minutes(
     user: dict = Depends(require_write_access),
 ):
     """Finalize approved minutes (approved Ã¢ÂÂ finalized, terminal)."""
-    await require_org_grant(minutes_id, user=user)
+    trust_id = await _resolve_minutes_trust_id(minutes_id)
+    if trust_id:
+        await require_org_grant(trust_id, user=user)
     # Legacy minutes created through /minutes live in minutes_records and do
     # not have an approval document. Preserve the approval workflow for
     # meeting_minutes, but allow the legacy draft path to finalize directly.
@@ -291,7 +320,9 @@ async def reject_minutes(
     user: dict = Depends(require_write_access),
 ):
     """Reject minutes (terminal)."""
-    await require_org_grant(minutes_id, user=user)
+    trust_id = await _resolve_minutes_trust_id(minutes_id)
+    if trust_id:
+        await require_org_grant(trust_id, user=user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.rejected, user, note=payload.note
     )
