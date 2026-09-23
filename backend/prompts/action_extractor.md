@@ -228,6 +228,18 @@ For `change_settings` intents, `extracted` MUST use exactly two keys — `field`
 ```
 `field` must be one of: name, trust_type, formation_date, ein, jurisdiction, state_code. If the user names a state ("Change the trust to Nevada"), map it to the exact field (`jurisdiction`) and its value as the 2-letter code.
 
+## Output Format (Alert Dismissal)
+For `dismiss_alert` intents, `extracted` MUST use the key `criterion_name` with the EXACT criterion title from the user's message:
+```json
+{
+  "action_type": "dismiss_alert",
+  "extracted": {"criterion_name": "Quarterly Minutes"},
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+Valid criterion names: Quarterly Minutes, Task Compliance, Compensation Alignment, Distribution Documentation, Annual Review, Asset Valuation Freshness, Transaction Classification, Separation Alert Health. Use the user's wording verbatim when it matches one of these titles; otherwise echo their phrase as criterion_name.
+
 ## Strong Clarification Rules
 When `missing_required` is non-empty, the `suggested_clarification` MUST be a natural, conversational question, not a technical field request:
 - Good: "What's Jane's email address?" or "How many units should Jane receive?"

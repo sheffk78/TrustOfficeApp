@@ -185,7 +185,7 @@ SWEEP = [
      "Remove the descendants of John Smith class of beneficiaries.",
      ["class_beneficiary_removal_preview", "remove_beneficiary_class", "remove_class_beneficiary"], True),
     ("alert_dismiss",
-     "Dismiss the governance alert criterion test_criterion_sweep for this trust.",
+     "Dismiss the Quarterly Minutes governance alert for this trust.",
      ["alert_dismiss", "dismiss_governance_alert_criterion", "dismiss_alert"], True),
     ("settings_update",
      "Change the trust's jurisdiction to Nevada.",
@@ -217,6 +217,7 @@ def main():
     log("settings-snapshot", "ok", f"jurisdiction={orig_jurisdiction!r}")
 
     passed = failed = 0
+    rid_by_key = {}
 
     # --- pre-seed dependent records via the UI API (chat intents that need targets) ---
     seed_beneficiary_id = None
@@ -224,7 +225,7 @@ def main():
     try:
         r = c.post(f"{BASE}/beneficiaries/create", headers=H, json={
             "trust_id": TRUST, "name": "Jane Doe", "email": "jane.doe@example.com",
-            "allocation_pct": 40})
+            "allocation_pct": 10})
         if r.status_code in (200, 201):
             rj = r.json() or {}
             seed_beneficiary_id = rj.get("beneficiary_id") or rj.get("certificate_id")
@@ -235,6 +236,20 @@ def main():
             log("seed/beneficiary", "warn", f"code={r.status_code} body_keys={seed_beneficiary_keys[:12]} body={r.text[:180]}")
     except Exception as e:
         log("seed/beneficiary", "ERROR", f"{type(e).__name__}: {e}")
+    seed_entity_id = None
+    try:
+        r = c.post(f"{BASE}/entities", headers=H, json={
+            "trust_id": TRUST, "name": "Sweep Seed Entity", "entity_type": "Trust",
+            "legal_name": "Sweep Seed Entity LLC", "formation_date": "2020-01-15",
+            "governing_law": "CA"})
+        if r.status_code in (200, 201):
+            seed_entity_id = (r.json() or {}).get("entity_id")
+        if seed_entity_id:
+            log("seed/entity", "ok", f"id={seed_entity_id} code={r.status_code}")
+        else:
+            log("seed/entity", "warn", f"code={r.status_code} body={r.text[:180]}")
+    except Exception as e:
+        log("seed/entity", "ERROR", f"{type(e).__name__}: {e}")
     seed_distribution_id = None
     try:
         r = c.post(f"{BASE}/distributions", headers=H, json={
@@ -274,9 +289,15 @@ def main():
             passed += ok
             failed += (not ok)
 
-            # cleanup per endpoint
+            rid_by_key[key] = rid  # remember for deferred/end cleanup
+            # cleanup per endpoint — chains (asset→asset_update, beneficiary→…→removal,
+            # class→removal) clean up at END so dependent cases keep their targets
+            DEFER = {"asset", "beneficiary", "beneficiary_update", "send_certificate",
+                     "class_beneficiary", "distribution"}
             ep = ex.get("endpoint", "")
-            if key == "contribute_asset" and ok:
+            if key in DEFER and ok:
+                log(key + "/cleanup", "ok", "deferred to end-of-run")
+            elif key == "contribute_asset" and ok:
                 a = c.delete(f"{BASE}/schedule-a/{ex.get('schedule_a_id')}", headers=H)
                 m = c.delete(f"{BASE}/minutes/{ex.get('minutes_id')}", headers=H)
                 log(key + "/cleanup", "ok", f"asset={a.status_code} minutes={m.status_code}")
@@ -284,12 +305,12 @@ def main():
                 p = c.patch(f"{BASE}/investments/{rid}", headers=H, json={"is_active": False})
                 log(key + "/cleanup", "ok", f"patch={p.status_code}")
             elif key == "settings_update" and ok:
-                rest = c.patch(f"{BASE}/trusts/{TRUST}", headers=H,
-                               json={"jurisdiction": orig_jurisdiction})
-                log(key + "/restore", "ok", f"patch={rest.status_code}")
+                rest = c.put(f"{BASE}/trusts/{TRUST}", headers=H,
+                              json={"jurisdiction": orig_jurisdiction})
+                log(key + "/restore", "ok", f"put={rest.status_code}")
             elif key == "alert_dismiss" and ok:
                 res = c.post(f"{BASE}/governance/insights/restore", headers=H,
-                             json={"trust_id": TRUST, "criterion_name": "test_criterion_sweep"})
+                             json={"trust_id": TRUST, "criterion_name": "Quarterly Minutes"})
                 log(key + "/restore", "ok", f"restore={res.status_code}")
             elif ep and rid and ep != "trusts":
                 code, body_ = cleanup(ep, rid, expect_404_ok=(key == "beneficiary_removal"))
@@ -367,7 +388,29 @@ def main():
         log("missing-field", "ERROR", f"{type(e).__name__}: {e}")
         failed += 1
 
+    # --- cleanup deferred (chain) records ---
+    for dkey in ("asset_update", "asset", "beneficiary_removal", "send_certificate",
+                 "beneficiary_update", "beneficiary", "class_beneficiary_removal",
+                 "class_beneficiary", "distribution_cancel", "distribution"):
+        d_rid = rid_by_key.get(dkey)
+        if not d_rid:
+            continue
+        ep_map = {"asset": "schedule-a", "asset_update": None,
+                  "beneficiary": "beneficiaries", "beneficiary_update": "beneficiaries",
+                  "send_certificate": None, "beneficiary_removal": None,
+                  "class_beneficiary": "class-beneficiaries",
+                  "class_beneficiary_removal": None,
+                  "distribution": "distributions", "distribution_cancel": None}
+        ep_ = ep_map.get(dkey)
+        if not ep_:
+            continue
+        rd_ = c.delete(f"{BASE}/{ep_}/{d_rid}", headers=H)
+        log("cleanup/" + dkey, "ok", f"code={rd_.status_code}")
+
     # --- cleanup seeded records ---
+    if seed_entity_id:
+        re_ = c.delete(f"{BASE}/entities/{seed_entity_id}", headers=H)
+        log("cleanup/seed-entity", "ok", f"code={re_.status_code}")
     if seed_distribution_id:
         rd = c.delete(f"{BASE}/distributions/{seed_distribution_id}", headers=H)
         log("cleanup/seed-distribution", "ok", f"code={rd.status_code}")
