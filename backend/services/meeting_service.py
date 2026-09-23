@@ -15,6 +15,7 @@ from typing import List, Optional, Tuple
 import uuid
 
 from database import db
+from dependencies import _toggle_trust_parties
 from models import (
     MeetingAgendaCreate, MeetingAgendaUpdate,
     MeetingAgendaItemCreate,
@@ -451,6 +452,8 @@ async def _create_approval_status(payload: MinutesApprovalStatusCreate, user: di
         "rejection_reason": None,
         "created_at": now,
         "updated_at": None,
+        "co_trustee_approvers": [],
+        "pending_signatures": 0,
     }
     await db.minutes_approval_status.insert_one(doc)
     doc.pop("_id", None)
@@ -530,7 +533,7 @@ async def transition_minutes(
 
     current = ApprovalStatus(approval["current_status"])
     if target not in _TRANSITIONS.get(current, set()):
-        return None, f"Invalid transition: {current.value} → {target.value}."
+        return None, f"Invalid transition: {current.value} â {target.value}."
 
     action, role = _ACTION_MAP[target]
     now = _now()
@@ -557,6 +560,23 @@ async def transition_minutes(
     if role == ApprovalRole.approver and not approval.get("approver_user_id"):
         set_fields["approver_user_id"] = user["user_id"]
         set_fields["approver_name"] = user_name
+
+    # Multi-sig: co-trustee approval counting (behind TOGGLE_TRUST_PARTIES)
+        if _toggle_trust_parties() and approval.get("approval_threshold") is not None:
+            # Track distinct co-trustee approvers via $addToSet (dedupes)
+            if role == ApprovalRole.approver and user["user_id"] not in approval.get("co_trustee_approvers", []):
+                set_fields.setdefault("co_trustee_approvers", approval.get("co_trustee_approvers", []))
+                set_fields["co_trustee_approvers"].append(user["user_id"])
+            # Count distinct approvers including the new one
+            co_trustee_count = len(set(approval.get("co_trustee_approvers", []) | {user["user_id"]}))
+            threshold = approval["approval_threshold"]
+            if co_trustee_count >= threshold and target == ApprovalStatus.approved:
+                # Threshold met â proceed as today
+                pass
+            elif co_trustee_count < threshold and target == ApprovalStatus.approved:
+                # Not yet met â stay pending_signatures
+                set_fields["current_status"] = "pending_signatures"
+                set_fields["pending_signatures"] = threshold - co_trustee_count
 
     await db.minutes_approval_status.update_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]},
