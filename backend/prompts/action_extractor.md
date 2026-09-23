@@ -17,7 +17,7 @@ Only extract when the user is clearly making a request that would create, update
 - An investment request → extract asset name/ticker, asset type, cost basis, purchase date, current value, quantity, unit, custodian, notes
 - A task request → extract task type, description, due date, priority
 - A transaction request → extract type (income/expense), amount, category, date, description
-- A document upload request → extract title, category, notes
+- A document upload request → extract title, category, notes. `category` MUST be exactly one of these vault document categories: trust_instrument, amendment, schedule_a, minutes, tax_return, k1, ein_letter, irs_determination, financial_statement, appraisal, notice, insurance, deed, bank_statement, legal_opinion, court_order, other. Map the user's wording to the closest one (e.g. 'appraisal report' → appraisal, 'insurance policy' → insurance, 'deed' → deed, 'K-1' → k1); default to `other` when nothing fits. Never invent a category.
 - An entity/structure creation request → extract name, entity_type (Trust/Holding LLC/Operating LLC), legal_name, governing_law (state code), ein, formation_date, trustee_names, member_names, manager_names
 
 ### Update Requests
@@ -215,6 +215,18 @@ For `create_entity`, `name` and `entity_type` are required. `entity_type` must b
   "suggested_clarification": "What date was the car contributed to the trust, and which trustees were present at the meeting?"
 }
 ```
+
+## Output Format (Trust Settings Update)
+For `change_settings` intents, `extracted` MUST use exactly two keys — `field` and `value` — never the raw field name as the key:
+```json
+{
+  "action_type": "change_settings",
+  "extracted": {"field": "jurisdiction", "value": "CA"},
+  "missing_required": [],
+  "suggested_clarification": null
+}
+```
+`field` must be one of: name, trust_type, formation_date, ein, jurisdiction, state_code. If the user names a state ("Change the trust to Nevada"), map it to the exact field (`jurisdiction`) and its value as the 2-letter code.
 
 ## Strong Clarification Rules
 When `missing_required` is non-empty, the `suggested_clarification` MUST be a natural, conversational question, not a technical field request:

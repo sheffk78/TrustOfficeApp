@@ -63,11 +63,23 @@ def log(step, status, detail=""):
 
 
 def chat(message):
-    r = c.post(f"{BASE}/ai/chat", headers=H, json={"message": message, "trust_id": TRUST})
+    """Post via the SSE streaming route — the path real users (frontend) hit.
+    Cards are generated server-side with PINNED types there; the non-streaming
+    /ai/chat route lets the LLM freestyle the type (unpinned) and is not the
+    user-facing path."""
+    r = c.post(f"{BASE}/ai/chat/stream", headers=H,
+               json={"message": message, "trust_id": TRUST})
     assert r.status_code == 200, f"chat {r.status_code}: {r.text[:300]}"
-    data = r.json()
-    conv_id = data.get("conversation_id")
-    assert conv_id, "no conversation_id"
+    conv_id = None
+    for line in r.text.split("\n"):
+        if line.startswith("data:"):
+            try:
+                ev = json.loads(line[5:].strip())
+            except Exception:
+                continue
+            if ev.get("conversation_id"):
+                conv_id = ev["conversation_id"]
+    assert conv_id, "no conversation_id in SSE stream"
     CONVERSATIONS.append(conv_id)
     return conv_id
 
@@ -117,39 +129,39 @@ SWEEP = [
     # (key, message, type_variants, expect_success)
     ("distribution",
      "Create a distribution of $500 to Jane Doe from the trust today for expenses.",
-     ["distribution_preview", "create_distribution"], True),
+     ["distribution_preview", "add_distribution", "create_distribution"], True),
     ("asset",
      "Add an asset to Schedule A: a 2024 Honda Accord worth $28,000, acquired today.",
      ["asset_preview", "add_asset"], True),
     ("asset_update",  # runs after asset — references it
      "Update the Schedule A asset '2024 Honda Accord' with a new value of $26,500 as of today.",
-     ["asset_update_preview", "update_asset"], True),
+     ["asset_update_preview", "update_asset_value", "update_asset"], True),
     ("contribute_asset",
      "Contribute my wine collection worth $12,000 to the trust. Grantor is John Smith, "
      "contribution meeting today with trustees Jane Doe and John Smith.",
-     ["contribute_asset"], True),
+     ["contribute_asset", "contribute_asset_to_trust", "accept_asset_contribution"], True),
     ("beneficiary",
      "Add Jane Doe as a beneficiary with a 40% allocation, email jane.doe@example.com.",
-     ["beneficiary_preview", "create_beneficiary"], True),
+     ["beneficiary_preview", "add_beneficiary", "create_beneficiary"], True),
     ("beneficiary_update",  # after beneficiary
      "Update beneficiary Jane Doe's email to jane2@example.com and add a note that she "
      "confirmed her mailing address.",
-     ["beneficiary_update_preview", "update_beneficiary"], True),
+     ["beneficiary_update_preview", "update_beneficiary_contact", "update_beneficiary"], True),
     ("send_certificate",  # after beneficiary (active cert required); self-addressed email
      "Email Jane Doe's certificate notice to demovideo@trustoffice.app.",
-     ["certificate_preview", "send_certificate"], True),
+     ["certificate_preview", "send_certificate_notice", "send_certificate"], True),
     ("beneficiary_removal",  # after certificate (soft-deletes the cert)
      "Remove beneficiary Jane Doe — she is no longer eligible under the trust terms.",
-     ["beneficiary_removal_preview", "remove_beneficiary"], True),
+     ["beneficiary_removal_preview", "remove_beneficiary", "delete_beneficiary"], True),
     ("distribution_cancel",  # after distribution
      "Cancel the $500 distribution to Jane Doe dated today.",
-     ["distribution_cancel_preview", "cancel_distribution"], True),
+     ["distribution_cancel_preview", "cancel_distribution", "delete_distribution"], True),
     ("document_upload",
-     "Upload a vault document titled 'Sweep Test Deed 2026' in category deeds.",
-     ["document_upload_preview", "upload_document"], True),
+     "Upload a vault document titled 'Sweep Test Deed 2026' to the vault with category deed.",
+     ["document_upload_preview", "upload_vault_document", "upload_document"], True),
     ("compensation_plan",
      "Set up a compensation plan for trustee John Smith at $3,000 per year, effective today.",
-     ["compensation_plan_preview", "setup_compensation"], True),
+     ["compensation_plan_preview", "create_compensation_plan", "setup_compensation"], True),
     ("compensation_payment",
      "Record a compensation payment of $250 to trustee John Smith today.",
      ["compensation_payment_preview", "record_compensation_payment"], True),
@@ -159,25 +171,25 @@ SWEEP = [
      ["investment_preview", "add_investment"], True),
     ("task",
      "Schedule a governance task of type tax_filing: review annual tax filings, due next month, high priority.",
-     ["task_preview", "schedule_task"], True),
+     ["task_preview", "add_governance_task", "schedule_task"], True),
     ("transaction",
      "Record a transaction: expense of $250 for accounting software today.",
-     ["transaction_preview", "add_transaction"], True),
+     ["transaction_preview", "record_transaction", "add_transaction"], True),
     ("entity",
      "Create an LLC named Sweep Test Properties LLC, formed in Utah on 2026-09-22.",
-     ["entity_preview", "create_entity"], True),
+     ["entity_preview", "create_entity", "add_entity"], True),
     ("class_beneficiary",
      "Add a class of beneficiaries: descendants of John Smith, 60 percent.",
-     ["class_beneficiary_preview", "create_class_beneficiary"], True),
+     ["class_beneficiary_preview", "add_beneficiary_class", "create_class_beneficiary"], True),
     ("class_beneficiary_removal",  # after class_beneficiary
      "Remove the descendants of John Smith class of beneficiaries.",
-     ["class_beneficiary_removal_preview", "remove_class_beneficiary"], True),
+     ["class_beneficiary_removal_preview", "remove_beneficiary_class", "remove_class_beneficiary"], True),
     ("alert_dismiss",
      "Dismiss the governance alert criterion test_criterion_sweep for this trust.",
-     ["alert_dismiss", "dismiss_alert"], True),
+     ["alert_dismiss", "dismiss_governance_alert_criterion", "dismiss_alert"], True),
     ("settings_update",
      "Change the trust's jurisdiction to Nevada.",
-     ["settings_update_preview"], True),
+     ["settings_update_preview", "update_trust_jurisdiction", "update_trust_settings"], True),
     ("minutes",
      "Log general minutes for our annual meeting today. Trustees present were Jane Doe "
      "and John Smith, and we approved the annual budget review.",
@@ -205,6 +217,39 @@ def main():
     log("settings-snapshot", "ok", f"jurisdiction={orig_jurisdiction!r}")
 
     passed = failed = 0
+
+    # --- pre-seed dependent records via the UI API (chat intents that need targets) ---
+    seed_beneficiary_id = None
+    seed_beneficiary_keys = []
+    try:
+        r = c.post(f"{BASE}/beneficiaries/create", headers=H, json={
+            "trust_id": TRUST, "name": "Jane Doe", "email": "jane.doe@example.com",
+            "allocation_pct": 40})
+        if r.status_code in (200, 201):
+            rj = r.json() or {}
+            seed_beneficiary_id = rj.get("beneficiary_id") or rj.get("certificate_id")
+            seed_beneficiary_keys = sorted(rj.keys())
+        if seed_beneficiary_id:
+            log("seed/beneficiary", "ok", f"id={seed_beneficiary_id} code={r.status_code}")
+        else:
+            log("seed/beneficiary", "warn", f"code={r.status_code} body_keys={seed_beneficiary_keys[:12]} body={r.text[:180]}")
+    except Exception as e:
+        log("seed/beneficiary", "ERROR", f"{type(e).__name__}: {e}")
+    seed_distribution_id = None
+    try:
+        r = c.post(f"{BASE}/distributions", headers=H, json={
+            "trust_id": TRUST, "beneficiary_name": "Jane Doe", "amount": 500,
+            "purpose_classification": "distribution", "date": "2026-09-22"})
+        if r.status_code in (200, 201):
+            rj = r.json() or {}
+            seed_distribution_id = rj.get("distribution_id")
+        if seed_distribution_id:
+            log("seed/distribution", "ok", f"id={seed_distribution_id} code={r.status_code}")
+        else:
+            log("seed/distribution", "warn", f"code={r.status_code} body={r.text[:180]}")
+    except Exception as e:
+        log("seed/distribution", "ERROR", f"{type(e).__name__}: {e}")
+
     for key, msg, variants, expect_ok in SWEEP:
         try:
             conv_id = chat(msg)
@@ -313,14 +358,22 @@ def main():
                         and ex.get("error"))
             log("missing-field", "PASS" if graceful else "FAIL",
                 f"approved→success={ex.get('success')} error={ex.get('error')}")
-            passed += graceful
-            failed += not graceful
+            passed += int(bool(graceful))
+            failed += int(not graceful)
             if ex.get("record_id"):
                 c.delete(f"{BASE}/tasks/{ex['record_id']}", headers=H)
         c.delete(f"{BASE}/ai/chat/conversations/{conv_id}", headers=H)
     except Exception as e:
         log("missing-field", "ERROR", f"{type(e).__name__}: {e}")
         failed += 1
+
+    # --- cleanup seeded records ---
+    if seed_distribution_id:
+        rd = c.delete(f"{BASE}/distributions/{seed_distribution_id}", headers=H)
+        log("cleanup/seed-distribution", "ok", f"code={rd.status_code}")
+    if seed_beneficiary_id:
+        rb = c.delete(f"{BASE}/beneficiaries/{seed_beneficiary_id}", headers=H)
+        log("cleanup/seed-beneficiary", "ok", f"code={rb.status_code}")
 
     summary = {"passed": passed, "failed": failed,
                "total": passed + failed,
