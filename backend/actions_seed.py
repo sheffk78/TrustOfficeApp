@@ -1649,11 +1649,18 @@ async def _chat_class_beneficiary_removal(params: dict, ctx: ActionContext) -> d
     class_name = params.get("class_name", "")
     existing = None
     if class_name:
+        # The class "name" is stored in `description` (no class_name field on the doc).
         existing = await db.class_beneficiaries.find_one({
             "trust_id": ctx.trust_id,
             "user_id": ctx.user_id,
-            "class_name": {"$regex": f"^{class_name.rstrip('.')}$", "$options": "i"},
+            "description": {"$regex": f"^{class_name.rstrip('.')}$", "$options": "i"},
         })
+        if not existing:
+            existing = await db.class_beneficiaries.find_one({
+                "trust_id": ctx.trust_id,
+                "user_id": ctx.user_id,
+                "class_name": {"$regex": f"^{class_name.rstrip('.')}$", "$options": "i"},
+            })
     if not existing and class_type:
         existing = await db.class_beneficiaries.find_one({
             "trust_id": ctx.trust_id,
