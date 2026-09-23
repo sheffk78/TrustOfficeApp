@@ -898,8 +898,14 @@ async def startup_event():
         await db.trust_grants.create_index([("trust_id", 1), ("status", 1)])
         await db.trust_grants.create_index([("org_id", 1), ("member_id", 1)])
         
+        # Trust-party indexes (M2)
+        await db.trust_parties.create_index([("trust_id", 1), ("party_type", 1)])
+        await db.trust_parties.create_index("email")
+        await db.party_grants.create_index([("trust_id", 1), ("status", 1)])
+        await db.party_grants.create_index("party_id")
+        await db.party_audit.create_index([("trust_id", 1), ("at", -1)])
+        
         # Bank accounts indexes
-        await db.bank_accounts.create_index("account_id", unique=True)
         await db.bank_accounts.create_index([("trust_id", 1), ("user_id", 1)])
         await db.bank_accounts.create_index([("entity_id", 1), ("user_id", 1)])
         
