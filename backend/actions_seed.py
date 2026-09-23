@@ -19,7 +19,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, HTTPException
+import re
 
 from action_layer import F, ActionContext, ActionError, action
 from database import db
@@ -714,6 +715,7 @@ async def _chat_contribute_asset(params: dict, ctx: ActionContext) -> dict:
                 # Route through the minutes router's update_minutes endpoint
                 # to enforce ownership verification and validation.
                 from routers.minutes import update_minutes as _update_minutes
+                from routers.chat import _MockRequest
                 mock_req = _MockRequest({"decisions_text": generated_text})
                 await _update_minutes(
                     minutes_id=minutes_result.minutes_id,
@@ -839,11 +841,11 @@ async def _chat_beneficiary_update(params: dict, ctx: ActionContext) -> dict:
     existing = await db.trust_unit_certificates.find_one({
         "trust_id": ctx.trust_id,
         "user_id": ctx.user_id,
-        "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
+        "holder_name": {"$regex": f"^{re.escape(params.get('holder_name', ''))}$", "$options": "i"},
         "status": "active",
     })
     if not existing:
-        return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found. Use 'Create Beneficiary' to add them first."}
+        return {"success": False, "error": f"Beneficiary '{params.get('holder_name', '')}' not found. Use 'Create Beneficiary' to add them first."}
 
     # Build the BeneficiaryUpdate model with only provided fields
     update_kwargs = {}
@@ -861,7 +863,7 @@ async def _chat_beneficiary_update(params: dict, ctx: ActionContext) -> dict:
 
     user = ctx.user or await _user_doc(ctx.user_id)
     try:
-        await _update_beneficiary(
+        await _update_bene(
             beneficiary_id=existing["certificate_id"],
             data=bene_update,
             user=user,
@@ -907,15 +909,15 @@ async def _chat_beneficiary_removal(params: dict, ctx: ActionContext) -> dict:
     existing = await db.trust_unit_certificates.find_one({
         "trust_id": ctx.trust_id,
         "user_id": ctx.user_id,
-        "holder_name": {"$regex": f"^{re.escape(mapped_data.get('holder_name', ''))}$", "$options": "i"},
+        "holder_name": {"$regex": f"^{re.escape(params.get('holder_name', ''))}$", "$options": "i"},
         "status": "active",
     })
     if not existing:
-        return {"success": False, "error": f"Beneficiary '{mapped_data.get('holder_name', '')}' not found."}
+        return {"success": False, "error": f"Beneficiary '{params.get('holder_name', '')}' not found."}
 
     user = ctx.user or await _user_doc(ctx.user_id)
     try:
-        await _delete_beneficiary(
+        await _delete_bene(
             beneficiary_id=existing["certificate_id"],
             user=user,
         )
@@ -1026,7 +1028,7 @@ async def _chat_distribution_cancel(params: dict, ctx: ActionContext) -> dict:
     # Find matching distribution by beneficiary name + optional amount/date
     query = {"trust_id": ctx.trust_id, "user_id": ctx.user_id}
     if params.get("beneficiary_name"):
-        query["beneficiary_name"] = {"$regex": f"^{mapped_data['beneficiary_name']}$", "$options": "i"}
+        query["beneficiary_name"] = {"$regex": f"^{params['beneficiary_name']}$", "$options": "i"}
     if params.get("amount"):
         query["amount"] = float(params["amount"])
 
