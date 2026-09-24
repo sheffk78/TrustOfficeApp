@@ -44,7 +44,9 @@ import {
   ScrollText,
   FilePlus,
   FileText,
-  Target
+  Target,
+  KeyRound,
+  Building2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -85,6 +87,7 @@ const NAV_GROUPS = [
   { key: 'trust-structure', icon: Network, label: 'Trust Structure', items: [
     { path: '/trust-roles', icon: UsersRound, label: 'Trust Roles', tooltip: 'Trustee, successor, protector, and handoff instructions' },
     { path: '/structures', icon: Layers, label: 'Trust & Entities' },
+    { path: '/trust-access', icon: KeyRound, label: 'Trust Access', tooltip: 'Grant or revoke fiduciary access to this trust' },
     { path: '/beneficiaries', icon: Users, label: 'Beneficiaries' },
   ]},
 
@@ -109,6 +112,7 @@ const NAV_GROUPS = [
   ]},
 
   // ═══ STANDALONE ITEMS ═══
+  { key: 'org-console', icon: Building2, label: 'Org Console', items: [], adminOnly: true },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
 
@@ -156,6 +160,7 @@ const resolveSingleGroupPath = (groupKey) => {
   switch (groupKey) {
     case 'dashboard': return '/dashboard';
     case 'trust-assistant': return '/trust-assistant';
+    case 'org-console': return '/org-console';
     case 'settings': return '/settings';
     default: return '/settings';
   }
@@ -427,6 +432,7 @@ const NavList = ({
 
       // Single-item groups render directly
       if (group.items.length === 0) {
+        if (group.adminOnly && !isAdmin) return null;
         return (
           <StandaloneNavItem
             key={group.key}

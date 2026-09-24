@@ -244,6 +244,34 @@ class TestM1M2OrgAuthz:
         is_member = any(m.get("org_id") == org_id and m.get("status") == "active" for m in memberships)
         assert is_member is False
 
+    @pytest.mark.asyncio
+    async def test_list_my_orgs_scopes_to_memberships(self, seeded_db):
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        _, _ = _router_modules()
+        import routers.orgs as orgs_router
+        orgs_router.db = database.db
+        owner = await _seed_user("own_list@example.com", "Owner")
+        stranger = await _seed_user("stranger_list@example.com", "Stranger")
+        org_id = "org_list"
+        await db.orgs.insert_one({"org_id": org_id, "name": "WP", "owner_user_id": owner["user_id"], "created_at": _now()})
+        await db.org_members.insert_one({
+            "member_id": "mem_list_owner", "org_id": org_id, "user_id": owner["user_id"],
+            "role": "owner", "status": "active", "invited_at": _now(), "joined_at": _now(),
+        })
+        res = await orgs_router.list_my_orgs(user=owner)
+        assert [o.org_id for o in res] == [org_id]
+        # Non-member gets an empty list, never another's org
+        res2 = await orgs_router.list_my_orgs(user=stranger)
+        assert res2 == []
+        # Flag off -> 404 semantics (feature_disabled)
+        os.environ["TOGGLE_INSTITUTION"] = ""
+        try:
+            await orgs_router.list_my_orgs(user=owner)
+            assert False, "should raise"
+        except Exception as e:
+            assert getattr(e, "status_code", None) == 404
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+
 
 # ======================================================================
 # M3-M8: Party endpoint authz 403s

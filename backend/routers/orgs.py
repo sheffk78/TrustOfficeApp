@@ -74,6 +74,22 @@ async def create_org(body: OrgCreate, user: dict = Depends(get_current_user)):
     return OrgResponse(**org_doc)
 
 
+@router.get("/orgs", response_model=List[OrgResponse])
+async def list_my_orgs(user: dict = Depends(get_current_user)):
+    """List orgs the caller owns or is an active member of (M4+ console)."""
+    if not _toggle_institution():
+        raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    memberships = await _my_memberships(user)
+    my_org_ids = [m["org_id"] for m in memberships if m.get("status") == "active"]
+    if not my_org_ids:
+        return []
+    orgs = []
+    cursor = db.orgs.find({"org_id": {"$in": my_org_ids}}, {"_id": 0})
+    async for o in cursor:
+        orgs.append(OrgResponse(**o))
+    return orgs
+
+
 @router.get("/orgs/{org_id}", response_model=OrgResponse)
 async def get_org(org_id: str, user: dict = Depends(get_current_user)):
     """Read org. Owner-or-member access (M1-M2 authz)."""

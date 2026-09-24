@@ -46,6 +46,8 @@ import MinutesEditor from "@/pages/MinutesEditor";
 import ApprovalFlow from "@/pages/ApprovalFlow";
 import MeetingHistory from "@/pages/MeetingHistory";
 import ClientsListPage from "@/pages/ClientsListPage";
+import TrustAccessPage from "@/pages/TrustAccessPage";
+import OrgConsolePage from "@/pages/OrgConsolePage";
 import ClientDashboard from "@/pages/ClientDashboard";
 import HealthDashboard from "@/pages/HealthDashboard";
 import DeadlineDashboard from "@/pages/DeadlineDashboard";
@@ -400,6 +402,16 @@ const AppRouter = () => {
         <SubscriptionProtectedRoute>
           <ClientsListPage />
         </SubscriptionProtectedRoute>
+      } />
+      <Route path="/trust-access" element={
+        <ProtectedRoute>
+          <TrustAccessPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/org-console" element={
+        <ProtectedRoute>
+          <OrgConsolePage />
+        </ProtectedRoute>
       } />
       <Route path="/clients/:clientId" element={
         <SubscriptionProtectedRoute>
