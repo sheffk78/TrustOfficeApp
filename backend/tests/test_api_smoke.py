@@ -288,22 +288,20 @@ class TestHealth:
 # ============================================================================
 
 class TestAuth:
-    def test_register(self, base):
+    def test_register_disabled(self, base):
+        """Direct signup is intentionally disabled (subscribe-first, 2026-09-04):
+        prod must keep returning 410 so stale clients can't re-open free signup."""
         email = f"smoke-reg-{TEST_RUN_ID}@test.trustoffice.app"
         resp = requests.post(f"{base}/api/auth/register", json={
             "email": email, "password": QA_PASSWORD, "name": "Smoke Register"
         })
-        assert resp.status_code == 200
-        assert "user_id" in resp.json()
+        assert resp.status_code == 410
+        assert "user_id" not in resp.json()
 
-    def test_login(self, base):
-        email = f"smoke-login-{TEST_RUN_ID}@test.trustoffice.app"
-        # Register first
-        requests.post(f"{base}/api/auth/register", json={
-            "email": email, "password": QA_PASSWORD, "name": "Smoke Login"
-        })
+    def test_login_qa_account(self, base):
+        """Login as a designated QA account (never creates throwaway users)."""
         resp = requests.post(f"{base}/api/auth/login", json={
-            "email": email, "password": QA_PASSWORD
+            "email": QA_ACCOUNTS[0], "password": QA_PASSWORD
         })
         assert resp.status_code == 200
         assert "token" in resp.json()
