@@ -87,6 +87,17 @@ ROUTE_MAP = [
     ("actions", [
         ("POST", "/api/actions/{x_action_name}", False),
     ]),
+    # Institution routers (2026-09-23): org endpoints scope by caller
+    # membership inside the handler (list_my_orgs / org members /
+    # org-grants); trust_parties is trust-scoped by trust_id. Both checked
+    # by test_institution_skeleton.py (org authz matrix); registered here so
+    # the ROUTE_MAP coverage gate stays exhaustive for data routers.
+    ("orgs", [
+        ("GET", "/api/orgs", False),
+    ]),
+    ("trust_parties", [
+        ("GET", "/api/trust-parties/{x_trust_id}", False),
+    ]),
 ]
 
 ENDPOINTS = [(mod, m, p, c) for mod, eps in ROUTE_MAP for (m, p, c) in eps]
@@ -161,6 +172,18 @@ class FakeCursor:
 
     def limit(self, n):
         return self
+
+    def __aiter__(self):
+        # motor cursors are async-iterable (async for over cursor); routers
+        # that iterate this way (orgs, trust_parties) need the fake to match.
+        self._it = iter(self._docs)
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self._it)
+        except StopIteration:
+            raise StopAsyncIteration
 
     async def to_list(self, length=None):
         return list(self._docs)
@@ -251,7 +274,8 @@ EMAIL_A = "a@test.local"
 DATA_ROUTER_MODULES = ("routers.trusts", "routers.vault", "routers.minutes",
                        "routers.banking", "routers.beneficiaries",
                        "routers.compensation", "routers.calendar",
-                       "routers.client_notes")
+                       "routers.client_notes", "routers.orgs",
+                       "routers.trust_parties")
 
 
 @pytest.fixture
@@ -297,12 +321,13 @@ def app(iso_db):
     import routers.beneficiaries, routers.compensation, routers.calendar
     import routers.client_notes, routers.actions
 
-    a = FastAPI()
+    app = FastAPI()
     for r in (routers.trusts, routers.vault, routers.minutes, routers.banking,
               routers.beneficiaries, routers.compensation, routers.calendar,
-              routers.client_notes, routers.actions):
-        a.include_router(r.router, prefix="/api")
-    return a
+              routers.client_notes, routers.actions, routers.orgs,
+              routers.trust_parties):
+        app.include_router(r.router, prefix="/api")
+    return app
 
 
 def _client_as(app, user):
