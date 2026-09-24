@@ -1284,3 +1284,122 @@ class TestGrantCreateFKValidation:
         assert grant.org_id == org_id
         assert grant.member_id == mem_id
         assert grant.status == "active"
+
+
+async def _seed_org_with_member(owner, org_id, mem_id, role="owner"):
+    """Insert an org + one active member row (owner-linked) for grant tests."""
+    await db.orgs.insert_one({
+        "org_id": org_id, "name": f"Org {org_id}",
+        "owner_user_id": owner["user_id"], "created_at": _now(),
+    })
+    await db.org_members.insert_one({
+        "member_id": mem_id, "org_id": org_id, "user_id": owner["user_id"],
+        "email": owner["email"], "name": owner["name"],
+        "role": role, "status": "active",
+        "invited_at": _now(), "invited_by": owner["user_id"], "joined_at": _now(),
+    })
+
+
+# ======================================================================
+# Expiry parsing hardening (prod E2E finding 2026-09-24): naive/garbage
+# expires_at used to raise ValueError/TypeError -> HTTP 500 on
+# POST /trusts/{tid}/org-grants. Now: 422 with stable codes; naive
+# values coerced to UTC; past expiries rejected.
+# ======================================================================
+
+class TestGrantCreateExpiryValidation:
+    @pytest.mark.asyncio
+    async def test_naive_expires_at_is_accepted_and_normalized(self, seeded_db):
+        """Naive expires_at (no tz) no longer 500s — coerced to UTC, grant written."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("expv_owner1@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        org_id, mem_id = "org_expv1", "mem_expv1"
+        await _seed_org_with_member(owner, org_id, mem_id)
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        body = TrustGrantCreate(
+            org_id=org_id,
+            member_id=mem_id,
+            level=GrantLevel.viewer,
+            expires_at=_future(5).replace("+00:00", ""),  # naive ISO
+            attested_delegation=True,
+            attestation_ref="test-expv-1",
+        )
+        grant = await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert grant.status == "active"
+        doc = await db.trust_grants.find_one({"grant_id": grant.grant_id})
+        # stored value must carry an explicit offset for string-compare filters
+        assert doc["expires_at"].endswith("+00:00")
+        assert doc["expires_at"] == grant.expires_at
+
+    @pytest.mark.asyncio
+    async def test_garbage_expires_at_rejected_422(self, seeded_db):
+        """Unparseable expires_at -> 422 invalid_expires_at (not ValueError/500)."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("expv_owner2@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        org_id, mem_id = "org_expv2", "mem_expv2"
+        await _seed_org_with_member(owner, org_id, mem_id)
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        from fastapi import HTTPException
+        body = TrustGrantCreate(
+            org_id=org_id,
+            member_id=mem_id,
+            level=GrantLevel.viewer,
+            expires_at="not-a-datetime",
+            attested_delegation=True,
+            attestation_ref="test-expv-2",
+        )
+        with pytest.raises(HTTPException) as exc:
+            await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert exc.value.status_code == 422
+        assert exc.value.detail["code"] == "invalid_expires_at"
+        assert await db.trust_grants.count_documents({"trust_id": trust["trust_id"]}) == 0
+
+    @pytest.mark.asyncio
+    async def test_past_expires_at_rejected_422(self, seeded_db):
+        """Already-expired expires_at -> 422 expiry_in_past."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("expv_owner3@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        org_id, mem_id = "org_expv3", "mem_expv3"
+        await _seed_org_with_member(owner, org_id, mem_id)
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        from fastapi import HTTPException
+        body = TrustGrantCreate(
+            org_id=org_id,
+            member_id=mem_id,
+            level=GrantLevel.viewer,
+            expires_at=_past(1),
+            attested_delegation=True,
+            attestation_ref="test-expv-3",
+        )
+        with pytest.raises(HTTPException) as exc:
+            await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert exc.value.status_code == 422
+        assert exc.value.detail["code"] == "expiry_in_past"
+        assert await db.trust_grants.count_documents({"trust_id": trust["trust_id"]}) == 0
+
+    @pytest.mark.asyncio
+    async def test_z_suffix_expires_at_accepted(self, seeded_db):
+        """'Z'-suffixed expires_at (common client form) is accepted."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("expv_owner4@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        org_id, mem_id = "org_expv4", "mem_expv4"
+        await _seed_org_with_member(owner, org_id, mem_id)
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        body = TrustGrantCreate(
+            org_id=org_id,
+            member_id=mem_id,
+            level=GrantLevel.viewer,
+            expires_at=_future(7).replace("+00:00", "Z"),
+            attested_delegation=True,
+            attestation_ref="test-expv-4",
+        )
+        grant = await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert grant.status == "active"

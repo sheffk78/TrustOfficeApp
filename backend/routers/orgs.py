@@ -248,11 +248,22 @@ async def grant_trust_access(
         raise HTTPException(status_code=403, detail={"code": "owner_only"})
     if not body.attested_delegation:
         raise HTTPException(status_code=422, detail={"code": "attestation_required"})
-    # Validate expiry <= 365 days (D5)
-    expires_at = datetime.fromisoformat(body.expires_at)
+    # Validate expiry <= 365 days (D5). Unparseable input -> 422 (was an
+    # unhandled ValueError -> 500, prod E2E finding 2026-09-24). Naive
+    # datetimes (no tz offset) raised TypeError on the aware-datetime
+    # subtraction -> 500; treat them as UTC. Past expiries are rejected so
+    # no permanently-dead grant can be written.
+    try:
+        expires_at = datetime.fromisoformat(body.expires_at.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422, detail={"code": "invalid_expires_at"})
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
     granted_at = datetime.now(timezone.utc)
     if (expires_at - granted_at).days > 365:
         raise HTTPException(status_code=422, detail={"code": "expiry_exceeds_365_days"})
+    if expires_at <= granted_at:
+        raise HTTPException(status_code=422, detail={"code": "expiry_in_past"})
     # FK validation: org must exist and the client must hold an active membership
     # in it (D4 hardening 2026-09-24 — a free-text org label once polluted these
     # fields and silently broke the org-console join).
@@ -280,7 +291,9 @@ async def grant_trust_access(
         "status": "active",
         "granted_by": user["user_id"],
         "granted_at": now,
-        "expires_at": body.expires_at,
+        # Normalized tz-aware ISO (naive input coerced to UTC) so the
+        # string-compare expiry filters in require_org_grant stay correct.
+        "expires_at": expires_at.isoformat(),
         "attestation_ref": body.attestation_ref,
         "client_notified_at": None,
         "revoked_at": None,
