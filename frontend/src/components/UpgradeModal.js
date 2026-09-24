@@ -82,10 +82,10 @@ export const UpgradeModal = ({
   
   const features = [
     'Unlimited minutes and distributions',
-    'Schedule A asset tracking',
-    'Defensibility monitoring',
+    'Governance health tracking',
+    'Client Access: grant view access on your terms — time-boxed, revocable anytime',
     'PDF exports and reports',
-    'Trust certificate management',
+    'All document templates',
     'Priority email support'
   ];
 

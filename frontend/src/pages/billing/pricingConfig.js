@@ -6,6 +6,7 @@ export const TIERS = [
   {
     id: 'trustee',
     name: 'Trustee Plan',
+    tagline: 'One trust, fully documented, every deadline caught — you decide who sees what, and when.',
     monthly: 99,
     annual: 948,
     maxTrusts: 1,
@@ -14,6 +15,7 @@ export const TIERS = [
       '1 trust record',
       'Governance health tracking',
       'Minutes & distribution management',
+      'Client Access: grant your professional view access on your terms — time-boxed, revocable anytime',
       'PDF generation',
       'CSV data export',
       'Priority support'
@@ -22,6 +24,7 @@ export const TIERS = [
   {
     id: 'estate',
     name: 'Estate Plan',
+    tagline: 'One dashboard, one calendar, one source of truth for your whole family portfolio.',
     monthly: 189,
     annual: 1788,
     maxTrusts: 8,
@@ -33,12 +36,14 @@ export const TIERS = [
       'Multi-trust dashboard',
       'Recurring task automation',
       'Minutes & distribution management',
+      'Client Access: grant your professional view access on your terms — time-boxed, revocable anytime',
       'PDF generation & CSV export'
     ]
   },
   {
     id: 'advisor',
     name: 'Advisor Plan',
+    tagline: 'Your clients see their records on their terms; you see every trust you serve in one console.',
     monthly: 499,
     annual: 4788,
     maxTrusts: Infinity,
@@ -46,9 +51,9 @@ export const TIERS = [
     features: [
       'Everything in Estate',
       'Unlimited trusts & entities',
+      'Org Console: every client trust in one view — clients grant access from their own account, revocable anytime',
       'Multi-trust dashboard',
       'Recurring task automation',
-      'White-label binder export',
       'PDF generation & CSV export',
       'Dedicated account manager'
     ]

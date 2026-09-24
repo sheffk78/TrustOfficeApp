@@ -63,7 +63,8 @@ const TIERS = [
       'PDF export with watermark control',
       'Defensibility scoring',
       'Email notifications',
-      'Benevolence mode for charitable trusts'
+      'Benevolence mode for charitable trusts',
+      'Client Access: grant your professional view access on your terms — time-boxed, revocable anytime'
     ]
   },
   {
@@ -90,7 +91,7 @@ const TIERS = [
   {
     id: 'advisor',
     name: 'Advisor',
-    tagline: 'Unlimited trusts, white-label exports',
+    tagline: 'Unlimited trusts, one console for every client you serve',
     monthly: 499,
     annual: 4788,
     trustLimit: 'Unlimited trusts',
@@ -100,7 +101,7 @@ const TIERS = [
       'Everything in Estate',
       'Multi-trust dashboard',
       'Recurring task automation',
-      'White-label binder export',
+      'Org Console: every client trust in one view — clients grant access from their own account, revocable anytime',
       'PDF export with watermark control',
       'Defensibility scoring',
       'Priority email support'
@@ -121,9 +122,8 @@ const COMPARISON_ROWS = [
   { label: 'Benevolence mode for charitable trusts', trustee: true, estate: true, advisor: true },
   { label: 'Multi-trust dashboard', trustee: false, estate: true, advisor: true },
   { label: 'Recurring task automation', trustee: false, estate: true, advisor: true },
-  { label: 'Client view', trustee: false, estate: false, advisor: 'Q3 2026' },
-  { label: 'White-label binder export', trustee: false, estate: false, advisor: true },
-  { label: 'Multi-signature approvals', trustee: false, estate: false, advisor: 'Q3 2026' },
+  { label: 'Client Access (grant view access on your terms, revocable anytime)', trustee: true, estate: true, advisor: true },
+  { label: 'Org Console (all client trusts in one view)', trustee: false, estate: false, advisor: true },
   { label: 'Priority email support', trustee: false, estate: false, advisor: true },
 ];
 

@@ -186,7 +186,7 @@ export const FullSubscriptionGate = ({ children }) => {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                Advisor ($399/mo with annual): unlimited trusts, client view, white-label
+                Advisor ($399/mo with annual): unlimited trusts, Org Console for every client you serve
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
