@@ -1200,3 +1200,87 @@ class TestFixPassDBAttribution:
         assert resp.attribution is None
         doc = await db.minutes_records.find_one({"minutes_id": resp.minutes_id})
         assert "attribution" not in doc  # additive-only: field absent, not empty
+
+
+# ======================================================================
+# D4 hardening (2026-09-24): grant-create FK validation
+# ======================================================================
+
+class TestGrantCreateFKValidation:
+    @pytest.mark.asyncio
+    async def test_grant_rejects_unknown_org(self, seeded_db):
+        """POST /trusts/{tid}/org-grants with a nonexistent org_id → 422 org_not_found."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("fkv_owner@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        from fastapi import HTTPException
+        body = TrustGrantCreate(
+            org_id="org_doesnotexist",
+            member_id="mem_whatever",
+            level=GrantLevel.viewer,
+            expires_at=_future(30),
+            attested_delegation=True,
+            attestation_ref="test-fkv-1",
+        )
+        with pytest.raises(HTTPException) as exc:
+            await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert exc.value.status_code == 422
+        assert exc.value.detail["code"] == "org_not_found"
+
+    @pytest.mark.asyncio
+    async def test_grant_rejects_member_not_in_org(self, seeded_db):
+        """POST with real org but bogus member_id → 422 member_not_in_org."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("fkv_owner2@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        org_id = "org_fkv1"
+        await db.orgs.insert_one({"org_id": org_id, "name": "FKV Org", "owner_user_id": owner["user_id"], "created_at": _now()})
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        from fastapi import HTTPException
+        body = TrustGrantCreate(
+            org_id=org_id,
+            member_id="mem_notinorg",
+            level=GrantLevel.viewer,
+            expires_at=_future(30),
+            attested_delegation=True,
+            attestation_ref="test-fkv-2",
+        )
+        with pytest.raises(HTTPException) as exc:
+            await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert exc.value.status_code == 422
+        assert exc.value.detail["code"] == "member_not_in_org"
+        # and nothing was written
+        assert await db.trust_grants.count_documents({"trust_id": trust["trust_id"]}) == 0
+
+    @pytest.mark.asyncio
+    async def test_grant_accepts_valid_org_member(self, seeded_db):
+        """POST with real org + active member → grant created with clean FKs."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("fkv_owner3@example.com", "Owner")
+        trust = await _seed_trust(owner)
+        org_id = "org_fkv2"
+        mem_id = "mem_fkv2"
+        await db.orgs.insert_one({"org_id": org_id, "name": "FKV Org 2", "owner_user_id": owner["user_id"], "created_at": _now()})
+        await db.org_members.insert_one({
+            "member_id": mem_id, "org_id": org_id, "user_id": owner["user_id"],
+            "email": owner["email"], "name": owner["name"],
+            "role": "owner", "status": "active",
+            "invited_at": _now(), "invited_by": owner["user_id"], "joined_at": _now(),
+        })
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        body = TrustGrantCreate(
+            org_id=org_id,
+            member_id=mem_id,
+            level=GrantLevel.viewer,
+            expires_at=_future(30),
+            attested_delegation=True,
+            attestation_ref="test-fkv-3",
+        )
+        grant = await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert grant.org_id == org_id
+        assert grant.member_id == mem_id
+        assert grant.status == "active"

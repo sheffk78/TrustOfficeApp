@@ -253,6 +253,22 @@ async def grant_trust_access(
     granted_at = datetime.now(timezone.utc)
     if (expires_at - granted_at).days > 365:
         raise HTTPException(status_code=422, detail={"code": "expiry_exceeds_365_days"})
+    # FK validation: org must exist and the client must hold an active membership
+    # in it (D4 hardening 2026-09-24 — a free-text org label once polluted these
+    # fields and silently broke the org-console join).
+    org = await db.orgs.find_one({"org_id": body.org_id}, {"_id": 0, "org_id": 1})
+    if not org:
+        raise HTTPException(status_code=422, detail={"code": "org_not_found"})
+    membership = await db.org_members.find_one(
+        {
+            "org_id": body.org_id,
+            "member_id": body.member_id,
+            "status": "active",
+        },
+        {"_id": 0, "member_id": 1},
+    )
+    if not membership:
+        raise HTTPException(status_code=422, detail={"code": "member_not_in_org"})
     grant_id = f"grant_{uuid.uuid4().hex[:12]}"
     now = _now()
     grant_doc = {
