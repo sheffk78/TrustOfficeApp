@@ -57,7 +57,7 @@ def _alert(message: str) -> None:
     try:
         httpx.post(
             DISCORD_LEADS_WEBHOOK_URL,
-            json={"content": f"Ã°Å¸ÃÅ¡Â¨ **FB Leadgen subscription DOWN** (TrustOffice)\n{message}"},
+            json={"content": f"**[RED] FB Leadgen subscription DOWN** (TrustOffice)\n{message}"},
             timeout=10.0,
         )
     except Exception as e:  # never crash the monitor on alert delivery failure
@@ -76,10 +76,23 @@ def check_subscription() -> bool:
             params={"access_token": FB_PAGE_ACCESS_TOKEN},
             timeout=15.0,
         )
-        data = resp.json().get("data", [])
+        payload = resp.json()
     except Exception as e:
         _alert(f"Failed to query /subscribed_apps: {e}")
         return False
+
+    if "error" in payload:
+        # Auth failure, expired token, etc. — report the real error, not a
+        # misleading "empty array" (empty data means the subscription dropped).
+        err = payload["error"]
+        _alert(
+            f"Graph API error from /subscribed_apps: {err.get('message', payload)} "
+            f"(code={err.get('code')}, type={err.get('type')}). "
+            "Check FB_PAGE_ACCESS_TOKEN validity/expiry."
+        )
+        return False
+
+    data = payload.get("data", [])
 
     if not data:
         _alert(
