@@ -734,19 +734,25 @@ def _router_modules():
     import types, sys
     backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     if not _ROUTER_IMPORTS_DONE:
-        # bypass routers/__init__.py (it imports email_service -> postmarker,
-        # which is not installed in this venv)
-        pkg = types.ModuleType("routers")
-        pkg.__path__ = [os.path.join(backend_dir, "routers")]
-        sys.modules["routers"] = pkg
-        es = types.ModuleType("email_service")
+        # routers/__init__.py imports email_service -> postmarker. When
+        # postmarker is missing (local venv), patch email_service with a
+        # stub FIRST so the real routers package imports cleanly — never
+        # replace the routers package itself: a bare namespace module in
+        # sys.modules["routers"] stops submodule attribute-binding, which
+        # poisoned later files in the combined CI unit run
+        # (test_repository_flow / test_tenant_isolation then failed with
+        # "module 'routers' has no attribute 'trusts'").
+        try:
+            import email_service  # noqa: F401
+        except Exception:
+            es = types.ModuleType("email_service")
 
-        class _StubEmailService:
-            async def send_minutes_notification(self, **kw):
-                pass
+            class _StubEmailService:
+                async def send_minutes_notification(self, **kw):
+                    pass
 
-        es.email_service = _StubEmailService()
-        sys.modules["email_service"] = es
+            es.email_service = _StubEmailService()
+            sys.modules["email_service"] = es
         _ROUTER_IMPORTS_DONE = True
     import routers.minutes as _rm
     import routers.meetings as _rmeet
@@ -969,19 +975,25 @@ def _router_modules():
     import types, sys
     backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     if not _ROUTER_IMPORTS_DONE:
-        # bypass routers/__init__.py (it imports email_service -> postmarker,
-        # which is not installed in this venv)
-        pkg = types.ModuleType("routers")
-        pkg.__path__ = [os.path.join(backend_dir, "routers")]
-        sys.modules["routers"] = pkg
-        es = types.ModuleType("email_service")
+        # routers/__init__.py imports email_service -> postmarker. When
+        # postmarker is missing (local venv), patch email_service with a
+        # stub FIRST so the real routers package imports cleanly — never
+        # replace the routers package itself: a bare namespace module in
+        # sys.modules["routers"] stops submodule attribute-binding, which
+        # poisoned later files in the combined CI unit run
+        # (test_repository_flow / test_tenant_isolation then failed with
+        # "module 'routers' has no attribute 'trusts'").
+        try:
+            import email_service  # noqa: F401
+        except Exception:
+            es = types.ModuleType("email_service")
 
-        class _StubEmailService:
-            async def send_minutes_notification(self, **kw):
-                pass
+            class _StubEmailService:
+                async def send_minutes_notification(self, **kw):
+                    pass
 
-        es.email_service = _StubEmailService()
-        sys.modules["email_service"] = es
+            es.email_service = _StubEmailService()
+            sys.modules["email_service"] = es
         _ROUTER_IMPORTS_DONE = True
     import routers.minutes as _rm
     import routers.meetings as _rmeet
