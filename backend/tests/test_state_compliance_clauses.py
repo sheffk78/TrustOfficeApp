@@ -74,7 +74,8 @@ def test_block_contains_state_name_and_header():
 
 def test_notice_state_includes_notice_language():
     text = build_state_compliance_block("CA", "trustee_compensation", CA_PROFILE, None)
-    assert "notices" in text
+    assert text is not None
+    assert "notice" in text
     assert "60-day" in text
 
 
@@ -137,3 +138,56 @@ def test_supported_actions_match_launch_set():
         "acceptance_of_property",
         "trustee_compensation",
     }
+
+
+# ── Circular attestation guard (council fix, 9/25) ────────────────────────────
+
+def test_loan_rate_clause_rejects_afr_sentinel_string():
+    # The old frontend default attested "AFR ... is not less than the AFR" — circular.
+    assert build_loan_rate_clause({"interest_rate": "AFR (Applicable Federal Rate)"}) is None
+
+
+def test_loan_rate_clause_absent_on_non_numeric():
+    assert build_loan_rate_clause({"interest_rate": "to be determined"}) is None
+
+
+def test_loan_rate_clause_attests_real_number():
+    clause = build_loan_rate_clause({"interest_rate": "5.5%", "term_months": 60})
+    assert clause is not None
+    assert "5.5%" in clause
+
+
+def test_loan_rate_clause_cites_afr_when_month_in_table():
+    clause = build_loan_rate_clause({"interest_rate": "5.5%", "term_months": 60,
+                                     "loan_date": "October 2026"})
+    assert clause is not None
+    assert "4.61%" in clause and "Rev. Rul. 2026-19" in clause
+
+
+def test_loan_rate_clause_flags_sub_afr_rate():
+    clause = build_loan_rate_clause({"interest_rate": "3%", "term_months": 60,
+                                     "loan_date": "October 2026"})
+    assert clause is not None
+    assert "BELOW" in clause
+
+
+# ── Honest citation / statute naming (council fix, 9/25) ──────────────────────
+
+def test_default_reference_names_real_statute():
+    text = build_state_compliance_block("CA", "trustee_compensation", CA_PROFILE, None)
+    assert text is not None
+    assert "California Trust Code" not in text
+    assert "California Probate Code" in text
+
+
+def test_citation_line_no_self_reference():
+    text = build_state_compliance_block("CA", "trustee_compensation", CA_PROFILE,
+                                        _clause(reviewed=False))
+    assert text is not None
+    assert "TrustOffice state compliance profiles" not in text
+
+
+def test_spendthrift_conditional_not_asserted():
+    text = build_state_compliance_block("CA", "trustee_compensation", CA_PROFILE, None)
+    assert text is not None
+    assert "To the extent the Trust instrument contains spendthrift" in text

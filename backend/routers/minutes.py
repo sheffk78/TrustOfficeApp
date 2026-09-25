@@ -23,7 +23,7 @@ from models import (
     GuidedMinutesContext
 )
 from email_service import email_service
-from ai_service import draft_minutes_from_structured_input, MinutesDraftRequest as AiMinutesDraftRequest
+from ai_service import draft_minutes_from_structured_input, MinutesDraftRequest as AiMinutesDraftRequest, MinutesDraftResponse as AiMinutesDraftResponse
 
 
 # ==================== TO-016: Draft Schedule A asset from minutes ====================
@@ -502,7 +502,7 @@ async def _build_attribution(user: dict, trust: dict) -> Optional[str]:
     return None
 
 
-async def _call_ai_draft(ai_request) -> object:
+async def _call_ai_draft(ai_request) -> "AiMinutesDraftResponse":
     """Call the AI draft service, translating HTTPException re-raises and logging others as 500."""
     try:
         return await draft_minutes_from_structured_input(ai_request)
@@ -605,9 +605,20 @@ async def create_minutes_draft(
         )
         ai_response = await _call_ai_draft(ai_request)
 
+    # State Compliance Confirmation (template mode only): computed server-side
+    # and appended to the AI draft so every generation path carries the block.
+    compliance_note = ""
+    if request.template_type:
+        compliance_note = await _state_compliance_text_block(
+            trust, request.template_type, request.template_data
+        ) or ""
+    draft_body = ai_response.draft_body + (
+        f"\n\n{compliance_note}" if compliance_note else ""
+    )
+
     return MinutesDraftResponse(
         suggested_title=ai_response.suggested_title,
-        draft_body=ai_response.draft_body,
+        draft_body=draft_body,
         cautions=ai_response.cautions + [
             "AI-generated content. Review all dates, amounts, and decisions before finalizing.",
             "You are responsible for accuracy and legal sufficiency of these minutes."
@@ -3378,7 +3389,7 @@ def generate_loan_authorization_content(data: dict) -> str:
     borrower_name = data.get("borrower_name", "[Borrower Name]")
     lender_name = data.get("lender_name", "[Lender Name]")
     loan_amount = float(data.get("loan_amount") or 0)
-    interest_rate = data.get("interest_rate", "AFR")
+    interest_rate = data.get("interest_rate") or "to be stated (see applicable federal rate rules)"
     term_months = data.get("term_months", 60)
     purpose = data.get("loan_purpose", "")
     collateral = data.get("collateral_description", "")
@@ -4019,7 +4030,7 @@ def generate_beneficiary_loan_content(data: dict) -> str:
     """Generate content for loan to beneficiary"""
     beneficiary_name = data.get("beneficiary_name", "[Beneficiary Name]")
     loan_amount = float(data.get("loan_amount") or 0)
-    interest_rate = data.get("interest_rate", "AFR (Applicable Federal Rate)")
+    interest_rate = data.get("interest_rate") or "to be stated (see applicable federal rate rules)"
     term_months = data.get("term_months", 60)
     loan_purpose = data.get("loan_purpose", "")
     collateral = data.get("collateral_description", "")

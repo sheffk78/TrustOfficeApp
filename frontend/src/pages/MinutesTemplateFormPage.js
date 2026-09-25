@@ -196,7 +196,7 @@ export default function MinutesTemplateFormPage() {
     borrower_name: '',
     lender_name: '',
     loan_amount: '',
-    interest_rate: 'AFR (Applicable Federal Rate)',
+    interest_rate: '',
     term_months: '60',
     loan_purpose: '',
     collateral_description: ''
@@ -318,7 +318,7 @@ export default function MinutesTemplateFormPage() {
   const [beneficiaryLoanData, setBeneficiaryLoanData] = useState({
     beneficiary_name: '',
     loan_amount: '',
-    interest_rate: 'AFR (Applicable Federal Rate)',
+    interest_rate: '',
     term_months: '60',
     loan_purpose: '',
     collateral_description: '',

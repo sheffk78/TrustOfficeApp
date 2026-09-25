@@ -29,6 +29,26 @@ SUPPORTED_ACTIONS = {
 PRIORITY_STATES = ["CA", "TX", "DE", "FL", "NV", "SD", "WY", "NY", "OH", "WA", "AZ", "PA", "IL"]
 
 
+# Controlling trust statute per state — used to name the actual code (never
+# invent one: California's controlling law is the Probate Code, not a "Trust
+# Code"). States not listed fall back to "applicable state trust law".
+_STATE_TRUST_STATUTE = {
+    "CA": "California Probate Code (commencing with §15000)",
+    "TX": "Texas Property Code, Chapter 111 et seq.",
+    "DE": "Delaware Code, Title 12, Chapter 35",
+    "FL": "Florida Trust Code (Chapter 736, Florida Statutes)",
+    "NV": "Nevada Revised Statutes, Chapter 163",
+    "SD": "South Dakota Codified Laws, Chapter 55-1 et seq.",
+    "WY": "Wyoming Trust Code (Wyoming Statutes, Title 13)",
+    "NY": "New York Estates, Powers & Trusts Law",
+    "OH": "Ohio Revised Code, Chapter 5801 et seq.",
+    "WA": "Washington Trust Act (RCW 11.98)",
+    "AZ": "Arizona Trust Code (A.R.S., Title 14, Chapter 10)",
+    "PA": "Pennsylvania Uniform Trust Act (20 Pa.C.S. Chapter 77)",
+    "IL": "Illinois Trust Code (760 ILCS 3)",
+}
+
+
 def _utc_clause(profile: dict) -> str | None:
     adopted = (profile.get("utc_adopted") or "").lower()
     # The Governing Law header already states the state; add a sentence only
@@ -62,8 +82,10 @@ def _accounting_clause(profile: dict) -> str | None:
 
 def _spendthrift_clause(profile: dict) -> str | None:
     if profile.get("spendthrift_default"):
-        return ("The Trust instrument contains spendthrift provisions; distributions "
-                "recorded herein were made with due regard to those provisions.")
+        # Conditional phrasing: the engine has not read the trust instrument.
+        return ("To the extent the Trust instrument contains spendthrift "
+                "provisions, distributions recorded herein were made with due "
+                "regard to those provisions.")
     return None
 
 
@@ -72,10 +94,13 @@ def state_name_of(profile: dict) -> str:
 
 
 def _default_state_reference(profile: dict) -> str:
-    """Neutral governing-law reference, used only when no reviewed citation exists."""
+    """Neutral governing-law reference, used only when no reviewed citation exists.
+
+    Names the state's actual controlling statute where known (a factual
+    citation, not drafted legal language); falls back to generic trust law.
+    """
     code = profile.get("state_code") or ""
-    name = state_name_of(profile)
-    return f"{name} Trust Code" if code else "applicable state trust law"
+    return _STATE_TRUST_STATUTE.get(code) or "applicable state trust law"
 
 
 def build_state_compliance_block(
@@ -109,7 +134,15 @@ def build_state_compliance_block(
             body.append(text.replace("{state_name}", state_name).replace("{state_citation}", state_ref))
     notice = _notice_clause(profile)
     if notice:
-        body.append(notice)
+        # Scope-honest: profile data tracks the trustee acceptance-notice
+        # window (e.g. Cal. Prob. Code §16061.5), not every notice type.
+        body.append(notice.replace(
+            "all beneficiary notices required by",
+            "the beneficiary notice required by",
+        ).replace(
+            "have been given within",
+            "has been given within",
+        ))
     spendthrift = _spendthrift_clause(profile)
     if spendthrift:
         body.append(spendthrift)
@@ -127,21 +160,69 @@ def build_state_compliance_block(
 
     lines.extend(body)
     lines.append("")
-    citation = state_ref if (action_clause and action_clause.get("reviewed_by")) else (
-        "Source: TrustOffice state compliance profiles; state-specific language pending attorney review."
-    )
-    lines.append(f"Citation: {citation}")
+    if action_clause and action_clause.get("reviewed_by"):
+        citation = action_clause.get("source_citation") or state_ref
+        lines.append(f"Citation: {citation}")
+    elif action_clause:
+        # Unreviewed action clause: honest status + the factual statutory
+        # reference (the statute itself is fact; the clause text is what's
+        # pending review).
+        lines.append(
+            f"Citation: {state_ref}. State-specific action language pending "
+            f"attorney review."
+        )
+    else:
+        lines.append(f"Citation: {state_ref}")
     return "\n".join(lines)
 
 
 def build_loan_rate_clause(template_data: dict) -> str | None:
-    """Prevailing-rate attestation for beneficiary loans, when rate data is present."""
+    """Prevailing-rate attestation for beneficiary loans.
+
+    Fires only on a REAL numeric rate. The frontend's default placeholder
+    string ("AFR (Applicable Federal Rate)") and any other non-numeric value
+    return None — a circular attestation ("AFR is not less than the AFR")
+    asserts a determination nobody made, and the trustee's own rate entry is
+    the determination that matters.
+
+    When the loan month is in the AFR reference table, the clause renders the
+    actual Treasury-published comparison instead of an unverifiable judgment.
+    """
+    import re
+    from services.afr_rates import lookup_afr
     rate = template_data.get("interest_rate") or template_data.get("apr")
     if not rate:
         return None
+    if "AFR" in str(rate).upper():
+        return None
+    m = re.search(r"\d+(\.\d+)?", str(rate))
+    if not m:
+        return None
+    rate_val = float(m.group(0))
+    pct = f"{rate_val:g}%"
+
+    ref = lookup_afr(template_data.get("term_months"), template_data.get("loan_date"))
+    if ref:
+        afr_pct, source = ref
+        if rate_val >= float(afr_pct.rstrip("%")):
+            return (
+                f"The Trustees confirm that the loan bears interest of {pct} per annum, "
+                f"not less than the {afr_pct} applicable federal rate published by the "
+                f"U.S. Treasury for the month of the loan ({source}), satisfying the "
+                "below-market loan rules of IRC 7872."
+            )
+        # Below the referenced AFR: FLAG it — never attest a false compliance.
+        return (
+            f"NOTE: The loan bears interest of {pct} per annum, which is BELOW the "
+            f"{afr_pct} applicable federal rate published by the U.S. Treasury for "
+            f"the month of the loan ({source}). The Trustees should re-examine the "
+            "rate against the below-market loan rules of IRC 7872 before finalizing."
+        )
+
+    # Month not in the reference table: neutral wording, no unverifiable claim.
     return (
-        f"The Trustees confirm that the loan bears interest of {rate}, which the "
-        "Trustees have determined is not less than the applicable federal rate "
-        "(AFR) for the month of the loan, satisfying the below-market loan rules "
-        "of IRC 7872."
+        f"The Trustees confirm that the loan bears interest of {pct} per annum, "
+        "which in the Trustees' judgment is not less than the applicable federal "
+        "rate (AFR) published by the U.S. Treasury for the month of the loan, "
+        "satisfying the below-market loan rules of IRC 7872."
     )
