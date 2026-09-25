@@ -8,7 +8,10 @@ const PROVIDER_LABELS = {
   google_drive: 'Google Drive',
   dropbox: 'Dropbox',
   onedrive: 'OneDrive',
-  proton_drive: 'Proton Drive',
+  // NOTE: proton_drive is intentionally NOT here — it has no icon in
+  // PROVIDER_ICONS and a dedicated connect button below (2026-09-25: a
+  // proton_drive entry here rendered <undefined/> in the provider map →
+  // React error #130 crashed the whole /vault page).
 };
 
 const PROVIDER_ICONS = {
