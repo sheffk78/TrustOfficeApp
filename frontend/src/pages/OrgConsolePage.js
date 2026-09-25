@@ -63,7 +63,7 @@ export default function OrgConsolePage() {
     if (!inviteOrg || !inviteEmail.trim()) return;
     setInviting(true);
     try {
-      const res = await fetchWithAuth(`/orgs/${inviteOrg}/invites`, {
+      const res = await fetchWithAuth(`/orgs/${inviteOrg.org_id}/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail.trim(), role: 'member' }),
