@@ -1252,36 +1252,70 @@ def _pdf_footer(minutes: dict, trust: dict, hide_watermark: bool, styles, divide
 
 _STATE_PROFILE_CACHE: dict = {}
 
+# Trust docs store the state inconsistently (state_code "DE", or jurisdiction
+# "Delaware"/"UT"). Normalize any form to the two-letter code.
+_STATE_NAME_TO_CODE: dict = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
+    "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
+    "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
+    "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
+    "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
+    "massachusetts": "MA", "michigan": "MI", "minnesota": "MN",
+    "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE",
+    "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ",
+    "new mexico": "NM", "new york": "NY", "north carolina": "NC",
+    "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR",
+    "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
+    "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT",
+    "vermont": "VT", "virginia": "VA", "washington": "WA",
+    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
+    "district of columbia": "DC",
+}
+
+
+def _normalize_state_code(raw: str | None) -> str | None:
+    """Accept 'DE', 'de', 'Delaware', 'UT ' → canonical two-letter code."""
+    if not raw:
+        return None
+    value = str(raw).strip()
+    if not value:
+        return None
+    if len(value) == 2 and value.isalpha():
+        return value.upper()
+    return _STATE_NAME_TO_CODE.get(value.lower())
+
 
 async def _state_profile_lookup(state_code: str) -> dict | None:
     """Fetch + memoize the state compliance profile (50-state seeded set).
 
-    Profiles are keyed by _id == state_code (see state_compliance.py seed).
+    Accepts a two-letter code or a full state name. Profiles are keyed by
+    _id == state_code (see state_compliance.py seed).
     """
-    if not state_code:
+    code = _normalize_state_code(state_code)
+    if not code:
         return None
-    state_code = state_code.upper()
-    cached = _STATE_PROFILE_CACHE.get(state_code)
+    cached = _STATE_PROFILE_CACHE.get(code)
     if cached is not None:
         return cached
     try:
         from database import db
-        profile = await db.state_compliance_profiles.find_one({"_id": state_code}, {"_id": 0})
+        profile = await db.state_compliance_profiles.find_one({"_id": code}, {"_id": 0})
     except Exception:
         return None
     if profile:
-        _STATE_PROFILE_CACHE[state_code] = profile
+        _STATE_PROFILE_CACHE[code] = profile
     return profile
 
 
 async def _state_action_clause_lookup(state_code: str, template_type: str) -> dict | None:
     """Per-state, per-action reviewed clause row (state_action_clauses)."""
-    if not state_code or not template_type:
+    code = _normalize_state_code(state_code)
+    if not code or not template_type:
         return None
     try:
         from database import db
         return await db.state_action_clauses.find_one(
-            {"state_code": state_code.upper(), "action": template_type, "reviewed_by": {"$nin": [None, ""]}},
+            {"state_code": code, "action": template_type, "reviewed_by": {"$nin": [None, ""]}},
             {"_id": 0},
         )
     except Exception:
