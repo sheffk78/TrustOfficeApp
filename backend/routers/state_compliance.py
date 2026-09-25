@@ -60,8 +60,45 @@ STATE_COMPLIANCE_SEED = [
     {"state_code": "WA", "state_name": "Washington", "utc_adopted": "full", "utc_adoption_date": "2016-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "reasonable grounds", "spendthrift_default": True},
     {"state_code": "WI", "state_name": "Wisconsin", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
     {"state_code": "WV", "state_name": "West Virginia", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
-    {"state_code": "WY", "state_name": "Wyoming", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True}
+    {"state_code": "WY", "state_name": "Wyoming", "utc_adopted": "full", "utc_adoption_date": "2006-01-01", "notice_required": False, "accounting_frequency": "annual", "trustee_removal_standard": "breach of trust", "spendthrift_default": True},
 ]
+
+# ─── State action clause seed ────────────────────────────────────────────────
+# Per-state, per-action clause rows consumed by minutes generation
+# (services/state_compliance_clauses.py). Rows WITHOUT reviewed_by are
+# placeholders: minutes render a neutral confirmation line, never freeform law.
+# reviewed_by is set ONLY after a qualified attorney reviews the language.
+# Priority states (Don Foster: CA/TX/DE + 10 most common trust jurisdictions) x
+# four launch actions (9/25): loan_authorization, distribution_to_beneficiaries,
+# acceptance_of_property, trustee_compensation.
+STATE_ACTION_CLAUSE_SEED = []
+
+
+def _build_action_clause_seed() -> list:
+    """Generate placeholder rows for the priority states + launch actions.
+
+    Deliberately minimal: a row exists so the engine can distinguish 'state
+    known, clause pending attorney review' from 'state unknown'. No legal
+    language is asserted until an attorney reviews it (reviewed_by set).
+    """
+    from services.state_compliance_clauses import PRIORITY_STATES, SUPPORTED_ACTIONS
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    rows = []
+    for sc in PRIORITY_STATES:
+        for action in sorted(SUPPORTED_ACTIONS):
+            rows.append({
+                "_id": f"{sc}:{action}",
+                "state_code": sc,
+                "action": action,
+                "clause_text": None,
+                "source_citation": None,
+                "reviewed_by": None,
+                "reviewed_at": None,
+                "status": "pending_review",
+                "notes": f"Placeholder for {sc} {action} — awaiting attorney-reviewed language.",
+                "created_at": now,
+            })
+    return rows
 
 
 @router.post("/state-compliance/seed")
@@ -87,6 +124,69 @@ async def seed_state_compliance(user: dict = Depends(get_current_user), upsert_m
     docs = [{"_id": s["state_code"], **s} for s in STATE_COMPLIANCE_SEED]
     await db.state_compliance_profiles.insert_many(docs)
     return {"message": "Seeded", "count": len(docs)}
+
+
+@router.post("/state-compliance/seed-clauses")
+async def seed_state_action_clauses(user: dict = Depends(get_current_user), upsert_missing: bool = False):
+    """Seed placeholder clause rows (state x action). Idempotent.
+
+    Rows carry NO legal language and reviewed_by=None until an attorney review
+    sets them. Minutes generation treats missing/unreviewed rows identically:
+    neutral confirmation line only.
+    """
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    rows = _build_action_clause_seed()
+    if upsert_missing:
+        inserted = 0
+        for row in rows:
+            result = await db.state_action_clauses.update_one(
+                {"_id": row["_id"]},
+                {"$setOnInsert": row},
+                upsert=True,
+            )
+            if result.upserted_id is not None:
+                inserted += 1
+        return {"message": "Upserted missing clause rows", "inserted": inserted}
+    existing = await db.state_action_clauses.count_documents({})
+    if existing > 0:
+        return {"message": "Already seeded", "count": existing}
+    await db.state_action_clauses.insert_many(rows)
+    return {"message": "Seeded", "count": len(rows)}
+
+
+@router.patch("/state-compliance/clauses/{state_code}/{action}")
+async def review_state_action_clause(
+    state_code: str,
+    action: str,
+    clause_text: str | None = None,
+    source_citation: str | None = None,
+    reviewed_by: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Record attorney-reviewed clause language for a state/action pair.
+
+    Only rows with reviewed_by set are rendered by minutes generation; the
+    reviewed language becomes the state-specific confirmation in minutes PDFs.
+    """
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if not clause_text or not reviewed_by:
+        raise HTTPException(status_code=422, detail="clause_text and reviewed_by are required")
+    _id = f"{state_code.upper()}:{action}"
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    result = await db.state_action_clauses.update_one(
+        {"_id": _id},
+        {"$set": {
+            "clause_text": clause_text,
+            "source_citation": source_citation,
+            "reviewed_by": reviewed_by,
+            "reviewed_at": now,
+            "status": "reviewed",
+        }},
+        upsert=True,
+    )
+    return {"message": "Clause recorded", "matched": result.matched_count, "id": _id}
 
 
 @router.get("/state-compliance/profiles")

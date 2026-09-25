@@ -1250,12 +1250,131 @@ def _pdf_footer(minutes: dict, trust: dict, hide_watermark: bool, styles, divide
     return story
 
 
+_STATE_PROFILE_CACHE: dict = {}
+
+
+async def _state_profile_lookup(state_code: str) -> dict | None:
+    """Fetch + memoize the state compliance profile (50-state seeded set).
+
+    Profiles are keyed by _id == state_code (see state_compliance.py seed).
+    """
+    if not state_code:
+        return None
+    state_code = state_code.upper()
+    cached = _STATE_PROFILE_CACHE.get(state_code)
+    if cached is not None:
+        return cached
+    try:
+        from database import db
+        profile = await db.state_compliance_profiles.find_one({"_id": state_code}, {"_id": 0})
+    except Exception:
+        return None
+    if profile:
+        _STATE_PROFILE_CACHE[state_code] = profile
+    return profile
+
+
+async def _state_action_clause_lookup(state_code: str, template_type: str) -> dict | None:
+    """Per-state, per-action reviewed clause row (state_action_clauses)."""
+    if not state_code or not template_type:
+        return None
+    try:
+        from database import db
+        return await db.state_action_clauses.find_one(
+            {"state_code": state_code.upper(), "action": template_type, "reviewed_by": {"$nin": [None, ""]}},
+            {"_id": 0},
+        )
+    except Exception:
+        return None
+
+
+async def _state_compliance_pdf_block(minutes: dict, trust: dict, s, divider_style, section_header_style) -> list:
+    """State Compliance Confirmation block for the PDF (template-mode minutes).
+
+    Renders the reviewed/unreviewed clause text from the state compliance engine.
+    No state on the trust → no block (frontend nudges the user to set one).
+    """
+    from services.state_compliance_clauses import build_state_compliance_block, build_loan_rate_clause
+
+    if not minutes.get('template_type'):
+        # Clause block applies to template-generated documents only.
+        return []
+    state_code = trust.get('state_code') or trust.get('jurisdiction') or ''
+    if not state_code:
+        return []
+    template_type = minutes.get('template_type') or ''
+    template_data = minutes.get('template_data') or {}
+
+    profile = None
+    action_clause = None
+    try:
+        profile = await _state_profile_lookup(state_code)
+        action_clause = await _state_action_clause_lookup(state_code, template_type)
+    except Exception:
+        pass  # clause block is additive; never block PDF generation on lookup failure
+
+    block_text = build_state_compliance_block(state_code, template_type, profile, action_clause)
+    if not block_text:
+        return []
+
+    # Loan actions: append the prevailing-rate attestation when a rate is present.
+    if template_type == 'loan_authorization':
+        rate_clause = build_loan_rate_clause(template_data)
+        if rate_clause:
+            block_text += f"\n\n{rate_clause}"
+
+    story = [
+        Paragraph("─" * 50, divider_style),
+        Paragraph("STATE COMPLIANCE CONFIRMATION", section_header_style),
+        Spacer(1, 8),
+    ]
+    story.extend(_parse_legal_document_text(
+        block_text, s['styles'], s['whereas_style'], s['resolved_style'],
+        s['body_style'], s['bullet_style'], s['section_header_style'],
+    ))
+    return story
+
+
+async def _state_compliance_text_block(trust: dict, template_type: str,
+                                       template_data: dict | None = None) -> str | None:
+    """State Compliance Confirmation text for template documents (text path).
+
+    Mirrors the PDF block: None when no state is set / state unknown to the
+    engine; unreviewed actions render the neutral placeholder, never freeform law.
+    """
+    from services.state_compliance_clauses import build_state_compliance_block, build_loan_rate_clause
+
+    if not template_type:
+        return None
+    state_code = trust.get('state_code') or trust.get('jurisdiction') or ''
+    if not state_code:
+        return None
+
+    profile = await _state_profile_lookup(state_code)
+    if not profile:
+        return None
+    action_clause = await _state_action_clause_lookup(state_code, template_type)
+
+    block_text = build_state_compliance_block(state_code, template_type, profile, action_clause)
+    if not block_text:
+        return None
+
+    if template_type == 'loan_authorization' and template_data:
+        rate_clause = build_loan_rate_clause(template_data)
+        if rate_clause:
+            block_text += f"\n\n{rate_clause}"
+    return block_text
+
+
 def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = False,
-                         white_label: bool = False) -> bytes:
+                         white_label: bool = False,
+                         state_compliance_block: list | None = None) -> bytes:
     """Generate a professional legal-style PDF for minutes record with proper formatting.
 
     white_label=True produces a de-branded PDF (black text, no TrustOffice
     watermark) for advisor-facing documents.
+    state_compliance_block: pre-rendered story elements for the State Compliance
+    Confirmation block (async lookups done by the caller). None/empty = omitted.
     """
     doc, buffer = create_doc_template(margins={
         'topMargin': 0.75 * inch,
@@ -1275,6 +1394,8 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
         story.extend(_pdf_retroactive_block(minutes))
     story.extend(_pdf_attendees(minutes, s['section_header_style'], s['bullet_style']))
     story.extend(_pdf_body(minutes, s, s['divider_style'], s['section_header_style']))
+    if state_compliance_block:
+        story.extend(state_compliance_block)
     story.extend(_pdf_signature_block(minutes, s, s['divider_style'], s['section_header_style']))
     story.extend(_pdf_footer(minutes, trust, hide_watermark, s['styles'], s['divider_style'], trust_name, white_label))
 
@@ -1423,9 +1544,20 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
     
     # Check if watermark should be shown (soft gating based on subscription)
     show_watermark = await should_show_watermark(user["user_id"])
+    white_label = await is_white_label(user["user_id"])
+
+    # State Compliance Confirmation block: needs async DB lookups, so the caller
+    # (this endpoint, async) renders the story elements and passes them in —
+    # styled with the SAME white_label flag the PDF itself will use.
+    _sc_styles = _pdf_styles(white_label)
+    state_block = await _state_compliance_pdf_block(
+        minutes, trust or {}, _sc_styles,
+        _sc_styles['divider_style'], _sc_styles['section_header_style'],
+    )
 
     pdf_bytes = generate_minutes_pdf(minutes, trust or {}, hide_watermark=not show_watermark,
-                                     white_label=await is_white_label(user["user_id"]))
+                                     white_label=white_label,
+                                     state_compliance_block=state_block)
     pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
     
     return {
@@ -1594,7 +1726,8 @@ def _fmt_time_12h(t: str) -> str:
         return t
 
 
-def generate_template_document(trust: dict, template_type: str, template_data: dict) -> str:
+def generate_template_document(trust: dict, template_type: str, template_data: dict,
+                               state_compliance_text: str | None = None) -> str:
     """Generate the full text minutes document from template"""
     trust_name = trust.get("name", "[Trust Name]")
     trustees_raw = trust.get("trustees") or trust.get("trustee_names") or ""
@@ -1698,6 +1831,16 @@ MATTERS CONSIDERED AND RESOLUTIONS ADOPTED
 
     # Generate template-specific content via dispatch table
     doc += _dispatch_template_content(template_type, trust, template_data)
+
+    # State Compliance Confirmation (text path) — before adjournment so it reads
+    # as part of the business conducted, not the certification.
+    if state_compliance_text:
+        doc += f"""
+═══════════════════════════════════════════════════════════════════════════════
+
+{state_compliance_text}
+
+"""
 
     # Add adjournment and certification
     doc += f"""
@@ -4799,8 +4942,14 @@ async def create_minutes_from_template(template: MinutesTemplateCreate, user: di
         except Exception:
             pass
     
+    # State Compliance Confirmation text: async lookups here (async endpoint),
+    # passed into the sync document generator.
+    state_compliance_text = await _state_compliance_text_block(
+        trust, template.template_type.value, template.template_data)
+
     # Generate the document
-    generated_doc = generate_template_document(trust, template.template_type.value, template.template_data)
+    generated_doc = generate_template_document(trust, template.template_type.value, template.template_data,
+                                               state_compliance_text=state_compliance_text)
     
     # Extract meeting date from template data
     meeting_date = template.template_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
