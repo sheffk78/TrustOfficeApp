@@ -39,6 +39,11 @@ CATEGORY_ORDER = [
 def _apply_legacy_defaults(item):
     if "status" not in item:
         item["status"] = "active"
+    if "last_valued_date" not in item:
+        # Legacy items predate the valuation-freshness field. Fall back to the
+        # conveyance date so the health score keeps its current meaning until
+        # the user records a fresh valuation.
+        item["last_valued_date"] = item.get("date_conveyed")
     if "minutes_ref" not in item:
         item["minutes_ref"] = None
     if "disposition_minutes_ref" not in item:
@@ -161,6 +166,7 @@ async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends
         "location": item.location,
         "approximate_value": item.approximate_value,
         "date_conveyed": item.date_conveyed,
+        "last_valued_date": item.last_valued_date or item.date_conveyed,  # new assets: valuation = conveyance unless stated
         "notes": item.notes,
         "status": "active",
         "minutes_ref": item.minutes_ref,

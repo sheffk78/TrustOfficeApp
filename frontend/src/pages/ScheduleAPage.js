@@ -33,6 +33,7 @@ import {
   ExternalLink,
   Ban,
   Gavel,
+  CheckCircle2,
   X
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -80,6 +81,7 @@ export default function ScheduleAPage() {
     location: '',
     approximate_value: '',
     date_conveyed: getLocalDateStr(),
+    last_valued_date: getLocalDateStr(),
     notes: '',
     minutes_ref: null
   });
@@ -262,10 +264,37 @@ export default function ScheduleAPage() {
       location: asset.location,
       approximate_value: asset.approximate_value || '',
       date_conveyed: asset.date_conveyed,
+      last_valued_date: asset.last_valued_date || asset.date_conveyed || '',
       notes: asset.notes,
       minutes_ref: asset.minutes_ref || null
     });
     setDialogOpen(true);
+  };
+
+  // Quick action: record a fresh valuation as of today (resets the health-score
+  // freshness clock without opening the full edit dialog).
+  const handleMarkValued = async (asset) => {
+    if (isReadOnly) {
+      showUpgradeModal('update asset valuations', 'button_click', 'schedule_a_page');
+      return;
+    }
+    try {
+      const response = await fetchWithAuth(`/schedule-a/${asset.item_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_valued_date: getLocalDateStr() })
+      });
+      if (response.ok) {
+        toast.success(`Valuation recorded for ${asset.description}`);
+        loadAssets();
+        loadSummary();
+      } else {
+        const errBody = await response.json().catch(() => ({}));
+        showError(toast, errBody || { detail: 'Failed to record valuation' }, { operation: 'mark-valued', page: 'ScheduleA' });
+      }
+    } catch (error) {
+      showError(toast, error, { operation: 'mark-valued', page: 'ScheduleA' });
+    }
   };
 
   const handleDisposeClick = (asset) => {
@@ -340,6 +369,7 @@ export default function ScheduleAPage() {
       location: '',
       approximate_value: '',
       date_conveyed: getLocalDateStr(),
+      last_valued_date: getLocalDateStr(),
       notes: '',
       minutes_ref: null
     });
@@ -548,6 +578,17 @@ export default function ScheduleAPage() {
                           required
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <Label className="label-trust">Last Valued</Label>
+                      <Input
+                        type="date"
+                        value={formData.last_valued_date}
+                        onChange={(e) => setFormData({ ...formData, last_valued_date: e.target.value })}
+                        className="mt-1 input-trust"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">When the asset's value was last reviewed. The health score uses this date — update it whenever you re-value the asset.</p>
                     </div>
 
                     <div>
@@ -815,6 +856,15 @@ export default function ScheduleAPage() {
                                       data-testid={`edit-asset-${asset.item_id}`}
                                     >
                                       <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleMarkValued(asset)}
+                                      title="Mark valued today"
+                                      data-testid={`mark-valued-${asset.item_id}`}
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" />
                                     </Button>
                                     <Button
                                       size="sm"

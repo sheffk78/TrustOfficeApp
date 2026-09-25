@@ -51,7 +51,11 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
         }
     
     now = datetime.now(timezone.utc)
-    
+
+    def now_minus(days: int) -> str:
+        """ISO date N days before now — used for demo asset valuation dates."""
+        return (now - timedelta(days=days)).date().isoformat()
+
     # ==================== TRUST 1: Smith Family Trust (Full featured with Benevolence) ====================
     trust1_id = f"trust_{uuid.uuid4().hex[:12]}"
     
@@ -292,6 +296,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Wilmington, Delaware",
             "approximate_value": 650000, 
             "date_conveyed": "2020-01-15",
+            "last_valued_date": now_minus(days=30),
             "notes": "Original trust corpus - 4BR/3BA Colonial", 
             "status": "active",
             "minutes_ref": None,
@@ -311,6 +316,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Rehoboth Beach, Delaware",
             "approximate_value": 425000, 
             "date_conveyed": "2021-06-01",
+            "last_valued_date": now_minus(days=30),
             "notes": "Added via property acceptance minutes - 2BR oceanfront", 
             "status": "active",
             "minutes_ref": property_acceptance_minutes_id,
@@ -330,6 +336,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Charles Schwab",
             "approximate_value": 1250000, 
             "date_conveyed": "2020-01-15",
+            "last_valued_date": now_minus(days=30),
             "notes": "Primary investment account - diversified equity/bond mix", 
             "status": "active",
             "minutes_ref": None,
@@ -349,6 +356,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "First National Bank, DE",
             "approximate_value": 85000, 
             "date_conveyed": "2020-02-01",
+            "last_valued_date": now_minus(days=30),
             "notes": "Trust checking account for distributions", 
             "status": "active",
             "minutes_ref": None,
@@ -368,6 +376,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Delaware",
             "approximate_value": 500000, 
             "date_conveyed": "2020-03-01",
+            "last_valued_date": now_minus(days=30),
             "notes": "Wholly-owned holding company", 
             "status": "active",
             "minutes_ref": None,
@@ -388,6 +397,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Delaware",
             "approximate_value": 45000, 
             "date_conveyed": "2020-01-15",
+            "last_valued_date": now_minus(days=30),
             "notes": "Trust vehicle - sold to fund distribution", 
             "status": "disposed",
             "minutes_ref": None,
@@ -408,6 +418,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Wilmington, Delaware",
             "approximate_value": 95000, 
             "date_conveyed": "2023-04-15",
+            "last_valued_date": now_minus(days=30),
             "notes": "Replacement trust vehicle", 
             "status": "active",
             "minutes_ref": None,
@@ -427,6 +438,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Family Residence",
             "approximate_value": 175000, 
             "date_conveyed": "2020-01-15",
+            "last_valued_date": now_minus(days=30),
             "notes": "12 paintings and 3 sculptures", 
             "status": "active",
             "minutes_ref": None,
@@ -446,6 +458,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Cold Storage (Ledger)",
             "approximate_value": 125000, 
             "date_conveyed": "2021-11-01",
+            "last_valued_date": now_minus(days=30),
             "notes": "2.5 BTC acquired at $50,000 avg cost basis", 
             "status": "active",
             "minutes_ref": None,
@@ -466,6 +479,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Fidelity Investments",
             "approximate_value": 250000, 
             "date_conveyed": "2023-01-15",
+            "last_valued_date": now_minus(days=30),
             "notes": "College savings - aggressive growth allocation", 
             "status": "active",
             "minutes_ref": None,
@@ -485,6 +499,7 @@ async def seed_demo_data(user: dict = Depends(get_current_user)):
             "location": "Wells Fargo",
             "approximate_value": 15000, 
             "date_conveyed": "2023-01-15",
+            "last_valued_date": now_minus(days=30),
             "notes": "Operating account for expenses", 
             "status": "active",
             "minutes_ref": None,

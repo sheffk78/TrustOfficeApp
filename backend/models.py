@@ -903,6 +903,7 @@ class ScheduleAItemCreate(BaseModel):
     location: str = ""
     approximate_value: Optional[float] = Field(None, ge=0)
     date_conveyed: str
+    last_valued_date: Optional[str] = None  # valuation freshness for health score; falls back to date_conveyed
     notes: str = ""
     minutes_ref: Optional[str] = None
 
@@ -912,6 +913,7 @@ class ScheduleAItemUpdate(BaseModel):
     location: Optional[str] = None
     approximate_value: Optional[float] = Field(None, ge=0)
     date_conveyed: Optional[str] = None
+    last_valued_date: Optional[str] = None
     notes: Optional[str] = None
     minutes_ref: Optional[str] = None
 
@@ -924,6 +926,7 @@ class ScheduleAItemResponse(BaseModel):
     location: str
     approximate_value: Optional[float]
     date_conveyed: str
+    last_valued_date: Optional[str] = None
     notes: str
     created_at: str
     updated_at: Optional[str] = None

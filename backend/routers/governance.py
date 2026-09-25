@@ -382,7 +382,14 @@ def _parse_asset_valuation_date(valuation_ref_str: str) -> Optional[datetime]:
 
 
 def _is_asset_stale(asset: dict, twelve_months_ago: datetime) -> bool:
-    """Check if a single asset's valuation is stale (>12 months old or missing)."""
+    """Check if a single asset's valuation is stale (>12 months old or missing).
+
+    Freshness is judged by last_valued_date (the recorded valuation) when present,
+    falling back to date_conveyed for legacy items. A fresh 'Mark valued' update
+    resets the clock — conveying an asset years ago no longer makes it permanently
+    stale (2026-09-25 fix: last_valued_date was previously absent from the product,
+    so conveyance date was the only signal).
+    """
     valuation_ref_str = asset.get("last_valued_date") or asset.get("date_conveyed")
     if not valuation_ref_str:
         return True
@@ -539,6 +546,18 @@ def _compute_asset_valuation_criterion(data: dict) -> tuple:
             points=0, max_points=mp, achieved=False, no_data=True
         )
         return criterion, 0
+
+    # New-trust grace (mirrors Annual Review's is_new_trust treatment): a trust
+    # younger than 90 days hasn't had its first valuation cycle yet — assets
+    # entered at setup shouldn't drag the score down on day one.
+    is_new_trust = _parse_trust_created_age(data.get("trust_created_at"), data["now"])
+    if is_new_trust:
+        criterion = HealthScoreCriterion(
+            name="Asset Valuation Freshness",
+            description="Asset valuations not due yet — first review within the first year",
+            points=mp, max_points=mp, achieved=True, no_data=True
+        )
+        return criterion, mp
 
     stale_count = sum(1 for a in active_assets if _is_asset_stale(a, twelve_months_ago))
     fresh_count = total_assets - stale_count
