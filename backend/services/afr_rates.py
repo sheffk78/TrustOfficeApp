@@ -32,7 +32,7 @@ def _month_key(month_date: str | None) -> str:
     # Month-name form: "October 2026" / "Oct 2026"
     ml = s.lower()
     for name, i in months.items():
-        if name in ml:
+        if name in ml or name[:3] in ml.split():
             year = re.search(r"(\d{4})", s)
             return f"{year.group(1)}-{i:02d}" if year else ""
     return ""
