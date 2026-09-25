@@ -369,7 +369,7 @@ def _parse_trust_created_age(trust_created_at: Optional[str], now: datetime) -> 
         return False
 
 
-def _parse_asset_valuation_date(valuation_ref_str: str) -> Optional[datetime]:
+def _parse_asset_valuation_date(valuation_ref_str: Optional[str]) -> Optional[datetime]:
     """Parse an asset valuation/conveyance date string, returning None on failure."""
     if not valuation_ref_str:
         return None
@@ -415,7 +415,12 @@ def _compute_quarterly_minutes_criterion(data: dict) -> tuple:
         description = "Minutes generated this quarter"
     else:
         days_into_quarter = (now - get_quarter_start(now)).days
-        if days_into_quarter < QUARTER_GRACE_DAYS:
+        # Fairness (2026-09-25): judge by tenure, not the calendar. A new trust
+        # (< 90d, same grace as Annual Review / Asset Valuation) has no
+        # quarter-cycle obligation yet — without this, a trust created
+        # mid-quarter scores 0/15 applicable on day one.
+        is_new_trust = _parse_trust_created_age(data.get("trust_created_at"), now)
+        if days_into_quarter < QUARTER_GRACE_DAYS or is_new_trust:
             points = 0
             no_data = True
             description = "Quarterly minutes not yet due — record them by quarter end"
@@ -727,7 +732,13 @@ def _compute_health_score(data: dict) -> dict:
     breakdown = penalty_result["breakdown"]
     findings_with_penalty = penalty_result["findings_with_penalty"]
 
-    base_score = sum(c["points"] for c in [cr.model_dump() for cr in criteria])
+    # Fairness (2026-09-25): grace-granted points on no_data criteria (new-trust
+    # Annual Review / Asset Valuation) must NOT count toward base_score — their
+    # max is excluded from the denominator, so counting them inflates the ratio
+    # (a fresh trust could score 300/100). Sum applicable criteria only.
+    base_score = sum(
+        c["points"] for c in [cr.model_dump() for cr in criteria] if not c["no_data"]
+    )
 
     # --- Final Score with Critical Cap ---
     # Scale against effective_max (applicable criteria only), then convert to

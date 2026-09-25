@@ -168,6 +168,50 @@ def test_after_grace_period_missing_minutes_count():
     assert result["color"] == HealthColor.yellow
 
 
+def test_tenure_grace_midquarter_created_trust():
+    """Fairness (2026-09-25): a trust created mid-quarter has no quarter-cycle
+    obligation yet — judged by tenure, not the calendar. A 5-day-old trust on
+    day 40 of the quarter must be no_data, not 0/15 applicable."""
+    late = datetime(2026, 11, 10, tzinfo=timezone.utc)
+    data = _base_data(
+        now=late, quarterly_minutes=0,
+        trust_created_at="2026-11-05T00:00:00+00:00",  # 5 days old
+    )
+    result = _compute_health_score(data)
+    crit = _criterion(result, "Quarterly Minutes")
+    assert crit.no_data is True
+    assert result["total_score"] == 100
+
+
+def test_tenured_trust_midquarter_still_counts():
+    """A trust older than the 90d new-trust grace with no minutes on day 40+
+    of the quarter scores 0/15 applicable — grace is tenure-bounded."""
+    late = datetime(2026, 11, 10, tzinfo=timezone.utc)
+    data = _base_data(
+        now=late, quarterly_minutes=0,
+        trust_created_at="2026-07-01T00:00:00+00:00",  # 132 days old
+    )
+    result = _compute_health_score(data)
+    crit = _criterion(result, "Quarterly Minutes")
+    assert crit.no_data is False
+    assert crit.points == 0
+
+
+def test_90day_grace_matches_other_criteria():
+    """Fairness (2026-09-25): the Quarterly Minutes new-trust grace uses the
+    same 90d window as Annual Review / Asset Valuation — a 45-day-old trust is
+    no_data everywhere except Foundation."""
+    late = datetime(2026, 11, 10, tzinfo=timezone.utc)
+    data = _base_data(
+        now=late, quarterly_minutes=0,
+        trust_created_at="2026-09-26T00:00:00+00:00",  # 45 days old
+    )
+    result = _compute_health_score(data)
+    crit = _criterion(result, "Quarterly Minutes")
+    assert crit.no_data is True
+    assert result["total_score"] == 100
+
+
 # --- Tax penalties: overdue penalizes, upcoming doesn't ---
 
 def test_overdue_tax_penalizes():
