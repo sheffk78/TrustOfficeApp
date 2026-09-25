@@ -255,7 +255,10 @@ export default function CloudBackupSection({ selectedTrust }) {
           </p>
           <div className="flex flex-wrap gap-3">
             {Object.entries(PROVIDER_LABELS).map(([key, label]) => {
-              const Icon = PROVIDER_ICONS[key];
+              // Fallback guard: a LABELS entry without an icon would render
+              // <undefined/> → React #130 crashes the whole page (the exact
+              // bug that broke /vault on 2026-09-25).
+              const Icon = PROVIDER_ICONS[key] || Cloud;
               return (
                 <button
                   key={key}
