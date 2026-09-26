@@ -425,6 +425,8 @@ class TrustUpdate(BaseModel):
     benevolence_mission: Optional[str] = None
     determination_letter_date: Optional[str] = None
     approval_threshold: Optional[int] = None
+    minutes_slug: Optional[str] = Field(None, description="Inbound address local-part at minutes domain, e.g. kohler-family-trust")
+    minutes_email_enabled: Optional[bool] = Field(None, description="Whether email→minutes capture is on for this trust")
 
     @model_validator(mode="after")
     def validate_tax_fields(self):

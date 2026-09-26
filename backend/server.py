@@ -105,6 +105,7 @@ from routers.actions import router as actions_router
 from action_layer import register_all as register_seed_actions
 from routers.communications import router as communications_router
 from routers.email_archive import router as email_archive_router, ensure_email_archive_indexes
+from routers.email_minutes import router as email_minutes_router, ensure_email_minutes_indexes
 from routers.vault import router as vault_router
 from routers.risk_dashboard import router as risk_dashboard_router
 from routers.binder import router as binder_router
@@ -549,6 +550,7 @@ app.include_router(state_deep_knowledge_router, prefix="/api")
 app.include_router(investments_router, prefix="/api")
 app.include_router(communications_router, prefix="/api")
 app.include_router(email_archive_router, prefix="/api")
+app.include_router(email_minutes_router, prefix="/api")
 app.include_router(vault_router, prefix="/api")
 app.include_router(risk_dashboard_router, prefix="/api")
 app.include_router(binder_router, prefix="/api")
@@ -943,6 +945,9 @@ async def startup_event():
         
         # Email archive indexes (BCC capture feature)
         await ensure_email_archive_indexes()
+        
+        # Email→minutes capture indexes (slug lookup + MessageId dedup)
+        await ensure_email_minutes_indexes()
         
         logger.info("Database indexes created/verified successfully")
         

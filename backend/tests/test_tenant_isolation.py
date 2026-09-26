@@ -106,7 +106,7 @@ ENDPOINTS = [(mod, m, p, c) for mod, eps in ROUTE_MAP for (m, p, c) in eps]
 NON_DATA_ROUTERS = {
     "__init__", "admin", "admin_api", "auth", "ai", "alerts", "analytics",
     "background_jobs", "chat", "contact", "contact_memory", "dashboard",
-    "demo", "email", "email_admin", "email_archive", "error_log",
+    "demo", "email", "email_admin", "email_archive", "email_minutes", "error_log",
     "error_reports", "feedback", "governance", "health", "knowledge",
     "knowledge_retrieval", "leads", "messaging", "notifications",
     "page_agent", "performance", "preferences", "referrals", "risk_dashboard",

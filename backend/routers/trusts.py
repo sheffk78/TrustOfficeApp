@@ -6,6 +6,7 @@ from enum import Enum
 import json
 import uuid
 import logging
+import re
 
 from database import db
 from dependencies import (
@@ -379,6 +380,17 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
     
     # Auto-sync jurisdiction and state_code
     _sync_update_jurisdiction(update_data)
+    
+    # Normalize the email→minutes inbound slug (address local-part)
+    if "minutes_slug" in update_data:
+        raw = str(update_data["minutes_slug"]).strip().lower()
+        update_data["minutes_slug"] = re.sub(r"[^a-z0-9-]", "-", raw).strip("-") or None
+        if update_data["minutes_slug"]:
+            taken = await db.trusts.find_one(
+                {"minutes_slug": update_data["minutes_slug"], "trust_id": {"$ne": trust_id}}, {"_id": 0, "trust_id": 1}
+            )
+            if taken:
+                raise HTTPException(status_code=409, detail="That minutes address is already in use by another trust. Pick a different one.")
     
     # Auto-compute is_fiscal_year from tax year end date
     month = update_data.get("tax_year_end_month", trust.get("tax_year_end_month"))
