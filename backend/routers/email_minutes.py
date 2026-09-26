@@ -114,8 +114,48 @@ async def process_minutes_email(payload: dict) -> dict:
     signal = extract_meeting_signal(text_body)
     tkey = thread_key(subject, message_id, payload.get("References", ""))
 
-    minutes_id = f"minutes_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc).isoformat()
+    new_decisions = "\n".join(f"- {d}" for d in signal["decisions"])
+    new_participants = ", ".join(signal["participants"]) or from_name or from_email
+    solvency_note = (
+        " (solvency determination requires trustee confirmation — review before use)"
+        if signal["minutes_type"] == "solvency" else ""
+    )
+
+    # One thread = one draft (council consensus 2026-09-25): merge into the
+    # existing open email-capture draft for this thread instead of inserting
+    # per-email drafts. Manually-edited drafts are left alone — capture into
+    # them would overwrite trustee work.
+    existing = await db.minutes_records.find_one({
+        "trust_id": trust["trust_id"],
+        "source_thread_key": tkey,
+        "source": "email_capture",
+        "status": "draft",
+        "manually_edited": {"$ne": True},
+    })
+    if existing:
+        update_ops = {
+            "$set": {
+                "updated_at": now,
+                "source_email_from": from_email,
+                "source_subject": subject,
+            },
+            "$inc": {"thread_email_count": 1},
+        }
+        if new_decisions:
+            update_ops["$push"] = {"captured_decisions": new_decisions}
+        if new_participants:
+            update_ops["$addToSet"] = {"captured_participants": new_participants}
+        await db.minutes_records.update_one(
+            {"_id": existing["_id"]}, update_ops
+        )
+        logger.info(
+            f"Postmark minutes: merged into draft {existing['minutes_id']} "
+            f"(thread: {tkey}, email #{(existing.get('thread_email_count') or 1) + 1})"
+        )
+        return {"status": "logged", "minutes_id": existing["minutes_id"]}
+
+    minutes_id = f"minutes_{uuid.uuid4().hex[:12]}"
     minutes_doc = {
         "minutes_id": minutes_id,
         "trust_id": trust["trust_id"],
@@ -123,8 +163,14 @@ async def process_minutes_email(payload: dict) -> dict:
         "minutes_type": signal["minutes_type"],
         "template_type": None,
         "meeting_date": signal["meeting_date"] or now[:10],
-        "participants_text": ", ".join(signal["participants"]) or from_name or from_email,
-        "decisions_text": "\n".join(f"- {d}" for d in signal["decisions"]) or "(extracted from email — review and complete)",
+        "participants_text": new_participants,
+        "decisions_text": new_decisions
+        or "(extracted from email — review and complete)",
+        # Capture accumulation (merged drafts append here; consolidated by
+        # the user via Draft review — keeps decisions_text clean)
+        "captured_decisions": [new_decisions] if new_decisions else [],
+        "captured_participants": [new_participants] if new_participants else [],
+        "thread_email_count": 1,
         "sections": [],
         "template_data": None,
         "status": "draft",
@@ -141,6 +187,8 @@ async def process_minutes_email(payload: dict) -> dict:
         "source_thread_key": tkey,
         "source_message_id": message_id,
     }
+    if solvency_note:
+        minutes_doc["decisions_text"] = (minutes_doc["decisions_text"] or "") + solvency_note
     await db.minutes_records.insert_one(minutes_doc)
     logger.info(f"Postmark minutes: created draft {minutes_id} for trust {trust['trust_id']} (thread: {tkey})")
     return {"status": "logged", "minutes_id": minutes_id}
@@ -158,4 +206,9 @@ async def ensure_email_minutes_indexes():
         name="minutes_message_dedup",
         sparse=True,
         unique=True,
+    )
+    await db.minutes_records.create_index(
+        [("trust_id", 1), ("source_thread_key", 1)],
+        name="minutes_thread_capture",
+        partialFilterExpression={"source": "email_capture", "status": "draft"},
     )

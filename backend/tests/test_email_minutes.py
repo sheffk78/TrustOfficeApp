@@ -125,21 +125,56 @@ class FakeCollection:
     def __init__(self):
         self.docs = []
 
+    @staticmethod
+    def _match(d, query):
+        if not query:
+            return True
+        for k, v in query.items():
+            if isinstance(v, dict) and v and all(str(op).startswith("$") for op in v):
+                actual = d.get(k)
+                for op, operand in v.items():
+                    if op == "$ne" and actual == operand:
+                        return False
+                    if op == "$in" and actual not in operand:
+                        return False
+                    if op == "$exists":
+                        if (k in d) != bool(operand):
+                            return False
+                continue
+            if d.get(k) != v:
+                return False
+        return True
+
     async def find_one(self, query, projection=None, **kwargs):
         for d in self.docs:
-            if all(d.get(k) == v for k, v in query.items()):
+            if self._match(d, query):
                 return d
         return None
 
     def find(self, query=None, projection=None):
-        return FakeCursor([d for d in self.docs
-                           if not query or all(d.get(k) == v for k, v in query.items())])
+        return FakeCursor([d for d in self.docs if self._match(d, query)])
 
     async def insert_one(self, doc):
         d = dict(doc)
         d.setdefault("_id", f"id_{len(self.docs)}")
         self.docs.append(d)
         return FakeResult(inserted_id=d["_id"])
+
+    async def update_one(self, query, ops):
+        for d in self.docs:
+            if all(d.get(k) == v for k, v in query.items()):
+                for k, v in ops.get("$set", {}).items():
+                    d[k] = v
+                for k, v in ops.get("$inc", {}).items():
+                    d[k] = (d.get(k) or 0) + v
+                for k, v in ops.get("$push", {}).items():
+                    d.setdefault(k, []).append(v)
+                for k, v in ops.get("$addToSet", {}).items():
+                    lst = d.setdefault(k, [])
+                    if v not in lst:
+                        lst.append(v)
+                return FakeResult(modified_count=1)
+        return FakeResult(modified_count=0)
 
     async def create_index(self, *a, **k):
         return None
@@ -344,3 +379,68 @@ class TestSlugNormalization:
         # str(None) → 'none': address none@minutes... — the toggle, not slug
         # magic, disables the feature (KISS, documented behavior)
         assert _normalize_minutes_slug(None) == "none"
+
+
+class TestThreadConsolidation:
+    """Council mechanics (2026-09-25): one thread = one draft. Same-subject
+    emails merge into the open capture draft instead of spawning per-email
+    drafts (the bloat Jeff flagged)."""
+
+    def _post(self, client, **overrides):
+        payload = dict(PAYLOAD, **overrides)
+        return client.post("/api/webhooks/postmark-inbound-minutes/any", json=payload)
+
+    def test_same_thread_merges_into_one_draft(self, webhook_env):
+        c = _client()
+        self._post(c)  # email 1 (Re: Quarterly trustee meeting)
+        r2 = self._post(c, MessageId="pm-222",
+                        TextBody="Follow-up.\n- Approved paying the contractor invoice")
+        assert r2.json()["status"] == "logged"
+        drafts = [d for d in webhook_env.minutes_records.docs if d.get("source") == "email_capture"]
+        assert len(drafts) == 1, "same thread must not spawn per-email drafts"
+        doc = drafts[0]
+        assert doc["thread_email_count"] == 2
+        assert len(doc["captured_decisions"]) == 2
+
+    def test_different_threads_get_separate_drafts(self, webhook_env):
+        c = _client()
+        self._post(c)
+        self._post(c, Subject="Estate planning call", MessageId="pm-333")
+        drafts = [d for d in webhook_env.minutes_records.docs if d.get("source") == "email_capture"]
+        assert len(drafts) == 2
+
+    def test_manually_edited_draft_not_merged(self, webhook_env):
+        c = _client()
+        self._post(c)
+        webhook_env.minutes_records.docs[0]["manually_edited"] = True
+        self._post(c, MessageId="pm-444")
+        drafts = [d for d in webhook_env.minutes_records.docs if d.get("source") == "email_capture"]
+        # trustee has taken over the draft → new email starts its own capture
+        assert len(drafts) == 2
+        assert drafts[0]["thread_email_count"] == 1
+
+    def test_solvency_capture_carries_confirmation_note(self, webhook_env):
+        c = _client()
+        payload = dict(PAYLOAD, MessageId="pm-555",
+                       TextBody="Solvency determination discussed. We approved the solvency review.",
+                       Subject="Solvency determination meeting")
+        r = self._post(c, **{k: payload[k] for k in ("MessageId", "TextBody", "Subject")})
+        doc = webhook_env.minutes_records.docs[-1]
+        assert "trustee confirmation" in doc["decisions_text"].lower() or \
+               "review before use" in doc["decisions_text"].lower()
+
+
+class TestEmailCaptureBanner:
+    def test_banner_present_for_email_capture_draft(self):
+        from routers.minutes import _pdf_email_capture_banner
+        blocks = _pdf_email_capture_banner({
+            "source": "email_capture", "status": "draft",
+            "thread_email_count": 3, "source_email_from": "t@x.com",
+            "source_subject": "Quarterly meeting",
+        })
+        assert blocks, "banner must render for an email-capture draft"
+
+    def test_no_banner_when_finalized_or_manual(self):
+        from routers.minutes import _pdf_email_capture_banner
+        assert _pdf_email_capture_banner({"source": "email_capture", "status": "finalized"}) == []
+        assert _pdf_email_capture_banner({"source": "manual", "status": "draft"}) == []

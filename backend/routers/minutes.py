@@ -1182,6 +1182,40 @@ def _pdf_retroactive_block(minutes: dict) -> list:
     return [retroactive_table, Spacer(1, 16)]
 
 
+def _pdf_email_capture_banner(minutes: dict) -> list:
+    """Watermark banner for email-sourced drafts (council seat 3, 2026-09-25).
+
+    Stored signal: source="email_capture" + status != finalized. Rendered as a
+    stored-field-driven banner — the draft is AI-assembled from email and has
+    never been board-approved; the trustee reviews, edits, finalizes.
+    """
+    if minutes.get("source") != "email_capture" or minutes.get("status") == "finalized":
+        return []
+    n_emails = minutes.get("thread_email_count") or 1
+    banner_data = [
+        ['DRAFTED FROM EMAIL — NOT BOARD-APPROVED', ''],
+        [f"AI-assembled from {n_emails} captured email(s) "
+         f"({minutes.get('source_email_from', 'unknown sender')}, "
+         f"\"{(minutes.get('source_subject') or '')[:60]}\"). "
+         'Review, edit and formally adopt before signing.', ''],
+    ]
+    table = Table(banner_data, colWidths=[6.0 * inch])
+    table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, 0), 'Times-Bold'),
+        ('FONTSIZE', (0, 0), (0, 0), 12),
+        ('TEXTCOLOR', (0, 0), (0, 0), colors.HexColor('#990000')),
+        ('FONTNAME', (0, 1), (0, 1), 'Times-Roman'),
+        ('FONTSIZE', (0, 1), (0, 1), 9),
+        ('TEXTCOLOR', (0, 1), (0, 1), colors.HexColor('#333333')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#990000')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    return [table, Spacer(1, 0.25 * inch)]
+
+
 def _pdf_attendees(minutes: dict, section_header_style, bullet_style) -> list:
     """Build the TRUSTEES PRESENT and ALSO PRESENT sections."""
     story = []
@@ -1437,6 +1471,7 @@ def generate_minutes_pdf(minutes: dict, trust: dict, hide_watermark: bool = Fals
     story.extend(_pdf_details_table(minutes, trust, minutes_type))
     if minutes.get('is_retroactive'):
         story.extend(_pdf_retroactive_block(minutes))
+    story.extend(_pdf_email_capture_banner(minutes))
     story.extend(_pdf_attendees(minutes, s['section_header_style'], s['bullet_style']))
     story.extend(_pdf_body(minutes, s, s['divider_style'], s['section_header_style']))
     if state_compliance_block:

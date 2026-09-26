@@ -384,18 +384,21 @@ def _parse_asset_valuation_date(valuation_ref_str: Optional[str]) -> Optional[da
 def _is_asset_stale(asset: dict, twelve_months_ago: datetime) -> bool:
     """Check if a single asset's valuation is stale (>12 months old or missing).
 
-    Freshness is judged by last_valued_date (the recorded valuation) when present,
-    falling back to date_conveyed for legacy items. A fresh 'Mark valued' update
-    resets the clock — conveying an asset years ago no longer makes it permanently
-    stale (2026-09-25 fix: last_valued_date was previously absent from the product,
-    so conveyance date was the only signal).
+    Freshness is judged by the most recent of last_valued_date and
+    date_conveyed: a fresh 'Mark valued' resets the clock, and conveying an
+    asset into the trust also counts (funding = valuation). Neither signal
+    makes the asset instantly stale when the other is recent.
     """
-    valuation_ref_str = asset.get("last_valued_date") or asset.get("date_conveyed")
-    if not valuation_ref_str:
+    # Judge freshness from the most recent valuation event. Conveying an asset
+    # INTO the trust is itself a valuation (you value it to fund the trust), so
+    # a last_valued_date older than date_conveyed must not make the asset
+    # instantly stale — take the later of the two (2026-09-25 fairness fix).
+    valuation_refs = [asset.get("last_valued_date"), asset.get("date_conveyed")]
+    parsed = [d for d in (_parse_asset_valuation_date(v) for v in valuation_refs if v)
+              if d is not None]
+    if not parsed:
         return True
-    valuation_ref = _parse_asset_valuation_date(valuation_ref_str)
-    if valuation_ref is None:
-        return True
+    valuation_ref = max(parsed)
     return valuation_ref < twelve_months_ago
 
 
