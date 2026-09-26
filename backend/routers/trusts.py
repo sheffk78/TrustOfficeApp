@@ -394,8 +394,9 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
     # Auto-sync jurisdiction and state_code
     _sync_update_jurisdiction(update_data)
     
-    # Normalize the email→minutes inbound slug (address local-part)
-    if "minutes_slug" in update_data:
+    # Normalize the email→minutes inbound slug (address local-part);
+    # an explicit null means "clear the address" and skips normalization
+    if "minutes_slug" in update_data and update_data["minutes_slug"] is not None:
         update_data["minutes_slug"] = _normalize_minutes_slug(update_data["minutes_slug"])
         if update_data["minutes_slug"]:
             taken = await db.trusts.find_one(
