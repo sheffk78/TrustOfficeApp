@@ -155,6 +155,8 @@ export default function SettingsPage() {
     financial_advisor_email: selectedTrust?.financial_advisor_email || '',
     successor_instructions: selectedTrust?.successor_instructions || '',
     document_location: selectedTrust?.document_location || '',
+    minutes_slug: selectedTrust?.minutes_slug || '',
+    minutes_email_enabled: selectedTrust?.minutes_email_enabled || false,
   });
 
   // Settings tab state (Fix 15: split single scroll wall into 4 tabs)
@@ -1770,6 +1772,40 @@ export default function SettingsPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Minutes by Email (email→minutes capture, 2026-09-25): the trust's
+                    inbound address + opt-in toggle. Slug normalizes server-side
+                    (lowercase, [a-z0-9-]); duplicates get a 409 with a clear message. */}
+                <div className="pt-4 border-t border-navy/10" data-testid="minutes-email-section">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Minutes by Email</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Email meeting notes to your trust's address and a minutes draft is created for your review.
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Input
+                      value={trustData.minutes_slug || ''}
+                      onChange={(e) => setTrustData({ ...trustData, minutes_slug: e.target.value })}
+                      placeholder="kohler-family-trust"
+                      className="max-w-xs"
+                      data-testid="minutes-slug-input"
+                    />
+                    <span className="text-sm text-muted-foreground">@minutes.trustoffice.app</span>
+                    <Switch
+                      checked={trustData.minutes_email_enabled ?? false}
+                      onCheckedChange={(checked) => setTrustData({ ...trustData, minutes_email_enabled: checked })}
+                      aria-label="Toggle minutes by email capture"
+                      data-testid="minutes-email-toggle"
+                    />
+                    <Label className="text-sm text-navy cursor-pointer" onClick={() => setTrustData({ ...trustData, minutes_email_enabled: !(trustData.minutes_email_enabled ?? false) })}>
+                      Capture on
+                    </Label>
+                  </div>
+                  {trustData.minutes_slug && trustData.minutes_email_enabled && (
+                    <p className="text-xs text-muted-foreground mt-2" data-testid="minutes-address-preview">
+                      Send to: {(trustData.minutes_slug || '').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '')}@minutes.trustoffice.app
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-navy/10">

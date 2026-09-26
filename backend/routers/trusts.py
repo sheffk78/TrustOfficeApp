@@ -16,6 +16,16 @@ from dependencies import (
     get_trust_limit, PLAN_TRUST_LIMITS
 )
 from trustee_utils import parse_trustees
+
+def _normalize_minutes_slug(raw) -> str | None:
+    """Normalize an email→minutes inbound slug (address local-part).
+
+    Lowercase, keep [a-z0-9-] only (everything else → dash), trim dashes.
+    Empty input or an all-noise string → None (feature off).
+    """
+    raw = str(raw).strip().lower()
+    return re.sub(r"[^a-z0-9-]", "-", raw).strip("-") or None
+
 from models import TrustCreate, TrustUpdate, TrustResponse, TrustDissolveRequest
 from utils.tax_calendar_math import _generate_entries, _seed_tax_year
 from utils.audit import log_audit_event
@@ -383,8 +393,7 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
     
     # Normalize the email→minutes inbound slug (address local-part)
     if "minutes_slug" in update_data:
-        raw = str(update_data["minutes_slug"]).strip().lower()
-        update_data["minutes_slug"] = re.sub(r"[^a-z0-9-]", "-", raw).strip("-") or None
+        update_data["minutes_slug"] = _normalize_minutes_slug(update_data["minutes_slug"])
         if update_data["minutes_slug"]:
             taken = await db.trusts.find_one(
                 {"minutes_slug": update_data["minutes_slug"], "trust_id": {"$ne": trust_id}}, {"_id": 0, "trust_id": 1}

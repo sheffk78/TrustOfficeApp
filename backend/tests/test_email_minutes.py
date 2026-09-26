@@ -320,3 +320,27 @@ class TestArchiveWebhookDispatch:
         # with no_matching_trust; minutes doc must NOT be created)
         assert r.json()["reason"] == "no_matching_trust"
         assert webhook_env.minutes_records.docs == []
+
+class TestSlugNormalization:
+    """_normalize_minutes_slug: the update_trust path turns whatever the user
+    types into a safe address local-part."""
+
+    def test_spaces_and_symbols_become_dashes(self):
+        from routers.trusts import _normalize_minutes_slug
+        assert _normalize_minutes_slug("Kohler Family Trust!") == "kohler-family-trust"
+
+    def test_leading_trailing_dashes_trimmed(self):
+        from routers.trusts import _normalize_minutes_slug
+        assert _normalize_minutes_slug("  --Foo_Bar--  ") == "foo-bar"
+
+    def test_empty_becomes_none(self):
+        from routers.trusts import _normalize_minutes_slug
+        assert _normalize_minutes_slug("") is None
+        assert _normalize_minutes_slug("   ") is None
+        assert _normalize_minutes_slug("///") is None
+
+    def test_none_string_passthrough(self):
+        from routers.trusts import _normalize_minutes_slug
+        # str(None) → 'none': address none@minutes... — the toggle, not slug
+        # magic, disables the feature (KISS, documented behavior)
+        assert _normalize_minutes_slug(None) == "none"
