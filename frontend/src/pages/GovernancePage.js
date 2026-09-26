@@ -105,13 +105,13 @@ export default function GovernancePage() {
   const chartWidth = 100;
   const maxScore = governance?.max_score || 100;
 
-  // Generate chart points
+  // Generate chart points (clamp to chart box: bonus scores can exceed max)
   const getChartPoints = () => {
     if (history.length === 0) return '';
     
     const points = history.map((item, index) => {
       const x = (index / (history.length - 1 || 1)) * chartWidth;
-      const y = chartHeight - (item.score / maxScore) * chartHeight;
+      const y = chartHeight - Math.min(1, item.score / maxScore) * chartHeight;
       return `${x},${y}`;
     });
     
@@ -123,7 +123,7 @@ export default function GovernancePage() {
     
     const points = history.map((item, index) => {
       const x = (index / (history.length - 1 || 1)) * chartWidth;
-      const y = chartHeight - (item.score / maxScore) * chartHeight;
+      const y = chartHeight - Math.min(1, item.score / maxScore) * chartHeight;
       return `${x},${y}`;
     });
     

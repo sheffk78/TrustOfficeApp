@@ -732,13 +732,11 @@ def _compute_health_score(data: dict) -> dict:
     breakdown = penalty_result["breakdown"]
     findings_with_penalty = penalty_result["findings_with_penalty"]
 
-    # Fairness (2026-09-25): grace-granted points on no_data criteria (new-trust
-    # Annual Review / Asset Valuation) must NOT count toward base_score — their
-    # max is excluded from the denominator, so counting them inflates the ratio
-    # (a fresh trust could score 300/100). Sum applicable criteria only.
-    base_score = sum(
-        c["points"] for c in [cr.model_dump() for cr in criteria] if not c["no_data"]
-    )
+    # Bonus scoring (Jeff decision 2026-09-25): grace-granted points on no_data
+    # criteria (new-trust Annual Review / Asset Valuation) COUNT toward
+    # base_score while their max stays excluded from the denominator — trusts
+    # that bank grace points can display above 100. Intentional over-drive.
+    base_score = sum(c["points"] for c in [cr.model_dump() for cr in criteria])
 
     # --- Final Score with Critical Cap ---
     # Scale against effective_max (applicable criteria only), then convert to

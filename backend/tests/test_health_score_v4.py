@@ -4,7 +4,7 @@
 # deadlines penalized, onboarding gave zero credit). v4 fixes all four.
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -180,7 +180,8 @@ def test_tenure_grace_midquarter_created_trust():
     result = _compute_health_score(data)
     crit = _criterion(result, "Quarterly Minutes")
     assert crit.no_data is True
-    assert result["total_score"] == 100
+    # Bonus scoring (Jeff 2026-09-25): grace points count → 300 over-drive display
+    assert result["total_score"] == 300
 
 
 def test_tenured_trust_midquarter_still_counts():
@@ -197,19 +198,21 @@ def test_tenured_trust_midquarter_still_counts():
     assert crit.points == 0
 
 
-def test_90day_grace_matches_other_criteria():
-    """Fairness (2026-09-25): the Quarterly Minutes new-trust grace uses the
-    same 90d window as Annual Review / Asset Valuation — a 45-day-old trust is
-    no_data everywhere except Foundation."""
+def test_bonus_scoring_above_100():
+    """Jeff decision 2026-09-25: grace points COUNT toward base_score while
+    their max stays excluded — a fresh trust that banks Annual Review + Asset
+    Valuation grace displays above 100 (intentional over-drive)."""
     late = datetime(2026, 11, 10, tzinfo=timezone.utc)
     data = _base_data(
         now=late, quarterly_minutes=0,
         trust_created_at="2026-09-26T00:00:00+00:00",  # 45 days old
     )
     result = _compute_health_score(data)
-    crit = _criterion(result, "Quarterly Minutes")
-    assert crit.no_data is True
-    assert result["total_score"] == 100
+    # base includes grace points; denominator (applicable_max) does not
+    grace_pointed = [c for c in result["criteria"] if c.no_data and c.points > 0]
+    assert grace_pointed, "fixture must include grace-pointed no_data criteria"
+    assert result["base_score"] > result["applicable_max"]
+    assert result["total_score"] > 100
 
 
 # --- Tax penalties: overdue penalizes, upcoming doesn't ---
