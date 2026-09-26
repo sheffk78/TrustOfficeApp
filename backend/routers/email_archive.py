@@ -259,6 +259,12 @@ async def postmark_inbound_webhook(secret: str, request: Request):
             archive_slug = email.split("@")[0].lower()
             break
 
+    # One Postmark server = one hook: mail aimed at the minutes domain is
+    # dispatched here to the email→minutes flow instead of the archive.
+    from routers.email_minutes import has_minutes_recipient, process_minutes_email
+    if not archive_slug and has_minutes_recipient(payload):
+        return await process_minutes_email(payload)
+
     if not archive_slug:
         logger.info(f"Postmark inbound: no archive address found in recipients")
         return {"status": "ignored", "reason": "no_archive_address"}

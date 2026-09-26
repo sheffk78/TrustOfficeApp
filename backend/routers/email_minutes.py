@@ -33,22 +33,35 @@ MINUTES_WEBHOOK_SECRET = os.environ.get("POSTMARK_MINUTES_SECRET", "")
 
 @router.post("/webhooks/postmark-inbound-minutes/{secret}")
 async def postmark_minutes_webhook(secret: str, request: Request):
-    """Receive an inbound meeting-notes email and create a minutes DRAFT.
-
-    Same Postmark payload contract as the archive webhook. The slug is the
-    local part of the address in BccFull/CcFull/ToFull pointing at the
-    minutes domain.
-    """
+    """Standalone minutes hook (kept for direct Postmark wiring if we split servers)."""
     if MINUTES_WEBHOOK_SECRET and secret != MINUTES_WEBHOOK_SECRET:
         logger.warning("Postmark minutes webhook: invalid secret")
         raise HTTPException(status_code=403, detail="Invalid webhook secret")
-
     try:
         payload = await request.json()
     except Exception as e:
         logger.error(f"Postmark minutes: failed to parse body: {e}")
         return {"status": "ignored", "reason": "invalid_payload"}
+    return await process_minutes_email(payload)
 
+
+def has_minutes_recipient(payload: dict) -> bool:
+    """True if any Bcc/Cc/To address points at the minutes inbound domain."""
+    for field in ("BccFull", "CcFull", "ToFull"):
+        for r in payload.get(field, []) or []:
+            email = r.get("Email", "") if isinstance(r, dict) else (r if isinstance(r, str) else "")
+            if email and MINUTES_INBOUND_DOMAIN in email.lower():
+                return True
+    return False
+
+
+async def process_minutes_email(payload: dict) -> dict:
+    """Process one Postmark inbound payload against the minutes flow.
+
+    Shared by the dedicated minutes webhook and the archive webhook
+    dispatcher (one Postmark server = one hook URL, so routing by
+    recipient domain happens in-app).
+    """
     from_email = payload.get("FromFull", {}).get("Email", payload.get("From", ""))
     from_name = payload.get("FromFull", {}).get("Name", payload.get("FromName", ""))
     subject = payload.get("Subject", "(no subject)")

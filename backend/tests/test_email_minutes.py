@@ -284,3 +284,39 @@ def test_plan_gate_blocks_trustee_plan(webhook_env, monkeypatch):
     c = _client()
     r = c.post("/api/webhooks/postmark-inbound-minutes/any", json=PAYLOAD)
     assert r.json()["reason"] == "plan_not_eligible"
+
+class TestArchiveWebhookDispatch:
+    """One Postmark server = one hook: the archive webhook forwards
+    minutes-domain mail into the minutes flow (routing by recipient)."""
+
+    def _archive_client(self, webhook_env, monkeypatch):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        import routers.email_archive as ea
+        import routers.email_minutes as em
+
+        app = FastAPI()
+        app.include_router(ea.router, prefix="/api")
+        client = TestClient(app, raise_server_exceptions=False)
+        # archive webhook has its own secret (empty by default in tests)
+        monkeypatch.setattr(ea, "WEBHOOK_SECRET", "")
+        return client
+
+    def test_archive_hook_dispatches_minutes_mail(self, webhook_env, monkeypatch):
+        c = self._archive_client(webhook_env, monkeypatch)
+        r = c.post("/api/webhooks/postmark-inbound/any", json=PAYLOAD)
+        assert r.status_code == 200
+        assert r.json()["status"] == "logged"
+        doc = webhook_env.minutes_records.docs[-1]
+        assert doc["status"] == "draft"
+
+    def test_archive_hook_still_logs_archive_mail(self, webhook_env, monkeypatch):
+        c = self._archive_client(webhook_env, monkeypatch)
+        payload = dict(PAYLOAD, ToFull=[{"Email": "kohler-family-trust@archive.trustoffice.app"}])
+        r = c.post("/api/webhooks/postmark-inbound/any", json=payload)
+        assert r.status_code == 200
+        # archive path logs a communication, not minutes (trust lookup by
+        # email_archive_slug — not seeded here, so archive returns ignored
+        # with no_matching_trust; minutes doc must NOT be created)
+        assert r.json()["reason"] == "no_matching_trust"
+        assert webhook_env.minutes_records.docs == []
