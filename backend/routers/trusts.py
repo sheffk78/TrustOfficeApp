@@ -388,8 +388,11 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
 
     update_data = {k: v.value if isinstance(v, Enum) else v for k, v in update.model_dump().items() if v is not None}
     # minutes_slug=null must CLEAR the address (the generic None-filter would
-    # silently drop it, leaving an address the user can never remove)
-    if update.minutes_slug is None and "minutes_slug" in update.model_dump():
+    # silently drop it, leaving an address the user can never remove) — but
+    # only when the client EXPLICITLY sent null; model_dump() includes fields
+    # the client omitted (defaulting to None), and clearing those would wipe
+    # the address on every unrelated trust edit (caught live 2026-09-25).
+    if update.minutes_slug is None and "minutes_slug" in update.model_fields_set:
         update_data["minutes_slug"] = None
     # Auto-sync jurisdiction and state_code
     _sync_update_jurisdiction(update_data)
