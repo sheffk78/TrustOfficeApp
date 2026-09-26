@@ -507,6 +507,9 @@ class TrustResponse(BaseModel):
     status: Optional[str] = "active"
     dissolved_on: Optional[str] = None
     approval_threshold: Optional[int] = None  # multi-sig: null = all active co-trustees (M2 D9)
+    # Email→minutes inbound address + capture toggle (2026-09-25)
+    minutes_slug: Optional[str] = None
+    minutes_email_enabled: Optional[bool] = False
 
 
 # ==================== ENTITY MODELS ====================

@@ -387,7 +387,10 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
     update_data = {k: v.value if isinstance(v, Enum) else v for k, v in update.model_dump().items() if v is not None}
-    
+    # minutes_slug=null must CLEAR the address (the generic None-filter would
+    # silently drop it, leaving an address the user can never remove)
+    if update.minutes_slug is None and "minutes_slug" in update.model_dump():
+        update_data["minutes_slug"] = None
     # Auto-sync jurisdiction and state_code
     _sync_update_jurisdiction(update_data)
     
