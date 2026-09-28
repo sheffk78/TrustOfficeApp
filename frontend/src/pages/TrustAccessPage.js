@@ -56,7 +56,7 @@ export default function TrustAccessPage() {
       if (orgsRes.ok) setOrgs(await orgsRes.json());
       if (grantsRes.ok) setGrants(await grantsRes.json());
     } catch (e) {
-      showError(e);
+      showError(toast, e, { operation: 'load_access', page: 'TrustAccess' });
     } finally {
       setLoading(false);
     }
@@ -98,14 +98,14 @@ export default function TrustAccessPage() {
         if (code === 'expiry_exceeds_365_days') toast.error('Grant window cannot exceed 12 months.');
         else if (res.status === 404) toast.error('Feature not available or org not found — check the org ID.');
         else if (res.status === 403) toast.error('Only the trust owner can grant access.');
-        else toast.error(body?.detail || 'Grant failed.');
+        else toast.error(typeof body?.detail === 'object' ? (body?.detail?.code || body?.detail?.message || 'Grant failed.') : (body?.detail || 'Grant failed.'));
         return;
       }
       toast.success('Access granted. A notice email has been sent.');
       setGrantOpen(false); setAttested(false); setOrgIdInput(''); setLevel('viewer');
       await load();
     } catch (e) {
-      showError(e);
+      showError(toast, e, { operation: 'grant_access', page: 'TrustAccess' });
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +118,7 @@ export default function TrustAccessPage() {
       if (res.ok) { toast.success('Access revoked.'); await load(); }
       else toast.error('Revoke failed — try again or contact support.');
     } catch (e) {
-      showError(e);
+      showError(toast, e, { operation: 'revoke_access', page: 'TrustAccess' });
     } finally {
       setRevoking(null);
     }

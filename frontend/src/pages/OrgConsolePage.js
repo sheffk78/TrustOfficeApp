@@ -51,7 +51,7 @@ export default function OrgConsolePage() {
       }));
       setMembers(mem); setTrustsByOrg(trs);
     } catch (e) {
-      showError(e);
+      showError(toast, e, { page: 'OrgConsole' });
     } finally {
       setLoading(false);
     }
@@ -77,7 +77,7 @@ export default function OrgConsolePage() {
         toast.error(body?.detail?.code || body?.detail || 'Invite failed.');
       }
     } catch (e) {
-      showError(e);
+      showError(toast, e, { page: 'OrgConsole' });
     } finally {
       setInviting(false);
     }
@@ -120,7 +120,7 @@ export default function OrgConsolePage() {
                     });
                     if (res.ok) { toast.success('Organization created.'); await load(); }
                     else toast.error('Could not create org — it may already exist.');
-                  } catch (e) { showError(e); }
+                  } catch (e) { showError(toast, e, { page: 'OrgConsole' }); }
                 }}
                 data-testid="create-org-btn"
               >

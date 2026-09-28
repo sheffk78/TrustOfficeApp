@@ -74,6 +74,14 @@ async def create_org(body: OrgCreate, user: dict = Depends(get_current_user)):
     return OrgResponse(**org_doc)
 
 
+async def _resolve_org_ref(org_ref: str) -> Optional[dict]:
+    """Resolve an org by org_id OR by exact name (users type the name)."""
+    org = await db.orgs.find_one({"org_id": org_ref}, {"_id": 0})
+    if not org:
+        org = await db.orgs.find_one({"name": org_ref}, {"_id": 0})
+    return org
+
+
 @router.get("/orgs", response_model=List[OrgResponse])
 async def list_my_orgs(user: dict = Depends(get_current_user)):
     """List orgs the caller owns or is an active member of (M4+ console)."""
@@ -95,9 +103,10 @@ async def get_org(org_id: str, user: dict = Depends(get_current_user)):
     """Read org. Owner-or-member access (M1-M2 authz)."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
-    org = await db.orgs.find_one({"org_id": org_id}, {"_id": 0})
+    org = await _resolve_org_ref(org_id)
     if not org:
         raise HTTPException(status_code=404, detail="Org not found")
+    org_id = org["org_id"]
     # Owner short-circuit
     if org.get("owner_user_id") == user["user_id"]:
         return OrgResponse(**org)
@@ -113,9 +122,10 @@ async def list_org_members(org_id: str, user: dict = Depends(get_current_user)):
     """List org members. Owner-or-member access (M1-M2 authz)."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
-    org = await db.orgs.find_one({"org_id": org_id}, {"_id": 0})
+    org = await _resolve_org_ref(org_id)
     if not org:
         raise HTTPException(status_code=404, detail="Org not found")
+    org_id = org["org_id"]
     # Owner short-circuit
     if org.get("owner_user_id") == user["user_id"]:
         cursor = db.org_members.find({"org_id": org_id}, {"_id": 0})

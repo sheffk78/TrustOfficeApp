@@ -85,9 +85,19 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
     credentials: 'include',
     headers: getAuthHeaders()
   };
-  
+
+  // Guard: callers may pass an absolute URL (e.g. `${API_BASE}/api/...`).
+  // Strip the backend origin + /api prefix so we never produce `${API}https://...`.
+  let path = endpoint;
+  if (typeof path === 'string' && path.startsWith(BACKEND_URL)) {
+    path = path.slice(BACKEND_URL.length);
+  }
+  if (typeof path === 'string' && path.startsWith(`${API}/`)) {
+    path = path.slice(API.length);
+  }
+
   const doFetch = () =>
-    fetch(`${API}${endpoint}`, {
+    fetch(`${API}${path}`, {
       ...defaultOptions,
       ...options,
       headers: {

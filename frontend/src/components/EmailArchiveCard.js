@@ -68,11 +68,11 @@ export default function EmailArchiveCard({ trustId, trustName }) {
         if (res.status === 403) {
           toast.error('Upgrade to Estate or Advisor plan to enable Email Archive');
         } else {
-          showError(err);
+          showError(toast, new Error(typeof err === 'string' ? err : JSON.stringify(err)), { operation: 'email_archive_toggle', page: 'EmailArchiveCard' });
         }
       }
     } catch (e) {
-      showError(e);
+      showError(toast, e, { page: 'EmailArchiveCard' });
     } finally {
       setToggling(false);
     }
@@ -90,10 +90,10 @@ export default function EmailArchiveCard({ trustId, trustName }) {
         toast.success('Email Archive disabled');
       } else {
         const err = await res.json();
-        showError(err);
+        showError(toast, new Error(typeof err === 'string' ? err : JSON.stringify(err)), { operation: 'email_archive_action', page: 'EmailArchiveCard' });
       }
     } catch (e) {
-      showError(e);
+      showError(toast, e, { page: 'EmailArchiveCard' });
     } finally {
       setToggling(false);
     }

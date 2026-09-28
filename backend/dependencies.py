@@ -3,7 +3,7 @@ from fastapi import HTTPException, Request, Depends
 from fastapi.security import HTTPBearer
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import jwt
 import bcrypt
 import os
@@ -99,6 +99,15 @@ class SubscriptionState(BaseModel):
     stripe_subscription_id: Optional[str] = None
     current_period_end: Optional[str] = None
     cancel_at_period_end: Optional[bool] = None
+
+    @field_validator("current_period_end", mode="before")
+    @classmethod
+    def _coerce_period_end(cls, v):
+        # Mongo may hold this as a native datetime (legacy writers); coerce to
+        # an ISO string so SubscriptionState validation never 500s.
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
 
 
 PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
