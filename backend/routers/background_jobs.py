@@ -99,6 +99,17 @@ async def trigger_post_drip_reengagement(user: dict = Depends(get_current_user))
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/run/no-show-recovery")
+async def trigger_no_show_recovery(user: dict = Depends(get_current_user)):
+    """Manually trigger the no-show recovery flow (built 2026-09-28)."""
+    try:
+        result = await background_runner.send_no_show_recovery_emails()
+        return {"success": True, "message": "No-show recovery run", "result": result}
+    except Exception as e:
+        logger.error(f"Error running no-show recovery: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/run/leads-pipeline-health")
 async def trigger_leads_pipeline_health(user: dict = Depends(get_current_user)):
     """Manually trigger the leads pipeline health monitor (item 4)."""
