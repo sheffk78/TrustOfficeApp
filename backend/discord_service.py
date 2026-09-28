@@ -45,7 +45,10 @@ async def send_discord_message(
         payload["embeds"] = embeds
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(
+            headers={"User-Agent": "TrustOfficeBackend (https://trustoffice.app, 1.0)"},
+            timeout=10.0,
+        ) as client:
             response = await client.post(
                 webhook_url,
                 json=payload,

@@ -188,6 +188,15 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
+        # No-show recovery flow (reschedule → 7-day nudge → 14-day close) — hourly.
+        self.scheduler.add_job(
+            self.send_no_show_recovery_emails,
+            trigger=IntervalTrigger(hours=1),
+            id='no_show_recovery',
+            name='No-show recovery: reschedule invite, 7-day nudge, 14-day close',
+            replace_existing=True
+        )
+
         # Item 5: backfill lead_activities.created_at strings -> BSON Dates â daily.
         self.scheduler.add_job(
             self.backfill_lead_activities_dates,
@@ -1576,6 +1585,153 @@ class BackgroundTaskRunner:
             logger.error(f"Error in compliance deadline reminder job: {e}")
             return 0
 
+    async def send_no_show_recovery_emails(self) -> dict:
+        """No-show recovery flow (built 2026-09-28 per Jeff directive).
+
+        Comment spec at send_nurture_drip_emails: no_show leads are owned by
+        "the no-show flow (reschedule email, 7-day nudge, 14-day DNC)". That
+        flow was referenced but never built — no-shows sat frozen forever.
+
+        Timeline from call_outcome marking:
+          day 0      reschedule invitation email (empathetic, one-click book)
+          day 7      nudge (different angle: recording/summary offer)
+          day 14     DNC — mark lost, stop all email
+
+        Idempotent via no_show_stage ('resend' | 'nudged' | 'closed') +
+        no_show_marked_at timestamps. Hourly scheduler job.
+        """
+        from email_service import email_service
+        now = datetime.now(timezone.utc)
+        result = {"reschedule_sent": 0, "nudge_sent": 0, "closed": 0, "errors": 0}
+        try:
+            # Day-0: no_shows never yet sent a reschedule invite
+            fresh = await self.db.leads.find({
+                "booked_call": True,
+                "call_outcome": "no_show",
+                "no_show_stage": {"$in": [None, False]},
+                "stage": {"$ne": "lost"},
+            }, {"_id": 0}).to_list(200)
+            for lead in fresh:
+                if (lead.get("email") or "").lower().endswith("@agentictrust.app"):
+                    continue  # internal test lead — never email
+                first = (lead.get("name") or "there").split()[0]
+                booking_url = f"{email_service.app_url}/book-a-call/"
+                try:
+                    r = await email_service.send_email(
+                        to_email=lead["email"],
+                        to_name=lead.get("name", ""),
+                        subject="Missed you — want to grab a new time?",
+                        html_body=(
+                            f"<p>Hi {first},</p>"
+                            f"<p>We had our consultation on the calendar but the time slipped past us — no problem, it happens.</p>"
+                            f"<p>Still want to walk through your trust questions? Pick whatever time suits you here:</p>"
+                            f"<p><a href=\"{booking_url}\">{booking_url}</a></p>"
+                            f"<p>And if a call isn't what you need right now, just reply with what would help — I'd rather send the right resource than another invite.</p>"
+                            f"<p>Best,<br>Jeff Kohler<br>TrustOffice</p>"
+                        ),
+                        text_body=(
+                            f"Hi {first},\n\nWe had our consultation scheduled but the time slipped past us.\n\n"
+                            f"Still want to talk it through? Pick a new time here:\n{booking_url}\n\n"
+                            f"If a call isn't what you need right now, just reply with what would help.\n\n"
+                            f"Best,\nJeff Kohler\nTrustOffice"
+                        ),
+                        tag="no_show_reschedule",
+                    )
+                    if r.get("success"):
+                        await self.db.leads.update_one(
+                            {"lead_id": lead.get("lead_id")},
+                            {"$set": {
+                                "no_show_stage": "resend",
+                                "no_show_reached_out_at": now.isoformat(),
+                            }},
+                        )
+                        await self._log_drip_activity(
+                            lead.get("lead_id"), "no_show_recovery",
+                            "Sent no-show reschedule invitation",
+                        )
+                        result["reschedule_sent"] += 1
+                except Exception as e:
+                    logger.error(f"No-show reschedule failed for {lead.get('email')}: {e}")
+                    result["errors"] += 1
+
+            # Day-7 nudge
+            nudges = await self.db.leads.find({
+                "booked_call": True,
+                "call_outcome": "no_show",
+                "no_show_stage": "resend",
+                "no_show_reached_out_at": {"$lte": (now - timedelta(days=7)).isoformat()},
+                "stage": {"$ne": "lost"},
+            }, {"_id": 0}).to_list(200)
+            for lead in nudges:
+                if (lead.get("email") or "").lower().endswith("@agentictrust.app"):
+                    continue  # internal test lead — never email
+                first = (lead.get("name") or "there").split()[0]
+                booking_url = f"{email_service.app_url}/book-a-call/"
+                try:
+                    r = await email_service.send_email(
+                        to_email=lead["email"],
+                        to_name=lead.get("name", ""),
+                        subject="Still open, if you want it",
+                        html_body=(
+                            f"<p>Hi {first},</p>"
+                            f"<p>Quick follow-up — no guilt either way. If getting your trust housekeeping done is still on the list, the calendar's here:</p>"
+                            f"<p><a href=\"{booking_url}\">{booking_url}</a></p>"
+                            f"<p>If now's just not the season, that's completely fine — reply 'close it' and I'll stop the emails and keep your file on hand.</p>"
+                            f"<p>Best,<br>Jeff Kohler<br>TrustOffice</p>"
+                        ),
+                        text_body=(
+                            f"Hi {first},\n\nNo guilt either way. If it's still on the list, the calendar's here:\n{booking_url}\n\n"
+                            f"If now's not the season, reply 'close it' and I'll stop the emails.\n\n"
+                            f"Best,\nJeff Kohler\nTrustOffice"
+                        ),
+                        tag="no_show_nudge",
+                    )
+                    if r.get("success"):
+                        await self.db.leads.update_one(
+                            {"lead_id": lead.get("lead_id")},
+                            {"$set": {
+                                "no_show_stage": "nudged",
+                                "no_show_nudged_at": now.isoformat(),
+                            }},
+                        )
+                        await self._log_drip_activity(
+                            lead.get("lead_id"), "no_show_recovery",
+                            "Sent day-7 no-show nudge",
+                        )
+                        result["nudge_sent"] += 1
+                except Exception as e:
+                    logger.error(f"No-show nudge failed for {lead.get('email')}: {e}")
+                    result["errors"] += 1
+
+            # Day-14 close: mark lost, stop the drip from ever touching them again
+            closes = await self.db.leads.find({
+                "booked_call": True,
+                "call_outcome": "no_show",
+                "no_show_stage": "nudged",
+                "no_show_nudged_at": {"$lte": (now - timedelta(days=7)).isoformat()},
+                "stage": {"$ne": "lost"},
+            }, {"_id": 0}).to_list(200)
+            for lead in closes:
+                await self.db.leads.update_one(
+                    {"lead_id": lead.get("lead_id")},
+                    {"$set": {
+                        "no_show_stage": "closed",
+                        "no_show_closed_at": now.isoformat(),
+                        "stage": "lost",
+                    }},
+                )
+                await self._log_drip_activity(
+                    lead.get("lead_id"), "no_show_recovery",
+                    "Day-14: closed no-show lead (marked lost, drip excluded)",
+                )
+                result["closed"] += 1
+        except Exception as e:
+            logger.error(f"Error in no-show recovery: {e}")
+            result["errors"] += 1
+        if any(result[k] for k in ("reschedule_sent", "nudge_sent", "closed")):
+            logger.info(f"No-show recovery: {result}")
+        return result
+
     async def _log_audit(
         self,
         user_id: str,
@@ -1671,6 +1827,11 @@ async def run_booking_reminders():
         return await runner.send_booking_reminder_emails()
     finally:
         runner.client.close()
+
+
+async def run_no_show_recovery() -> dict:
+    """Manual trigger: no-show recovery sweep (reschedule/nudge/close)."""
+    return await background_runner.send_no_show_recovery_emails()
 
 
 async def run_post_drip_reengagement() -> int:
