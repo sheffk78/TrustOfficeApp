@@ -1091,7 +1091,12 @@ async def facebook_webhook_handler(request: Request):
     if FB_APP_SECRET:
         signature = request.headers.get("X-Hub-Signature-256", "")
         if not _verify_facebook_signature(body, signature, FB_APP_SECRET):
-            logger.warning("Facebook webhook signature verification failed")
+            sig_hdr = request.headers.get("X-Hub-Signature-256", "")
+            logger.warning(
+                f"Facebook webhook signature verification failed "
+                f"(sig_hdr_present={bool(sig_hdr)} sig_hdr_len={len(sig_hdr)} "
+                f"body_len={len(body)})"
+            )
             raise HTTPException(status_code=403, detail="Signature verification failed")
 
     if payload.get("object") != "page":
