@@ -1477,3 +1477,37 @@ async def upload_vault_document(
         "file_size": len(content),
         "message": "Document uploaded to vault successfully",
     }
+
+@router.get("/users/{user_id}/trusts/{trust_id}/vault/documents")
+async def admin_list_vault_documents(
+    user_id: str,
+    trust_id: str,
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """
+    List a user's vault documents for one trust (admin API). Excludes file_content.
+    Support use: verify which documents a client can actually download.
+    """
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await check_admin_access_locked(user_id)
+
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found for this user")
+
+    docs = await db.vault_documents.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "file_content": 0},
+    ).sort("created_at", -1).to_list(length=500)
+
+    await log_api_action(
+        action="list_vault_documents",
+        details={"target_user_id": user_id, "trust_id": trust_id, "count": len(docs)},
+        ip_address=get_client_ip(request),
+    )
+
+    return {"trust_id": trust_id, "user_id": user_id, "count": len(docs), "documents": docs}
