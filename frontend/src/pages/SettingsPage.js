@@ -1781,12 +1781,13 @@ export default function SettingsPage() {
                   <Label className="text-xs text-muted-foreground mb-2 block">Minutes by Email</Label>
                   <p className="text-xs text-muted-foreground mb-3">
                     Email meeting notes to your trust's address and a minutes draft is created for your review.
+                    This address is only for emailing in meeting notes — spending-threshold notifications are not sent here.
                   </p>
                   <div className="flex items-center gap-3 flex-wrap">
                     <Input
                       value={trustData.minutes_slug || ''}
                       onChange={(e) => setTrustData({ ...trustData, minutes_slug: e.target.value })}
-                      placeholder="kohler-family-trust"
+                      placeholder="e-g-your-trust-name"
                       className="max-w-xs"
                       data-testid="minutes-slug-input"
                     />
