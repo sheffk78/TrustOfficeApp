@@ -95,6 +95,11 @@ export default function LoginPage() {
     if (!user) return;
     const wp = searchParams.get('wp');
     const action = searchParams.get('action');
+    const invite = searchParams.get('invite');
+    if (invite) {
+      navigate(`/invite/${encodeURIComponent(invite)}`, { replace: true });
+      return;
+    }
     if (wp === '1' && action) {
       const coupon = searchParams.get('coupon');
       const plan = searchParams.get('plan');
@@ -140,6 +145,11 @@ export default function LoginPage() {
     // WingPoint-aware routing: check URL params for wp=1 and action
     const wp = searchParams.get('wp');
     const action = searchParams.get('action');
+    const invite = searchParams.get('invite');
+    if (invite) {
+      navigate(`/invite/${encodeURIComponent(invite)}`, { replace: true });
+      return;
+    }
     if (wp === '1' && action) {
       const coupon = searchParams.get('coupon');
       const plan = searchParams.get('plan');
