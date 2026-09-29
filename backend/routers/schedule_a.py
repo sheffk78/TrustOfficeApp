@@ -13,11 +13,31 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 from database import db
-from dependencies import get_current_user, require_write_access, should_show_watermark, is_white_label
-from models import ScheduleAItemCreate, ScheduleAItemUpdate, ScheduleAItemResponse
+from dependencies import (
+    get_current_user,
+    require_write_access,
+    should_show_watermark,
+    is_white_label,
+    require_org_grant,
+    _toggle_institution,
+)
+from models import ScheduleAItemCreate, ScheduleAItemUpdate, ScheduleAItemResponse, GrantLevel
 from pdf_utils import NAVY, GRAY, LIGHT_GRAY, separator_line, legal_separator_line, create_doc_template
 
 router = APIRouter(tags=["schedule-a"])
+
+
+async def _apply_schedule_a_guards(trust_id: str, user: dict, min_level) -> dict:
+    """Institution guard (item 6): verify an active org grant covers trust_id at
+    min_level, attaching user["org_grant"]. Owner / flag-off paths short-circuit
+    inside require_org_grant and return user unchanged (legacy-identical).
+    """
+    return await require_org_grant(trust_id, min_level, user=user)
+
+
+def _grant_lookup_query(trust_id: str, user_id: str) -> dict:
+    """Base query for schedule_a_items scoped to one trust."""
+    return {"trust_id": trust_id, "user_id": user_id}
 
 
 # ==================== Helpers ====================
@@ -151,7 +171,12 @@ def _build_item_row(item):
 @router.post("/schedule-a", response_model=ScheduleAItemResponse)
 async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends(require_write_access)):
     """Add an asset to Schedule A"""
+    # Institution guard (M1 D2): preparer org-grant may add assets; owner passes
+    # unchanged. Flag off = legacy identical.
+    user = await _apply_schedule_a_guards(item.trust_id, user, GrantLevel.preparer)
     trust = await db.trusts.find_one({"trust_id": item.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust and user.get("org_grant"):
+        trust = await db.trusts.find_one({"trust_id": item.trust_id}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
@@ -159,7 +184,7 @@ async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends
     item_doc = {
         "item_id": item_id,
         "trust_id": item.trust_id,
-        "user_id": user["user_id"],
+        "user_id": (trust["user_id"] if user.get("org_grant") else user["user_id"]),
         "category": item.category.value,
         "description": item.description,
         "identifier": item.identifier,
@@ -190,7 +215,12 @@ async def get_schedule_a_items(
     user: dict = Depends(get_current_user)
 ):
     """Get all Schedule A items for a trust. Use status='all' to include disposed assets (paginated)."""
+    # Institution guard (M1 D2): viewer org-grant may read; owner flag-off legacy.
+    user = await _apply_schedule_a_guards(trust_id, user, GrantLevel.viewer)
     query = {"trust_id": trust_id, "user_id": user["user_id"]}
+    if user.get("org_grant"):
+        # Granted members see the trust's ledger (guard verified access)
+        query = {"trust_id": trust_id}
     if category:
         query["category"] = category
 
@@ -213,6 +243,13 @@ async def get_schedule_a_items(
 async def get_schedule_a_item(item_id: str, user: dict = Depends(get_current_user)):
     """Get a single Schedule A item"""
     item = await db.schedule_a_items.find_one({"item_id": item_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not item and _toggle_institution():
+        # Institution guard (M1 D2): resolve access from the item's trust —
+        # viewer+ may read; owner passes unchanged; others 403/404 via guard.
+        candidate = await db.schedule_a_items.find_one({"item_id": item_id}, {"_id": 0, "trust_id": 1})
+        if candidate:
+            user = await _apply_schedule_a_guards(candidate["trust_id"], user, GrantLevel.viewer)
+            item = await db.schedule_a_items.find_one({"item_id": item_id}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Asset not found")
     # Ensure backward compatibility
@@ -223,6 +260,13 @@ async def get_schedule_a_item(item_id: str, user: dict = Depends(get_current_use
 async def update_schedule_a_item(item_id: str, update: ScheduleAItemUpdate, user: dict = Depends(require_write_access)):
     """Update a Schedule A item"""
     item = await db.schedule_a_items.find_one({"item_id": item_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not item and _toggle_institution():
+        # Institution guard (M1 D2): preparer org-grant may update trust assets
+        candidate = await db.schedule_a_items.find_one({"item_id": item_id}, {"_id": 0, "trust_id": 1})
+        if candidate:
+            user = await _apply_schedule_a_guards(candidate["trust_id"], user, GrantLevel.preparer)
+            if user.get("org_grant"):
+                item = await db.schedule_a_items.find_one({"item_id": item_id}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Asset not found")
 
@@ -253,6 +297,12 @@ async def confirm_draft_asset(item_id: str, user: dict = Depends(require_write_a
         {"item_id": item_id, "user_id": user["user_id"], "status": "draft"},
         {"_id": 0}
     )
+    if not item and _toggle_institution():
+        candidate = await db.schedule_a_items.find_one({"item_id": item_id, "status": "draft"}, {"_id": 0, "trust_id": 1})
+        if candidate:
+            user = await _apply_schedule_a_guards(candidate["trust_id"], user, GrantLevel.preparer)
+            if user.get("org_grant"):
+                item = await db.schedule_a_items.find_one({"item_id": item_id, "status": "draft"}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Draft asset not found")
     await db.schedule_a_items.update_one(
@@ -287,6 +337,12 @@ async def dispose_schedule_a_item(
         {"item_id": item_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
+    if not item and _toggle_institution():
+        candidate = await db.schedule_a_items.find_one({"item_id": item_id}, {"_id": 0, "trust_id": 1})
+        if candidate:
+            user = await _apply_schedule_a_guards(candidate["trust_id"], user, GrantLevel.preparer)
+            if user.get("org_grant"):
+                item = await db.schedule_a_items.find_one({"item_id": item_id}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Asset not found")
 
@@ -310,11 +366,18 @@ async def dispose_schedule_a_item(
 @router.get("/schedule-a/summary/{trust_id}")
 async def get_schedule_a_summary(trust_id: str, user: dict = Depends(get_current_user)):
     """Get Schedule A summary with totals by category"""
+    # Institution guard (M1 D2): viewer org-grant may read; owner flag-off legacy.
+    user = await _apply_schedule_a_guards(trust_id, user, GrantLevel.viewer)
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust and user.get("org_grant"):
+        trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
-    items = await db.schedule_a_items.find({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0}).to_list(1000)
+    items_query = {"trust_id": trust_id, "user_id": user["user_id"]}
+    if user.get("org_grant"):
+        items_query = {"trust_id": trust_id}
+    items = await db.schedule_a_items.find(items_query, {"_id": 0}).to_list(1000)
 
     # Group by category
     categories = {}
@@ -556,7 +619,11 @@ def _build_pdf_story(trust, items, grouped, total_value, styles, hide_watermark,
 @router.get("/schedule-a/export/{trust_id}/pdf")
 async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_user)):
     """Generate a styled PDF export of Schedule A"""
+    # Institution guard (M1 D2): viewer org-grant may export; owner flag-off legacy.
+    user = await _apply_schedule_a_guards(trust_id, user, GrantLevel.viewer)
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not trust and user.get("org_grant"):
+        trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found")
 
@@ -565,8 +632,11 @@ async def export_schedule_a_pdf(trust_id: str, user: dict = Depends(get_current_
     hide_watermark = not show_watermark
     white_label = await is_white_label(user["user_id"])
 
+    items_query = {"trust_id": trust_id, "user_id": user["user_id"]}
+    if user.get("org_grant"):
+        items_query = {"trust_id": trust_id}
     items = await db.schedule_a_items.find(
-        {"trust_id": trust_id, "user_id": user["user_id"]},
+        items_query,
         {"_id": 0}
     ).sort("category", 1).to_list(1000)
 

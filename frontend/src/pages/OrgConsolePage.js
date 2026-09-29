@@ -1,7 +1,10 @@
-// OrgConsolePage.js — org owner console (institution M4)
-// Shows orgs you own, members, and the trusts clients have granted you.
-// Calls GET /api/orgs, /api/orgs/{org_id}/members, /api/orgs/{org_id}/trusts.
+// OrgConsolePage.js — org owner console (institution M4 + frontend upgrade)
+// Shows orgs you own, members, full client-context trust cards, deep-links
+// into the client workspace (global selectedTrust), and the org activity feed.
+// Calls GET /api/orgs, /api/orgs/{org_id}/members, /api/orgs/{org_id}/trusts,
+// /api/orgs/{org_id}/activity.
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,19 +16,46 @@ import {
 } from '@/components/ui/dialog';
 import { fetchWithAuth } from '@/utils/api';
 import { showError } from '@/utils/errors';
+import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
-import { Building2, RefreshCw, UserPlus, FileText, Users } from 'lucide-react';
+import {
+  Building2, RefreshCw, UserPlus, FileText, Users, ArrowUpRight,
+  Activity, CalendarClock, FileSignature,
+} from 'lucide-react';
 
 const fmtDate = (iso) => {
   try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
   catch { return iso; }
 };
 
+// Activity feed verbs → readable labels
+const ACTION_LABELS = {
+  minutes_finalized: 'Finalized minutes',
+  minutes_autosaved: 'Autosaved a minutes draft',
+  distribution_created: 'Recorded a distribution',
+  distribution_approved: 'Approved a distribution',
+  distribution_status_changed: 'Updated a distribution status',
+  distribution_minutes_attached: 'Attached minutes to a distribution',
+  distribution_notice_sent: 'Sent a distribution notice',
+  admin_kit_generated: 'Generated the admin kit',
+  successor_packet_sent: 'Sent a successor packet',
+  trust_protector_appointment_sent: 'Sent a trust protector appointment',
+  schedule_a_item_created: 'Added a Schedule A asset',
+  schedule_a_item_updated: 'Updated a Schedule A asset',
+  schedule_a_item_confirmed: 'Confirmed a Schedule A asset',
+  schedule_a_item_disposed: 'Disposed of a Schedule A asset',
+  schedule_a_pdf_exported: 'Exported the Schedule A PDF',
+  grant_expiring_7d: 'Grant expiry notice sent',
+};
+
 export default function OrgConsolePage() {
+  const navigate = useNavigate();
+  const { setSelectedTrust } = useAuth();
   const [loading, setLoading] = useState(true);
   const [orgs, setOrgs] = useState([]);
   const [members, setMembers] = useState({});
   const [trustsByOrg, setTrustsByOrg] = useState({});
+  const [activity, setActivity] = useState({});
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteOrg, setInviteOrg] = useState(null);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -38,18 +68,20 @@ export default function OrgConsolePage() {
       if (!res.ok) { setOrgs([]); return; }
       const list = await res.json();
       setOrgs(list);
-      const mem = {}; const trs = {};
+      const mem = {}; const trs = {}; const acts = {};
       await Promise.all(list.map(async o => {
         try {
-          const [mRes, tRes] = await Promise.all([
+          const [mRes, tRes, aRes] = await Promise.all([
             fetchWithAuth(`/orgs/${o.org_id}/members`),
             fetchWithAuth(`/orgs/${o.org_id}/trusts`),
+            fetchWithAuth(`/orgs/${o.org_id}/activity?limit=50`),
           ]);
           if (mRes.ok) mem[o.org_id] = await mRes.json();
           if (tRes.ok) trs[o.org_id] = (await tRes.json()).trusts || [];
+          if (aRes.ok) acts[o.org_id] = (await aRes.json()).events || [];
         } catch { /* per-org failure tolerated */ }
       }));
-      setMembers(mem); setTrustsByOrg(trs);
+      setMembers(mem); setTrustsByOrg(trs); setActivity(acts);
     } catch (e) {
       showError(toast, e, { page: 'OrgConsole' });
     } finally {
@@ -58,6 +90,13 @@ export default function OrgConsolePage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Deep-link: set the global selected trust (AuthContext persists
+  // selected_trust_id), then navigate into the workspace view for it.
+  const goToTrustSection = (trust, route) => {
+    setSelectedTrust({ trust_id: trust.trust_id, name: trust.name });
+    navigate(route);
+  };
 
   const sendInvite = async () => {
     if (!inviteOrg || !inviteEmail.trim()) return;
@@ -81,6 +120,118 @@ export default function OrgConsolePage() {
     } finally {
       setInviting(false);
     }
+  };
+
+  const grantLevelBadge = (level) => (
+    <Badge
+      data-testid="trust-card-level"
+      variant={level === 'preparer' ? 'default' : 'secondary'}
+      className={`capitalize text-xs ${level === 'preparer' ? 'bg-navy text-white hover:opacity-90' : 'text-navy'}`}
+    >
+      {level}
+    </Badge>
+  );
+
+  const trustCard = (t) => (
+    <Card key={t.trust_id} className="card-trust" data-testid="trust-card">
+      <CardContent className="pt-6">
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="min-w-0">
+            <h3 className="font-serif text-base text-navy truncate">{t.name || 'Untitled trust'}</h3>
+            <p className="text-sm text-muted-foreground" data-testid="trust-card-client">
+              {t.owner_name || 'Client'}
+              {t.owner_email ? <span className="text-xs"> · {t.owner_email}</span> : null}
+            </p>
+          </div>
+          {grantLevelBadge(t.grant_level)}
+        </div>
+
+        <dl className="text-sm space-y-1.5 mb-3">
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground shrink-0">Grantor</dt>
+            <dd className="text-navy text-right truncate">{t.grantor_name || '—'}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground shrink-0">Trustee</dt>
+            <dd className="text-navy text-right truncate">{t.trustee_name || '—'}</dd>
+          </div>
+        </dl>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mb-4">
+          <span className="inline-flex items-center gap-1">
+            <FileSignature className="w-3.5 h-3.5 text-gold" />
+            {t.pending_minutes > 0
+              ? <span className="text-navy font-medium">{t.pending_minutes} minutes pending review</span>
+              : 'No minutes pending'}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <CalendarClock className="w-3.5 h-3.5 text-gold" />
+            {t.next_deadline ? `Next deadline ${fmtDate(t.next_deadline)}` : 'No upcoming deadline'}
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Button
+            className="btn-primary w-full"
+            data-testid="go-to-minutes"
+            onClick={() => goToTrustSection(t, '/minutes')}
+          >
+            <FileText className="w-4 h-4 mr-2" /> Go to Minutes <ArrowUpRight className="w-4 h-4 ml-auto" />
+          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline" className="btn-secondary"
+              data-testid={`go-to-meetings-${t.trust_id}`}
+              onClick={() => goToTrustSection(t, `/governance/history/${t.trust_id}`)}
+            >
+              Meetings <ArrowUpRight className="w-4 h-4 ml-2" />
+            </Button>
+            <Button
+              variant="outline" className="btn-secondary"
+              data-testid={`go-to-distributions-${t.trust_id}`}
+              onClick={() => goToTrustSection(t, '/distributions')}
+            >
+              Distributions <ArrowUpRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const activityFeed = (o) => {
+    const events = activity[o.org_id] || [];
+    return (
+      <Card className="card-trust" data-testid="activity-feed">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4 text-gold" />
+            <h3 className="font-medium text-navy">Activity</h3>
+          </div>
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No activity yet. Actions org members take on the left appear here — who did what, on whose behalf.
+            </p>
+          ) : (
+            <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {events.filter(Boolean).map(ev => (
+                <li key={ev.event_id || ev.created_at} className="text-sm border-b last:border-0 border-border/50 pb-2 last:pb-0">
+                  <p className="text-navy">
+                    {ACTION_LABELS[ev.action] || ev.action}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {ev.member_name || 'Org member'} · {fmtDate(ev.created_at)}
+                  </p>
+                  {ev.attribution ? (
+                    <p className="text-xs text-muted-foreground/80 italic mt-0.5">{ev.attribution}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
@@ -144,42 +295,38 @@ export default function OrgConsolePage() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card className="card-trust">
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Users className="w-4 h-4 text-navy" />
-                        <h3 className="font-medium text-navy">Members ({(members[o.org_id] || []).length})</h3>
+                <Card className="card-trust mb-4">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users className="w-4 h-4 text-navy" />
+                      <h3 className="font-medium text-navy">Members ({(members[o.org_id] || []).length})</h3>
+                    </div>
+                    {(members[o.org_id] || []).map(m => (
+                      <div key={m.member_id} className="flex items-center justify-between py-1.5 border-b last:border-0 border-border/50 text-sm">
+                        <span className="text-muted-foreground">{m.name || m.email}</span>
+                        <Badge variant={m.role === 'owner' ? 'default' : 'secondary'} className="capitalize text-xs">{m.role}</Badge>
                       </div>
-                      {(members[o.org_id] || []).map(m => (
-                        <div key={m.member_id} className="flex items-center justify-between py-1.5 border-b last:border-0 border-border/50 text-sm">
-                          <span className="text-muted-foreground">{m.name || m.email}</span>
-                          <Badge variant={m.role === 'owner' ? 'default' : 'secondary'} className="capitalize text-xs">{m.role}</Badge>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
+                    ))}
+                  </CardContent>
+                </Card>
 
-                  <Card className="card-trust">
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <FileText className="w-4 h-4 text-navy" />
-                        <h3 className="font-medium text-navy">Granted trusts ({(trustsByOrg[o.org_id] || []).length})</h3>
-                      </div>
-                      {(trustsByOrg[o.org_id] || []).length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          None yet. When a client grants your org access to their trust, it appears here.
-                        </p>
-                      ) : (
-                        (trustsByOrg[o.org_id] || []).map(t => (
-                          <div key={t.trust_id} className="py-1.5 border-b last:border-0 border-border/50 text-sm">
-                            <span className="text-navy">{t.name || 'Untitled trust'}</span>
-                          </div>
-                        ))
-                      )}
-                    </CardContent>
-                  </Card>
+                <div className="mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-navy" />
+                  <h3 className="font-medium text-navy">
+                    Client trusts ({(trustsByOrg[o.org_id] || []).length})
+                  </h3>
                 </div>
+                {(trustsByOrg[o.org_id] || []).length === 0 ? (
+                  <div className="card-trust text-sm text-muted-foreground py-6 text-center mb-4">
+                    None yet. When a client grants your org access to their trust, it appears here.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
+                    {(trustsByOrg[o.org_id] || []).filter(Boolean).map(t => trustCard(t))}
+                  </div>
+                )}
+
+                {activityFeed(o)}
               </div>
             ))
           )}

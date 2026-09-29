@@ -775,3 +775,30 @@ async def archive_export(trust_id: str, user: dict = Depends(get_current_user)):
         headers={"Content-Disposition": f'attachment; filename="{safe}"'},
     )
 
+
+
+# ==================== ORG ACTIVITY FEED (owner view, item 5) ====================
+
+@router.get("/trusts/{trust_id}/org-activity")
+async def trust_org_activity_feed(trust_id: str, user: dict = Depends(get_current_user)):
+    """Owner-only activity feed: what the org did on THEIR trust's behalf (C1).
+
+    Requires TOGGLE_INSTITUTION on + trust ownership. Newest first, max 100.
+    """
+    import os
+    if os.environ.get("TOGGLE_INSTITUTION", "").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0, "user_id": 1})
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+    if trust.get("user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail={"code": "owner_only"})
+    events = []
+    cursor = (
+        db.org_activity.find({"trust_id": trust_id}, {"_id": 0})
+        .sort("created_at", -1)
+        .limit(100)
+    )
+    async for ev in cursor:
+        events.append(ev)
+    return {"trust_id": trust_id, "events": events, "count": len(events)}

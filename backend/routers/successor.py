@@ -221,6 +221,16 @@ async def send_successor_packet(trust_id: str, user: dict = Depends(require_writ
         {"to_email": successor_email, "sent": sent, "expires_at": expires_at.isoformat()},
     )
 
+    # Item 2/5: org activity feed entry — additive, best-effort
+    # (no natural free-text stamp field on the packet; activity log only)
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(trust_id, user)
+    if attribution:
+        await log_org_activity(
+            trust_id=trust_id, actor=user, action="successor_packet_sent",
+            attribution=attribution, org_id=org_id,
+        )
+
     if not sent:
         logger.error(f"Failed to send successor packet email for trust {trust_id}: {result}")
         raise HTTPException(
@@ -284,6 +294,15 @@ async def send_trust_protector_appointment(trust_id: str, user: dict = Depends(r
         user["user_id"], "trust_protector_notice_sent", "trust", trust_id,
         {"to_email": protector_email, "sent": sent, "powers": powers},
     )
+
+    # Item 2/5: org activity feed entry — additive, best-effort
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(trust_id, user)
+    if attribution:
+        await log_org_activity(
+            trust_id=trust_id, actor=user, action="trust_protector_appointment_sent",
+            attribution=attribution, org_id=org_id,
+        )
 
     if not sent:
         logger.error(f"Failed to send trust protector appointment email for trust {trust_id}: {result}")

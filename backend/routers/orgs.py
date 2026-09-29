@@ -375,30 +375,177 @@ async def revoke_trust_grant(
 
 @router.get("/orgs/{org_id}/trusts")
 async def org_trusts(org_id: str, user: dict = Depends(get_current_user)):
-    """Org console read: trust name, owner, pending minutes, next deadline."""
+    """Org console read: full client context per granted trust.
+
+    Additive fields per trust (item 1): owner_user_id, owner_name, owner_email,
+    grantor_name, trustee_name (from the ACTUAL live trustee field:
+    trustee_full_name), grant_level for the requesting member, pending_minutes
+    (drafts awaiting owner approval), next_deadline (earliest governance task
+    deadline in the future; null when none). Batched to avoid N+1.
+    """
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    org = await db.orgs.find_one({"org_id": org_id}, {"_id": 0, "org_id": 1, "name": 1})
+    if not org:
+        raise HTTPException(status_code=404, detail="Org not found")
+    org_name = org.get("name", "")
     memberships = await _my_memberships(user)
     member_ids = [m["member_id"] for m in memberships if m.get("status") == "active" and m.get("org_id") == org_id]
     if not member_ids:
         raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
     cursor = db.trust_grants.find(
-        {"org_id": org_id, "member_id": {"$in": member_ids}, "status": "active"},
-        {"_id": 0, "trust_id": 1},
+        {
+            "org_id": org_id,
+            "member_id": {"$in": member_ids},
+            "status": "active",
+            "$or": [
+                {"expires_at": {"$gte": _now()}},
+                {"expires_at": {"$exists": False}},
+                {"expires_at": None},
+            ],
+        },
+        {"_id": 0, "trust_id": 1, "member_id": 1, "level": 1},
     )
-    trust_ids = []
+    grants = []
     async for g in cursor:
-        trust_ids.append(g["trust_id"])
+        grants.append(g)
+    # Best grant level per trust for THIS requesting member (preparer > viewer)
+    level_by_trust: dict = {}
+    trust_ids: list = []
+    for g in grants:
+        tid = g["trust_id"]
+        if tid not in trust_ids:
+            trust_ids.append(tid)
+        if _level_rank(g.get("level", "viewer")) > _level_rank(level_by_trust.get(tid, "viewer")):
+            level_by_trust[tid] = g.get("level", "viewer")
+
+    # Batch fetch: trusts
+    trust_map = {}
+    tcur = db.trusts.find({"trust_id": {"$in": trust_ids}})
+    async for t in tcur:
+        t.pop("_id", None)
+        trust_map[t["trust_id"]] = t
+
+    # Batch fetch: owners (users)
+    owner_ids = []
+    for tid in trust_ids:
+        t = trust_map.get(tid) or {}
+        if t.get("user_id") and t["user_id"] not in owner_ids:
+            owner_ids.append(t["user_id"])
+    owner_map = {}
+    if owner_ids:
+        ucur = db.users.find({"user_id": {"$in": owner_ids}}, {"_id": 0, "user_id": 1, "name": 1, "email": 1})
+        async for u in ucur:
+            owner_map[u["user_id"]] = u
+
+    # Batch fetch: pending minutes (workflow drafts, not yet finalized) +
+    # upcoming governance deadlines, aggregated with two grouped queries.
+    APPROVAL_OPEN = ("draft", "pending_review", "under_review", "changes_requested")
+    pending_by_trust: dict = {}
+    async for row in db.meeting_minutes.aggregate([
+        {"$match": {"trust_id": {"$in": trust_ids}}},
+        {"$lookup": {
+            "from": "minutes_approval_status",
+            "localField": "minutes_id",
+            "foreignField": "minutes_id",
+            "as": "_appr",
+        }},
+        {"$addFields": {
+            "_st": {"$ifNull": [{"$arrayElemAt": ["$_appr.current_status", 0]}, "$status"]},
+        }},
+        {"$match": {"_st": {"$in": list(APPROVAL_OPEN)}}},
+        {"$group": {"_id": "$trust_id", "n": {"$sum": 1}}},
+    ]):
+        pending_by_trust[row["_id"]] = row["n"]
+
+    deadline_by_trust: dict = {}
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    async for row in db.governance_tasks.aggregate([
+        {"$match": {
+            "trust_id": {"$in": trust_ids},
+            "due_date": {"$gte": today},
+            "$or": [{"completed_at": {"$exists": False}}, {"completed_at": None}],
+        }},
+        {"$group": {"_id": "$trust_id", "earliest": {"$min": "$due_date"}}},
+    ]):
+        deadline_by_trust[row["_id"]] = row["earliest"]
+
     trusts = []
     for tid in trust_ids:
-        trust = await db.trusts.find_one({"trust_id": tid}, {"_id": 0})
-        if trust:
-            trusts.append({
-                "trust_id": tid,
-                "name": trust.get("name") or trust.get("trust_name"),
-                "owner_user_id": trust.get("user_id"),
-            })
-    return {"org_id": org_id, "trusts": trusts}
+        trust = trust_map.get(tid) or {}
+        owner = owner_map.get(trust.get("user_id")) or {}
+        trusts.append({
+            "trust_id": tid,
+            "name": trust.get("name") or trust.get("trust_name"),
+            "owner_user_id": trust.get("user_id"),
+            "owner_name": owner.get("name"),
+            "owner_email": owner.get("email"),
+            "grantor_name": trust.get("grantor_name"),
+            "trustee_name": _trustee_display_name(trust),
+            "grant_level": level_by_trust.get(tid, "viewer"),
+            "pending_minutes": pending_by_trust.get(tid, 0),
+            "next_deadline": deadline_by_trust.get(tid),
+        })
+    return {"org_id": org_id, "org_name": org_name, "trusts": trusts}
+
+
+def _trustee_display_name(trust: dict) -> str:
+    """Trustee display name from the ACTUAL live fields (dogfood verified
+    2026-09-28: trustee_full_name is the populated field; trustee_names is
+    usually empty). Falls back to grantor_name, then '' — never invents."""
+    from services.org_activity import trustee_display_name
+    return trustee_display_name(trust)
+
+
+# ==================== ORG ACTIVITY FEED (item 5) ====================
+
+@router.get("/orgs/{org_id}/activity")
+async def org_activity_feed(
+    org_id: str,
+    limit: int = 100,
+    user: dict = Depends(get_current_user),
+):
+    """Org activity feed — what org members did on clients' behalf.
+
+    Member-only (any active member of the org sees it), newest first,
+    capped at 100 entries.
+    """
+    if not _toggle_institution():
+        raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    memberships = await _my_memberships(user)
+    if not any(
+        m.get("org_id") == org_id and m.get("status") == "active"
+        for m in memberships
+    ):
+        raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
+    limit = max(1, min(int(limit or 100), 100))
+    events = []
+    cursor = (
+        db.org_activity.find({"org_id": org_id}, {"_id": 0})
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    async for ev in cursor:
+        events.append(ev)
+    return {"org_id": org_id, "events": events, "count": len(events)}
+
+
+@router.post("/orgs/run-expiring-grants-job")
+async def run_expiring_grants_job(user: dict = Depends(get_current_user)):
+    """D7: on-demand run of the expiring-grant notice job.
+
+    Finds active trust_grants with expires_at within 7 days that have not been
+    noticed, emails each trust owner, stamps expiring_notice_sent=True.
+    TOGGLE_INSTITUTION-gated (404 when off). Admin-only: platform operator
+    trigger for the daily background job.
+    """
+    if not _toggle_institution():
+        raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail={"code": "admin_only"})
+    from background_tasks import run_org_expiring_grant_notices
+    result = await run_org_expiring_grant_notices()
+    return {"status": "ok", **result}
 
 
 # ==================== EMAIL (best-effort, non-blocking) ====================

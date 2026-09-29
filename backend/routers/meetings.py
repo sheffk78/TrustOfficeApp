@@ -107,6 +107,23 @@ async def generate_agenda(
     if payload.trust_id != trust_id:
         raise HTTPException(status_code=400, detail="trust_id in path and body must match.")
     agenda = await meeting_service.generate_agenda(trust_id, payload, user)
+    # Item 2: D10 attribution + item 5 activity — additive, best-effort
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(trust_id, user)
+    if attribution:
+        from database import db as _db
+        try:
+            await _db.meeting_agendas.update_one(
+                {"agenda_id": agenda["agenda_id"]},
+                {"$set": {"attribution": attribution}},
+            )
+        except Exception:
+            pass
+        agenda["attribution"] = agenda.get("attribution") or attribution
+        await log_org_activity(
+            trust_id=trust_id, actor=user, action="agenda_created",
+            attribution=attribution, org_id=org_id,
+        )
     return MeetingAgendaResponse(**agenda)
 
 
@@ -149,6 +166,23 @@ async def create_meeting_record(
     if not agenda:
         raise HTTPException(status_code=404, detail="Agenda not found.")
     meeting = await meeting_service.create_meeting(trust_id, payload, user)
+    # Item 2: D10 attribution + item 5 activity — additive, best-effort
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(trust_id, user)
+    if attribution:
+        from database import db as _db
+        try:
+            await _db.meetings.update_one(
+                {"meeting_id": meeting["meeting_id"]},
+                {"$set": {"attribution": attribution}},
+            )
+        except Exception:
+            pass
+        meeting["attribution"] = attribution
+        await log_org_activity(
+            trust_id=trust_id, actor=user, action="meeting_recorded",
+            attribution=attribution, org_id=org_id,
+        )
     return MeetingResponse(**meeting)
 
 
@@ -165,6 +199,27 @@ async def create_minutes(
     minutes = await meeting_service.create_minutes_record(
         trust_id, payload.model_dump(exclude_unset=True), user
     )
+    # Item 2: D10 attribution + item 5 activity — additive, best-effort
+    from services.org_activity import build_org_attribution, log_org_activity
+    from database import db as _db
+    attribution, org_id = await build_org_attribution(trust_id, user)
+    if attribution:
+        try:
+            await _db.meeting_minutes.update_one(
+                {"minutes_id": minutes["minutes_id"]},
+                {"$set": {"attribution": attribution}},
+            )
+            await _db.minutes_approval_status.update_one(
+                {"minutes_id": minutes["minutes_id"]},
+                {"$set": {"attribution": attribution}},
+            )
+        except Exception:
+            pass
+        minutes["attribution"] = attribution
+        await log_org_activity(
+            trust_id=trust_id, actor=user, action="minutes_created",
+            attribution=attribution, org_id=org_id,
+        )
     return minutes
 
 
@@ -193,6 +248,24 @@ async def update_minutes(
         raise HTTPException(status_code=409, detail=str(e))
     if not minutes:
         raise HTTPException(status_code=404, detail="Minutes not found.")
+    # Item 2: D10 attribution + item 5 activity — additive, best-effort
+    if trust_id and user.get("org_grant"):
+        from services.org_activity import build_org_attribution, log_org_activity
+        from database import db as _db
+        attribution, org_id = await build_org_attribution(trust_id, user)
+        if attribution:
+            try:
+                await _db.meeting_minutes.update_one(
+                    {"minutes_id": minutes_id},
+                    {"$set": {"attribution": attribution}},
+                )
+            except Exception:
+                pass
+            minutes["attribution"] = attribution
+            await log_org_activity(
+                trust_id=trust_id, actor=user, action="minutes_updated",
+                attribution=attribution, org_id=org_id,
+            )
     return minutes
 
 

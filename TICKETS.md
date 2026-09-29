@@ -180,3 +180,9 @@ Health checks: api 200, app 200 post-deploy.
 **Symptom:** 2 Discord alerts 🚨 Server Error: UnboundLocalError at 21:37 UTC on PATCH /api/admin/leads/{lead_id} (stage changes by Kenneth: Natalie Sullivan, Deborah Geyman). Lead update saved + Discord ping fired, but API returned 500.
 **Root cause:** duplicate stage-change notification block in leads.py (second copy had function-local `from routers.notifications import create_notification`) — Python treats the name as function-local for the whole function, so the FIRST `await create_notification(...)` hit UnboundLocalError before the local import line ran.
 **Fix:** commit 7fe62b6 — removed duplicate block, kept single notification. Verified: live PATCH probe with admin auth → 200. Backend-wide AST scan: zero use-before-import bugs remain.
+
+## TO-2026-09-22-01 — Frontend offers co_trustee approve role backend doesn't recognize (OPEN, pre-existing)
+**Discovered by:** FS roles review agent (fs-roles-review-2026-09-22.md), verified by Kit 9/22.
+**Symptom:** frontend/src/pages/ApprovalFlow.js:111 includes 'co_trustee' in the canApprove role list; backend ApprovalRole enum (backend/models.py:2170) = drafter|reviewer|approver only. A user whose workflow data carries user_role='co_trustee' passes the frontend check but the backend enum cannot represent the role.
+**Impact:** latent — no current workflow data uses co_trustee; becomes real the moment FS-style multi-trustee trusts exist.
+**Fix options:** (a) strip 'co_trustee' from the frontend list, or (b) add co_trustee to ApprovalRole + route in meeting_service _ACTION_MAP (option b is the FS bespoke prerequisite).

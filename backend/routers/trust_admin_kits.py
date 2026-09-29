@@ -466,6 +466,24 @@ async def generate_kit(
         logger.error("Failed to persist kit %s: %s", kit_id, e)
         raise HTTPException(status_code=500, detail="Failed to save kit. Please try again.") from e
 
+    # Item 2: D10 attribution + item 5 activity — additive, best-effort.
+    # Natural free-text stamp target: the AI-generated kit_title itself.
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(trust_id, user)
+    if attribution:
+        try:
+            await db.trust_admin_kits.update_one(
+                {"kit_id": kit_id},
+                {"$set": {"attribution": attribution}},
+            )
+        except Exception:
+            pass
+        kit_doc["attribution"] = attribution
+        await log_org_activity(
+            trust_id=trust_id, actor=user, action="kit_generated",
+            attribution=attribution, org_id=org_id,
+        )
+
     # Strip _id for response
     kit_doc.pop("_id", None)
     return kit_doc

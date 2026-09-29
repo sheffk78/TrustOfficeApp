@@ -948,7 +948,11 @@ async def startup_event():
         
         # Email→minutes capture indexes (slug lookup + MessageId dedup)
         await ensure_email_minutes_indexes()
-        
+
+        # Org activity feed indexes (item 5: org console activity panel)
+        await db.org_activity.create_index([("org_id", 1), ("created_at", -1)])
+        await db.org_activity.create_index([("trust_id", 1), ("created_at", -1)])
+
         logger.info("Database indexes created/verified successfully")
         
         # Ensure primary admin account exists

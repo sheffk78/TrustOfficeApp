@@ -206,6 +206,15 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
+        # D7: expiring org grant notices — daily check, notices fire once per grant
+        self.scheduler.add_job(
+            self.send_org_expiring_grant_notices,
+            trigger=CronTrigger(hour=6, minute=30, timezone='UTC'),
+            id='org_expiring_grant_notices',
+            name='Notice trust owners 7 days before org grant expiry',
+            replace_existing=True
+        )
+
         self.scheduler.start()
         logger.info("Background task runner started with APScheduler")
         
@@ -350,6 +359,186 @@ class BackgroundTaskRunner:
 
         if created or updated:
             logger.info(f"TidyCal sync: {created} created, {updated} updated, {len(bookings)} total bookings")
+
+    async def send_org_expiring_grant_notices(self) -> dict:
+        """D7: notice trust owners 7 days before an org grant expires.
+
+        Active trust_grants with expires_at within the next 7 days and
+        expiring_notice_sent unset get one notice email (sent to the trust
+        owner — the client whose delegation is lapsing), then the grant is
+        stamped expiring_notice_sent=True so repeated runs dedupe.
+        Additive-only: expiring_notice_sent is the only new field on
+        trust_grants. Never raises (background job contract).
+        """
+        logger.info("Running expiring grant notice job")
+
+        from email_service import email_service
+
+        sent = 0
+        skipped = 0
+        if not email_service.is_configured:
+            logger.warning("Email service not configured - skipping expiring grant notices")
+            return {"checked": 0, "sent": 0, "skipped": 0, "disabled": True}
+
+        now = datetime.now(timezone.utc)
+        horizon = now + timedelta(days=7)
+        cursor = self.db.trust_grants.find({
+            "status": "active",
+            "expires_at": {"$gt": now.isoformat(), "$lte": horizon.isoformat()},
+            "$or": [{"expiring_notice_sent": {"$exists": False}}, {"expiring_notice_sent": None}],
+        }, {"_id": 0})
+        grants = await cursor.to_list(2000)
+
+        owner_cache: dict = {}
+        for grant in grants:
+            try:
+                trust_id = grant.get("trust_id")
+                trust = await self.db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
+                if not trust:
+                    skipped += 1
+                    continue
+                owner_id = trust.get("user_id")
+                if not owner_id:
+                    skipped += 1
+                    continue
+                if owner_id not in owner_cache:
+                    owner_cache[owner_id] = await self.db.users.find_one(
+                        {"user_id": owner_id}, {"_id": 0, "user_id": 1, "email": 1, "name": 1}
+                    )
+                owner = owner_cache.get(owner_id)
+                if not owner or not owner.get("email"):
+                    skipped += 1
+                    continue
+
+                # Org name for the email body
+                org_name = ""
+                if grant.get("org_id"):
+                    org = await self.db.orgs.find_one({"org_id": grant["org_id"]}, {"_id": 0, "name": 1})
+                    org_name = (org or {}).get("name", "")
+
+                member_name = grant.get("member_email") or grant.get("member_id", "an org member")
+                await email_service.send_email(
+                    to_email=owner["email"],
+                    to_name=owner.get("name"),
+                    subject=f"Trust access expiring: {trust.get('name', trust_id)}",
+                    html_body=(
+                        f"<p>Hi {owner.get('name') or 'there'},</p>"
+                        f"<p>The organization access granted on <strong>{trust.get('name', trust_id)}</strong> "
+                        f"({org_name or 'your organization'}) is scheduled to expire on "
+                        f"<strong>{str(grant.get('expires_at', ''))[:10]}</strong>.</p>"
+                        f"<p>If you want this access to continue, no action is needed from you "
+                        f"only if the organization renews it. Otherwise, access will end automatically "
+                        f"on that date.</p>"
+                    ),
+                    text_body=(
+                        f"The organization access granted on {trust.get('name', trust_id)} "
+                        f"({org_name or 'your organization'}) expires on "
+                        f"{str(grant.get('expires_at', ''))[:10]}."
+                    ),
+                    tag="grant_expiring_7d",
+                )
+                sent += 1
+                # Stamp AFTER a successful send (best-effort never raises)
+                await self.db.trust_grants.update_one(
+                    {"grant_id": grant["grant_id"]},
+                    {"$set": {"expiring_notice_sent": True}},
+                )
+            except Exception as e:
+                logger.warning(f"expiring grant notice failed for grant {grant.get('grant_id')}: {e}")
+                skipped += 1
+
+        logger.info(f"Expiring grant notices: sent={sent} skipped={skipped}")
+        return {"checked": len(grants), "sent": sent, "skipped": skipped}
+
+    async def send_org_expiring_grant_notices(self) -> dict:
+        """D7: notice trust owners 7 days before an org grant expires.
+
+        Active trust_grants with expires_at within the next 7 days and
+        expiring_notice_sent unset get one notice email (sent to the trust
+        owner - the client whose delegation is lapsing), then the grant is
+        stamped expiring_notice_sent=True so repeated runs dedupe.
+        Additive-only: expiring_notice_sent is the only new field on
+        trust_grants. Never raises (background job contract).
+        """
+        logger.info("Running expiring grant notice job")
+
+        from email_service import email_service
+
+        sent = 0
+        skipped = 0
+        if not email_service.is_configured:
+            logger.warning("Email service not configured - skipping expiring grant notices")
+            return {"checked": 0, "sent": 0, "skipped": 0, "disabled": True}
+
+        now = datetime.now(timezone.utc)
+        horizon = now + timedelta(days=7)
+        cursor = self.db.trust_grants.find({
+            "status": "active",
+            "expires_at": {"$gt": now.isoformat(), "$lte": horizon.isoformat()},
+            "$or": [{"expiring_notice_sent": {"$exists": False}}, {"expiring_notice_sent": None}],
+        }, {"_id": 0})
+        grants = await cursor.to_list(2000)
+
+        owner_cache: dict = {}
+        for grant in grants:
+            try:
+                trust_id = grant.get("trust_id")
+                trust = await self.db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
+                if not trust:
+                    skipped += 1
+                    continue
+                owner_id = trust.get("user_id")
+                if not owner_id:
+                    skipped += 1
+                    continue
+                if owner_id not in owner_cache:
+                    owner_cache[owner_id] = await self.db.users.find_one(
+                        {"user_id": owner_id}, {"_id": 0, "user_id": 1, "email": 1, "name": 1}
+                    )
+                owner = owner_cache.get(owner_id)
+                if not owner or not owner.get("email"):
+                    skipped += 1
+                    continue
+
+                # Org name for the email body
+                org_name = ""
+                if grant.get("org_id"):
+                    org = await self.db.orgs.find_one({"org_id": grant["org_id"]}, {"_id": 0, "name": 1})
+                    org_name = (org or {}).get("name", "")
+
+                member_name = grant.get("member_email") or grant.get("member_id", "an org member")
+                await email_service.send_email(
+                    to_email=owner["email"],
+                    to_name=owner.get("name"),
+                    subject=f"Trust access expiring: {trust.get('name', trust_id)}",
+                    html_body=(
+                        f"<p>Hi {owner.get('name') or 'there'},</p>"
+                        f"<p>The organization access granted on <strong>{trust.get('name', trust_id)}</strong> "
+                        f"({org_name or 'your organization'}) is scheduled to expire on "
+                        f"<strong>{str(grant.get('expires_at', ''))[:10]}</strong>.</p>"
+                        f"<p>If you want this access to continue, no action is needed from you "
+                        f"only if the organization renews it. Otherwise, access will end automatically "
+                        f"on that date.</p>"
+                    ),
+                    text_body=(
+                        f"The organization access granted on {trust.get('name', trust_id)} "
+                        f"({org_name or 'your organization'}) expires on "
+                        f"{str(grant.get('expires_at', ''))[:10]}."
+                    ),
+                    tag="grant_expiring_7d",
+                )
+                sent += 1
+                # Stamp AFTER a successful send (best-effort never raises)
+                await self.db.trust_grants.update_one(
+                    {"grant_id": grant["grant_id"]},
+                    {"$set": {"expiring_notice_sent": True}},
+                )
+            except Exception as e:
+                logger.warning(f"expiring grant notice failed for grant {grant.get('grant_id')}: {e}")
+                skipped += 1
+
+        logger.info(f"Expiring grant notices: sent={sent} skipped={skipped}")
+        return {"checked": len(grants), "sent": sent, "skipped": skipped}
 
     async def stop(self):
         """Stop the background task runner"""
@@ -1863,6 +2052,17 @@ async def run_compliance_reminder_health() -> dict:
     runner.db = runner.client[DB_NAME]
     try:
         return await runner.check_compliance_reminder_health()
+    finally:
+        runner.client.close()
+
+
+async def run_org_expiring_grant_notices() -> dict:
+    """D7 manual trigger: expiring org grant notices (7-day window)."""
+    runner = BackgroundTaskRunner()
+    runner.client = AsyncIOMotorClient(MONGO_URL)
+    runner.db = runner.client[DB_NAME]
+    try:
+        return await runner.send_org_expiring_grant_notices()
     finally:
         runner.client.close()
 

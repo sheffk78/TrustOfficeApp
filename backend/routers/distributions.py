@@ -245,6 +245,23 @@ async def create_distribution(
     await db.distribution_records.insert_one(dist_doc)
     await auto_update_onboarding(user["user_id"], dist.trust_id)
 
+    # Item 2: D10 attribution + item 5 activity — additive, best-effort
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(dist.trust_id, user)
+    if attribution:
+        try:
+            await db.distribution_records.update_one(
+                {"distribution_id": dist_id},
+                {"$set": {"attribution": attribution}},
+            )
+        except Exception:
+            pass
+        dist_doc["attribution"] = attribution
+        await log_org_activity(
+            trust_id=dist.trust_id, actor=user, action="distribution_created",
+            attribution=attribution, org_id=org_id,
+        )
+
     # Send notification email
     background_tasks.add_task(
         email_service.send_distribution_notification,
@@ -352,9 +369,22 @@ async def update_distribution(
 
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        # Item 2: D10 attribution — additive, best-effort (org-grant actors only)
+        from services.org_activity import build_org_attribution
+        attribution, _org = await build_org_attribution(dist["trust_id"], user)
+        if attribution:
+            update_data["attribution"] = attribution
         await db.distribution_records.update_one(
             {"distribution_id": distribution_id},
             {"$set": update_data}
+        )
+
+    # Item 2/5: activity feed entry — additive, best-effort
+    if update_data:
+        from services.org_activity import log_org_activity
+        await log_org_activity(
+            trust_id=dist["trust_id"], actor=user, action="distribution_updated",
+            attribution=update_data.get("attribution"), org_id=None,
         )
 
     updated = await db.distribution_records.find_one(
@@ -439,6 +469,23 @@ async def approve_distribution(
         linked_distribution_id=distribution_id,
     )
 
+    # Item 2: D10 attribution + item 5 activity — additive, best-effort
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(dist["trust_id"], user)
+    if attribution:
+        try:
+            await db.distribution_records.update_one(
+                {"distribution_id": distribution_id},
+                {"$set": {"attribution": attribution}},
+            )
+        except Exception:
+            pass
+        updated["attribution"] = attribution
+        await log_org_activity(
+            trust_id=dist["trust_id"], actor=user, action="distribution_approved",
+            attribution=attribution, org_id=org_id,
+        )
+
     return DistributionResponse(**updated)
 
 
@@ -478,6 +525,24 @@ async def patch_distribution_status(
         {"distribution_id": distribution_id},
         {"$set": update_fields}
     )
+
+    # Item 2: D10 attribution + item 5 activity — additive, best-effort
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(distribution["trust_id"], user)
+    if attribution:
+        stamp = dict(update_fields)
+        stamp["attribution"] = attribution
+        try:
+            await db.distribution_records.update_one(
+                {"distribution_id": distribution_id},
+                {"$set": stamp},
+            )
+        except Exception:
+            pass
+        await log_org_activity(
+            trust_id=distribution["trust_id"], actor=user, action="distribution_status_changed",
+            attribution=attribution, org_id=org_id,
+        )
 
     updated = await db.distribution_records.find_one(
         {"distribution_id": distribution_id},
@@ -556,13 +621,29 @@ async def attach_minutes_to_distribution(
     if not minutes:
         raise HTTPException(status_code=404, detail="Minutes record not found. It may have been deleted. Please refresh the page and try again.")
 
+    attach_update = {
+        "minutes_record_id": minutes_record_id,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    # Item 2: D10 attribution — additive, best-effort (org-grant actors only)
+    from services.org_activity import build_org_attribution
+    attribution, _org = await build_org_attribution(dist["trust_id"], user)
+    if attribution:
+        attach_update["attribution"] = attribution
+
     await db.distribution_records.update_one(
         {"distribution_id": distribution_id},
-        {"$set": {
-            "minutes_record_id": minutes_record_id,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
+        {"$set": attach_update}
     )
+
+    # Item 2/5: activity feed entry — additive, best-effort
+    if attribution:
+        from services.org_activity import log_org_activity
+        await log_org_activity(
+            trust_id=dist["trust_id"], actor=user, action="distribution_minutes_attached",
+            attribution=attribution, org_id=_org,
+        )
 
     updated = await db.distribution_records.find_one(
         {"distribution_id": distribution_id},
@@ -814,6 +895,15 @@ async def send_distribution_notice(
         {"distribution_id": distribution_id},
         {"$set": {"notice_sent_at": notice_sent_at}}
     )
+
+    # Item 2/5: activity feed entry — additive, best-effort
+    from services.org_activity import build_org_attribution, log_org_activity
+    attribution, org_id = await build_org_attribution(dist["trust_id"], user)
+    if attribution:
+        await log_org_activity(
+            trust_id=dist["trust_id"], actor=user, action="distribution_notice_sent",
+            attribution=attribution, org_id=org_id,
+        )
 
     return {
         "message": "Distribution notice sent",
