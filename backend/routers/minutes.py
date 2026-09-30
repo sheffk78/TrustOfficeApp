@@ -257,7 +257,26 @@ async def create_minutes(minutes: MinutesCreate, background_tasks: BackgroundTas
         minutes_doc["attribution"] = attribution  # additive; absent without grants
 
     await db.minutes_records.insert_one(minutes_doc)
-    
+
+    # C (T3): org-member minutes writes land in the org activity feed.
+    # Additive + best-effort; owner writes stay feed-silent (their home feed
+    # already covers them).
+    if user.get("org_grant"):
+        try:
+            from services.org_activity import build_org_attribution, log_org_activity
+            attribution, org_id = await build_org_attribution(minutes_record.trust_id, user)
+            if attribution:
+                await log_org_activity(
+                    trust_id=minutes_record.trust_id,
+                    actor=user,
+                    action="minutes_created",
+                    attribution=attribution,
+                    org_id=org_id,
+                )
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).warning("org activity log failed (minutes create): %s", e)
+
     # Link to distribution if provided
     if minutes.distribution_id:
         result = await db.distribution_records.update_one(

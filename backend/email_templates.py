@@ -1346,23 +1346,26 @@ Founder, TrustOffice
 
     # Distribution Notice to Beneficiary
     "distribution_notice": {
-        "subject": lambda data: f"Distribution Notice — {data.get('trust_name', 'Your Trust')}",
+        # D5 (T2 MED-11): beneficiary_name / trust_name / category / notes are
+        # user-controlled — escaped via _h() like every other injected template
+        # (status is whitelisted server-side; amount/date are formatted numerals).
+        "subject": lambda data: f"Distribution Notice — {_h(data.get('trust_name', 'Your Trust'))}",
         "html": lambda data: _base_template(f"""
             <h2>Distribution Notice</h2>
-            <p>Dear {data.get('beneficiary_name', 'Beneficiary')},</p>
-            <p>This notice is to inform you of a distribution from the <strong>{data.get('trust_name', 'Trust')}</strong>.</p>
-            
+            <p>Dear {_h(data.get('beneficiary_name', 'Beneficiary'))},</p>
+            <p>This notice is to inform you of a distribution from the <strong>{_h(data.get('trust_name', 'Trust'))}</strong>.</p>
+
             <div class="task-card">
                 <h3>Distribution Details</h3>
                 <p><span class="label">Amount:</span> <span class="value">${{data.get('amount', '0.00'):,.2f}}</span></p>
                 <p><span class="label">Date:</span> <span class="value">{data.get('date', 'N/A')}</span></p>
-                <p><span class="label">Category:</span> <span class="value">{data.get('category', 'N/A')}</span></p>
+                <p><span class="label">Category:</span> <span class="value">{_h(data.get('category', 'N/A'))}</span></p>
                 <p><span class="label">Status:</span> <span class="value">{data.get('status', 'N/A').replace('_', ' ').title()}</span></p>
-                {f'<p><span class="label">Notes:</span> <span class="value">{data.get("notes", "")}</span></p>' if data.get('notes') else ''}
+                {f'<p><span class="label">Notes:</span> <span class="value">{_h(data.get("notes", ""))}</span></p>' if data.get('notes') else ''}
             </div>
-            
+
             <p>This notice was sent by the trustee of the trust. If you have questions about this distribution, please contact the trustee directly.</p>
-            
+
             <p>Best regards,<br>The TrustOffice Team</p>
         """),
         "text": lambda data: f"""

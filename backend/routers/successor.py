@@ -11,6 +11,7 @@ from fastapi.encoders import jsonable_encoder
 
 from database import db
 from dependencies import require_write_access, require_org_grant
+from models import GrantLevel
 from email_service import email_service
 from utils.audit import log_audit_event
 from utils.stepup_2fa import require_2fa_stepup
@@ -159,7 +160,7 @@ async def send_successor_packet(trust_id: str, user: dict = Depends(require_writ
     link is valid for 30 days and can be used once (M1: send only; the access
     view is delivered in M2).
     """
-    await require_org_grant(trust_id, user=user)
+    user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)
     trust = await db.trusts.find_one(
         {"trust_id": trust_id, "user_id": user["user_id"]},
         {"_id": 0},
@@ -249,7 +250,7 @@ async def send_successor_packet(trust_id: str, user: dict = Depends(require_writ
 @router.post("/trusts/{trust_id}/protector/appoint")
 async def send_trust_protector_appointment(trust_id: str, user: dict = Depends(require_write_access)):
     """Send a trust protector appointment notification."""
-    await require_org_grant(trust_id, user=user)
+    user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)
     """Notify the designated trust protector of their appointment, outlining their role and requested powers.
 
     Mirrors the successor trustee send flow but sends a plain appointment notice (no packet access link).

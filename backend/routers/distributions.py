@@ -11,6 +11,7 @@ from database import db
 from dependencies import get_current_user, require_write_access, require_org_grant, auto_update_onboarding, check_feature_access, Feature, PREMIUM_FEATURE_ERROR_CODE, PREMIUM_FEATURE_ERROR_MESSAGE
 from trustee_utils import parse_trustees
 from models import (
+    GrantLevel,
     DistributionCreate, DistributionUpdate, DistributionResponse,
     DistributionApprove, DistributionStatusUpdate,
     BenevolenceLogResponse, BenevolenceMonthlyAggregate, BenevolenceYearlyAggregate
@@ -119,7 +120,7 @@ async def create_distribution(
     user: dict = Depends(require_write_access),
 ):
     """Create a new distribution record"""
-    await require_org_grant(dist.trust_id, user=user)
+    user = await require_org_grant(dist.trust_id, min_level=GrantLevel.preparer, user=user)
     trust = await db.trusts.find_one({"trust_id": dist.trust_id, "user_id": user["user_id"]}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
@@ -303,7 +304,15 @@ async def get_distributions(
     """Get distributions with optional search and filters (paginated)"""
     query = {"user_id": user["user_id"]}
     if trust_id:
-        query["trust_id"] = trust_id
+        # B8: the trust owner sees every record on the trust, including rows
+        # created by org members. Everyone else keeps their own rows only.
+        _t = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0}
+        )
+        if _t:
+            query = {"trust_id": trust_id}
+        else:
+            query["trust_id"] = trust_id
 
     # Filter by approval status via dispatch map
     if status:
@@ -343,12 +352,12 @@ async def update_distribution(
 ):
     """Update a distribution record"""
     dist = await db.distribution_records.find_one(
-        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"distribution_id": distribution_id},
         {"_id": 0}
     )
     if not dist:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
-    await require_org_grant(dist["trust_id"], user=user)
+    user = await require_org_grant(dist["trust_id"], min_level=GrantLevel.preparer, user=user)
 
     # Build update dict with only provided fields
     update_data = {}
@@ -403,12 +412,12 @@ async def approve_distribution(
 ):
     """Approve a distribution with solvency and recusal confirmation"""
     dist = await db.distribution_records.find_one(
-        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"distribution_id": distribution_id},
         {"_id": 0}
     )
     if not dist:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
-    await require_org_grant(dist["trust_id"], user=user)
+    user = await require_org_grant(dist["trust_id"], min_level=GrantLevel.preparer, user=user)
 
     if not approval.solvency_confirmed:
         raise HTTPException(status_code=400, detail="Solvency must be confirmed to approve the distribution. Please review the trust's financial position and check the solvency confirmation box.")
@@ -497,12 +506,12 @@ async def patch_distribution_status(
 ):
     """Update distribution status via PATCH (set to review, declined, etc.)"""
     distribution = await db.distribution_records.find_one(
-        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"distribution_id": distribution_id},
         {"_id": 0}
     )
     if not distribution:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
-    await require_org_grant(distribution["trust_id"], user=user)
+    user = await require_org_grant(distribution["trust_id"], min_level=GrantLevel.preparer, user=user)
 
     status = status_update.status
 
@@ -510,14 +519,17 @@ async def patch_distribution_status(
         raise HTTPException(status_code=400, detail=f"Invalid status '{status}'. Must be one of: {VALID_PATCH_STATUSES}. Please select a valid status from the dropdown.")
 
     distribution = await db.distribution_records.find_one(
-        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"distribution_id": distribution_id},
         {"_id": 0}
     )
     if not distribution:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
 
     update_fields = {
-        "updated_at": datetime.now(timezone.utc).isoformat()
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        # T1 catch: the patch validated this value but never persisted it —
+        # a status PATCH updated timestamps while the status itself stayed put.
+        "status": status,
     }
     update_fields.update(_build_status_reset_fields())
 
@@ -563,11 +575,12 @@ async def update_distribution_status(
         raise HTTPException(status_code=400, detail=f"Invalid status '{status}'. Must be one of: {VALID_PATCH_STATUSES}. Please select a valid status from the dropdown.")
 
     distribution = await db.distribution_records.find_one(
-        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"distribution_id": distribution_id},
         {"_id": 0}
     )
     if not distribution:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
+    user = await require_org_grant(distribution["trust_id"], min_level=GrantLevel.preparer, user=user)
 
     update_fields = {
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -603,7 +616,7 @@ async def attach_minutes_to_distribution(
     from datetime import timezone
 
     dist = await db.distribution_records.find_one(
-        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"distribution_id": distribution_id},
         {"_id": 0}
     )
     if not dist:
@@ -656,12 +669,12 @@ async def attach_minutes_to_distribution(
 async def delete_distribution(distribution_id: str, user: dict = Depends(require_write_access)):
     """Delete a distribution record"""
     dist = await db.distribution_records.find_one(
-        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"distribution_id": distribution_id},
         {"_id": 0}
     )
     if not dist:
         raise HTTPException(status_code=404, detail="Distribution not found. It may have been already deleted. Please refresh the page and try again.")
-    await require_org_grant(dist["trust_id"], user=user)
+    user = await require_org_grant(dist["trust_id"], min_level=GrantLevel.preparer, user=user)
 
     result = await db.distribution_records.delete_one({
         "distribution_id": distribution_id,
@@ -831,16 +844,16 @@ async def send_distribution_notice(
     Requires the distribution to exist and the beneficiary to have an email on file.
     """
     dist = await db.distribution_records.find_one(
-        {"distribution_id": distribution_id, "user_id": user["user_id"]},
+        {"distribution_id": distribution_id},
         {"_id": 0}
     )
     if not dist:
         raise HTTPException(status_code=404, detail=DISTRIBUTION_NOT_FOUND_MSG)
-    await require_org_grant(dist["trust_id"], user=user)
+    user = await require_org_grant(dist["trust_id"], min_level=GrantLevel.preparer, user=user)
 
     # Get trust info
     trust = await db.trusts.find_one(
-        {"trust_id": dist["trust_id"], "user_id": user["user_id"]},
+        {"trust_id": dist["trust_id"]},
         {"_id": 0, "name": 1, "trust_id": 1}
     )
     trust_name = trust.get("name", "Trust") if trust else "Trust"

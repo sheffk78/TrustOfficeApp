@@ -203,6 +203,30 @@ async def create_schedule_a_item(item: ScheduleAItemCreate, user: dict = Depends
     }
 
     await db.schedule_a_items.insert_one(item_doc)
+
+    # C (T3): org-member asset entries land in the org activity feed with
+    # attribution. Additive + best-effort; owner writes stay feed-silent.
+    if user.get("org_grant"):
+        try:
+            from services.org_activity import build_org_attribution, log_org_activity
+            attribution, org_id = await build_org_attribution(item.trust_id, user)
+            if attribution:
+                await db.schedule_a_items.update_one(
+                    {"item_id": item_doc["item_id"]},
+                    {"$set": {"attribution": attribution}},
+                )
+                await log_org_activity(
+                    trust_id=item.trust_id,
+                    actor=user,
+                    action="schedule_a_item_added",
+                    attribution=attribution,
+                    org_id=org_id,
+                )
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).warning("org activity log failed (schedule_a create): %s", e)
+
+    item_doc["attribution"] = item_doc.get("attribution")
     return ScheduleAItemResponse(**item_doc)
 
 @router.get("/schedule-a")

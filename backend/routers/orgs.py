@@ -2,9 +2,11 @@
 # Gated on TOGGLE_INSTITUTION: returns 404 when flag is off.
 # All endpoints are additive; no existing collection or endpoint is modified.
 
+import logging
 import os
+import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, List
@@ -166,8 +168,12 @@ async def invite_org_member(
     email = body.get("email")
     name = body.get("name", "")
     member_id = f"mem_{uuid.uuid4().hex[:12]}"
-    invite_token = uuid.uuid4().hex[:16]
+    # D6 (T2 MED-8): real 256-bit token with a true 72h expiry the accept
+    # path enforces — the old 16-char uuid4 hex "token" was guessable and
+    # the advertised "72h" was never real.
+    invite_token = secrets.token_urlsafe(32)
     now = _now()
+    invite_expires_at = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
     await db.org_members.insert_one({
         "member_id": member_id,
         "org_id": org_id,
@@ -178,12 +184,10 @@ async def invite_org_member(
         "status": "invited",
         "invited_at": now,
         "invited_by": user["user_id"],
+        # Stored in the same doc (single source of truth, no second roundtrip)
+        "invite_token": invite_token,
+        "invite_expires_at": invite_expires_at,
     })
-    # Store token for accept endpoint (simple approach: store in members doc)
-    await db.org_members.update_one(
-        {"member_id": member_id},
-        {"$set": {"invite_token": invite_token}},
-    )
     return {"member_id": member_id, "invite_token": invite_token, "expires_in": "72h"}
 
 
@@ -192,24 +196,39 @@ async def accept_org_invite(token: str, user: dict = Depends(get_current_user)):
     """Accept an org invite by token. Binds user_id, status=active (C3 email binding)."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
-    member = await db.org_members.find_one(
-        {"invite_token": token, "status": "invited"},
-        {"_id": 0},
-    )
-    if not member:
-        raise HTTPException(status_code=404, detail="Invite not found or already accepted")
-    # C3: invited email must match authenticated user email
-    if member.get("email", "").lower() != (user.get("email", "")).lower():
-        raise HTTPException(status_code=403, detail={"code": "invite_email_mismatch"})
     now = _now()
-    await db.org_members.update_one(
-        {"member_id": member["member_id"]},
+    # D6: atomic accept — find_one_and_update keyed on token + status=invited
+    # + expiry. Single-use by construction (second submit finds no invited
+    # doc), so the C3-verified email binding below stays race-free too.
+    member = await db.org_members.find_one_and_update(
+        {
+            "invite_token": token,
+            "status": "invited",
+            "$or": [
+                {"invite_expires_at": {"$exists": False}},
+                {"invite_expires_at": None},
+                {"invite_expires_at": {"$gte": now}},
+            ],
+        },
         {"$set": {
             "user_id": user["user_id"],
             "status": "active",
             "joined_at": now,
+            "invite_accepted_at": now,
         }},
+        return_document=False,
     )
+    if not member:
+        raise HTTPException(status_code=404, detail="Invite not found, expired, or already accepted")
+    # C3: invited email must match authenticated user email — on mismatch the
+    # accept is rolled back so the invite stays usable by the right person.
+    if member.get("email", "").lower() != (user.get("email", "")).lower():
+        await db.org_members.update_one(
+            {"member_id": member["member_id"], "status": "active"},
+            {"$set": {"user_id": None, "status": "invited"},
+             "$unset": {"joined_at": "", "invite_accepted_at": ""}},
+        )
+        raise HTTPException(status_code=403, detail={"code": "invite_email_mismatch"})
     return {"member_id": member["member_id"], "org_id": member["org_id"], "status": "active"}
 
 
@@ -231,8 +250,16 @@ async def update_org_member(
         raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
     update_fields = {}
     if "role" in body:
+        # E (MED-13): validate against the real role/status vocabulary —
+        # a raw dict body could otherwise inject arbitrary role/status docs.
+        if body["role"] not in ("member", "admin", "owner"):
+            raise HTTPException(status_code=422, detail={"code": "invalid_role"})
+        if body["role"] == "owner":
+            raise HTTPException(status_code=422, detail={"code": "owner_role_transfer_not_supported"})
         update_fields["role"] = body["role"]
     if "status" in body:
+        if body["status"] not in ("invited", "active", "suspended"):
+            raise HTTPException(status_code=422, detail={"code": "invalid_status"})
         update_fields["status"] = body["status"]
     if update_fields:
         await db.org_members.update_one(
@@ -308,10 +335,15 @@ async def grant_trust_access(
         "client_notified_at": None,
         "revoked_at": None,
         "revoke_reason": None,
+        # D1 (T2 HIGH): one-click revoke now keys on an unguessable
+        # 256-bit token, NOT the raw grant_id. Token expires with the grant.
+        "revoke_token": secrets.token_urlsafe(32),
+        "revoke_token_expires_at": expires_at.isoformat(),
     }
     await db.trust_grants.insert_one(grant_doc)
     # D7: fire grant_created notice email (best-effort, non-blocking)
-    _ = _send_grant_notice(grant_doc, "grant_created")
+    import asyncio
+    _task_notice = asyncio.ensure_future(_send_grant_notice(grant_doc, "grant_created"))
     # M4: record notification timestamp
     await db.trust_grants.update_one(
         {"grant_id": grant_id},
@@ -353,7 +385,7 @@ async def revoke_trust_grant(
     """Revoke a grant. Owner or the granted member themselves."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
-    grant = await db.trust_grants.find_one({"grant_id": grant_id})
+    grant = await db.trust_grants.find_one({"grant_id": grant_id, "trust_id": trust_id})
     if not grant:
         raise HTTPException(status_code=404, detail="Grant not found")
     trust = await db.trusts.find_one({"trust_id": trust_id})
@@ -369,7 +401,8 @@ async def revoke_trust_grant(
         {"grant_id": grant_id},
         {"$set": {"status": "revoked", "revoked_at": now, "revoke_reason": "manual_revoke"}},
     )
-    _ = _send_grant_notice(grant, "grant_revoked")
+    import asyncio
+    _task_notice = asyncio.ensure_future(_send_grant_notice(grant, "grant_revoked"))
     return {"grant_id": grant_id, "status": "revoked"}
 
 
@@ -550,54 +583,101 @@ async def run_expiring_grants_job(user: dict = Depends(get_current_user)):
 
 # ==================== EMAIL (best-effort, non-blocking) ====================
 
-def _send_grant_notice(grant: dict, event: str):
-    """Fire a notice email. Best-effort — never blocks the request."""
+async def _send_grant_notice(grant: dict, event: str):
+    """D2 (T2 HIGH-4): fire a notice email to the REAL member address.
+
+    Grant docs carry member_id, not email — resolve via org_members. Best-effort:
+    resolution or send failures are logged, never silently swallowed, and never
+    block the request.
+    """
     try:
-        from email_service import email_service
-        # Tokenized one-click revoke link (D7)
-        revoke_token = grant["grant_id"]
-        revoke_url = f"{os.environ.get('APP_URL', 'http://localhost:3000')}/revoke/{revoke_token}"
-        # Look up real email instead of using member_id string
         to_email = grant.get("email", "")
         if not to_email:
-            # fallback: this is a sync context, can't async lookup.
-            # In production, refactor to async. For now, rely on grant.email if populated.
-            to_email = grant.get("member_id", "")
-        email_service.send_email(
+            member = await db.org_members.find_one(
+                {"member_id": grant.get("member_id")}, {"_id": 0, "email": 1}
+            )
+            to_email = (member or {}).get("email", "")
+        if not to_email or "@" not in to_email:
+            logging.warning(
+                "grant notice skipped: no resolvable email for member_id=%s event=%s",
+                grant.get("member_id"), event,
+            )
+            return
+        # Unauthenticated one-click revoke link (D7) — now the per-grant
+        # unguessable token, never the raw grant_id (D1/T2 HIGH-6).
+        revoke_token = grant.get("revoke_token") or ""
+        base = os.environ.get("APP_URL", "http://localhost:3000")
+        if revoke_token:
+            revoke_url = f"{base}/revoke/{revoke_token}"
+            revoke_line = f"Revoke: {revoke_url}"
+        else:
+            # Legacy grants created before token hardening: owner revoke via console.
+            revoke_line = f"Revoke from your TrustOffice console: {base}/trust-access"
+        email_html = (
+            f"<p>Trust access was {event}.</p>"
+            f"<p>{revoke_line}</p>"
+        )
+        from email_service import email_service
+        await email_service.send_email(
             to_email=to_email,
             subject=f"Trust access {event}",
-            html_body=f"<p>Grant {event}. Revoke: <a href='{revoke_url}'>revoke</a></p>",
-            text_body=f"Grant {event}. Revoke at: {revoke_url}",
+            html_body=email_html,
+            text_body=f"Trust access was {event}. {revoke_line}",
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning("grant notice failed (member_id=%s, event=%s): %s",
+                        grant.get("member_id"), event, e)
 
 
 @router.post("/revoke/{token}")
 async def revoke_by_token(token: str):
-    """D7: tokenized one-click revoke (no login required).
-    Looks up active grant by grant_id, sets status=revoked.
-    Single-use: already-revoked/expired grants return 410 Gone.
+    """D7 one-click revoke, D1-hardened (T2 HIGH-6).
+
+    The token is a per-grant 256-bit revoke_token — never a raw grant_id, so
+    possession of a grant_id alone revokes nothing. Single-use (atomic
+    find_one_and_update on status=active) and expiring; every successful
+    revoke writes an audit row + org activity event.
     """
     now = _now()
-    # Try org grant first
-    grant = await db.trust_grants.find_one({"grant_id": token})
+    # Org grants: atomically flip active -> revoked keyed on the revoke token
+    grant = await db.trust_grants.find_one_and_update(
+        {
+            "revoke_token": token,
+            "status": "active",
+            "$or": [
+                {"revoke_token_expires_at": {"$exists": False}},
+                {"revoke_token_expires_at": None},
+                {"revoke_token_expires_at": {"$gte": now}},
+            ],
+        },
+        {"$set": {"status": "revoked", "revoked_at": now, "revoke_reason": "token_revoke"}},
+        return_document=False,
+    )
     if grant:
-        if grant.get("status") != "active":
-            raise HTTPException(status_code=410, detail={"code": "grant_already_revoked"})
-        await db.trust_grants.update_one(
-            {"grant_id": token},
-            {"$set": {"status": "revoked", "revoked_at": now, "revoke_reason": "token_revoke"}},
-        )
-        return {"grant_id": token, "status": "revoked", "type": "org_grant"}
-    # Try party grant
-    pgrant = await db.party_grants.find_one({"grant_id": token})
+        # Audit trail (T2 HIGH-6): every successful token revoke writes an org
+        # activity row directly — log_org_activity's contract no-ops for
+        # non-grant actors, and the one-click link is a system actor by design.
+        try:
+            await db.org_activity.insert_one({
+                "event_id": f"act_{uuid.uuid4().hex[:12]}",
+                "org_id": grant.get("org_id") or "",
+                "trust_id": grant.get("trust_id") or "",
+                "member_name": "One-click revoke",
+                "org_name": "",
+                "action": "grant_revoked_via_link",
+                "attribution": None,
+                "created_at": now,
+            })
+        except Exception as e:
+            logging.warning("revoke audit write failed (grant=%s): %s", grant.get("grant_id"), e)
+        return {"grant_id": grant["grant_id"], "status": "revoked", "type": "org_grant"}
+    # Party grants (co-trustee invites) mirror the same token mechanics
+    pgrant = await db.party_grants.find_one_and_update(
+        {"revoke_token": token, "status": "active"},
+        {"$set": {"status": "revoked", "revoked_at": now, "revoke_reason": "token_revoke"}},
+        return_document=False,
+    )
     if pgrant:
-        if pgrant.get("status") != "active":
-            raise HTTPException(status_code=410, detail={"code": "grant_already_revoked"})
-        await db.party_grants.update_one(
-            {"grant_id": token},
-            {"$set": {"status": "revoked", "revoked_at": now, "revoke_reason": "token_revoke"}},
-        )
-        return {"grant_id": token, "status": "revoked", "type": "party_grant"}
+        return {"grant_id": pgrant["grant_id"], "status": "revoked", "type": "party_grant"}
+    # Unknown or stale token: 404 (no enumeration of grant state)
     raise HTTPException(status_code=404, detail={"code": "grant_not_found"})

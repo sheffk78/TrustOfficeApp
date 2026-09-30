@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from dependencies import get_current_user, require_write_access, require_org_grant, _toggle_trust_parties, _toggle_institution
 from models import (
+    GrantLevel,
     MeetingAgendaCreate, MeetingAgendaUpdate, MeetingAgendaResponse,
     MeetingCreate, MeetingResponse,
     MinutesApprovalStatusResponse, ApprovalWorkflowSummary,
@@ -103,7 +104,7 @@ async def generate_agenda(
 ):
     """Generate a meeting agenda. If agenda_items is empty, smart defaults are
     built from meeting type, open deadlines, and incomplete prior agenda items."""
-    await require_org_grant(trust_id, user=user)
+    user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)
     if payload.trust_id != trust_id:
         raise HTTPException(status_code=400, detail="trust_id in path and body must match.")
     agenda = await meeting_service.generate_agenda(trust_id, payload, user)
@@ -159,7 +160,7 @@ async def create_meeting_record(
     user: dict = Depends(require_write_access),
 ):
     """Record that a meeting actually took place (links an agenda to minutes)."""
-    await require_org_grant(trust_id, user=user)
+    user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)
     if payload.trust_id != trust_id:
         raise HTTPException(status_code=400, detail="trust_id in path and body must match.")
     agenda = await meeting_service.get_agenda(payload.agenda_id, user["user_id"])
@@ -195,7 +196,7 @@ async def create_minutes(
     user: dict = Depends(require_write_access),
 ):
     """Create a minutes record and open its approval workflow (status: draft)."""
-    await require_org_grant(trust_id, user=user)
+    user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)
     minutes = await meeting_service.create_minutes_record(
         trust_id, payload.model_dump(exclude_unset=True), user
     )
@@ -239,7 +240,7 @@ async def update_minutes(
 ):
     trust_id = await _resolve_minutes_trust_id(minutes_id)
     if trust_id:
-        await require_org_grant(trust_id, user=user)
+        user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)
     try:
         minutes = await meeting_service.update_minutes_record(
             minutes_id, payload.model_dump(exclude_unset=True), user["user_id"]
@@ -324,11 +325,32 @@ async def submit_for_review(
     payload: WorkflowActionBody,
     user: dict = Depends(require_write_access),
 ):
-    """Submit draft minutes for review (draft â pending_review)."""
+    """Submit draft minutes for review.
+
+    ORG-SKELETON-SPEC §5 (D-C): approve/reject stay owner-or-co-trustee ONLY.
+    Submit is the DRAFTER's own action — the trust owner may also submit; any
+    other user is refused. Flag-off behavior unchanged (legacy = owner path).
+    """
     trust_id = await _resolve_minutes_trust_id(minutes_id)
     if trust_id and (_toggle_institution() or _toggle_trust_parties()):
-        # ORG-SKELETON-SPEC §5: org grant never sufficient here (D-C)
-        await _require_owner_or_co_trustee(trust_id, user)
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id}, {"_id": 0, "user_id": 1}
+        )
+        is_owner = bool(trust and trust.get("user_id") == user["user_id"])
+        is_drafter = (
+            await db.meeting_minutes.find_one(
+                {"minutes_id": minutes_id, "user_id": user["user_id"]},
+                {"_id": 0, "minutes_id": 1},
+            )
+            or await db.minutes_records.find_one(
+                {"minutes_id": minutes_id, "user_id": user["user_id"]},
+                {"_id": 0, "minutes_id": 1},
+            )
+        )
+        if not is_owner and not is_drafter:
+            raise HTTPException(
+                status_code=403, detail={"code": "approval_owner_or_co_trustee_only"}
+            )
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.pending_review, user, note=payload.note
     )
@@ -370,7 +392,7 @@ async def finalize_minutes(
     """Finalize approved minutes (approved Ã¢ÂÂ finalized, terminal)."""
     trust_id = await _resolve_minutes_trust_id(minutes_id)
     if trust_id:
-        await require_org_grant(trust_id, user=user)
+        user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)
     # Legacy minutes created through /minutes live in minutes_records and do
     # not have an approval document. Preserve the approval workflow for
     # meeting_minutes, but allow the legacy draft path to finalize directly.
@@ -417,7 +439,7 @@ async def reject_minutes(
     """Reject minutes (terminal)."""
     trust_id = await _resolve_minutes_trust_id(minutes_id)
     if trust_id:
-        await require_org_grant(trust_id, user=user)
+        user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)
     updated, err = await meeting_service.transition_minutes(
         minutes_id, ApprovalStatus.rejected, user, note=payload.note
     )
