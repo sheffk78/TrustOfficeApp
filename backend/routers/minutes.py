@@ -330,7 +330,14 @@ async def get_minutes(
     """
     query = {"user_id": user["user_id"]}
     if trust_id:
-        query["trust_id"] = trust_id
+        from dependencies import _toggle_institution
+        _t = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
+        if _t and _toggle_institution():
+            # B8-family owner view: owner sees org-member-created minutes on their
+            # trust (those rows carry the member's user_id + owner-scope attribution).
+            query = {"trust_id": trust_id}
+        else:
+            query["trust_id"] = trust_id
     if minutes_type:
         query["minutes_type"] = minutes_type
     if template_type:
@@ -359,9 +366,13 @@ async def get_minutes(
     
     # Also fetch from minutes_templates (template-created minutes)
     # Normalize status filter: "finalized" in minutes_records maps to "final" in minutes_templates
+    _owner_view = trust_id is not None and query.get("trust_id") == trust_id and "user_id" not in query
     template_query = {"user_id": user["user_id"]}
     if trust_id:
-        template_query["trust_id"] = trust_id
+        if _owner_view:
+            template_query = {"trust_id": trust_id}
+        else:
+            template_query["trust_id"] = trust_id
     if template_type:
         template_query["template_type"] = template_type
     if status:

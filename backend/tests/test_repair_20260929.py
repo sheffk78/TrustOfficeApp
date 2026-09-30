@@ -546,3 +546,74 @@ class TestEMemberValidation:
         with pytest.raises(HTTPException) as exc2:
             await rorg.update_org_member("org_e", "mem_e", {"status": "weird"}, user=owner)
         assert exc2.value.status_code == 422
+
+# =====================================================================
+# F: Owner minutes-list visibility (B8-family follow-up, 2026-09-30).
+# Owner filtering /minutes?trust_id=<their trust> sees trust-wide minutes,
+# including member-created rows (which carry the member's user_id).
+# Non-owner callers keep strict user_id scoping.
+# =====================================================================
+
+class TestFOwnerMinutesList:
+    @pytest.mark.asyncio
+    async def test_owner_sees_member_minutes_in_list(self, seeded_db):
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        import routers.minutes as rm
+        rm.db = db
+        owner = await _seed_user("f_owner@example.com", "Owner")
+        marge = await _seed_user("f_marge@example.com", "Marge")
+        trust = await _seed_trust(owner, "F Trust")
+        await _grant_member(owner, marge, trust, "org_f", "mem_f")
+        # get_minutes reads minutes_records + minutes_templates (NOT meeting_minutes)
+        await db.minutes_records.insert_one({
+            "minutes_id": "min_f_1", "trust_id": trust["trust_id"],
+            "user_id": marge["user_id"], "minutes_type": "meeting",
+            "meeting_date": "2026-09-20", "participants_text": "Marge",
+            "decisions_text": "Test decision", "status": "draft",
+            "created_at": _now(),
+        })
+        await db.minutes_approval_status.insert_one({
+            "approval_id": "approval_min_f_1", "minutes_id": "min_f_1",
+            "trust_id": trust["trust_id"], "user_id": marge["user_id"],
+            "current_status": ApprovalStatus.draft.value,
+            "drafter_user_id": marge["user_id"], "drafter_name": marge["name"],
+            "action_log": [], "created_at": _now(),
+        })
+
+        # Owner list with trust filter → sees member-created minutes
+        rows = await rm.get_minutes(trust_id=trust["trust_id"], user=owner)
+        ids = [r.minutes_id for r in rows]
+        assert "min_f_1" in ids, f"owner missing member minutes: {ids}"
+
+        # Member list stays strictly scoped to their own rows (still sees their own)
+        actor = _make_org_actor(marge, trust, "org_f", "mem_f", level="preparer")
+        rows_m = await rm.get_minutes(trust_id=trust["trust_id"], user=actor)
+        ids_m = [r.minutes_id for r in rows_m]
+        assert "min_f_1" in ids_m
+
+        # A stranger who happens to pass trust_id gets nothing (no widening leak)
+        stranger = await _seed_user("f_stranger@example.com", "Stranger")
+        rows_s = await rm.get_minutes(trust_id=trust["trust_id"], user=stranger)
+        assert rows_s == []
+
+        # Owner WITHOUT trust_id filter keeps narrow user_id scoping (no trust given)
+        rows_o = await rm.get_minutes(user=owner)
+        assert all(r.user_id == owner["user_id"] for r in rows_o)
+
+    @pytest.mark.asyncio
+    async def test_owner_view_covers_minutes_templates_too(self, seeded_db):
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        import routers.minutes as rm
+        rm.db = db
+        owner = await _seed_user("f2_owner@example.com", "Owner")
+        marge = await _seed_user("f2_marge@example.com", "Marge")
+        trust = await _seed_trust(owner, "F2 Trust")
+        await _grant_member(owner, marge, trust, "org_f2", "mem_f2")
+        await db.minutes_templates.insert_one({
+            "minutes_id": "mint_f2_1", "trust_id": trust["trust_id"],
+            "user_id": marge["user_id"], "template_type": "meeting",
+            "status": "draft", "created_at": _now(),
+        })
+        rows = await rm.get_minutes(trust_id=trust["trust_id"], user=owner)
+        ids = [r.minutes_id for r in rows]
+        assert "mint_f2_1" in ids, f"owner missing member template minutes: {ids}"
