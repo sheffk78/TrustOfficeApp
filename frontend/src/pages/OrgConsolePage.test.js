@@ -126,7 +126,9 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     }));
     render(<OrgConsolePage />);
     await waitFor(() => expect(screen.getByText(textOf(/Client trusts \(0\)/))).toBeInTheDocument());
-    expect(screen.getByText(textOf(/None yet/))).toBeInTheDocument();
+    // FIX 3: grant-less members get a clear empty state, not the terse owner line.
+    expect(screen.getByText('Nothing shared with you yet')).toBeInTheDocument();
+    expect(screen.getByText(textOf(/hasn't granted you access to any client trusts yet/))).toBeInTheDocument();
     expect(screen.getByText(textOf(/No activity yet/))).toBeInTheDocument();
   });
 

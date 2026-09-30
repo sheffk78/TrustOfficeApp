@@ -166,7 +166,7 @@ const ProtectedRoute = ({ children }) => {
   // - Still loading trusts
   // - User has explicit "skip onboarding" in localStorage (set when clicking read-only mode)
   // - User has a token but user data hasn't loaded yet (loading timeout scenario)
-  if (shouldRedirectToOnboarding({ user, trustsLoading, trusts, isOnboarding, isAdmin, skipOnboarding })) {
+  if (shouldRedirectToOnboarding({ user, trustsLoading, trusts, isOnboarding, isAdmin, skipOnboarding, pathname: location.pathname })) {
     return <Navigate to="/onboarding" replace />;
   }
 
@@ -190,8 +190,14 @@ const shouldRedirectToLoginPostTimeout = ({ hasToken, user, hasUserFromState, is
 
 // Guard: redirect users with no trusts to onboarding, unless they're already
 // there, are admins, are still loading trusts, or have opted out via localStorage.
-const shouldRedirectToOnboarding = ({ user, trustsLoading, trusts, isOnboarding, isAdmin, skipOnboarding }) =>
-  user && !trustsLoading && trusts && trusts.length === 0 && !isOnboarding && !isAdmin && !skipOnboarding;
+// Org surfaces (/org-console, /trust-access) are exempt: org members can be
+// active with zero personal trusts before any grant reaches them — trapping
+// them in the upload wizard locks them out of their console entirely.
+const ONBOARDING_EXEMPT_ORG_PREFIXES = ['/org-console', '/trust-access'];
+const isOnboardingExemptOrgRoute = (pathname) =>
+  ONBOARDING_EXEMPT_ORG_PREFIXES.some(p => pathname === p || pathname.startsWith(`${p}/`));
+const shouldRedirectToOnboarding = ({ user, trustsLoading, trusts, isOnboarding, isAdmin, skipOnboarding, pathname }) =>
+  user && !trustsLoading && trusts && trusts.length === 0 && !isOnboarding && !isAdmin && !skipOnboarding && !isOnboardingExemptOrgRoute(pathname);
 
 // Protected Route with Subscription Gate (for routes that require active subscription)
 const SubscriptionProtectedRoute = ({ children }) => {

@@ -36,6 +36,8 @@ export default function TrustAccessPage() {
   const [grants, setGrants] = useState([]);
   const [grantOpen, setGrantOpen] = useState(false);
   const [orgIdInput, setOrgIdInput] = useState('');
+  const [memberIdInput, setMemberIdInput] = useState('');
+  const [members, setMembers] = useState([]);
   const [level, setLevel] = useState('viewer');
   const [months, setMonths] = useState('12');
   const [attested, setAttested] = useState(false);
@@ -67,25 +69,40 @@ export default function TrustAccessPage() {
   const activeGrants = grants.filter(g => g.status === 'active');
   const pastGrants = grants.filter(g => g.status !== 'active');
 
+  // Load the org's member roster whenever the selected org changes, so the
+  // grant dialog can ask WHO receives access (never silently the owner).
+  useEffect(() => {
+    setMemberIdInput('');
+    setMembers([]);
+    if (!orgIdInput.trim()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithAuth(`/orgs/${encodeURIComponent(orgIdInput.trim())}/members`);
+        if (!res.ok || cancelled) return;
+        const list = await res.json();
+        if (!cancelled && Array.isArray(list)) setMembers(list.filter(Boolean));
+      } catch { /* roster is a convenience — grant POST re-validates member_id */ }
+    })();
+    return () => { cancelled = true; };
+  }, [orgIdInput, grantOpen]);
+
   const submitGrant = async () => {
+    if (!memberIdInput.trim()) {
+      toast.error('Choose which team member receives this access.');
+      return;
+    }
     if (!attested) { toast.error('Please confirm the attestation before granting.'); return; }
     setSubmitting(true);
     try {
       const expires = new Date();
       expires.setMonth(expires.getMonth() + Number(months || 12));
-      const memberRes = await fetchWithAuth(`/orgs/${orgIdInput.trim()}/members`);
-      let memberId = `mem_${orgIdInput.trim().replace('org_', '')}`;
-      if (memberRes.ok) {
-        const members = await memberRes.json();
-        const owner = members.find(m => m.role === 'owner');
-        if (owner) memberId = owner.member_id;
-      }
       const res = await fetchWithAuth(`/trusts/${trustId}/org-grants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           org_id: orgIdInput.trim(),
-          member_id: memberId,
+          member_id: memberIdInput.trim(),
           level,
           expires_at: expires.toISOString(),
           attested_delegation: true,
@@ -102,7 +119,7 @@ export default function TrustAccessPage() {
         return;
       }
       toast.success('Access granted. A notice email has been sent.');
-      setGrantOpen(false); setAttested(false); setOrgIdInput(''); setLevel('viewer');
+      setGrantOpen(false); setAttested(false); setOrgIdInput(''); setMemberIdInput(''); setLevel('viewer');
       await load();
     } catch (e) {
       showError(toast, e, { operation: 'grant_access', page: 'TrustAccess' });
@@ -257,6 +274,27 @@ export default function TrustAccessPage() {
               />
             </div>
             <div>
+              <Label htmlFor="grant-member">Which team member gets access</Label>
+              <select
+                id="grant-member"
+                className="w-full mt-2 p-2 rounded-md border border-border bg-background text-sm"
+                value={memberIdInput}
+                onChange={e => setMemberIdInput(e.target.value)}
+                data-testid="member-select"
+              >
+                <option value="">{orgIdInput.trim() ? (members.length ? 'Choose a team member…' : 'Loading team members…') : 'Choose an organization first…'}</option>
+                {members.map(m => (
+                  <option key={m.member_id} value={m.member_id}>
+                    {(m.name || m.email)} · {m.status === 'active' ? 'Active' : 'Invited'}
+                    {m.role === 'owner' ? ' · Owner' : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Access is given to the person you pick here — it doesn't go to everyone.
+              </p>
+            </div>
+            <div>
               <Label className="text-sm text-navy">Access level</Label>
               <div className="grid grid-cols-1 gap-2 mt-2">
                 {LEVELS.map(l => (
@@ -291,7 +329,7 @@ export default function TrustAccessPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGrantOpen(false)}>Cancel</Button>
-            <Button className="btn-primary" onClick={submitGrant} disabled={submitting || !attested || !orgIdInput.trim()} data-testid="confirm-grant-btn">
+            <Button className="btn-primary" onClick={submitGrant} disabled={submitting || !attested || !orgIdInput.trim() || !memberIdInput.trim()} data-testid="confirm-grant-btn">
               {submitting ? 'Granting…' : 'Grant Access'}
             </Button>
           </DialogFooter>

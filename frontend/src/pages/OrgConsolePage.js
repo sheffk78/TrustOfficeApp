@@ -98,6 +98,60 @@ export default function OrgConsolePage() {
     navigate(route);
   };
 
+  const OrgRouteEmptyState = ({ onRetry }) => (
+    <div className="main-layout" data-testid="org-console-page">
+      <Sidebar />
+      <main className="main-content dot-grid">
+        <div className="page-container">
+          <div className="page-header">
+            <h1 className="page-title">Org Console</h1>
+            <p className="page-subtitle">
+              Trusts your clients have authorized you to work on — scoped, time-limited, revocable by them.
+            </p>
+          </div>
+          <div className="card-trust text-center py-12">
+            <Building2 className="w-12 h-12 text-navy/30 mx-auto mb-4" />
+            <h2 className="font-serif text-xl text-navy mb-2">No organization yet</h2>
+            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+              You're not a member of an organization yet. If someone invited you, accept their email invitation first —
+              or if you run your own practice, you can create your organization here.
+            </p>
+            <Button
+              className="btn-primary"
+              onClick={async () => {
+                try {
+                  const res = await fetchWithAuth('/orgs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: 'My Fiduciary Group' }),
+                  });
+                  if (res.ok) { toast.success('Organization created.'); await onRetry(); }
+                  else toast.error('Could not create org — it may already exist.');
+                } catch (e) { showError(toast, e, { page: 'OrgConsole' }); }
+              }}
+              data-testid="create-org-btn"
+            >
+              <Building2 className="w-4 h-4 mr-2" /> Create Organization
+            </Button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+
+  // Member-side view: an org member with no granted trusts sees what happened,
+  // who can fix it, and what happens next — instead of an empty list.
+  const GrantedTrustsEmptyState = (o) => (
+    <div className="card-trust text-center py-10 mb-4" data-testid="no-granted-trusts">
+      <FileText className="w-10 h-10 text-navy/30 mx-auto mb-3" />
+      <h3 className="font-serif text-md text-navy mb-1">Nothing shared with you yet</h3>
+      <p className="text-sm text-muted-foreground max-w-md mx-auto">
+        The organization owner hasn't granted you access to any client trusts yet. Once they do, those trusts appear
+        here and you'll see exactly what you can work on. Until then, nothing is needed from you.
+      </p>
+    </div>
+  );
+
   const sendInvite = async () => {
     if (!inviteOrg || !inviteEmail.trim()) return;
     setInviting(true);
@@ -254,30 +308,7 @@ export default function OrgConsolePage() {
           {loading ? (
             <div className="card-trust skeleton h-40 w-full" />
           ) : orgs.length === 0 ? (
-            <div className="card-trust text-center py-12">
-              <Building2 className="w-12 h-12 text-navy/30 mx-auto mb-4" />
-              <h2 className="font-serif text-xl text-navy mb-2">No organization yet</h2>
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                An org represents your fiduciary practice. Create one to receive delegated access from your clients.
-              </p>
-              <Button
-                className="btn-primary"
-                onClick={async () => {
-                  try {
-                    const res = await fetchWithAuth('/orgs', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ name: 'My Fiduciary Group' }),
-                    });
-                    if (res.ok) { toast.success('Organization created.'); await load(); }
-                    else toast.error('Could not create org — it may already exist.');
-                  } catch (e) { showError(toast, e, { page: 'OrgConsole' }); }
-                }}
-                data-testid="create-org-btn"
-              >
-                <Building2 className="w-4 h-4 mr-2" /> Create Organization
-              </Button>
-            </div>
+            <OrgRouteEmptyState onRetry={load} />
           ) : (
             orgs.map(o => (
               <div key={o.org_id} className="mb-8" data-testid={`org-card-${o.org_id}`}>
@@ -304,7 +335,10 @@ export default function OrgConsolePage() {
                     {(members[o.org_id] || []).map(m => (
                       <div key={m.member_id} className="flex items-center justify-between py-1.5 border-b last:border-0 border-border/50 text-sm">
                         <span className="text-muted-foreground">{m.name || m.email}</span>
-                        <Badge variant={m.role === 'owner' ? 'default' : 'secondary'} className="capitalize text-xs">{m.role}</Badge>
+                        <span className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{m.status === 'active' ? 'Active' : 'Invited'}</span>
+                          <Badge variant={m.role === 'owner' ? 'default' : 'secondary'} className="capitalize text-xs">{m.role}</Badge>
+                        </span>
                       </div>
                     ))}
                   </CardContent>
@@ -317,9 +351,7 @@ export default function OrgConsolePage() {
                   </h3>
                 </div>
                 {(trustsByOrg[o.org_id] || []).length === 0 ? (
-                  <div className="card-trust text-sm text-muted-foreground py-6 text-center mb-4">
-                    None yet. When a client grants your org access to their trust, it appears here.
-                  </div>
+                  <GrantedTrustsEmptyState org={o} />
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
                     {(trustsByOrg[o.org_id] || []).filter(Boolean).map(t => trustCard(t))}

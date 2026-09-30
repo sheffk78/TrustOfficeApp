@@ -10,7 +10,8 @@ const AcceptInvitePage = () => {
   const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState('idle'); // idle | accepting | done | error
   const [errorMsg, setErrorMsg] = useState('');
-  const [orgName, setOrgName] = useState('WingPoint Trust Group');
+  const [orgName, setOrgName] = useState('');
+  const [inviterName, setInviterName] = useState('');
 
   useEffect(() => {
     if (!user || authLoading) return;
@@ -27,10 +28,10 @@ const AcceptInvitePage = () => {
           const code = data?.detail?.code || '';
           if (res.status === 403 && code === 'invite_email_mismatch') {
             setErrorMsg(
-              'This invite was sent to a different email address. Log in with the email that received the invitation, or contact Jeff for help.'
+              'This invite was sent to a different email address. Log in with the email that received the invitation, or contact the person who invited you for help.'
             );
           } else if (res.status === 404 || res.status === 410) {
-            setErrorMsg('This invite link is no longer valid — it may have expired or already been used. Ask Jeff to send a fresh one.');
+            setErrorMsg('This invite link is no longer valid — it may have expired or already been used. Ask the person who invited you to send a fresh one.');
           } else {
             setErrorMsg('Something went wrong accepting your invite. Please try again, or reply to the email you received for help.');
           }
@@ -39,6 +40,27 @@ const AcceptInvitePage = () => {
         }
         const data = await res.json().catch(() => ({}));
         if (data && data.org_name) setOrgName(data.org_name);
+        if (data && data.inviter_name) setInviterName(data.inviter_name);
+        // The accept endpoint returns only member/org ids. Pull the real org
+        // name + inviter name from the org members endpoints (a new member can
+        // read both), so the page shows the actual org — never a hardcoded one.
+        if (!orgName && data?.org_id) {
+          try {
+            const orgRes = await fetchWithAuth(`/orgs/${encodeURIComponent(data.org_id)}`);
+            if (orgRes.ok) {
+              const org = await orgRes.json().catch(() => ({}));
+              if (org?.name) setOrgName(org.name);
+            }
+            const memRes = await fetchWithAuth(`/orgs/${encodeURIComponent(data.org_id)}/members`);
+            if (memRes.ok) {
+              const members = await memRes.json().catch(() => ([]));
+              if (Array.isArray(members)) {
+                const owner = members.find(m => m.role === 'owner') || null;
+                if (owner?.name) setInviterName(owner.name);
+              }
+            }
+          } catch { /* branding detail only — never block the accept flow */ }
+        }
         setStatus('done');
       } catch (e) {
         setErrorMsg('Something went wrong accepting your invite. Please try again in a moment.');
@@ -65,9 +87,9 @@ const AcceptInvitePage = () => {
       <div className="flex min-h-screen items-center justify-center bg-subtle-bg px-6 py-12 text-gray-900">
         <div className="w-full max-w-lg rounded border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
           <Users className="mx-auto mb-4 h-10 w-10 text-gold" aria-hidden="true" />
-          <h1 className="mb-3 text-2xl font-bold">You're invited to {orgName}</h1>
+          <h1 className="mb-3 text-2xl font-bold">{orgName ? <>You're invited to {orgName}</> : "You're invited to TrustOffice"}</h1>
           <p className="mb-6 text-sm leading-6 text-gray-500">
-            Jeff Kohler has invited you to connect with his desk inside TrustOffice. One quick step: log in with the
+            You've been invited to join your organization's workspace inside TrustOffice. One quick step: log in with the
             email this invitation was sent to, and your membership is confirmed automatically.
           </p>
           <Link
@@ -103,15 +125,18 @@ const AcceptInvitePage = () => {
         <CheckCircle2 className="mx-auto mb-4 h-10 w-10 text-gold" aria-hidden="true" />
         <h1 className="mb-3 text-2xl font-bold">You're all set</h1>
         <p className="mb-6 text-sm leading-6 text-gray-500">
-          You're now a member of <strong>{orgName}</strong>. Your connection to Jeff's desk is confirmed — you decide
-          the access level, and you can change or remove it any time.
+          You're now a member of <strong>{orgName || 'your organization'}</strong>.
+          {inviterName
+            ? <> {inviterName} invited you — the organization owner decides which clients' trusts you can work on and grants access from their side.</>
+            : <> The organization owner decides which clients' trusts you can work on and grants access from their side.</>}
+          {' '}Open the organization console to see what's been granted to you so far.
         </p>
         <button
-          onClick={() => navigate('/trust-access')}
+          onClick={() => navigate('/org-console')}
           data-testid="invite-success-cta"
           className="inline-block bg-navy px-6 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-90"
         >
-          Choose your access level
+          Go to your organization console
         </button>
       </div>
     </div>
