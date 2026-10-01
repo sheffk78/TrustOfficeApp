@@ -18,7 +18,9 @@ import { trackEvent } from '@/utils/analytics';
  * authenticated page.
  *
  * Behavior:
- *  - Gold circular FAB, bottom-right, stacked above the SupportWidget.
+ *  - Gold circular FAB, bottom-right. Desktop (lg+) only — phones reach
+ *    the Assistant through the bottom nav item, which already exists; on
+ *    phones the FAB just stacked a second floating chrome over the nav.
  *  - Click opens a popover with the current page's help items + a
  *    contextual "Ask Trust Assistant" link.
  *  - Reads help config from PageHelpContext (set by <PageHelpButton />).
@@ -56,7 +58,7 @@ export function AssistantFab() {
     <Popover open={open} onOpenChange={handleOpen}>
       <PopoverTrigger asChild>
         <button
-          className="fixed bottom-24 md:bottom-24 right-2 z-40 w-14 h-14 rounded-full bg-gold text-navy shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2"
+          className="fixed right-2 bottom-24 z-40 hidden lg:flex w-14 h-14 rounded-full bg-gold text-navy shadow-lg items-center justify-center transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2"
           aria-label="Ask Trust Assistant"
           data-testid="assistant-fab"
         >
