@@ -121,7 +121,7 @@ _TEST_422_RICH_RE = re.compile(
 _CLIENT_422_NOISE_RE = (
     re.compile(r"invalid_email|valid email address", re.IGNORECASE),
     re.compile(r"Input should be '(viewer|preparer)'", re.IGNORECASE),
-    re.compile(r"Input should be '(real_property|personal_property|", re.IGNORECASE),
+    re.compile(r"Input should be '(real_property|personal_property)'\]", re.IGNORECASE),
     re.compile(r"^Trust not found\. Please refresh", re.IGNORECASE),
 )
 
