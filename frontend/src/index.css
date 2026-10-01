@@ -605,18 +605,20 @@
     }
 }
 
-/* Dark mode utility overrides */
+/* Dark mode utility overrides.
+   2026-10-01 (Jeff mobile-dark directive): .text-navy and .border-navy no
+   longer flip to gold in dark mode — any navy-on-gold element (AssistantFab
+   icon on gold FAB, btn-gold label, billing badges) was rendering
+   gold-on-gold = invisible text. Navy keeps #010079 in every theme; gold
+   stays the accent ON dark surfaces. Surface remaps (bg-navy/bg-white →
+   dark slate) remain, they only affect BACKGROUNDS. */
 @layer utilities {
-    .dark .text-navy {
-        color: #D5AD36 !important;
-    }
-    
     .dark .bg-navy {
         background-color: #1e293b !important;
     }
     
     .dark .border-navy {
-        border-color: #D5AD36 !important;
+        border-color: rgba(213, 173, 54, 0.35) !important;
     }
     
     .dark .bg-subtle-bg {
