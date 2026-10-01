@@ -154,9 +154,13 @@ _KNOWN_DEAD_TRUST_IDS = _KNOWN_DEAD_TRUST_IDS + (
     "trust_c72e3bac4b3a",
     "org_682d79d69043",
     "org_2eb093dbefe9",
-    "trust_087db3afba55",   # qa tax-calendar/bank-accounts negative probes
-    "trust_ba6ecd1c99a4",   # qa governance churn
-    "trust_65eff8784570",   # qa governance churn
+    # 2026-10-01 712ca38 added three "qa fixture" ids here; reverted below:
+    # trust_087db3afba55 is a LIVE client trust (I AM MINISTRIES, Ben Barlow,
+    # verified in prod org listing + audit trail 22:25-22:31Z same day).
+    # trust_ba6ecd1c99a4 / trust_65eff8784570: unverified against prod — the
+    # failure mode of wrongly noise-tagging live-client errors (TO-F13
+    # blindness) outweighs backlog hygiene. Add ids only after a prod-truth
+    # check AND a pinned-suite case.
 )
 
 # ---------------------------------------------------------------------------
@@ -259,15 +263,10 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
             return "client_validation"
         if any(k in m for k in ("field required", "value is not a valid email")):
             return "client_validation"
-    if status_code == 422:
-        # Structured client-flow rejections (2026-10-01 backlog sweep): field
-        # bundles from bot/qa submits, the API's own handled business codes,
-        # and enum picks. The fixer only engages here via the tracked
-        # frontend-guards ticket — these are not backend defects.
-        m = detail_str.lower()
-        if ("field required" in m or "not_in_org" in m or "attestation_required" in m
-                or "expiry_" in m or "input should be" in m):
-            return "client_validation"
+    # NOTE: no 422 catch-all (reverted 712ca38's): "field required"/
+    # "Input should be" bundles are covered by the pinned _CLIENT_422_NOISE_RE
+    # patterns above; a blanket catch would also silence REAL enum-drift 422s
+    # — exactly the drift class TO-F13 sat on for 38 days.
 
     # --- Scanner probes (catch-all for credential/path sweeps) ---
     if status_code in (404, 400) and _SCANNER_RE.search(path_str):
