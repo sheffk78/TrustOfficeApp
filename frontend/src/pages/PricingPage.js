@@ -445,14 +445,14 @@ export default function PricingPage() {
                         <button
                           type="button"
                           onClick={() => setWingPointPeriod('monthly')}
-                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${wingPointPeriod === 'monthly' ? 'bg-gold text-white' : 'text-muted-foreground hover:text-navy'}`}
+                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${wingPointPeriod === 'monthly' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Monthly
                         </button>
                         <button
                           type="button"
                           onClick={() => setWingPointPeriod('annual')}
-                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${wingPointPeriod === 'annual' ? 'bg-gold text-white' : 'text-muted-foreground hover:text-navy'}`}
+                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${wingPointPeriod === 'annual' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Annual <span className="ml-1 text-success">save $240/yr</span>
                         </button>

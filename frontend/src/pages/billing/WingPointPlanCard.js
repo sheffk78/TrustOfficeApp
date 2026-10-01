@@ -150,7 +150,7 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
       className={`card-trust relative border-gold/40 bg-gold/5 ${isTargetPlan ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
       data-testid={`plan-card-${WINGPOINT_TIER.id}`}
     >
-      <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
+      <div className="absolute top-0 right-0 bg-gold text-navy px-3 py-1 font-mono text-xs uppercase">
         WingPoint Exclusive
       </div>
       <h3 className="font-serif text-xl text-navy mb-2">WingPoint Plan</h3>
@@ -162,14 +162,14 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
           <button
             type="button"
             onClick={() => setPeriod('monthly')}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'monthly' ? 'bg-gold text-white' : 'text-muted-foreground hover:text-navy'}`}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'monthly' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
           >
             Monthly
           </button>
           <button
             type="button"
             onClick={() => setPeriod('annual')}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'annual' ? 'bg-gold text-white' : 'text-muted-foreground hover:text-navy'}`}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'annual' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
           >
             Annual <span className="ml-1 text-success">save $240/yr</span>
           </button>

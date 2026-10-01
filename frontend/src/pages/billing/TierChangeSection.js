@@ -68,7 +68,7 @@ export default function TierChangeSection({
               data-testid={`tier-change-card-${tier.id}`}
             >
               {tier.popular && !isCurrentTier && !isIneligible && (
-                <div className="absolute top-0 right-0 bg-gold text-white px-3 py-1 font-mono text-xs uppercase">
+                <div className="absolute top-0 right-0 bg-gold text-navy px-3 py-1 font-mono text-xs uppercase">
                   Most Popular
                 </div>
               )}
