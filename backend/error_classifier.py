@@ -109,6 +109,22 @@ _KNOWN_DEAD_TRUST_IDS = (
     "trust_bf8f97c6151c",
 )
 
+# Rich-capture 422 fixture variants (2026-10-01): pydantic v2 now surfaces
+# "<field>: Field required" instead of the bare field name.
+_TEST_422_RICH_RE = re.compile(
+    r"^(name|template_type|template_name)\s*:\s*Field required(?!\w)", re.IGNORECASE
+)
+
+# Client-validation 422 shapes (2026-10-01): bad USER-entered data correctly
+# rejected. Not backend defects — capture keeps them queryable, the fixer
+# never pages on them, and the real fix is frontend form guards.
+_CLIENT_422_NOISE_RE = (
+    re.compile(r"invalid_email|valid email address", re.IGNORECASE),
+    re.compile(r"Input should be '(viewer|preparer)'", re.IGNORECASE),
+    re.compile(r"Input should be '(real_property|personal_property|", re.IGNORECASE),
+    re.compile(r"^Trust not found\. Please refresh", re.IGNORECASE),
+)
+
 # ---------------------------------------------------------------------------
 # Business-empty responses (documented empty answers, not defects)
 # ---------------------------------------------------------------------------
@@ -148,6 +164,23 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
             base_path = path_str.split("?")[0].rstrip("/")
             if any(base_path == p.rstrip("/") for p in _TEST_422_PATHS):
                 return "test_suite"
+        # Rich-capture variant (2026-10-01): FastAPI 422s now store the full
+        # pydantic detail ("name: Field required", "template_type: Field
+        # required", "template_name: Field required") — same fixture probes,
+        # same endpoints, richer storage. Match the FIELD prefix.
+        if _TEST_422_RICH_RE.match(detail_str.strip()):
+            base_path = path_str.split("?")[0].rstrip("/")
+            if any(base_path == p.rstrip("/") for p in _TEST_422_PATHS):
+                return "test_suite"
+        # Client validation noise (2026-10-01 sweep): user-entered bad data
+        # that the API correctly rejects with 422 — email typos, enum picks,
+        # duplicate-signup shapes. The API is WORKING when it returns these;
+        # they log an error but are not backend defects. Frontend guards are
+        # the real fix (tracked separately); until then they must not churn
+        # the fixer queue 5-per-run.
+        for pat in _CLIENT_422_NOISE_RE:
+            if pat.search(detail_str):
+                return "client_validation"
     if status_code == 404:
         if any(p.rstrip("/") == path_str.rstrip("/") for p in _TEST_404_PATHS):
             return "test_suite"
