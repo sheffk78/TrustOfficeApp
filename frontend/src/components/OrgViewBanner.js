@@ -30,19 +30,20 @@ export const OrgViewBanner = () => {
   // Keep the banner reactive + push page content down while viewing
   // (same body-class contract ImpersonationBanner uses).
   useEffect(() => {
+    // Re-run on every viewTick (event fires on enter + exit): apply the
+    // push-down while viewing, remove it when the view ends.
     if (view) {
       document.body.classList.add('impersonating');
-      setViewTick((t) => t + 1);
     } else {
       document.body.classList.remove('impersonating');
     }
     const onStorage = () => setViewTick((t) => t + 1);
     window.addEventListener('org_view_changed', onStorage);
     return () => {
-      document.body.classList.remove('impersonating');
+      if (!view) document.body.classList.remove('impersonating');
       window.removeEventListener('org_view_changed', onStorage);
     };
-  }, []);  // mount/unmount scope — view re-read on tick render
+  }, [viewTick]);  // view re-read each tick
   if (!view) return null;
 
   const handleExit = async () => {

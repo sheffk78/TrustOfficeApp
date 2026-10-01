@@ -1044,11 +1044,14 @@ async def get_impersonation_audit_log(
     Get audit log of all impersonation actions.
     """
     skip = (page - 1) * limit
-    
-    total = await db.admin_audit_log.count_documents({"action": {"$in": ["impersonate_user", "exit_impersonation"]}})
+    # 2026-10-01: org workspace entry rides the same audit trail — surface the
+    # org viewing-session rows alongside admin impersonation.
+    audit_actions = ["impersonate_user", "exit_impersonation",
+                     "org_enter_workspace", "org_exit_workspace"]
+    total = await db.admin_audit_log.count_documents({"action": {"$in": audit_actions}})
     
     logs = await db.admin_audit_log.find(
-        {"action": {"$in": ["impersonate_user", "exit_impersonation"]}},
+        {"action": {"$in": audit_actions}},
         {"_id": 0}
     ).sort("timestamp", -1).skip(skip).limit(limit).to_list(length=limit)
     
