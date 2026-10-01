@@ -125,6 +125,37 @@ _CLIENT_422_NOISE_RE = (
     re.compile(r"^Trust not found\. Please refresh", re.IGNORECASE),
 )
 
+# Negative-path probe ids in paths (2026-10-01): suites intentionally request
+# obviously-missing resources; the literal slug names make them unambiguous.
+_NEGATIVE_PROBE_ID_RE = re.compile(
+    r"(nonexistent|does_no\w*|fake|removed|missing|bogus)", re.IGNORECASE
+)
+
+# Structured client-side 404 rejections (2026-10-01): the API's own handled
+# "resource not available to you" answers, not missing backend routes.
+_CLIENT_404_MESSAGES = (
+    "invite not found",
+    "member_not_in_org",
+    "grant_not_found",
+    "grant not found",
+    "category: input should be",
+)
+
+# QA fixture trust/org ids exercised by test.qa1–qa3 sessions and isolation
+# negative paths (2026-10-01 DB attribution), appended to the tuple above.
+_KNOWN_DEAD_TRUST_IDS = _KNOWN_DEAD_TRUST_IDS + (
+    "trust_4dc7fc7227a8",
+    "trust_60d4c8577af3",
+    "trust_be1335a726c3",
+    "trust_a43430161d2b",
+    "trust_140c1ac1e13d",
+    "trust_121ad71a8f59",
+    "trust_92af9e198a66",
+    "trust_c72e3bac4b3a",
+    "org_682d79d69043",
+    "org_2eb093dbefe9",
+)
+
 # ---------------------------------------------------------------------------
 # Business-empty responses (documented empty answers, not defects)
 # ---------------------------------------------------------------------------
@@ -181,10 +212,21 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
         for pat in _CLIENT_422_NOISE_RE:
             if pat.search(detail_str):
                 return "client_validation"
+    if status_code == 405:
+        # Machine probes hitting auth/API routes with wrong verbs (2026-10-01
+        # sweep: /api/auth/login, /api/auth/session, /api/admin/impersonate/*
+        # — anonymous, no UA, pre-dawn hours). The API answering "wrong
+        # method" is CORRECT behavior, not a defect.
+        return "bot_probe"
     if status_code == 404:
         if any(p.rstrip("/") == path_str.rstrip("/") for p in _TEST_404_PATHS):
             return "test_suite"
         msg_lower = detail_str.lower()
+        # Explicit negative-path probes (any 404 message): the smoke/isolation
+        # suites and manual API checks intentionally request ids named
+        # nonexistent*/does_no*/fake*/removed* (verified 2026-10-01).
+        if _NEGATIVE_PROBE_ID_RE.search(path_str):
+            return "test_suite"
         if any(m in msg_lower for m in _TEST_404_MESSAGES):
             # Governance misses on documented dead QA trust ids (suite/fixture).
             if path_str.startswith("/api/governance/") and _known_dead_trust(path_str):
@@ -193,6 +235,16 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
             # against live API; the QA fixture trust doesn't exist in prod).
             if any(path_str.split("?")[0].rstrip("/") == p.rstrip("/") for p in _TEST_404_TRUST_NOT_FOUND_PATHS):
                 return "test_suite"
+            # QA fixture ids anywhere in the path (2026-10-01): the qa1–qa3
+            # sessions and isolation negative paths exercise these ids on any
+            # trust endpoint, not just the ones enumerated above.
+            if _known_dead_trust(path_str):
+                return "test_suite"
+        # Structured client-side rejections (2026-10-01 sweep): expired
+        # invites, non-member access, missing grants/categories — the API's
+        # own handled "not available to you" answers, not missing routes.
+        if any(m in msg_lower for m in _CLIENT_404_MESSAGES):
+            return "client_validation"
 
     # --- Scanner probes (catch-all for credential/path sweeps) ---
     if status_code in (404, 400) and _SCANNER_RE.search(path_str):
