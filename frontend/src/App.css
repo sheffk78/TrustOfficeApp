@@ -1137,3 +1137,22 @@
   color: var(--gold);
   background: rgba(213, 173, 54, 0.1);
 }
+
+/* ── Dark-mode text contrast: var(--navy) TEXT usages (2026-10-01, Jeff) ──
+   .page-title and active tabs read var(--navy) directly, bypassing the
+   Tailwind .text-navy utility (which fc45f4c already remaps near-white in
+   dark). Navy text on dark surfaces = 1.09:1, unreadable. These pair
+   overrides restore readability; navy-on-gold pairs (btn-gold, badges,
+   mobile-fab) are untouched. */
+.dark .page-title {
+  color: #f8fafc;
+}
+
+.dark [role="tab"][data-state="active"] {
+  color: #f8fafc !important;
+}
+
+.dark .page-header .page-subtitle,
+.dark .page-header p {
+  color: #cbd5e1;
+}
