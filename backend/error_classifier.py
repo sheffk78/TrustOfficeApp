@@ -105,6 +105,8 @@ _KNOWN_DEAD_TRUST_IDS = (
     "6044a663dc5d",
     "f4321000dd26",
     "nonexistent",  # smoke suite's explicit nonexistent-id probe
+    "trust_bc8af93378d2",  # deleted-trust probe traffic (2026-10-01 fixture churn)
+    "trust_bf8f97c6151c",
 )
 
 # ---------------------------------------------------------------------------
