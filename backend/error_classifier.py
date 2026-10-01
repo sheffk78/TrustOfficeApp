@@ -246,6 +246,16 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
         # own handled "not available to you" answers, not missing routes.
         if any(m in msg_lower for m in _CLIENT_404_MESSAGES):
             return "client_validation"
+    if status_code == 0:
+        # Server-side ValidationError docs (capture stores them without a
+        # 4xx status; source:"server"): when their content is client-bad-data
+        # (bad email, missing form fields on user-driven submits), the API
+        # rejecting them is correct behavior (2026-10-01 sweep).
+        m = detail_str.lower()
+        if any(p.search(detail_str) for p in _CLIENT_422_NOISE_RE):
+            return "client_validation"
+        if any(k in m for k in ("field required", "value is not a valid email")):
+            return "client_validation"
 
     # --- Scanner probes (catch-all for credential/path sweeps) ---
     if status_code in (404, 400) and _SCANNER_RE.search(path_str):
