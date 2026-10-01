@@ -212,12 +212,13 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
         for pat in _CLIENT_422_NOISE_RE:
             if pat.search(detail_str):
                 return "client_validation"
-    if status_code == 405:
-        # Machine probes hitting auth/API routes with wrong verbs (2026-10-01
-        # sweep: /api/auth/login, /api/auth/session, /api/admin/impersonate/*
-        # — anonymous, no UA, pre-dawn hours). The API answering "wrong
-        # method" is CORRECT behavior, not a defect.
-        return "bot_probe"
+    # NOTE: 405 stays REAL by design (pinned by test_error_classifier):
+    # /api/auth/session, /api/minutes-templates/generate etc. — a 405 on a
+    # live route is exactly what client/API drift looks like (TO-F13 lived
+    # 38 days). Blanket-noise-classifying them (4346bd6, 2026-10-01) broke
+    # the drift detector; the anon-probe 405 backlog gets cleared by
+    # batch-resolve instead, and any future bot filter must key on
+    # request signatures captured at capture time, not status+path alone.
     if status_code == 404:
         if any(p.rstrip("/") == path_str.rstrip("/") for p in _TEST_404_PATHS):
             return "test_suite"

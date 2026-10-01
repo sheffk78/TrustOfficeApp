@@ -122,6 +122,12 @@ async def create_distribution(
     """Create a new distribution record"""
     user = await require_org_grant(dist.trust_id, min_level=GrantLevel.preparer, user=user)
     trust = await db.trusts.find_one({"trust_id": dist.trust_id, "user_id": user["user_id"]}, {"_id": 0})
+    # Org-grant fallback (mirrors minutes.py create): a member granted access
+    # is not the trust owner — the owner-scoped fetch misses and 404'd, so
+    # preparer-granted members could never create distributions. Gate already
+    # passed (line above), so fetch the trust regardless once granted.
+    if not trust and (user.get("org_grant") or user.get("party_grant")):
+        trust = await db.trusts.find_one({"trust_id": dist.trust_id}, {"_id": 0})
     if not trust:
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
