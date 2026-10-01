@@ -336,7 +336,7 @@ export default function OrgConsolePage() {
                       <div key={m.member_id} className="flex items-center justify-between py-1.5 border-b last:border-0 border-border/50 text-sm">
                         <span className="text-muted-foreground">{m.name || m.email}</span>
                         <span className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{m.status === 'active' ? 'Active' : 'Invited'}</span>
+                          <span className="text-xs text-muted-foreground">{m.status === 'active' ? 'Active' : m.status === 'suspended' ? 'Suspended' : 'Invited'}</span>
                           <Badge variant={m.role === 'owner' ? 'default' : 'secondary'} className="capitalize text-xs">{m.role}</Badge>
                         </span>
                       </div>

@@ -285,7 +285,7 @@ export default function TrustAccessPage() {
                 <option value="">{orgIdInput.trim() ? (members.length ? 'Choose a team member…' : 'Loading team members…') : 'Choose an organization first…'}</option>
                 {members.map(m => (
                   <option key={m.member_id} value={m.member_id}>
-                    {(m.name || m.email)} · {m.status === 'active' ? 'Active' : 'Invited'}
+                    {(m.name || m.email)} · {m.status === 'active' ? 'Active' : m.status === 'suspended' ? 'Suspended' : 'Invited'}
                     {m.role === 'owner' ? ' · Owner' : ''}
                   </option>
                 ))}
