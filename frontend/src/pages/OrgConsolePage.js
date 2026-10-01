@@ -98,7 +98,7 @@ export default function OrgConsolePage() {
   const goToTrustSection = async (trust, route) => {
     try {
       const res = await fetchWithAuth(
-        `${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app'}/api/orgs/enter-trust/${trust.trust_id}`,
+        `/orgs/enter-trust/${trust.trust_id}`,
         { method: 'POST' },
       );
       if (!res.ok) throw new Error(`enter-trust ${res.status}`);
