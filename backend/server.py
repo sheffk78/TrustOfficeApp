@@ -727,8 +727,16 @@ async def startup_event():
         await db.dismissed_insights.create_index([("trust_id", 1), ("user_id", 1)])
         await db.dismissed_insights.create_index([("trust_id", 1), ("criterion_name", 1)], unique=True)
         
-        # Session indexes with TTL
-        await db.user_sessions.create_index("session_token", unique=True)
+        # Session indexes. session_token is only present on Google-OAuth cookie
+        # sessions (auth.py Google flow); the JWT path keys sessions on
+        # (user_id, jti) and has no session_token field, which a plain unique
+        # index treats as null -> duplicate-key failure on EVERY deploy start
+        # (caught 2026-10-01). Partial index: only real token strings compete.
+        await db.user_sessions.create_index(
+            "session_token",
+            unique=True,
+            partialFilterExpression={"session_token": {"$type": "string"}},
+        )
         await db.user_sessions.create_index("user_id")
         
         # Password reset with TTL (auto-expire after 2 hours)
