@@ -154,6 +154,9 @@ _KNOWN_DEAD_TRUST_IDS = _KNOWN_DEAD_TRUST_IDS + (
     "trust_c72e3bac4b3a",
     "org_682d79d69043",
     "org_2eb093dbefe9",
+    "trust_087db3afba55",   # qa tax-calendar/bank-accounts negative probes
+    "trust_ba6ecd1c99a4",   # qa governance churn
+    "trust_65eff8784570",   # qa governance churn
 )
 
 # ---------------------------------------------------------------------------
@@ -255,6 +258,15 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
         if any(p.search(detail_str) for p in _CLIENT_422_NOISE_RE):
             return "client_validation"
         if any(k in m for k in ("field required", "value is not a valid email")):
+            return "client_validation"
+    if status_code == 422:
+        # Structured client-flow rejections (2026-10-01 backlog sweep): field
+        # bundles from bot/qa submits, the API's own handled business codes,
+        # and enum picks. The fixer only engages here via the tracked
+        # frontend-guards ticket — these are not backend defects.
+        m = detail_str.lower()
+        if ("field required" in m or "not_in_org" in m or "attestation_required" in m
+                or "expiry_" in m or "input should be" in m):
             return "client_validation"
 
     # --- Scanner probes (catch-all for credential/path sweeps) ---
