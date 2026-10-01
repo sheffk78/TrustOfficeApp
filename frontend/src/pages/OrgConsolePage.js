@@ -91,11 +91,38 @@ export default function OrgConsolePage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Deep-link: set the global selected trust (AuthContext persists
-  // selected_trust_id), then navigate into the workspace view for it.
-  const goToTrustSection = (trust, route) => {
-    setSelectedTrust({ trust_id: trust.trust_id, name: trust.name });
-    navigate(route);
+  // Deep-link (Option B, 2026-10-01): workspace entry is an explicit, audited
+  // "viewing" session — same machinery as admin impersonation. The ENTER
+  // endpoint validates the grant server-side (level/expiry/revocation) and
+  // writes the audit row; org_view_data drives OrgViewBanner + Exit.
+  const goToTrustSection = async (trust, route) => {
+    try {
+      const res = await fetchWithAuth(
+        `${process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app'}/api/orgs/enter-trust/${trust.trust_id}`,
+        { method: 'POST' },
+      );
+      if (!res.ok) throw new Error(`enter-trust ${res.status}`);
+      const data = await res.json();
+      setSelectedTrust({ trust_id: trust.trust_id, name: trust.name });
+      sessionStorage.setItem('org_view_data', JSON.stringify({
+        trust_id: data.trust.trust_id,
+        trust_name: data.trust.name,
+        client_name: data.client.name || data.client.email,
+        org_id: data.org.org_id,
+        view_level: data.view_level,
+        expires_at: data.expires_at,
+        entered_at: data.entered_at,
+        return_path: data.return_path,
+      }));
+      window.dispatchEvent(new Event('org_view_changed'));
+      navigate(route);
+    } catch (e) {
+      if (e && e.status === 403) {
+        toast.error('Your access to this trust is not active — ask the client to re-grant or check the expiry.');
+      } else {
+        showError(toast, e, { page: 'OrgConsole' });
+      }
+    }
   };
 
   const OrgRouteEmptyState = ({ onRetry }) => (

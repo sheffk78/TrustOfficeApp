@@ -9,20 +9,23 @@ import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional, List
 
 from database import db
 from dependencies import (
     get_current_user, _toggle_institution, _level_rank,
-    require_org_grant,
+    require_org_grant, _active_member_ids,
 )
+from services.security_events import record_security_event
 from models import (
     OrgCreate, OrgResponse, OrgMemberRole, OrgMember,
     GrantLevel, TrustGrantCreate, TrustGrant,
 )
 
 router = APIRouter(tags=["orgs"])
+
+logger = logging.getLogger("orgs")
 
 
 # ==================== HELPERS ====================
@@ -709,3 +712,167 @@ async def revoke_by_token(token: str):
         return {"grant_id": pgrant["grant_id"], "status": "revoked", "type": "party_grant"}
     # Unknown or stale token: 404 (no enumeration of grant state)
     raise HTTPException(status_code=404, detail={"code": "grant_not_found"})
+
+
+# ==================== ORG WORKSPACE ENTRY (M5, 2026-10-01) ====================
+# Jeff's verdict on the org console: entering a client's workspace was a silent
+# handoff (selectedTrust + navigate) — no "you're in their account" state, no
+# back navigation, nothing audited. Option B (approved 2026-10-01): org entry
+# rides the same state machinery as admin impersonation — an explicit, audited
+# ENTER endpoint + an EXIT endpoint; the frontend swaps on the banner/exit UX.
+# Scoping stays server-side: every trust data endpoint keeps enforcing
+# require_org_grant (grant level, expiry, revocation) for member sessions.
+
+@router.post("/orgs/enter-trust/{trust_id}")
+async def enter_trust_workspace(
+    trust_id: str,
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Org member enters a granted trust's workspace (audited 'viewing as')."""
+    if not _toggle_institution():
+        raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id},
+        {"_id": 0, "trust_id": 1, "name": 1, "user_id": 1},
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail={"code": "trust_not_found"})
+
+    # Trust owner entering their own trust: allowed, marked as owner view.
+    if trust.get("user_id") == user["user_id"]:
+        view_level = "owner"
+        grant = None
+    else:
+        member_ids = await _active_member_ids(user)
+        now = datetime.now(timezone.utc).isoformat()
+        grant = await db.trust_grants.find_one({
+            "trust_id": trust_id,
+            "status": "active",
+            "member_id": {"$in": member_ids},
+            "$or": [
+                {"expires_at": {"$gte": now}},
+                {"expires_at": {"$exists": False}},
+                {"expires_at": None},
+            ],
+        })
+        if not grant:
+            raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
+        view_level = grant.get("level", "viewer")
+
+    # Client-side lock consent (mirrors admin impersonation): a client who
+    # locked admin access also keeps service-provider viewers out.
+    locked_pref = await db.user_preferences.find_one(
+        {"user_id": trust["user_id"]},
+        {"_id": 0, "admin_access_locked": 1},
+    )
+    if locked_pref and locked_pref.get("admin_access_locked") is True and view_level != "owner":
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "workspace_locked_by_owner"},
+        )
+
+    client = await db.users.find_one(
+        {"user_id": trust["user_id"]},
+        {"_id": 0, "email": 1, "name": 1},
+    )
+    org_row = await db.orgs.find_one(
+        {"org_id": (grant or {}).get("org_id", "")},
+        {"_id": 0, "org_id": 1, "name": 1},
+    )
+
+    # Audit: both collections used by admin impersonation, org-specific actions.
+    now = _now()
+    await db.admin_audit_log.insert_one({
+        "audit_id": f"audit_{uuid.uuid4().hex[:12]}",
+        "action": "org_enter_workspace",
+        "admin_user_id": user["user_id"],
+        "admin_email": user.get("email", ""),
+        "target_user_id": trust["user_id"],
+        "target_email": (client or {}).get("email", ""),
+        "trust_id": trust_id,
+        "org_id": (grant or {}).get("org_id"),
+        "grant_id": (grant or {}).get("grant_id"),
+        "view_level": view_level,
+        "timestamp": now,
+    })
+
+    # Security event logging (best-effort, mirrors admin impersonation)
+    try:
+        ip = request.headers.get("X-Forwarded-For", "").split(",")[-1].strip() if request else None
+        ua = request.headers.get("User-Agent") if request else None
+        await record_security_event(
+            user["user_id"], "org_enter_workspace",
+            ip=ip, user_agent=ua,
+            details={
+                "trust_id": trust_id,
+                "org_id": (grant or {}).get("org_id"),
+                "grant_id": (grant or {}).get("grant_id"),
+                "view_level": view_level,
+            },
+        )
+    except Exception as sec_exc:
+        logger.warning(f"Security event logging for org_enter_workspace failed (non-fatal): {sec_exc}")
+
+    logger.info("Org member %s entered workspace of trust %s (level=%s)",
+                user.get("email", ""), trust_id, view_level)
+
+    return {
+        "trust": {
+            "trust_id": trust["trust_id"],
+            "name": trust.get("name", ""),
+        },
+        "client": {
+            "user_id": trust["user_id"],
+            "email": (client or {}).get("email", ""),
+            "name": (client or {}).get("name", ""),
+        },
+        "org": {"org_id": (org_row or {}).get("org_id", ""), "name": (org_row or {}).get("name", "")},
+        "view_level": view_level,
+        "expires_at": (grant or {}).get("expires_at"),
+        "entered_at": now,
+        "return_path": "/org-console",
+    }
+
+
+@router.post("/orgs/enter-trust/{trust_id}/log-exit")
+async def log_org_workspace_exit(
+    trust_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Org member exits a granted trust's workspace (audited)."""
+    if not _toggle_institution():
+        raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id},
+        {"_id": 0, "user_id": 1},
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail={"code": "trust_not_found"})
+    member_ids = await _active_member_ids(user)
+    owner_view = trust.get("user_id") == user["user_id"]
+    if not owner_view:
+        grant = await db.trust_grants.find_one(
+            {"trust_id": trust_id, "member_id": {"$in": member_ids}},
+            {"_id": 0, "grant_id": 1, "org_id": 1},
+        )
+        if not grant:
+            # Never fail the exit itself — the member may still be in-session
+            # from a revocation; log with unknown grant but do not 403-block
+            # a legitimate exit path.
+            grant = {}
+    else:
+        grant = {}
+    await db.admin_audit_log.insert_one({
+        "audit_id": f"audit_{uuid.uuid4().hex[:12]}",
+        "action": "org_exit_workspace",
+        "admin_user_id": user["user_id"],
+        "admin_email": user.get("email", ""),
+        "target_user_id": trust["user_id"],
+        "trust_id": trust_id,
+        "org_id": grant.get("org_id"),
+        "grant_id": grant.get("grant_id"),
+        "timestamp": _now(),
+    })
+    logger.info("Org member %s exited workspace of trust %s", user.get("email", ""), trust_id)
+    return {"message": "Org workspace session ended"}

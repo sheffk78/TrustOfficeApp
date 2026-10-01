@@ -3,6 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import { OrgViewBanner } from "@/components/OrgViewBanner";
 import { UpgradeBar } from "@/components/UpgradeBar";
 import { SupportWidget } from "@/components/SupportWidget";
 import { AssistantFab } from "@/components/AssistantFab";
@@ -572,6 +573,7 @@ function App() {
               <ErrorBoundary>
                 <UpgradeBar />
                 <ImpersonationBanner />
+                <OrgViewBanner />
                 <AppRouter />
                 <SupportWidgetMount />
                 <AssistantFab />
