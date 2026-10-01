@@ -106,6 +106,13 @@
 }
 
 /* Sharp corners by default - override rounded classes except rounded-full */
+/* Badge/pill navy-on-gold pair stays navy in dark (badges sit on gold bg).
+   Written without utility class names — Tailwind treats them as @apply
+   candidates in this stylesheet and fails the build with a circular dep. */
+.dark [class*="bg-gold"][class*="text-navy"] {
+    color: #010079 !important;
+}
+
 @layer utilities {
     .rounded-none {
         border-radius: 0 !important;
@@ -613,6 +620,14 @@
    stays the accent ON dark surfaces. Surface remaps (bg-navy/bg-white →
    dark slate) remain, they only affect BACKGROUNDS. */
 @layer utilities {
+    /* 2026-10-01 (Jeff report: "dark blue text hard to read"): navy TEXT on
+       dark surfaces is unreadable (~1.2:1). In dark mode text-navy reads as
+       near-white — EXCEPT when the same element carries bg-gold (badges,
+       pills), where navy-on-gold (8.2:1) is the readable brand pair. */
+    .dark .text-navy {
+        color: #f8fafc !important;
+    }
+
     .dark .bg-navy {
         background-color: #1e293b !important;
     }
@@ -1255,4 +1270,27 @@ body.impersonating .fixed.top-0.z-\[90\] {
   body.impersonating .sidebar-trust {
     top: 0;
   }
+}
+
+/* ── Login page dark-mode contrast (2026-10-01, Jeff mobile-dark report #2) ──
+   Login headings/labels used light-mode-only navy text on dark surfaces.
+   Scoped to [data-testid="login-page"] so navy-on-gold pairs elsewhere in the
+   app keep their 8:1 contrast. */
+.dark [data-testid="login-page"] h1 {
+  color: #f8fafc !important;
+}
+.dark [data-testid="login-page"] .text-navy {
+  color: #e2e8f0 !important;
+}
+.dark [data-testid="login-page"] .bg-navy\/5 {
+  background-color: rgba(213, 173, 54, 0.08) !important;
+  border-color: rgba(213, 173, 54, 0.25) !important;
+}
+.dark [data-testid="login-page"] .bg-navy\/5 .text-navy {
+  color: #f1f5f9 !important;
+}
+/* Navy-filled logo illegible on dark surfaces — render the same asset in
+   white via filter (no new logo asset; original SVG untouched). */
+.dark [data-testid="login-page"] img[src*="trustoffice-logo"] {
+  filter: brightness(0) invert(1) opacity(0.92);
 }
