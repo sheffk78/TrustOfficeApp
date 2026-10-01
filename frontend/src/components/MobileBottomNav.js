@@ -40,6 +40,8 @@ import {
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { Sun, Moon } from 'lucide-react';
 
 // ═══ 5 primary nav items (max for a bottom bar) ═══
 const primaryNav = [
@@ -137,6 +139,7 @@ const ADMIN_NAV_GROUP = {
 export const MobileBottomNav = () => {
   const location = useLocation();
   const { selectedTrust, user } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
   const moreNavGroups = isAdmin ? [...BASE_MORE_NAV_GROUPS, ADMIN_NAV_GROUP] : BASE_MORE_NAV_GROUPS;
   const [openMenu, setOpenMenu] = useState(null); // 'Money' | '__more__' | null
@@ -316,6 +319,19 @@ export const MobileBottomNav = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            {/* Theme switch — phones have no sidebar access, so this is the
+                only reachable theme control (Jeff report 2026-10-01: could
+                not change dark/light mode on mobile). Full-width row,
+                44px min height for touch targets. */}
+            <button
+              onClick={toggleTheme}
+              className="mobile-more-item mobile-more-theme-toggle"
+              data-testid="mobile-theme-toggle"
+              aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            >
+              {isDark ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
+              <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+            </button>
             <div className="mobile-more-grid">
               {moreNavGroups.map((group) => (
                 <div key={group.groupLabel} className="mobile-more-group">

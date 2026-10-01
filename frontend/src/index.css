@@ -67,8 +67,14 @@
         --error: 0 84% 60%;
         --info: 217 91% 60%;
         
-        /* Custom TrustOffice colors - dark mode */
-        --navy: #D5AD36;
+        /* Custom TrustOffice colors - dark mode.
+           NOTE: --navy intentionally keeps its light value in dark mode. The
+           previous dark remap --navy: #D5AD36 made "navy" render as gold
+           everywhere (mobile bottom bar, FAB, active tabs) and produced
+           gold-on-gold invisible text on .btn-gold / .mobile-fab:active
+           (Jeff report 2026-10-01). Brand gold accent is --gold; navy only
+           darkens the theme's SURFACES. */
+        --navy: #010079;
         --gold: #D5AD36;
         --paper: #1e293b;
         --subtle-bg: #0f172a;

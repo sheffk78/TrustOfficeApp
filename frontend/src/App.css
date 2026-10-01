@@ -1037,3 +1037,96 @@
 .to-support-pulse {
   animation: to-support-pulse 2.2s ease-out infinite;
 }
+
+/* ── Theme-aware mobile chrome (2026-10-01, Jeff mobile-dark directive) ──
+   Base rules above hardcode white/dark-navy for phone chrome; under .dark
+   these overrides switch the same surfaces to the dark tokens. Light mode
+   is unchanged. */
+.dark .mobile-more-sheet {
+  background: var(--paper, #1e293b);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+}
+.dark .mobile-more-sheet-header {
+  background: var(--paper, #1e293b);
+  border-bottom: 1px solid rgba(213, 173, 54, 0.15);
+}
+.dark .mobile-more-sheet-title {
+  color: #f1f5f9;
+}
+.dark .mobile-more-sheet-close {
+  color: #94a3b8;
+}
+.dark .mobile-more-sheet-close:hover {
+  color: var(--gold);
+}
+.dark .mobile-more-group {
+  border-bottom: 1px solid rgba(213, 173, 54, 0.12);
+}
+.dark .mobile-more-group-label {
+  color: rgba(213, 173, 54, 0.75);
+}
+.dark .mobile-more-group-items {
+  background: rgba(213, 173, 54, 0.08);
+}
+.dark .mobile-more-item {
+  background: var(--subtle-bg, #0f172a);
+  color: #e2e8f0;
+}
+.dark .mobile-more-item:hover {
+  background: rgba(213, 173, 54, 0.12);
+}
+.dark .mobile-more-item.active {
+  color: var(--gold);
+  background: rgba(213, 173, 54, 0.1);
+}
+.dark .mobile-more-item.active svg {
+  color: var(--gold);
+}
+/* Theme toggle row in the More sheet */
+.mobile-more-theme-toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 20px;
+  min-height: 48px; /* touch target */
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-bottom: 1px solid rgba(1, 0, 121, 0.08);
+  cursor: pointer;
+}
+.mobile-more-theme-toggle:hover {
+  background: rgba(213, 173, 54, 0.08);
+}
+.dark .mobile-more-theme-toggle {
+  color: #e2e8f0;
+  border-bottom: 1px solid rgba(213, 173, 54, 0.12);
+}
+.dark .mobile-more-theme-toggle:hover {
+  background: rgba(213, 173, 54, 0.12);
+}
+.mobile-more-theme-toggle svg {
+  color: var(--gold);
+}
+
+/* Money submenu popup — theme-aware (2026-10-01) */
+.dark .mobile-submenu-popup {
+  background: var(--paper, #1e293b);
+  border: 1px solid rgba(213, 173, 54, 0.15);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+}
+.dark .mobile-submenu-item {
+  color: #e2e8f0;
+}
+.dark .mobile-submenu-item:hover {
+  background: rgba(213, 173, 54, 0.08);
+}
+.dark .mobile-submenu-item.active {
+  color: var(--gold);
+  background: rgba(213, 173, 54, 0.1);
+}
