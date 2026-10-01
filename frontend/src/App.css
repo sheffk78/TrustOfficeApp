@@ -26,6 +26,13 @@
 @media (max-width: 1024px) {
   .main-content {
     margin-left: 0;
+    /* Mobile overflow fix (2026-10-01, Jeff phone report): as a flex item with
+       flex:1 the default min-width:auto let intrinsic page content stretch
+       main-content past the 390px viewport (org-console +41px, settings +29px
+       horizontal scroll on phones). min-width:0 clamps it to the viewport. */
+    min-width: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 }
 
