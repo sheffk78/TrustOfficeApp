@@ -4,6 +4,7 @@
 
 import logging
 import os
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -26,8 +27,26 @@ router = APIRouter(tags=["orgs"])
 
 # ==================== HELPERS ====================
 
+# RFC-5322-lite: local@domain.tld — blocks the "Invite sent to not-an-email."
+# class of bugs (P0-1, 2026-10-01). Full RFC validation stays with EmailStr.
+EMAIL_RE = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$")
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _sanitize_members(raw: list) -> list:
+    """Defensive read-side filter (P0-1 fix, 2026-10-01): skip rows that fail
+    OrgMember validation (e.g. legacy malformed emails) instead of letting one
+    bad row 500 the whole members list."""
+    members = []
+    for m in raw:
+        try:
+            members.append(OrgMember(**m))
+        except Exception:
+            logging.warning("org_members: skipping malformed row org=%s email=%r",
+                            m.get("org_id"), m.get("email"))
+    return members
 
 
 async def _my_memberships(user: dict) -> List[dict]:
@@ -131,19 +150,19 @@ async def list_org_members(org_id: str, user: dict = Depends(get_current_user)):
     # Owner short-circuit
     if org.get("owner_user_id") == user["user_id"]:
         cursor = db.org_members.find({"org_id": org_id}, {"_id": 0})
-        members = []
+        raw = []
         async for m in cursor:
-            members.append(OrgMember(**m))
-        return members
+            raw.append(m)
+        return _sanitize_members(raw)
     # Member check
     memberships = await _my_memberships(user)
     if not any(m.get("org_id") == org_id and m.get("status") == "active" for m in memberships):
         raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
     cursor = db.org_members.find({"org_id": org_id}, {"_id": 0})
-    members = []
+    raw = []
     async for m in cursor:
-        members.append(OrgMember(**m))
-    return members
+        raw.append(m)
+    return _sanitize_members(raw)
 
 
 @router.post("/orgs/{org_id}/invites")
@@ -165,8 +184,17 @@ async def invite_org_member(
     )
     if not membership or membership["role"] not in ("owner", "admin"):
         raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
-    email = body.get("email")
+    email = (body.get("email") or "").strip()
     name = body.get("name", "")
+    # P0 fix 2026-10-01: invite used to store ANY string as email with zero
+    # validation; the members-list endpoint then fails its EmailStr
+    # validation on read -> HTTP 500 for the whole org (org card degrades to
+    # Members (0)). Validate BEFORE insert and return a proper 422.
+    if not email or not EMAIL_RE.match(email):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_email", "message": "Enter a valid email address to invite."},
+        )
     member_id = f"mem_{uuid.uuid4().hex[:12]}"
     # D6 (T2 MED-8): real 256-bit token with a true 72h expiry the accept
     # path enforces — the old 16-char uuid4 hex "token" was guessable and
