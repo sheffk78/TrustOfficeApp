@@ -198,7 +198,41 @@ async def invite_org_member(
             status_code=422,
             detail={"code": "invalid_email", "message": "Enter a valid email address to invite."},
         )
+    # LOW-c (2026-10-02): duplicate-invite guard. Inviting the same email
+    # twice used to insert a second 'invited' row, and the accept path
+    # blanket-reactivates ANY invited row for the caller on login — so the
+    # org could end up with two live copies of one person. Block the fresh
+    # invite while an invited/active row already exists (suspended rows
+    # stay re-invitable by design; active/invited recovery is the
+    # member-menu path, not another email).
+    existing = await db.org_members.find_one(
+        {
+            "org_id": org_id,
+            "email": {"$regex": f"^{re.escape(email)}$", "$options": "i"},
+            "status": {"$in": ("invited", "active")},
+        },
+        {"_id": 0, "member_id": 1, "status": 1},
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "invite_already_exists",
+                "message": (
+                    "This person is already a member of this organization."
+                    if existing.get("status") == "active"
+                    else "This email already has a pending invite. It expires 72h after it was sent."
+                ),
+            },
+        )
     member_id = f"mem_{uuid.uuid4().hex[:12]}"
+    # Council UI contract (2026-10-02): the invite dialog's role selector was
+    # a dead control — the route hardcoded 'member' while the UI sent the
+    # selected role. Honor it: member|admin only (ownership is never granted
+    # via invite).
+    requested_role = body.get("role") or "member"
+    if requested_role not in ("member", "admin"):
+        raise HTTPException(status_code=422, detail={"code": "invalid_role"})
     # D6 (T2 MED-8): real 256-bit token with a true 72h expiry the accept
     # path enforces — the old 16-char uuid4 hex "token" was guessable and
     # the advertised "72h" was never real.
@@ -211,7 +245,7 @@ async def invite_org_member(
         "user_id": None,
         "email": email,
         "name": name,
-        "role": OrgMemberRole.member,
+        "role": requested_role,
         "status": "invited",
         "invited_at": now,
         "invited_by": user["user_id"],
@@ -260,6 +294,26 @@ async def accept_org_invite(token: str, user: dict = Depends(get_current_user)):
              "$unset": {"joined_at": "", "invite_accepted_at": ""}},
         )
         raise HTTPException(status_code=403, detail={"code": "invite_email_mismatch"})
+    # LOW-c companion (2026-10-02): if this email ALREADY holds an active row
+    # in the org (a duplicate created before the invite guard existed),
+    # accepting this token would leave two live rows for one person. Roll the
+    # accept back (invite stays usable) and surface the conflict instead.
+    existing_active = await db.org_members.find_one(
+        {
+            "org_id": member["org_id"],
+            "email": {"$regex": f"^{re.escape(member.get('email', ''))}$", "$options": "i"},
+            "status": "active",
+            "member_id": {"$ne": member["member_id"]},
+        },
+        {"_id": 0, "member_id": 1},
+    )
+    if existing_active:
+        await db.org_members.update_one(
+            {"member_id": member["member_id"], "status": "active"},
+            {"$set": {"user_id": None, "status": "invited"},
+             "$unset": {"joined_at": "", "invite_accepted_at": ""}},
+        )
+        raise HTTPException(status_code=409, detail={"code": "member_already_active"})
     return {"member_id": member["member_id"], "org_id": member["org_id"], "status": "active"}
 
 
@@ -279,6 +333,16 @@ async def update_org_member(
     )
     if not membership or membership["role"] != "owner":
         raise HTTPException(status_code=403, detail={"code": "org_access_denied"})
+    # BUG-14 (2026-10-02): owner-row guard. An owner PATCHing their OWN row
+    # could suspend themselves or change their own role — every owner-only
+    # route then 403s and the console is locked until a DB restore. The owner
+    # row is immutable through this endpoint (no self-serve ownership path).
+    target = await db.org_members.find_one(
+        {"member_id": member_id, "org_id": org_id},
+        {"_id": 0, "user_id": 1, "role": 1},
+    )
+    if target and (target.get("user_id") == user["user_id"] or target.get("role") == "owner"):
+        raise HTTPException(status_code=409, detail={"code": "owner_row_immutable"})
     update_fields = {}
     if "role" in body:
         # E (MED-13): validate against the real role/status vocabulary —
@@ -328,7 +392,10 @@ async def grant_trust_access(
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     granted_at = datetime.now(timezone.utc)
-    if (expires_at - granted_at).days > 365:
+    # LOW-a (2026-10-02): .days floors (365d 9h = 365.375 → 365), so an
+    # expiry past the 365-day cap previously slipped through. Compare the
+    # actual duration against a real 365-day window instead.
+    if (expires_at - granted_at) > timedelta(days=365):
         raise HTTPException(status_code=422, detail={"code": "expiry_exceeds_365_days"})
     if expires_at <= granted_at:
         raise HTTPException(status_code=422, detail={"code": "expiry_in_past"})
