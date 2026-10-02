@@ -378,3 +378,37 @@ describe('OrgConsolePage Phase 1 — portfolio overview + review queue', () => {
     await waitFor(() => expect(fetchWithAuth.mock.calls.some(([u, i]) => u === '/org/queue/tk1/complete' && i?.method === 'POST')).toBe(true));
   });
 });
+
+describe('OrgConsolePage Phase 2 — firm calendar + automated badge', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust: null, setSelectedTrust: jest.fn() });
+  });
+
+  it('renders week-bucketed tasks with Automated badge on engine-created entries', async () => {
+    fetchWithAuth.mockImplementation((url) => {
+      if (url === '/orgs') return Promise.resolve({ ok: true, json: async () => [ORG] });
+      if (url.includes('/members')) return Promise.resolve({ ok: true, json: async () => [MEMBER] });
+      if (url.includes('/trusts/search')) return Promise.resolve({ ok: true, json: async () => ({ trusts: [], total: 0 }) });
+      if (url.includes('/trusts')) return Promise.resolve({ ok: true, json: async () => ({ trusts: [TRUST] }) });
+      if (url.includes('/overview')) return Promise.resolve({ ok: true, json: async () => ({ org_id: 'org_1', portfolio: null, trusts: [] }) });
+      if (url.includes('/calendar')) return Promise.resolve({ ok: true, json: async () => ({
+        org_id: 'org_1',
+        weeks: [
+          { week: '2026-W40', items: [
+            { task_id: 'a1', trust_id: 'trust_1', trust_name: 'Family Trust', task_type: 'quarterly_review', title: 'Quarterly review', due_date: '2026-10-02', automated: true },
+            { task_id: 'a2', trust_id: 'trust_1', trust_name: 'Family Trust', task_type: 'custom', title: 'Read ledger', due_date: '2026-10-02', automated: false },
+          ] },
+        ],
+        counts: { total: 2 },
+      }) });
+      if (url.includes('/org/queue')) return Promise.resolve({ ok: true, json: async () => ({ items: [], counts: { overdue: 0, due_week: 0, later: 0 } }) });
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('firm-calendar')).toBeInTheDocument());
+    expect(screen.getAllByTestId('cal-week-2026-W40')).toHaveLength(1);
+    expect(screen.getByText('Automated')).toBeInTheDocument();
+    expect(screen.getByTestId('cal-open-a1')).toBeInTheDocument();
+  });
+});

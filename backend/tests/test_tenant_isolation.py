@@ -102,6 +102,7 @@ ROUTE_MAP = [
         ("GET", "/api/orgs/{org_id}/overview", False),
         ("GET", "/api/org/queue", False),
         ("POST", "/api/org/queue/{x_task}/complete", True),
+        ("GET", "/api/orgs/{org_id}/calendar", False),
     ]),
     ("trust_parties", [
         ("GET", "/api/trust-parties/{x_trust_id}", False),

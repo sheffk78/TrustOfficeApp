@@ -85,6 +85,7 @@ export default function OrgConsolePage() {
   const [overview, setOverview] = useState({});
   const [queue, setQueue] = useState(null);
   const [queueBusy, setQueueBusy] = useState(null);
+  const [firmCal, setFirmCal] = useState(null);
   const [focusOrg, setFocusOrg] = useState(null);    // active org in switcher
   const [switcherOpen, setSwitcherOpen] = useState(false);
   // trusts browser
@@ -192,6 +193,14 @@ export default function OrgConsolePage() {
     } catch { /* sections degrade silently to base console */ }
   }, []);
   useEffect(() => { if (focusOrg) loadOverview(focusOrg.org_id); }, [focusOrg?.org_id, loadOverview]);
+
+  const loadCalendar = useCallback(async (orgId) => {
+    try {
+      const res = await fetchWithAuth(`/orgs/${orgId}/calendar`);
+      if (res.ok) setFirmCal(await res.json());
+    } catch { /* calendar degrades out */ }
+  }, []);
+  useEffect(() => { if (focusOrg) loadCalendar(focusOrg.org_id); }, [focusOrg?.org_id, loadCalendar]);
 
   // URL sync — shareable/stable filtered views (?q=&level=&status=...)
   useEffect(() => {
@@ -806,6 +815,44 @@ export default function OrgConsolePage() {
                             </li>
                           ))}
                         </ul>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                  {firmCal && firmCal.weeks && firmCal.weeks.length > 0 ? (
+                    <Card className="card-trust mb-4" data-testid="firm-calendar">
+                      <CardContent className="pt-6">
+                        <SectionHeader
+                          icon={CalendarClock} title="Firm Calendar"
+                          right={<span className="text-xs text-muted-foreground">{firmCal.counts?.total || 0} upcoming · next 90 days</span>}
+                        />
+                        <div className="space-y-3">
+                          {firmCal.weeks.slice(0, 6).map(wk => (
+                            <div key={wk.week} data-testid={`cal-week-${wk.week}`}>
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{wk.week}</p>
+                              <ul className="space-y-1.5">
+                                {wk.items.map(it => (
+                                  <li key={it.task_id} className="flex items-center justify-between gap-2 text-sm py-1.5 border-b last:border-0 border-border/40">
+                                    <div className="min-w-0">
+                                      <p className="text-navy truncate">
+                                        {it.title}
+                                        {it.automated ? (
+                                          <span className="ml-2 inline-flex items-center text-[10px] uppercase tracking-wide text-navy bg-gold/25 border border-gold/50 rounded px-1.5 py-0.5" data-testid="automated-badge">Automated</span>
+                                        ) : null}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground truncate">{it.trust_name || it.trust_id} · {String(it.due_date).slice(0, 10)}</p>
+                                    </div>
+                                    <Button variant="outline" size="sm" className="btn-secondary shrink-0"
+                                      onClick={() => goToTrustSection({ trust_id: it.trust_id, name: it.trust_name }, '/tasks')}
+                                      data-testid={`cal-open-${it.task_id}`}
+                                    >
+                                      Open
+                                    </Button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
                       </CardContent>
                     </Card>
                   ) : null}

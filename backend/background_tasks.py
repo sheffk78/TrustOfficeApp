@@ -188,6 +188,17 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
+        # Phase 2 (council #2): recurring-task materialization engine — daily.
+        from services.recurring_automation import scheduled_recurring_pass
+        self.scheduler.add_job(
+            scheduled_recurring_pass,
+            trigger=CronTrigger(hour=3, minute=45),
+            args=[self.db],
+            id='recurring_task_materialization',
+            name='Materialize next recurring governance cycles (30d look-ahead)',
+            replace_existing=True
+        )
+
         # No-show recovery flow (reschedule → 7-day nudge → 14-day close) — hourly.
         self.scheduler.add_job(
             self.send_no_show_recovery_emails,

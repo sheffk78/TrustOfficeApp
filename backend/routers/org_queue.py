@@ -317,3 +317,54 @@ async def org_queue_complete(task_id: str, user: dict = Depends(get_current_user
         "task_id": task_id, "status": "completed", "completed_via": "org_queue",
         "next_cycle_task_id": next_cycle["task_id"] if next_cycle else None,
     }
+
+
+@router.get("/orgs/{org_id}/calendar")
+async def org_firm_calendar(
+    org_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Firm-wide governance calendar: every granted trust's upcoming tasks,
+    week-bucketed (week_start), automation provenance exposed
+    (created_via == recurring_automation -> automated:true)."""
+    if not _toggle_institution():
+        raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    today, week, month = _dates()
+    tids, level_by_trust, _ = await _granted_trusts(org_id, user)
+    if not tids:
+        return {"org_id": org_id, "weeks": [], "counts": {"total": 0}}
+    quarter_end = (datetime.now(timezone.utc) + timedelta(days=92)).strftime("%Y-%m-%d")
+    tmap = {}
+    async for t in db.trusts.find({"trust_id": {"$in": tids}}, {"_id": 0, "trust_id": 1, "name": 1}):
+        tmap[t["trust_id"]] = t.get("name")
+    events = []
+    async for row in db.governance_tasks.aggregate([
+        {"$match": {
+            "trust_id": {"$in": tids},
+            "$or": [{"completed_at": {"$exists": False}}, {"completed_at": None}],
+            "due_date": {"$gte": today, "$lte": quarter_end},
+        }},
+        {"$sort": {"due_date": 1}},
+        {"$limit": 500},
+    ]):
+        events.append(row)
+    # week bucket (ISO)
+    weeks: dict = {}
+    for ev in events:
+        try:
+            d = datetime.fromisoformat(str(ev["due_date"]).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+        iso_y, iso_w, _ = d.isocalendar()
+        key = f"{iso_y}-W{iso_w:02d}"
+        weeks.setdefault(key, []).append({
+            "task_id": ev.get("task_id"),
+            "trust_id": ev.get("trust_id"),
+            "trust_name": tmap.get(ev.get("trust_id")),
+            "task_type": ev.get("task_type"),
+            "title": ev.get("description") or ev.get("task_type"),
+            "due_date": ev.get("due_date"),
+            "automated": ev.get("created_via") == "recurring_automation",
+        })
+    out = [{"week": k, "items": v} for k, v in sorted(weeks.items())]
+    return {"org_id": org_id, "weeks": out, "counts": {"total": len(events)}}
