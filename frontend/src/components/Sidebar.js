@@ -286,7 +286,17 @@ const TrustSelector = ({ trusts, selectedTrust, onSelect }) => (
             className="font-mono text-sm"
             data-testid={`trust-option-${trust.trust_id}`}
           >
-            {trust.name}
+            <span className="flex items-center justify-between w-full gap-2">
+              <span className="truncate">{trust.name}</span>
+              {trust.org_grant_level && (
+                <span
+                  className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 border border-[#7C6BB8]/50 text-[#B9A8E8] shrink-0"
+                  data-testid={`trust-option-level-${trust.trust_id}`}
+                >
+                  {trust.org_grant_level}
+                </span>
+              )}
+            </span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
