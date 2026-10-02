@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import { fetchWithAuth } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
-import { showError } from '@/utils/errors';
+import { showError, humanizeErrorCode } from '@/utils/errors';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Shield, KeyRound, Trash2, RefreshCw, Calendar } from 'lucide-react';
 
@@ -115,7 +116,9 @@ export default function TrustAccessPage() {
         if (code === 'expiry_exceeds_365_days') toast.error('Grant window cannot exceed 12 months.');
         else if (res.status === 404) toast.error('Feature not available or org not found — check the org ID.');
         else if (res.status === 403) toast.error('Only the trust owner can grant access.');
-        else toast.error(typeof body?.detail === 'object' ? (body?.detail?.code || body?.detail?.message || 'Grant failed.') : (body?.detail || 'Grant failed.'));
+        else toast.error(typeof body?.detail === 'object'
+          ? (body?.detail?.message || humanizeErrorCode(body?.detail?.code) || 'Grant failed.')
+          : humanizeErrorCode(body?.detail) || 'Grant failed.');
         return;
       }
       toast.success('Access granted. A notice email has been sent.');
@@ -148,7 +151,24 @@ export default function TrustAccessPage() {
         <main className="main-content dot-grid">
           <div className="page-container">
             <h1 className="page-title">Trust Access</h1>
-            <p className="text-sm text-muted-foreground">Select a trust to manage who has access to it.</p>
+            {/* P0-2 (2026-10-01 QA): a dead end when the only relevant trust is
+                a pre-staged client trust — those are opened from the Org
+                Console, and org access is granted from inside each trust. */}
+            {trusts.length === 0 ? (
+              <div className="card-trust mt-4 py-10 text-center" data-testid="trust-access-empty">
+                <KeyRound className="w-10 h-10 text-navy/30 mx-auto mb-3" />
+                <h2 className="font-serif text-xl text-navy mb-2">No trusts to manage yet</h2>
+                <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                  Client trusts your organization works on open from the Org Console. Granting
+                  a team member access happens inside each trust, when a client shares it with you.
+                </p>
+                <Link to="/org-console" className="btn-primary inline-block">
+                  Open Org Console
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Select a trust to manage who has access to it.</p>
+            )}
           </div>
         </main>
       </div>

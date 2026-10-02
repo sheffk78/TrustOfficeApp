@@ -100,6 +100,36 @@ export function reportToErrorLog(data, debounceKey = null) {
  * Extract the most useful error message from a thrown error or Response.
  * Handles: Response objects, Error objects, plain strings, and nested detail objects.
  */
+// Snake_case API error codes ({"detail": {"code": "org_access_denied"}})
+// used to leak to users as raw text (org-console QA P2, 2026-10-01). Map the
+// known vocabulary to plain language; unknown codes degrade to a neutral
+// sentence so a raw token never reaches the screen.
+const ERROR_CODE_COPY = {
+  org_access_denied: "You don't have access to this organization. Ask the org owner to add you.",
+  owner_only: "Only the trust owner can do that.",
+  owner_row_immutable: "The organization owner's row can't be changed here.",
+  invite_already_exists: "This email already has a pending invite or is already a member.",
+  member_already_active: "This person is already an active member of this organization.",
+  invalid_email: "Enter a valid email address to invite.",
+  invalid_role: "That role isn't available here.",
+  invalid_status: "That status change isn't available.",
+  invalid_expires_at: "Enter a valid expiry date for this access.",
+  expiry_exceeds_365_days: "Access can be granted for up to 12 months.",
+  expiry_in_past: "The expiry date must be in the future.",
+  attestation_required: "Please confirm the attestation before granting access.",
+  org_not_found: "That organization doesn't exist.",
+  member_not_in_org: "That person isn't a member of this organization.",
+  invite_email_mismatch: "This invite was sent to a different email address.",
+  feature_disabled: "This feature isn't available yet.",
+};
+
+export function humanizeErrorCode(code) {
+  if (typeof code !== 'string' || !code) return null;
+  if (ERROR_CODE_COPY[code]) return ERROR_CODE_COPY[code];
+  const words = code.replace(/_/g, ' ').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : null;
+}
+
 export function extractErrorMessage(error) {
   if (!error) return 'An unexpected error occurred.';
 
@@ -125,7 +155,7 @@ export function extractErrorMessage(error) {
 
   // If it has a detail property (some API error wrappers)
   if (error.detail) {
-    if (typeof error.detail === 'string') return error.detail;
+    if (typeof error.detail === 'string') return humanizeErrorCode(error.detail);
     if (error.detail?.message) return String(error.detail.message);
     if (error.detail?.msg) return String(error.detail.msg);
     // FastAPI validation errors: array of { loc, msg, type }

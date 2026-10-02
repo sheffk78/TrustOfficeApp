@@ -21,7 +21,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { fetchWithAuth } from '@/utils/api';
-import { showError } from '@/utils/errors';
+import { showError, humanizeErrorCode } from '@/utils/errors';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import {
@@ -345,7 +345,11 @@ export default function OrgConsolePage() {
       } else {
         const body = await res.json().catch(() => ({}));
         const code = body?.detail?.code || body?.detail;
-        setInviteErr(typeof code === 'string' ? code.replace(/_/g, ' ') : 'Invite failed. Check the email and try again.');
+        setInviteErr(
+          body?.detail?.message
+          || humanizeErrorCode(typeof code === 'string' ? code : null)
+          || 'Invite failed. Check the email and try again.'
+        );
       }
     } catch (e) {
       setInviteErr('Network error — try again.');
@@ -408,16 +412,26 @@ export default function OrgConsolePage() {
 
   const trustCard = (t) => {
     const pending = t.pending_minutes || 0;
+    // Pre-staged client trust (P0-2, 2026-10-01 QA): the client hasn't signed
+    // up / claimed it yet, so it has no owner — show that state honestly
+    // instead of a normal card with a phantom "Client" meta line.
+    const unclaimed = !t.owner_user_id;
     return (
       <Card key={t.trust_id} className="card-trust" data-testid="trust-card">
         <CardContent className="pt-6">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="min-w-0">
               <h3 className="font-serif text-base text-navy truncate" title={t.name || 'Untitled trust'}>{t.name || 'Untitled trust'}</h3>
-              <p className="text-sm text-muted-foreground truncate" title={t.owner_email || ''} data-testid="trust-card-client">
-                {t.owner_name || 'Client'}
-                {t.owner_email ? <span className="text-xs"> · {t.owner_email}</span> : null}
-              </p>
+              {unclaimed ? (
+                <p className="text-xs text-muted-foreground italic" data-testid="trust-card-unclaimed" title="The client hasn't created their TrustOffice account yet — the trust is pre-staged and will connect once they sign up.">
+                  Awaiting client account — access was attested, not yet live
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground truncate" title={t.owner_email || ''} data-testid="trust-card-client">
+                  {t.owner_name || 'Client'}
+                  {t.owner_email ? <span className="text-xs"> · {t.owner_email}</span> : null}
+                </p>
+              )}
             </div>
             {grantLevelBadge(t.grant_level)}
           </div>

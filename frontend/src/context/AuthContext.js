@@ -154,6 +154,10 @@ const useAuthActions = ({
       if (data.token) {
         localStorage.setItem('auth_token', data.token);
       }
+      // Session hygiene (2026-10-02): a previous user's org-view session
+      // (banner + trust selection keyed on sessionStorage) must never leak
+      // into a fresh login in the same tab.
+      sessionStorage.removeItem('org_view_data');
       setUser(data.user);
       return data;
     } catch (error) {
@@ -182,6 +186,9 @@ const useAuthActions = ({
 
     localStorage.removeItem('auth_token');
     localStorage.removeItem('selected_trust_id');
+    // Session hygiene (2026-10-02): an org-view session (banner + selection)
+    // must not survive logout in this tab.
+    sessionStorage.removeItem('org_view_data');
     setUser(null);
     setTrusts([]);
     setSelectedTrust(null);
@@ -439,7 +446,30 @@ const useTrustsLoader = ({ setTrusts, setTrustsLoading, setSelectedTrust, select
         // the stored id, then the first real (non-demo) trust, then the first
         // trust (demo-only accounts still need a selection for the demo
         // experience).
-        const isSelectedValid = selectedTrust && data.some(t => t.trust_id === selectedTrust.trust_id);
+        //
+        // 2026-10-02 (org-console QA): client trusts entered from the Org
+        // Console (enter-trust) never appear in the member's own /trusts list,
+        // so this reconcile used to CULL the org-view selection seconds after
+        // entry — Minutes/Distributions then rendered empty. A selection that
+        // matches the ACTIVE org-view session is VALID even though it isn't in
+        // /trusts: it short-circuits to true via isOrgViewTrust, so the normal
+        // path simply skips the fallback chain. Only an explicit user pick
+        // (forceSelectNew) overrides an org-view selection.
+        let orgView = null;
+        try { orgView = JSON.parse(sessionStorage.getItem('org_view_data') || 'null'); } catch (_e) { orgView = null; }
+        const isOrgViewTrust = selectedTrust && orgView
+          && orgView.trust_id === selectedTrust.trust_id;
+        // 2026-10-02: an org-view session that survives a page reload must keep
+        // its selected trust — client trusts aren't in /trusts, and the
+        // auto-pick below would silently swap the viewer onto their own first
+        // trust mid-view.
+        if (!selectedTrust && orgView?.trust_id && !forceSelectNew) {
+          const ovTrust = data.find(t => t.trust_id === orgView.trust_id)
+            || { trust_id: orgView.trust_id, name: orgView.trust_name };
+          setSelectedTrust(ovTrust);
+          return;
+        }
+        const isSelectedValid = selectedTrust && (isOrgViewTrust || data.some(t => t.trust_id === selectedTrust.trust_id));
         if (forceSelectNew || !isSelectedValid) {
           if (selectedTrust && !isSelectedValid) {
             // Stale selection pointing at a deleted/filtered trust — clear it.

@@ -26,9 +26,16 @@ const ORG = { org_id: 'org_1', name: 'Fiduciary Group' };
 const MEMBER = { member_id: 'm1', name: 'Owner', email: 'o@x.com', role: 'owner' };
 const TRUST = {
   trust_id: 'trust_1', name: 'Family Trust',
-  owner_name: 'Jane Client', owner_email: 'jane@x.com',
+  owner_user_id: 'u_jane', owner_name: 'Jane Client', owner_email: 'jane@x.com',
   grantor_name: 'Jane Grantor', trustee_name: 'Bob Trustee',
   grant_level: 'preparer', pending_minutes: 2, next_deadline: '2026-10-15T00:00:00Z',
+};
+// Pre-staged client trust (real backend contract): ownerless — user never
+// signed up. Renders the honest "awaiting client account" state, no phantom client line.
+const UNCLAIMED_TRUST = {
+  trust_id: 'trust_9', name: 'Untitled trust',
+  owner_user_id: null, owner_name: null, owner_email: null,
+  grant_level: 'viewer', pending_minutes: 0, next_deadline: null,
 };
 const EVENT = {
   event_id: 'e1', action: 'distribution_approved',
@@ -97,6 +104,17 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     expect(screen.getByText('Bob Trustee')).toBeInTheDocument();
     expect(screen.getByText(hasText('2 minutes pending review'))).toBeInTheDocument();
     expect(screen.getByText(textOf(/deadline/))).toBeInTheDocument();
+  });
+
+  it('pre-staged client trust: renders honest unclaimed state, no phantom client line', async () => {
+    fetchWithAuth.mockImplementation(api({
+      [`/orgs/${ORG.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: [UNCLAIMED_TRUST] }) },
+    }));
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(1));
+    expect(screen.getByTestId('trust-card-unclaimed')).toBeInTheDocument();
+    expect(screen.getByTestId('trust-card-unclaimed').textContent).toMatch(/Awaiting client account/i);
+    expect(screen.queryByTestId('trust-card-client')).not.toBeInTheDocument();
   });
 
   it('deep-link: sets global selectedTrust before navigating to /minutes', async () => {
