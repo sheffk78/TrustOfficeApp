@@ -21,6 +21,7 @@ import { DashboardTodaysFocus } from './dashboard/DashboardTodaysFocus';
 import { DashboardTaxCalendar } from './dashboard/DashboardTaxCalendar';
 import { DashboardHealthScoreCard } from './dashboard/DashboardHealthScoreCard';
 import { DashboardQuickActionsCard } from './dashboard/DashboardQuickActionsCard';
+import DashboardOrgWorkspacesCard from './org-console/DashboardOrgWorkspacesCard';
 import { DashboardTrustAdminCard } from './dashboard/DashboardTrustAdminCard';
 import { DashboardRecentActivity } from './dashboard/DashboardRecentActivity';
 import { ReviewPromptModal } from '@/components/ReviewPromptModal';
@@ -213,6 +214,7 @@ export default function DashboardPage() {
                 nextAction={nextActionDismissed ? null : nextAction}
                 onDismiss={() => setNextActionDismissed(true)}
               />
+              <DashboardOrgWorkspacesCard />
 
               <DashboardOnboardingChecklist
                 onboarding={onboarding}
