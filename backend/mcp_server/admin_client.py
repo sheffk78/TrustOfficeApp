@@ -257,18 +257,27 @@ class AdminAPIClient:
 # ==================== HELPERS ====================
 
 def _days_remaining(due_date_str: Optional[str]) -> int:
-    """Calculate days remaining until a due date. Mirrors tax_calendar_math._days_remaining."""
+    """Calculate days remaining until a due date. Mirrors tax_calendar_math._days_remaining.
+
+    2026-10-01 tz fix: full datetimes now diff against UTC-now (the previous
+    code derived a UTC calendar day and compared it with the LOCAL
+    date.today() — at 16:00 Denver on Oct 1 an Oct 7 deadline read as 6 days
+    instead of 5). Date-only strings keep the local-today semantic per
+    TO-003b (a deadline due today must not read as overdue before the day
+    ends in the user's timezone).
+    """
     if not due_date_str:
         return 9999
     try:
-        # Parse ISO date string (may be full datetime or date-only)
         if "T" in due_date_str:
             due = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
-            due_date = due.date()
+            if due.tzinfo is None:
+                due = due.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            # ceil to whole calendar days: 0-24h -> 1 day ... >4d -> 5
+            return max(0, -(-(due - now).total_seconds() // 86400))
         else:
             due_date = date.fromisoformat(due_date_str[:10])
-
-        today = date.today()
-        return (due_date - today).days
+            return (due_date - date.today()).days
     except (ValueError, TypeError):
         return 9999
