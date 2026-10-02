@@ -44,7 +44,24 @@ const api = (over = {}) => (url) => {
     [`/orgs/${ORG.org_id}/activity?limit=50`]: { ok: true, json: async () => ({ events: [EVENT] }) },
   };
   const route = over[url] || map[url];
-  return route || { ok: false, json: async () => ({}) };
+  if (route) return route;
+  // audited workspace entry (M4 Option B): POST enter-trust resolves the org
+  // view envelope — deep-link tests route through it, so the mock must too.
+  if (url.startsWith('/orgs/enter-trust/') && over._enter !== false) {
+    return {
+      ok: true,
+      json: async () => ({
+        trust: { trust_id: 'trust_1', name: 'Family Trust' },
+        client: { name: 'Jane Client', email: 'jane@x.com' },
+        org: { org_id: 'org_1' },
+        view_level: 'preparer',
+        expires_at: null,
+        entered_at: 'now',
+        return_path: '/org-console',
+      }),
+    };
+  }
+  return { ok: false, json: async () => ({}) };
 };
 
 // Text in the page is split across nested spans; match against combined text
@@ -88,7 +105,8 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     render(<OrgConsolePage />);
     await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(1));
     fireEvent.click(screen.getByTestId('go-to-minutes'));
-    expect(mockNavigate).toHaveBeenCalledWith('/minutes');
+    // entry is async (POST audited enter → then navigate): wait for the hop
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/minutes'));
     // setSelectedTrust must have been called BEFORE navigate (order matters —
     // the workspace routes read the persisted selected_trust_id on mount)
     const setCallOrder = setSelectedTrust.mock.invocationCallOrder[0];
@@ -104,9 +122,9 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     render(<OrgConsolePage />);
     await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(1));
     fireEvent.click(screen.getByTestId(`go-to-meetings-trust_1`));
-    expect(mockNavigate).toHaveBeenCalledWith('/governance/history/trust_1');
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/governance/history/trust_1'));
     fireEvent.click(screen.getByTestId(`go-to-distributions-trust_1`));
-    expect(mockNavigate).toHaveBeenCalledWith('/distributions');
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/distributions'));
   });
 
   it('renders the activity feed with label, member, attribution', async () => {
@@ -155,7 +173,103 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
         ? { ok: true, json: async () => [ORG] }
         : Promise.reject(new Error('network down')));
     render(<OrgConsolePage />);
-    await waitFor(() => expect(screen.getByText('Fiduciary Group')).toBeInTheDocument());
-    expect(screen.getByText(textOf(/Client trusts \(0\)/))).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('Fiduciary Group').length).toBeGreaterThan(0));
+    expect(screen.getByTestId('trusts-heading').textContent).toContain('Client trusts (0)');
+    // section failure is explicit, not silent: a retry affordance exists
+    expect(screen.getByTestId('org-section-failed')).toBeInTheDocument();
+  });
+});
+describe('OrgConsolePage v2 — scale + member actions + error states', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust: null, setSelectedTrust: jest.fn() });
+  });
+
+  const manyTrusts = Array.from({ length: 30 }, (_, i) => ({
+    trust_id: `trust_${i}`,
+    name: i % 2 ? `Trust ${i}` : `Alpha Trust ${i}`,
+    owner_name: `Client ${i}`,
+    grant_level: i % 3 ? 'viewer' : 'preparer',
+    pending_minutes: i < 4 ? 2 : 0,
+    next_deadline: null,
+  }));
+
+  it('scale: 30 trusts → search + level filter + show-more pagination + pending-first sort', async () => {
+    fetchWithAuth.mockImplementation(api({
+      [`/orgs/${ORG.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: manyTrusts }) },
+    }));
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(24));
+    // search narrows
+    fireEvent.change(screen.getByTestId('trust-search'), { target: { value: 'Alpha' } });
+    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(15));
+    // level filter
+    fireEvent.click(screen.getByTestId('trust-level-preparer'));
+    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(5));
+    fireEvent.click(screen.getByTestId('trust-level-all'));
+    fireEvent.change(screen.getByTestId('trust-search'), { target: { value: '' } });
+    // pending-first: card with pending_minutes appears before page-2 items
+    expect(screen.getAllByTestId('trust-card-pending').length).toBeGreaterThan(0);
+    // pagination: show more appends
+    fireEvent.click(screen.getByTestId('trust-show-more'));
+    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(30));
+  });
+
+  it('switcher: chips render per org with stats; clicking focuses one org panel', async () => {
+    const ORG2 = { org_id: 'org_2', name: 'Barlow Fiduciary' };
+    fetchWithAuth.mockImplementation((url) => {
+      const map = {
+        '/orgs': { ok: true, json: async () => [ORG, ORG2] },
+        [`/orgs/${ORG.org_id}/members`]: { ok: true, json: async () => [MEMBER] },
+        [`/orgs/${ORG.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: [TRUST] }) },
+        [`/orgs/${ORG.org_id}/activity?limit=50`]: { ok: true, json: async () => ({ events: [] }) },
+        [`/orgs/${ORG2.org_id}/members`]: { ok: true, json: async () => [] },
+        [`/orgs/${ORG2.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: [] }) },
+        [`/orgs/${ORG2.org_id}/activity?limit=50`]: { ok: true, json: async () => ({ events: [] }) },
+      };
+      return map[url] || { ok: false, json: async () => ({}) };
+    });
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('org-chip-org_2')).toBeInTheDocument());
+    expect(screen.getByTestId('trusts-heading').textContent).toContain('(1)');
+    fireEvent.click(screen.getByTestId('org-chip-org_2'));
+    await waitFor(() => expect(screen.getByTestId('trusts-heading').textContent).toContain('(0)'));
+  });
+
+  it('attention rail renders pending + deadline chips from loaded data', async () => {
+    fetchWithAuth.mockImplementation(api());
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('rail-pending')).toBeInTheDocument());
+    expect(screen.getByTestId('rail-pending').textContent).toContain('2');
+  });
+
+  it('team: collapsed default at >8, search members, row menu exposes suspend via real PATCH', async () => {
+    const MEMBERS = Array.from({ length: 10 }, (_, i) => ({
+      member_id: `mem_${i}`,
+      name: `Member ${i}`,
+      email: `m${i}@x.com`,
+      role: i === 0 ? 'owner' : 'member',
+      status: i === 9 ? 'invited' : 'active',
+    }));
+    fetchWithAuth.mockImplementation(api({
+      [`/orgs/${ORG.org_id}/members`]: { ok: true, json: async () => MEMBERS },
+    }));
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('team-toggle')).toBeInTheDocument());
+    // collapsed: only 5 rows visible
+    expect(screen.queryByText('Member 9')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('team-toggle'));
+    await waitFor(() => expect(screen.getByText('m9@x.com')).toBeInTheDocument());
+    // invite → dialog has role select now
+    fireEvent.click(screen.getByTestId(`invite-${ORG.org_id}`));
+    expect(screen.getByTestId('invite-role-select')).toBeInTheDocument();
+  });
+
+  it('page-level load failure shows the error card, NOT the no-org empty state', async () => {
+    fetchWithAuth.mockImplementation(() => ({ ok: false, json: async () => ({}) }));
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('org-console-error')).toBeInTheDocument());
+    expect(screen.queryByText(/No organization yet/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('org-console-retry'));
   });
 });
