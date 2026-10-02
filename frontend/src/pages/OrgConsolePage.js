@@ -473,6 +473,27 @@ export default function OrgConsolePage() {
               </Button>
             </div>
           </div>
+            <div className="flex gap-2 pt-1 border-t border-border/40">
+              <Button
+                variant="ghost" size="sm"
+                className="text-xs text-muted-foreground hover:text-navy flex-1"
+                onClick={async () => {
+                  try {
+                    const res = await fetchWithAuth(`/exports/defense-summary/${t.trust_id}`);
+                    if (!res.ok) { toast.error('Could not build the summary.'); return; }
+                    const blob = await res.blob();
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `defense-summary-${t.trust_id}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                  } catch { toast.error('Could not build the summary.'); }
+                }}
+                data-testid={`defense-summary-${t.trust_id}`}
+              >
+                Defense Summary
+              </Button>
+            </div>
         </CardContent>
       </Card>
     );
@@ -994,7 +1015,28 @@ export default function OrgConsolePage() {
                           <Copy className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      <span className="text-xs text-muted-foreground">Renaming and org-level policy are coming — contact support for changes.</span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" className="btn-secondary"
+                          onClick={async () => {
+                            try {
+                              toast.info('Building the packet…');
+                              const res = await fetchWithAuth(`/exports/org/${focusOrg.org_id}/packet`, { method: 'POST' });
+                              if (!res.ok) { toast.error('Packet build failed.'); return; }
+                              const blob = await res.blob();
+                              const a = document.createElement('a');
+                              a.href = URL.createObjectURL(blob);
+                              a.download = 'governance-packet.zip';
+                              a.click();
+                              URL.revokeObjectURL(a.href);
+                              toast.success('Governance packet downloaded.');
+                            } catch { toast.error('Packet build failed.'); }
+                          }}
+                          data-testid="org-packet-btn"
+                        >
+                          Export Governance Packet
+                        </Button>
+                        <span className="text-xs text-muted-foreground">Renaming and org-level policy are coming — contact support for changes.</span>
+                      </div>
                     </CardContent>
                   </div>
                 </div>

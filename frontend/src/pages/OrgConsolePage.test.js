@@ -13,7 +13,7 @@ jest.mock('lucide-react', () => {
   return new Proxy({}, { get: () => Stub });
 });
 jest.mock('@/components/Sidebar', () => ({ Sidebar: () => <nav data-testid="sidebar" /> }));
-jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
 
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
@@ -410,5 +410,38 @@ describe('OrgConsolePage Phase 2 — firm calendar + automated badge', () => {
     expect(screen.getAllByTestId('cal-week-2026-W40')).toHaveLength(1);
     expect(screen.getByText('Automated')).toBeInTheDocument();
     expect(screen.getByTestId('cal-open-a1')).toBeInTheDocument();
+  });
+});
+
+describe('OrgConsolePage Phase 3 — defense summary + packet buttons', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust: null, setSelectedTrust: jest.fn() });
+  });
+
+  it('trust card exposes Defense Summary download; settings row exposes packet export', async () => {
+    fetchWithAuth.mockImplementation((url, init) => {
+      if (url.includes('/exports/defense-summary/trust_1')) return Promise.resolve({ ok: true, blob: async () => new Blob(['%PDF-x']), status: 200 });
+      if (url.includes('/exports/org/org_1/packet')) return Promise.resolve({ ok: true, blob: async () => new Blob(['PK-zip']), status: 200 });
+      if (url.includes('/overview')) return Promise.resolve({ ok: true, json: async () => ({ org_id: 'org_1', portfolio: null, trusts: [] }) });
+      if (url.includes('/org/queue')) return Promise.resolve({ ok: true, json: async () => ({ items: [] }) });
+      if (url.includes('/calendar')) return Promise.resolve({ ok: true, json: async () => ({ weeks: [], counts: { total: 0 } }) });
+      const map = {
+        '/orgs': { ok: true, json: async () => [ORG] },
+        [`/orgs/org_1/members`]: { ok: true, json: async () => [MEMBER] },
+        [`/orgs/org_1/trusts`]: { ok: true, json: async () => ({ trusts: [TRUST] }) },
+        [`/orgs/org_1/activity?limit=50`]: { ok: true, json: async () => ({ events: [] }) },
+      };
+      return map[url] || { ok: false, json: async () => ({}) };
+    });
+    URL.createObjectURL = jest.fn(() => 'blob:x');
+    URL.revokeObjectURL = jest.fn();
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('defense-summary-trust_1')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('defense-summary-trust_1'));
+    await waitFor(() => expect(fetchWithAuth.mock.calls.some(([u]) => u.includes('/exports/defense-summary/trust_1'))).toBe(true));
+    const pkt = screen.getByTestId('org-packet-btn');
+    fireEvent.click(pkt);
+    await waitFor(() => expect(fetchWithAuth.mock.calls.some(([u, i]) => u.includes('/exports/org/org_1/packet') && i?.method === 'POST')).toBe(true));
   });
 });

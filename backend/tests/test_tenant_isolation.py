@@ -104,6 +104,11 @@ ROUTE_MAP = [
         ("POST", "/api/org/queue/{x_task}/complete", True),
         ("GET", "/api/orgs/{org_id}/calendar", False),
     ]),
+    ("defense_summary", [
+        ("GET", "/api/exports/defense-summary/{trust_id}", False),
+        ("POST", "/api/exports/defense-summary/{trust_id}/share", True),
+        ("POST", "/api/exports/client/{x_user}/packet", True),
+    ]),
     ("trust_parties", [
         ("GET", "/api/trust-parties/{x_trust_id}", False),
     ]),
@@ -285,7 +290,7 @@ DATA_ROUTER_MODULES = ("routers.trusts", "routers.vault", "routers.minutes",
                        "routers.compensation", "routers.calendar",
                        "routers.client_notes", "routers.orgs",
                        "routers.org_search", "routers.org_queue",
-                       "routers.trust_parties")
+                       "routers.defense_summary", "routers.trust_parties")
 
 
 @pytest.fixture
@@ -330,13 +335,14 @@ def app(iso_db):
     import routers.trusts, routers.vault, routers.minutes, routers.banking
     import routers.beneficiaries, routers.compensation, routers.calendar
     import routers.client_notes, routers.actions
-    import routers.org_search, routers.org_queue
+    import routers.org_search, routers.org_queue, routers.defense_summary
 
     app = FastAPI()
     for r in (routers.trusts, routers.vault, routers.minutes, routers.banking,
               routers.beneficiaries, routers.compensation, routers.calendar,
               routers.client_notes, routers.actions, routers.orgs,
-              routers.org_search, routers.org_queue, routers.trust_parties):
+              routers.org_search, routers.org_queue, routers.defense_summary,
+              routers.trust_parties):
         app.include_router(r.router, prefix="/api")
     return app
 

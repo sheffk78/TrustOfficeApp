@@ -78,6 +78,8 @@ from routers.entities import router as entities_router
 from routers.tasks import router as tasks_router
 from routers.orgs import router as orgs_router
 from routers.org_search import router as org_search_router
+from routers.org_queue import router as org_queue_router
+from routers.defense_summary import router as defense_summary_router
 from routers.auth import router as auth_router
 from routers.totp_2fa import router as totp_2fa_router
 from routers.preferences import router as preferences_router
@@ -501,6 +503,8 @@ app.add_middleware(
 # Register all routers
 app.include_router(orgs_router, prefix="/api")
 app.include_router(org_search_router, prefix="/api")
+app.include_router(org_queue_router, prefix="/api")
+app.include_router(defense_summary_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(totp_2fa_router, prefix="/api")
 app.include_router(actions_router, prefix="/api")
