@@ -211,3 +211,73 @@ if __name__ == "__main__":
         global s
         pytestmark2 = None
     print("run via pytest")
+
+
+# ==================== Edge 1: granted members keep trust context ====================
+from routers import trusts as trust_mod
+
+
+def _trusts_client(user, seeded_state):
+    app = FastAPI()
+    app.include_router(trust_mod.router, prefix="/api")
+
+    async def fake_user():
+        return {**user, "name": user.get("name", "")}
+
+    app.dependency_overrides[get_current_user] = fake_user
+    return TestClient(app)
+
+
+class TestGrantedTrustContext:
+    """GET /trusts and GET /trusts/{id} include actively granted trusts with a
+    SAFE projection (no owner/PII fields) + grant metadata. Reload-safe:
+    useTrustsLoader's reconcile can restore a granted member's selection."""
+
+    @pytest.mark.asyncio
+    async def test_granted_trust_listed_safe_projection(self, seeded):
+        tid = seeded["trust"]["trust_id"]
+        res = _trusts_client(seeded["prep"], seeded).get("/api/trusts")
+        assert res.status_code == 200, res.text[:140]
+        rows = res.json()
+        granted = [t for t in rows if t["trust_id"] == tid]
+        assert granted, f"granted trust missing from /trusts: rows={[t['trust_id'] for t in rows]}"
+        row = granted[0]
+        assert row.get("org_grant_level") == "preparer", row
+        assert row.get("granted_via_org_id") == "o_authz", row
+        assert row.get("org_grant_expires_at"), "grant expiry missing"
+
+    @pytest.mark.asyncio
+    async def test_granted_trust_single_get(self, seeded):
+        tid = seeded["trust"]["trust_id"]
+        res = _trusts_client(seeded["prep"], seeded).get(f"/api/trusts/{tid}")
+        assert res.status_code == 200, f"preparer grant single GET must 200, got {res.status_code}: {res.text[:120]}"
+        row = res.json()
+        assert row["trust_id"] == tid
+        assert row.get("org_grant_level") == "preparer"
+
+    @pytest.mark.asyncio
+    async def test_expired_grant_single_get_404(self, seeded):
+        tid = seeded["trust"]["trust_id"]
+        res = _trusts_client(seeded["viewexp"], seeded).get(f"/api/trusts/{tid}")
+        assert res.status_code == 404, f"expired grant must NOT read trust: {res.status_code}"
+
+    @pytest.mark.asyncio
+    async def test_owner_gets_full_record_not_grant_metadata(self, seeded):
+        tid = seeded["trust"]["trust_id"]
+        res = _trusts_client(seeded["owner"], seeded).get("/api/trusts")
+        rows = res.json()
+        mine = [t for t in rows if t["trust_id"] == tid]
+        assert mine, "owner trust vanished"
+        assert mine[0].get("org_grant_level") is None, "own trust must not be tagged as granted"
+
+    @pytest.mark.asyncio
+    async def test_member_without_grant_sees_nothing_extra(self, seeded):
+        # nogrant got a grant for t_authz?? No: seeded gives every member a grant
+        # except the cross-trust case — use trust2 (no grant) as the probe.
+        tid2 = seeded["trust2"]["trust_id"]
+        res = _trusts_client(seeded["viewer"], seeded).get("/api/trusts")
+        rows = res.json()
+        assert not [t for t in rows if t["trust_id"] == tid2], \
+            "ungranted trust leaked into member's /trusts"
+        assert [t for t in rows if t["trust_id"] == seeded["trust"]["trust_id"]], \
+            "granted trust should appear"

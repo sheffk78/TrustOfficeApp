@@ -324,6 +324,91 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
         raise HTTPException(status_code=500, detail="Something went wrong on our end while creating the trust. Our team has been notified. If this continues, contact support@trustoffice.app.")
 
 
+
+
+# ==================== ORG-GRANTED TRUSTS (org console, 2026-10-01) ====================
+# Granted members must keep trust context: GET /trusts previously scoped to
+# the caller's OWN trusts, so an org member's sidebar selector emptied on
+# reload (useTrustsLoader reconcile found nothing to restore) and pages lost
+# their selection. Granted trusts are appended with a SAFE projection —
+# owner/successor/attorney/CPA contact fields stay owner-only; the grant
+# gates already govern every data route, so this is list metadata only.
+
+_GRANTED_TRUST_PROJECTION = {
+    "_id": 0, "trust_id": 1, "name": 1, "trust_type": 1, "status": 1,
+    "created_at": 1, "is_demo": 1, "description": 1, "review_cadence": 1,
+    "jurisdiction": 1, "benevolence_enabled": 1,
+}
+
+
+def _dt_parse(raw: str):
+    from datetime import datetime as _dt
+    try:
+        return _dt.fromisoformat(str(raw).replace('Z', '+00:00'))
+    except ValueError:
+        return _dt.fromisoformat(str(raw)[:19])
+
+
+def _grant_active(grant: dict) -> bool:
+    """Same activity rule require_org_grant uses (status + expiry)."""
+    if grant.get("status") != "active":
+        return False
+    expires = grant.get("expires_at")
+    if not expires:
+        return True
+    try:
+        return _dt_parse(expires) > datetime.now(timezone.utc)
+    except Exception:
+        return True
+
+
+async def _granted_trusts_for(user: dict) -> list:
+    """[(trust_doc_safe, grant)] for this member's active trust grants."""
+    from dependencies import _my_memberships
+    member_ids = []
+    async for m in _my_memberships(user):
+        if m.get("status") == "active":
+            member_ids.append(m["member_id"])
+    if not member_ids:
+        return []
+    now = datetime.now(timezone.utc).isoformat()
+    grants = await db.trust_grants.find({
+        "member_id": {"$in": member_ids},
+        "status": "active",
+        "$or": [
+            {"expires_at": {"$gte": now}},
+            {"expires_at": {"$exists": False}},
+            {"expires_at": None},
+        ],
+    }, {"_id": 0}).to_list(100)
+    out = []
+    for g in grants:
+        if not _grant_active(g):
+            continue
+        t = await db.trusts.find_one(
+            {"trust_id": g["trust_id"]}, _GRANTED_TRUST_PROJECTION)
+        if t and t.get("is_demo") is not True:
+            out.append((t, g))
+    return out
+
+
+def _safe_grant_trust_response(trust: dict, grant: dict, governance_score: int):
+    """TrustResponse for a granted trust: safe fields + grant metadata."""
+    return TrustResponse(
+        trust_id=trust["trust_id"], user_id="", name=trust.get("name", ""),
+        trust_type=trust.get("trust_type") or "irrevocable",
+        jurisdiction=trust.get("jurisdiction") or "",
+        benevolence_enabled=bool(trust.get("benevolence_enabled")),
+        created_at=trust.get("created_at") or "",
+        governance_score=governance_score,
+        is_demo=False, status=trust.get("status") or "active",
+        description=trust.get("description"), review_cadence=trust.get("review_cadence") or "quarterly",
+        org_grant_level=grant.get("level"),
+        org_grant_expires_at=grant.get("expires_at"),
+        granted_via_org_id=grant.get("org_id"),
+    )
+
+
 @router.get("/trusts", response_model=List[TrustResponse])
 async def get_trusts(user: dict = Depends(get_current_user)):
     """Get trusts for the current user.
@@ -359,6 +444,16 @@ async def get_trusts(user: dict = Depends(get_current_user)):
         health = await calculate_health_score(trust["trust_id"], user["user_id"], save_snapshot=False)
         result.append(TrustResponse(**trust, governance_score=health["total_score"]))
     
+    # Granted trusts (org console workspace entry): active org grants appear
+    # after the user's own trusts with a safe projection + grant metadata.
+    granted = await _granted_trusts_for(user)
+    seen = {getattr(t, "trust_id", None) for t in result}
+    for trust, grant in granted:
+        if trust["trust_id"] in seen:
+            continue
+        health = await calculate_health_score(trust["trust_id"], user["user_id"], save_snapshot=False)
+        result.append(_safe_grant_trust_response(trust, grant, health["total_score"]))
+    
     return result
 
 
@@ -370,6 +465,15 @@ async def get_trust(trust_id: str, user: dict = Depends(get_current_user)):
         {"_id": 0}
     )
     if not trust:
+        # Org-grant fallback (workspace entry): granted members are not the
+        # owner — serve a safe-projection view instead of a 404, so reloads
+        # and per-trust detail keep working for granted members.
+        granted = await _granted_trusts_for(user)
+        match = next(((t, g) for t, g in granted if t["trust_id"] == trust_id), None)
+        if match:
+            t, g = match
+            health = await calculate_health_score(trust_id, user["user_id"], save_snapshot=False)
+            return _safe_grant_trust_response(t, g, health["total_score"])
         raise HTTPException(status_code=404, detail="Trust not found. Please refresh the page or check your trust selection.")
 
     health = await calculate_health_score(trust_id, user["user_id"], save_snapshot=False)

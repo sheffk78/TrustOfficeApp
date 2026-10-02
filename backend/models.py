@@ -510,6 +510,13 @@ class TrustResponse(BaseModel):
     # Email→minutes inbound address + capture toggle (2026-09-25)
     minutes_slug: Optional[str] = None
     minutes_email_enabled: Optional[bool] = False
+    # Org-grant metadata (org-console workspace entry, 2026-10-01): set ONLY
+    # when the trust reached the caller through an active org grant — own
+    # trusts come back with these as None so the frontend can chip granted
+    # entries in the sidebar selector.
+    org_grant_level: Optional[str] = None
+    org_grant_expires_at: Optional[str] = None
+    granted_via_org_id: Optional[str] = None
 
 
 # ==================== ENTITY MODELS ====================
