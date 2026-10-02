@@ -7,6 +7,9 @@ import requests
 import os
 import sys
 
+if not os.environ.get('REACT_APP_BACKEND_URL'):
+    pytest.skip("REACT_APP_BACKEND_URL not set — live-server suite skipped",
+                allow_module_level=True)
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 # Optional partner API key — if unset, endpoints will 401 (still a valid smoke signal)
 EXTERNAL_API_KEY = os.environ.get("EXTERNAL_API_KEY", "")

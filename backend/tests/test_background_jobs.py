@@ -15,7 +15,10 @@ from datetime import datetime, timezone, timedelta
 # Get BASE_URL from environment
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    raise ValueError("REACT_APP_BACKEND_URL environment variable is not set")
+    # 2026-10-01: module-LEVEL SKIP (was: raise ValueError) — live-server
+    # suite; full-suite dev collection errored here instead of skipping.
+    pytest.skip("REACT_APP_BACKEND_URL not set — live-server suite skipped",
+                allow_module_level=True)
 
 
 class TestBackgroundJobs:

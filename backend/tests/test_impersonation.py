@@ -13,7 +13,13 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://trust-governance-fix.preview.emergentagent.com')
+# 2026-10-01: default pointed at a DEAD preview deploy (emergentagent.com
+# retired) — logins 404'd even when someone meant to run it. Live-server
+# suite: skip cleanly when the env is unset.
+if not os.environ.get('REACT_APP_BACKEND_URL'):
+    pytest.skip("REACT_APP_BACKEND_URL not set — live-server suite skipped",
+                allow_module_level=True)
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL')
 
 # Test credentials
 ADMIN_EMAIL = "contact@trustoffice.app"

@@ -45,9 +45,13 @@ QA_ACCOUNTS = [
 # the ops config only (nightly cron sets TRUSTOFFICE_QA_PASSWORD).
 QA_PASSWORD = os.environ.get("TRUSTOFFICE_QA_PASSWORD")
 if not QA_PASSWORD:
-    raise RuntimeError(
+    # 2026-10-01: module-LEVEL SKIP (was: raise RuntimeError) — full-suite
+    # collection in every dev run errored here; the nightly cron sets the
+    # env and gets a real run. Skipping keeps the gate semantic.
+    pytest.skip(
         "TRUSTOFFICE_QA_PASSWORD env var is required to run the smoke suite. "
-        "The QA password is not stored in this repo."
+        "The QA password is not shipped in this repo.",
+        allow_module_level=True,
     )
 
 

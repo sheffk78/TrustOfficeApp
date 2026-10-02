@@ -16,6 +16,12 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND))
 
+# CLEANUP CONTRACT (2026-10-01 full-suite fix): stubs below are REPLACED
+# in sys.modules and never restored — in full-suite collection every
+# later-alphabet suite imported these stubs (cascading "unknown
+# location" ImportErrors). Snapshot here, restore at file end.
+_saved_modules = {k: sys.modules.get(k) for k in ('routers', 'routers.admin', 'email_service', 'database', 'dependencies', 'routers.leads')}
+
 # ---- Module-level stubs (same shape as the sibling test) ----
 _routers_pkg = types.ModuleType("routers")
 _routers_pkg.__path__ = [str(BACKEND / "routers")]
@@ -113,3 +119,10 @@ def test_mixed_valid_and_invalid_raises_422():
         assert e.status_code == 422
     else:
         raise AssertionError("expected HTTPException 422 for mixed list")
+
+# ---- Restore sys.modules (see CLEANUP CONTRACT above) ----
+for _k, _v in _saved_modules.items():
+    if _v is None:
+        sys.modules.pop(_k, None)
+    else:
+        sys.modules[_k] = _v

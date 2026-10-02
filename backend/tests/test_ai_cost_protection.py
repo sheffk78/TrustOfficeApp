@@ -18,7 +18,13 @@ import jwt as pyjwt
 from datetime import datetime, timezone, timedelta
 
 # Get BASE_URL - use localhost for testing to avoid external rate limits
-BASE_URL = os.environ.get('TEST_BASE_URL', 'http://localhost:8001')
+# 2026-10-01: live-server suite (own comment: needs a running server).
+# Defaulting to localhost:8001 meant meaningless 404s/connection errors in
+# full-suite runs with no server up. Skip unless TEST_BASE_URL is set.
+if not os.environ.get('TEST_BASE_URL'):
+    pytest.skip("TEST_BASE_URL not set — live-server suite skipped",
+                allow_module_level=True)
+BASE_URL = os.environ.get('TEST_BASE_URL')
 
 # Test credentials
 DEMO_EMAIL = "demo@trustoffice.com"

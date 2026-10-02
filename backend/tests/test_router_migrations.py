@@ -5,7 +5,13 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
+# 2026-10-01: was os.environ.get(...).rstrip('/') crashing on None at
+# module level in every full-suite dev collection. Skip instead.
+_base_url_raw = os.environ.get('REACT_APP_BACKEND_URL')
+if not _base_url_raw:
+    pytest.skip("REACT_APP_BACKEND_URL not set — live-server suite skipped",
+                allow_module_level=True)
+BASE_URL = _base_url_raw.rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "demo@trustoffice.com"

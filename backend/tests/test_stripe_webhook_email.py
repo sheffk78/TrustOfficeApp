@@ -8,6 +8,9 @@ import requests
 import os
 import json
 
+if not os.environ.get('REACT_APP_BACKEND_URL'):
+    pytest.skip("REACT_APP_BACKEND_URL not set — live-server suite skipped",
+                allow_module_level=True)
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials

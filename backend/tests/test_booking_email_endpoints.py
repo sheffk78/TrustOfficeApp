@@ -21,6 +21,15 @@ BACKEND = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND))
 
 # ---- Module-level stubs ----
+# CLEANUP CONTRACT (2026-10-01 full-suite fix): these modules are REPLACED in
+# sys.modules below, and pytest full-collection imports every test file in
+# alphabetical order — without restoring, every LATER-alphabet suite imported
+# these stubs and cascaded 19 'unknown location' ImportErrors. Snapshot here,
+# restore at file end.
+_saved_modules = {k: sys.modules.get(k) for k in (
+    "routers", "routers.admin", "routers.leads", "email_service",
+    "database", "dependencies")}
+
 _routers_pkg = types.ModuleType("routers")
 _routers_pkg.__path__ = [str(BACKEND / "routers")]
 sys.modules["routers"] = _routers_pkg
@@ -263,3 +272,10 @@ def test_empty_body_guardrail():
     """Empty subject or body should be rejected."""
     assert not "  ".strip()
     assert not "".strip()
+
+# ---- Restore sys.modules (see CLEANUP CONTRACT above) ----
+for _k, _v in _saved_modules.items():
+    if _v is None:
+        sys.modules.pop(_k, None)
+    else:
+        sys.modules[_k] = _v

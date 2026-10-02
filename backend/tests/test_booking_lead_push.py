@@ -15,6 +15,12 @@ import pytest
 BACKEND = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND))
 
+# CLEANUP CONTRACT (2026-10-01 full-suite fix): stubs below are REPLACED
+# in sys.modules and never restored — in full-suite collection every
+# later-alphabet suite imported these stubs (cascading "unknown
+# location" ImportErrors). Snapshot here, restore at file end.
+_saved_modules = {k: sys.modules.get(k) for k in ('routers', 'routers.admin', 'email_service')}
+
 # leads.py does `from routers.admin import require_admin`, which pulls the whole
 # routers package (py3.10+ syntax in email_templates breaks on local py3.9).
 # Stub the package + admin + email_service first; the deployed image (py3.11+)
@@ -136,3 +142,10 @@ async def test_confirmed_push_bumps_existing_lead_score(monkeypatch):
     assert s["score"] == 55, "40 + 15 (same weight the scorer gives booked_call)"
     confirmed_logs = [a for a in updates["activities"] if "confirmed" in a.get("content", "")]
     assert confirmed_logs, "confirm must log the score bump as an activity"
+
+# ---- Restore sys.modules (see CLEANUP CONTRACT above) ----
+for _k, _v in _saved_modules.items():
+    if _v is None:
+        sys.modules.pop(_k, None)
+    else:
+        sys.modules[_k] = _v
