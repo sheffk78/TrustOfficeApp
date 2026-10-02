@@ -26,6 +26,12 @@ jest.mock('react-router-dom', () => ({
 
 jest.mock('@/context/AuthContext', () => ({ useAuth: jest.fn() }));
 
+// 4856782 added the dark-mode toggle (useTheme) to MobileBottomNav; the
+// harness must supply it or useTheme throws outside ThemeProvider.
+jest.mock('@/context/ThemeContext', () => ({
+  useTheme: () => ({ isDark: false, toggleTheme: jest.fn() }),
+}));
+
 jest.mock('lucide-react', () => new Proxy({}, {
   get: (_target, name) => (props) => (
     <span data-testid={`icon-${String(name)}`} {...props} />

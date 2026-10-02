@@ -43,9 +43,10 @@ describe('ChatPanel regression: messages may be undefined', () => {
     ).not.toThrow();
   });
 
-  it('still renders the greeting when messages is undefined', () => {
+  it('still renders the empty-state welcome when messages is undefined', () => {
+    // Greeting bubble was replaced (82a9551) by the welcome heading + chips empty state
     render(<ChatPanel {...baseProps} messages={undefined} />);
-    expect(screen.getByText(/Hi! I'm your Trust Assistant/)).toBeInTheDocument();
+    expect(screen.getByText('Trust Assistant')).toBeInTheDocument();
   });
 
   it('renders message bubbles when messages is a real array', () => {

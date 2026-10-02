@@ -52,13 +52,13 @@ describe('analytics utilities', () => {
         plan_type: 'trustee',
         billing_period: 'monthly',
         transaction_id: 'txn_abc123',
-        value: 79,
+        value: 99,
         currency: 'USD',
         user_id: 'user_abc123',
       });
     });
 
-    it('uses correct tier pricing for estate/annual ($1,490)', () => {
+    it('uses correct tier pricing for estate/annual ($1,788)', () => {
       analytics.trackActivationComplete({
         user_id: 'user_estate',
         plan_type: 'estate',
@@ -67,11 +67,11 @@ describe('analytics utilities', () => {
       });
 
       expect(mockGtag).toHaveBeenCalledWith('event', 'activation_complete',
-        expect.objectContaining({ value: 1490 })
+        expect.objectContaining({ value: 1788 })
       );
     });
 
-    it('uses correct tier pricing for advisor/monthly ($399)', () => {
+    it('uses correct tier pricing for advisor/monthly ($499)', () => {
       analytics.trackActivationComplete({
         user_id: 'user_advisor',
         plan_type: 'advisor',
@@ -79,7 +79,7 @@ describe('analytics utilities', () => {
       });
 
       expect(mockGtag).toHaveBeenCalledWith('event', 'activation_complete',
-        expect.objectContaining({ value: 399 })
+        expect.objectContaining({ value: 499 })
       );
     });
 
@@ -167,7 +167,7 @@ describe('analytics utilities', () => {
 
       expect(mockGtag).toHaveBeenCalledTimes(1);
       expect(mockGtag).toHaveBeenCalledWith('event', 'activation_complete',
-        expect.objectContaining({ user_id: 'user_bob', value: 79 })
+        expect.objectContaining({ user_id: 'user_bob', value: 99 })
       );
     });
 
@@ -196,7 +196,7 @@ describe('analytics utilities', () => {
 
       expect(mockGtag).toHaveBeenCalledTimes(1);
       expect(mockGtag).toHaveBeenCalledWith('event', 'activation_complete',
-        expect.objectContaining({ plan_type: 'estate', value: 1490 })
+        expect.objectContaining({ plan_type: 'estate', value: 1788 })
       );
     });
 
