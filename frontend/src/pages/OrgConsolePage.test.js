@@ -18,6 +18,7 @@ jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }))
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useSearchParams: () => [new URLSearchParams(), jest.fn()],
   Link: ({ to, children, ...rest }) => <a href={to} {...rest}>{children}</a>,
 }));
 
@@ -271,5 +272,49 @@ describe('OrgConsolePage v2 — scale + member actions + error states', () => {
     await waitFor(() => expect(screen.getByTestId('org-console-error')).toBeInTheDocument());
     expect(screen.queryByText(/No organization yet/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('org-console-retry'));
+  });
+});
+
+describe('OrgConsolePage Phase 0 — server-mode advanced filtering (>48 trusts)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust: null, setSelectedTrust: jest.fn() });
+  });
+
+  const bigBook = Array.from({ length: 60 }, (_, i) => ({
+    trust_id: `trust_${i}`,
+    name: i % 2 ? `Trust ${i}` : `Alpha Trust ${i}`,
+    owner_name: `Client ${i % 10}`,
+    owner_email: `c${i % 10}@x.com`,
+    grant_level: i % 4 ? 'viewer' : 'preparer',
+    pending_minutes: i < 3 ? 5 : 0,
+    next_deadline: null,
+  }));
+  const searchBody = (over = {}) => ({ trusts: bigBook, total: 60, page: { page: 1, page_size: 24, pages: 3 }, ...over });
+
+  it('server mode: renders server grid + count line + advanced filters; search hits /search endpoint', async () => {
+    fetchWithAuth.mockImplementation((url) => {
+      if (url.startsWith('/orgs/org_1/trusts/search')) {
+        if (url.includes('q=Alpha')) return Promise.resolve({ ok: true, json: async () => searchBody({ trusts: bigBook.filter(t => t.name.includes('Alpha')), total: 30 }) });
+        return Promise.resolve({ ok: true, json: async () => searchBody() });
+      }
+      const map = {
+        '/orgs': { ok: true, json: async () => [ORG] },
+        [`/orgs/${ORG.org_id}/members`]: { ok: true, json: async () => [MEMBER] },
+        [`/orgs/${ORG.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: bigBook }) },
+        [`/orgs/${ORG.org_id}/activity?limit=50`]: { ok: true, json: async () => ({ events: [] }) },
+      };
+      return map[url] || { ok: false, json: async () => ({}) };
+    });
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('advanced-filters')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('trust-result-count').textContent).toContain('of 60'), { timeout: 2000 });
+    fireEvent.change(screen.getByTestId('trust-search'), { target: { value: 'Alpha' } });
+    // debounced 300ms — wait for server grid update
+    await waitFor(() => expect(screen.getByTestId('trust-result-count').textContent).toContain('of 30'), { timeout: 2000 });
+    expect(fetchWithAuth.mock.calls.some(([u]) => u.includes('q=Alpha'))).toBe(true);
+    // status select present and functional (state change triggers refetch)
+    fireEvent.change(screen.getByTestId('trust-status-filter'), { target: { value: 'attention' } });
+    await waitFor(() => expect(fetchWithAuth.mock.calls.some(([u]) => u.includes('status=attention'))).toBe(true), { timeout: 2000 });
   });
 });

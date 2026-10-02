@@ -9,6 +9,7 @@
 // /api/orgs/{org_id}/activity; PATCH /orgs/{id}/members/{member_id};
 // POST /orgs/enter-trust/{trust_id} (audited workspace entry).
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -86,6 +87,17 @@ export default function OrgConsolePage() {
   const [trustQuery, setTrustQuery] = useState('');
   const [trustLevel, setTrustLevel] = useState('all'); // all | preparer | viewer
   const [trustShown, setTrustShown] = useState(TRUST_PAGE_SIZE);
+  // — Phase 0: server-backed search for orgs beyond client-aggregation scale (>24) —
+  const SERVER_MODE_THRESHOLD = 48;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [serverTrusts, setServerTrusts] = useState(null);   // null = client mode
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverPage, setServerPage] = useState(1);
+  const [trustStatus, setTrustStatus] = useState('all');
+  const [trustDeadline, setTrustDeadline] = useState('all');
+  const [trustSort, setTrustSort] = useState('pending_desc');
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef(null);
   // team
   const [teamOpen, setTeamOpen] = useState(false);   // collapsed by default (>8 shows collapsed)
   const [teamQuery, setTeamQuery] = useState('');
@@ -134,6 +146,43 @@ export default function OrgConsolePage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // ——— Phase 0: server-side search (fires when the focused org is big enough) ———
+  const trustCount = (trustsByOrg[focusOrg?.org_id] || []).filter(Boolean).length;
+  const serverMode = trustCount > SERVER_MODE_THRESHOLD;
+  useEffect(() => {
+    if (!serverMode || !focusOrg) { setServerTrusts(null); return; }
+    const params = {
+      q: trustQuery, level: trustLevel, status: trustStatus,
+      deadline: trustDeadline, sort: trustSort,
+      page: String(serverPage), page_size: String(TRUST_PAGE_SIZE),
+    };
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const qs = new URLSearchParams(params).toString();
+        const res = await fetchWithAuth(`/orgs/${focusOrg.org_id}/trusts/search?${qs}`);
+        if (res.ok) {
+          const body = await res.json();
+          setServerTrusts(body.trusts || []);
+          setServerTotal(body.total || 0);
+        }
+      } finally { setSearching(false); }
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [serverMode, focusOrg?.org_id, trustQuery, trustLevel, trustStatus, trustDeadline, trustSort, serverPage]);
+
+  // URL sync — shareable/stable filtered views (?q=&level=&status=...)
+  useEffect(() => {
+    const sp = new URLSearchParams();
+    if (trustQuery) sp.set('q', trustQuery);
+    if (trustLevel !== 'all') sp.set('level', trustLevel);
+    if (trustStatus !== 'all') sp.set('status', trustStatus);
+    if (trustDeadline !== 'all') sp.set('deadline', trustDeadline);
+    if (trustSort !== 'pending_desc') sp.set('sort', trustSort);
+    setSearchParams(sp, { replace: true });
+  }, [trustQuery, trustLevel, trustStatus, trustDeadline, trustSort, setSearchParams]);
 
   // my role in the focused org (owner vs member — gates admin actions)
   useEffect(() => {
@@ -677,13 +726,18 @@ export default function OrgConsolePage() {
                       <h3 className="font-medium text-navy" data-testid="trusts-heading">
                         Client trusts ({(trustsByOrg[focusOrg.org_id] || []).filter(Boolean).length})
                       </h3>
+                      {serverMode && serverTrusts ? (
+                        <span className="text-xs text-muted-foreground" data-testid="trust-result-count">
+                          {serverTotal === 0 ? 'no matches' : `showing ${serverTrusts.length} of ${serverTotal}`}
+                        </span>
+                      ) : null}
                     </div>
-                    {(trustsByOrg[focusOrg.org_id] || []).filter(Boolean).length > 6 ? (
-                      <div className="flex items-center gap-2">
+                    {trustCount > 6 ? (
+                      <div className="flex items-center gap-2 flex-wrap">
                         <div className="relative">
                           <Search className="w-4 h-4 text-muted-foreground absolute left-2.5 top-2.5" />
                           <Input
-                            value={trustQuery} onChange={e => setTrustQuery(e.target.value)}
+                            value={trustQuery} onChange={e => { setTrustQuery(e.target.value); setServerPage(1); }}
                             placeholder="Search trust, client, or email…" className="pl-8 text-sm w-64"
                             data-testid="trust-search"
                           />
@@ -691,7 +745,7 @@ export default function OrgConsolePage() {
                         <div className="flex gap-1">
                           {['all', 'preparer', 'viewer'].map(lv => (
                             <button key={lv}
-                              onClick={() => { setTrustLevel(lv); setTrustShown(TRUST_PAGE_SIZE); }}
+                              onClick={() => { setTrustLevel(lv); setServerPage(1); }}
                               className={`px-2.5 py-1 rounded-full text-xs border ${trustLevel === lv ? 'bg-navy text-white border-navy' : 'text-navy border-border hover:border-navy/50'}`}
                               data-testid={`trust-level-${lv}`}
                             >
@@ -699,23 +753,81 @@ export default function OrgConsolePage() {
                             </button>
                           ))}
                         </div>
+                        {serverMode ? (
+                          <div className="flex gap-1" data-testid="advanced-filters">
+                            <select
+                              value={trustStatus} onChange={e => { setTrustStatus(e.target.value); setServerPage(1); }}
+                              className="text-xs border border-border rounded-md bg-background px-2 py-1.5 text-navy"
+                              data-testid="trust-status-filter"
+                              aria-label="Status filter"
+                            >
+                              <option value="all">All status</option>
+                              <option value="attention">Needs attention</option>
+                              <option value="healthy">Healthy</option>
+                            </select>
+                            <select
+                              value={trustDeadline} onChange={e => { setTrustDeadline(e.target.value); setServerPage(1); }}
+                              className="text-xs border border-border rounded-md bg-background px-2 py-1.5 text-navy"
+                              data-testid="trust-deadline-filter"
+                              aria-label="Deadline filter"
+                            >
+                              <option value="all">Any deadline</option>
+                              <option value="overdue">Overdue</option>
+                              <option value="7d">Next 7 days</option>
+                              <option value="30d">Next 30 days</option>
+                              <option value="quarter">This quarter</option>
+                              <option value="none">No deadline</option>
+                            </select>
+                            <select
+                              value={trustSort} onChange={e => { setTrustSort(e.target.value); setServerPage(1); }}
+                              className="text-xs border border-border rounded-md bg-background px-2 py-1.5 text-navy"
+                              data-testid="trust-sort"
+                              aria-label="Sort"
+                            >
+                              <option value="pending_desc">Most pending first</option>
+                              <option value="deadline_asc">Deadline soonest</option>
+                              <option value="health_asc">Lowest score</option>
+                              <option value="name_asc">Name A–Z</option>
+                            </select>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">Scoped, time-limited, revocable by the client.</p>
                   {(trustsByOrg[focusOrg.org_id] || []).length === 0 ? (
                     <GrantedTrustsEmptyState />
-                  ) : filteredTrusts.length === 0 ? (
+                  ) : serverMode && (serverTrusts || []).length === 0 ? (
+                    <div className="card-trust text-center py-8 mb-4" data-testid="trust-filter-empty">
+                      <p className="text-sm text-muted-foreground mb-2">
+                        No trusts match {trustQuery ? `"${trustQuery}"` : 'these filters'}
+                        {trustStatus !== 'all' || trustDeadline !== 'all' ? ' + filter selections' : ''}.
+                      </p>
+                      <Button variant="outline" size="sm" className="btn-secondary" onClick={() => { setTrustQuery(''); setTrustLevel('all'); setTrustStatus('all'); setTrustDeadline('all'); setServerPage(1); }}>Clear</Button>
+                    </div>
+                  ) : !serverMode && filteredTrusts.length === 0 ? (
                     <div className="card-trust text-center py-8 mb-4" data-testid="trust-filter-empty">
                       <p className="text-sm text-muted-foreground mb-2">No trusts match “{trustQuery || trustLevel}”.</p>
                       <Button variant="outline" size="sm" className="btn-secondary" onClick={() => { setTrustQuery(''); setTrustLevel('all'); }}>Clear</Button>
                     </div>
                   ) : (
                     <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
-                        {visibleTrusts.map(t => trustCard(t))}
-                      </div>
-                      {filteredTrusts.length > trustShown ? (
+                      {serverMode ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4" data-testid="server-trust-grid">
+                          {(serverTrusts || []).filter(Boolean).map(t => trustCard(t))}
+                          {searching ? <p className="text-xs text-muted-foreground">Searching…</p> : null}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
+                          {visibleTrusts.map(t => trustCard(t))}
+                        </div>
+                      )}
+                      {serverMode && serverTotal > serverPage * TRUST_PAGE_SIZE ? (
+                        <Button variant="outline" className="btn-secondary w-full mb-4" onClick={() => setServerPage(n => n + 1)} data-testid="trust-show-more">
+                          Load page {serverPage + 1} of {Math.ceil(serverTotal / TRUST_PAGE_SIZE)}
+                        </Button>
+                      ) : null}
+                      {!serverMode && filteredTrusts.length > trustShown ? (
                         <Button variant="outline" className="btn-secondary w-full mb-4" onClick={() => setTrustShown(n => n + TRUST_PAGE_SIZE)} data-testid="trust-show-more">
                           Show {Math.min(TRUST_PAGE_SIZE, filteredTrusts.length - trustShown)} more of {filteredTrusts.length}
                         </Button>
