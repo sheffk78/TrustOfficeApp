@@ -98,6 +98,11 @@ ROUTE_MAP = [
     ("org_search", [
         ("GET", "/api/orgs/{org_id}/trusts/search", False),
     ]),
+    ("org_queue", [
+        ("GET", "/api/orgs/{org_id}/overview", False),
+        ("GET", "/api/org/queue", False),
+        ("POST", "/api/org/queue/{x_task}/complete", True),
+    ]),
     ("trust_parties", [
         ("GET", "/api/trust-parties/{x_trust_id}", False),
     ]),
@@ -278,7 +283,7 @@ DATA_ROUTER_MODULES = ("routers.trusts", "routers.vault", "routers.minutes",
                        "routers.banking", "routers.beneficiaries",
                        "routers.compensation", "routers.calendar",
                        "routers.client_notes", "routers.orgs",
-                       "routers.org_search",
+                       "routers.org_search", "routers.org_queue",
                        "routers.trust_parties")
 
 
@@ -324,13 +329,13 @@ def app(iso_db):
     import routers.trusts, routers.vault, routers.minutes, routers.banking
     import routers.beneficiaries, routers.compensation, routers.calendar
     import routers.client_notes, routers.actions
-    import routers.org_search
+    import routers.org_search, routers.org_queue
 
     app = FastAPI()
     for r in (routers.trusts, routers.vault, routers.minutes, routers.banking,
               routers.beneficiaries, routers.compensation, routers.calendar,
               routers.client_notes, routers.actions, routers.orgs,
-              routers.org_search, routers.trust_parties):
+              routers.org_search, routers.org_queue, routers.trust_parties):
         app.include_router(r.router, prefix="/api")
     return app
 

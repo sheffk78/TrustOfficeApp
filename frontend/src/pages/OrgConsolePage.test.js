@@ -318,3 +318,63 @@ describe('OrgConsolePage Phase 0 — server-mode advanced filtering (>48 trusts)
     await waitFor(() => expect(fetchWithAuth.mock.calls.some(([u]) => u.includes('status=attention'))).toBe(true), { timeout: 2000 });
   });
 });
+
+describe('OrgConsolePage Phase 1 — portfolio overview + review queue', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust: null, setSelectedTrust: jest.fn() });
+  });
+
+  it('renders portfolio rollup cells + queue rows with preparer Complete action; non-preparer rows lack it', async () => {
+    fetchWithAuth.mockImplementation((url) => {
+      if (url.includes('/overview')) return Promise.resolve({ ok: true, json: async () => ({
+        org_id: 'org_1',
+        portfolio: { trust_count: 3, average_health: 78.4, at_risk: 1, overdue_total: 2, pending_minutes_total: 4, due_week: 1 },
+        trusts: [{ trust_id: 'trust_1', name: 'Family Trust', grant_level: 'preparer', health_score: 78, health_chip: 'watch', pending_minutes: 4, overdue_count: 2, next_deadline: '2026-10-04' }],
+      }) });
+      if (url.includes('/org/queue')) return Promise.resolve({ ok: true, json: async () => ({
+        items: [
+          { task_id: 'tk1', trust_id: 'trust_1', trust_name: 'Family Trust', task_type: 'quarterly_review', title: 'Quarterly review', due_date: '2026-09-30', urgency: 'overdue', grant_level: 'preparer' },
+          { task_id: 'tk2', trust_id: 'trust_1', trust_name: 'Family Trust', task_type: 'custom', title: 'Read ledger', due_date: '2026-11-01', urgency: 'later', grant_level: 'viewer' },
+        ],
+        counts: { overdue: 1, due_week: 0, later: 1 },
+      }) });
+      const map = {
+        '/orgs': { ok: true, json: async () => [ORG] },
+        [`/orgs/${ORG.org_id}/members`]: { ok: true, json: async () => [MEMBER] },
+        [`/orgs/${ORG.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: [TRUST] }) },
+        [`/orgs/${ORG.org_id}/activity?limit=50`]: { ok: true, json: async () => ({ events: [] }) },
+      };
+      return map[url] || { ok: false, json: async () => ({}) };
+    });
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('portfolio-overview')).toBeInTheDocument());
+    expect(screen.getByTestId('ov-health').textContent).toBe('78.4');
+    expect(screen.getByTestId('ov-overdue').textContent).toBe('2');
+    await waitFor(() => expect(screen.getByTestId('review-queue')).toBeInTheDocument());
+    expect(screen.getByTestId('queue-complete-tk1')).toBeInTheDocument();       // preparer
+    expect(screen.queryByTestId('queue-complete-tk2')).not.toBeInTheDocument(); // viewer
+    expect(screen.getByTestId('queue-open-tk1')).toBeInTheDocument();
+  });
+
+  it('queue Complete rounds-trip POST and refreshes', async () => {
+    const okEnv = new Map(Object.entries({
+      '/orgs': { ok: true, json: async () => [ORG] },
+      [`/orgs/${ORG.org_id}/members`]: { ok: true, json: async () => [MEMBER] },
+      [`/orgs/${ORG.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: [TRUST] }) },
+      [`/orgs/${ORG.org_id}/activity?limit=50`]: { ok: true, json: async () => ({ events: [] }) },
+      [`/orgs/${ORG.org_id}/overview`]: { ok: true, json: async () => ({ org_id: 'org_1', portfolio: { trust_count: 1, average_health: 90, at_risk: 0, overdue_total: 0, pending_minutes_total: 0, due_week: 0 }, trusts: [] }) },
+      '/org/queue?org_id=org_1&limit=50': { ok: true, json: async () => ({ items: [{ task_id: 'tk1', trust_id: 'trust_1', trust_name: 'Family Trust', title: 'Q', due_date: '2026-10-02', urgency: 'due_week', grant_level: 'preparer' }], counts: { overdue: 0, due_week: 1, later: 0 } }) },
+      '/org/queue/tk1/complete': { ok: true, json: async () => ({ task_id: 'tk1', status: 'completed', next_cycle_task_id: 'n1' }) },
+    }));
+    fetchWithAuth.mockImplementation((url, init) => {
+      const key = init && init.method === 'POST' ? '/org/queue/tk1/complete' : url;
+      const v = okEnv.get(key) || okEnv.get(url);
+      return Promise.resolve(v || { ok: false, json: async () => ({}) });
+    });
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByTestId('queue-complete-tk1')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('queue-complete-tk1'));
+    await waitFor(() => expect(fetchWithAuth.mock.calls.some(([u, i]) => u === '/org/queue/tk1/complete' && i?.method === 'POST')).toBe(true));
+  });
+});

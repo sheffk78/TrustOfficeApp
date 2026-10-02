@@ -81,6 +81,10 @@ export default function OrgConsolePage() {
   const [trustsByOrg, setTrustsByOrg] = useState({});
   const [activity, setActivity] = useState({});
   const [failedOrgs, setFailedOrgs] = useState({});  // per-org section failures
+  // — Phase 1: oversight dashboard + review queue (advisor features) —
+  const [overview, setOverview] = useState({});
+  const [queue, setQueue] = useState(null);
+  const [queueBusy, setQueueBusy] = useState(null);
   const [focusOrg, setFocusOrg] = useState(null);    // active org in switcher
   const [switcherOpen, setSwitcherOpen] = useState(false);
   // trusts browser
@@ -172,6 +176,22 @@ export default function OrgConsolePage() {
     }, 300);
     return () => clearTimeout(debounceRef.current);
   }, [serverMode, focusOrg?.org_id, trustQuery, trustLevel, trustStatus, trustDeadline, trustSort, serverPage]);
+
+  // ——— Phase 1: dashboard + queue fetch (any active member) ———
+  const loadOverview = useCallback(async (orgId) => {
+    try {
+      const [ov, q] = await Promise.all([
+        fetchWithAuth(`/orgs/${orgId}/overview`),
+        fetchWithAuth(`/org/queue?org_id=${orgId}&limit=50`),
+      ]);
+      if (ov.ok) {
+        const body = await ov.json();
+        setOverview(prev => ({ ...prev, [orgId]: body }));
+      }
+      if (q.ok) setQueue(await q.json());
+    } catch { /* sections degrade silently to base console */ }
+  }, []);
+  useEffect(() => { if (focusOrg) loadOverview(focusOrg.org_id); }, [focusOrg?.org_id, loadOverview]);
 
   // URL sync — shareable/stable filtered views (?q=&level=&status=...)
   useEffect(() => {
@@ -719,6 +739,76 @@ export default function OrgConsolePage() {
                     </div>
                   ) : null}
 
+                  {/* overview + review queue (Phase 1) */}
+                  {overview[focusOrg.org_id] ? (
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4" data-testid="portfolio-overview">
+                      {[
+                        { label: 'Portfolio health', value: overview[focusOrg.org_id].portfolio?.average_health ?? '—', testid: 'ov-health' },
+                        { label: 'At-risk trusts', value: overview[focusOrg.org_id].portfolio?.at_risk ?? 0, testid: 'ov-at-risk' },
+                        { label: 'Overdue tasks', value: overview[focusOrg.org_id].portfolio?.overdue_total ?? 0, testid: 'ov-overdue' },
+                        { label: 'Minutes pending', value: overview[focusOrg.org_id].portfolio?.pending_minutes_total ?? 0, testid: 'ov-pending' },
+                        { label: 'Due this week', value: overview[focusOrg.org_id].portfolio?.due_week ?? 0, testid: 'ov-due-week' },
+                      ].map(cell => (
+                        <div key={cell.label} className="card-trust text-center py-3">
+                          <p className="font-serif text-xl text-navy" data-testid={cell.testid}>{cell.value}</p>
+                          <p className="text-xs text-muted-foreground">{cell.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {queue && queue.items && queue.items.length > 0 ? (
+                    <Card className="card-trust mb-4" data-testid="review-queue">
+                      <CardContent className="pt-6">
+                        <SectionHeader
+                          icon={RefreshCw} title="Review Queue"
+                          right={<span className="text-xs text-muted-foreground">
+                            {queue.counts?.overdue ? `${queue.counts.overdue} overdue · ` : ''}{queue.counts?.due_week || 0} this week
+                          </span>}
+                        />
+                        <ul className="space-y-2">
+                          {queue.items.slice(0, 8).map(it => (
+                            <li key={it.task_id} className="flex items-center justify-between gap-3 py-2 border-b last:border-0 border-border/50 text-sm">
+                              <div className="min-w-0">
+                                <p className="text-navy truncate">{it.title || it.task_type}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {it.trust_name || it.trust_id} · due {it.due_date ? String(it.due_date).slice(0, 10) : '—'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {it.urgency === 'overdue' ? (
+                                  <Badge className="bg-red-900 text-white text-xs">Overdue</Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">{it.urgency === 'due_week' ? 'This week' : 'Upcoming'}</Badge>
+                                )}
+                                {(it.grant_level === 'preparer') ? (
+                                  <Button variant="outline" size="sm" className="btn-secondary"
+                                    disabled={queueBusy === it.task_id}
+                                    onClick={async () => {
+                                      setQueueBusy(it.task_id);
+                                      try {
+                                        const res = await fetchWithAuth(`/org/queue/${it.task_id}/complete`, { method: 'POST' });
+                                        if (res.ok) { toast.success('Task completed — next cycle scheduled.'); await load(); loadOverview(focusOrg.org_id); }
+                                        else toast.error('Could not complete that task.');
+                                      } finally { setQueueBusy(null); }
+                                    }}
+                                    data-testid={`queue-complete-${it.task_id}`}
+                                  >
+                                    {queueBusy === it.task_id ? '…' : 'Complete'}
+                                  </Button>
+                                ) : null}
+                                <Button variant="outline" size="sm" className="btn-secondary"
+                                  onClick={() => goToTrustSection({ trust_id: it.trust_id, name: it.trust_name }, '/tasks')}
+                                  data-testid={`queue-open-${it.task_id}`}
+                                >
+                                  Open
+                                </Button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  ) : null}
                   {/* trusts */}
                   <div className="mb-2 flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
