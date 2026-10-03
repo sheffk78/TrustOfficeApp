@@ -362,6 +362,54 @@ def _grant_active(grant: dict) -> bool:
         return True
 
 
+
+async def resolve_granted_trust(trust_id: str, user: dict):
+    """Owner-or-grant resolution for trust READ endpoints (2026-10-03).
+
+    GET /dashboard, /ai/weekly-briefing, /trusts/{id}/bank-accounts/summary,
+    and /trusts/{id}/tax-calendar/upcoming all scoped strictly to the caller's
+    own trusts, so an org member with an active viewer/preparer grant got a
+    404 after selecting the granted trust (the /trusts LIST already surfaces
+    it — the list promised access the detail routes didn't honor; 10/1–10/2
+    prod error-log bursts on sandbox AND live client trusts).
+
+    Returns ("owner", None) when the caller owns the trust,
+    ("granted", grant_doc) when an active org grant covers one of the
+    caller's active org member rows, or (None, None) when not found /
+    not authorized — caller raises its existing 404. Read-only: writes stay
+    behind require_org_grant. Owner-only fields are never returned here;
+    data queries run against the grant-derived (viewer/preparer) path.
+    """
+    from dependencies import _my_memberships
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id}, {"_id": 0, "trust_id": 1, "user_id": 1}
+    )
+    if not trust:
+        return None, None
+    if trust.get("user_id") == user.get("user_id"):
+        return trust["user_id"], None
+    member_ids = []
+    async for m in _my_memberships(user):
+        if m.get("status") == "active":
+            member_ids.append(m["member_id"])
+    if not member_ids:
+        return None, None
+    now = datetime.now(timezone.utc).isoformat()
+    grant = await db.trust_grants.find_one({
+        "trust_id": trust_id,
+        "status": "active",
+        "member_id": {"$in": member_ids},
+        "$or": [
+            {"expires_at": {"$gte": now}},
+            {"expires_at": {"$exists": False}},
+            {"expires_at": None},
+        ],
+    })
+    if grant and _grant_active(grant):
+        return trust["user_id"], grant
+    return None, None
+
+
 async def _granted_trusts_for(user: dict) -> list:
     """[(trust_doc_safe, grant)] for this member's active trust grants."""
     from dependencies import _my_memberships

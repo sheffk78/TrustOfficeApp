@@ -415,3 +415,20 @@ def test_405_wrapped_probe_ids_stay_real():
                     "/api/beneficiaries/trust_9f5b1f59b205") is None
     assert classify(405, "Method Not Allowed",
                     "/api/trusts/trust_9f5b1f59b205") is None
+
+
+def test_structured_business_422_codes_client_validation():
+    # 2026-10-03: sanctioned QA negative-path probes + real user-form rejects
+    # share these structured codes; the invite-role fix (5c17897) made
+    # invalid_role a contract answer (member|admin, else 422 invalid_role) and
+    # the 10-02 17:37Z probe captured {"code":"invalid_role"} as an untagged
+    # 4xx that aged 24h+ in the fixer queue. Client-bad-data answers — API
+    # working. (405-stays-real and dead-id rules untouched.)
+    assert classify(422, str({"code": "invalid_role"}),
+                    "/api/orgs/org_2eb093dbefe9/invites") == "client_validation"
+    # anonymous empty-credential probes (scraper garbage posting empty JSON):
+    assert classify(422, "email: Field required; password: Field required",
+                    "/api/auth/login") == "client_validation"
+    # enum-choice capture shape (viewer|preparer alternation in the pattern):
+    assert classify(422, "2: Input should be 'viewer' or 'preparer'",
+                    "/api/trusts/trust_x/parties") == "client_validation"

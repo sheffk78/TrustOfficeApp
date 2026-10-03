@@ -119,7 +119,13 @@ _TEST_422_RICH_RE = re.compile(
 # rejected. Not backend defects — capture keeps them queryable, the fixer
 # never pages on them, and the real fix is frontend form guards.
 _CLIENT_422_NOISE_RE = (
-    re.compile(r"invalid_email|valid email address", re.IGNORECASE),
+    re.compile(r"invalid_email|invalid_role|valid email address", re.IGNORECASE),
+    # Anonymous credential probes (2026-10-03): bots POST empty JSON to
+    # /api/auth/login — "email: Field required; password: Field required".
+    # Field-required shapes from real app flows are form-guarded client-side
+    # and carry richer pydantic details on app paths; a bare Field-required
+    # 422 on an auth path is probe traffic (API answer correct).
+    re.compile(r"^(email|password|username)\s*:\s*Field required", re.IGNORECASE),
     re.compile(r"Input should be '(viewer|preparer)'", re.IGNORECASE),
     re.compile(r"Input should be '(real_property|personal_property)'\]", re.IGNORECASE),
     re.compile(r"^Trust not found\. Please refresh", re.IGNORECASE),

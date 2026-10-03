@@ -150,6 +150,16 @@ async def _capture(
             # error: store for forensics, keep it out of the fixer queue.
             noise_class = "verification"
 
+        if noise_class is None and user_id and str(user_id).endswith(
+            ("aa883b011b01", "81f9fccc11d3", "b175106f0d04")
+        ):
+            # QA sessions (test.qa1/qa2/qa3 — nightly smoke + data-isolation
+            # suites and sanctioned negative-path probes, 2026-10-03): their
+            # 404 "Trust not found" on /api/governance/<rotating-id> can't be
+            # pinned by static id lists because the isolation suite mints a
+            # fresh trust per run. Store for forensics; never queue.
+            noise_class = "test_suite"
+
         await report_error(
             source="server",
             error_type=error_type,

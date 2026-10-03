@@ -393,11 +393,24 @@ async def get_trust_banking_summary(
     user: dict = Depends(get_current_user),
 ):
     """Get a trust-level banking summary: account count, total latest balance, balance trend."""
+    effective_user_id = user["user_id"]
     trust = await db.trusts.find_one(
-        {"trust_id": trust_id, "user_id": user["user_id"]}, {"_id": 0}
+        {"trust_id": trust_id, "user_id": effective_user_id}, {"_id": 0}
     )
+    # 2026-10-03 granted-member reads: active org grant (viewer/preparer)
+    # satisfies the summary for a granted client trust — counts/balances only,
+    # no account numbers or owner PII beyond the summary shape.
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        from routers.trusts import resolve_granted_trust
+        owner_user_id, grant = await resolve_granted_trust(trust_id, user)
+        if not owner_user_id:
+            raise HTTPException(status_code=404, detail="Trust not found")
+        trust = await db.trusts.find_one(
+            {"trust_id": trust_id, "user_id": owner_user_id}, {"_id": 0}
+        )
+        if not trust:
+            raise HTTPException(status_code=404, detail="Trust not found")
+        effective_user_id = owner_user_id
 
     # Preserve summary visibility for archived accounts that still have
     # linked statements; archiving removes the account from active CRUD but
@@ -406,14 +419,14 @@ async def get_trust_banking_summary(
         "account_id",
         {
             "trust_id": trust_id,
-            "user_id": user["user_id"],
+            "user_id": effective_user_id,
             "account_id": {"$ne": None},
         },
     )
     accounts = await db.bank_accounts.find(
         {
             "trust_id": trust_id,
-            "user_id": user["user_id"],
+            "user_id": effective_user_id,
             "$or": [
                 {"is_archived": {"$ne": True}},
                 {"account_id": {"$in": linked_archived_ids}},
@@ -432,7 +445,7 @@ async def get_trust_banking_summary(
             {
                 "account_id": acct["account_id"],
                 "trust_id": trust_id,
-                "user_id": user["user_id"],
+                "user_id": effective_user_id,
                 "extraction_status": {"$in": ["completed", "needs_review"]},
                 "ending_balance": {"$ne": None},
             },

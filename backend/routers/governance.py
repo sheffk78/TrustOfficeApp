@@ -1405,13 +1405,31 @@ async def _get_pending_quarterly_draft(trust_id: str, user_id: str) -> Optional[
     }
 
 
-async def _resolve_dashboard_trust(trust_id: Optional[str], user_id: str) -> dict:
-    """Resolve the trust for the dashboard — by id or the most recent one."""
+async def _resolve_dashboard_trust(
+    trust_id: Optional[str], user_id: str, user: dict = None,
+) -> dict:
+    """Resolve the trust for the dashboard — by id or the most recent one.
+
+    2026-10-03: falls back to org-grant resolution when the caller doesn't
+    own the trust — an active viewer/preparer org grant now satisfies the
+    dashboard for a granted client trust (was a 404 after the /trusts list
+    started surfacing granted trusts). Granted members read the trust with
+    the OWNER's user_id so health-score/insight queries match the client's
+    data; writes stay behind require_org_grant.
+    """
+    from routers.trusts import resolve_granted_trust
     if trust_id:
         trust = await db.trusts.find_one(
             {"trust_id": trust_id, "user_id": user_id},
             {"_id": 0}
         )
+        if not trust and user is not None:
+            owner_user_id, grant = await resolve_granted_trust(trust_id, user)
+            if owner_user_id:
+                trust = await db.trusts.find_one(
+                    {"trust_id": trust_id, "user_id": owner_user_id},
+                    {"_id": 0}
+                )
         if not trust:
             raise HTTPException(
                 status_code=404,
@@ -1461,18 +1479,25 @@ async def get_dashboard(
     """
     user_id = user["user_id"]
 
-    trust = await _resolve_dashboard_trust(trust_id, user_id)
+    trust = await _resolve_dashboard_trust(trust_id, user_id, user=user)
     trust_id = trust["trust_id"]
     trust_name = trust.get("name", "Unnamed Trust")
 
-    health_data = await calculate_health_score(trust_id, user_id, save_snapshot=False)
+    # 2026-10-03 granted-member reads: run per-trust data queries with the
+    # trust OWNER's user_id (the data belongs to the client); subscription
+    # state stays on the caller. Owner path unchanged (trust["user_id"] is
+    # already the caller's id there). Granted viewers see the client's live
+    # governance picture; write routes remain behind require_org_grant.
+    data_user_id = trust.get("user_id") or user_id
+
+    health_data = await calculate_health_score(trust_id, data_user_id, save_snapshot=False)
     health_score = HealthScoreResponse(**health_data)
 
-    onboarding_state = await get_onboarding_state(user_id, trust_id)
-    recent_activity = await get_recent_activity(user_id, trust_id, limit=10)
-    stats = await get_dashboard_stats(trust_id, user_id)
+    onboarding_state = await get_onboarding_state(data_user_id, trust_id)
+    recent_activity = await get_recent_activity(data_user_id, trust_id, limit=10)
+    stats = await get_dashboard_stats(trust_id, data_user_id)
 
-    governance_insights = await _get_active_insights(trust_id, user_id, health_data["criteria"])
+    governance_insights = await _get_active_insights(trust_id, data_user_id, health_data["criteria"])
 
     sub_state = await get_subscription_state(user_id)
     subscription = DashboardSubscriptionState(
@@ -1485,7 +1510,7 @@ async def get_dashboard(
     )
 
     # Check for pending quarterly draft (Fix 3)
-    pending_quarterly_draft = await _get_pending_quarterly_draft(trust_id, user_id)
+    pending_quarterly_draft = await _get_pending_quarterly_draft(trust_id, data_user_id)
 
     return DashboardResponse(
         trust_id=trust_id,

@@ -95,8 +95,17 @@ async def get_tax_calendar(trust_id: str, tax_year: Optional[int] = None, user: 
 @router.get("/trusts/{trust_id}/tax-calendar/upcoming")
 async def get_upcoming_deadlines(trust_id: str, days: int = 90, user: dict = Depends(get_current_user)):
     trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user["user_id"]})
+    # 2026-10-03 granted-member reads: active org grant (viewer/preparer)
+    # satisfies the upcoming-deadlines widget for a granted client trust (the
+    # dashboard tax widget calls this with a grant-selected trust). Read-only.
     if not trust:
-        raise HTTPException(status_code=404, detail="Trust not found")
+        from routers.trusts import resolve_granted_trust
+        owner_user_id, grant = await resolve_granted_trust(trust_id, user)
+        if not owner_user_id:
+            raise HTTPException(status_code=404, detail="Trust not found")
+        trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": owner_user_id})
+        if not trust:
+            raise HTTPException(status_code=404, detail="Trust not found")
 
     year = date.today().year
     raw = await db.tax_calendar.find(

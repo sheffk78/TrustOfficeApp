@@ -725,6 +725,7 @@ async def get_weekly_briefing(
 
     user_id = user["user_id"]
 
+    from routers.trusts import resolve_granted_trust
     if not trust_id:
         trust = await db.trusts.find_one(
             {"user_id": user_id}, {"_id": 0}, sort=[("created_at", -1)]
@@ -736,8 +737,21 @@ async def get_weekly_briefing(
         trust = await db.trusts.find_one(
             {"trust_id": trust_id, "user_id": user_id}, {"_id": 0}
         )
+        # 2026-10-03 granted-member reads: an active org grant (viewer/
+        # preparer) now satisfies the weekly briefing for a granted client
+        # trust; insights are computed with the OWNER's user_id so criteria
+        # match the client's data. Writes unchanged (require_org_grant).
         if not trust:
-            raise HTTPException(status_code=404, detail="Trust not found")
+            owner_user_id, grant = await resolve_granted_trust(trust_id, user)
+            if not owner_user_id:
+                raise HTTPException(status_code=404, detail="Trust not found")
+            trust = await db.trusts.find_one(
+                {"trust_id": trust_id, "user_id": owner_user_id}, {"_id": 0}
+            )
+            if not trust:
+                raise HTTPException(status_code=404, detail="Trust not found")
+        trust_owner_user_id = trust.get("user_id") or user_id
+        user_id = trust_owner_user_id
 
     now = datetime.now(timezone.utc)
 
